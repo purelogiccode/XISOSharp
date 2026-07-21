@@ -12,8 +12,8 @@ MIT
 
 | Project | Description |
 |---|---|
-| [ExtractXiso.Library](ExtractXiso.Library/) | Class library — also available as a [NuGet package](https://www.nuget.org/) |
-| [ExtractXiso](ExtractXiso/) | CLI tool (`extract-xiso`) |
+| [ExtractXiso.Core](ExtractXiso.Core/) | Class library — available as the [ExtractXiso](https://www.nuget.org/) NuGet package |
+| [ExtractXiso.Cli](ExtractXiso.Cli/) | CLI tool (`extract-xiso`) |
 | [ExtractXiso.Tests](ExtractXiso.Tests/) | Unit tests (xUnit) |
 
 ## Building

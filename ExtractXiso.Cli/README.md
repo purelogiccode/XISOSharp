@@ -1,4 +1,4 @@
-# ExtractXiso CLI
+# ExtractXiso.Cli
 
 Command-line tool for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images.
 

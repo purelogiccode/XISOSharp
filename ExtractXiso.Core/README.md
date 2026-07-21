@@ -1,4 +1,4 @@
-# ExtractXiso.Library
+# ExtractXiso.Core
 
 A .NET class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images.
 

@@ -10,7 +10,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\ExtractXiso.Library\ExtractXiso.Library.csproj" />
+        <ProjectReference Include="..\ExtractXiso.Core\ExtractXiso.Core.csproj" />
     </ItemGroup>
 
 </Project>
