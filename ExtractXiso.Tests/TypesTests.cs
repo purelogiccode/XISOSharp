@@ -58,40 +58,6 @@ public class TypesTests
     }
 
     [Fact]
-    public void FileTime_Default()
-    {
-        var ft = new FileTime();
-        Assert.Equal(0u, ft.Low);
-        Assert.Equal(0u, ft.High);
-    }
-
-    [Fact]
-    public void FileTime_SetValues()
-    {
-        var ft = new FileTime { Low = 0xDEADBEEF, High = 0xCAFEBABE };
-        Assert.Equal(0xDEADBEEFu, ft.Low);
-        Assert.Equal(0xCAFEBABEu, ft.High);
-    }
-
-    [Fact]
-    public void WdsafpContext_Defaults()
-    {
-        var ctx = new WdsafpContext();
-        Assert.Equal(0, ctx.DirStart);
-        Assert.Equal(0u, ctx.CurrentSector);
-    }
-
-    [Fact]
-    public void WriteTreeContext_AutoProperty()
-    {
-        var ctx = new WriteTreeContext();
-        Assert.Equal(0, ctx.FinalBytes);
-        Assert.Null(ctx.Path);
-        Assert.Null(ctx.Progress);
-        Assert.Null(ctx.SourceStream);
-    }
-
-    [Fact]
     public void ProgressCallback_Invoke()
     {
         long receivedCurrent = -1;

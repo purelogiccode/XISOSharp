@@ -9,6 +9,7 @@ namespace ExtractXiso;
 /// </summary>
 public static class XisoWriter
 {
+    [ThreadStatic]
     private static BoyerMoore? _bm;
 
     /// <summary>
@@ -39,6 +40,7 @@ public static class XisoWriter
     /// <param name="progressCallback">
     /// Optional callback invoked with (<c>currentBytes</c>, <c>totalBytes</c>) during write.
     /// </param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns>0 on success, 1 on error.</returns>
     public static int CreateXiso(
         string rootDirectory,
@@ -47,8 +49,10 @@ public static class XisoWriter
         Stream? sourceStream,
         out string? outIsoPath,
         string? inName,
-        ProgressCallback? progressCallback)
+        ProgressCallback? progressCallback,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
         int err = 0;
 
@@ -65,7 +69,7 @@ public static class XisoWriter
 
             string dir = rootDirectory;
             int last = dir.Length - 1;
-            if (last >= 0 && (dir[last] == '/' || dir[last] == '\\'))
+            if (last >= 0 && dir[last] == Path.DirectorySeparatorChar)
                 dir = dir[..last];
 
             int slashPos = dir.LastIndexOf(Constants.PathChar) + 1;
@@ -127,6 +131,7 @@ public static class XisoWriter
 
         if (err != 0) goto cleanup;
 
+        cancellationToken.ThrowIfCancellationRequested();
         progressCallback?.Invoke(0, Logger.TotalBytes);
 
         Logger.TotalBytes = Logger.TotalFiles = 0;
@@ -209,7 +214,8 @@ public static class XisoWriter
                 Path = null,
                 SourceStream = sourceStream,
                 Progress = progressCallback,
-                FinalBytes = Logger.TotalBytes
+                FinalBytes = Logger.TotalBytes,
+                CancellationToken = cancellationToken
             };
 
             AvlTree.AvlTraverseDepthFirst(root, WriteTreeCallback, wtContext,
@@ -233,6 +239,10 @@ public static class XisoWriter
             {
                 Logger.Log($"\nsucessfully created {isoName}{(inName != null ? "" : ".iso")} ({Logger.TotalFiles} files totalling {Logger.TotalBytes} bytes added)\n");
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -417,6 +427,7 @@ public static class XisoWriter
 
             while (bytes > 0)
             {
+                ctx.CancellationToken.ThrowIfCancellationRequested();
                 int toRead = (int)Math.Min(bytes, (uint)(bufSize - written));
                 int n = srcStream.Read(buf, written, toRead);
                 if (n <= 0) break;
@@ -491,7 +502,7 @@ public static class XisoWriter
     /// <param name="outRoot">Receives the root of the generated AVL tree.</param>
     /// <param name="ioN">Running count of filename characters for progress display.</param>
     /// <returns>0 on success.</returns>
-    public static int GenerateAvlTreeLocal(ref AvlNode? outRoot, ref int ioN)
+    internal static int GenerateAvlTreeLocal(ref AvlNode? outRoot, ref int ioN)
     {
         var entries = Directory.GetFileSystemEntries(".");
         bool emptyDir = true;
@@ -555,7 +566,7 @@ public static class XisoWriter
     /// <param name="context">Not used.</param>
     /// <param name="depth">Not used.</param>
     /// <returns>Always 0.</returns>
-    public static int CalculateTotalFilesAndBytes(AvlNode avl, object? context, int depth)
+    internal static int CalculateTotalFilesAndBytes(AvlNode avl, object? context, int depth)
     {
         if (avl.Subdirectory != null && !ReferenceEquals(avl.Subdirectory, AvlNode.EmptySubdirectory))
         {
@@ -579,7 +590,7 @@ public static class XisoWriter
     /// <param name="context">Not used.</param>
     /// <param name="depth">Not used.</param>
     /// <returns>Always 0.</returns>
-    public static int CalculateDirectoryRequirements(AvlNode avl, object? context, int depth)
+    internal static int CalculateDirectoryRequirements(AvlNode avl, object? context, int depth)
     {
         if (avl.Subdirectory != null)
         {
@@ -610,7 +621,7 @@ public static class XisoWriter
     /// <param name="avl">Node whose entry size is being calculated.</param>
     /// <param name="outSize">Running total size of the directory table; updated in place.</param>
     /// <param name="depth">Not used.</param>
-    public static void CalculateDirectorySize(AvlNode avl, ref uint outSize, int depth)
+    internal static void CalculateDirectorySize(AvlNode avl, ref uint outSize, int depth)
     {
         uint length = (uint)(Constants.FilenameOffset + avl.Filename.Length);
         length += (Constants.DwordSize - (length % Constants.DwordSize)) % Constants.DwordSize;
@@ -635,7 +646,7 @@ public static class XisoWriter
     /// <param name="avl">Current node being visited.</param>
     /// <param name="ctx">Context tracking the current sector counter.</param>
     /// <param name="depth">Not used.</param>
-    public static void CalculateDirectoryOffsets(AvlNode avl, OffsetCalcContext ctx, int depth)
+    internal static void CalculateDirectoryOffsets(AvlNode avl, OffsetCalcContext ctx, int depth)
     {
         if (avl.Subdirectory != null)
         {
@@ -681,7 +692,7 @@ public static class XisoWriter
     /// <param name="ctx">Context carrying the directory start and current sector.</param>
     /// <param name="depth">Not used.</param>
     /// <returns>Always 0.</returns>
-    public static int WriteDirStartAndFilePositions(AvlNode avl, WdsafpContext ctx, int depth)
+    internal static int WriteDirStartAndFilePositions(AvlNode avl, WdsafpContext ctx, int depth)
     {
         avl.DirStart = ctx.DirStart;
 
@@ -701,7 +712,7 @@ public static class XisoWriter
     /// </summary>
     /// <param name="fs">File stream positioned at the data area start offset.</param>
     /// <param name="totalSectors">Total number of sectors in the image.</param>
-    public static void WriteVolumeDescriptors(FileStream fs, uint totalSectors)
+    internal static void WriteVolumeDescriptors(FileStream fs, uint totalSectors)
     {
         int big = (int)totalSectors;
         int little = (int)totalSectors;
@@ -745,13 +756,44 @@ public static class XisoWriter
         fs.Write("CD001"u8);
         fs.WriteByte(0x01);
     }
+
+    /// <summary>
+    /// Asynchronously creates or rewrites an XISO image.
+    /// When <paramref name="inRoot"/> is <c>null</c>,
+    /// builds an AVL tree from the local file system and creates a new ISO.
+    /// Otherwise, rewrites the ISO using the pre-built AVL tree and source stream.
+    /// </summary>
+    /// <param name="rootDirectory">Source directory for creation, or base name for rewrite mode.</param>
+    /// <param name="outputDirectory">Directory where the output ISO file is written. When <c>null</c>, the current working directory is used.</param>
+    /// <param name="inRoot">Pre-built AVL tree root. When <c>null</c>, the tree is generated from the file system.</param>
+    /// <param name="sourceStream">Source ISO stream for reading file data in rewrite mode; <c>null</c> when creating from a file system.</param>
+    /// <param name="inName">Explicit output filename. When <c>null</c>, the directory name plus <c>.iso</c> is used.</param>
+    /// <param name="progressCallback">Optional callback invoked with (<c>currentBytes</c>, <c>totalBytes</c>) during write.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns>A task that completes with 0 on success, 1 on error. The first tuple element is the result code; the second is the output ISO path.</returns>
+    public static async Task<(int Result, string? OutIsoPath)> CreateXisoAsync(
+        string rootDirectory,
+        string? outputDirectory,
+        AvlNode? inRoot,
+        Stream? sourceStream,
+        string? inName,
+        ProgressCallback? progressCallback,
+        CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            int result = CreateXiso(rootDirectory, outputDirectory, inRoot, sourceStream,
+                out string? outPath, inName, progressCallback, cancellationToken);
+            return (result, outPath);
+        }, cancellationToken);
+    }
 }
 
 /// <summary>
 /// Context object passed through the directory-offset calculation traversal.
 /// Tracks the current sector counter being assigned to directory entries.
 /// </summary>
-public class OffsetCalcContext
+internal class OffsetCalcContext
 {
     /// <summary>Current sector number being assigned by the offset calculator.</summary>
     public uint CurrentSector;

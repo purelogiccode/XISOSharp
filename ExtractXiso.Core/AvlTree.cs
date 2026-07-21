@@ -292,7 +292,7 @@ public static class AvlTree
     /// <param name="context">Not used.</param>
     /// <param name="depth">Not used.</param>
     /// <returns>Always 0.</returns>
-    public static int FreeDirNodeAvl(AvlNode node, object? context, int depth)
+    internal static int FreeDirNodeAvl(AvlNode node, object? context, int depth)
     {
         if (node.Subdirectory != null && !ReferenceEquals(node.Subdirectory, AvlNode.EmptySubdirectory))
         {

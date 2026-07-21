@@ -10,7 +10,11 @@ namespace ExtractXiso;
 /// </summary>
 public static class XisoReader
 {
-    private static byte[] _copyBuffer = new byte[Constants.ReadWriteBufferSize];
+    [ThreadStatic]
+    private static byte[]? _copyBuffer;
+
+    private static byte[] CopyBuffer => _copyBuffer ??= new byte[Constants.ReadWriteBufferSize];
+
     private static readonly byte[] _headerDataBytes = System.Text.Encoding.ASCII.GetBytes(Constants.HeaderData);
 
     /// <summary>
@@ -111,7 +115,7 @@ public static class XisoReader
     /// <param name="llCompat">If <c>true</c>, uses backwards-compatible right-offset calculation.</param>
     /// <param name="discLseek">Disc lseek offset for sector address calculation.</param>
     /// <returns>0 on success, non-zero on error.</returns>
-    public static int TraverseXiso(
+    internal static int TraverseXiso(
         FileStream fs,
         DirEntry? inDirNode,
         long dirStart,
@@ -185,7 +189,7 @@ public static class XisoReader
                 filename.Contains('/') || filename.Contains('\\'))
             {
                 Logger.LogErr($"filename '{filename}' contains invalid character(s), aborting.\n");
-                Environment.Exit(1);
+                throw new InvalidOperationException($"Filename '{filename}' contains invalid character(s).");
             }
 
             if (mode == ExtractMode.GenerateAvl)
@@ -326,7 +330,7 @@ public static class XisoReader
     /// <param name="path">Path prefix for progress logging.</param>
     /// <param name="discLseek">Disc lseek offset for sector address calculation.</param>
     /// <exception cref="IOException">Thrown on read or write errors.</exception>
-    public static void ExtractFile(
+    internal static void ExtractFile(
         FileStream fs,
         string filename,
         uint startSector,
@@ -364,13 +368,13 @@ public static class XisoReader
 
             do
             {
-                int readSize = fs.Read(_copyBuffer, 0, (int)size);
+                int readSize = fs.Read(CopyBuffer, 0, (int)size);
                 if (readSize < 0)
                     throw new IOException("Read error in extract_file");
 
                 if (readSize != 0)
                 {
-                    outFile.Write(_copyBuffer, 0, readSize);
+                    outFile.Write(CopyBuffer, 0, readSize);
                 }
 
                 totalSize += (uint)readSize;
@@ -407,6 +411,7 @@ public static class XisoReader
     /// <param name="llCompat">
     /// If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.
     /// </param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns>0 on success, non-zero on error.</returns>
     /// <exception cref="InvalidDataException">
     /// Thrown when the file is not a valid XISO image.
@@ -418,8 +423,10 @@ public static class XisoReader
         string? outputPath,
         ExtractMode mode,
         out string? outIsoPath,
-        bool llCompat)
+        bool llCompat,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
         bool repair = false;
 
@@ -529,6 +536,30 @@ public static class XisoReader
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// Asynchronously processes an XISO image. Verifies the image, then
+    /// performs extraction, listing, or rewriting based on the specified mode.
+    /// </summary>
+    /// <param name="xisoPath">Path to the XISO file (or <c>.old</c> file for rewrite mode).</param>
+    /// <param name="outputPath">Output directory for extraction or rewrite output. When <c>null</c> in extract mode, a directory named after the ISO is created.</param>
+    /// <param name="mode">Operating mode: extract, list, or rewrite.</param>
+    /// <param name="llCompat">If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns>A task that completes with the result code (0 on success, non-zero on error) and the output ISO path when in rewrite mode.</returns>
+    public static async Task<(int Result, string? OutIsoPath)> DecodeXisoAsync(
+        string xisoPath,
+        string? outputPath,
+        ExtractMode mode,
+        bool llCompat = false,
+        CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            int result = DecodeXiso(xisoPath, outputPath, mode, out string? outPath, llCompat, cancellationToken);
+            return (result, outPath);
+        }, cancellationToken);
     }
 
     /// <summary>

@@ -145,11 +145,11 @@ public static class Constants
     /// <summary>Startup banner text displayed on startup.</summary>
     public const string Banner = "extract-xiso v" + ExisoVersion + " for win32 - written by in <in@fishtank.com>\n";
 
-    /// <summary>Path separator character used on the target platform ('\\' on Windows).</summary>
-    public const char PathChar = '\\';
+    /// <summary>Path separator character used on the target platform.</summary>
+    public static readonly char PathChar = Path.DirectorySeparatorChar;
 
     /// <summary>Path separator as a single-character string.</summary>
-    public const string PathCharStr = "\\";
+    public static readonly string PathCharStr = Path.DirectorySeparatorChar.ToString();
 
     /// <summary>Default alphabet size for the Boyer-Moore bad-character table.</summary>
     public const int DefaultAlphabetSize = 256;

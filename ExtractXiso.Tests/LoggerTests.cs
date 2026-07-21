@@ -2,21 +2,21 @@ namespace ExtractXiso.Tests;
 
 public class LoggerTests : IDisposable
 {
-    private readonly StringWriter _stdOutCapture;
-    private readonly StringWriter _stdErrCapture;
+    private readonly StringWriter _outCapture;
+    private readonly StringWriter _errorCapture;
     private readonly TextWriter _originalOut;
     private readonly TextWriter _originalError;
 
     public LoggerTests()
     {
-        _originalOut = Console.Out;
-        _originalError = Console.Error;
+        _originalOut = Logger.Out;
+        _originalError = Logger.Error;
 
-        _stdOutCapture = new StringWriter();
-        _stdErrCapture = new StringWriter();
+        _outCapture = new StringWriter();
+        _errorCapture = new StringWriter();
 
-        Console.SetOut(_stdOutCapture);
-        Console.SetError(_stdErrCapture);
+        Logger.Out = _outCapture;
+        Logger.Error = _errorCapture;
 
         Logger.Quiet = false;
         Logger.RealQuiet = false;
@@ -32,24 +32,24 @@ public class LoggerTests : IDisposable
 
     public void Dispose()
     {
-        Console.SetOut(_originalOut);
-        Console.SetError(_originalError);
-        _stdOutCapture.Dispose();
-        _stdErrCapture.Dispose();
+        Logger.Out = _originalOut;
+        Logger.Error = _originalError;
+        _outCapture.Dispose();
+        _errorCapture.Dispose();
     }
 
     [Fact]
-    public void Log_WritesToStdOut()
+    public void Log_WritesToOut()
     {
         Logger.Log("hello");
-        Assert.Equal("hello", _stdOutCapture.ToString());
+        Assert.Equal("hello", _outCapture.ToString());
     }
 
     [Fact]
     public void Log_WithArgs()
     {
         Logger.Log("hello {0} {1}", "world", 42);
-        Assert.Equal("hello world 42", _stdOutCapture.ToString());
+        Assert.Equal("hello world 42", _outCapture.ToString());
     }
 
     [Fact]
@@ -57,14 +57,14 @@ public class LoggerTests : IDisposable
     {
         Logger.Quiet = true;
         Logger.Log("should not appear");
-        Assert.Equal("", _stdOutCapture.ToString());
+        Assert.Equal("", _outCapture.ToString());
     }
 
     [Fact]
     public void LogLine_WritesWithNewline()
     {
         Logger.LogLine("test");
-        Assert.Equal("test\r\n", _stdOutCapture.ToString());
+        Assert.Equal("test\r\n", _outCapture.ToString());
     }
 
     [Fact]
@@ -72,21 +72,21 @@ public class LoggerTests : IDisposable
     {
         Logger.Quiet = true;
         Logger.LogLine("should not appear");
-        Assert.Equal("", _stdOutCapture.ToString());
+        Assert.Equal("", _outCapture.ToString());
     }
 
     [Fact]
-    public void LogErr_WritesToStdErr()
+    public void LogErr_WritesToError()
     {
         Logger.LogErr("error msg");
-        Assert.Equal("error msg", _stdErrCapture.ToString());
+        Assert.Equal("error msg", _errorCapture.ToString());
     }
 
     [Fact]
     public void LogErr_WithArgs()
     {
         Logger.LogErr("error {0}", 99);
-        Assert.Equal("error 99", _stdErrCapture.ToString());
+        Assert.Equal("error 99", _errorCapture.ToString());
     }
 
     [Fact]
@@ -94,12 +94,13 @@ public class LoggerTests : IDisposable
     {
         Logger.RealQuiet = true;
         Logger.LogErr("should not appear");
-        Assert.Equal("", _stdErrCapture.ToString());
+        Assert.Equal("", _errorCapture.ToString());
     }
 
     [Fact]
     public void Flush_DoesNotThrow_WhenNotQuiet()
     {
+        Logger.Out = _outCapture;
         Logger.Flush();
     }
 

@@ -40,9 +40,28 @@ using ExtractXiso;
 XisoWriter.CreateXiso("source_dir", "output_dir", null, null, out _, "game.iso", null);
 ```
 
+### Cancellation support
+
+```csharp
+var cts = new CancellationTokenSource();
+XisoWriter.CreateXiso("source_dir", "output_dir", null, null, out _, "game.iso", null, cts.Token);
+XisoReader.DecodeXiso("game.iso", "output_dir", ExtractMode.Extract, out _, llCompat: false, cts.Token);
+```
+
+### Async APIs
+
+```csharp
+var (result, outPath) = await XisoReader.DecodeXisoAsync("game.iso", "output_dir", ExtractMode.Extract);
+var (result, outPath) = await XisoWriter.CreateXisoAsync("source_dir", "output_dir", null, null, "game.iso", null);
+```
+
 ### Logging
 
 ```csharp
+// Redirect output to custom TextWriters
+Logger.Out = new StreamWriter(logFilePath);
+Logger.Error = new StringWriter();
+
 Logger.Quiet = true;           // Suppress non-error output
 Logger.RealQuiet = true;       // Suppress all output
 Logger.RemoveSystemUpdate = true; // Skip $SystemUpdate folder
@@ -53,11 +72,11 @@ Logger.MediaEnable = false;    // Disable .xbe media patching
 
 | Type | Description |
 |---|---|
-| `ExtractMode` | Enum: `Extract`, `List`, `Rewrite` |
+| `ExtractMode` | Enum: `Extract`, `List`, `Rewrite`, `GenerateAvl` |
 | `ExtractError` | Error codes |
 | `ExtractErrorException` | Exception thrown on extraction errors |
 | `ProgressCallback` | Delegate for progress reporting |
 | `CreateList` | Descriptor for creation source |
 | `DirEntry` | On-disk directory entry |
-| `BoyerMoore` | Boyer-Moore pattern search (xbe patching) |
-| `AvlTree` | AVL tree for filename indexing |
+| `AvlNode` | AVL tree node for filename indexing |
+| `AvlTree` | AVL balanced tree with insert, fetch, and traversal methods |

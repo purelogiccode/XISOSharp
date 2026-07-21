@@ -32,39 +32,46 @@ public delegate int TraversalCallback(AvlNode node, object? context, int depth);
 
 /// <summary>
 /// Describes a source directory and optional output name for creating an XISO image.
+/// Entries can be chained via <see cref="Next"/> for batch creation.
 /// </summary>
 public class CreateList
 {
     /// <summary>Source directory path whose contents will be packed into the XISO.</summary>
-    public string Path = "";
+    public string Path { get; set; } = "";
 
     /// <summary>
     /// Optional output filename or path for the resulting ISO.
     /// When <c>null</c> the directory name is used.
     /// </summary>
-    public string? Name;
+    public string? Name { get; set; }
 
     /// <summary>Next entry in a linked list of creation tasks, or <c>null</c>.</summary>
-    public CreateList? Next;
+    public CreateList? Next { get; set; }
 }
 
 /// <summary>
 /// Represents a Windows FILETIME value as two 32-bit unsigned integers.
+/// Internal implementation detail used for writing timestamps into XISO headers.
 /// </summary>
-public struct FileTime
+internal struct FileTime
 {
     /// <summary>Low 32 bits of the FILETIME value.</summary>
+#pragma warning disable CS0649 // Field is assigned by external code / spans
     public uint Low;
+#pragma warning restore CS0649
 
     /// <summary>High 32 bits of the FILETIME value.</summary>
+#pragma warning disable CS0649
     public uint High;
+#pragma warning restore CS0649
 }
 
 /// <summary>
 /// Context used during directory offset calculation for storing the
 /// current sector position and directory start offset.
+/// Internal implementation detail.
 /// </summary>
-public class WdsafpContext
+internal class WdsafpContext
 {
     /// <summary>Directory start offset in bytes (sector * 2048).</summary>
     public long DirStart;
@@ -76,8 +83,9 @@ public class WdsafpContext
 /// <summary>
 /// Context passed through the write-tree traversal, bundling the output stream,
 /// optional source stream (for rewrite mode), progress callback, and path.
+/// Internal implementation detail.
 /// </summary>
-public class WriteTreeContext
+internal class WriteTreeContext
 {
     /// <summary>The output XISO file stream being written to.</summary>
     public Stream XisoStream = null!;
@@ -98,4 +106,7 @@ public class WriteTreeContext
 
     /// <summary>Total expected byte count used for progress reporting.</summary>
     public long FinalBytes;
+
+    /// <summary>Cancellation token to observe during file writes.</summary>
+    public CancellationToken CancellationToken;
 }

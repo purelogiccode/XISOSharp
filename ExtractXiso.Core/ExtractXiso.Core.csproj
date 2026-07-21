@@ -1,24 +1,30 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <RootNamespace>ExtractXiso</RootNamespace>
+
+        <!-- Strong name signing -->
+        <SignAssembly>true</SignAssembly>
+        <AssemblyOriginatorKeyFile>ExtractXiso.snk</AssemblyOriginatorKeyFile>
 
         <!-- NuGet metadata -->
         <PackageId>ExtractXiso</PackageId>
         <Version>2.7.1</Version>
         <Authors>in</Authors>
         <Copyright>Copyright (c) in &lt;in@fishtank.com&gt;</Copyright>
-        <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) images. C# port of extract-xiso v2.7.1.</Description>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <PackageTags>xiso;xbox;iso;extract-xiso</PackageTags>
+        <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats.</Description>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PackageTags>xiso;xbox;iso;extract-xiso;xgd3;xgd1;xbe;disc-image;original-xbox</PackageTags>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageIcon>icon.png</PackageIcon>
         <PackageProjectUrl>https://github.com/drpetersonfernandes/ExtractXiso</PackageProjectUrl>
         <RepositoryUrl>https://github.com/drpetersonfernandes/ExtractXiso.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
+        <PackageReleaseNotes>See https://github.com/drpetersonfernandes/ExtractXiso/releases</PackageReleaseNotes>
 
         <!-- XML documentation -->
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -34,15 +40,20 @@
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+        <!-- API compatibility validation across target frameworks -->
+        <EnablePackageValidation>true</EnablePackageValidation>
     </PropertyGroup>
 
     <ItemGroup>
         <None Include="README.md" Pack="true" PackagePath="\" />
+        <None Include="LICENSE" Pack="true" PackagePath="\" />
+        <None Include="icon\icon.png" Pack="true" PackagePath="\" />
     </ItemGroup>
 
     <!-- Source Link -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.301" PrivateAssets="All" />
     </ItemGroup>
 
 </Project>
