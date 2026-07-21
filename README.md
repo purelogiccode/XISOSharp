@@ -14,6 +14,7 @@ MIT
 |---|---|
 | [ExtractXiso.Core](ExtractXiso.Core/) | Class library — available as the [ExtractXiso](https://www.nuget.org/) NuGet package |
 | [ExtractXiso.Cli](ExtractXiso.Cli/) | CLI tool (`extract-xiso`) |
+| [ExtractXisoTester](ExtractXisoTester/) | WPF GUI application for batch testing XISO operations |
 | [ExtractXiso.Tests](ExtractXiso.Tests/) | Unit tests (xUnit) |
 
 ## Building

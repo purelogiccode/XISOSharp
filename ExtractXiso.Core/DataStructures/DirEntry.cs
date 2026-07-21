@@ -3,7 +3,7 @@
 /// <summary>
 /// Represents an on-disk directory entry in an XISO image.
 /// Directory entries are linked as a binary tree structure via the
-/// <see cref="Left"/> and <see cref="Right"/> pointers, mirroring the
+/// <see cref="Left"/> and <see cref="ROffset"/> pointers, mirroring the
 /// on-disk format of the original Xbox filesystem.
 /// </summary>
 public class DirEntry

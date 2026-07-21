@@ -7,18 +7,42 @@
         <Nullable>enable</Nullable>
         <RootNamespace>ExtractXiso</RootNamespace>
 
+        <!-- NuGet metadata -->
         <PackageId>ExtractXiso</PackageId>
         <Version>2.7.1</Version>
         <Authors>in</Authors>
-        <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) images.</Description>
+        <Copyright>Copyright (c) in &lt;in@fishtank.com&gt;</Copyright>
+        <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) images. C# port of extract-xiso v2.7.1.</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageTags>xiso;xbox;iso;extract-xiso</PackageTags>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageProjectUrl>https://github.com/drpetersonfernandes/ExtractXiso</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/drpetersonfernandes/ExtractXiso.git</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+
+        <!-- XML documentation -->
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+        <!-- Source Link + reproducible builds -->
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <Deterministic>true</Deterministic>
+        <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
+        <!-- Package output -->
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     </PropertyGroup>
 
     <ItemGroup>
         <None Include="README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+
+    <!-- Source Link -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
     </ItemGroup>
 
 </Project>
