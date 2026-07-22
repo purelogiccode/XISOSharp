@@ -527,6 +527,9 @@ public static class XisoWriter
 
             if ((attr & FileAttributes.Directory) != 0)
             {
+                if (Logger.RemoveSystemUpdate && entryName.Contains("$SystemUpdate"))
+                    continue;
+
                 emptyDir = false;
                 string prevDir = Directory.GetCurrentDirectory();
                 Directory.SetCurrentDirectory(entryName);

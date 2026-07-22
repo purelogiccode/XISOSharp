@@ -21,19 +21,19 @@ class Program
             return 1;
         }
 
-        bool extract = true;
-        bool rewrite = false;
-        bool xSeen = false;
-        bool deleteOld = false;
+        var extract = true;
+        var rewrite = false;
+        var xSeen = false;
+        var deleteOld = false;
         string? path = null;
         var createList = new List<(string Dir, string? Name)>();
-        int isos = 0;
-        int err = 0;
+        var isos = 0;
+        var err = 0;
 
-        int optind = 0;
-        for (int i = 0; i < args.Length; i++)
+        var optind = 0;
+        for (var i = 0; i < args.Length; i++)
         {
-            string arg = args[i];
+            var arg = args[i];
             if (arg.StartsWith('-') && arg.Length > 1)
             {
                 switch (arg)
@@ -44,7 +44,7 @@ class Program
                         {
                             if (xSeen || rewrite || !extract) { PrintUsage(); return 1; }
                             if (i + 1 >= args.Length) { PrintUsage(); return 1; }
-                            string dir = args[++i];
+                            var dir = args[++i];
                             string? name = null;
                             if (i + 1 < args.Length && !args[i + 1].StartsWith('-'))
                                 name = args[++i];
@@ -109,7 +109,7 @@ class Program
 
                 if (name != null)
                 {
-                    int lastSep = name.LastIndexOf(Constants.PathChar);
+                    var lastSep = name.LastIndexOf(Constants.PathChar);
                     if (lastSep >= 0)
                     {
                         outputDir = name[..lastSep];
@@ -126,14 +126,14 @@ class Program
             return 0;
         }
 
-        for (int i = optind; i < args.Length; i++)
+        for (var i = optind; i < args.Length; i++)
         {
             isos++;
             Logger.Log("\n");
             Logger.TotalBytes = Logger.TotalFiles = 0;
 
-            string xisoPath = args[i];
-            bool optimized = false;
+            var xisoPath = args[i];
+            var optimized = false;
 
             try
             {
@@ -147,10 +147,10 @@ class Program
 
                 tagFs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
                 var tagBuf = new byte[Constants.OptimizedTagLength];
-                int tagRead = tagFs.Read(tagBuf);
+                var tagRead = tagFs.Read(tagBuf);
                 if (tagRead == Constants.OptimizedTagLength)
                 {
-                    string tag = System.Text.Encoding.ASCII.GetString(tagBuf);
+                    var tag = System.Text.Encoding.ASCII.GetString(tagBuf);
                     if (tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin]))
                         optimized = true;
                 }
@@ -170,7 +170,7 @@ class Program
                     continue;
                 }
 
-                string oldPath = xisoPath + ".old";
+                var oldPath = xisoPath + ".old";
                 if (File.Exists(oldPath))
                 {
                     Logger.LogErr($"{oldPath} already exists, cannot rewrite {xisoPath}\n");
@@ -180,7 +180,7 @@ class Program
                 try
                 {
                     File.Move(xisoPath, oldPath);
-                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out string? newIsoPath, optimized);
+                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out var newIsoPath, optimized);
 
                     if (err == 0)
                     {
