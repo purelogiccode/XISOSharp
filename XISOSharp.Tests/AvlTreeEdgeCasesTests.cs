@@ -134,7 +134,7 @@ public class AvlTreeEdgeCasesTests
     public void AvlTraverseDepthFirst_NullRoot_AllMethods_ReturnZero()
     {
         var callCount = 0;
-        TraversalCallback cb = (n, ctx, depth) =>
+        TraversalCallback cb = (_, _, _) =>
         {
             callCount++;
             return 0;

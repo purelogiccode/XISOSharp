@@ -264,11 +264,8 @@ public class XisoTestRunner
             var exeTempDir = CreateTempSubDir("exe_extract");
             try
             {
-                // C# extraction
-                var originalDir = Environment.CurrentDirectory;
                 try
                 {
-                    // Logger.Quiet = true needed to suppress output
                     var saveQuiet = Logger.Quiet;
                     Logger.Quiet = true;
                     try
@@ -416,7 +413,7 @@ public class XisoTestRunner
             Logger.Quiet = true;
             try
             {
-                XisoReader.DecodeXiso(csInput, csOutDir, ExtractMode.Rewrite, out var csOutPath, false);
+                XisoReader.DecodeXiso(csInput, csOutDir, ExtractMode.Rewrite, out _, false);
             }
             catch (ExtractErrorException ex) when (
                 ex.ErrorCode is ExtractError.ErrIsoRewritten or ExtractError.ErrIsoNoFiles)

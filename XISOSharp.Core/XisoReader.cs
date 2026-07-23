@@ -190,7 +190,7 @@ public static class XisoReader
             ReadExact(fs, byteBuf);
             var filenameLength = byteBuf[0];
 
-            Span<byte> nameBuf = stackalloc byte[filenameLength];
+            var nameBuf = new byte[filenameLength];
             ReadExact(fs, nameBuf);
             var filename = Encoding.ASCII.GetString(nameBuf);
 
@@ -500,7 +500,6 @@ public static class XisoReader
 
         if (rootDirSect != 0 && rootDirSize != 0)
         {
-            var pathLen = outputPath?.Length ?? 0;
             var addSlash = 0;
             if (outputPath != null && outputPath[^1] != Constants.PathChar)
             {

@@ -615,7 +615,7 @@ public static class XisoWriter
             if (!ReferenceEquals(avl.Subdirectory, AvlNode.EmptySubdirectory))
             {
                 avl.FileSize = 0;
-                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, (n, c, d) =>
+                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, (n, _, d) =>
                 {
                     CalculateDirectorySize(n, ref avl.FileSize, d);
                     return 0;
@@ -734,10 +734,7 @@ public static class XisoWriter
     /// <param name="totalSectors">Total number of sectors in the image.</param>
     internal static void WriteVolumeDescriptors(FileStream fs, uint totalSectors)
     {
-        var big = (int)totalSectors;
         var little = (int)totalSectors;
-
-        big = (big << 24) | ((big << 8) & 0xFF0000) | ((big >> 8) & 0xFF00) | (big >> 24);
 
         fs.Seek(Constants.Ecma119DataAreaStart, SeekOrigin.Begin);
         fs.WriteByte(0x01);

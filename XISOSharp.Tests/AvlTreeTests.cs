@@ -149,7 +149,7 @@ public class AvlTreeTests
         AvlTree.AvlInsert(ref root, nodeD);
 
         var visited = new List<string>();
-        AvlTree.AvlTraverseDepthFirst(root, (node, ctx, depth) =>
+        AvlTree.AvlTraverseDepthFirst(root, (node, ctx, _) =>
         {
             ((List<string>)ctx!).Add(node.Filename);
             return 0;
@@ -175,7 +175,7 @@ public class AvlTreeTests
         }
 
         var visited = new List<string>();
-        AvlTree.AvlTraverseDepthFirst(root, (node, ctx, depth) =>
+        AvlTree.AvlTraverseDepthFirst(root, (node, ctx, _) =>
         {
             ((List<string>)ctx!).Add(node.Filename);
             return 0;
@@ -198,7 +198,7 @@ public class AvlTreeTests
         AvlTree.AvlInsert(ref root, new AvlNode { Filename = "b" });
 
         var visited = new List<string>();
-        AvlTree.AvlTraverseDepthFirst(root, (node, ctx, depth) =>
+        AvlTree.AvlTraverseDepthFirst(root, (node, ctx, _) =>
         {
             ((List<string>)ctx!).Add(node.Filename);
             return 0;
