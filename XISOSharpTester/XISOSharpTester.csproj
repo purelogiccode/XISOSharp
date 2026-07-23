@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UseWPF>true</UseWPF>
+        <AssemblyVersion>1.0.0</AssemblyVersion>
+        <FileVersion>1.0.0</FileVersion>
+        <NeutralLanguage>en</NeutralLanguage>
+
+        <IsPackable>false</IsPackable>
+        <DebugType>embedded</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+        <ApplicationIcon>Icon\icon.ico</ApplicationIcon>
+        <PackageId>XISOSharpTester</PackageId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\XISOSharp.Core\XISOSharp.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Serilog" Version="4.4.0" />
+        <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
+        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+        <PackageReference Include="WPF-UI" Version="4.3.0" />
+        <PackageReference Include="QuestPDF" Version="2026.7.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="extract-xiso.exe">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Resource Include="Images\logo.png" />
+        <Resource Include="Images\about.png" />
+        <Resource Include="Images\exit.png" />
+    </ItemGroup>
+
+</Project>
