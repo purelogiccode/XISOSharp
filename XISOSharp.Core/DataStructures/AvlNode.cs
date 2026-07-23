@@ -1,7 +1,9 @@
 ﻿namespace XISOSharp.DataStructures;
 
 /// <summary>Skew direction of an AVL tree node, used during balancing.</summary>
-public enum AvlSkew { NoSkew, LeftSkew, RightSkew }
+public enum AvlSkew { NoSkew,
+    LeftSkew,
+    RightSkew }
 
 /// <summary>
 /// Node in an AVL (Adelson-Velsky/Landis) balanced binary search tree.

@@ -1,5 +1,3 @@
-using XISOSharp;
-
 namespace XISOSharp.Tests;
 
 public class FileTimeHelperTests
@@ -11,7 +9,7 @@ public class FileTimeHelperTests
         FileTimeHelper.WriteFileTimeNow(dest);
 
         var nonZero = false;
-        for (int i = 0; i < 8; i++)
+        for (var i = 0; i < 8; i++)
         {
             if (dest[i] != 0)
             {
@@ -47,13 +45,13 @@ public class FileTimeHelperTests
         Span<byte> dest = stackalloc byte[8];
         FileTimeHelper.WriteFileTimeNow(dest);
 
-        uint low = BitConverter.ToUInt32(dest);
-        uint high = BitConverter.ToUInt32(dest[4..]);
+        var low = BitConverter.ToUInt32(dest);
+        var high = BitConverter.ToUInt32(dest[4..]);
 
         Assert.NotEqual(0u, high | low);
 
-        double filetime = (double)high * 4.0 * (double)(1L << 30) + low;
-        double unixTime = filetime / 1.0e7 - (369.0 * 365.25 * 24.0 * 60.0 * 60.0 - (3.0 * 24.0 * 60.0 * 60.0 + 6.0 * 60.0 * 60.0));
+        var filetime = high * 4.0 * (1L << 30) + low;
+        var unixTime = filetime / 1.0e7 - (369.0 * 365.25 * 24.0 * 60.0 * 60.0 - (3.0 * 24.0 * 60.0 * 60.0 + 6.0 * 60.0 * 60.0));
 
         double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 

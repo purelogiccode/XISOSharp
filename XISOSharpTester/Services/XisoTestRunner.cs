@@ -1,33 +1,33 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
-using XISOSharp;
 using Serilog;
+using XISOSharp;
 using XISOSharpTester.Models;
 
 namespace XISOSharpTester.Services;
 
 public class XisoTestRunner
 {
-    private static string? _XISOSharpVersion;
+    private static string? _xisoSharpVersion;
 
-    public string? XISOSharpVersion => _XISOSharpVersion;
+    public string? XisoSharpVersion => _xisoSharpVersion;
 
     public async Task<TestSessionResult> RunAsync(
         List<XisoFileEntry> files,
-        string XISOSharpExePath,
+        string xisoSharpExePath,
         IProgress<TestProgress>? progress = null)
     {
         var session = new TestSessionResult();
-        var exeAvailable = File.Exists(XISOSharpExePath);
+        var exeAvailable = File.Exists(xisoSharpExePath);
 
-        using var wrapper = exeAvailable ? new XISOSharpWrapper(XISOSharpExePath) : null;
+        using var wrapper = exeAvailable ? new XisoSharpWrapper(xisoSharpExePath) : null;
 
         if (wrapper != null)
         {
-            _XISOSharpVersion = wrapper.GetVersion();
+            _xisoSharpVersion = wrapper.GetVersion();
         }
 
         for (var i = 0; i < files.Count; i++)
@@ -48,7 +48,7 @@ public class XisoTestRunner
 
     private static PerFileResult TestSingleFile(
         XisoFileEntry entry,
-        XISOSharpWrapper? wrapper,
+        XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
         int fileIndex,
         int totalFiles)
@@ -96,7 +96,7 @@ public class XisoTestRunner
 
     private static void RunVerifyTest(
         XisoFileEntry entry,
-        XISOSharpWrapper? wrapper,
+        XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
         int fileIndex,
         int totalFiles,
@@ -165,7 +165,7 @@ public class XisoTestRunner
 
     private static void RunListTest(
         XisoFileEntry entry,
-        XISOSharpWrapper? wrapper,
+        XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
         int fileIndex,
         int totalFiles,
@@ -248,7 +248,7 @@ public class XisoTestRunner
 
     private static void RunExtractTest(
         XisoFileEntry entry,
-        XISOSharpWrapper? wrapper,
+        XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
         int fileIndex,
         int totalFiles,
@@ -356,7 +356,7 @@ public class XisoTestRunner
 
     private static void RunRewriteTest(
         XisoFileEntry entry,
-        XISOSharpWrapper? wrapper,
+        XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
         int fileIndex,
         int totalFiles,
@@ -365,7 +365,7 @@ public class XisoTestRunner
         Report(progress, entry.FileName, fileIndex + 1, totalFiles, "Rewrite",
             "Rewriting and comparing ISO hashes...");
 
-        if (wrapper == null || !wrapper.Available)
+        if (wrapper is not { Available: true })
         {
             result.SubTests.Add(new SubTestResult
             {
@@ -388,12 +388,12 @@ public class XisoTestRunner
             // Check if already optimized (tag at offset 31337)
             using (var fs = File.OpenRead(csInput))
             {
-                if (fs.Length > Constants.OptimizedTagOffset + Constants.OptimizedTag!.Length)
+                if (fs.Length > Constants.OptimizedTagOffset + Constants.OptimizedTag.Length)
                 {
                     fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
                     Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTag.Length];
                     fs.ReadExactly(tagBuf);
-                    var tag = System.Text.Encoding.ASCII.GetString(tagBuf);
+                    var tag = Encoding.ASCII.GetString(tagBuf);
                     if (tag == Constants.OptimizedTag)
                     {
                         tSw.Stop();
@@ -419,8 +419,7 @@ public class XisoTestRunner
                 XisoReader.DecodeXiso(csInput, csOutDir, ExtractMode.Rewrite, out var csOutPath, false);
             }
             catch (ExtractErrorException ex) when (
-                ex.ErrorCode == ExtractError.ErrIsoRewritten ||
-                ex.ErrorCode == ExtractError.ErrIsoNoFiles)
+                ex.ErrorCode is ExtractError.ErrIsoRewritten or ExtractError.ErrIsoNoFiles)
             {
                 tSw.Stop();
                 result.SubTests.Add(new SubTestResult
@@ -438,13 +437,9 @@ public class XisoTestRunner
             }
 
             // Find the C# output ISO
-            var csIsoOutput = Directory.GetFiles(csOutDir, "*.iso").FirstOrDefault();
-            if (csIsoOutput == null)
-            {
-                // Maybe in csWorkDir
-                csIsoOutput = Directory.GetFiles(csWorkDir, "*.iso", SearchOption.AllDirectories)
-                    .FirstOrDefault(f => !f.EndsWith(".old", StringComparison.OrdinalIgnoreCase));
-            }
+            // Maybe in csWorkDir
+            var csIsoOutput = Directory.GetFiles(csOutDir, "*.iso").FirstOrDefault() ?? Directory.GetFiles(csWorkDir, "*.iso", SearchOption.AllDirectories)
+                .FirstOrDefault(f => !f.EndsWith(".old", StringComparison.OrdinalIgnoreCase));
 
             // extract-xiso rewrite
             var exeInput = Path.Combine(exeWorkDir, entry.FileName);

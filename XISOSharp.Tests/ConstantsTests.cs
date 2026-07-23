@@ -1,5 +1,3 @@
-using XISOSharp;
-
 namespace XISOSharp.Tests;
 
 public class ConstantsTests
@@ -30,7 +28,7 @@ public class ConstantsTests
     [Fact]
     public void NumSectors_LargeValue()
     {
-        uint expected = (uint)Math.Ceiling((uint.MaxValue >> 1) / (double)Constants.SectorSize);
+        var expected = (uint)Math.Ceiling((uint.MaxValue >> 1) / (double)Constants.SectorSize);
         Assert.Equal(expected, Constants.NumSectors(uint.MaxValue >> 1));
     }
 }

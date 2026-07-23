@@ -1,4 +1,3 @@
-using XISOSharp;
 using XISOSharp.DataStructures;
 
 namespace XISOSharp.Tests;
@@ -85,18 +84,24 @@ public class AvlTreeEdgeCasesTests
         var node = new AvlNode { Filename = "test" };
         AvlTree.AvlInsert(ref root, node);
 
-        int callCount = 0;
-        TraversalCallback cb = (n, ctx, depth) => { callCount++; return 0; };
+        var callCount = 0;
 
-        int result = AvlTree.AvlTraverseDepthFirst(root, cb, null, (AvlTraversalMethod)99, 0);
+        var result = AvlTree.AvlTraverseDepthFirst(root, Cb, null, (AvlTraversalMethod)99, 0);
         Assert.Equal(0, result);
         Assert.Equal(0, callCount);
+        return;
+
+        int Cb(AvlNode n, object? ctx, int depth)
+        {
+            callCount++;
+            return 0;
+        }
     }
 
     [Fact]
     public void AvlCompareKey_SameString_ReturnsZero()
     {
-        string same = "test";
+        const string same = "test";
 
         Assert.Equal(0, AvlTree.AvlCompareKey(same, same));
     }
@@ -104,8 +109,8 @@ public class AvlTreeEdgeCasesTests
     [Fact]
     public void AvlCompareKey_DifferentLengths()
     {
-        string shorter = "abc";
-        string longer = "abc123";
+        const string shorter = "abc";
+        const string longer = "abc123";
 
         Assert.True(AvlTree.AvlCompareKey(shorter, longer) < 0);
         Assert.True(AvlTree.AvlCompareKey(longer, shorter) > 0);
@@ -114,10 +119,10 @@ public class AvlTreeEdgeCasesTests
     [Fact]
     public void AvlCompareKey_CaseInsensitiveComparison()
     {
-        string a = "TEST";
-        string b = "Test";
-        string c = "test";
-        string d = "TESU";
+        const string a = "TEST";
+        const string b = "Test";
+        const string c = "test";
+        const string d = "TESU";
 
         Assert.Equal(0, AvlTree.AvlCompareKey(a, b));
         Assert.Equal(0, AvlTree.AvlCompareKey(b, c));
@@ -128,8 +133,12 @@ public class AvlTreeEdgeCasesTests
     [Fact]
     public void AvlTraverseDepthFirst_NullRoot_AllMethods_ReturnZero()
     {
-        int callCount = 0;
-        TraversalCallback cb = (n, ctx, depth) => { callCount++; return 0; };
+        var callCount = 0;
+        TraversalCallback cb = (n, ctx, depth) =>
+        {
+            callCount++;
+            return 0;
+        };
 
         Assert.Equal(0, AvlTree.AvlTraverseDepthFirst(null, cb, null, AvlTraversalMethod.Prefix, 0));
         Assert.Equal(0, AvlTree.AvlTraverseDepthFirst(null, cb, null, AvlTraversalMethod.Infix, 0));

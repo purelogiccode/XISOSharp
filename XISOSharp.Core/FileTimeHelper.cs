@@ -1,4 +1,6 @@
-﻿namespace XISOSharp;
+﻿using System.Buffers.Binary;
+
+namespace XISOSharp;
 
 /// <summary>
 /// Helper for converting Unix timestamps to Windows FILETIME values
@@ -15,12 +17,12 @@ public static class FileTimeHelper
     public static void WriteFileTimeNow(Span<byte> destination)
     {
         double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        double tmp = (now + (369.0 * 365.25 * 24.0 * 60.0 * 60.0 - (3.0 * 24.0 * 60.0 * 60.0 + 6.0 * 60.0 * 60.0))) * 1.0e7;
+        var tmp = (now + (369.0 * 365.25 * 24.0 * 60.0 * 60.0 - (3.0 * 24.0 * 60.0 * 60.0 + 6.0 * 60.0 * 60.0))) * 1.0e7;
 
-        uint h = (uint)(tmp * (1.0 / (4.0 * (double)(1L << 30))));
-        uint l = (uint)(tmp - ((double)h) * 4.0 * (double)(1L << 30));
+        var h = (uint)(tmp * (1.0 / (4.0 * (1L << 30))));
+        var l = (uint)(tmp - h * 4.0 * (1L << 30));
 
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(destination, l);
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(destination[4..], h);
+        BinaryPrimitives.WriteUInt32LittleEndian(destination, l);
+        BinaryPrimitives.WriteUInt32LittleEndian(destination[4..], h);
     }
 }

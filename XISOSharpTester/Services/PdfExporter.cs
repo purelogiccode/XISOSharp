@@ -1,3 +1,4 @@
+using QuestPDF;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -9,10 +10,10 @@ public static class PdfExporter
 {
     static PdfExporter()
     {
-        QuestPDF.Settings.License = LicenseType.Community;
+        Settings.License = LicenseType.Community;
     }
 
-    public static void Export(TestSessionResult session, string? XISOSharpVersion, string outputPath)
+    public static void Export(TestSessionResult session, string? xisoSharpVersion, string outputPath)
     {
         Document.Create(container =>
         {
@@ -28,9 +29,9 @@ public static class PdfExporter
                         .Bold().FontSize(16).FontColor(Colors.Blue.Darken3);
 
                     var genText = $"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
-                    if (XISOSharpVersion != null)
+                    if (xisoSharpVersion != null)
                     {
-                        genText += $"    extract-xiso: {XISOSharpVersion}";
+                        genText += $"    extract-xiso: {xisoSharpVersion}";
                     }
 
                     header.Item().Text(genText).FontSize(8).FontColor(Colors.Grey.Medium);
@@ -59,10 +60,10 @@ public static class PdfExporter
                     {
                         cols.RelativeColumn(2.5f);
                         cols.RelativeColumn(1.2f);
-                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn();
                         cols.RelativeColumn(5f);
-                        cols.RelativeColumn(1f);
-                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn();
+                        cols.RelativeColumn();
                     });
 
                     table.Header(header =>

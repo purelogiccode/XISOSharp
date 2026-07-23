@@ -1,5 +1,3 @@
-using XISOSharp;
-
 namespace XISOSharp.Tests;
 
 [Collection("Sequential")]
@@ -92,7 +90,7 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void VerifyXiso_LargeInvalidFile_Throws()
     {
-        string invalidPath = Path.Combine(Path.GetTempPath(), $"garbage_{Guid.NewGuid()}.bin");
+        var invalidPath = Path.Combine(Path.GetTempPath(), $"garbage_{Guid.NewGuid()}.bin");
         try
         {
             var data = new byte[Constants.HeaderOffset + Constants.SectorSize];
@@ -164,7 +162,7 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void DecodeXiso_LargeInvalidFile_Throws()
     {
-        string invalidPath = Path.Combine(Path.GetTempPath(), $"xiso_garbage_{Guid.NewGuid()}.bin");
+        var invalidPath = Path.Combine(Path.GetTempPath(), $"xiso_garbage_{Guid.NewGuid()}.bin");
         try
         {
             var data = new byte[Constants.HeaderOffset + Constants.SectorSize];

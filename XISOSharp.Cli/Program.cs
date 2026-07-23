@@ -1,11 +1,13 @@
-﻿namespace XISOSharp;
+﻿using System.Text;
+
+namespace XISOSharp.Cli;
 
 /// <summary>
 /// Command-line entry point for extract-xiso.
 /// Parses arguments and dispatches to <see cref="XisoReader"/> for extraction/listing/rewriting
 /// or <see cref="XisoWriter"/> for image creation.
 /// </summary>
-class Program
+internal class Program
 {
     /// <summary>
     /// Entry point. Parses command-line flags and positional arguments,
@@ -13,7 +15,7 @@ class Program
     /// </summary>
     /// <param name="args">Command-line arguments.</param>
     /// <returns>0 on success, 1 on error.</returns>
-    static int Main(string[] args)
+    private static int Main(string[] args)
     {
         if (args.Length < 1)
         {
@@ -38,27 +40,36 @@ class Program
             {
                 switch (arg)
                 {
-                    case "-v": Console.Write(Constants.Banner); return 0;
-                    case "-h": PrintUsage(); return 0;
+                    case "-v":
+                        Console.Write(Constants.Banner);
+                        return 0;
+                    case "-h":
+                        PrintUsage();
+                        return 0;
                     case "-c":
                         {
-                            if (xSeen || rewrite || !extract) { PrintUsage(); return 1; }
-                            if (i + 1 >= args.Length) { PrintUsage(); return 1; }
+                            if (xSeen || rewrite || !extract || i + 1 >= args.Length) { PrintUsage();
+                                return 1; }
+
                             var dir = args[++i];
                             string? name = null;
                             if (i + 1 < args.Length && !args[i + 1].StartsWith('-'))
+                            {
                                 name = args[++i];
+                            }
+
                             createList.Add((dir, name));
-                            optind = i + 1;
                             break;
                         }
                     case "-x": xSeen = true; break;
                     case "-l":
-                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage(); return 1; }
+                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
+                            return 1; }
                         extract = false;
                         break;
                     case "-r":
-                        if (xSeen || !extract || createList.Count > 0) { PrintUsage(); return 1; }
+                        if (xSeen || !extract || createList.Count > 0) { PrintUsage();
+                            return 1; }
                         rewrite = true;
                         break;
                     case "-q": Logger.Quiet = true; break;
@@ -68,11 +79,15 @@ class Program
                     case "-m": Logger.MediaEnable = false; break;
                     case "-d":
                         if (i + 1 < args.Length)
+                        {
                             path = args[++i];
-                        else { PrintUsage(); return 1; }
+                        }
+                        else { PrintUsage();
+                            return 1; }
                         break;
                     case "-p":
-                        PrintUsage(); return 1;
+                        PrintUsage();
+                        return 1;
                     default:
                         optind = i;
                         goto parse_done;
@@ -86,11 +101,12 @@ class Program
             }
         }
 
-    parse_done:
+        parse_done:
 
         if (createList.Count > 0)
         {
-            if (optind < args.Length) { PrintUsage(); return 1; }
+            if (optind < args.Length) { PrintUsage();
+                return 1; }
         }
         else if (optind >= args.Length)
         {
@@ -150,9 +166,11 @@ class Program
                 var tagRead = tagFs.Read(tagBuf);
                 if (tagRead == Constants.OptimizedTagLength)
                 {
-                    var tag = System.Text.Encoding.ASCII.GetString(tagBuf);
-                    if (tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin]))
+                    var tag = Encoding.ASCII.GetString(tagBuf);
+                    if (tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin], StringComparison.Ordinal))
+                    {
                         optimized = true;
+                    }
                 }
             }
             catch
@@ -232,33 +250,35 @@ class Program
     /// <summary>
     /// Prints the usage/help text to standard error.
     /// </summary>
-    static void PrintUsage()
+    private static void PrintUsage()
     {
-        Console.Error.Write($@"{Constants.Banner}
-  Usage:
+        Console.Error.Write($"""
+                             {Constants.Banner}
+                               Usage:
 
-    extract-xiso [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
-    extract-xiso [options] -c <dir> [name] [-c <dir> [name]] ...
+                                 extract-xiso [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
+                                 extract-xiso [options] -c <dir> [name] [-c <dir> [name]] ...
 
-  Mutually exclusive modes:
+                               Mutually exclusive modes:
 
-    -c <dir> [name]     Create xiso from file(s) starting in <dir>.
-    -l                  List files in xiso(s).
-    -r                  Rewrite xiso(s) as optimized xiso(s).
-    -x                  Extract xiso(s) (the default mode if none is given).
+                                 -c <dir> [name]     Create xiso from file(s) starting in <dir>.
+                                 -l                  List files in xiso(s).
+                                 -r                  Rewrite xiso(s) as optimized xiso(s).
+                                 -x                  Extract xiso(s) (the default mode if none is given).
 
-  Options:
+                               Options:
 
-    -d <directory>      In extract mode, expand xiso in <directory>.
-                        In rewrite mode, rewrite xiso in <directory>.
-    -D                  In rewrite mode, delete old xiso after processing.
-    -h                  Print this help text and exit.
-    -m                  In create or rewrite mode, disable automatic .xbe
-                          media enable patching (not recommended).
-    -q                  Run quiet (suppress all non-error output).
-    -Q                  Run silent (suppress all output).
-    -s                  Skip $SystemUpdate folder.
-    -v                  Print version information and exit.
-");
+                                 -d <directory>      In extract mode, expand xiso in <directory>.
+                                                     In rewrite mode, rewrite xiso in <directory>.
+                                 -D                  In rewrite mode, delete old xiso after processing.
+                                 -h                  Print this help text and exit.
+                                 -m                  In create or rewrite mode, disable automatic .xbe
+                                                       media enable patching (not recommended).
+                                 -q                  Run quiet (suppress all non-error output).
+                                 -Q                  Run silent (suppress all output).
+                                 -s                  Skip $SystemUpdate folder.
+                                 -v                  Print version information and exit.
+
+                             """);
     }
 }

@@ -1,5 +1,3 @@
-using XISOSharp;
-
 namespace XISOSharp.Tests;
 
 public class LoggerTests : IDisposable

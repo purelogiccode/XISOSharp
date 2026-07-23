@@ -10,6 +10,7 @@ using Microsoft.Win32;
 using Serilog;
 using XISOSharpTester.Models;
 using XISOSharpTester.Services;
+using XISOSharpTester.Views;
 
 namespace XISOSharpTester.ViewModels;
 
@@ -19,7 +20,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
     internal MainViewModel()
     {
-        BrowseXISOSharpCommand = new RelayCommand(_ => BrowseXISOSharp());
+        BrowseXisoSharpCommand = new RelayCommand(_ => BrowseXisoSharp());
         AddFilesCommand = new RelayCommand(_ => AddFiles());
         AddFolderCommand = new RelayCommand(_ => AddFolder());
         RemoveFileCommand = new RelayCommand(RemoveFile);
@@ -30,29 +31,29 @@ internal class MainViewModel : INotifyPropertyChanged
         AboutCommand = new RelayCommand(_ => ShowAbout());
         ExitCommand = new RelayCommand(_ => ExitApp());
 
-        AutoDetectXISOSharp();
+        AutoDetectXisoSharp();
     }
 
-    private void AutoDetectXISOSharp()
+    private void AutoDetectXisoSharp()
     {
         var candidate = Path.Combine(AppContext.BaseDirectory, "extract-xiso.exe");
         if (File.Exists(candidate))
         {
-            XISOSharpPath = candidate;
+            XisoSharpPath = candidate;
         }
     }
 
-    private string _XISOSharpPath = string.Empty;
-    public string XISOSharpPath
+    private string _xisoSharpPath = string.Empty;
+    public string XisoSharpPath
     {
-        get => _XISOSharpPath;
-        set { _XISOSharpPath = value;
+        get => _xisoSharpPath;
+        set { _xisoSharpPath = value;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(IsXISOSharpValid));
+            OnPropertyChanged(nameof(IsXisoSharpValid));
             OnPropertyChanged(nameof(CanRunTests)); }
     }
 
-    public bool IsXISOSharpValid => !string.IsNullOrEmpty(XISOSharpPath) && File.Exists(XISOSharpPath);
+    public bool IsXisoSharpValid => !string.IsNullOrEmpty(XisoSharpPath) && File.Exists(XisoSharpPath);
 
     public ObservableCollection<XisoFileEntry> Files { get; } = [];
 
@@ -64,7 +65,7 @@ internal class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(); }
     }
 
-    public ICommand BrowseXISOSharpCommand { get; }
+    public ICommand BrowseXisoSharpCommand { get; }
     public ICommand AddFilesCommand { get; }
     public ICommand AddFolderCommand { get; }
     public ICommand RemoveFileCommand { get; }
@@ -185,7 +186,7 @@ internal class MainViewModel : INotifyPropertyChanged
         ? new ObservableCollection<PerFileResult>(SessionResult.FileResults)
         : [];
 
-    private void BrowseXISOSharp()
+    private void BrowseXisoSharp()
     {
         var dlg = new OpenFileDialog
         {
@@ -195,8 +196,8 @@ internal class MainViewModel : INotifyPropertyChanged
         };
         if (dlg.ShowDialog() == true)
         {
-            XISOSharpPath = dlg.FileName;
-            AddLog($"extract-xiso.exe set to: {XISOSharpPath}");
+            XisoSharpPath = dlg.FileName;
+            AddLog($"extract-xiso.exe set to: {XisoSharpPath}");
         }
     }
 
@@ -289,8 +290,8 @@ internal class MainViewModel : INotifyPropertyChanged
         ProgressText = "Starting tests...";
         FileProgress = "";
 
-        var exePath = IsXISOSharpValid ? XISOSharpPath : string.Empty;
-        if (!IsXISOSharpValid)
+        var exePath = IsXisoSharpValid ? XisoSharpPath : string.Empty;
+        if (!IsXisoSharpValid)
         {
             AddLog("WARNING: extract-xiso.exe not selected. Comparison tests will be skipped.");
         }
@@ -351,7 +352,7 @@ internal class MainViewModel : INotifyPropertyChanged
         {
             try
             {
-                PdfExporter.Export(SessionResult, _runner.XISOSharpVersion, dlg.FileName);
+                PdfExporter.Export(SessionResult, _runner.XisoSharpVersion, dlg.FileName);
                 AddLog($"PDF exported: {dlg.FileName}");
                 MessageBox.Show($"Results exported successfully to:\n{dlg.FileName}",
                     "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -413,7 +414,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private static void ShowAbout()
     {
-        var about = new Views.AboutWindow
+        var about = new AboutWindow
         {
             Owner = Application.Current.MainWindow
         };

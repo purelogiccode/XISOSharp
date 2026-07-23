@@ -4,11 +4,11 @@ using System.Text;
 
 namespace XISOSharpTester.Services;
 
-public class XISOSharpWrapper : IDisposable
+public class XisoSharpWrapper : IDisposable
 {
     private readonly string _exePath;
 
-    public XISOSharpWrapper(string exePath)
+    public XisoSharpWrapper(string exePath)
     {
         _exePath = exePath;
     }
@@ -72,7 +72,9 @@ public class XISOSharpWrapper : IDisposable
 
         var stdout = r.StdOut.Trim();
         if (string.IsNullOrEmpty(stdout))
+        {
             stdout = r.All.Trim();
+        }
 
         var lines = stdout.Split('\n');
         return lines.FirstOrDefault()?.Trim();

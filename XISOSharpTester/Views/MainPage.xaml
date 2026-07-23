@@ -98,11 +98,11 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="extract-xiso.exe:" VerticalAlignment="Center" FontWeight="SemiBold" />
-                        <TextBox Grid.Column="1" Text="{Binding XISOSharpPath, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBox Grid.Column="1" Text="{Binding XisoSharpPath, UpdateSourceTrigger=PropertyChanged}"
                                  IsReadOnly="True" VerticalAlignment="Center"
                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         <ui:Button Grid.Column="2" Content="Browse" Margin="8,0,0,0"
-                                   Command="{Binding BrowseXISOSharpCommand}" Appearance="Primary" />
+                                   Command="{Binding BrowseXisoSharpCommand}" Appearance="Primary" />
                     </Grid>
 
                     <TextBlock Margin="0,0,0,10" FontSize="11" TextWrapping="Wrap">
@@ -111,7 +111,7 @@
                                 <Setter Property="Text" Value="No extract-xiso.exe selected. Comparison tests will be skipped." />
                                 <Setter Property="Foreground" Value="#FF9800" />
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsXISOSharpValid}" Value="True">
+                                    <DataTrigger Binding="{Binding IsXisoSharpValid}" Value="True">
                                         <Setter Property="Text" Value="extract-xiso.exe ready." />
                                         <Setter Property="Foreground" Value="#4CAF50" />
                                     </DataTrigger>

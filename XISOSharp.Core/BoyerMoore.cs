@@ -8,8 +8,8 @@
 /// </summary>
 public class BoyerMoore
 {
-    private byte[] _pattern;
-    private int _patLen;
+    private readonly byte[] _pattern;
+    private readonly int _patLen;
     private int[]? _bcTable;
     private int[]? _gsTable;
     private readonly int _alphabetSize;
@@ -35,21 +35,28 @@ public class BoyerMoore
     /// </summary>
     public void Init()
     {
-        int i, j, k;
+        int i;
 
         _bcTable = new int[_alphabetSize];
         for (i = 0; i < _alphabetSize; i++)
+        {
             _bcTable[i] = _patLen;
+        }
+
         for (i = 0; i < _patLen - 1; i++)
+        {
             _bcTable[_pattern[i]] = _patLen - i - 1;
+        }
 
         _gsTable = new int[2 * (_patLen + 1) + 2];
 
         for (i = 1; i <= _patLen; i++)
+        {
             _gsTable[i] = 2 * _patLen - i;
+        }
 
         i = _patLen;
-        j = _patLen + 1;
+        var j = _patLen + 1;
         while (i > 0)
         {
             _gsTable[_patLen + 1 + i] = j;
@@ -57,7 +64,10 @@ public class BoyerMoore
             while (j <= _patLen && _pattern[i - 1] != _pattern[j - 1])
             {
                 if (_gsTable[j] > _patLen - i)
+                {
                     _gsTable[j] = _patLen - i;
+                }
+
                 j = _gsTable[_patLen + 1 + j];
             }
 
@@ -67,16 +77,21 @@ public class BoyerMoore
 
         for (i = 1; i <= j; i++)
             if (_gsTable[i] > _patLen + j - i)
+            {
                 _gsTable[i] = _patLen + j - i;
+            }
 
-        k = _gsTable[_patLen + 1 + j];
+        var k = _gsTable[_patLen + 1 + j];
 
         while (j <= _patLen)
         {
             while (j <= k)
             {
                 if (_gsTable[j] >= k - j + _patLen)
+                {
                     _gsTable[j] = k - j + _patLen;
+                }
+
                 j++;
             }
             k = _gsTable[_patLen + 1 + k];
@@ -95,9 +110,9 @@ public class BoyerMoore
     /// </returns>
     public int Search(byte[] text, int startIndex, int length)
     {
-        int i, j, k, l;
+        int j;
 
-        i = j = _patLen - 1;
+        var i = j = _patLen - 1;
 
         while (j < length && i >= 0)
         {
@@ -108,8 +123,8 @@ public class BoyerMoore
             }
             else
             {
-                k = _gsTable![i + 1];
-                l = _bcTable![text[startIndex + j]];
+                var k = _gsTable![i + 1];
+                var l = _bcTable![text[startIndex + j]];
 
                 j += Math.Max(k, l);
                 i = _patLen - 1;

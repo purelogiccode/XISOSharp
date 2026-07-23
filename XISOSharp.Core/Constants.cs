@@ -80,7 +80,7 @@ public static class Constants
     public const int FilenameLengthSize = 1;
 
     /// <summary>8-byte signature pattern searched for during media-enable patching of .xbe files.</summary>
-    public static readonly byte[] MediaEnable = { 0xE8, 0xCA, 0xFD, 0xFF, 0xFF, 0x85, 0xC0, 0x7D };
+    public static readonly byte[] MediaEnable = [0xE8, 0xCA, 0xFD, 0xFF, 0xFF, 0x85, 0xC0, 0x7D];
 
     /// <summary>Byte value that replaces the last byte of the media-enable pattern.</summary>
     public const byte MediaEnableByte = 0xEB;
@@ -119,22 +119,22 @@ public static class Constants
     public const int ReadWriteBufferSize = 0x00200000;
 
     /// <summary>File attribute: read-only.</summary>
-    public const byte AttributeRO = 0x01;
+    public const byte AttributeRo = 0x01;
 
     /// <summary>File attribute: hidden.</summary>
-    public const byte AttributeHID = 0x02;
+    public const byte AttributeHid = 0x02;
 
     /// <summary>File attribute: system.</summary>
-    public const byte AttributeSYS = 0x04;
+    public const byte AttributeSys = 0x04;
 
     /// <summary>File attribute: directory.</summary>
-    public const byte AttributeDIR = 0x10;
+    public const byte AttributeDir = 0x10;
 
     /// <summary>File attribute: archive.</summary>
-    public const byte AttributeARC = 0x20;
+    public const byte AttributeArc = 0x20;
 
     /// <summary>File attribute: normal.</summary>
-    public const byte AttributeNOR = 0x80;
+    public const byte AttributeNor = 0x80;
 
     /// <summary>Version string reported by the tool and written into the optimized tag.</summary>
     public const string ExisoVersion = "2.7.1 (01.11.14)";

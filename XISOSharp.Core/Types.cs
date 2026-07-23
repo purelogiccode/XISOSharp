@@ -3,16 +3,25 @@ using XISOSharp.DataStructures;
 namespace XISOSharp;
 
 /// <summary>Result codes returned by AVL tree insertion.</summary>
-public enum AvlResult { NoErr, AvlError, AvlBalanced }
+public enum AvlResult { NoErr,
+    AvlError,
+    AvlBalanced }
 
 /// <summary>Traversal order when walking an AVL tree.</summary>
-public enum AvlTraversalMethod { Prefix, Infix, Postfix }
+public enum AvlTraversalMethod { Prefix,
+    Infix,
+    Postfix }
 
 /// <summary>Operating mode for XISO image processing.</summary>
-public enum ExtractMode { GenerateAvl, Extract, List, Rewrite }
+public enum ExtractMode { GenerateAvl,
+    Extract,
+    List,
+    Rewrite }
 
 /// <summary>Error codes for non-fatal extraction failures.</summary>
-public enum ExtractError { ErrEndOfSector = -5001, ErrIsoRewritten = -5002, ErrIsoNoFiles = -5003 }
+public enum ExtractError { ErrEndOfSector = -5001,
+    ErrIsoRewritten = -5002,
+    ErrIsoNoFiles = -5003 }
 
 /// <summary>
 /// Callback invoked during extraction/creation to report progress.

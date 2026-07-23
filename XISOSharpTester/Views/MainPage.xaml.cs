@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Windows.Controls;
 using System.Windows.Data;
 using XISOSharpTester.Models;
 using XISOSharpTester.ViewModels;
@@ -14,9 +15,9 @@ internal partial class MainPage
         DataContext = new MainViewModel();
     }
 
-    private void LogTextBox_OnTextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    private void LogTextBox_OnTextChanged(object sender, TextChangedEventArgs e)
     {
-        if (sender is System.Windows.Controls.TextBox tb)
+        if (sender is TextBox tb)
         {
             tb.ScrollToEnd();
         }

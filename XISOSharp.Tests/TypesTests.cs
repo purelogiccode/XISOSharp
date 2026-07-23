@@ -1,4 +1,3 @@
-using XISOSharp;
 using XISOSharp.DataStructures;
 
 namespace XISOSharp.Tests;
@@ -61,36 +60,38 @@ public class TypesTests
     [Fact]
     public void ProgressCallback_Invoke()
     {
-        long receivedCurrent = -1;
-        long receivedFinal = -1;
+        long receivedCurrent;
+        long receivedFinal;
 
-        ProgressCallback cb = (current, final) =>
+        Cb(100, 1000);
+        Assert.Equal(100, receivedCurrent);
+        Assert.Equal(1000, receivedFinal);
+        return;
+
+        void Cb(long current, long final)
         {
             receivedCurrent = current;
             receivedFinal = final;
-        };
-
-        cb(100, 1000);
-        Assert.Equal(100, receivedCurrent);
-        Assert.Equal(1000, receivedFinal);
+        }
     }
 
     [Fact]
     public void TraversalCallback_Invoke()
     {
-        int receivedDepth = -1;
+        int receivedDepth;
         var node = new AvlNode { Filename = "test" };
 
-        TraversalCallback cb = (n, ctx, depth) =>
+        var result = Cb(node, "ctx", 3);
+        Assert.Equal(42, result);
+        Assert.Equal(3, receivedDepth);
+        return;
+
+        int Cb(AvlNode n, object? ctx, int depth)
         {
             receivedDepth = depth;
             Assert.Same(node, n);
             Assert.Equal("ctx", ctx);
             return 42;
-        };
-
-        int result = cb(node, "ctx", 3);
-        Assert.Equal(42, result);
-        Assert.Equal(3, receivedDepth);
+        }
     }
 }

@@ -1,4 +1,3 @@
-using XISOSharp;
 using XISOSharp.DataStructures;
 
 namespace XISOSharp.Tests;
@@ -46,7 +45,7 @@ public class AvlTreeTests
         AvlNode? root = null;
         var node = new AvlNode { Filename = "test" };
 
-        AvlResult result = AvlTree.AvlInsert(ref root, node);
+        var result = AvlTree.AvlInsert(ref root, node);
 
         Assert.Equal(AvlResult.AvlBalanced, result);
         Assert.Same(node, root);
@@ -62,7 +61,7 @@ public class AvlTreeTests
         var node2 = new AvlNode { Filename = "test" };
 
         AvlTree.AvlInsert(ref root, node1);
-        AvlResult result = AvlTree.AvlInsert(ref root, node2);
+        var result = AvlTree.AvlInsert(ref root, node2);
 
         Assert.Equal(AvlResult.AvlError, result);
     }
@@ -75,7 +74,7 @@ public class AvlTreeTests
         var node2 = new AvlNode { Filename = "TEST" };
 
         AvlTree.AvlInsert(ref root, node1);
-        AvlResult result = AvlTree.AvlInsert(ref root, node2);
+        var result = AvlTree.AvlInsert(ref root, node2);
 
         Assert.Equal(AvlResult.AvlError, result);
     }
@@ -112,11 +111,11 @@ public class AvlTreeTests
         var nodes = new List<AvlNode>();
 
         // Insert nodes in ascending order (worst case for unbalanced tree)
-        for (int i = 0; i < 100; i++)
+        for (var i = 0; i < 100; i++)
         {
             var node = new AvlNode { Filename = $"file{i:D3}" };
             nodes.Add(node);
-            AvlResult result = AvlTree.AvlInsert(ref root, node);
+            var result = AvlTree.AvlInsert(ref root, node);
             Assert.NotEqual(AvlResult.AvlError, result);
         }
 
@@ -128,7 +127,7 @@ public class AvlTreeTests
         }
 
         // Verify tree depth is logarithmic (balanced)
-        int depth = GetTreeDepth(root);
+        var depth = GetTreeDepth(root);
         Assert.True(depth <= 12, $"Tree depth {depth} exceeds expected max for 100 nodes (should be ~7)");
     }
 
@@ -213,7 +212,7 @@ public class AvlTreeTests
     [Fact]
     public void AvlTraverse_NullRoot_ReturnsZero()
     {
-        int result = AvlTree.AvlTraverseDepthFirst(null, (_, _, _) => 1, null, AvlTraversalMethod.Prefix, 0);
+        var result = AvlTree.AvlTraverseDepthFirst(null, (_, _, _) => 1, null, AvlTraversalMethod.Prefix, 0);
         Assert.Equal(0, result);
     }
 
@@ -225,8 +224,8 @@ public class AvlTreeTests
         AvlTree.AvlInsert(ref root, new AvlNode { Filename = "b" });
         AvlTree.AvlInsert(ref root, new AvlNode { Filename = "c" });
 
-        int callCount = 0;
-        int result = AvlTree.AvlTraverseDepthFirst(root, (_, _, _) =>
+        var callCount = 0;
+        var result = AvlTree.AvlTraverseDepthFirst(root, (_, _, _) =>
         {
             callCount++;
             return 1; // error stops traversal
@@ -251,7 +250,7 @@ public class AvlTreeTests
     {
         AvlNode? root = null;
         // Insert nodes in sequential order (tests rebalancing)
-        for (int i = 0; i < 50; i++)
+        for (var i = 0; i < 50; i++)
         {
             var node = new AvlNode { Filename = $"f{i:D4}" };
             AvlTree.AvlInsert(ref root, node);
@@ -273,7 +272,7 @@ public class AvlTreeTests
         foreach (var name in names)
         {
             var node = new AvlNode { Filename = name };
-            AvlResult res = AvlTree.AvlInsert(ref root, node);
+            var res = AvlTree.AvlInsert(ref root, node);
             Assert.NotEqual(AvlResult.AvlError, res);
         }
 
@@ -289,18 +288,22 @@ public class AvlTreeTests
     private static int GetTreeDepth(AvlNode? node)
     {
         if (node == null) return 0;
+
         return 1 + Math.Max(GetTreeDepth(node.Left), GetTreeDepth(node.Right));
     }
 
     private static void VerifyAvlBalance(AvlNode? node)
     {
-        if (node == null) return;
-        int leftDepth = GetTreeDepth(node.Left);
-        int rightDepth = GetTreeDepth(node.Right);
-        Assert.True(Math.Abs(leftDepth - rightDepth) <= 1,
-            $"Unbalanced at node '{node.Filename}': left={leftDepth}, right={rightDepth}");
+        while (true)
+        {
+            if (node == null) return;
 
-        VerifyAvlBalance(node.Left);
-        VerifyAvlBalance(node.Right);
+            var leftDepth = GetTreeDepth(node.Left);
+            var rightDepth = GetTreeDepth(node.Right);
+            Assert.True(Math.Abs(leftDepth - rightDepth) <= 1, $"Unbalanced at node '{node.Filename}': left={leftDepth}, right={rightDepth}");
+
+            VerifyAvlBalance(node.Left);
+            node = node.Right;
+        }
     }
 }

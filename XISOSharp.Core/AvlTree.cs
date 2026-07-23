@@ -22,15 +22,22 @@ public static class AvlTree
     /// </returns>
     public static int AvlCompareKey(string lhs, string rhs)
     {
-        int i = 0;
+        var i = 0;
         while (true)
         {
-            char a = i < lhs.Length ? lhs[i] : '\0';
-            char b = i < rhs.Length ? rhs[i] : '\0';
+            var a = i < lhs.Length ? lhs[i] : '\0';
+            var b = i < rhs.Length ? rhs[i] : '\0';
             i++;
 
-            if (a >= 'a' && a <= 'z') a = (char)(a - 32);
-            if (b >= 'a' && b <= 'z') b = (char)(b - 32);
+            if (a is >= 'a' and <= 'z')
+            {
+                a = (char)(a - 32);
+            }
+
+            if (b is >= 'a' and <= 'z')
+            {
+                b = (char)(b - 32);
+            }
 
             if (a != 0)
             {
@@ -39,9 +46,15 @@ public static class AvlTree
                     if (a < b) return -1;
                     if (a > b) return 1;
                 }
-                else return 1;
+                else
+                {
+                    return 1;
+                }
             }
-            else return b != 0 ? -1 : 0;
+            else
+            {
+                return b != 0 ? -1 : 0;
+            }
         }
     }
 
@@ -57,11 +70,19 @@ public static class AvlTree
         {
             if (root == null) return null;
 
-            int result = AvlCompareKey(filename, root.Filename);
+            var result = AvlCompareKey(filename, root.Filename);
 
-            if (result < 0) root = root.Left;
-            else if (result > 0) root = root.Right;
-            else return root;
+            switch (result)
+            {
+                case < 0:
+                    root = root.Left;
+                    break;
+                case > 0:
+                    root = root.Right;
+                    break;
+                default:
+                    return root;
+            }
         }
     }
 
@@ -84,20 +105,23 @@ public static class AvlTree
             return AvlResult.AvlBalanced;
         }
 
-        int result = AvlCompareKey(node.Filename, root.Filename);
+        var result = AvlCompareKey(node.Filename, root.Filename);
 
-        if (result < 0)
+        switch (result)
         {
-            AvlResult tmp = AvlInsert(ref root.Left, node);
-            return tmp == AvlResult.AvlBalanced ? AvlLeftGrown(ref root) : tmp;
+            case < 0:
+            {
+                var tmp = AvlInsert(ref root.Left, node);
+                return tmp == AvlResult.AvlBalanced ? AvlLeftGrown(ref root) : tmp;
+            }
+            case > 0:
+            {
+                var tmp = AvlInsert(ref root.Right, node);
+                return tmp == AvlResult.AvlBalanced ? AvlRightGrown(ref root) : tmp;
+            }
+            default:
+                return AvlResult.AvlError;
         }
-        if (result > 0)
-        {
-            AvlResult tmp = AvlInsert(ref root.Right, node);
-            return tmp == AvlResult.AvlBalanced ? AvlRightGrown(ref root) : tmp;
-        }
-
-        return AvlResult.AvlError;
     }
 
     /// <summary>
@@ -135,7 +159,7 @@ public static class AvlTree
                             break;
                     }
                     root.Left.Right.Skew = AvlSkew.NoSkew;
-                    AvlNode left = root.Left;
+                    var left = root.Left;
                     AvlRotateLeft(ref left);
                     root.Left = left;
                     AvlRotateRight(ref root);
@@ -192,7 +216,7 @@ public static class AvlTree
                             break;
                     }
                     root.Right.Left.Skew = AvlSkew.NoSkew;
-                    AvlNode right = root.Right;
+                    var right = root.Right;
                     AvlRotateRight(ref right);
                     root.Right = right;
                     AvlRotateLeft(ref root);
@@ -211,7 +235,7 @@ public static class AvlTree
     /// </summary>
     private static void AvlRotateLeft(ref AvlNode root)
     {
-        AvlNode tmp = root;
+        var tmp = root;
         root = root.Right!;
         tmp.Right = root.Left;
         root.Left = tmp;
@@ -222,7 +246,7 @@ public static class AvlTree
     /// </summary>
     private static void AvlRotateRight(ref AvlNode root)
     {
-        AvlNode tmp = root;
+        var tmp = root;
         root = root.Left!;
         tmp.Left = root.Right;
         root.Right = tmp;
@@ -258,20 +282,44 @@ public static class AvlTree
         {
             case AvlTraversalMethod.Prefix:
                 err = callback(root, context, depth);
-                if (err == 0) err = AvlTraverseDepthFirst(root.Left, callback, context, method, depth + 1);
-                if (err == 0) err = AvlTraverseDepthFirst(root.Right, callback, context, method, depth + 1);
+                if (err == 0)
+                {
+                    err = AvlTraverseDepthFirst(root.Left, callback, context, method, depth + 1);
+                }
+
+                if (err == 0)
+                {
+                    err = AvlTraverseDepthFirst(root.Right, callback, context, method, depth + 1);
+                }
+
                 break;
 
             case AvlTraversalMethod.Infix:
                 err = AvlTraverseDepthFirst(root.Left, callback, context, method, depth + 1);
-                if (err == 0) err = callback(root, context, depth);
-                if (err == 0) err = AvlTraverseDepthFirst(root.Right, callback, context, method, depth + 1);
+                if (err == 0)
+                {
+                    err = callback(root, context, depth);
+                }
+
+                if (err == 0)
+                {
+                    err = AvlTraverseDepthFirst(root.Right, callback, context, method, depth + 1);
+                }
+
                 break;
 
             case AvlTraversalMethod.Postfix:
                 err = AvlTraverseDepthFirst(root.Left, callback, context, method, depth + 1);
-                if (err == 0) err = AvlTraverseDepthFirst(root.Right, callback, context, method, depth + 1);
-                if (err == 0) err = callback(root, context, depth);
+                if (err == 0)
+                {
+                    err = AvlTraverseDepthFirst(root.Right, callback, context, method, depth + 1);
+                }
+
+                if (err == 0)
+                {
+                    err = callback(root, context, depth);
+                }
+
                 break;
 
             default:

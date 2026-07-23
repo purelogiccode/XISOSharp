@@ -1,4 +1,5 @@
 ﻿using System.Buffers.Binary;
+using System.Text;
 using XISOSharp.DataStructures;
 
 namespace XISOSharp;
@@ -9,8 +10,7 @@ namespace XISOSharp;
 /// </summary>
 public static class XisoWriter
 {
-    [ThreadStatic]
-    private static BoyerMoore? _bm;
+    [ThreadStatic] private static BoyerMoore? _bm;
 
     /// <summary>
     /// Creates or rewrites an XISO image. When <paramref name="inRoot"/> is <c>null</c>,
@@ -54,25 +54,26 @@ public static class XisoWriter
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
-        int err = 0;
+        var err = 0;
 
         Logger.TotalBytes = Logger.TotalFiles = 0;
 
-        string cwd = Directory.GetCurrentDirectory();
+        var cwd = Directory.GetCurrentDirectory();
         string isoName;
         string isoDir;
-        string xisoPath = "";
 
         if (inRoot == null)
         {
             Directory.SetCurrentDirectory(rootDirectory);
 
-            string dir = rootDirectory;
-            int last = dir.Length - 1;
+            var dir = rootDirectory;
+            var last = dir.Length - 1;
             if (last >= 0 && dir[last] == Path.DirectorySeparatorChar)
+            {
                 dir = dir[..last];
+            }
 
-            int slashPos = dir.LastIndexOf(Constants.PathChar) + 1;
+            var slashPos = dir.LastIndexOf(Constants.PathChar) + 1;
             isoDir = dir[slashPos..];
             isoName = inName ?? isoDir;
         }
@@ -83,20 +84,28 @@ public static class XisoWriter
         }
 
         if (string.IsNullOrEmpty(isoDir))
+        {
             isoDir = Constants.PathCharStr;
+        }
 
         outputDirectory ??= cwd;
 
-        int outLen = outputDirectory.Length;
+        var outLen = outputDirectory.Length;
         if (outLen > 0 && outputDirectory[outLen - 1] == Constants.PathChar)
+        {
             outputDirectory = outputDirectory[..--outLen];
+        }
 
         if (string.IsNullOrEmpty(isoName))
+        {
             isoName = "root";
+        }
         else if (isoName.Length > 1 && isoName[1] == ':')
+        {
             isoName = isoName[1..];
+        }
 
-        xisoPath = Path.Combine(outputDirectory, isoName + (inName != null ? "" : ".iso"));
+        var xisoPath = Path.Combine(outputDirectory, isoName + (inName != null ? "" : ".iso"));
 
         Logger.Log($"{(inRoot != null ? "rewriting" : "\ncreating")} {isoName}{(inName != null ? "" : ".iso")}:\n\n");
 
@@ -116,15 +125,15 @@ public static class XisoWriter
         }
         else
         {
-            int n = 0;
+            var n = 0;
             Logger.Log("generating avl tree from filesystem: ");
             Logger.Flush();
 
             err = GenerateAvlTreeLocal(ref root.Subdirectory, ref n);
 
-            for (int i = 0; i < n; i++) Logger.Log("\b");
-            for (int i = 0; i < n; i++) Logger.Log(" ");
-            for (int i = 0; i < n; i++) Logger.Log("\b");
+            for (var i = 0; i < n; i++) Logger.Log("\b");
+            for (var i = 0; i < n; i++) Logger.Log(" ");
+            for (var i = 0; i < n; i++) Logger.Log("\b");
 
             Logger.Log($"{(err != 0 ? "failed!" : "[OK]")}\n\n");
         }
@@ -136,7 +145,7 @@ public static class XisoWriter
 
         Logger.TotalBytes = Logger.TotalFiles = 0;
 
-        uint startSector = root.StartSector;
+        var startSector = root.StartSector;
 
         AvlTree.AvlTraverseDepthFirst(root, CalculateDirectoryRequirements, null,
             AvlTraversalMethod.Prefix, 0);
@@ -146,10 +155,10 @@ public static class XisoWriter
         {
             CalculateDirectoryOffsets(n, (OffsetCalcContext)c!, d);
             return 0;
-                    }, offsetCtx, AvlTraversalMethod.Prefix, 0);
+        }, offsetCtx, AvlTraversalMethod.Prefix, 0);
 
-        int bufSize = Math.Max(Constants.ReadWriteBufferSize, Constants.HeaderOffset);
-        byte[] buf = new byte[bufSize];
+        var bufSize = Math.Max(Constants.ReadWriteBufferSize, Constants.HeaderOffset);
+        var buf = new byte[bufSize];
 
         try
         {
@@ -166,7 +175,7 @@ public static class XisoWriter
             Array.Clear(buf, 0, Constants.HeaderOffset);
             xisoFs.Write(buf, 0, Constants.HeaderOffset);
 
-            byte[] magicBytes = System.Text.Encoding.ASCII.GetBytes(Constants.HeaderData);
+            var magicBytes = Encoding.ASCII.GetBytes(Constants.HeaderData);
             xisoFs.Write(magicBytes, 0, Constants.HeaderDataLength);
 
             Span<byte> leBuf = stackalloc byte[4];
@@ -179,7 +188,7 @@ public static class XisoWriter
             if (inRoot != null && sourceStream != null)
             {
                 sourceStream.Seek(Constants.HeaderOffset + Constants.HeaderDataLength +
-                    Constants.SectorOffsetSize + Constants.DirTableSize + Logger.XboxDiscLseek,
+                                  Constants.SectorOffsetSize + Constants.DirTableSize + Logger.XboxDiscLseek,
                     SeekOrigin.Begin);
                 Span<byte> ftBuf = stackalloc byte[8];
                 sourceStream.ReadExactly(ftBuf);
@@ -221,8 +230,8 @@ public static class XisoWriter
             AvlTree.AvlTraverseDepthFirst(root, WriteTreeCallback, wtContext,
                 AvlTraversalMethod.Prefix, 0);
 
-            long pos = xisoFs.Seek(0, SeekOrigin.End);
-            long pad = ((Constants.FileModulus - pos % Constants.FileModulus) % Constants.FileModulus);
+            var pos = xisoFs.Seek(0, SeekOrigin.End);
+            var pad = ((Constants.FileModulus - pos % Constants.FileModulus) % Constants.FileModulus);
             if (pad > 0)
             {
                 Array.Clear(buf, 0, (int)pad);
@@ -232,7 +241,7 @@ public static class XisoWriter
             WriteVolumeDescriptors(xisoFs, (uint)((pos + pad) / Constants.SectorSize));
 
             xisoFs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
-            byte[] tagBytes = System.Text.Encoding.ASCII.GetBytes(Constants.OptimizedTag);
+            var tagBytes = Encoding.ASCII.GetBytes(Constants.OptimizedTag);
             xisoFs.Write(tagBytes, 0, Constants.OptimizedTagLength);
 
             if (inRoot == null)
@@ -250,7 +259,7 @@ public static class XisoWriter
             err = 1;
         }
 
-    cleanup:
+        cleanup:
         if (root.Subdirectory != null && !ReferenceEquals(root.Subdirectory, AvlNode.EmptySubdirectory))
         {
             AvlTree.FreeTree(root.Subdirectory);
@@ -302,8 +311,8 @@ public static class XisoWriter
                 AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, WriteDirectoryCallback, xisoFs,
                     AvlTraversalMethod.Prefix, 0);
 
-                long pos = xisoFs.Seek(0, SeekOrigin.Current);
-                long pad = (Constants.SectorSize - (pos % Constants.SectorSize)) % Constants.SectorSize;
+                var pos = xisoFs.Seek(0, SeekOrigin.Current);
+                var pad = (Constants.SectorSize - (pos % Constants.SectorSize)) % Constants.SectorSize;
                 if (pad > 0)
                 {
                     Span<byte> padBuf = stackalloc byte[(int)pad];
@@ -348,21 +357,23 @@ public static class XisoWriter
     {
         var fs = (FileStream)context!;
 
-        uint fileSizeForEntry = avl.FileSize;
+        var fileSizeForEntry = avl.FileSize;
         if (avl.Subdirectory != null)
+        {
             fileSizeForEntry += (Constants.SectorSize - (avl.FileSize % Constants.SectorSize)) % Constants.SectorSize;
+        }
 
-        byte attributes = (byte)(avl.Subdirectory != null ? Constants.AttributeDIR : Constants.AttributeARC);
-        byte length = (byte)avl.Filename.Length;
+        var attributes = avl.Subdirectory != null ? Constants.AttributeDir : Constants.AttributeArc;
+        var length = (byte)avl.Filename.Length;
 
-        ushort lOffset = (ushort)(avl.Left != null ? avl.Left.Offset / Constants.DwordSize : 0);
-        ushort rOffset = (ushort)(avl.Right != null ? avl.Right.Offset / Constants.DwordSize : 0);
+        var lOffset = (ushort)(avl.Left != null ? avl.Left.Offset / Constants.DwordSize : 0);
+        var rOffset = (ushort)(avl.Right != null ? avl.Right.Offset / Constants.DwordSize : 0);
 
         Span<byte> leBuf = stackalloc byte[4];
 
-        long pos = fs.Seek(0, SeekOrigin.Current);
-        long targetPos = (long)avl.Offset + avl.DirStart;
-        long pad = targetPos - pos;
+        var pos = fs.Seek(0, SeekOrigin.Current);
+        var targetPos = avl.Offset + avl.DirStart;
+        var pad = targetPos - pos;
         if (pad > 0)
         {
             Span<byte> padBuf = stackalloc byte[(int)pad];
@@ -381,7 +392,7 @@ public static class XisoWriter
         fs.WriteByte(attributes);
         fs.WriteByte(length);
 
-        byte[] nameBytes = System.Text.Encoding.ASCII.GetBytes(avl.Filename);
+        var nameBytes = Encoding.ASCII.GetBytes(avl.Filename);
         fs.Write(nameBytes, 0, length);
 
         return 0;
@@ -396,8 +407,8 @@ public static class XisoWriter
         var xisoFs = (FileStream)ctx.XisoStream;
         xisoFs.Seek((long)avl.StartSector * Constants.SectorSize, SeekOrigin.Begin);
 
-        int bufSize = (int)Math.Max(Constants.SectorSize, Constants.ReadWriteBufferSize) + 1;
-        byte[] buf = new byte[bufSize];
+        var bufSize = Math.Max(Constants.SectorSize, Constants.ReadWriteBufferSize) + 1;
+        var buf = new byte[bufSize];
 
         Stream srcStream;
         if (ctx.SourceStream == null)
@@ -422,15 +433,16 @@ public static class XisoWriter
             Logger.Log($"adding {ctx.Path}{avl.Filename} ({avl.FileSize} bytes) ");
             Logger.Flush();
 
-            int written = 0;
-            uint bytes = avl.FileSize;
+            var written = 0;
+            var bytes = avl.FileSize;
 
             while (bytes > 0)
             {
                 ctx.CancellationToken.ThrowIfCancellationRequested();
-                int toRead = (int)Math.Min(bytes, (uint)(bufSize - written));
-                int n = srcStream.Read(buf, written, toRead);
+                var toRead = (int)Math.Min(bytes, (uint)(bufSize - written));
+                var n = srcStream.Read(buf, written, toRead);
                 if (n <= 0) break;
+
                 bytes -= (uint)n;
 
                 if (Logger.MediaEnable &&
@@ -441,19 +453,20 @@ public static class XisoWriter
                     _bm.Init();
 
                     buf[written + n] = 0;
-                    int searchEnd = written + n;
-                    int searchPos = 0;
+                    var searchEnd = written + n;
+                    var searchPos = 0;
                     while (searchPos < searchEnd)
                     {
-                        int found = _bm.Search(buf, searchPos, searchEnd - searchPos);
+                        var found = _bm.Search(buf, searchPos, searchEnd - searchPos);
                         if (found < 0) break;
+
                         buf[found + Constants.MediaEnableBytePos] = Constants.MediaEnableByte;
                         searchPos = found + Constants.MediaEnableLength;
                     }
 
                     if (bytes > 0)
                     {
-                        int overlap = Constants.MediaEnableLength - 1;
+                        const int overlap = Constants.MediaEnableLength - 1;
                         xisoFs.Write(buf, 0, written + n - overlap);
                         Array.Copy(buf, written + n - overlap, buf, 0, overlap);
                         written = overlap;
@@ -471,10 +484,10 @@ public static class XisoWriter
                 }
             }
 
-            uint originalSize = avl.FileSize;
+            var originalSize = avl.FileSize;
             avl.FileSize -= bytes;
 
-            uint padding = (Constants.SectorSize - (avl.FileSize % Constants.SectorSize)) % Constants.SectorSize;
+            var padding = (Constants.SectorSize - (avl.FileSize % Constants.SectorSize)) % Constants.SectorSize;
             if (padding > 0)
             {
                 Span<byte> padBuf = stackalloc byte[(int)padding];
@@ -505,24 +518,24 @@ public static class XisoWriter
     internal static int GenerateAvlTreeLocal(ref AvlNode? outRoot, ref int ioN)
     {
         var entries = Directory.GetFileSystemEntries(".");
-        bool emptyDir = true;
+        var emptyDir = true;
 
-        foreach (string entryPath in entries)
+        foreach (var entryPath in entries)
         {
-            string entryName = Path.GetFileName(entryPath);
+            var entryName = Path.GetFileName(entryPath);
 
-            if (entryName == "." || entryName == "..")
+            if (entryName is "." or "..")
                 continue;
 
-            for (int i = ioN; i > 0; i--) Logger.Log("\b");
+            for (var i = ioN; i > 0; i--) Logger.Log("\b");
             Logger.Log(entryName);
-            int nameLen = entryName.Length;
-            for (int j = nameLen; j < ioN; j++) Logger.Log(" ");
-            for (int j = nameLen; j < ioN; j++) Logger.Log("\b");
+            var nameLen = entryName.Length;
+            for (var j = nameLen; j < ioN; j++) Logger.Log(" ");
+            for (var j = nameLen; j < ioN; j++) Logger.Log("\b");
             ioN = nameLen;
             Logger.Flush();
 
-            FileAttributes attr = File.GetAttributes(entryPath);
+            var attr = File.GetAttributes(entryPath);
             var avl = new AvlNode { Filename = entryName };
 
             if ((attr & FileAttributes.Directory) != 0)
@@ -531,7 +544,7 @@ public static class XisoWriter
                     continue;
 
                 emptyDir = false;
-                string prevDir = Directory.GetCurrentDirectory();
+                var prevDir = Directory.GetCurrentDirectory();
                 Directory.SetCurrentDirectory(entryName);
 
                 GenerateAvlTreeLocal(ref avl.Subdirectory, ref ioN);
@@ -556,7 +569,9 @@ public static class XisoWriter
         }
 
         if (emptyDir)
+        {
             outRoot = AvlNode.EmptySubdirectory;
+        }
 
         return 0;
     }
@@ -626,7 +641,7 @@ public static class XisoWriter
     /// <param name="depth">Not used.</param>
     internal static void CalculateDirectorySize(AvlNode avl, ref uint outSize, int depth)
     {
-        uint length = (uint)(Constants.FilenameOffset + avl.Filename.Length);
+        var length = (uint)(Constants.FilenameOffset + avl.Filename.Length);
         length += (Constants.DwordSize - (length % Constants.DwordSize)) % Constants.DwordSize;
 
         if (NumSectors(outSize + length) > NumSectors(outSize))
@@ -639,8 +654,10 @@ public static class XisoWriter
     }
 
     /// <summary>Local helper for sector count calculation (ceiling division).</summary>
-    private static uint NumSectors(uint size) =>
-        size / Constants.SectorSize + (size % Constants.SectorSize != 0 ? 1u : 0u);
+    private static uint NumSectors(uint size)
+    {
+        return size / Constants.SectorSize + (size % Constants.SectorSize != 0 ? 1u : 0u);
+    }
 
     /// <summary>
     /// Traversal callback that assigns sector positions to directory entries
@@ -661,7 +678,7 @@ public static class XisoWriter
             else
             {
                 avl.StartSector = ctx.CurrentSector;
-                long dirStart = (long)avl.StartSector * Constants.SectorSize;
+                var dirStart = (long)avl.StartSector * Constants.SectorSize;
                 ctx.CurrentSector += NumSectors(avl.FileSize);
 
                 var wdsafp = new WdsafpContext
@@ -717,8 +734,8 @@ public static class XisoWriter
     /// <param name="totalSectors">Total number of sectors in the image.</param>
     internal static void WriteVolumeDescriptors(FileStream fs, uint totalSectors)
     {
-        int big = (int)totalSectors;
-        int little = (int)totalSectors;
+        var big = (int)totalSectors;
+        var little = (int)totalSectors;
 
         big = (big << 24) | ((big << 8) & 0xFF0000) | ((big >> 8) & 0xFF00) | (big >> 24);
 
@@ -732,20 +749,20 @@ public static class XisoWriter
         Span<byte> beBuf = stackalloc byte[4];
         BinaryPrimitives.WriteUInt32LittleEndian(leBuf, (uint)little);
         fs.Write(leBuf);
-        BinaryPrimitives.WriteUInt32BigEndian(beBuf, (uint)totalSectors);
+        BinaryPrimitives.WriteUInt32BigEndian(beBuf, totalSectors);
         fs.Write(beBuf);
 
         fs.Seek(Constants.Ecma119VolumeSetSize, SeekOrigin.Begin);
-        byte[] volumeSetSize = { 0x01, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x08, 0x08, 0x00 };
+        byte[] volumeSetSize = [0x01, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x08, 0x08, 0x00];
         fs.Write(volumeSetSize, 0, 12);
 
         fs.Seek(Constants.Ecma119VolumeSetIdentifier, SeekOrigin.Begin);
-        int spacesSize = Constants.Ecma119VolumeCreationDate - Constants.Ecma119VolumeSetIdentifier;
-        byte[] spaces = new byte[spacesSize];
+        const int spacesSize = Constants.Ecma119VolumeCreationDate - Constants.Ecma119VolumeSetIdentifier;
+        var spaces = new byte[spacesSize];
         Array.Fill(spaces, (byte)0x20);
         fs.Write(spaces, 0, spacesSize);
 
-        byte[] date = new byte[17];
+        var date = new byte[17];
         Array.Fill(date, (byte)'0');
         date[16] = 0;
         fs.Write(date, 0, 17);
@@ -785,8 +802,8 @@ public static class XisoWriter
     {
         return await Task.Run(() =>
         {
-            int result = CreateXiso(rootDirectory, outputDirectory, inRoot, sourceStream,
-                out string? outPath, inName, progressCallback, cancellationToken);
+            var result = CreateXiso(rootDirectory, outputDirectory, inRoot, sourceStream,
+                out var outPath, inName, progressCallback, cancellationToken);
             return (result, outPath);
         }, cancellationToken);
     }

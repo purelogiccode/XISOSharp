@@ -1,4 +1,5 @@
 ﻿using System.Buffers.Binary;
+using System.Text;
 using XISOSharp.DataStructures;
 
 namespace XISOSharp;
@@ -10,12 +11,11 @@ namespace XISOSharp;
 /// </summary>
 public static class XisoReader
 {
-    [ThreadStatic]
-    private static byte[]? _copyBuffer;
+    [ThreadStatic] private static byte[]? _copyBuffer;
 
     private static byte[] CopyBuffer => _copyBuffer ??= new byte[Constants.ReadWriteBufferSize];
 
-    private static readonly byte[] _headerDataBytes = System.Text.Encoding.ASCII.GetBytes(Constants.HeaderData);
+    private static readonly byte[] HeaderDataBytes = Encoding.ASCII.GetBytes(Constants.HeaderData);
 
     /// <summary>
     /// Verifies that the given stream is a valid XISO image by checking the header
@@ -49,43 +49,52 @@ public static class XisoReader
 
         ReadExact(fs, buffer);
 
-        if (!buffer.SequenceEqual(_headerDataBytes.AsSpan()))
+        if (!buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
         {
             fs.Seek((long)Constants.HeaderOffset + Constants.GlobalLseekOffset, SeekOrigin.Begin);
             ReadExact(fs, buffer);
 
-            if (!buffer.SequenceEqual(_headerDataBytes))
+            if (!buffer.SequenceEqual(HeaderDataBytes))
             {
                 fs.Seek((long)Constants.HeaderOffset + Constants.Xgd3LseekOffset, SeekOrigin.Begin);
                 ReadExact(fs, buffer);
 
-                if (!buffer.SequenceEqual(_headerDataBytes))
+                if (!buffer.SequenceEqual(HeaderDataBytes))
                 {
                     fs.Seek((long)Constants.HeaderOffset + Constants.Xgd1LseekOffset, SeekOrigin.Begin);
                     ReadExact(fs, buffer);
 
-                    if (!buffer.SequenceEqual(_headerDataBytes))
+                    if (!buffer.SequenceEqual(HeaderDataBytes))
                     {
                         Logger.LogErr($"{isoName} does not appear to be a valid xbox iso image\n");
                         throw new InvalidDataException($"Invalid XISO: {isoName}");
                     }
-                    else discLseek = Constants.Xgd1LseekOffset;
+                    else
+                    {
+                        discLseek = Constants.Xgd1LseekOffset;
+                    }
                 }
-                else discLseek = Constants.Xgd3LseekOffset;
+                else
+                {
+                    discLseek = Constants.Xgd3LseekOffset;
+                }
             }
-            else discLseek = Constants.GlobalLseekOffset;
+            else
+            {
+                discLseek = Constants.GlobalLseekOffset;
+            }
         }
 
         Span<byte> intBuf = stackalloc byte[4];
         ReadExact(fs, intBuf);
-        uint rootDirSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+        var rootDirSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
 
         ReadExact(fs, intBuf);
-        uint rootDirSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+        var rootDirSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
 
         fs.Seek(Constants.FileTimeSize + Constants.UnusedSize, SeekOrigin.Current);
         ReadExact(fs, buffer);
-        if (!buffer.SequenceEqual(_headerDataBytes))
+        if (!buffer.SequenceEqual(HeaderDataBytes))
         {
             Logger.LogErr($"{isoName} appears to be corrupt\n");
             throw new InvalidDataException($"Corrupt XISO: {isoName}");
@@ -130,7 +139,7 @@ public static class XisoReader
         Span<byte> byteBuf = stackalloc byte[1];
 
         DirEntry node = new();
-        DirEntry? dir = inDirNode ?? node;
+        var dir = inDirNode ?? node;
 
         dir.Left = null;
         dir.Parent = null;
@@ -138,12 +147,12 @@ public static class XisoReader
         dir.Filename = "";
 
         ushort lOffset = 0;
-        int err = 0;
+        const int err = 0;
 
         while (true)
         {
             ReadExact(fs, shortBuf);
-            ushort tmp = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+            var tmp = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
 
             if (tmp == Constants.PadShort)
             {
@@ -167,23 +176,23 @@ public static class XisoReader
             }
 
             ReadExact(fs, shortBuf);
-            ushort rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+            var rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
 
             ReadExact(fs, intBuf);
-            uint startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+            var startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
 
             ReadExact(fs, intBuf);
-            uint fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+            var fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
 
             ReadExact(fs, byteBuf);
-            byte attributes = byteBuf[0];
+            var attributes = byteBuf[0];
 
             ReadExact(fs, byteBuf);
-            byte filenameLength = byteBuf[0];
+            var filenameLength = byteBuf[0];
 
             Span<byte> nameBuf = stackalloc byte[filenameLength];
             ReadExact(fs, nameBuf);
-            string filename = System.Text.Encoding.ASCII.GetString(nameBuf);
+            var filename = Encoding.ASCII.GetString(nameBuf);
 
             if (filename == "." || filename == ".." ||
                 filename.Contains('/') || filename.Contains('\\'))
@@ -214,13 +223,13 @@ public static class XisoReader
 
                 fs.Seek(dirStart + (long)lOffset * Constants.DwordSize, SeekOrigin.Begin);
 
-                DirEntry savedDir = dir.Left!;
+                var savedDir = dir.Left!;
                 TraverseXiso(fs, savedDir, dirStart, path, mode, ref avlRoot, llCompat, discLseek);
             }
 
             dir.Left = null;
 
-            if ((attributes & Constants.AttributeDIR) != 0)
+            if ((attributes & Constants.AttributeDir) != 0)
             {
                 string subPath = null!;
                 if (path != null)
@@ -298,10 +307,12 @@ public static class XisoReader
             {
                 if (llCompat)
                 {
-                    int sector = (int)((fs.Position - dirStart) / Constants.SectorSize);
+                    var sector = (int)((fs.Position - dirStart) / Constants.SectorSize);
                     if ((long)rOffset * Constants.DwordSize / Constants.SectorSize > sector)
+                    {
                         rOffset = (ushort)(sector * (Constants.SectorSize / Constants.DwordSize) +
-                            (Constants.SectorSize / Constants.DwordSize));
+                                           (Constants.SectorSize / Constants.DwordSize));
+                    }
                 }
 
                 fs.Seek(dirStart + (long)rOffset * Constants.DwordSize, SeekOrigin.Begin);
@@ -315,7 +326,7 @@ public static class XisoReader
             break;
         }
 
-    end_traverse:
+        end_traverse:
         return err;
     }
 
@@ -364,11 +375,11 @@ public static class XisoReader
         else
         {
             uint totalSize = 0;
-            uint size = Math.Min(fileSize, (uint)Constants.ReadWriteBufferSize);
+            var size = Math.Min(fileSize, Constants.ReadWriteBufferSize);
 
             do
             {
-                int readSize = fs.Read(CopyBuffer, 0, (int)size);
+                var readSize = fs.Read(CopyBuffer, 0, (int)size);
                 if (readSize < 0)
                     throw new IOException("Read error in extract_file");
 
@@ -378,13 +389,12 @@ public static class XisoReader
                 }
 
                 totalSize += (uint)readSize;
-                uint percent = (uint)(totalSize * 100.0 / fileSize);
+                var percent = (uint)(totalSize * 100.0 / fileSize);
                 Logger.Log($"extracting {path}{filename} ({fileSize} bytes) [{percent}%]\r");
                 Logger.Flush();
 
-                size = Math.Min(fileSize - totalSize, (uint)Constants.ReadWriteBufferSize);
-            }
-            while (totalSize < fileSize && size > 0);
+                size = Math.Min(fileSize - totalSize, Constants.ReadWriteBufferSize);
+            } while (totalSize < fileSize && size > 0);
 
             if (totalSize < fileSize)
             {
@@ -428,10 +438,9 @@ public static class XisoReader
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
-        bool repair = false;
+        var repair = false;
 
-        string filename = xisoPath;
-        int len = filename.Length;
+        var filename = xisoPath;
 
         if (mode == ExtractMode.Rewrite)
         {
@@ -439,21 +448,19 @@ public static class XisoReader
             repair = true;
         }
 
-        string name;
-        int nameStart = filename.LastIndexOf(Constants.PathChar) + 1;
-        name = filename[nameStart..];
-        len = name.Length;
+        var nameStart = filename.LastIndexOf(Constants.PathChar) + 1;
+        var name = filename[nameStart..];
+        var len = name.Length;
 
         string? shortName = null;
-        if (len > 4 && string.Equals(name[^4..], ".iso", StringComparison.OrdinalIgnoreCase))
+        switch (len)
         {
-            shortName = name[..^4];
-        }
-
-        if (len == 0)
-        {
-            Logger.LogErr($"invalid xiso image name: {xisoPath}\n");
-            return 1;
+            case > 4 when string.Equals(name[^4..], ".iso", StringComparison.OrdinalIgnoreCase):
+                shortName = name[..^4];
+                break;
+            case 0:
+                Logger.LogErr($"invalid xiso image name: {xisoPath}\n");
+                return 1;
         }
 
         string? cwd = null;
@@ -478,7 +485,7 @@ public static class XisoReader
 
         Logger.XboxDiscLseek = discLseek;
 
-        string isoName = shortName ?? name;
+        var isoName = shortName ?? name;
 
         if (mode != ExtractMode.Rewrite)
         {
@@ -493,12 +500,14 @@ public static class XisoReader
 
         if (rootDirSect != 0 && rootDirSize != 0)
         {
-            int pathLen = outputPath?.Length ?? 0;
-            int addSlash = 0;
+            var pathLen = outputPath?.Length ?? 0;
+            var addSlash = 0;
             if (outputPath != null && outputPath[^1] != Constants.PathChar)
+            {
                 addSlash = 1;
+            }
 
-            string buf = string.Concat(
+            var buf = string.Concat(
                 outputPath ?? "",
                 addSlash != 0 && outputPath == null ? Constants.PathCharStr : "",
                 mode != ExtractMode.List && outputPath == null ? isoName : "",
@@ -557,7 +566,7 @@ public static class XisoReader
     {
         return await Task.Run(() =>
         {
-            int result = DecodeXiso(xisoPath, outputPath, mode, out string? outPath, llCompat, cancellationToken);
+            var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken);
             return (result, outPath);
         }, cancellationToken);
     }
@@ -571,12 +580,13 @@ public static class XisoReader
     /// </exception>
     private static void ReadExact(FileStream fs, Span<byte> buffer)
     {
-        int offset = 0;
+        var offset = 0;
         while (offset < buffer.Length)
         {
-            int read = fs.Read(buffer[offset..]);
+            var read = fs.Read(buffer[offset..]);
             if (read <= 0)
                 throw new IOException($"Read error: expected {buffer.Length} bytes, got {offset}");
+
             offset += read;
         }
     }
