@@ -24,22 +24,34 @@ internal partial class MainPage
     }
 }
 
+/// <summary>
+/// Converts a <see cref="TestStatus"/> value to a single-character
+/// display icon for use in WPF data binding scenarios.
+/// </summary>
 public class StatusIconConverter : IValueConverter
 {
+    /// <summary>
+    /// Converts a <see cref="TestStatus"/> value to its corresponding
+    /// icon character: "✓" for Passed, "✗" for Failed, "○" for Skipped,
+    /// and "?" for any unknown value.
+    /// </summary>
     [SuppressMessage("ReSharper", "NullnessAnnotationConflictWithJetBrainsAnnotations")]
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return value is TestStatus status
             ? status switch
             {
-                TestStatus.Passed => "✓",
-                TestStatus.Failed => "✗",
-                TestStatus.Skipped => "○",
+                TestStatus.Passed => "\u2713",
+                TestStatus.Failed => "\u2717",
+                TestStatus.Skipped => "\u25CB",
                 _ => "?"
             }
             : "?";
     }
 
+    /// <summary>
+    /// Not supported. Throws <see cref="NotSupportedException"/>.
+    /// </summary>
     [SuppressMessage("ReSharper", "NullnessAnnotationConflictWithJetBrainsAnnotations")]
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {

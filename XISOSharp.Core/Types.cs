@@ -3,25 +3,50 @@ using XISOSharp.DataStructures;
 namespace XISOSharp;
 
 /// <summary>Result codes returned by AVL tree insertion.</summary>
-public enum AvlResult { NoErr,
+public enum AvlResult
+{
+    /// <summary>Operation completed successfully without requiring rebalancing.</summary>
+    NoErr,
+    /// <summary>An error occurred during the operation.</summary>
     AvlError,
-    AvlBalanced }
+    /// <summary>Operation completed and the tree was rebalanced.</summary>
+    AvlBalanced
+}
 
 /// <summary>Traversal order when walking an AVL tree.</summary>
-public enum AvlTraversalMethod { Prefix,
+public enum AvlTraversalMethod
+{
+    /// <summary>Visit the current node before its children (pre-order traversal).</summary>
+    Prefix,
+    /// <summary>Visit the left child, then the current node, then the right child (in-order traversal).</summary>
     Infix,
-    Postfix }
+    /// <summary>Visit children before the current node (post-order traversal).</summary>
+    Postfix
+}
 
 /// <summary>Operating mode for XISO image processing.</summary>
-public enum ExtractMode { GenerateAvl,
+public enum ExtractMode
+{
+    /// <summary>Build the AVL tree directory structure without writing an output file.</summary>
+    GenerateAvl,
+    /// <summary>Extract files from the XISO image to disk.</summary>
     Extract,
+    /// <summary>List the contents of the XISO image.</summary>
     List,
-    Rewrite }
+    /// <summary>Rewrite the XISO image with an optimized AVL directory structure.</summary>
+    Rewrite
+}
 
 /// <summary>Error codes for non-fatal extraction failures.</summary>
-public enum ExtractError { ErrEndOfSector = -5001,
+public enum ExtractError
+{
+    /// <summary>Unexpected end of sector while reading a directory entry chain.</summary>
+    ErrEndOfSector = -5001,
+    /// <summary>XISO image has already been rewritten (optimized format detected).</summary>
     ErrIsoRewritten = -5002,
-    ErrIsoNoFiles = -5003 }
+    /// <summary>XISO image references no files in its directory table.</summary>
+    ErrIsoNoFiles = -5003
+}
 
 /// <summary>
 /// Callback invoked during extraction/creation to report progress.

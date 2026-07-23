@@ -1,7 +1,15 @@
 namespace XISOSharp.Tests;
 
+/// <summary>
+/// Tests for <see cref="FileTimeHelper"/>, verifying that FILETIME values
+/// are written correctly as 8-byte timestamps representing the current time.
+/// </summary>
 public class FileTimeHelperTests
 {
+    /// <summary>
+    /// Verifies that <see cref="FileTimeHelper.WriteFileTimeNow"/> writes
+    /// a non-zero 8-byte value into the destination span.
+    /// </summary>
     [Fact]
     public void WriteFileTimeNow_WritesEightBytes()
     {
@@ -21,6 +29,11 @@ public class FileTimeHelperTests
         Assert.True(nonZero, "Expected non-zero FILETIME value");
     }
 
+    /// <summary>
+    /// Verifies that repeated calls to <see cref="FileTimeHelper.WriteFileTimeNow"/>
+    /// within a short interval produce values that are equal or close together,
+    /// and are not all zeros.
+    /// </summary>
     [Fact]
     public void WriteFileTimeNow_IdempotentPerCall()
     {
@@ -39,6 +52,11 @@ public class FileTimeHelperTests
             "FILETIME should not be all zeros");
     }
 
+    /// <summary>
+    /// Verifies that the FILETIME value produced by
+    /// <see cref="FileTimeHelper.WriteFileTimeNow"/> converts to a Unix timestamp
+    /// within 10 seconds of the current system time.
+    /// </summary>
     [Fact]
     public void WriteFileTimeNow_ReasonableRange()
     {

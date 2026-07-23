@@ -2,8 +2,17 @@ using XISOSharp.DataStructures;
 
 namespace XISOSharp.Tests;
 
+/// <summary>
+/// Tests for enum value correctness and data structure types
+/// (<see cref="AvlResult"/>, <see cref="AvlTraversalMethod"/>,
+/// <see cref="ExtractMode"/>, <see cref="ExtractError"/>,
+/// <see cref="CreateList"/>, and callback delegates).
+/// </summary>
 public class TypesTests
 {
+    /// <summary>
+    /// Verifies the integer values of <see cref="AvlResult"/> enum members.
+    /// </summary>
     [Fact]
     public void AvlResult_Values()
     {
@@ -12,6 +21,9 @@ public class TypesTests
         Assert.Equal(2, (int)AvlResult.AvlBalanced);
     }
 
+    /// <summary>
+    /// Verifies the integer values of <see cref="AvlTraversalMethod"/> enum members.
+    /// </summary>
     [Fact]
     public void AvlTraversalMethod_Values()
     {
@@ -20,6 +32,9 @@ public class TypesTests
         Assert.Equal(2, (int)AvlTraversalMethod.Postfix);
     }
 
+    /// <summary>
+    /// Verifies the integer values of <see cref="ExtractMode"/> enum members.
+    /// </summary>
     [Fact]
     public void ExtractMode_Values()
     {
@@ -29,6 +44,9 @@ public class TypesTests
         Assert.Equal(3, (int)ExtractMode.Rewrite);
     }
 
+    /// <summary>
+    /// Verifies the integer values of <see cref="ExtractError"/> enum members.
+    /// </summary>
     [Fact]
     public void ExtractError_Values()
     {
@@ -37,6 +55,9 @@ public class TypesTests
         Assert.Equal(-5003, (int)ExtractError.ErrIsoNoFiles);
     }
 
+    /// <summary>
+    /// Verifies that a newly constructed <see cref="CreateList"/> has expected default field values.
+    /// </summary>
     [Fact]
     public void CreateList_Defaults()
     {
@@ -46,6 +67,10 @@ public class TypesTests
         Assert.Null(list.Next);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="CreateList"/> instances can be linked via the <c>Next</c> property,
+    /// forming a singly-linked list.
+    /// </summary>
     [Fact]
     public void CreateList_Linked()
     {
@@ -57,6 +82,10 @@ public class TypesTests
         Assert.Equal("iso1", second.Next.Name);
     }
 
+    /// <summary>
+    /// Verifies that the <c>ProgressCallback</c> delegate can be invoked with
+    /// current and final long values, and that the callback receives them correctly.
+    /// </summary>
     [Fact]
     public void ProgressCallback_Invoke()
     {
@@ -75,6 +104,11 @@ public class TypesTests
         }
     }
 
+    /// <summary>
+    /// Verifies that the <c>TraversalCallback</c> delegate can be invoked with
+    /// an <see cref="AvlNode"/>, a context object, and a depth value,
+    /// and that the callback receives and can return values correctly.
+    /// </summary>
     [Fact]
     public void TraversalCallback_Invoke()
     {

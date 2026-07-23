@@ -143,7 +143,16 @@ public static class Constants
     public const int VersionLength = 16;
 
     /// <summary>Startup banner text displayed on startup.</summary>
-    public const string Banner = "extract-xiso v" + ExisoVersion + " for win32 - written by in <in@fishtank.com>\n";
+    public static string Banner
+    {
+        get
+        {
+            var platform = OperatingSystem.IsWindows() ? "win" :
+                           OperatingSystem.IsLinux()   ? "linux" :
+                           OperatingSystem.IsMacOS()   ? "macos" : "cross-platform";
+            return $"extract-xiso v{ExisoVersion} for {platform} - written by in <in@fishtank.com>\n";
+        }
+    }
 
     /// <summary>Path separator character used on the target platform.</summary>
     public static readonly char PathChar = Path.DirectorySeparatorChar;

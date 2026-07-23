@@ -1,5 +1,8 @@
 namespace XISOSharp.Tests;
 
+/// <summary>
+/// Tests for XisoReader XISO verification, decoding, and extraction functionality.
+/// </summary>
 [Collection("Sequential")]
 public class XisoReaderTests : IDisposable
 {
@@ -40,6 +43,9 @@ public class XisoReaderTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Verifies that VerifyXiso returns positive root directory sector and size values for a valid ISO file.
+    /// </summary>
     [Fact]
     public void VerifyXiso_ValidFile_ReturnsExpectedValues()
     {
@@ -50,13 +56,16 @@ public class XisoReaderTests : IDisposable
             Share = FileShare.Read
         });
 
-        var (rootDirSector, rootDirSize, discLseek) = XisoReader.VerifyXiso(fs, "source.iso");
+        (uint rootDirSector, uint rootDirSize, long discLseek) = XisoReader.VerifyXiso(fs, "source.iso");
 
         Assert.True(rootDirSector > 0);
         Assert.True(rootDirSize > 0);
         Assert.Equal(0, discLseek);
     }
 
+    /// <summary>
+    /// Verifies that VerifyXiso throws a FileNotFoundException for a path that does not exist.
+    /// </summary>
     [Fact]
     public void VerifyXiso_NonExistentFile_Throws()
     {
@@ -72,6 +81,9 @@ public class XisoReaderTests : IDisposable
         });
     }
 
+    /// <summary>
+    /// Verifies that VerifyXiso throws an IOException when given a file that is not a valid XISO image.
+    /// </summary>
     [Fact]
     public void VerifyXiso_InvalidFileNotIso_Throws()
     {
@@ -87,6 +99,9 @@ public class XisoReaderTests : IDisposable
         });
     }
 
+    /// <summary>
+    /// Verifies that VerifyXiso throws an IOException when given a large file containing only random data.
+    /// </summary>
     [Fact]
     public void VerifyXiso_LargeInvalidFile_Throws()
     {
@@ -115,6 +130,9 @@ public class XisoReaderTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Verifies that DecodeXiso in List mode returns a success error code for a valid ISO file.
+    /// </summary>
     [Fact]
     public void DecodeXiso_ListMode_ReturnsSuccess()
     {
@@ -122,6 +140,9 @@ public class XisoReaderTests : IDisposable
         Assert.Equal(0, err);
     }
 
+    /// <summary>
+    /// Verifies that DecodeXiso in Extract mode creates output files in the specified directory.
+    /// </summary>
     [Fact]
     public void DecodeXiso_ExtractMode_ExtractsFiles()
     {
@@ -136,6 +157,9 @@ public class XisoReaderTests : IDisposable
         Assert.NotEmpty(files);
     }
 
+    /// <summary>
+    /// Verifies that DecodeXiso in Extract mode without an explicit output directory extracts to an ISO-named subdirectory.
+    /// </summary>
     [Fact]
     public void DecodeXiso_ExtractMode_WithoutOutputDir_ExtractsToIsoNamedDir()
     {
@@ -159,6 +183,9 @@ public class XisoReaderTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Verifies that DecodeXiso throws an IOException when given a large file containing only random data.
+    /// </summary>
     [Fact]
     public void DecodeXiso_LargeInvalidFile_Throws()
     {
@@ -181,6 +208,9 @@ public class XisoReaderTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Verifies that DecodeXiso throws an IOException when given a small non-ISO binary file.
+    /// </summary>
     [Fact]
     public void DecodeXiso_SmallFile_Throws()
     {
@@ -190,6 +220,9 @@ public class XisoReaderTests : IDisposable
         });
     }
 
+    /// <summary>
+    /// Verifies that DecodeXiso throws a FileNotFoundException for a path that does not exist.
+    /// </summary>
     [Fact]
     public void DecodeXiso_NonExistentFile_Throws()
     {
@@ -199,6 +232,9 @@ public class XisoReaderTests : IDisposable
         });
     }
 
+    /// <summary>
+    /// Verifies that the ExtractErrorException message contains the error code name when constructed with ErrEndOfSector.
+    /// </summary>
     [Fact]
     public void ExtractErrorException_MessageContainsErrorCode()
     {
@@ -206,6 +242,9 @@ public class XisoReaderTests : IDisposable
         Assert.Contains("ErrEndOfSector", ex.Message);
     }
 
+    /// <summary>
+    /// Verifies that the ExtractErrorException message contains the error code name when constructed with ErrIsoNoFiles.
+    /// </summary>
     [Fact]
     public void ExtractErrorException_MessageContainsErrorCode_NoFiles()
     {

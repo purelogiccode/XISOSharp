@@ -2,8 +2,16 @@ using XISOSharp.DataStructures;
 
 namespace XISOSharp.Tests;
 
+/// <summary>
+/// Tests for the <see cref="DirEntry"/> data structure, verifying default values,
+/// field assignment, sibling linking, and parent chain relationships.
+/// </summary>
 public class DirEntryTests
 {
+    /// <summary>
+    /// Verifies that a newly constructed <see cref="DirEntry"/> has expected default
+    /// values for all fields.
+    /// </summary>
     [Fact]
     public void New_DirEntry_HasDefaults()
     {
@@ -20,6 +28,10 @@ public class DirEntryTests
         Assert.Equal(0u, entry.StartSector);
     }
 
+    /// <summary>
+    /// Verifies that all <see cref="DirEntry"/> fields can be individually set
+    /// and retain their assigned values.
+    /// </summary>
     [Fact]
     public void DirEntry_FieldsCanBeSet()
     {
@@ -51,6 +63,10 @@ public class DirEntryTests
         Assert.Equal(5u, entry.StartSector);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="DirEntry"/> instances can be linked through the
+    /// <see cref="DirEntry.Left"/> property to form a sibling chain.
+    /// </summary>
     [Fact]
     public void DirEntry_LinkedLeftSiblings()
     {
@@ -62,6 +78,10 @@ public class DirEntryTests
         Assert.Same(a, c.Left.Left);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="DirEntry"/> instances can be linked through the
+    /// <see cref="DirEntry.Parent"/> property to form a parent-child hierarchy.
+    /// </summary>
     [Fact]
     public void DirEntry_ParentChain()
     {

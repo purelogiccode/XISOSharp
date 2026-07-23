@@ -2,8 +2,18 @@ using XISOSharp.DataStructures;
 
 namespace XISOSharp.Tests;
 
+/// <summary>
+/// Unit tests for the <see cref="AvlTree"/> static methods:
+/// key comparison, insertion, fetching, traversal, and
+/// balance verification.
+/// </summary>
 public class AvlTreeTests
 {
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlCompareKey"/> returns zero
+    /// when comparing two strings that are case-insensitively equal,
+    /// including an empty string compared to itself.
+    /// </summary>
     [Fact]
     public void AvlCompareKey_SameStrings_ReturnsZero()
     {
@@ -13,6 +23,11 @@ public class AvlTreeTests
         Assert.Equal(0, AvlTree.AvlCompareKey("", ""));
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlCompareKey"/> returns a negative
+    /// value when the first key is case-insensitively less than the second,
+    /// including comparing an empty string to a non-empty string.
+    /// </summary>
     [Fact]
     public void AvlCompareKey_LessThan_ReturnsNegative()
     {
@@ -22,6 +37,11 @@ public class AvlTreeTests
         Assert.True(AvlTree.AvlCompareKey("", "a") < 0);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlCompareKey"/> returns a positive
+    /// value when the first key is case-insensitively greater than the second,
+    /// including comparing a non-empty string to an empty string.
+    /// </summary>
     [Fact]
     public void AvlCompareKey_GreaterThan_ReturnsPositive()
     {
@@ -31,6 +51,12 @@ public class AvlTreeTests
         Assert.True(AvlTree.AvlCompareKey("a", "") > 0);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlCompareKey"/> handles strings
+    /// of different lengths correctly: longer strings are greater
+    /// if they share a common prefix, and case differences
+    /// do not affect equality.
+    /// </summary>
     [Fact]
     public void AvlCompareKey_CaseInsensitive_DifferentLengths()
     {
@@ -39,6 +65,11 @@ public class AvlTreeTests
         Assert.True(AvlTree.AvlCompareKey("ABC", "abc") == 0);
     }
 
+    /// <summary>
+    /// Verifies that inserting into an empty tree makes the
+    /// inserted node the root, returns <see cref="AvlResult.AvlBalanced"/>,
+    /// and the root has no children.
+    /// </summary>
     [Fact]
     public void AvlInsert_EmptyTree_BecomesRoot()
     {
@@ -53,6 +84,11 @@ public class AvlTreeTests
         Assert.Null(root.Right);
     }
 
+    /// <summary>
+    /// Verifies that inserting a node with a duplicate filename
+    /// (case-insensitive match) returns <see cref="AvlResult.AvlError"/>
+    /// and does not modify the tree.
+    /// </summary>
     [Fact]
     public void AvlInsert_Duplicate_ReturnsError()
     {
@@ -66,6 +102,11 @@ public class AvlTreeTests
         Assert.Equal(AvlResult.AvlError, result);
     }
 
+    /// <summary>
+    /// Verifies that inserting a node with a filename that differs
+    /// only in case from an existing node returns
+    /// <see cref="AvlResult.AvlError"/>.
+    /// </summary>
     [Fact]
     public void AvlInsert_CaseInsensitiveDuplicate_ReturnsError()
     {
@@ -79,6 +120,11 @@ public class AvlTreeTests
         Assert.Equal(AvlResult.AvlError, result);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlFetch"/> returns the exact
+    /// node instance for each inserted filename (case-insensitive lookup)
+    /// and returns null for a non-existent key.
+    /// </summary>
     [Fact]
     public void AvlFetch_FindsInsertedNode()
     {
@@ -98,19 +144,27 @@ public class AvlTreeTests
         Assert.Null(AvlTree.AvlFetch(root, "delta"));
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlFetch"/> returns null
+    /// when called on a null root.
+    /// </summary>
     [Fact]
     public void AvlFetch_EmptyTree_ReturnsNull()
     {
         Assert.Null(AvlTree.AvlFetch(null, "anything"));
     }
 
+    /// <summary>
+    /// Verifies that inserting 100 nodes with sequential filenames
+    /// produces a balanced tree (depth &lt;= 12), that all nodes
+    /// are retrievable, and that no duplicate errors occur.
+    /// </summary>
     [Fact]
     public void AvlInsert_MultipleNodes_TreeIsBalanced()
     {
         AvlNode? root = null;
         var nodes = new List<AvlNode>();
 
-        // Insert nodes in ascending order (worst case for unbalanced tree)
         for (var i = 0; i < 100; i++)
         {
             var node = new AvlNode { Filename = $"file{i:D3}" };
@@ -119,23 +173,25 @@ public class AvlTreeTests
             Assert.NotEqual(AvlResult.AvlError, result);
         }
 
-        // Verify all nodes can be found
         foreach (var node in nodes)
         {
             var found = AvlTree.AvlFetch(root, node.Filename);
             Assert.Same(node, found);
         }
 
-        // Verify tree depth is logarithmic (balanced)
         var depth = GetTreeDepth(root);
         Assert.True(depth <= 12, $"Tree depth {depth} exceeds expected max for 100 nodes (should be ~7)");
     }
 
+    /// <summary>
+    /// Verifies that prefix traversal visits all five inserted nodes
+    /// exactly once, with at least one valid element found
+    /// at each position in the visited list.
+    /// </summary>
     [Fact]
     public void AvlTraverse_Prefix_VisitsInCorrectOrder()
     {
         AvlNode? root = null;
-        // Insert to form a known tree structure
         var nodeC = new AvlNode { Filename = "c" };
         var nodeA = new AvlNode { Filename = "a" };
         var nodeB = new AvlNode { Filename = "b" };
@@ -155,8 +211,6 @@ public class AvlTreeTests
             return 0;
         }, visited, AvlTraversalMethod.Prefix, 0);
 
-        // Prefix: root, left subtree, right subtree
-        // The tree shape depends on insert order; verify it's valid prefix order
         Assert.Equal(5, visited.Count);
         Assert.Contains("a", visited);
         Assert.Contains("b", visited);
@@ -165,6 +219,10 @@ public class AvlTreeTests
         Assert.Contains("e", visited);
     }
 
+    /// <summary>
+    /// Verifies that infix (in-order) traversal visits nodes
+    /// in case-insensitive sorted alphabetical order.
+    /// </summary>
     [Fact]
     public void AvlTraverse_Infix_VisitsInSortedOrder()
     {
@@ -181,17 +239,18 @@ public class AvlTreeTests
             return 0;
         }, visited, AvlTraversalMethod.Infix, 0);
 
-        // Infix should be sorted (case-insensitive)
         Assert.Equal(new[] { "a", "b", "m", "q", "z" }, visited);
     }
 
+    /// <summary>
+    /// Verifies that postfix traversal visits children before
+    /// their parent and that the tree root is the last
+    /// node visited.
+    /// </summary>
     [Fact]
     public void AvlTraverse_Postfix_VisitsChildrenBeforeParent()
     {
         AvlNode? root = null;
-        // Insert in order that yields a known structure without double rotation:
-        // "c", "a", "e", "b" — the AVL rebalancing will create a balanced tree.
-        // We just verify the root is visited last in postfix.
         AvlTree.AvlInsert(ref root, new AvlNode { Filename = "c" });
         AvlTree.AvlInsert(ref root, new AvlNode { Filename = "a" });
         AvlTree.AvlInsert(ref root, new AvlNode { Filename = "e" });
@@ -205,10 +264,13 @@ public class AvlTreeTests
         }, visited, AvlTraversalMethod.Postfix, 0);
 
         Assert.Equal(4, visited.Count);
-        // In postfix, the root node should be visited last
         Assert.Equal(root!.Filename, visited[^1]);
     }
 
+    /// <summary>
+    /// Verifies that traversing a null root returns zero
+    /// without invoking the callback.
+    /// </summary>
     [Fact]
     public void AvlTraverse_NullRoot_ReturnsZero()
     {
@@ -216,6 +278,11 @@ public class AvlTreeTests
         Assert.Equal(0, result);
     }
 
+    /// <summary>
+    /// Verifies that traversal stops immediately when the
+    /// callback returns a non-zero value, and that the
+    /// non-zero value is propagated as the return value.
+    /// </summary>
     [Fact]
     public void AvlTraverse_CallbackError_StopsTraversal()
     {
@@ -228,13 +295,19 @@ public class AvlTreeTests
         var result = AvlTree.AvlTraverseDepthFirst(root, (_, _, _) =>
         {
             callCount++;
-            return 1; // error stops traversal
+            return 1;
         }, null, AvlTraversalMethod.Prefix, 0);
 
         Assert.Equal(1, result);
         Assert.Equal(1, callCount);
     }
 
+    /// <summary>
+    /// Verifies that assigning <see cref="AvlNode.EmptySubdirectory"/>
+    /// to a node's Subdirectory property results in a non-null,
+    /// referentially identical sentinel value that is distinct
+    /// from a newly constructed <see cref="AvlNode"/>.
+    /// </summary>
     [Fact]
     public void EmptySubdirectory_Sentinel_IsNotNullAndIdentifiable()
     {
@@ -245,11 +318,15 @@ public class AvlTreeTests
         Assert.NotSame(new AvlNode(), AvlNode.EmptySubdirectory);
     }
 
+    /// <summary>
+    /// Verifies that after inserting 50 nodes with sequential
+    /// filenames, the balance factor at every node in the tree
+    /// is within the AVL invariant of ±1.
+    /// </summary>
     [Fact]
     public void AvlInsert_ManyNodes_AllSkewsValid()
     {
         AvlNode? root = null;
-        // Insert nodes in sequential order (tests rebalancing)
         for (var i = 0; i < 50; i++)
         {
             var node = new AvlNode { Filename = $"f{i:D4}" };
@@ -259,6 +336,11 @@ public class AvlTreeTests
         VerifyAvlBalance(root);
     }
 
+    /// <summary>
+    /// Verifies that inserting 200 nodes with random, distinct
+    /// filenames results in a balanced tree where every node
+    /// is retrievable via <see cref="AvlTree.AvlFetch"/>.
+    /// </summary>
     [Fact]
     public void AvlInsert_RandomOrder_Consistent()
     {
@@ -278,7 +360,6 @@ public class AvlTreeTests
 
         VerifyAvlBalance(root);
 
-        // All nodes findable
         foreach (var name in names)
         {
             Assert.NotNull(AvlTree.AvlFetch(root, name));

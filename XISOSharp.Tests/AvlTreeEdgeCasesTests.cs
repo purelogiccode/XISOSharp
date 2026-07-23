@@ -2,20 +2,38 @@ using XISOSharp.DataStructures;
 
 namespace XISOSharp.Tests;
 
+/// <summary>
+/// Edge-case and error-handling tests for the <see cref="AvlTree"/>
+/// static methods: freeing trees, null or empty inputs, invalid
+/// traversal methods, and duplicate insert validation.
+/// </summary>
 public class AvlTreeEdgeCasesTests
 {
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.FreeTree"/> does not throw
+    /// when passed a null root.
+    /// </summary>
     [Fact]
     public void FreeTree_NullRoot_DoesNotThrow()
     {
         AvlTree.FreeTree(null);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.FreeTree"/> does not throw
+    /// when passed the <see cref="AvlNode.EmptySubdirectory"/> sentinel.
+    /// </summary>
     [Fact]
     public void FreeTree_EmptySubdirectory_DoesNotThrow()
     {
         AvlTree.FreeTree(AvlNode.EmptySubdirectory);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.FreeTree"/> clears the
+    /// Left, Right, and Subdirectory references on all nodes
+    /// in a simple two-node tree.
+    /// </summary>
     [Fact]
     public void FreeTree_SimpleTree_CleansUpReferences()
     {
@@ -38,6 +56,11 @@ public class AvlTreeEdgeCasesTests
         Assert.Null(node2.Subdirectory);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.FreeTree"/> recursively
+    /// cleans up references on nodes in a tree that contains
+    /// a subdirectory, including references inside the subtree.
+    /// </summary>
     [Fact]
     public void FreeTree_WithSubdirectory_CleansUpRecursively()
     {
@@ -59,6 +82,11 @@ public class AvlTreeEdgeCasesTests
         Assert.Null(dirNode.Subdirectory);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlFetch"/> throws a
+    /// <see cref="NullReferenceException"/> when the key argument
+    /// is null.
+    /// </summary>
     [Fact]
     public void AvlFetch_NullFilename_ThrowsNullReferenceException()
     {
@@ -69,6 +97,10 @@ public class AvlTreeEdgeCasesTests
         Assert.Throws<NullReferenceException>(() => AvlTree.AvlFetch(root, null!));
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlFetch"/> returns null
+    /// when searching an empty tree with an empty string key.
+    /// </summary>
     [Fact]
     public void AvlFetch_EmptyKey_ReturnsNull_UnlessInsertedEmpty()
     {
@@ -77,6 +109,11 @@ public class AvlTreeEdgeCasesTests
         Assert.Null(result);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlTraverseDepthFirst"/>
+    /// returns zero and never invokes the callback when passed
+    /// an invalid <see cref="AvlTraversalMethod"/> value (99).
+    /// </summary>
     [Fact]
     public void AvlTraverseDepthFirst_InvalidMethod_ReturnsZero()
     {
@@ -98,6 +135,10 @@ public class AvlTreeEdgeCasesTests
         }
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlCompareKey"/> returns zero
+    /// when comparing a string to the exact same reference.
+    /// </summary>
     [Fact]
     public void AvlCompareKey_SameString_ReturnsZero()
     {
@@ -106,6 +147,11 @@ public class AvlTreeEdgeCasesTests
         Assert.Equal(0, AvlTree.AvlCompareKey(same, same));
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlCompareKey"/> correctly
+    /// orders strings of different lengths that share a common
+    /// prefix: the shorter string sorts before the longer one.
+    /// </summary>
     [Fact]
     public void AvlCompareKey_DifferentLengths()
     {
@@ -116,6 +162,12 @@ public class AvlTreeEdgeCasesTests
         Assert.True(AvlTree.AvlCompareKey(longer, shorter) > 0);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlCompareKey"/> performs
+    /// case-insensitive comparisons: strings differing only in case
+    /// are equal, and ordering follows ordinal rules after
+    /// normalizing case.
+    /// </summary>
     [Fact]
     public void AvlCompareKey_CaseInsensitiveComparison()
     {
@@ -130,6 +182,12 @@ public class AvlTreeEdgeCasesTests
         Assert.True(AvlTree.AvlCompareKey(d, a) > 0);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlTree.AvlTraverseDepthFirst"/>
+    /// returns zero for all three traversal methods (Prefix, Infix,
+    /// Postfix) when given a null root, and the callback is
+    /// never invoked.
+    /// </summary>
     [Fact]
     public void AvlTraverseDepthFirst_NullRoot_AllMethods_ReturnZero()
     {
@@ -146,6 +204,11 @@ public class AvlTreeEdgeCasesTests
         Assert.Equal(0, callCount);
     }
 
+    /// <summary>
+    /// Verifies that inserting a node with the same filename
+    /// as an existing node returns <see cref="AvlResult.AvlError"/>,
+    /// after the first insert returns <see cref="AvlResult.AvlBalanced"/>.
+    /// </summary>
     [Fact]
     public void AvlInsert_Duplicate_ReturnsAvlError()
     {
@@ -157,6 +220,11 @@ public class AvlTreeEdgeCasesTests
         Assert.Equal(AvlResult.AvlError, AvlTree.AvlInsert(ref root, node2));
     }
 
+    /// <summary>
+    /// Verifies that inserting nodes whose filenames differ only
+    /// in case is treated as a duplicate: the first insert
+    /// succeeds and the second returns <see cref="AvlResult.AvlError"/>.
+    /// </summary>
     [Fact]
     public void AvlInsert_CaseInsensitiveDuplicate_ReturnsAvlError()
     {

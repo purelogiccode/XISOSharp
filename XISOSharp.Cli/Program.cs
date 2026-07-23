@@ -118,7 +118,7 @@ internal class Program
 
         if (createList.Count > 0)
         {
-            foreach (var (dir, name) in createList)
+            foreach ((string dir, string? name) in createList)
             {
                 string? outputDir = null;
                 string? isoName = null;

@@ -9,12 +9,34 @@ using XISOSharpTester.Models;
 
 namespace XISOSharpTester.Services;
 
+/// <summary>
+/// Orchestrates batch testing of XISO disc images by running
+/// verify, list, extract, and rewrite comparisons against both
+/// the managed XISOSharp.Core library and the native extract-xiso.exe
+/// tool (when available).
+/// </summary>
 public class XisoTestRunner
 {
     private static string? _xisoSharpVersion;
 
+    /// <summary>
+    /// Gets the version string of the extract-xiso.exe executable,
+    /// if it was successfully detected during the last run.
+    /// </summary>
     public string? XisoSharpVersion => _xisoSharpVersion;
 
+    /// <summary>
+    /// Runs the full test suite against all specified XISO files,
+    /// reporting progress to an optional <paramref name="progress"/>
+    /// callback.
+    /// </summary>
+    /// <param name="files">The list of XISO entries to test.</param>
+    /// <param name="xisoSharpExePath">
+    /// Path to extract-xiso.exe. If the file does not exist,
+    /// comparison tests against the native tool are skipped.
+    /// </param>
+    /// <param name="progress">Optional progress reporter invoked after each file.</param>
+    /// <returns>A <see cref="TestSessionResult"/> aggregating all per-file results.</returns>
     public async Task<TestSessionResult> RunAsync(
         List<XisoFileEntry> files,
         string xisoSharpExePath,
@@ -109,7 +131,7 @@ public class XisoTestRunner
         try
         {
             using var fs = File.OpenRead(entry.FilePath);
-            var (rootDirSector, rootDirSize, discLseek) = XisoReader.VerifyXiso(fs, entry.FileName);
+            (uint rootDirSector, uint rootDirSize, long discLseek) = XisoReader.VerifyXiso(fs, entry.FileName);
             tSw.Stop();
 
             var csDetail = $"Valid XISO | RootSector={rootDirSector} RootSize={rootDirSize} DiscLseek={discLseek}";
@@ -486,7 +508,7 @@ public class XisoTestRunner
                 TestName = "Rewrite Compare",
                 Status = match ? TestStatus.Passed : TestStatus.Failed,
                 Detail = match
-                    ? $"SHA-256: {csHash} ✓ ({(csSize / (1024.0 * 1024)):F1} MB vs {(exeSize / (1024.0 * 1024)):F1} MB)"
+                    ? $"SHA-256: {csHash} \u2713 ({(csSize / (1024.0 * 1024)):F1} MB vs {(exeSize / (1024.0 * 1024)):F1} MB)"
                     : $"SHA-256 MISMATCH\nC#:      {csHash} ({(csSize / (1024.0 * 1024)):F1} MB)\nextract-xiso: {exeHash} ({(exeSize / (1024.0 * 1024)):F1} MB)",
                 ElapsedSeconds = tSw.Elapsed.TotalSeconds
             });
@@ -508,8 +530,6 @@ public class XisoTestRunner
             DeleteDirectorySafe(exeWorkDir);
         }
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────
 
     private static string CaptureCSharpListOutput(string isoPath)
     {
@@ -586,7 +606,7 @@ public class XisoTestRunner
         var matchCount = 0;
         var mismatchCount = 0;
 
-        foreach (var (path, csEntry) in csByPath)
+        foreach ((string path, ListEntry csEntry) in csByPath)
         {
             if (exeByPath.TryGetValue(path, out var exeEntry))
             {
@@ -618,7 +638,7 @@ public class XisoTestRunner
         var allMatch = mismatchCount == 0;
         if (allMatch)
         {
-            details.Add($"{matchCount} entries match ✓");
+            details.Add($"{matchCount} entries match \u2713");
         }
 
         return new ListComparison(allMatch, string.Join("\n", details));
@@ -640,7 +660,7 @@ public class XisoTestRunner
             .Select(f => (FullPath: f, Relative: Path.GetRelativePath(exeDir, f)))
             .ToDictionary(x => x.Relative, StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (relative, csPath) in csFiles)
+        foreach ((string relative, (string FullPath, string Relative) csPath) in csFiles)
         {
             if (exeFiles.TryGetValue(relative, out var exePath))
             {
@@ -652,18 +672,18 @@ public class XisoTestRunner
                     {
                         matchCount++;
                         if (matchCount <= 5)
-                            details.Add($"✓ {relative}");
+                            details.Add($"\u2713 {relative}");
                     }
                     else
                     {
                         mismatchCount++;
-                        details.Add($"✗ SHA-256 MISMATCH: {relative}\n  C#: {csHash}\n  exe: {exeHash}");
+                        details.Add($"\u2717 SHA-256 MISMATCH: {relative}\n  C#: {csHash}\n  exe: {exeHash}");
                     }
                 }
                 catch (Exception ex)
                 {
                     mismatchCount++;
-                    details.Add($"✗ Error hashing {relative}: {ex.Message}");
+                    details.Add($"\u2717 Error hashing {relative}: {ex.Message}");
                 }
             }
             else
@@ -688,7 +708,7 @@ public class XisoTestRunner
         if (allMatch)
         {
             details.Clear();
-            details.Add($"{matchCount} files extracted, all SHA-256 hashes match ✓");
+            details.Add($"{matchCount} files extracted, all SHA-256 hashes match \u2713");
         }
 
         return new DirComparison(allMatch, string.Join("\n", details));

@@ -2,8 +2,16 @@ using XISOSharp.DataStructures;
 
 namespace XISOSharp.Tests;
 
+/// <summary>
+/// Unit tests for the <see cref="AvlNode"/> data structure
+/// and the <see cref="AvlSkew"/> enumeration.
+/// </summary>
 public class AvlNodeTests
 {
+    /// <summary>
+    /// Verifies that <see cref="AvlSkew"/> enumeration values
+    /// are 0 (NoSkew), 1 (LeftSkew), and 2 (RightSkew).
+    /// </summary>
     [Fact]
     public void AvlSkew_Values()
     {
@@ -12,6 +20,10 @@ public class AvlNodeTests
         Assert.Equal(2, (int)AvlSkew.RightSkew);
     }
 
+    /// <summary>
+    /// Verifies that a newly constructed <see cref="AvlNode"/>
+    /// has expected default values for all fields.
+    /// </summary>
     [Fact]
     public void New_AvlNode_HasDefaults()
     {
@@ -29,6 +41,10 @@ public class AvlNodeTests
         Assert.Null(node.Right);
     }
 
+    /// <summary>
+    /// Verifies that all properties of an <see cref="AvlNode"/>
+    /// can be set via object initializer and read back correctly.
+    /// </summary>
     [Fact]
     public void AvlNode_FieldsCanBeSet()
     {
@@ -62,18 +78,31 @@ public class AvlNodeTests
         Assert.Same(right, node.Right);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlNode.EmptySubdirectory"/>
+    /// is not null.
+    /// </summary>
     [Fact]
     public void EmptySubdirectory_IsNotNull()
     {
         Assert.NotNull(AvlNode.EmptySubdirectory);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlNode.EmptySubdirectory"/>
+    /// always returns the same singleton instance.
+    /// </summary>
     [Fact]
     public void EmptySubdirectory_IsSingleton()
     {
         Assert.Same(AvlNode.EmptySubdirectory, AvlNode.EmptySubdirectory);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlNode.EmptySubdirectory"/>
+    /// has default field values (empty filename, zero offset,
+    /// null left/right children).
+    /// </summary>
     [Fact]
     public void EmptySubdirectory_HasDefaults()
     {
@@ -83,12 +112,22 @@ public class AvlNodeTests
         Assert.Null(AvlNode.EmptySubdirectory.Right);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="AvlNode.EmptySubdirectory"/>
+    /// is a distinct instance, not the same as a newly
+    /// constructed <see cref="AvlNode"/>.
+    /// </summary>
     [Fact]
     public void EmptySubdirectory_IsDistinctFromNewNode()
     {
         Assert.NotSame(new AvlNode(), AvlNode.EmptySubdirectory);
     }
 
+    /// <summary>
+    /// Verifies that the <see cref="AvlNode.Skew"/> property
+    /// can be set to all three <see cref="AvlSkew"/> values
+    /// (NoSkew, LeftSkew, RightSkew) and read back correctly.
+    /// </summary>
     [Fact]
     public void AvlNode_AllSkewValues_CanBeSet()
     {

@@ -273,7 +273,7 @@ internal class MainViewModel : INotifyPropertyChanged
             < 1024L * 1024 * 1024 => $"{totalSize / (1024.0 * 1024):F1} MB",
             _ => $"{totalSize / (1024.0 * 1024 * 1024):F2} GB"
         };
-        FilesSummary = $"{Files.Count} file(s) — {sizeStr} total";
+        FilesSummary = $"{Files.Count} file(s) \u2014 {sizeStr} total";
         OnPropertyChanged(nameof(CanRunTests));
     }
 
@@ -434,33 +434,67 @@ internal class MainViewModel : INotifyPropertyChanged
     }
 }
 
+/// <summary>
+/// Represents a single log entry displayed in the application's
+/// scrolling log output, with a message and timestamp.
+/// </summary>
 public class LogEntry
 {
+    /// <summary>
+    /// Gets or sets the log message text.
+    /// </summary>
     public string Message { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the timestamp string (e.g. "14:30:05").
+    /// </summary>
     public string Timestamp { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// A generic command implementation for WPF that delegates
+/// its execution and can-execute logic to callbacks. Also
+/// wires the <c>CommandManager.RequerySuggested</c> event.
+/// </summary>
 public class RelayCommand : ICommand
 {
     private readonly Action<object?> _execute;
     private readonly Func<object?, bool>? _canExecute;
 
+    /// <summary>
+    /// Creates a new <see cref="RelayCommand"/>.
+    /// </summary>
+    /// <param name="execute">The delegate to invoke when the command is executed.</param>
+    /// <param name="canExecute">
+    /// Optional delegate that determines whether the command can execute.
+    /// If <c>null</c>, the command is always enabled.
+    /// </param>
     internal RelayCommand(Action<object?> execute, Func<object?, bool>? canExecute = null)
     {
         _execute = execute;
         _canExecute = canExecute;
     }
 
+    /// <summary>
+    /// Determines whether the command can execute in its current state.
+    /// </summary>
     public bool CanExecute(object? parameter)
     {
         return _canExecute?.Invoke(parameter) ?? true;
     }
 
+    /// <summary>
+    /// Invokes the execute delegate.
+    /// </summary>
     public void Execute(object? parameter)
     {
         _execute(parameter);
     }
 
+    /// <summary>
+    /// Occurs when changes in the UI state affect whether the command
+    /// should execute.
+    /// </summary>
     public event EventHandler? CanExecuteChanged
     {
         add => CommandManager.RequerySuggested += value;

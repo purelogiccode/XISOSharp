@@ -1,30 +1,24 @@
-# CSharp-ExtractXiso
+# CSharp_XISOSharp
 
-A C# port of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool v2.7.1 by in `<in@fishtank.com>`.
-
-Extract-XISO is a command-line tool for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images.
-
-## License
-
-MIT
+A pure C# implementation of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2.7.1, the tool for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images.
 
 ## Projects
 
 | Project | Description |
 |---|---|
-| [ExtractXiso.Core](ExtractXiso.Core/) | Class library — available as the [ExtractXiso](https://www.nuget.org/) NuGet package |
-| [ExtractXiso.Cli](ExtractXiso.Cli/) | CLI tool (`extract-xiso`) |
-| [ExtractXisoTester](ExtractXisoTester/) | WPF GUI application for batch testing XISO operations |
-| [ExtractXiso.Tests](ExtractXiso.Tests/) | Unit tests (xUnit) |
+| [XISOSharp.Core](XISOSharp.Core/README.md) | Core class library with the complete XISO read/write engine |
+| [XISOSharp.Cli](XISOSharp.Cli/README.md) | CLI tool compatible with the original extract-xiso |
+| [XISOSharp.Tests](XISOSharp.Tests/README.md) | Unit tests for the core library |
+| [XISOSharpTester](XISOSharpTester/README.md) | WPF GUI for batch regression testing against the C tool |
 
-## Building
+## Build
 
-```bash
-dotnet build CSharp_ExtractXiso.sln --configuration Release
+Open `CSharp_XISOSharp.sln` in Visual Studio or run:
+
+```
+dotnet build
 ```
 
-## Testing
+## License
 
-```bash
-dotnet test ExtractXiso.Tests/ExtractXiso.Tests.csproj --configuration Release
-```
+MIT

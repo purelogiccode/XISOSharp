@@ -369,7 +369,7 @@ public static class XisoReader
 
         if (fileSize == 0)
         {
-            Logger.Log($"extracting {path}{filename} (0 bytes) [100%]\r");
+            Logger.Log($"extracting {path}{filename} (0 bytes) [100%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
             Logger.Flush();
         }
         else
@@ -390,7 +390,7 @@ public static class XisoReader
 
                 totalSize += (uint)readSize;
                 var percent = (uint)(totalSize * 100.0 / fileSize);
-                Logger.Log($"extracting {path}{filename} ({fileSize} bytes) [{percent}%]\r");
+                Logger.Log($"extracting {path}{filename} ({fileSize} bytes) [{percent}%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
                 Logger.Flush();
 
                 size = Math.Min(fileSize - totalSize, Constants.ReadWriteBufferSize);
@@ -481,7 +481,7 @@ public static class XisoReader
                 BufferSize = 65536
             });
 
-        var (rootDirSect, rootDirSize, discLseek) = VerifyXiso(fs, name);
+        (uint rootDirSect, uint rootDirSize, long discLseek) = VerifyXiso(fs, name);
 
         Logger.XboxDiscLseek = discLseek;
 

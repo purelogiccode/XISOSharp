@@ -2,9 +2,7 @@
 
 Command-line tool for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images.
 
-## License
-
-MIT
+This project is a direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) CLI tool (v2.7.1) from C to C#. It provides the same interface and produces byte-identical output for all operations.
 
 ## Usage
 
@@ -29,8 +27,12 @@ extract-xiso [options] -c <dir> [name] [-c <dir> [name]] ...
 | `-d <directory>` | In extract mode, expand xiso in `<directory>`. In rewrite mode, rewrite xiso in `<directory>` |
 | `-D` | In rewrite mode, delete old xiso after processing |
 | `-h` | Print help text and exit |
-| `-m` | Disable automatic `.xbe` media enable patching (not recommended) |
+| `-m` | Disable automatic `.xbe` media enable patching |
 | `-q` | Quiet (suppress all non-error output) |
 | `-Q` | Silent (suppress all output) |
 | `-s` | Skip `$SystemUpdate` folder |
 | `-v` | Print version information and exit |
+
+## License
+
+MIT

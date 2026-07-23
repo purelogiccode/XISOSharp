@@ -1,7 +1,13 @@
 namespace XISOSharp.Tests;
 
+/// <summary>
+/// Tests for the BoyerMoore byte-pattern search algorithm.
+/// </summary>
 public class BoyerMooreTests
 {
+    /// <summary>
+    /// Verifies that Init sets up internal tables without throwing an exception.
+    /// </summary>
     [Fact]
     public void Init_SetsUpTables()
     {
@@ -11,6 +17,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search finds a pattern located at the start of the text.
+    /// </summary>
     [Fact]
     public void Search_FindsPatternAtStart()
     {
@@ -24,6 +33,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search finds a pattern located in the middle of the text.
+    /// </summary>
     [Fact]
     public void Search_FindsPatternInMiddle()
     {
@@ -37,6 +49,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search finds a pattern located at the end of the text.
+    /// </summary>
     [Fact]
     public void Search_FindsPatternAtEnd()
     {
@@ -50,6 +65,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search returns -1 when the pattern is not present in the text.
+    /// </summary>
     [Fact]
     public void Search_NoMatch_ReturnsMinusOne()
     {
@@ -63,6 +81,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search returns -1 when given an empty text buffer.
+    /// </summary>
     [Fact]
     public void Search_EmptyText_ReturnsMinusOne()
     {
@@ -75,6 +96,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search returns -1 when the pattern is longer than the text.
+    /// </summary>
     [Fact]
     public void Search_PatternLongerThanText_ReturnsMinusOne()
     {
@@ -88,6 +112,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search returns the index of the first occurrence when multiple matches exist.
+    /// </summary>
     [Fact]
     public void Search_FindsFirstOfMultipleMatches()
     {
@@ -101,6 +128,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search finds the MediaEnable byte pattern placed at a known offset within a buffer.
+    /// </summary>
     [Fact]
     public void Search_MediaEnablePattern_InBuffer()
     {
@@ -119,6 +149,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search returns -1 when the MediaEnable pattern is not present in the buffer.
+    /// </summary>
     [Fact]
     public void Search_MediaEnablePattern_NotFound()
     {
@@ -134,6 +167,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that the Search overload with start index and length respects the specified range boundaries.
+    /// </summary>
     [Fact]
     public void Search_WithOffset_RespectsBoundary()
     {
@@ -154,6 +190,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search correctly finds a single-byte pattern in a buffer with multiple occurrences.
+    /// </summary>
     [Fact]
     public void Search_SingleBytePattern()
     {
@@ -167,6 +206,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search finds the first occurrence of the MediaEnable pattern in a 1000-byte buffer when multiple matches exist.
+    /// </summary>
     [Fact]
     public void Search_MediaEnablePattern_In1000ByteBuffer()
     {
@@ -201,6 +243,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that Search correctly handles a pattern consisting of repeating identical bytes.
+    /// </summary>
     [Fact]
     public void Search_PatternWithRepeatingBytes()
     {
@@ -214,6 +259,9 @@ public class BoyerMooreTests
         bm.Done();
     }
 
+    /// <summary>
+    /// Verifies that calling Done then reinitializing with a new pattern on a new instance works correctly.
+    /// </summary>
     [Fact]
     public void Init_ThenDone_CanReinit()
     {

@@ -5,8 +5,16 @@ using Serilog;
 
 namespace XISOSharpTester;
 
+/// <summary>
+/// Application entry point for the XISOSharp Tester WPF application.
+/// Configures Serilog logging, writes the log to a rolling file
+/// in local app data, and logs startup and shutdown events.
+/// </summary>
 public partial class App
 {
+    /// <summary>
+    /// Configures Serilog logging before the application window opens.
+    /// </summary>
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -26,6 +34,10 @@ public partial class App
         Log.Information("XISOSharpTester started");
     }
 
+    /// <summary>
+    /// Logs the shutdown event and flushes the Serilog log before
+    /// the application exits.
+    /// </summary>
     protected override void OnExit(ExitEventArgs e)
     {
         Log.Information("XISOSharpTester exiting");

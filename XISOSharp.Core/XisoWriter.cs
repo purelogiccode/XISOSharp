@@ -100,7 +100,7 @@ public static class XisoWriter
         {
             isoName = "root";
         }
-        else if (isoName.Length > 1 && isoName[1] == ':')
+        else if (OperatingSystem.IsWindows() && isoName.Length > 1 && isoName[1] == ':')
         {
             isoName = isoName[1..];
         }

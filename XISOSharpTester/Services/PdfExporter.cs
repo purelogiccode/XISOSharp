@@ -6,6 +6,10 @@ using XISOSharpTester.Models;
 
 namespace XISOSharpTester.Services;
 
+/// <summary>
+/// Provides a static method to export test session results as a
+/// formatted PDF report using the QuestPDF library.
+/// </summary>
 public static class PdfExporter
 {
     static PdfExporter()
@@ -13,6 +17,17 @@ public static class PdfExporter
         Settings.License = LicenseType.Community;
     }
 
+    /// <summary>
+    /// Generates a landscape A4 PDF report from the specified
+    /// <paramref name="session"/> results and writes it to
+    /// <paramref name="outputPath"/>.
+    /// </summary>
+    /// <param name="session">The completed test session results to export.</param>
+    /// <param name="xisoSharpVersion">
+    /// Optional version string of the extract-xiso executable used,
+    /// included in the report header.
+    /// </param>
+    /// <param name="outputPath">Full file path where the PDF will be written.</param>
     public static void Export(TestSessionResult session, string? xisoSharpVersion, string outputPath)
     {
         Document.Create(container =>
@@ -118,9 +133,9 @@ public static class PdfExporter
         var parts = file.SubTests.Select(t =>
             $"{(t.Status switch
             {
-                TestStatus.Passed => "✓",
-                TestStatus.Failed => "✗",
-                _ => "○"
+                TestStatus.Passed => "\u2713",
+                TestStatus.Failed => "\u2717",
+                _ => "\u25CB"
             })} {t.TestName}");
         return string.Join("  ", parts);
     }

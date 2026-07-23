@@ -1,5 +1,8 @@
 namespace XISOSharp.Tests;
 
+/// <summary>
+/// Tests for the Logger utility class, verifying output routing, suppression flags, and field management.
+/// </summary>
 public class LoggerTests : IDisposable
 {
     private readonly StringWriter _outCapture;
@@ -38,6 +41,9 @@ public class LoggerTests : IDisposable
         _errorCapture.Dispose();
     }
 
+    /// <summary>
+    /// Verifies that Log writes the given message to the output stream.
+    /// </summary>
     [Fact]
     public void Log_WritesToOut()
     {
@@ -45,6 +51,9 @@ public class LoggerTests : IDisposable
         Assert.Equal("hello", _outCapture.ToString());
     }
 
+    /// <summary>
+    /// Verifies that Log formats messages with string placeholders and arguments.
+    /// </summary>
     [Fact]
     public void Log_WithArgs()
     {
@@ -52,6 +61,9 @@ public class LoggerTests : IDisposable
         Assert.Equal("hello world 42", _outCapture.ToString());
     }
 
+    /// <summary>
+    /// Verifies that Log produces no output when Quiet mode is enabled.
+    /// </summary>
     [Fact]
     public void Log_SuppressedWhenQuiet()
     {
@@ -60,6 +72,9 @@ public class LoggerTests : IDisposable
         Assert.Equal("", _outCapture.ToString());
     }
 
+    /// <summary>
+    /// Verifies that LogLine writes the message followed by a newline to the output stream.
+    /// </summary>
     [Fact]
     public void LogLine_WritesWithNewline()
     {
@@ -67,6 +82,9 @@ public class LoggerTests : IDisposable
         Assert.Equal("test\r\n", _outCapture.ToString());
     }
 
+    /// <summary>
+    /// Verifies that LogLine produces no output when Quiet mode is enabled.
+    /// </summary>
     [Fact]
     public void LogLine_SuppressedWhenQuiet()
     {
@@ -75,6 +93,9 @@ public class LoggerTests : IDisposable
         Assert.Equal("", _outCapture.ToString());
     }
 
+    /// <summary>
+    /// Verifies that LogErr writes the given message to the error stream.
+    /// </summary>
     [Fact]
     public void LogErr_WritesToError()
     {
@@ -82,6 +103,9 @@ public class LoggerTests : IDisposable
         Assert.Equal("error msg", _errorCapture.ToString());
     }
 
+    /// <summary>
+    /// Verifies that LogErr formats error messages with string placeholders and arguments.
+    /// </summary>
     [Fact]
     public void LogErr_WithArgs()
     {
@@ -89,6 +113,9 @@ public class LoggerTests : IDisposable
         Assert.Equal("error 99", _errorCapture.ToString());
     }
 
+    /// <summary>
+    /// Verifies that LogErr produces no output when RealQuiet mode is enabled.
+    /// </summary>
     [Fact]
     public void LogErr_SuppressedWhenRealQuiet()
     {
@@ -97,6 +124,9 @@ public class LoggerTests : IDisposable
         Assert.Equal("", _errorCapture.ToString());
     }
 
+    /// <summary>
+    /// Verifies that Flush does not throw when Quiet is disabled.
+    /// </summary>
     [Fact]
     public void Flush_DoesNotThrow_WhenNotQuiet()
     {
@@ -104,6 +134,9 @@ public class LoggerTests : IDisposable
         Logger.Flush();
     }
 
+    /// <summary>
+    /// Verifies that Flush does not throw when Quiet mode is enabled.
+    /// </summary>
     [Fact]
     public void Flush_DoesNotThrow_WhenQuiet()
     {
@@ -111,6 +144,9 @@ public class LoggerTests : IDisposable
         Logger.Flush();
     }
 
+    /// <summary>
+    /// Verifies the default values of all Logger static fields after construction.
+    /// </summary>
     [Fact]
     public void Fields_DefaultValues()
     {
@@ -126,6 +162,9 @@ public class LoggerTests : IDisposable
         Assert.Equal(0, Logger.XboxDiscLseek);
     }
 
+    /// <summary>
+    /// Verifies that all Logger static fields can be set to non-default values and read back correctly.
+    /// </summary>
     [Fact]
     public void Fields_CanBeSet()
     {

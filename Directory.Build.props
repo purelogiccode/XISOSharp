@@ -1,0 +1,16 @@
+<Project>
+
+    <PropertyGroup>
+        <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <Authors>drpetersonfernandes</Authors>
+        <Copyright>Copyright (c) drpetersonfernandes</Copyright>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/drpetersonfernandes/XISOSharp</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/drpetersonfernandes/XISOSharp.git</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <RepositoryBranch>main</RepositoryBranch>
+    </PropertyGroup>
+
+</Project>

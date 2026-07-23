@@ -14,25 +14,22 @@
         <!-- NuGet metadata -->
         <PackageId>XISOSharp</PackageId>
         <Version>2.7.1</Version>
-        <Authors>in</Authors>
-        <Copyright>Copyright (c) in &lt;in@fishtank.com&gt;</Copyright>
+        <Title>XISOSharp</Title>
         <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats.</Description>
-        <PackageLicenseFile>LICENSE</PackageLicenseFile>
         <PackageTags>xiso;xbox;iso;extract-xiso;xgd3;xgd1;xbe;disc-image;original-xbox</PackageTags>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageIcon>icon.png</PackageIcon>
-        <PackageProjectUrl>https://github.com/drpetersonfernandes/XISOSharp</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/drpetersonfernandes/XISOSharp.git</RepositoryUrl>
-        <RepositoryType>git</RepositoryType>
         <PackageReleaseNotes>See https://github.com/drpetersonfernandes/XISOSharp/releases</PackageReleaseNotes>
+        <MinClientVersion>5.0</MinClientVersion>
 
         <!-- XML documentation -->
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <NoWarn>$(NoWarn);CS1591</NoWarn>
 
         <!-- Source Link + reproducible builds -->
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedAllSources>true</EmbedAllSources>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <DebugType>portable</DebugType>
         <Deterministic>true</Deterministic>
         <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
 
