@@ -17,7 +17,7 @@ public record VolumeInfo(
     uint RootDirSize,
     long DiscLseek,
     long FileLength,
-    uint TotalSectors);
+    long TotalSectors);
 
 /// <summary>
 /// Metadata about a single directory entry within an XISO image.

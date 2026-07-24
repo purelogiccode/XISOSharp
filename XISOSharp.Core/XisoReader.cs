@@ -108,7 +108,7 @@ public static class XisoReader
         }
 
         var fileLength = fs.Length;
-        var totalSectors = (uint)(fileLength / Constants.SectorSize);
+        var totalSectors = fileLength / Constants.SectorSize;
 
         if (rootDirSector >= totalSectors)
         {
@@ -124,7 +124,7 @@ public static class XisoReader
                 $"Corrupt XISO: {isoName} — root directory size is zero with non-zero sector pointer.");
         }
 
-        var availableBytes = (long)(totalSectors - rootDirSector) * Constants.SectorSize;
+        var availableBytes = (totalSectors - rootDirSector) * (long)Constants.SectorSize;
         if (rootDirSize > availableBytes)
         {
             Logger.LogErr($"{isoName}: root directory size {rootDirSize} exceeds available space {availableBytes}\n");
@@ -341,7 +341,7 @@ public static class XisoReader
             {
                 if (llCompat)
                 {
-                    var sector = (int)((curpos - dirStart) / Constants.SectorSize);
+                    var sector = (curpos - dirStart) / Constants.SectorSize;
                     if ((long)rOffset * Constants.DwordSize / Constants.SectorSize > sector)
                     {
                         rOffset = (ushort)(sector * (Constants.SectorSize / Constants.DwordSize) +
@@ -746,7 +746,7 @@ public static class XisoReader
             });
 
         var fileLength = fs.Length;
-        var totalSectors = (uint)(fileLength / Constants.SectorSize);
+        var totalSectors = fileLength / Constants.SectorSize;
 
         if (fileLength < Constants.HeaderOffset + Constants.HeaderDataLength)
             return new VolumeInfo(false, 0, 0, 0, fileLength, totalSectors);

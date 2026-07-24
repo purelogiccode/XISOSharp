@@ -244,7 +244,15 @@ public static class XisoWriter
                 xisoFs.Write(buf, 0, (int)pad);
             }
 
-            WriteVolumeDescriptors(xisoFs, (uint)((pos + pad) / Constants.SectorSize));
+            var totalSectors = (pos + pad) / Constants.SectorSize;
+            if (totalSectors > uint.MaxValue)
+            {
+                Logger.LogErr($"Error: image too large ({totalSectors} sectors exceeds 32-bit limit)\n");
+                err = 1;
+                goto cleanup;
+            }
+
+            WriteVolumeDescriptors(xisoFs, (uint)totalSectors);
 
             xisoFs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
             var tagBytes = Encoding.ASCII.GetBytes(Constants.OptimizedTag);
@@ -782,8 +790,6 @@ public static class XisoWriter
     /// <param name="totalSectors">Total number of sectors in the image.</param>
     internal static void WriteVolumeDescriptors(FileStream fs, uint totalSectors)
     {
-        var little = (int)totalSectors;
-
         fs.Seek(Constants.Ecma119DataAreaStart, SeekOrigin.Begin);
         fs.WriteByte(0x01);
         fs.Write("CD001"u8);
@@ -792,7 +798,7 @@ public static class XisoWriter
         fs.Seek(Constants.Ecma119VolumeSpaceSize, SeekOrigin.Begin);
         Span<byte> leBuf = stackalloc byte[4];
         Span<byte> beBuf = stackalloc byte[4];
-        BinaryPrimitives.WriteUInt32LittleEndian(leBuf, (uint)little);
+        BinaryPrimitives.WriteUInt32LittleEndian(leBuf, totalSectors);
         fs.Write(leBuf);
         BinaryPrimitives.WriteUInt32BigEndian(beBuf, totalSectors);
         fs.Write(beBuf);
