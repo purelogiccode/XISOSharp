@@ -137,7 +137,20 @@ internal static class Program
                     }
                 }
 
-                XisoWriter.CreateXiso(dir, outputDir, null, null, out _, isoName, null);
+                try
+                {
+                    XisoWriter.CreateXiso(dir, outputDir, null, null, out _, isoName, null);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Logger.LogErr($"Error: permission denied: {ex.Message}\n");
+                    return 1;
+                }
+                catch (IOException ex)
+                {
+                    Logger.LogErr($"Error: {ex.Message}\n");
+                    return 1;
+                }
             }
             return 0;
         }
@@ -226,6 +239,16 @@ internal static class Program
                 catch (ExtractErrorException ex) when (ex.ErrorCode == ExtractError.ErrIsoNoFiles)
                 {
                     err = 0;
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Logger.LogErr($"Error: permission denied: {ex.Message}\n");
+                    err = 1;
+                }
+                catch (IOException ex)
+                {
+                    Logger.LogErr($"Error: {ex.Message}\n");
+                    err = 1;
                 }
                 catch (Exception ex)
                 {

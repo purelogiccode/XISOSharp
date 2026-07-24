@@ -106,6 +106,31 @@ public static class XisoReader
             throw new ExtractErrorException(ExtractError.ErrIsoNoFiles);
         }
 
+        var fileLength = fs.Length;
+        var totalSectors = (uint)(fileLength / Constants.SectorSize);
+
+        if (rootDirSector >= totalSectors)
+        {
+            Logger.LogErr($"{isoName}: root directory sector {rootDirSector} exceeds total sectors {totalSectors}\n");
+            throw new InvalidDataException(
+                $"Corrupt XISO: {isoName} — root directory sector {rootDirSector} is beyond end of image ({totalSectors} sectors).");
+        }
+
+        if (rootDirSize == 0)
+        {
+            Logger.LogErr($"{isoName}: root directory size is zero but sector is non-zero\n");
+            throw new InvalidDataException(
+                $"Corrupt XISO: {isoName} — root directory size is zero with non-zero sector pointer.");
+        }
+
+        var availableBytes = (long)(totalSectors - rootDirSector) * Constants.SectorSize;
+        if (rootDirSize > availableBytes)
+        {
+            Logger.LogErr($"{isoName}: root directory size {rootDirSize} exceeds available space {availableBytes}\n");
+            throw new InvalidDataException(
+                $"Corrupt XISO: {isoName} — root directory size {rootDirSize} bytes exceeds available space ({availableBytes} bytes from sector {rootDirSector}).");
+        }
+
         fs.Seek((long)rootDirSector * Constants.SectorSize + discLseek, SeekOrigin.Begin);
 
         return (rootDirSector, rootDirSize, discLseek);
@@ -192,7 +217,7 @@ public static class XisoReader
 
             var nameBuf = new byte[filenameLength];
             ReadExact(fs, nameBuf);
-            var filename = Encoding.ASCII.GetString(nameBuf);
+            var filename = Latin1Encoding.Instance.GetString(nameBuf);
 
             if (string.Equals(filename, ".", StringComparison.Ordinal) || string.Equals(filename, "..", StringComparison.Ordinal) ||
                 filename.Contains('/') || filename.Contains('\\'))
@@ -217,11 +242,18 @@ public static class XisoReader
             {
                 llCompat = false;
 
+                var leftSeek = dirStart + (long)lOffset * Constants.DwordSize;
+                if (leftSeek >= fs.Length)
+                {
+                    Logger.LogErr($"warning: left offset {lOffset} (seek {leftSeek}) exceeds file length {fs.Length}, truncating directory.\n");
+                    goto end_traverse;
+                }
+
                 var left = new DirEntry();
                 dir.Left = left;
                 left.Parent = dir;
 
-                fs.Seek(dirStart + (long)lOffset * Constants.DwordSize, SeekOrigin.Begin);
+                fs.Seek(leftSeek, SeekOrigin.Begin);
 
                 var savedDir = dir.Left!;
                 TraverseXiso(fs, savedDir, dirStart, path, mode, ref avlRoot, llCompat, discLseek);
@@ -316,7 +348,14 @@ public static class XisoReader
                     }
                 }
 
-                fs.Seek(dirStart + (long)rOffset * Constants.DwordSize, SeekOrigin.Begin);
+                var rightSeek = dirStart + (long)rOffset * Constants.DwordSize;
+                if (rightSeek >= fs.Length)
+                {
+                    Logger.LogErr($"warning: right offset {rOffset} (seek {rightSeek}) exceeds file length {fs.Length}, truncating directory.\n");
+                    break;
+                }
+
+                fs.Seek(rightSeek, SeekOrigin.Begin);
 
                 dir.Filename = "";
                 lOffset = rOffset;
@@ -527,8 +566,21 @@ public static class XisoReader
         if (mode == ExtractMode.Extract && outputPath != null)
         {
             cwd = Directory.GetCurrentDirectory();
-            Directory.CreateDirectory(outputPath);
-            Directory.SetCurrentDirectory(outputPath);
+            try
+            {
+                Directory.CreateDirectory(outputPath);
+                Directory.SetCurrentDirectory(outputPath);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Logger.LogErr($"Error: permission denied: {outputPath}\n");
+                throw new IOException($"Permission denied: {outputPath}", ex);
+            }
+            catch (IOException ex)
+            {
+                Logger.LogErr($"Error: cannot access output directory: {outputPath}: {ex.Message}\n");
+                throw;
+            }
         }
 
         using var fs = new FileStream(
@@ -553,8 +605,21 @@ public static class XisoReader
 
             if (mode == ExtractMode.Extract && outputPath == null)
             {
-                Directory.CreateDirectory(isoName);
-                Directory.SetCurrentDirectory(isoName);
+                try
+                {
+                    Directory.CreateDirectory(isoName);
+                    Directory.SetCurrentDirectory(isoName);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Logger.LogErr($"Error: permission denied: {isoName}\n");
+                    throw new IOException($"Permission denied: {isoName}", ex);
+                }
+                catch (IOException ex)
+                {
+                    Logger.LogErr($"Error: cannot create output directory: {isoName}: {ex.Message}\n");
+                    throw;
+                }
             }
         }
 

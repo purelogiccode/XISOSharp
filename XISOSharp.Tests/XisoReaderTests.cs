@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace XISOSharp.Tests;
 
 /// <summary>
@@ -250,5 +252,62 @@ public class XisoReaderTests : IDisposable
     {
         var ex = new ExtractErrorException(ExtractError.ErrIsoNoFiles);
         Assert.Contains("ErrIsoNoFiles", ex.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Verifies that VerifyXiso throws InvalidDataException (not OutOfMemoryException)
+    /// when the header contains a valid magic but an absurdly large rootDirSize that
+    /// exceeds the available space in the file.
+    /// </summary>
+    [Fact]
+    public void VerifyXiso_InsaneRootDirSize_ThrowsInvalidDataException()
+    {
+        var invalidPath = Path.Combine(Path.GetTempPath(), $"xiso_bad_toc_{Guid.NewGuid()}.bin");
+        try
+        {
+            var magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
+            const int fileLength = Constants.HeaderOffset + Constants.HeaderDataLength
+                                                          + 4 + 4
+                                                          + Constants.FileTimeSize + Constants.UnusedSize
+                                                          + Constants.HeaderDataLength;
+
+            var data = new byte[fileLength];
+            Array.Copy(magic, 0, data, Constants.HeaderOffset, magic.Length);
+
+            const int sectorOffset = Constants.HeaderOffset + Constants.HeaderDataLength;
+            data[sectorOffset] = 0x08;
+            data[sectorOffset + 1] = 0x01;
+            data[sectorOffset + 2] = 0x00;
+            data[sectorOffset + 3] = 0x00;
+
+            const int sizeOffset = sectorOffset + 4;
+            data[sizeOffset] = 0x00;
+            data[sizeOffset + 1] = 0x00;
+            data[sizeOffset + 2] = 0x00;
+            data[sizeOffset + 3] = 0x10;
+
+            const int trailingOffset = Constants.HeaderOffset + Constants.HeaderDataLength
+                                                              + 4 + 4
+                                                              + Constants.FileTimeSize + Constants.UnusedSize;
+            Array.Copy(magic, 0, data, trailingOffset, magic.Length);
+
+            File.WriteAllBytes(invalidPath, data);
+
+            Assert.Throws<InvalidDataException>(() =>
+            {
+                using var fs = new FileStream(invalidPath, new FileStreamOptions
+                {
+                    Mode = FileMode.Open,
+                    Access = FileAccess.Read,
+                    Share = FileShare.Read
+                });
+                XisoReader.VerifyXiso(fs, "bad_toc.iso");
+            });
+        }
+        finally
+        {
+            if (File.Exists(invalidPath))
+                File.Delete(invalidPath);
+        }
     }
 }

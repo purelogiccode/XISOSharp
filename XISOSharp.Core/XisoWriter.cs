@@ -126,16 +126,22 @@ public static class XisoWriter
         else
         {
             var n = 0;
+            var filesSkipped = 0;
             Logger.Log("generating avl tree from filesystem: ");
             Logger.Flush();
 
-            err = GenerateAvlTreeLocal(ref root.Subdirectory, ref n);
+            err = GenerateAvlTreeLocal(ref root.Subdirectory, ref n, ref filesSkipped);
 
             for (var i = 0; i < n; i++) Logger.Log("\b");
             for (var i = 0; i < n; i++) Logger.Log(" ");
             for (var i = 0; i < n; i++) Logger.Log("\b");
 
             Logger.Log($"{(err != 0 ? "failed!" : "[OK]")}\n\n");
+
+            if (filesSkipped > 0)
+            {
+                Logger.LogErr($"warning: {filesSkipped} file(s)/director(y/ies) skipped due to access errors.\n");
+            }
         }
 
         if (err != 0) goto cleanup;
@@ -253,6 +259,16 @@ public static class XisoWriter
         {
             throw;
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            Logger.LogErr($"Error: permission denied: {xisoPath}\n{ex.Message}\n");
+            err = 1;
+        }
+        catch (IOException ex)
+        {
+            Logger.LogErr($"Error: cannot write to {xisoPath}: {ex.Message}\n");
+            err = 1;
+        }
         catch (Exception ex)
         {
             Logger.LogErr($"{ex.Message}\n");
@@ -363,6 +379,12 @@ public static class XisoWriter
             fileSizeForEntry += (Constants.SectorSize - (avl.FileSize % Constants.SectorSize)) % Constants.SectorSize;
         }
 
+        if (avl.Filename.Contains('/') || avl.Filename.Contains('\\'))
+        {
+            throw new InvalidOperationException(
+                $"Filename '{avl.Filename}' contains path separator characters ('/' or '\\') which are not allowed in XISO directory entries.");
+        }
+
         var attributes = avl.Subdirectory != null ? Constants.AttributeDir : Constants.AttributeArc;
         var length = (byte)avl.Filename.Length;
 
@@ -392,7 +414,7 @@ public static class XisoWriter
         fs.WriteByte(attributes);
         fs.WriteByte(length);
 
-        var nameBytes = Encoding.ASCII.GetBytes(avl.Filename);
+        var nameBytes = Latin1Encoding.Instance.GetBytes(avl.Filename);
         fs.Write(nameBytes, 0, length);
 
         return 0;
@@ -511,11 +533,13 @@ public static class XisoWriter
     /// <summary>
     /// Recursively descends into the current working directory, building an AVL tree
     /// of all files and subdirectories found. Updates the progress display as it goes.
+    /// Inaccessible entries are skipped with a warning rather than aborting.
     /// </summary>
     /// <param name="outRoot">Receives the root of the generated AVL tree.</param>
     /// <param name="ioN">Running count of filename characters for progress display.</param>
+    /// <param name="filesSkipped">Running count of entries skipped due to access errors.</param>
     /// <returns>0 on success.</returns>
-    internal static int GenerateAvlTreeLocal(ref AvlNode? outRoot, ref int ioN)
+    internal static int GenerateAvlTreeLocal(ref AvlNode? outRoot, ref int ioN, ref int filesSkipped)
     {
         var entries = Directory.GetFileSystemEntries(".");
         var emptyDir = true;
@@ -527,45 +551,69 @@ public static class XisoWriter
             if (entryName is "." or "..")
                 continue;
 
-            for (var i = ioN; i > 0; i--) Logger.Log("\b");
-            Logger.Log(entryName);
-            var nameLen = entryName.Length;
-            for (var j = nameLen; j < ioN; j++) Logger.Log(" ");
-            for (var j = nameLen; j < ioN; j++) Logger.Log("\b");
-            ioN = nameLen;
-            Logger.Flush();
-
-            var attr = File.GetAttributes(entryPath);
-            var avl = new AvlNode { Filename = entryName };
-
-            if ((attr & FileAttributes.Directory) != FileAttributes.None)
+            try
             {
-                if (Logger.RemoveSystemUpdate && entryName.Contains("$SystemUpdate", StringComparison.Ordinal))
-                    continue;
+                for (var i = ioN; i > 0; i--) Logger.Log("\b");
+                Logger.Log(entryName);
+                var nameLen = entryName.Length;
+                for (var j = nameLen; j < ioN; j++) Logger.Log(" ");
+                for (var j = nameLen; j < ioN; j++) Logger.Log("\b");
+                ioN = nameLen;
+                Logger.Flush();
 
-                emptyDir = false;
-                var prevDir = Directory.GetCurrentDirectory();
-                Directory.SetCurrentDirectory(entryName);
+                var attr = File.GetAttributes(entryPath);
+                var avl = new AvlNode { Filename = entryName };
 
-                GenerateAvlTreeLocal(ref avl.Subdirectory, ref ioN);
-
-                Directory.SetCurrentDirectory(prevDir);
-            }
-            else
-            {
-                emptyDir = false;
-                var fi = new FileInfo(entryPath);
-                if (fi.Length > uint.MaxValue)
+                if ((attr & FileAttributes.Directory) != FileAttributes.None)
                 {
-                    Logger.LogErr($"file {avl.Filename} is too large for xiso, skipping...\n");
-                    continue;
-                }
-                avl.FileSize = (uint)fi.Length;
-                Logger.TotalBytes += avl.FileSize;
-                Logger.TotalFiles++;
-            }
+                    if (Logger.RemoveSystemUpdate && entryName.Contains("$SystemUpdate", StringComparison.Ordinal))
+                        continue;
 
-            AvlTree.AvlInsert(ref outRoot, avl);
+                    emptyDir = false;
+                    var prevDir = Directory.GetCurrentDirectory();
+                    Directory.SetCurrentDirectory(entryName);
+
+                    GenerateAvlTreeLocal(ref avl.Subdirectory, ref ioN, ref filesSkipped);
+
+                    Directory.SetCurrentDirectory(prevDir);
+                }
+                else
+                {
+                    emptyDir = false;
+                    var fi = new FileInfo(entryPath);
+                    if (fi.Length > uint.MaxValue)
+                    {
+                        Logger.LogErr($"file {avl.Filename} is too large for xiso, skipping...\n");
+                        filesSkipped++;
+                        continue;
+                    }
+                    avl.FileSize = (uint)fi.Length;
+                    Logger.TotalBytes += avl.FileSize;
+                    Logger.TotalFiles++;
+                }
+
+                AvlTree.AvlInsert(ref outRoot, avl);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                Logger.LogErr($"warning: permission denied: {entryName}, skipping.\n");
+                filesSkipped++;
+            }
+            catch (PathTooLongException)
+            {
+                Logger.LogErr($"warning: path too long: {entryName}, skipping.\n");
+                filesSkipped++;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                Logger.LogErr($"warning: directory not found: {entryName}, skipping.\n");
+                filesSkipped++;
+            }
+            catch (IOException ex)
+            {
+                Logger.LogErr($"warning: I/O error on {entryName}: {ex.Message}, skipping.\n");
+                filesSkipped++;
+            }
         }
 
         if (emptyDir)

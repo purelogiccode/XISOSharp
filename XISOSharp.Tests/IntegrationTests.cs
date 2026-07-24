@@ -232,4 +232,34 @@ public class IntegrationTests : IDisposable
         Assert.Equal(0, extractResult);
         Assert.True(File.Exists(Path.Combine(customSubdir, "file1.txt")));
     }
+
+    /// <summary>
+    /// Verifies that filenames containing non-ASCII Latin-1 bytes (e.g. 0xE9 = é)
+    /// survive a full create → extract round-trip without being replaced by '?'.
+    /// </summary>
+    [Fact]
+    public void CreateXiso_ThenExtract_NonAsciiFilename_PreservesLatin1Bytes()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+        var extractDir = CreateTempDir();
+
+        // Create a file whose name contains é (U+00E9, byte 0xE9 in Latin-1)
+        var nonAsciiName = "café" + (char)0xE9 + ".txt";
+        var filePath = Path.Combine(srcDir, nonAsciiName);
+        File.WriteAllText(filePath, "non-ascii content");
+
+        var createResult = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.Equal(0, createResult);
+        Assert.NotNull(isoPath);
+
+        var extractResult = XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        Assert.Equal(0, extractResult);
+
+        var extractedFiles = Directory.GetFiles(extractDir);
+        Assert.Single(extractedFiles);
+        var extractedName = Path.GetFileName(extractedFiles[0]);
+        Assert.Equal(nonAsciiName, extractedName);
+        Assert.Equal("non-ascii content", File.ReadAllText(extractedFiles[0]));
+    }
 }
