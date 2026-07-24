@@ -2,6 +2,7 @@ using QuestPDF;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+
 using XISOSharpTester.Models;
 
 namespace XISOSharpTester.Services;
@@ -36,7 +37,7 @@ public static class PdfExporter
             {
                 page.Size(PageSizes.A4.Landscape());
                 page.Margin(20);
-                page.DefaultTextStyle(x => x.FontSize(9));
+                page.DefaultTextStyle(static x => x.FontSize(9));
 
                 page.Header().Column(header =>
                 {
@@ -71,7 +72,7 @@ public static class PdfExporter
 
                 page.Content().PaddingTop(10).Table(table =>
                 {
-                    table.ColumnsDefinition(cols =>
+                    table.ColumnsDefinition(static cols =>
                     {
                         cols.RelativeColumn(2.5f);
                         cols.RelativeColumn(1.2f);
@@ -81,7 +82,7 @@ public static class PdfExporter
                         cols.RelativeColumn();
                     });
 
-                    table.Header(header =>
+                    table.Header(static header =>
                     {
                         header.Cell().Background(Colors.Grey.Lighten3)
                             .Padding(3).Text("File").Bold();
@@ -130,7 +131,7 @@ public static class PdfExporter
 
     private static string FormatSubTests(PerFileResult file)
     {
-        var parts = file.SubTests.Select(t =>
+        var parts = file.SubTests.Select(static t =>
             $"{(t.Status switch
             {
                 TestStatus.Passed => "\u2713",

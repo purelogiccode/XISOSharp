@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Windows;
+
 using Serilog;
 
 namespace XISOSharpTester;

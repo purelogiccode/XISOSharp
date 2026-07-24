@@ -60,6 +60,7 @@ internal static class Latin1Encoding
 
         /// <inheritdoc/>
         public override int GetMaxByteCount(int charCount) => charCount;
+
         /// <inheritdoc/>
         public override int GetMaxCharCount(int byteCount) => byteCount;
     }

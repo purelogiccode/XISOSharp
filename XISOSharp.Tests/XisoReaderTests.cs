@@ -40,7 +40,7 @@ public class XisoReaderTests : IDisposable
 
         if (!string.IsNullOrEmpty(_tempDir) && Directory.Exists(_tempDir))
         {
-            try { Directory.Delete(_tempDir, recursive: true); }
+            try { Directory.Delete(_tempDir, true); }
             catch { /* cleanup best-effort */ }
         }
     }
@@ -71,7 +71,7 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void VerifyXiso_NonExistentFile_Throws()
     {
-        Assert.Throws<FileNotFoundException>(() =>
+        Assert.Throws<FileNotFoundException>(static () =>
         {
             using var fs = new FileStream(NonExistentPath, new FileStreamOptions
             {
@@ -89,7 +89,7 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void VerifyXiso_InvalidFileNotIso_Throws()
     {
-        Assert.Throws<IOException>(() =>
+        Assert.Throws<IOException>(static () =>
         {
             using var fs = new FileStream(InvalidFilePath, new FileStreamOptions
             {

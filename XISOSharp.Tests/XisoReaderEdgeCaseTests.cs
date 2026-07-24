@@ -59,7 +59,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
         var isoPath = CreateTestIso();
         var entries = XisoReader.ListDirectory(isoPath, "/subdir/nested");
         Assert.NotEmpty(entries);
-        Assert.Contains(entries, e => string.Equals(e.Name, "deep.txt", StringComparison.Ordinal));
+        Assert.Contains(entries, static e => string.Equals(e.Name, "deep.txt", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -68,14 +68,14 @@ public class XisoReaderEdgeCaseTests : IDisposable
         var tempFile = Path.Combine(CreateTempDir(), "bad.bin");
         File.WriteAllBytes(tempFile, new byte[1024]);
 
-        Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(tempFile, "/"));
+        Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(tempFile));
     }
 
     [Fact]
     public void ListDirectory_EntryInfo_SectorAndSizeAreConsistent()
     {
         var isoPath = CreateTestIso();
-        var entries = XisoReader.ListDirectory(isoPath, "/");
+        var entries = XisoReader.ListDirectory(isoPath);
 
         foreach (var entry in entries)
         {
@@ -216,8 +216,8 @@ public class XisoReaderEdgeCaseTests : IDisposable
 
         Assert.NotEmpty(hashes);
         // Should include subfile.txt and nested/deep.txt
-        Assert.Contains(hashes, h => h.Path.Contains("subfile.txt", StringComparison.Ordinal));
-        Assert.Contains(hashes, h => h.Path.Contains("deep.txt", StringComparison.Ordinal));
+        Assert.Contains(hashes, static h => h.Path.Contains("subfile.txt", StringComparison.Ordinal));
+        Assert.Contains(hashes, static h => h.Path.Contains("deep.txt", StringComparison.Ordinal));
     }
 
     #endregion
@@ -361,7 +361,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
         var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        #pragma warning disable MA0004
+#pragma warning disable MA0004
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
             await XisoReader.DecodeXisoAsync(isoPath, extractDir, ExtractMode.Extract, false, cts.Token));
         #pragma warning restore MA0004
@@ -377,7 +377,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
         var isoPath = CreateTestIso();
 
         using var fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var (_, _, discLseek) = XisoReader.VerifyXiso(fs, "test.iso");
+        (_, _, long discLseek) = XisoReader.VerifyXiso(fs, "test.iso");
 
         Assert.Equal(0, discLseek);
     }
@@ -399,7 +399,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
         XisoReader.Rewrite(isoPath, rewriteDir, out var rewrittenPath);
         Assert.NotNull(rewrittenPath);
 
-        XisoReader.Extract(rewrittenPath, extractDir, llCompat: false);
+        XisoReader.Extract(rewrittenPath, extractDir, false);
 
         // Verify all files preserved
         Assert.True(File.Exists(Path.Combine(extractDir, "file1.txt")));

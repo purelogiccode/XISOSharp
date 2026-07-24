@@ -39,7 +39,7 @@ public class Latin1EncodingTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         Assert.True(File.Exists(Path.Combine(extractDir, "hello.txt")));
     }
@@ -56,7 +56,7 @@ public class Latin1EncodingTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         Assert.True(File.Exists(Path.Combine(extractDir, "file with spaces.txt")));
     }
@@ -73,7 +73,7 @@ public class Latin1EncodingTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         Assert.True(File.Exists(Path.Combine(extractDir, "file.name.with.dots.txt")));
     }
@@ -90,7 +90,7 @@ public class Latin1EncodingTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         Assert.True(File.Exists(Path.Combine(extractDir, "my-file_name.txt")));
     }
@@ -107,7 +107,7 @@ public class Latin1EncodingTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         Assert.True(File.Exists(Path.Combine(extractDir, "README.TXT")));
     }
@@ -120,13 +120,13 @@ public class Latin1EncodingTests : IDisposable
         var extractDir = CreateTempDir();
 
         // 40-char filename (under 42-byte XISO limit for some implementations)
-        var longName = "this_is_a_filename_that_is_quite_long.txt";
+        const string longName = "this_is_a_filename_that_is_quite_long.txt";
         File.WriteAllText(Path.Combine(srcDir, longName), "content");
 
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         Assert.True(File.Exists(Path.Combine(extractDir, longName)),
             $"Long filename '{longName}' not preserved");
@@ -146,7 +146,7 @@ public class Latin1EncodingTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         var extractedFiles = Directory.GetFiles(extractDir);
         Assert.Single(extractedFiles);
@@ -163,13 +163,17 @@ public class Latin1EncodingTests : IDisposable
 
         // Create file with all 256 byte values
         var data = new byte[256];
-        for (var i = 0; i < 256; i++) data[i] = (byte)i;
+        for (var i = 0; i < 256; i++)
+        {
+            data[i] = (byte)i;
+        }
+
         File.WriteAllBytes(Path.Combine(srcDir, "allbytes.bin"), data);
 
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         var extracted = File.ReadAllBytes(Path.Combine(extractDir, "allbytes.bin"));
         Assert.Equal(data, extracted);
@@ -187,7 +191,7 @@ public class Latin1EncodingTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         Assert.True(File.Exists(Path.Combine(extractDir, "empty.txt")));
         Assert.Equal(0, new FileInfo(Path.Combine(extractDir, "empty.txt")).Length);
@@ -202,13 +206,7 @@ public class Latin1EncodingTests : IDisposable
 
         var names = new[]
         {
-            "normal.txt",
-            "with spaces.txt",
-            "with-dashes.txt",
-            "with.dots.txt",
-            "UPPERCASE.TXT",
-            "MiXeD.CaSe",
-            "123numeric.txt",
+            "normal.txt", "with spaces.txt", "with-dashes.txt", "with.dots.txt", "UPPERCASE.TXT", "MiXeD.CaSe", "123numeric.txt"
         };
 
         foreach (var name in names)
@@ -219,7 +217,7 @@ public class Latin1EncodingTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         foreach (var name in names)
         {

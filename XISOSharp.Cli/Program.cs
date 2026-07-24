@@ -547,7 +547,9 @@ internal static class Program
                         }
 
                         if (!valResult.Passed && validateStrict)
+                        {
                             err = 2;
+                        }
                     }
 
                     if (deleteOld) File.Delete(oldPath);

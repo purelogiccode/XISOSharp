@@ -205,7 +205,7 @@ public class AvlTreeTests
         AvlTree.AvlInsert(ref root, nodeD);
 
         var visited = new List<string>();
-        AvlTree.AvlTraverseDepthFirst(root, (node, ctx, _) =>
+        AvlTree.AvlTraverseDepthFirst(root, static (node, ctx, _) =>
         {
             ((List<string>)ctx!).Add(node.Filename);
             return 0;
@@ -233,7 +233,7 @@ public class AvlTreeTests
         }
 
         var visited = new List<string>();
-        AvlTree.AvlTraverseDepthFirst(root, (node, ctx, _) =>
+        AvlTree.AvlTraverseDepthFirst(root, static (node, ctx, _) =>
         {
             ((List<string>)ctx!).Add(node.Filename);
             return 0;
@@ -257,7 +257,7 @@ public class AvlTreeTests
         AvlTree.AvlInsert(ref root, new AvlNode { Filename = "b" });
 
         var visited = new List<string>();
-        AvlTree.AvlTraverseDepthFirst(root, (node, ctx, _) =>
+        AvlTree.AvlTraverseDepthFirst(root, static (node, ctx, _) =>
         {
             ((List<string>)ctx!).Add(node.Filename);
             return 0;
@@ -274,7 +274,7 @@ public class AvlTreeTests
     [Fact]
     public void AvlTraverse_NullRoot_ReturnsZero()
     {
-        var result = AvlTree.AvlTraverseDepthFirst(null, (_, _, _) => 1, null, AvlTraversalMethod.Prefix, 0);
+        var result = AvlTree.AvlTraverseDepthFirst(null, static (_, _, _) => 1, null, AvlTraversalMethod.Prefix, 0);
         Assert.Equal(0, result);
     }
 

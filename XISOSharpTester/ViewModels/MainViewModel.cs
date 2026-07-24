@@ -6,8 +6,11 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Input;
+
 using Microsoft.Win32;
+
 using Serilog;
+
 using XISOSharpTester.Models;
 using XISOSharpTester.Services;
 using XISOSharpTester.Views;
@@ -28,8 +31,8 @@ internal class MainViewModel : INotifyPropertyChanged
         ExportPdfCommand = new RelayCommand(_ => ExportPdf(), _ => HasResults);
         CopyLogCommand = new RelayCommand(_ => CopyLog());
         CopyResultsCommand = new RelayCommand(_ => CopyResults(), _ => HasResults);
-        AboutCommand = new RelayCommand(_ => ShowAbout());
-        ExitCommand = new RelayCommand(_ => ExitApp());
+        AboutCommand = new RelayCommand(static _ => ShowAbout());
+        ExitCommand = new RelayCommand(static _ => ExitApp());
 
         AutoDetectXisoSharp();
     }
@@ -44,13 +47,17 @@ internal class MainViewModel : INotifyPropertyChanged
     }
 
     private string _xisoSharpPath = string.Empty;
+
     public string XisoSharpPath
     {
         get => _xisoSharpPath;
-        set { _xisoSharpPath = value;
+        set
+        {
+            _xisoSharpPath = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsXisoSharpValid));
-            OnPropertyChanged(nameof(CanRunTests)); }
+            OnPropertyChanged(nameof(CanRunTests));
+        }
     }
 
     public bool IsXisoSharpValid => !string.IsNullOrEmpty(XisoSharpPath) && File.Exists(XisoSharpPath);
@@ -58,11 +65,15 @@ internal class MainViewModel : INotifyPropertyChanged
     public ObservableCollection<XisoFileEntry> Files { get; } = [];
 
     private string _filesSummary = "No files selected.";
+
     public string FilesSummary
     {
         get => _filesSummary;
-        set { _filesSummary = value;
-            OnPropertyChanged(); }
+        set
+        {
+            _filesSummary = value;
+            OnPropertyChanged();
+        }
     }
 
     public ICommand BrowseXisoSharpCommand { get; }
@@ -79,14 +90,18 @@ internal class MainViewModel : INotifyPropertyChanged
     public bool CanRunTests => Files.Count > 0 && !IsRunning;
 
     private bool _isRunning;
+
     public bool IsRunning
     {
         get => _isRunning;
-        set { _isRunning = value;
+        set
+        {
+            _isRunning = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(CanRunTests));
             OnPropertyChanged(nameof(ShowProgress));
-            OnPropertyChanged(nameof(ShowResults)); }
+            OnPropertyChanged(nameof(ShowResults));
+        }
     }
 
     public bool ShowProgress => IsRunning;
@@ -94,56 +109,81 @@ internal class MainViewModel : INotifyPropertyChanged
     public bool ShowResults => !IsRunning && HasResults;
 
     private double _progressValue;
+
     public double ProgressValue
     {
         get => _progressValue;
-        set { _progressValue = value;
-            OnPropertyChanged(); }
+        set
+        {
+            _progressValue = value;
+            OnPropertyChanged();
+        }
     }
 
     private string _statusText = "Ready.";
+
     public string StatusText
     {
         get => _statusText;
-        set { _statusText = value;
-            OnPropertyChanged(); }
+        set
+        {
+            _statusText = value;
+            OnPropertyChanged();
+        }
     }
 
     private string _progressText = "Ready.";
+
     public string ProgressText
     {
         get => _progressText;
-        set { _progressText = value;
-            OnPropertyChanged(); }
+        set
+        {
+            _progressText = value;
+            OnPropertyChanged();
+        }
     }
 
     private string _currentTest = string.Empty;
+
     public string CurrentTest
     {
         get => _currentTest;
-        set { _currentTest = value;
-            OnPropertyChanged(); }
+        set
+        {
+            _currentTest = value;
+            OnPropertyChanged();
+        }
     }
 
     private string _fileProgress = string.Empty;
+
     public string FileProgress
     {
         get => _fileProgress;
-        set { _fileProgress = value;
-            OnPropertyChanged(); }
+        set
+        {
+            _fileProgress = value;
+            OnPropertyChanged();
+        }
     }
 
     private string _logText = string.Empty;
+
     public string LogText
     {
         get => _logText;
-        set { _logText = value;
-            OnPropertyChanged(); }
+        set
+        {
+            _logText = value;
+            OnPropertyChanged();
+        }
     }
 
     public ObservableCollection<LogEntry> LogEntries { get; } = [];
 
     private TestSessionResult? _sessionResult;
+
     public TestSessionResult? SessionResult
     {
         get => _sessionResult;
@@ -175,11 +215,15 @@ internal class MainViewModel : INotifyPropertyChanged
         : string.Empty;
 
     private string _summarySubText = string.Empty;
+
     public string SummarySubText
     {
         get => _summarySubText;
-        set { _summarySubText = value;
-            OnPropertyChanged(); }
+        set
+        {
+            _summarySubText = value;
+            OnPropertyChanged();
+        }
     }
 
     public ObservableCollection<PerFileResult> FileResults => SessionResult?.FileResults != null
@@ -215,6 +259,7 @@ internal class MainViewModel : INotifyPropertyChanged
             {
                 AddFileIfNew(path);
             }
+
             UpdateFilesSummary();
             AddLog($"Added {dlg.FileNames.Length} file(s). Total: {Files.Count}");
         }
@@ -235,6 +280,7 @@ internal class MainViewModel : INotifyPropertyChanged
                 {
                     AddFileIfNew(path);
                 }
+
                 UpdateFilesSummary();
                 AddLog($"Added {isoFiles.Length} file(s) from folder. Total: {Files.Count}");
             }
@@ -265,7 +311,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private void UpdateFilesSummary()
     {
-        var totalSize = Files.Sum(f => new FileInfo(f.FilePath).Length);
+        var totalSize = Files.Sum(static f => new FileInfo(f.FilePath).Length);
         var sizeStr = totalSize switch
         {
             < 1024 => $"{totalSize} B",
@@ -399,6 +445,7 @@ internal class MainViewModel : INotifyPropertyChanged
                 };
                 sb.AppendLine(CultureInfo.InvariantCulture, $"  {icon} {t.TestName,-22} {t.ElapsedSeconds,6:N2}s  {t.Detail}");
             }
+
             sb.AppendLine();
         }
 

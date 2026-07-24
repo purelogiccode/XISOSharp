@@ -57,7 +57,7 @@ public class XisoValidatorTests : IDisposable
     {
         var isoPath = CreateIsoFromSource();
 
-        var result = XisoValidator.ValidateConversion(isoPath, isoPath, verifyChecksums: true);
+        var result = XisoValidator.ValidateConversion(isoPath, isoPath, true);
 
         Assert.True(result.Passed, $"Validation with checksums failed: {string.Join("; ", result.Issues)}");
         Assert.Empty(result.Issues);
@@ -78,7 +78,7 @@ public class XisoValidatorTests : IDisposable
         var result = XisoValidator.ValidateConversion(isoPath, rewrittenPath);
 
         Assert.True(result.Passed,
-            $"Validation of rewrite failed: {string.Join("; ", result.Issues.Select(i => $"{i.Type}: {i.Path}"))}");
+            $"Validation of rewrite failed: {string.Join("; ", result.Issues.Select(static i => $"{i.Type}: {i.Path}"))}");
         Assert.Equal(result.SourceFileCount, result.OutputFileCount);
     }
 
@@ -94,10 +94,10 @@ public class XisoValidatorTests : IDisposable
         XisoReader.Rewrite(isoPath, rewriteDir, out var rewrittenPath);
         Assert.NotNull(rewrittenPath);
 
-        var result = XisoValidator.ValidateConversion(isoPath, rewrittenPath, verifyChecksums: true);
+        var result = XisoValidator.ValidateConversion(isoPath, rewrittenPath, true);
 
         Assert.True(result.Passed,
-            $"Validation of rewrite with checksums failed: {string.Join("; ", result.Issues.Select(i => $"{i.Type}: {i.Path}"))}");
+            $"Validation of rewrite with checksums failed: {string.Join("; ", result.Issues.Select(static i => $"{i.Type}: {i.Path}"))}");
         Assert.Empty(result.Issues);
     }
 
@@ -118,7 +118,7 @@ public class XisoValidatorTests : IDisposable
 
         Assert.False(result.Passed);
         Assert.NotEmpty(result.Issues);
-        Assert.Contains(result.Issues, i => i.Type == ValidationIssueType.MissingInOutput);
+        Assert.Contains(result.Issues, static i => i.Type == ValidationIssueType.MissingInOutput);
     }
 
     [Fact]

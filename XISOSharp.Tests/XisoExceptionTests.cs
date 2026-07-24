@@ -1,5 +1,3 @@
-using System.Runtime.Serialization;
-
 namespace XISOSharp.Tests;
 
 /// <summary>
@@ -114,7 +112,7 @@ public class XisoExceptionTests
     [Fact]
     public void XisoEmptyException_CanBeCaughtAsException()
     {
-        var caught = false;
+        bool caught;
         try
         {
             throw new XisoEmptyException();
@@ -123,6 +121,7 @@ public class XisoExceptionTests
         {
             caught = true;
         }
+
         Assert.True(caught);
     }
 
@@ -177,7 +176,7 @@ public class XisoExceptionTests
     [Fact]
     public void XisoFileTooLargeException_ExactLimit_FileSizeIsUint32MaxPlus1()
     {
-        var overLimit = (long)uint.MaxValue + 1;
+        const long overLimit = (long)uint.MaxValue + 1;
         var ex = new XisoFileTooLargeException("borderline.bin", overLimit);
 
         Assert.Equal(overLimit, ex.FileSize);
@@ -208,7 +207,7 @@ public class XisoExceptionTests
         [
             new XisoFormatException("fmt"),
             new XisoEmptyException("empty"),
-            new XisoFileTooLargeException("big", 1),
+            new XisoFileTooLargeException("big", 1)
         ];
 
         foreach (var ex in exceptions)

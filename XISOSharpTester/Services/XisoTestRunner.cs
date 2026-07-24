@@ -3,8 +3,11 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+
 using Serilog;
+
 using XISOSharp;
+
 using XISOSharpTester.Models;
 
 namespace XISOSharpTester.Services;
@@ -457,7 +460,7 @@ public static class XisoTestRunner
             // Find the C# output ISO
             // Maybe in csWorkDir
             var csIsoOutput = Directory.GetFiles(csOutDir, "*.iso").FirstOrDefault() ?? Directory.GetFiles(csWorkDir, "*.iso", SearchOption.AllDirectories)
-                .FirstOrDefault(f => !f.EndsWith(".old", StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(static f => !f.EndsWith(".old", StringComparison.OrdinalIgnoreCase));
 
             // extract-xiso rewrite
             var exeInput = Path.Combine(exeWorkDir, entry.FileName);
@@ -584,7 +587,7 @@ public static class XisoTestRunner
             entries.Add(new ListEntry(path, true, 0, 0));
         }
 
-        entries.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
+        entries.Sort(static (a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
         return entries;
     }
 
@@ -599,8 +602,8 @@ public static class XisoTestRunner
             details.Add($"File count: C#={csEntries.Count} extract-xiso={exeEntries.Count}");
         }
 
-        var csByPath = csEntries.ToDictionary(e => e.Path, StringComparer.OrdinalIgnoreCase);
-        var exeByPath = exeEntries.ToDictionary(e => e.Path, StringComparer.OrdinalIgnoreCase);
+        var csByPath = csEntries.ToDictionary(static e => e.Path, StringComparer.OrdinalIgnoreCase);
+        var exeByPath = exeEntries.ToDictionary(static e => e.Path, StringComparer.OrdinalIgnoreCase);
 
         var matchCount = 0;
         var mismatchCount = 0;
@@ -653,11 +656,11 @@ public static class XisoTestRunner
 
         var csFiles = Directory.GetFiles(csDir, "*", SearchOption.AllDirectories)
             .Select(f => (FullPath: f, Relative: Path.GetRelativePath(csDir, f)))
-            .ToDictionary(x => x.Relative, StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(static x => x.Relative, StringComparer.OrdinalIgnoreCase);
 
         var exeFiles = Directory.GetFiles(exeDir, "*", SearchOption.AllDirectories)
             .Select(f => (FullPath: f, Relative: Path.GetRelativePath(exeDir, f)))
-            .ToDictionary(x => x.Relative, StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(static x => x.Relative, StringComparer.OrdinalIgnoreCase);
 
         foreach ((string relative, (string FullPath, string Relative) csPath) in csFiles)
         {

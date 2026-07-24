@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 namespace XISOSharp.Tests;
 
 /// <summary>
@@ -71,7 +69,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        var listResult = XisoReader.List(isoPath, llCompat: false);
+        var listResult = XisoReader.List(isoPath, false);
         Assert.Equal(0, listResult);
     }
 
@@ -89,7 +87,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         Assert.True(Directory.Exists(Path.Combine(extractDir, "empty_subdir")),
             "Empty subdirectory should be preserved");
@@ -112,7 +110,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         Assert.True(File.Exists(Path.Combine(extractDir, "file with spaces.txt")));
         Assert.True(File.Exists(Path.Combine(extractDir, "file-with-dashes.txt")));
@@ -167,7 +165,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         for (var i = 0; i < 50; i++)
         {
@@ -192,7 +190,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         var extractedPath = Path.Combine(extractDir, "a", "b", "c", "d", "e", "deep.txt");
         Assert.True(File.Exists(extractedPath), "Deeply nested file missing");
@@ -214,7 +212,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         var extracted = File.ReadAllBytes(Path.Combine(extractDir, "large.bin"));
         Assert.Equal(data, extracted);
@@ -229,13 +227,17 @@ public class XisoWriterEdgeCaseTests : IDisposable
 
         // Create file with all 256 byte values
         var data = new byte[256];
-        for (var i = 0; i < 256; i++) data[i] = (byte)i;
+        for (var i = 0; i < 256; i++)
+        {
+            data[i] = (byte)i;
+        }
+
         File.WriteAllBytes(Path.Combine(srcDir, "allbytes.bin"), data);
 
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath, extractDir, false);
 
         var extracted = File.ReadAllBytes(Path.Combine(extractDir, "allbytes.bin"));
         Assert.Equal(data, extracted);
@@ -300,7 +302,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
             XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
             Assert.NotNull(isoPath);
 
-            XisoReader.Extract(isoPath, extractDir, llCompat: false);
+            XisoReader.Extract(isoPath, extractDir, false);
 
             Assert.True(File.Exists(Path.Combine(extractDir, "game.txt")));
             Assert.False(File.Exists(Path.Combine(extractDir, "$SystemUpdate", "update.bin")),

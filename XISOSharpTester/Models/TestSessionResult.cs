@@ -21,44 +21,44 @@ public class TestSessionResult
     /// <summary>
     /// Gets the number of files for which all sub-tests passed.
     /// </summary>
-    public int PassedFiles => FileResults.Count(r => r.AllPassed);
+    public int PassedFiles => FileResults.Count(static r => r.AllPassed);
 
     /// <summary>
     /// Gets the number of files with at least one failed sub-test
     /// or no passing sub-tests at all.
     /// </summary>
-    public int FailedFiles => FileResults.Count(r => r.Failed > 0 || r.Passed == 0);
+    public int FailedFiles => FileResults.Count(static r => r.Failed > 0 || r.Passed == 0);
 
     /// <summary>
     /// Gets the number of files that were fully skipped (no passing
     /// or failing sub-tests).
     /// </summary>
-    public int SkippedFiles => FileResults.Count(r => r is { Skipped: > 0, Passed: 0, Failed: 0 });
+    public int SkippedFiles => FileResults.Count(static r => r is { Skipped: > 0, Passed: 0, Failed: 0 });
 
     /// <summary>
     /// Gets the total number of sub-tests that were not skipped
     /// across all files.
     /// </summary>
-    public int TotalSubTests => FileResults.Sum(r => r.SubTests.Count(t => t.Status != TestStatus.Skipped));
+    public int TotalSubTests => FileResults.Sum(static r => r.SubTests.Count(static t => t.Status != TestStatus.Skipped));
 
     /// <summary>
     /// Gets the total number of passing sub-tests across all files.
     /// </summary>
-    public int PassedSubTests => FileResults.Sum(r => r.Passed);
+    public int PassedSubTests => FileResults.Sum(static r => r.Passed);
 
     /// <summary>
     /// Gets the total number of failing sub-tests across all files.
     /// </summary>
-    public int FailedSubTests => FileResults.Sum(r => r.Failed);
+    public int FailedSubTests => FileResults.Sum(static r => r.Failed);
 
     /// <summary>
     /// Gets the total number of skipped sub-tests across all files.
     /// </summary>
-    public int SkippedSubTests => FileResults.Sum(r => r.Skipped);
+    public int SkippedSubTests => FileResults.Sum(static r => r.Skipped);
 
     /// <summary>
     /// Gets the total elapsed wall-clock time across all per-file
     /// results, in seconds.
     /// </summary>
-    public double TotalElapsedSeconds => FileResults.Sum(r => r.ElapsedSeconds);
+    public double TotalElapsedSeconds => FileResults.Sum(static r => r.ElapsedSeconds);
 }

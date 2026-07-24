@@ -337,7 +337,7 @@ public class IntegrationTests : IDisposable
         Assert.Equal(0, createResult);
         Assert.NotNull(isoPath);
 
-        var entries = XisoReader.ListDirectory(isoPath, "/");
+        var entries = XisoReader.ListDirectory(isoPath);
 
         Assert.NotEmpty(entries);
         Assert.Contains(entries, static e => string.Equals(e.Name, "file1.txt", StringComparison.Ordinal));
@@ -432,7 +432,7 @@ public class IntegrationTests : IDisposable
         Assert.Equal(0, createResult);
         Assert.NotNull(isoPath);
 
-        var entries = XisoReader.ListDirectory(isoPath, "/");
+        var entries = XisoReader.ListDirectory(isoPath);
 
         var subdir = entries.First(static e => string.Equals(e.Name, "subdir", StringComparison.Ordinal));
         Assert.True(subdir.IsDirectory);
@@ -565,7 +565,7 @@ public class IntegrationTests : IDisposable
         var results = XisoReader.ComputeDirectoryHashes(isoPath, "/subdir", HashAlgorithmName.MD5);
 
         Assert.NotEmpty(results);
-        Assert.Contains(results, r => string.Equals(r.Path, "/subdir/subfile.txt", StringComparison.Ordinal));
+        Assert.Contains(results, static r => string.Equals(r.Path, "/subdir/subfile.txt", StringComparison.Ordinal));
     }
 
     [Fact]

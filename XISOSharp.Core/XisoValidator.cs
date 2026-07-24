@@ -36,27 +36,31 @@ public static class XisoValidator
         var sourceTree = CollectFileTree(sourcePath);
         var outputTree = CollectFileTree(outputPath);
 
-        var sourceFiles = sourceTree.Where(e => !e.IsDirectory).ToList();
-        var outputFiles = outputTree.Where(e => !e.IsDirectory).ToList();
-        var sourceDirs = sourceTree.Where(e => e.IsDirectory).ToList();
-        var outputDirs = outputTree.Where(e => e.IsDirectory).ToList();
+        var sourceFiles = sourceTree.Where(static e => !e.IsDirectory).ToList();
+        var outputFiles = outputTree.Where(static e => !e.IsDirectory).ToList();
+        var sourceDirs = sourceTree.Where(static e => e.IsDirectory).ToList();
+        var outputDirs = outputTree.Where(static e => e.IsDirectory).ToList();
 
-        var sourceTotalBytes = sourceFiles.Sum(e => e.Size);
-        var outputTotalBytes = outputFiles.Sum(e => e.Size);
+        var sourceTotalBytes = sourceFiles.Sum(static e => e.Size);
+        var outputTotalBytes = outputFiles.Sum(static e => e.Size);
 
         var issues = new List<ValidationIssue>();
 
         // Build case-insensitive dictionaries for comparison
         var sourceDict = new Dictionary<string, FileTreeEntry>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in sourceFiles)
+        {
             sourceDict[entry.Path] = entry;
+        }
 
         var outputDict = new Dictionary<string, FileTreeEntry>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in outputFiles)
+        {
             outputDict[entry.Path] = entry;
+        }
 
         // Check for missing files (in source but not in output)
-        foreach (var (path, entry) in sourceDict)
+        foreach ((string path, FileTreeEntry entry) in sourceDict)
         {
             if (!outputDict.ContainsKey(path))
             {
@@ -71,7 +75,7 @@ public static class XisoValidator
         }
 
         // Check for extra files (in output but not in source)
-        foreach (var (path, entry) in outputDict)
+        foreach ((string path, FileTreeEntry entry) in outputDict)
         {
             if (!sourceDict.ContainsKey(path))
             {
@@ -86,7 +90,7 @@ public static class XisoValidator
         }
 
         // Check file sizes and optionally checksums for files present in both
-        foreach (var (path, srcEntry) in sourceDict)
+        foreach ((string path, FileTreeEntry srcEntry) in sourceDict)
         {
             if (!outputDict.TryGetValue(path, out var outEntry))
                 continue;
@@ -187,7 +191,7 @@ public static class XisoValidator
             Logger.Log($"[VALIDATE] File count: MISMATCH — source: {result.SourceFileCount}, output: {result.OutputFileCount}\n");
 
         // File paths
-        var pathIssues = result.Issues.Where(i =>
+        var pathIssues = result.Issues.Where(static i =>
             i.Type is ValidationIssueType.MissingInOutput or ValidationIssueType.ExtraInOutput).ToList();
         if (pathIssues.Count == 0)
             Logger.Log("[VALIDATE] File paths: MATCH\n");
@@ -195,17 +199,17 @@ public static class XisoValidator
             Logger.Log($"[VALIDATE] File paths: MISMATCH — {pathIssues.Count} path difference(s)\n");
 
         // File sizes
-        var sizeIssues = result.Issues.Where(i => i.Type == ValidationIssueType.SizeMismatch).ToList();
+        var sizeIssues = result.Issues.Where(static i => i.Type == ValidationIssueType.SizeMismatch).ToList();
         if (sizeIssues.Count == 0)
             Logger.Log("[VALIDATE] File sizes: MATCH\n");
         else
             Logger.Log($"[VALIDATE] File sizes: MISMATCH — {sizeIssues.Count} size difference(s)\n");
 
         // Checksums
-        var checksumIssues = result.Issues.Where(i => i.Type == ValidationIssueType.ChecksumMismatch).ToList();
+        var checksumIssues = result.Issues.Where(static i => i.Type == ValidationIssueType.ChecksumMismatch).ToList();
         if (checksumIssues.Count > 0)
             Logger.Log($"[VALIDATE] Checksums: FAIL — {checksumIssues.Count} checksum difference(s) (SHA-256)\n");
-        else if (result.Issues.Any(i => i.Type == ValidationIssueType.ChecksumMismatch) ||
+        else if (result.Issues.Any(static i => i.Type == ValidationIssueType.ChecksumMismatch) ||
                  result.SourceFileCount == 0)
             Logger.Log("[VALIDATE] Checksums: SKIPPED\n");
 
@@ -269,7 +273,7 @@ public static class XisoValidator
             },
             passed = result.Passed,
             issueCount = result.Issues.Count,
-            issues = result.Issues.Select(i => new
+            issues = result.Issues.Select(static i => new
             {
                 type = i.Type.ToString(),
                 path = i.Path,

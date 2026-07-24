@@ -32,17 +32,17 @@ public class PerFileResult
     /// <summary>
     /// Gets the number of sub-tests that passed for this file.
     /// </summary>
-    public int Passed => SubTests.Count(t => t.Status == TestStatus.Passed);
+    public int Passed => SubTests.Count(static t => t.Status == TestStatus.Passed);
 
     /// <summary>
     /// Gets the number of sub-tests that failed for this file.
     /// </summary>
-    public int Failed => SubTests.Count(t => t.Status == TestStatus.Failed);
+    public int Failed => SubTests.Count(static t => t.Status == TestStatus.Failed);
 
     /// <summary>
     /// Gets the number of sub-tests that were skipped for this file.
     /// </summary>
-    public int Skipped => SubTests.Count(t => t.Status == TestStatus.Skipped);
+    public int Skipped => SubTests.Count(static t => t.Status == TestStatus.Skipped);
 
     /// <summary>
     /// Gets whether all executed sub-tests passed (at least one
@@ -92,8 +92,10 @@ public enum TestStatus
 {
     /// <summary>The test completed successfully.</summary>
     Passed,
+
     /// <summary>The test completed with failures.</summary>
     Failed,
+
     /// <summary>The test was not executed (e.g. missing dependency).</summary>
     Skipped
 }

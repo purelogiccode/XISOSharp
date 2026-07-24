@@ -743,7 +743,7 @@ public static class XisoWriter
                     DirStart = dirStart
                 };
 
-                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, (n, c, d) =>
+                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, static (n, c, d) =>
                 {
                     WriteDirStartAndFilePositions(n, (WdsafpContext)c!, d);
                     return 0;
@@ -751,7 +751,7 @@ public static class XisoWriter
 
                 ctx.CurrentSector = wdsafp.CurrentSector;
 
-                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, (n, c, d) =>
+                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, static (n, c, d) =>
                 {
                     CalculateDirectoryOffsets(n, (OffsetCalcContext)c!, d);
                     return 0;
