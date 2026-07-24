@@ -247,9 +247,7 @@ public static class XisoWriter
             var totalSectors = (pos + pad) / Constants.SectorSize;
             if (totalSectors > uint.MaxValue)
             {
-                Logger.LogErr($"Error: image too large ({totalSectors} sectors exceeds 32-bit limit)\n");
-                err = 1;
-                goto cleanup;
+                throw new XisoFileTooLargeException(isoName, pos + pad);
             }
 
             WriteVolumeDescriptors(xisoFs, (uint)totalSectors);
@@ -591,9 +589,7 @@ public static class XisoWriter
                     var fi = new FileInfo(entryPath);
                     if (fi.Length > uint.MaxValue)
                     {
-                        Logger.LogErr($"file {avl.Filename} is too large for xiso, skipping...\n");
-                        filesSkipped++;
-                        continue;
+                        throw new XisoFileTooLargeException(entryName, fi.Length);
                     }
                     avl.FileSize = (uint)fi.Length;
                     Logger.TotalBytes += avl.FileSize;

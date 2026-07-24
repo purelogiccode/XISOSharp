@@ -13,7 +13,7 @@
 
         <!-- NuGet metadata -->
         <PackageId>XISOSharp</PackageId>
-        <Version>2.7.1</Version>
+        <!-- Version is derived from git tags via MinVer. Tag format: v2.7.1 or 2.7.1 -->
         <Title>XISOSharp</Title>
         <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats.</Description>
         <PackageDescription>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats. Provides both synchronous and asynchronous APIs with cancellation support. Strong-named, trimmable, and AOT-compatible.</PackageDescription>
@@ -54,9 +54,12 @@
         <None Include="icon\icon.png" Pack="true" PackagePath="\" />
     </ItemGroup>
 
-    <!-- Source Link -->
+    <!-- Source Link + versioning -->
     <ItemGroup>
         <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+        <PackageReference Include="MinVer" PrivateAssets="All">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
     </ItemGroup>
 
 </Project>

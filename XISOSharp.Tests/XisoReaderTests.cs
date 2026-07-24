@@ -255,12 +255,12 @@ public class XisoReaderTests : IDisposable
     }
 
     /// <summary>
-    /// Verifies that VerifyXiso throws InvalidDataException (not OutOfMemoryException)
+    /// Verifies that VerifyXiso throws XisoFormatException (not OutOfMemoryException)
     /// when the header contains a valid magic but an absurdly large rootDirSize that
     /// exceeds the available space in the file.
     /// </summary>
     [Fact]
-    public void VerifyXiso_InsaneRootDirSize_ThrowsInvalidDataException()
+    public void VerifyXiso_InsaneRootDirSize_ThrowsXisoFormatException()
     {
         var invalidPath = Path.Combine(Path.GetTempPath(), $"xiso_bad_toc_{Guid.NewGuid()}.bin");
         try
@@ -293,7 +293,7 @@ public class XisoReaderTests : IDisposable
 
             File.WriteAllBytes(invalidPath, data);
 
-            Assert.Throws<InvalidDataException>(() =>
+            Assert.Throws<XisoFormatException>(() =>
             {
                 using var fs = new FileStream(invalidPath, new FileStreamOptions
                 {

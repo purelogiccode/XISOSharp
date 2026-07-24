@@ -674,6 +674,40 @@ public class ExtractErrorException : Exception
 |--------|------|-------------|
 | `ErrorCode` | `ExtractError` | The specific error code that caused this exception. |
 
+#### `XisoFormatException`
+
+Thrown when an XISO image has an invalid format — missing or corrupt header magic, truncated image, or sector pointers that exceed file bounds.
+
+```csharp
+public class XisoFormatException : InvalidDataException
+{
+    public XisoFormatException(string message)
+}
+```
+
+#### `XisoEmptyException`
+
+Thrown when an XISO image is structurally valid but contains no files.
+
+```csharp
+public class XisoEmptyException : ExtractErrorException
+{
+    public XisoEmptyException()
+}
+```
+
+#### `XisoFileTooLargeException`
+
+Thrown when a file exceeds the maximum size supported by the XISO format (4 GB, the 32-bit unsigned integer limit).
+
+```csharp
+public class XisoFileTooLargeException : IOException
+{
+    public string FileName { get; }
+    public long FileSize { get; }
+}
+```
+
 ---
 
 ## Usage Examples
@@ -894,7 +928,10 @@ The library uses a combination of return codes and exceptions:
 |-----------|-------|
 | **Return code** (`int`) | `0` = success, non-zero = failure. Returned by `DecodeXiso` and `CreateXiso`. |
 | `ExtractErrorException` | Thrown for non-fatal extraction errors. Check `ErrorCode` for the specific error. |
-| `InvalidDataException` | Thrown when a file is not a valid XISO image. |
+| `XisoFormatException` | Thrown when an XISO image has an invalid format (corrupt header, truncated, bad sector pointers). |
+| `XisoEmptyException` | Thrown when an XISO image contains no files. |
+| `XisoFileTooLargeException` | Thrown when a file exceeds the 4 GB XISO format limit. |
+| `InvalidDataException` | Thrown when a requested path does not exist within the XISO. |
 | `IOException` | Thrown for file read/write errors. |
 | `FileNotFoundException` | Thrown when the input file does not exist. |
 | `OperationCanceledException` | Thrown when a `CancellationToken` is triggered. |

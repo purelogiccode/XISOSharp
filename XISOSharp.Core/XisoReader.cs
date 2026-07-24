@@ -29,7 +29,7 @@ public static class XisoReader
     /// Tuple containing the root directory sector index, root directory size in bytes,
     /// and the detected disc lseek offset.
     /// </returns>
-    /// <exception cref="InvalidDataException">
+    /// <exception cref="XisoFormatException">
     /// Thrown when no valid XISO header is found at any known offset,
     /// or when the trailing magic byte does not match.
     /// </exception>
@@ -37,7 +37,7 @@ public static class XisoReader
     /// Thrown when the file is too short to contain the expected header data
     /// at all possible offsets.
     /// </exception>
-    /// <exception cref="ExtractErrorException">
+    /// <exception cref="XisoEmptyException">
     /// Thrown when the root directory sector and size are both zero (empty ISO).
     /// </exception>
     public static (uint rootDirSector, uint rootDirSize, long discLseek) VerifyXiso(
@@ -68,7 +68,7 @@ public static class XisoReader
                     if (!buffer.SequenceEqual(HeaderDataBytes))
                     {
                         Logger.LogErr($"{isoName} does not appear to be a valid xbox iso image\n");
-                        throw new InvalidDataException($"Invalid XISO: {isoName}");
+                        throw new XisoFormatException($"Invalid XISO: {isoName}");
                     }
                     else
                     {
@@ -98,13 +98,13 @@ public static class XisoReader
         if (!buffer.SequenceEqual(HeaderDataBytes))
         {
             Logger.LogErr($"{isoName} appears to be corrupt\n");
-            throw new InvalidDataException($"Corrupt XISO: {isoName}");
+            throw new XisoFormatException($"Corrupt XISO: {isoName}");
         }
 
         if (rootDirSector == 0 && rootDirSize == 0)
         {
             Logger.Log($"xbox image {isoName} contains no files.\n");
-            throw new ExtractErrorException(ExtractError.ErrIsoNoFiles);
+            throw new XisoEmptyException($"xbox image {isoName} contains no files.");
         }
 
         var fileLength = fs.Length;
@@ -113,14 +113,14 @@ public static class XisoReader
         if (rootDirSector >= totalSectors)
         {
             Logger.LogErr($"{isoName}: root directory sector {rootDirSector} exceeds total sectors {totalSectors}\n");
-            throw new InvalidDataException(
+            throw new XisoFormatException(
                 $"Corrupt XISO: {isoName} — root directory sector {rootDirSector} is beyond end of image ({totalSectors} sectors).");
         }
 
         if (rootDirSize == 0)
         {
             Logger.LogErr($"{isoName}: root directory size is zero but sector is non-zero\n");
-            throw new InvalidDataException(
+            throw new XisoFormatException(
                 $"Corrupt XISO: {isoName} — root directory size is zero with non-zero sector pointer.");
         }
 
@@ -128,7 +128,7 @@ public static class XisoReader
         if (rootDirSize > availableBytes)
         {
             Logger.LogErr($"{isoName}: root directory size {rootDirSize} exceeds available space {availableBytes}\n");
-            throw new InvalidDataException(
+            throw new XisoFormatException(
                 $"Corrupt XISO: {isoName} — root directory size {rootDirSize} bytes exceeds available space ({availableBytes} bytes from sector {rootDirSector}).");
         }
 
@@ -550,8 +550,11 @@ public static class XisoReader
     /// Ignored in non-rewrite modes.
     /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
-    /// <exception cref="InvalidDataException">
+    /// <exception cref="XisoFormatException">
     /// Thrown when the file is not a valid XISO image.
+    /// </exception>
+    /// <exception cref="XisoEmptyException">
+    /// Thrown when the XISO image contains no files.
     /// </exception>
     /// <exception cref="IOException">Thrown on read errors.</exception>
     /// <exception cref="FileNotFoundException">Thrown when the input file does not exist.</exception>
@@ -1038,7 +1041,7 @@ public static class XisoReader
 
         var volInfo = GetVolumeInfo(isoPath);
         if (!volInfo.IsValid)
-            throw new InvalidDataException($"Not a valid XISO: {isoPath}");
+            throw new XisoFormatException($"Not a valid XISO: {isoPath}");
 
         if (volInfo.RootDirSector == 0 && volInfo.RootDirSize == 0)
             return Array.Empty<EntryInfo>();
@@ -1113,7 +1116,7 @@ public static class XisoReader
 
         var volInfo = GetVolumeInfo(isoPath);
         if (!volInfo.IsValid)
-            throw new InvalidDataException($"Not a valid XISO: {isoPath}");
+            throw new XisoFormatException($"Not a valid XISO: {isoPath}");
 
         using var fs = new FileStream(
             isoPath,
@@ -1218,7 +1221,7 @@ public static class XisoReader
 
         var volInfo = GetVolumeInfo(isoPath);
         if (!volInfo.IsValid)
-            throw new InvalidDataException($"Not a valid XISO: {isoPath}");
+            throw new XisoFormatException($"Not a valid XISO: {isoPath}");
 
         using var fs = new FileStream(
             isoPath,
