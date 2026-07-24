@@ -13,6 +13,11 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **FileTimeHelper** — Unix epoch to Windows FILETIME conversion
 - **Logger** — output suppression flags
 - **XisoReader** — header verification and traversal
+- **XisoInfo** — volume metadata, directory listing, entry info lookup
+- **XisoReader.Tree** — recursive tree listing with sizes
+- **XisoReader.CopyOut** — single file and directory extraction
+- **XisoReader.ComputeFileHash** — MD5 and SHA-256 per-file hashing
+- **XisoReader.ComputeDirectoryHashes** — batch hashing of all files in a directory
 
 ## Running Tests
 

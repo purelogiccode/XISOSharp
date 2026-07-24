@@ -38,7 +38,9 @@ public enum ExtractMode
     /// <summary>List the contents of the XISO image.</summary>
     List,
     /// <summary>Rewrite the XISO image with an optimized AVL directory structure.</summary>
-    Rewrite
+    Rewrite,
+    /// <summary>Recursively list all files with sizes in a tree format.</summary>
+    Tree
 }
 
 /// <summary>Error codes for non-fatal extraction failures.</summary>

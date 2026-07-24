@@ -1,4 +1,5 @@
 ﻿using System.Buffers.Binary;
+using System.Security.Cryptography;
 using System.Text;
 using XISOSharp.DataStructures;
 
@@ -503,6 +504,25 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Recursively lists all files in an XISO image in a tree format,
+    /// showing full paths and sizes for each entry.
+    /// </summary>
+    /// <param name="xisoPath">Path to the XISO file.</param>
+    /// <param name="llCompat">
+    /// If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.
+    /// Pass <c>false</c> for already-optimized ISOs.
+    /// </param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    public static int Tree(
+        string xisoPath,
+        bool llCompat,
+        CancellationToken cancellationToken = default)
+    {
+        return DecodeXiso(xisoPath, null, ExtractMode.Tree, out _, llCompat, cancellationToken);
+    }
+
+    /// <summary>
     /// Main entry point for processing an XISO image. Verifies the image, then
     /// performs extraction, listing, or rewriting based on the specified mode.
     /// Prefer using <see cref="Rewrite"/>, <see cref="Extract"/>, or <see cref="List"/>
@@ -693,6 +713,472 @@ public static class XisoReader
             var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads the XISO volume descriptor and returns metadata about the image
+    /// without throwing on validation errors.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <returns>Volume information including root directory location and disc format.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static VolumeInfo GetVolumeInfo(string isoPath)
+    {
+        using var fs = new FileStream(
+            isoPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                BufferSize = 256
+            });
+
+        var fileLength = fs.Length;
+        var totalSectors = (uint)(fileLength / Constants.SectorSize);
+
+        if (fileLength < Constants.HeaderOffset + Constants.HeaderDataLength)
+            return new VolumeInfo(false, 0, 0, 0, fileLength, totalSectors);
+
+        Span<byte> buffer = stackalloc byte[Constants.HeaderDataLength];
+        long discLseek = 0;
+        bool isValid = false;
+
+        try
+        {
+            fs.Seek(Constants.HeaderOffset, SeekOrigin.Begin);
+            ReadExact(fs, buffer);
+
+            if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+            {
+                isValid = true;
+            }
+            else
+            {
+                fs.Seek((long)Constants.HeaderOffset + Constants.GlobalLseekOffset, SeekOrigin.Begin);
+                ReadExact(fs, buffer);
+                if (buffer.SequenceEqual(HeaderDataBytes))
+                {
+                    discLseek = Constants.GlobalLseekOffset;
+                    isValid = true;
+                }
+                else
+                {
+                    fs.Seek((long)Constants.HeaderOffset + Constants.Xgd3LseekOffset, SeekOrigin.Begin);
+                    ReadExact(fs, buffer);
+                    if (buffer.SequenceEqual(HeaderDataBytes))
+                    {
+                        discLseek = Constants.Xgd3LseekOffset;
+                        isValid = true;
+                    }
+                    else
+                    {
+                        fs.Seek((long)Constants.HeaderOffset + Constants.Xgd1LseekOffset, SeekOrigin.Begin);
+                        ReadExact(fs, buffer);
+                        if (buffer.SequenceEqual(HeaderDataBytes))
+                        {
+                            discLseek = Constants.Xgd1LseekOffset;
+                            isValid = true;
+                        }
+                    }
+                }
+            }
+
+            if (!isValid)
+                return new VolumeInfo(false, 0, 0, 0, fileLength, totalSectors);
+
+            Span<byte> intBuf = stackalloc byte[4];
+            ReadExact(fs, intBuf);
+            var rootDirSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+            ReadExact(fs, intBuf);
+            var rootDirSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+            return new VolumeInfo(true, rootDirSector, rootDirSize, discLseek, fileLength, totalSectors);
+        }
+        catch (IOException)
+        {
+            return new VolumeInfo(false, 0, 0, 0, fileLength, totalSectors);
+        }
+    }
+
+    /// <summary>
+    /// Returns metadata about all entries in the specified directory within an XISO image.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="internalPath">
+    /// Path within the ISO to list (e.g. <c>"/"</c> for root, <c>"/subdir"</c> for a subdirectory).
+    /// Use forward slashes as separators.
+    /// </param>
+    /// <returns>List of directory entries, or empty if the directory is empty.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the ISO is invalid.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static IReadOnlyList<EntryInfo> ListDirectory(string isoPath, string internalPath = "/")
+    {
+        using var fs = new FileStream(
+            isoPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                BufferSize = 65536
+            });
+
+        var volInfo = GetVolumeInfo(isoPath);
+        if (!volInfo.IsValid)
+            throw new InvalidDataException($"Not a valid XISO: {isoPath}");
+
+        if (volInfo.RootDirSector == 0 && volInfo.RootDirSize == 0)
+            return Array.Empty<EntryInfo>();
+
+        var dirStart = (long)volInfo.RootDirSector * Constants.SectorSize + volInfo.DiscLseek;
+
+        // Navigate to the target directory if not root
+        if (!string.Equals(internalPath, "/", StringComparison.Ordinal))
+        {
+            var segments = internalPath.TrimStart('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var segment in segments)
+            {
+                var entries = ReadDirectoryEntries(fs, dirStart);
+                var match = entries.FirstOrDefault(e =>
+                    string.Equals(e.Name, segment, StringComparison.OrdinalIgnoreCase) && e.IsDirectory);
+
+                if (match == null)
+                    throw new InvalidDataException($"Path not found: {internalPath}");
+
+                dirStart = (long)match.StartSector * Constants.SectorSize + volInfo.DiscLseek;
+            }
+        }
+
+        return ReadDirectoryEntries(fs, dirStart);
+    }
+
+    /// <summary>
+    /// Returns metadata about a specific file or directory entry within an XISO image.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="internalPath">Path within the ISO (e.g. <c>"/subdir/file.xbe"</c>).</param>
+    /// <returns>Entry information, or <c>null</c> if the path does not exist.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the ISO is invalid.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static EntryInfo? GetEntryInfo(string isoPath, string internalPath)
+    {
+        if (string.IsNullOrEmpty(internalPath) || string.Equals(internalPath, "/", StringComparison.Ordinal))
+            return null;
+
+        var segments = internalPath.TrimStart('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0)
+            return null;
+
+        var dirPath = segments.Length > 1
+            ? "/" + string.Join("/", segments[..^1])
+            : "/";
+
+        var entryName = segments[^1];
+
+        var entries = ListDirectory(isoPath, dirPath);
+        return entries.FirstOrDefault(e =>
+            string.Equals(e.Name, entryName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Copies a single file or directory from an XISO image to the local filesystem.
+    /// If the path points to a file, it is extracted to <paramref name="destPath"/>.
+    /// If the path points to a directory, all its contents are recursively extracted.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="internalPath">Path within the ISO (e.g. <c>"/subdir/file.xbe"</c>).</param>
+    /// <param name="destPath">Destination path on the local filesystem.</param>
+    /// <exception cref="FileNotFoundException">Thrown when the ISO file does not exist.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the internal path does not exist.</exception>
+    /// <exception cref="IOException">Thrown on read or write errors.</exception>
+    public static void CopyOut(string isoPath, string internalPath, string destPath)
+    {
+        var entry = GetEntryInfo(isoPath, internalPath);
+        if (entry == null)
+            throw new InvalidDataException($"Path not found in XISO: {internalPath}");
+
+        var volInfo = GetVolumeInfo(isoPath);
+        if (!volInfo.IsValid)
+            throw new InvalidDataException($"Not a valid XISO: {isoPath}");
+
+        using var fs = new FileStream(
+            isoPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                BufferSize = 65536
+            });
+
+        if (entry.IsDirectory)
+        {
+            CopyOutDirectory(fs, isoPath, internalPath, destPath, volInfo);
+        }
+        else
+        {
+            CopyOutFile(fs, entry, destPath, volInfo);
+        }
+    }
+
+    private static void CopyOutFile(FileStream fs, EntryInfo entry, string destPath, VolumeInfo volInfo)
+    {
+        var destDir = Path.GetDirectoryName(destPath);
+        if (!string.IsNullOrEmpty(destDir))
+            Directory.CreateDirectory(destDir);
+
+        using var outFile = new FileStream(
+            destPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Create,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                BufferSize = 65536
+            });
+
+        fs.Seek((long)entry.StartSector * Constants.SectorSize + volInfo.DiscLseek, SeekOrigin.Begin);
+
+        uint remaining = entry.FileSize;
+        var buffer = new byte[Constants.ReadWriteBufferSize];
+
+        while (remaining > 0)
+        {
+            var toRead = (int)Math.Min(remaining, Constants.ReadWriteBufferSize);
+            var read = fs.Read(buffer, 0, toRead);
+            if (read <= 0)
+                throw new IOException($"Unexpected end of file data for {entry.Name}");
+
+            outFile.Write(buffer, 0, read);
+            remaining -= (uint)read;
+        }
+    }
+
+    private static void CopyOutDirectory(FileStream fs, string isoPath, string internalPath, string destPath, VolumeInfo volInfo)
+    {
+        Directory.CreateDirectory(destPath);
+
+        var entries = ListDirectory(isoPath, internalPath);
+
+        foreach (var entry in entries)
+        {
+            var entryDestPath = Path.Combine(destPath, entry.Name);
+            var entryInternalPath = internalPath.TrimEnd('/') + "/" + entry.Name;
+
+            if (entry.IsDirectory)
+            {
+                CopyOutDirectory(fs, isoPath, entryInternalPath, entryDestPath, volInfo);
+            }
+            else
+            {
+                CopyOutFile(fs, entry, entryDestPath, volInfo);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Computes the hash of a single file within an XISO image.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="internalPath">Path within the ISO (e.g. <c>"/subdir/file.xbe"</c>).</param>
+    /// <param name="algorithm">Hash algorithm to use (<see cref="HashAlgorithmName.MD5"/> or <see cref="HashAlgorithmName.SHA256"/>).</param>
+    /// <returns>Hash bytes, or <c>null</c> if the file does not exist.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the ISO file does not exist.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the ISO is invalid or path is a directory.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static byte[]? ComputeFileHash(string isoPath, string internalPath, HashAlgorithmName algorithm)
+    {
+        var entry = GetEntryInfo(isoPath, internalPath);
+        if (entry == null)
+            return null;
+
+        if (entry.IsDirectory)
+            throw new InvalidDataException($"Cannot hash a directory: {internalPath}");
+
+        using var hasher = CreateHashAlgorithm(algorithm);
+
+        if (entry.FileSize == 0)
+        {
+            return hasher.ComputeHash(Array.Empty<byte>());
+        }
+
+        var volInfo = GetVolumeInfo(isoPath);
+        if (!volInfo.IsValid)
+            throw new InvalidDataException($"Not a valid XISO: {isoPath}");
+
+        using var fs = new FileStream(
+            isoPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                BufferSize = 65536
+            });
+
+        fs.Seek((long)entry.StartSector * Constants.SectorSize + volInfo.DiscLseek, SeekOrigin.Begin);
+
+        var buffer = new byte[Constants.ReadWriteBufferSize];
+        uint remaining = entry.FileSize;
+
+        while (remaining > 0)
+        {
+            var toRead = (int)Math.Min(remaining, Constants.ReadWriteBufferSize);
+            var read = fs.Read(buffer, 0, toRead);
+            if (read <= 0)
+                throw new IOException($"Unexpected end of file data at sector {entry.StartSector}");
+
+            hasher.TransformBlock(buffer, 0, read, buffer, 0);
+            remaining -= (uint)read;
+        }
+
+        hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        return hasher.Hash;
+    }
+
+    private static HashAlgorithm CreateHashAlgorithm(HashAlgorithmName algorithm)
+    {
+        if (algorithm == HashAlgorithmName.MD5)
+            return MD5.Create();
+        if (algorithm == HashAlgorithmName.SHA256)
+            return SHA256.Create();
+        if (algorithm == HashAlgorithmName.SHA1)
+            return SHA1.Create();
+        if (algorithm == HashAlgorithmName.SHA384)
+            return SHA384.Create();
+        if (algorithm == HashAlgorithmName.SHA512)
+            return SHA512.Create();
+
+        throw new NotSupportedException($"Hash algorithm '{algorithm.Name}' is not supported.");
+    }
+
+    /// <summary>
+    /// Computes hashes for all files in a directory (or the entire image) within an XISO.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="internalPath">Path within the ISO (e.g. <c>"/"</c> for root, <c>"/subdir"</c> for a subdirectory).</param>
+    /// <param name="algorithm">Hash algorithm to use.</param>
+    /// <returns>List of (path, hash) tuples for all files.</returns>
+    public static IReadOnlyList<(string Path, byte[] Hash)> ComputeDirectoryHashes(
+        string isoPath, string internalPath, HashAlgorithmName algorithm)
+    {
+        var results = new List<(string Path, byte[] Hash)>();
+        var volInfo = GetVolumeInfo(isoPath);
+        if (!volInfo.IsValid || volInfo.RootDirSector == 0)
+            return results;
+
+        CollectHashes(isoPath, internalPath, algorithm, volInfo, results);
+        return results;
+    }
+
+    private static void CollectHashes(
+        string isoPath,
+        string currentPath,
+        HashAlgorithmName algorithm,
+        VolumeInfo volInfo,
+        List<(string Path, byte[] Hash)> results)
+    {
+        var entries = ListDirectory(isoPath, currentPath);
+
+        foreach (var entry in entries)
+        {
+            var fullPath = currentPath.TrimEnd('/') + "/" + entry.Name;
+
+            if (entry.IsDirectory)
+            {
+                CollectHashes(isoPath, fullPath, algorithm, volInfo, results);
+            }
+            else
+            {
+                var hash = ComputeFileHash(isoPath, fullPath, algorithm);
+                if (hash != null)
+                    results.Add((fullPath, hash));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads all directory entries from a directory table at the given offset
+    /// by performing an iterative preorder traversal of the AVL tree.
+    /// </summary>
+    private static List<EntryInfo> ReadDirectoryEntries(FileStream fs, long dirStart)
+    {
+        var entries = new List<EntryInfo>();
+        var stack = new Stack<long>();
+        stack.Push(0); // Start at offset 0
+
+        Span<byte> shortBuf = stackalloc byte[2];
+        Span<byte> intBuf = stackalloc byte[4];
+        Span<byte> byteBuf = stackalloc byte[1];
+
+        while (stack.Count > 0)
+        {
+            var offset = stack.Pop();
+            fs.Seek(dirStart + offset, SeekOrigin.Begin);
+
+            ReadExact(fs, shortBuf);
+            var lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+
+            // Empty directory or end of entries
+            if (lOffset == Constants.PadShort && offset == 0)
+                continue;
+
+            // Read right offset
+            ReadExact(fs, shortBuf);
+            var rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+
+            ReadExact(fs, intBuf);
+            var startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+            ReadExact(fs, intBuf);
+            var fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+            ReadExact(fs, byteBuf);
+            var attributes = byteBuf[0];
+
+            ReadExact(fs, byteBuf);
+            var filenameLength = byteBuf[0];
+
+            var nameBuf = new byte[filenameLength];
+            ReadExact(fs, nameBuf);
+            var filename = Latin1Encoding.Instance.GetString(nameBuf);
+
+            // Skip "." and ".." entries
+            if (string.Equals(filename, ".", StringComparison.Ordinal) ||
+                string.Equals(filename, "..", StringComparison.Ordinal))
+            {
+                // Still need to traverse children
+                if (rOffset != 0 && rOffset != Constants.PadShort)
+                    stack.Push((long)rOffset * Constants.DwordSize);
+                if (lOffset != 0 && lOffset != Constants.PadShort)
+                    stack.Push((long)lOffset * Constants.DwordSize);
+                continue;
+            }
+
+            var isDir = (attributes & Constants.AttributeDir) != 0;
+
+            entries.Add(new EntryInfo(
+                filename,
+                isDir,
+                startSector,
+                isDir ? 0u : fileSize,
+                attributes,
+                lOffset,
+                rOffset));
+
+            // Push children onto stack (right first so left is processed first - preorder)
+            if (rOffset != 0 && rOffset != Constants.PadShort)
+                stack.Push((long)rOffset * Constants.DwordSize);
+
+            if (lOffset != 0 && lOffset != Constants.PadShort)
+                stack.Push((long)lOffset * Constants.DwordSize);
+        }
+
+        return entries;
     }
 
     /// <summary>

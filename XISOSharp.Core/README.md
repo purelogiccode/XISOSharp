@@ -59,7 +59,9 @@ The package is strong-name signed and includes XML documentation, Source Link fo
 
 | Format | Description | Lseek Offset |
 |--------|-------------|--------------|
+| **RAW** | Raw XISO (no offset) | `0` |
 | **GLOBAL** | Retail/Xbox Live discs | `0x0FD90000` |
+| **XGD2** | Xbox 360 XGD2 discs (same as GLOBAL) | `0x0FD90000` |
 | **XGD3** | Xbox 360 XGD3 discs | `0x02080000` |
 | **XGD1** | Xbox 360 XGD1 discs | `0x18300000` |
 
@@ -157,9 +159,92 @@ public static (uint rootDirSector, uint rootDirSize, long discLseek) VerifyXiso(
 - `IOException` — file too short to contain expected header data
 - `ExtractErrorException` — root directory sector and size are both zero (empty ISO)
 
----
+#### `Tree`
 
-### XisoWriter
+Recursively lists all files in an XISO image in a tree format, showing full paths and sizes.
+
+```csharp
+public static int Tree(
+    string xisoPath,
+    bool llCompat = false,
+    CancellationToken cancellationToken = default)
+```
+
+#### `GetVolumeInfo`
+
+Reads the XISO volume descriptor and returns metadata about the image without throwing on validation errors.
+
+```csharp
+public static VolumeInfo GetVolumeInfo(string isoPath)
+```
+
+**Returns**: A `VolumeInfo` record containing `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `FileLength`, and `TotalSectors`.
+
+#### `ListDirectory`
+
+Returns metadata about all entries in the specified directory within an XISO image.
+
+```csharp
+public static IReadOnlyList<EntryInfo> ListDirectory(string isoPath, string internalPath = "/")
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `isoPath` | `string` | Path to the XISO file. |
+| `internalPath` | `string` | Path within the ISO (e.g. `"/"` for root, `"/subdir"` for a subdirectory). |
+
+**Returns**: List of `EntryInfo` records, each containing `Name`, `IsDirectory`, `StartSector`, `FileSize`, `Attributes`, `LeftChildOffset`, `RightChildOffset`.
+
+#### `GetEntryInfo`
+
+Returns metadata about a specific file or directory entry within an XISO image.
+
+```csharp
+public static EntryInfo? GetEntryInfo(string isoPath, string internalPath)
+```
+
+**Returns**: An `EntryInfo` record, or `null` if the path does not exist.
+
+#### `CopyOut`
+
+Copies a single file or directory from an XISO image to the local filesystem. If the path points to a file, it is extracted to `destPath`. If the path points to a directory, all its contents are recursively extracted.
+
+```csharp
+public static void CopyOut(string isoPath, string internalPath, string destPath)
+```
+
+**Exceptions**:
+- `InvalidDataException` — path does not exist in the XISO
+- `IOException` — read or write errors
+
+#### `ComputeFileHash`
+
+Computes the hash of a single file within an XISO image.
+
+```csharp
+public static byte[]? ComputeFileHash(string isoPath, string internalPath, HashAlgorithmName algorithm)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `isoPath` | `string` | Path to the XISO file. |
+| `internalPath` | `string` | Path within the ISO (e.g. `"/subdir/file.xbe"`). |
+| `algorithm` | `HashAlgorithmName` | Hash algorithm to use (`HashAlgorithmName.MD5` or `HashAlgorithmName.SHA256`). |
+
+**Returns**: Hash bytes, or `null` if the file does not exist.
+
+#### `ComputeDirectoryHashes`
+
+Computes hashes for all files in a directory (or the entire image) within an XISO.
+
+```csharp
+public static List<(string Path, byte[] Hash)> ComputeDirectoryHashes(
+    string isoPath, string internalPath, HashAlgorithmName algorithm)
+```
+
+**Returns**: List of `(path, hash)` tuples for all files.
+
+---
 
 Static class for creating and rewriting XISO disc images.
 
@@ -368,6 +453,7 @@ Key constants include:
 | `SectorSize` | `2048` | One sector = 2 KB |
 | `RootDirectorySector` | `0x108` | Sector index of root directory table |
 | `GlobalLseekOffset` | `0x0FD90000` | Sector offset for GLOBAL layout |
+| `Xgd2LseekOffset` | `0x0FD90000` | Sector offset for XGD2 layout (same as Global) |
 | `Xgd3LseekOffset` | `0x02080000` | Sector offset for XGD3 layout |
 | `Xgd1LseekOffset` | `0x18300000` | Sector offset for XGD1 layout |
 | `ReadWriteBufferSize` | `0x00200000` | 2 MB buffer for file copy operations |
@@ -389,6 +475,7 @@ Operating mode for XISO image processing.
 | `Extract` | Extract files from the XISO image to disk. |
 | `List` | List the contents of the XISO image to the logger. |
 | `Rewrite` | Rewrite the XISO image with an optimized AVL directory structure. |
+| `Tree` | Recursively list all files with sizes in a tree format. |
 
 #### `ExtractError`
 
@@ -429,6 +516,37 @@ Skew direction of an AVL tree node.
 | `NoSkew` | Node is balanced (subtrees have equal height). |
 | `LeftSkew` | Left subtree is taller. |
 | `RightSkew` | Right subtree is taller. |
+
+---
+
+### Records
+
+#### `VolumeInfo`
+
+Metadata about an XISO volume descriptor.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `IsValid` | `bool` | Whether the volume magic is valid. |
+| `RootDirSector` | `uint` | Sector index of the root directory table. |
+| `RootDirSize` | `uint` | Size of the root directory table in bytes. |
+| `DiscLseek` | `long` | Disc lseek offset detected during probing. |
+| `FileLength` | `long` | Total size of the ISO file in bytes. |
+| `TotalSectors` | `uint` | Total number of sectors in the ISO. |
+
+#### `EntryInfo`
+
+Metadata about a single directory entry within an XISO image.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Name` | `string` | Filename of the entry. |
+| `IsDirectory` | `bool` | Whether this entry is a directory. |
+| `StartSector` | `uint` | Sector index where the entry's data begins. |
+| `FileSize` | `uint` | Size of the file data in bytes (0 for directories). |
+| `Attributes` | `byte` | Raw attribute byte (see `Constants` for flag definitions). |
+| `LeftChildOffset` | `ushort` | Left child offset in the directory tree (0 if none). |
+| `RightChildOffset` | `ushort` | Right child offset in the directory tree (0 if none). |
 
 ---
 

@@ -16,8 +16,13 @@ extract-xiso [options] -c <dir> [name] [-c <dir> [name]] ...
 | Flag | Description |
 |---|---|
 | `-c <dir> [name]` | Create xiso from file(s) starting in `<dir>` |
+| `--copy-out <iso> <path> <dest>` | Copy a file or directory out of an xiso |
+| `-i <file> [path]` | Show volume info and directory entry metadata |
 | `-l` | List files in xiso(s) |
+| `--md5 <file> [path]` | Compute MD5 hash of file(s) in xiso |
 | `-r` | Rewrite xiso(s) as optimized xiso(s) |
+| `--sha256 <file> [path]` | Compute SHA-256 hash of file(s) in xiso |
+| `-t` | List all files recursively with sizes (tree) |
 | `-x` | Extract xiso(s) (the default mode) |
 
 ### Options
@@ -32,6 +37,15 @@ extract-xiso [options] -c <dir> [name] [-c <dir> [name]] ...
 | `-Q` | Silent (suppress all output) |
 | `-s` | Skip `$SystemUpdate` folder |
 | `-v` | Print version information and exit |
+
+### New Features (beyond extract-xiso)
+
+These commands are not present in the original C tool:
+
+- **`-t`** — Tree listing with file sizes and totals
+- **`-i`** — Volume metadata and directory entry inspection
+- **`--copy-out`** — Selective file/directory extraction
+- **`--md5` / `--sha256`** — Per-file hash computation
 
 ## License
 

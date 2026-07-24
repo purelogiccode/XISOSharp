@@ -18,8 +18,12 @@ This project is a **direct rewrite** of the original C codebase into idiomatic, 
 - **Create** XISO images from a directory
 - **Extract** XISO contents to a directory
 - **List** files inside an XISO
+- **Tree** — recursive file listing with sizes and totals
 - **Rewrite** an XISO to optimize its filesystem layout
-- Supports **GLOBAL**, **XGD3**, and **XGD1** disc formats
+- **Info** — display volume metadata and directory entry details
+- **Copy-out** — extract individual files or directories without full unpack
+- **Hash** — compute MD5 or SHA-256 hashes of files within an XISO
+- Supports **GLOBAL**, **XGD2**, **XGD3**, and **XGD1** disc formats
 - Automatic `.xbe` media-enable patching
 - Async APIs for non-blocking I/O
 - Strong-named assembly

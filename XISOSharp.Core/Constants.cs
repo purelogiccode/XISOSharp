@@ -94,6 +94,9 @@ public static class Constants
     /// <summary>Sector lseek offset for global (retail) disc layout.</summary>
     public const uint GlobalLseekOffset = 0x0FD90000;
 
+    /// <summary>Sector lseek offset for XGD2 disc layout (same as GlobalLseekOffset).</summary>
+    public const uint Xgd2LseekOffset = GlobalLseekOffset;
+
     /// <summary>Sector lseek offset for XGD3 disc layout.</summary>
     public const uint Xgd3LseekOffset = 0x02080000;
 
