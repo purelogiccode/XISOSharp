@@ -59,7 +59,7 @@ public class IntegrationTests : IDisposable
         Assert.NotNull(isoPath);
 
         // Extract ISO
-        var extractResult = XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        var extractResult = XisoReader.Extract(isoPath, extractDir, false);
         Assert.Equal(0, extractResult);
 
         // Verify extracted files exist
@@ -81,7 +81,7 @@ public class IntegrationTests : IDisposable
         Assert.Equal(0, createResult);
         Assert.NotNull(isoPath);
 
-        var extractResult = XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        var extractResult = XisoReader.Extract(isoPath, extractDir, false);
         Assert.Equal(0, extractResult);
 
         // Compare file1.txt content
@@ -100,7 +100,7 @@ public class IntegrationTests : IDisposable
         Assert.NotNull(isoPath);
 
         // List should succeed without extracting
-        var listResult = XisoReader.List(isoPath, llCompat: false);
+        var listResult = XisoReader.List(isoPath, false);
         Assert.Equal(0, listResult);
     }
 
@@ -208,7 +208,7 @@ public class IntegrationTests : IDisposable
         Assert.Equal(0, createResult);
         Assert.NotNull(isoPath);
 
-        var extractResult = XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        var extractResult = XisoReader.Extract(isoPath, extractDir, false);
         Assert.Equal(0, extractResult);
 
         // Check nested structure: subdir/nested/deep.txt
@@ -230,7 +230,7 @@ public class IntegrationTests : IDisposable
         Assert.Equal(0, createResult);
         Assert.NotNull(isoPath);
 
-        var extractResult = XisoReader.Extract(isoPath, customSubdir, llCompat: false);
+        var extractResult = XisoReader.Extract(isoPath, customSubdir, false);
         Assert.Equal(0, extractResult);
         Assert.True(File.Exists(Path.Combine(customSubdir, "file1.txt")));
     }
@@ -255,7 +255,7 @@ public class IntegrationTests : IDisposable
         Assert.Equal(0, createResult);
         Assert.NotNull(isoPath);
 
-        var extractResult = XisoReader.Extract(isoPath, extractDir, llCompat: false);
+        var extractResult = XisoReader.Extract(isoPath, extractDir, false);
         Assert.Equal(0, extractResult);
 
         var extractedFiles = Directory.GetFiles(extractDir);
@@ -279,7 +279,7 @@ public class IntegrationTests : IDisposable
         Logger.Out = sw;
         try
         {
-            var treeResult = XisoReader.Tree(isoPath, llCompat: false);
+            var treeResult = XisoReader.Tree(isoPath, false);
             Assert.Equal(0, treeResult);
         }
         finally
@@ -340,11 +340,11 @@ public class IntegrationTests : IDisposable
         var entries = XisoReader.ListDirectory(isoPath, "/");
 
         Assert.NotEmpty(entries);
-        Assert.Contains(entries, e => string.Equals(e.Name, "file1.txt", StringComparison.Ordinal));
-        Assert.Contains(entries, e => string.Equals(e.Name, "file2.txt", StringComparison.Ordinal));
-        Assert.Contains(entries, e => string.Equals(e.Name, "binary.bin", StringComparison.Ordinal));
-        Assert.Contains(entries, e => string.Equals(e.Name, "test.xbe", StringComparison.Ordinal));
-        Assert.Contains(entries, e => string.Equals(e.Name, "subdir", StringComparison.Ordinal) && e.IsDirectory);
+        Assert.Contains(entries, static e => string.Equals(e.Name, "file1.txt", StringComparison.Ordinal));
+        Assert.Contains(entries, static e => string.Equals(e.Name, "file2.txt", StringComparison.Ordinal));
+        Assert.Contains(entries, static e => string.Equals(e.Name, "binary.bin", StringComparison.Ordinal));
+        Assert.Contains(entries, static e => string.Equals(e.Name, "test.xbe", StringComparison.Ordinal));
+        Assert.Contains(entries, static e => string.Equals(e.Name, "subdir", StringComparison.Ordinal) && e.IsDirectory);
     }
 
     [Fact]
@@ -359,7 +359,7 @@ public class IntegrationTests : IDisposable
         var entries = XisoReader.ListDirectory(isoPath, "/subdir");
 
         Assert.NotEmpty(entries);
-        Assert.Contains(entries, e => string.Equals(e.Name, "subfile.txt", StringComparison.Ordinal));
+        Assert.Contains(entries, static e => string.Equals(e.Name, "subfile.txt", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -434,11 +434,11 @@ public class IntegrationTests : IDisposable
 
         var entries = XisoReader.ListDirectory(isoPath, "/");
 
-        var subdir = entries.First(e => string.Equals(e.Name, "subdir", StringComparison.Ordinal));
+        var subdir = entries.First(static e => string.Equals(e.Name, "subdir", StringComparison.Ordinal));
         Assert.True(subdir.IsDirectory);
         Assert.True((subdir.Attributes & Constants.AttributeDir) != 0);
 
-        var file = entries.First(e => string.Equals(e.Name, "file1.txt", StringComparison.Ordinal));
+        var file = entries.First(static e => string.Equals(e.Name, "file1.txt", StringComparison.Ordinal));
         Assert.False(file.IsDirectory);
         Assert.True((file.Attributes & Constants.AttributeArc) != 0);
     }
@@ -546,11 +546,11 @@ public class IntegrationTests : IDisposable
         var results = XisoReader.ComputeDirectoryHashes(isoPath, "/", HashAlgorithmName.SHA256);
 
         Assert.NotEmpty(results);
-        Assert.Contains(results, r => string.Equals(r.Path, "/file1.txt", StringComparison.Ordinal));
-        Assert.Contains(results, r => string.Equals(r.Path, "/file2.txt", StringComparison.Ordinal));
-        Assert.Contains(results, r => string.Equals(r.Path, "/binary.bin", StringComparison.Ordinal));
-        Assert.Contains(results, r => string.Equals(r.Path, "/test.xbe", StringComparison.Ordinal));
-        Assert.Contains(results, r => string.Equals(r.Path, "/subdir/subfile.txt", StringComparison.Ordinal));
+        Assert.Contains(results, static r => string.Equals(r.Path, "/file1.txt", StringComparison.Ordinal));
+        Assert.Contains(results, static r => string.Equals(r.Path, "/file2.txt", StringComparison.Ordinal));
+        Assert.Contains(results, static r => string.Equals(r.Path, "/binary.bin", StringComparison.Ordinal));
+        Assert.Contains(results, static r => string.Equals(r.Path, "/test.xbe", StringComparison.Ordinal));
+        Assert.Contains(results, static r => string.Equals(r.Path, "/subdir/subfile.txt", StringComparison.Ordinal));
     }
 
     [Fact]

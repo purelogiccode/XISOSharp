@@ -73,23 +73,27 @@ internal static class Program
                     case "-l":
                         if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
                             return 1; }
+
                         extract = false;
                         break;
                     case "-t":
                         if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
                             return 1; }
+
                         extract = false;
                         tree = true;
                         break;
                     case "-i":
                         if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
                             return 1; }
+
                         extract = false;
                         info = true;
                         break;
                     case "--md5":
                         if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
                             return 1; }
+
                         extract = false;
                         hashMode = true;
                         hashAlgo = "MD5";
@@ -97,6 +101,7 @@ internal static class Program
                     case "--sha256":
                         if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
                             return 1; }
+
                         extract = false;
                         hashMode = true;
                         hashAlgo = "SHA256";
@@ -104,18 +109,21 @@ internal static class Program
                     case "-V":
                         if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
                             return 1; }
+
                         extract = false;
                         auditMode = true;
                         break;
                     case "--copy-out":
                         if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
                             return 1; }
+
                         extract = false;
                         copyOut = true;
                         break;
                     case "-r":
                         if (xSeen || !extract || createList.Count > 0) { PrintUsage();
                             return 1; }
+
                         rewrite = true;
                         break;
                     case "-q": Logger.Quiet = true; break;
@@ -130,6 +138,7 @@ internal static class Program
                         }
                         else { PrintUsage();
                             return 1; }
+
                         break;
                     case "-o":
                         if (i + 1 < args.Length)
@@ -138,6 +147,7 @@ internal static class Program
                         }
                         else { PrintUsage();
                             return 1; }
+
                         break;
                     case "-p":
                         PrintUsage();
@@ -146,6 +156,7 @@ internal static class Program
                         optind = i;
                         goto parse_done;
                 }
+
                 optind = i + 1;
             }
             else
@@ -206,12 +217,14 @@ internal static class Program
                     return 1;
                 }
             }
+
             return 0;
         }
 
         if (info)
         {
-            if (optind >= args.Length) { PrintUsage(); return 1; }
+            if (optind >= args.Length) { PrintUsage();
+                return 1; }
 
             var xisoPath = args[optind];
             var internalPath = optind + 1 < args.Length ? args[optind + 1] : "/";
@@ -260,12 +273,14 @@ internal static class Program
                 Logger.LogErr($"Error: {ex.Message}\n");
                 return 1;
             }
+
             return 0;
         }
 
         if (hashMode)
         {
-            if (optind >= args.Length) { PrintUsage(); return 1; }
+            if (optind >= args.Length) { PrintUsage();
+                return 1; }
 
             var xisoPath = args[optind];
             var internalPath = optind + 1 < args.Length ? args[optind + 1] : null;
@@ -286,7 +301,7 @@ internal static class Program
                     if (entry.IsDirectory)
                     {
                         var results = XisoReader.ComputeDirectoryHashes(xisoPath, internalPath, algorithm);
-                        foreach (var (filePath, hash) in results)
+                        foreach ((string filePath, byte[] hash) in results)
                         {
                             Logger.Log($"{Convert.ToHexString(hash).ToLowerInvariant()}  {filePath}\n");
                         }
@@ -302,7 +317,7 @@ internal static class Program
                 {
                     // Hash all files
                     var results = XisoReader.ComputeDirectoryHashes(xisoPath, "/", algorithm);
-                    foreach (var (filePath, hash) in results)
+                    foreach ((string filePath, byte[] hash) in results)
                     {
                         Logger.Log($"{Convert.ToHexString(hash).ToLowerInvariant()}  {filePath}\n");
                     }
@@ -313,12 +328,14 @@ internal static class Program
                 Logger.LogErr($"Error: {ex.Message}\n");
                 return 1;
             }
+
             return 0;
         }
 
         if (copyOut)
         {
-            if (optind + 2 >= args.Length) { PrintUsage(); return 1; }
+            if (optind + 2 >= args.Length) { PrintUsage();
+                return 1; }
 
             var xisoPath = args[optind];
             var internalPath = args[optind + 1];
@@ -341,6 +358,7 @@ internal static class Program
                 Logger.LogErr($"Error: {ex.Message}\n");
                 return 1;
             }
+
             return 0;
         }
 
@@ -359,7 +377,7 @@ internal static class Program
 
                     if (result.Issues.Count == 0)
                     {
-                        Logger.Log($"  Result:         PASS\n");
+                        Logger.Log("  Result:         PASS\n");
                     }
                     else
                     {
@@ -379,6 +397,7 @@ internal static class Program
                     allValid = false;
                 }
             }
+
             return allValid ? 0 : 1;
         }
 

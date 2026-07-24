@@ -158,12 +158,14 @@ public static class AvlTree
                             root.Left.Skew = AvlSkew.NoSkew;
                             break;
                     }
+
                     root.Left.Right.Skew = AvlSkew.NoSkew;
                     var left = root.Left;
                     AvlRotateLeft(ref left);
                     root.Left = left;
                     AvlRotateRight(ref root);
                 }
+
                 return AvlResult.NoErr;
             }
 
@@ -215,12 +217,14 @@ public static class AvlTree
                             root.Right.Skew = AvlSkew.NoSkew;
                             break;
                     }
+
                     root.Right.Left.Skew = AvlSkew.NoSkew;
                     var right = root.Right;
                     AvlRotateRight(ref right);
                     root.Right = right;
                     AvlRotateLeft(ref root);
                 }
+
                 return AvlResult.NoErr;
             }
 

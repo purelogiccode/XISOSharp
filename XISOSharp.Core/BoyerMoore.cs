@@ -8,10 +8,19 @@
 /// </summary>
 public class BoyerMoore
 {
+    /// <summary>The byte pattern to search for.</summary>
     private readonly byte[] _pattern;
+
+    /// <summary>Length of <see cref="_pattern"/>.</summary>
     private readonly int _patLen;
+
+    /// <summary>Bad-character shift table, built by <see cref="Init"/>.</summary>
     private int[]? _bcTable;
+
+    /// <summary>Good-suffix shift table, built by <see cref="Init"/>.</summary>
     private int[]? _gsTable;
+
+    /// <summary>Alphabet size used for the bad-character table.</summary>
     private readonly int _alphabetSize;
 
     /// <summary>
@@ -94,6 +103,7 @@ public class BoyerMoore
 
                 j++;
             }
+
             k = _gsTable[_patLen + 1 + k];
         }
     }

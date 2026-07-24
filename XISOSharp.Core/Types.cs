@@ -11,8 +11,10 @@ public enum AvlResult
 {
     /// <summary>Operation completed successfully without requiring rebalancing.</summary>
     NoErr,
+
     /// <summary>An error occurred during the operation.</summary>
     AvlError,
+
     /// <summary>Operation completed and the tree was rebalanced.</summary>
     AvlBalanced
 }
@@ -22,8 +24,10 @@ public enum AvlTraversalMethod
 {
     /// <summary>Visit the current node before its children (pre-order traversal).</summary>
     Prefix,
+
     /// <summary>Visit the left child, then the current node, then the right child (in-order traversal).</summary>
     Infix,
+
     /// <summary>Visit children before the current node (post-order traversal).</summary>
     Postfix
 }
@@ -33,14 +37,19 @@ public enum ExtractMode
 {
     /// <summary>Build the AVL tree directory structure without writing an output file.</summary>
     GenerateAvl,
+
     /// <summary>Extract files from the XISO image to disk.</summary>
     Extract,
+
     /// <summary>List the contents of the XISO image.</summary>
     List,
+
     /// <summary>Rewrite the XISO image with an optimized AVL directory structure.</summary>
     Rewrite,
+
     /// <summary>Recursively list all files with sizes in a tree format.</summary>
     Tree,
+
     /// <summary>Deep-audit the XISO image: validate header, walk tree, check sector bounds, detect cycles.</summary>
     Verify
 }
@@ -50,8 +59,10 @@ public enum ExtractError
 {
     /// <summary>Unexpected end of sector while reading a directory entry chain.</summary>
     ErrEndOfSector = -5001,
+
     /// <summary>XISO image has already been rewritten (optimized format detected).</summary>
     ErrIsoRewritten = -5002,
+
     /// <summary>XISO image references no files in its directory table.</summary>
     ErrIsoNoFiles = -5003
 }

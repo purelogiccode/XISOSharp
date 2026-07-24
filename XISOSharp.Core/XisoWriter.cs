@@ -1,5 +1,6 @@
 ﻿using System.Buffers.Binary;
 using System.Text;
+
 using XISOSharp.DataStructures;
 
 namespace XISOSharp;
@@ -157,7 +158,7 @@ public static class XisoWriter
             AvlTraversalMethod.Prefix, 0);
 
         var offsetCtx = new OffsetCalcContext { CurrentSector = startSector };
-        AvlTree.AvlTraverseDepthFirst(root, (n, c, d) =>
+        AvlTree.AvlTraverseDepthFirst(root, static (n, c, d) =>
         {
             CalculateDirectoryOffsets(n, (OffsetCalcContext)c!, d);
             return 0;
@@ -591,6 +592,7 @@ public static class XisoWriter
                     {
                         throw new XisoFileTooLargeException(entryName, fi.Length);
                     }
+
                     avl.FileSize = (uint)fi.Length;
                     Logger.TotalBytes += avl.FileSize;
                     Logger.TotalFiles++;
@@ -648,6 +650,7 @@ public static class XisoWriter
             Logger.TotalFiles++;
             Logger.TotalBytes += avl.FileSize;
         }
+
         return 0;
     }
 
@@ -681,6 +684,7 @@ public static class XisoWriter
                 avl.FileSize = Constants.SectorSize;
             }
         }
+
         return 0;
     }
 

@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 namespace XISOSharp.Tests;
 
 /// <summary>
@@ -90,7 +88,7 @@ public class AuditXisoTests : IDisposable
         var result = XisoReader.AuditXiso(truncatedPath);
 
         // Should either be invalid or have issues
-        Assert.False(result.IsValid && result.Issues.Count == 0,
+        Assert.False(result is { IsValid: true, Issues.Count: 0 },
             "Truncated ISO should have audit issues");
     }
 
@@ -188,7 +186,7 @@ public class AuditXisoTests : IDisposable
         XisoWriter.CreateXiso(SourceDir, createDir, null, null, out var isoPath1, null, null);
         Assert.NotNull(isoPath1);
 
-        XisoReader.Extract(isoPath1, extractDir, llCompat: false);
+        XisoReader.Extract(isoPath1, extractDir, false);
 
         XisoWriter.CreateXiso(extractDir, recreateDir, null, null, out var isoPath2, null, null);
         Assert.NotNull(isoPath2);

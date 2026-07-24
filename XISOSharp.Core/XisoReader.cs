@@ -1,6 +1,7 @@
 ﻿using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
+
 using XISOSharp.DataStructures;
 
 namespace XISOSharp;
@@ -188,6 +189,7 @@ public static class XisoReader
                     {
                         AvlTree.AvlInsert(ref avlRoot, AvlNode.EmptySubdirectory);
                     }
+
                     goto end_traverse;
                 }
 
@@ -838,7 +840,7 @@ public static class XisoReader
             return new AuditResult(false, 0, 0, issues);
         }
 
-        if (volInfo.RootDirSector == 0 && volInfo.RootDirSize == 0)
+        if (volInfo is { RootDirSector: 0, RootDirSize: 0 })
         {
             return new AuditResult(true, 0, 0, issues);
         }
@@ -989,8 +991,7 @@ public static class XisoReader
                         issues.Add($"Directory '{path}{filename}' size {fileSize} (ends at {endOffset}) exceeds file length {fileLength}.");
                     }
 
-                    var subDirStart = sectorOffset;
-                    AuditWalk(fs, subDirStart, path + filename + "/", fileLength, discLseek, issues, new HashSet<long>(), ref filesChecked, ref dirsChecked);
+                    AuditWalk(fs, sectorOffset, path + filename + "/", fileLength, discLseek, issues, new HashSet<long>(), ref filesChecked, ref dirsChecked);
                 }
             }
             else
@@ -1043,7 +1044,7 @@ public static class XisoReader
         if (!volInfo.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");
 
-        if (volInfo.RootDirSector == 0 && volInfo.RootDirSize == 0)
+        if (volInfo is { RootDirSector: 0, RootDirSize: 0 })
             return Array.Empty<EntryInfo>();
 
         var dirStart = (long)volInfo.RootDirSector * Constants.SectorSize + volInfo.DiscLseek;
