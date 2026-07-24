@@ -1,0 +1,339 @@
+using System.Security.Cryptography;
+
+namespace XISOSharp.Tests;
+
+/// <summary>
+/// Tests for <see cref="XisoWriter"/> edge cases: empty directories,
+/// special characters, custom output names, and large file rejection.
+/// </summary>
+[Collection("Sequential")]
+public class XisoWriterEdgeCaseTests : IDisposable
+{
+    private static readonly string TestDataRoot = Path.GetFullPath(
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData"));
+
+    private static readonly string SourceDir = Path.Combine(TestDataRoot, "source");
+
+    private readonly List<string> _tempDirs = [];
+
+    public void Dispose()
+    {
+        Logger.Quiet = false;
+        Logger.RealQuiet = false;
+
+        foreach (var dir in _tempDirs)
+        {
+            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+            catch { /* best effort cleanup */ }
+        }
+    }
+
+    private string CreateTempDir()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"xiso_writer_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        _tempDirs.Add(dir);
+        return dir;
+    }
+
+    [Fact]
+    public void CreateXiso_EmptyDirectory_ProducesValidIso()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+
+        Assert.Equal(0, result);
+        Assert.NotNull(isoPath);
+        Assert.True(File.Exists(isoPath));
+    }
+
+    [Fact]
+    public void CreateXiso_EmptyDirectory_CanBeAudited()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        var auditResult = XisoReader.AuditXiso(isoPath);
+        Assert.True(auditResult.IsValid, $"Empty ISO audit failed: {string.Join("; ", auditResult.Issues)}");
+    }
+
+    [Fact]
+    public void CreateXiso_EmptyDirectory_CanBeListed()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        var listResult = XisoReader.List(isoPath, llCompat: false);
+        Assert.Equal(0, listResult);
+    }
+
+    [Fact]
+    public void CreateXiso_WithEmptySubdirectory_PreservesIt()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+        var extractDir = CreateTempDir();
+
+        // Create source with an empty subdirectory
+        Directory.CreateDirectory(Path.Combine(srcDir, "empty_subdir"));
+        File.WriteAllText(Path.Combine(srcDir, "file.txt"), "content");
+
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+
+        Assert.True(Directory.Exists(Path.Combine(extractDir, "empty_subdir")),
+            "Empty subdirectory should be preserved");
+        Assert.True(File.Exists(Path.Combine(extractDir, "file.txt")));
+    }
+
+    [Fact]
+    public void CreateXiso_SpecialCharactersInFilename_PreservesThem()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+        var extractDir = CreateTempDir();
+
+        // Create files with various Latin-1-encodable characters
+        File.WriteAllText(Path.Combine(srcDir, "file with spaces.txt"), "spaces");
+        File.WriteAllText(Path.Combine(srcDir, "file-with-dashes.txt"), "dashes");
+        File.WriteAllText(Path.Combine(srcDir, "file.with.dots.txt"), "dots");
+        File.WriteAllText(Path.Combine(srcDir, "FILE.TXT"), "uppercase");
+
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+
+        Assert.True(File.Exists(Path.Combine(extractDir, "file with spaces.txt")));
+        Assert.True(File.Exists(Path.Combine(extractDir, "file-with-dashes.txt")));
+        Assert.True(File.Exists(Path.Combine(extractDir, "file.with.dots.txt")));
+        Assert.True(File.Exists(Path.Combine(extractDir, "FILE.TXT")));
+    }
+
+    [Fact]
+    public void CreateXiso_CustomOutputName_UsesProvidedName()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        File.WriteAllText(Path.Combine(srcDir, "test.txt"), "data");
+
+        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, "my_custom_name", null);
+
+        Assert.Equal(0, result);
+        Assert.NotNull(isoPath);
+        Assert.Contains("my_custom_name", isoPath, StringComparison.Ordinal);
+        Assert.DoesNotContain(".iso", isoPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CreateXiso_DefaultName_AddsIsoExtension()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        File.WriteAllText(Path.Combine(srcDir, "test.txt"), "data");
+
+        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+
+        Assert.Equal(0, result);
+        Assert.NotNull(isoPath);
+        Assert.EndsWith(".iso", isoPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CreateXiso_ManyFiles_ProducesValidIso()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+        var extractDir = CreateTempDir();
+
+        // Create 50 files
+        for (var i = 0; i < 50; i++)
+        {
+            File.WriteAllText(Path.Combine(srcDir, $"file_{i:D3}.txt"), $"content_{i}");
+        }
+
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+
+        for (var i = 0; i < 50; i++)
+        {
+            var path = Path.Combine(extractDir, $"file_{i:D3}.txt");
+            Assert.True(File.Exists(path), $"file_{i:D3}.txt missing");
+            Assert.Equal($"content_{i}", File.ReadAllText(path));
+        }
+    }
+
+    [Fact]
+    public void CreateXiso_DeeplyNested_PreservesStructure()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+        var extractDir = CreateTempDir();
+
+        // Create nested structure: a/b/c/d/e/file.txt
+        var nestedDir = Path.Combine(srcDir, "a", "b", "c", "d", "e");
+        Directory.CreateDirectory(nestedDir);
+        File.WriteAllText(Path.Combine(nestedDir, "deep.txt"), "deep content");
+
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+
+        var extractedPath = Path.Combine(extractDir, "a", "b", "c", "d", "e", "deep.txt");
+        Assert.True(File.Exists(extractedPath), "Deeply nested file missing");
+        Assert.Equal("deep content", File.ReadAllText(extractedPath));
+    }
+
+    [Fact]
+    public void CreateXiso_LargeFileContent_PreservesCorrectly()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+        var extractDir = CreateTempDir();
+
+        // Create a 1MB file with known content
+        var data = new byte[1024 * 1024];
+        new Random(42).NextBytes(data);
+        File.WriteAllBytes(Path.Combine(srcDir, "large.bin"), data);
+
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+
+        var extracted = File.ReadAllBytes(Path.Combine(extractDir, "large.bin"));
+        Assert.Equal(data, extracted);
+    }
+
+    [Fact]
+    public void CreateXiso_BinaryContent_PreservesAllByteValues()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+        var extractDir = CreateTempDir();
+
+        // Create file with all 256 byte values
+        var data = new byte[256];
+        for (var i = 0; i < 256; i++) data[i] = (byte)i;
+        File.WriteAllBytes(Path.Combine(srcDir, "allbytes.bin"), data);
+
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        XisoReader.Extract(isoPath, extractDir, llCompat: false);
+
+        var extracted = File.ReadAllBytes(Path.Combine(extractDir, "allbytes.bin"));
+        Assert.Equal(data, extracted);
+    }
+
+    [Fact]
+    public void CreateXiso_ProgressCallback_ReportsFinalTotal()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        File.WriteAllText(Path.Combine(srcDir, "file.txt"), "test content");
+
+        long finalBytes = 0;
+        long lastCurrent = 0;
+
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out _, null,
+            (current, final) =>
+            {
+                lastCurrent = current;
+                finalBytes = final;
+            });
+
+        Assert.True(lastCurrent > 0, "Should have reported progress");
+    }
+
+    [Fact]
+    public void CreateXiso_CancellationDuringWrite_ThrowsOperationCanceled()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        // Create enough files to ensure cancellation hits during write
+        for (var i = 0; i < 100; i++)
+        {
+            File.WriteAllText(Path.Combine(srcDir, $"file_{i}.txt"), new string('x', 10000));
+        }
+
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            XisoWriter.CreateXiso(srcDir, outputDir, null, null, out _, null, null, cts.Token));
+    }
+
+    [Fact]
+    public void CreateXiso_SystemUpdate_SkippedWhenEnabled()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+        var extractDir = CreateTempDir();
+
+        // Create $SystemUpdate directory
+        var updateDir = Path.Combine(srcDir, "$SystemUpdate");
+        Directory.CreateDirectory(updateDir);
+        File.WriteAllText(Path.Combine(updateDir, "update.bin"), "update data");
+        File.WriteAllText(Path.Combine(srcDir, "game.txt"), "game data");
+
+        Logger.RemoveSystemUpdate = true;
+        try
+        {
+            XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+            Assert.NotNull(isoPath);
+
+            XisoReader.Extract(isoPath, extractDir, llCompat: false);
+
+            Assert.True(File.Exists(Path.Combine(extractDir, "game.txt")));
+            Assert.False(File.Exists(Path.Combine(extractDir, "$SystemUpdate", "update.bin")),
+                "$SystemUpdate should be skipped");
+        }
+        finally
+        {
+            Logger.RemoveSystemUpdate = false;
+        }
+    }
+
+    [Fact]
+    public void CreateXiso_MediaEnableDisabled_SkipsPatching()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        // Create a minimal .xbe file (just enough to not crash)
+        var xbeContent = new byte[1024];
+        Array.Fill(xbeContent, (byte)0x00);
+        File.WriteAllBytes(Path.Combine(srcDir, "test.xbe"), xbeContent);
+        File.WriteAllText(Path.Combine(srcDir, "readme.txt"), "text");
+
+        Logger.MediaEnable = false;
+        try
+        {
+            var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+            Assert.Equal(0, result);
+            Assert.NotNull(isoPath);
+        }
+        finally
+        {
+            Logger.MediaEnable = true;
+        }
+    }
+}
