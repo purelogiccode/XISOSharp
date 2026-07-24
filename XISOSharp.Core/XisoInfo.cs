@@ -50,3 +50,59 @@ public record AuditResult(
     int FilesChecked,
     int DirsChecked,
     IReadOnlyList<string> Issues);
+
+/// <summary>
+/// Type of validation issue found during conversion validation.
+/// </summary>
+public enum ValidationIssueType
+{
+    /// <summary>A file exists in the source but not in the output.</summary>
+    MissingInOutput,
+
+    /// <summary>A file exists in the output but not in the source.</summary>
+    ExtraInOutput,
+
+    /// <summary>File sizes differ between source and output.</summary>
+    SizeMismatch,
+
+    /// <summary>File checksums differ between source and output.</summary>
+    ChecksumMismatch
+}
+
+/// <summary>
+/// A single validation issue found during conversion comparison.
+/// </summary>
+/// <param name="Type">The type of issue.</param>
+/// <param name="Path">The file path (XISO internal path with forward slashes).</param>
+/// <param name="SourceSize">Size in the source ISO (0 if missing in source).</param>
+/// <param name="OutputSize">Size in the output ISO (0 if missing in output).</param>
+/// <param name="SourceHash">SHA-256 hash in the source (null if checksums not computed).</param>
+/// <param name="OutputHash">SHA-256 hash in the output (null if checksums not computed).</param>
+public record ValidationIssue(
+    ValidationIssueType Type,
+    string Path,
+    long SourceSize,
+    long OutputSize,
+    byte[]? SourceHash,
+    byte[]? OutputHash);
+
+/// <summary>
+/// Result of a post-conversion validation comparing source and output XISO images.
+/// </summary>
+/// <param name="Passed">Whether validation passed with no issues.</param>
+/// <param name="SourceFileCount">Total files in the source image.</param>
+/// <param name="OutputFileCount">Total files in the output image.</param>
+/// <param name="SourceDirCount">Total directories in the source image.</param>
+/// <param name="OutputDirCount">Total directories in the output image.</param>
+/// <param name="SourceTotalBytes">Total file data bytes in the source.</param>
+/// <param name="OutputTotalBytes">Total file data bytes in the output.</param>
+/// <param name="Issues">List of validation issues found.</param>
+public record ValidationResult(
+    bool Passed,
+    int SourceFileCount,
+    int OutputFileCount,
+    int SourceDirCount,
+    int OutputDirCount,
+    long SourceTotalBytes,
+    long OutputTotalBytes,
+    IReadOnlyList<ValidationIssue> Issues);

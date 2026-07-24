@@ -31,6 +31,7 @@ internal static class Program
         var hashMode = false;
         var copyOut = false;
         var auditMode = false;
+        var validateMode = false;
         string? hashAlgo = null;
         var xSeen = false;
         var deleteOld = false;
@@ -40,8 +41,22 @@ internal static class Program
         var isos = 0;
         var err = 0;
 
+        var validateFlag = false;
+        var validateChecksums = false;
+        var validateStrict = false;
+        string? validateReport = null;
+
         var optind = 0;
-        for (var i = 0; i < args.Length; i++)
+
+        // Handle standalone 'validate' command early (doesn't start with '-')
+        if (args.Length > 0 && string.Equals(args[0], "validate", StringComparison.OrdinalIgnoreCase))
+        {
+            validateMode = true;
+            extract = false;
+            optind = 1;
+        }
+
+        for (var i = optind; i < args.Length; i++)
         {
             var arg = args[i];
             if (arg.StartsWith('-') && arg.Length > 1)
@@ -112,6 +127,32 @@ internal static class Program
 
                         extract = false;
                         auditMode = true;
+                        break;
+                    case "validate":
+                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
+                            return 1; }
+
+                        extract = false;
+                        validateMode = true;
+                        break;
+                    case "--validate":
+                        validateFlag = true;
+                        break;
+                    case "--validate-checksums":
+                        validateFlag = true;
+                        validateChecksums = true;
+                        break;
+                    case "--validate-strict":
+                        validateStrict = true;
+                        break;
+                    case "--validate-report":
+                        if (i + 1 < args.Length)
+                        {
+                            validateReport = args[++i];
+                        }
+                        else { PrintUsage();
+                            return 1; }
+
                         break;
                     case "--copy-out":
                         if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
@@ -401,6 +442,34 @@ internal static class Program
             return allValid ? 0 : 1;
         }
 
+        if (validateMode)
+        {
+            if (optind + 1 >= args.Length) { PrintUsage();
+                return 1; }
+
+            var sourcePath = args[optind];
+            var outputPath = args[optind + 1];
+
+            try
+            {
+                var result = XisoValidator.ValidateConversion(sourcePath, outputPath, validateChecksums);
+                XisoValidator.LogResult(result, sourcePath, outputPath);
+
+                if (validateReport != null)
+                {
+                    XisoValidator.WriteReport(result, sourcePath, outputPath, validateReport);
+                    Logger.Log($"[VALIDATE] Report written to {validateReport}\n");
+                }
+
+                return result.Passed ? 0 : 2;
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IOException or XisoFormatException)
+            {
+                Logger.LogErr($"Error validating: {ex.Message}\n");
+                return 1;
+            }
+        }
+
         for (var i = optind; i < args.Length; i++)
         {
             isos++;
@@ -463,6 +532,22 @@ internal static class Program
                     {
                         Logger.Log($"\n{Logger.TotalFiles} files in {newIsoPath} total {Logger.TotalBytes} bytes\n");
                         Logger.Log($"\n{xisoPath} successfully rewritten{(path != null ? " as " : ".")}{(path != null ? newIsoPath : "")}\n");
+                    }
+
+                    if (err == 0 && validateFlag && newIsoPath != null)
+                    {
+                        Logger.Log("\n");
+                        var valResult = XisoValidator.ValidateConversion(oldPath, newIsoPath, validateChecksums);
+                        XisoValidator.LogResult(valResult, oldPath, newIsoPath);
+
+                        if (validateReport != null)
+                        {
+                            XisoValidator.WriteReport(valResult, oldPath, newIsoPath, validateReport);
+                            Logger.Log($"[VALIDATE] Report written to {validateReport}\n");
+                        }
+
+                        if (!valResult.Passed && validateStrict)
+                            err = 2;
                     }
 
                     if (deleteOld) File.Delete(oldPath);
@@ -561,6 +646,7 @@ internal static class Program
                                   --sha256 <file> [path] Compute SHA-256 hash of file(s) in xiso.
                                   -t                  List all files recursively with sizes (tree).
                                   -V <file1.xiso> ... Deep-audit xiso(s): validate header, tree, sectors.
+                                  validate <src> <out> Validate conversion by comparing source and output ISOs.
                                   -x                  Extract xiso(s) (the default mode if none is given).
 
                                 Options:
@@ -577,6 +663,13 @@ internal static class Program
                                   -Q                  Run silent (suppress all output).
                                   -s                  Skip $SystemUpdate folder.
                                   -v                  Print version information and exit.
+
+                                  Validation options (with -r or validate command):
+
+                                  --validate          Enable post-conversion validation after rewrite.
+                                  --validate-checksums  Also verify SHA-256 checksums (slower).
+                                  --validate-strict   Fail with exit code 2 on any mismatch.
+                                  --validate-report <file>  Write JSON validation report to file.
 
                              """);
     }
