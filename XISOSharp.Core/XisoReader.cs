@@ -455,14 +455,18 @@ public static class XisoReader
     /// <param name="outputPath">Output directory for the rewritten ISO, or <c>null</c> for the current directory.</param>
     /// <param name="outIsoPath">Receives the path to the output ISO file.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="outputName">
+    /// Custom output filename. When <c>null</c>, the original filename with <c>.iso</c> extension is used.
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     public static int Rewrite(
         string xisoPath,
         string? outputPath,
         out string? outIsoPath,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? outputName = null)
     {
-        return DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken);
+        return DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken, outputName);
     }
 
     /// <summary>
@@ -541,6 +545,10 @@ public static class XisoReader
     /// If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.
     /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="outputName">
+    /// Custom output filename for rewrite mode. When <c>null</c>, the original filename with <c>.iso</c> extension is used.
+    /// Ignored in non-rewrite modes.
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     /// <exception cref="InvalidDataException">
     /// Thrown when the file is not a valid XISO image.
@@ -553,7 +561,8 @@ public static class XisoReader
         ExtractMode mode,
         out string? outIsoPath,
         bool llCompat,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? outputName = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
@@ -664,7 +673,7 @@ public static class XisoReader
                 TraverseXiso(fs, null, (long)rootDirSect * Constants.SectorSize + discLseek,
                     buf, ExtractMode.GenerateAvl, ref avlRoot, llCompat, discLseek);
 
-                XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, null, null);
+                XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null);
             }
             else
             {
@@ -700,17 +709,19 @@ public static class XisoReader
     /// <param name="mode">Operating mode: extract, list, or rewrite.</param>
     /// <param name="llCompat">If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="outputName">Custom output filename for rewrite mode. When <c>null</c>, the original filename with <c>.iso</c> extension is used.</param>
     /// <returns>A task that completes with the result code (0 on success, non-zero on error) and the output ISO path when in rewrite mode.</returns>
     public static async Task<(int Result, string? OutIsoPath)> DecodeXisoAsync(
         string xisoPath,
         string? outputPath,
         ExtractMode mode,
         bool llCompat = false,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? outputName = null)
     {
         return await Task.Run(() =>
         {
-            var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken);
+            var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken, outputName);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
     }

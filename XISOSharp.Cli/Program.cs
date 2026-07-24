@@ -34,6 +34,7 @@ internal static class Program
         var xSeen = false;
         var deleteOld = false;
         string? path = null;
+        string? outputName = null;
         var createList = new List<(string Dir, string? Name)>();
         var isos = 0;
         var err = 0;
@@ -119,6 +120,14 @@ internal static class Program
                         if (i + 1 < args.Length)
                         {
                             path = args[++i];
+                        }
+                        else { PrintUsage();
+                            return 1; }
+                        break;
+                    case "-o":
+                        if (i + 1 < args.Length)
+                        {
+                            outputName = args[++i];
                         }
                         else { PrintUsage();
                             return 1; }
@@ -384,7 +393,7 @@ internal static class Program
                 try
                 {
                     File.Move(xisoPath, oldPath);
-                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out var newIsoPath, true);
+                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out var newIsoPath, true, outputName: outputName);
 
                     if (err == 0)
                     {
@@ -489,18 +498,20 @@ internal static class Program
                                   -t                  List all files recursively with sizes (tree).
                                   -x                  Extract xiso(s) (the default mode if none is given).
 
-                               Options:
+                                Options:
 
-                                 -d <directory>      In extract mode, expand xiso in <directory>.
-                                                     In rewrite mode, rewrite xiso in <directory>.
-                                 -D                  In rewrite mode, delete old xiso after processing.
-                                 -h                  Print this help text and exit.
-                                 -m                  In create or rewrite mode, disable automatic .xbe
-                                                       media enable patching (not recommended).
-                                 -q                  Run quiet (suppress all non-error output).
-                                 -Q                  Run silent (suppress all output).
-                                 -s                  Skip $SystemUpdate folder.
-                                 -v                  Print version information and exit.
+                                  -d <directory>      In extract mode, expand xiso in <directory>.
+                                                      In rewrite mode, rewrite xiso in <directory>.
+                                  -D                  In rewrite mode, delete old xiso after processing.
+                                  -h                  Print this help text and exit.
+                                  -m                  In create or rewrite mode, disable automatic .xbe
+                                                        media enable patching (not recommended).
+                                  -o <filename>       In rewrite mode, set custom output filename
+                                                        (default: original name with .iso extension).
+                                  -q                  Run quiet (suppress all non-error output).
+                                  -Q                  Run silent (suppress all output).
+                                  -s                  Skip $SystemUpdate folder.
+                                  -v                  Print version information and exit.
 
                              """);
     }
