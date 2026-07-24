@@ -1,4 +1,8 @@
+using System.Runtime.InteropServices;
+
 using XISOSharp.DataStructures;
+
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
 
 namespace XISOSharp;
 
@@ -87,6 +91,7 @@ public class CreateList
 /// Represents a Windows FILETIME value as two 32-bit unsigned integers.
 /// Internal implementation detail used for writing timestamps into XISO headers.
 /// </summary>
+[StructLayout(LayoutKind.Auto)]
 internal struct FileTime
 {
     /// <summary>Low 32 bits of the FILETIME value.</summary>

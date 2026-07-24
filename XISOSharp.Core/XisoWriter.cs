@@ -538,9 +538,9 @@ public static class XisoWriter
             var attr = File.GetAttributes(entryPath);
             var avl = new AvlNode { Filename = entryName };
 
-            if ((attr & FileAttributes.Directory) != 0)
+            if ((attr & FileAttributes.Directory) != FileAttributes.None)
             {
-                if (Logger.RemoveSystemUpdate && entryName.Contains("$SystemUpdate"))
+                if (Logger.RemoveSystemUpdate && entryName.Contains("$SystemUpdate", StringComparison.Ordinal))
                     continue;
 
                 emptyDir = false;
@@ -802,16 +802,8 @@ public static class XisoWriter
             var result = CreateXiso(rootDirectory, outputDirectory, inRoot, sourceStream,
                 out var outPath, inName, progressCallback, cancellationToken);
             return (result, outPath);
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
     }
 }
 
-/// <summary>
-/// Context object passed through the directory-offset calculation traversal.
-/// Tracks the current sector counter being assigned to directory entries.
-/// </summary>
-internal class OffsetCalcContext
-{
-    /// <summary>Current sector number being assigned by the offset calculator.</summary>
-    public uint CurrentSector;
-}
+// OffsetCalcContext is defined in DataStructures/OffsetCalcContext.cs

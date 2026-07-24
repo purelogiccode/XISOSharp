@@ -25,37 +25,37 @@ public static class Logger
     public static TextWriter Error { get; set; } = Console.Error;
 
     /// <summary>When <c>true</c>, suppresses all non-error output.</summary>
-    public static bool Quiet;
+    public static bool Quiet { get; set; }
 
     /// <summary>When <c>true</c>, suppresses all output including errors.</summary>
-    public static bool RealQuiet;
+    public static bool RealQuiet { get; set; }
 
     /// <summary>Set to <c>true</c> when a warning is issued during processing.</summary>
-    public static bool Warned;
+    public static bool Warned { get; set; }
 
     /// <summary>Cumulative bytes written across the current operation.</summary>
-    public static long TotalBytes;
+    public static long TotalBytes { get; set; }
 
     /// <summary>Cumulative files processed in the current operation.</summary>
-    public static int TotalFiles;
+    public static int TotalFiles { get; set; }
 
     /// <summary>Cumulative bytes across all processed ISO images.</summary>
-    public static long TotalBytesAllIsos;
+    public static long TotalBytesAllIsos { get; set; }
 
     /// <summary>Cumulative file count across all processed ISO images.</summary>
-    public static int TotalFilesAllIsos;
+    public static int TotalFilesAllIsos { get; set; }
 
     /// <summary>When <c>true</c>, files in a <c>$SystemUpdate</c> folder are skipped.</summary>
-    public static bool RemoveSystemUpdate;
+    public static bool RemoveSystemUpdate { get; set; }
 
     /// <summary>
     /// When <c>true</c> (the default), <c>.xbe</c> files are automatically patched
     /// for media-enable during creation/rewrite.
     /// </summary>
-    public static bool MediaEnable = true;
+    public static bool MediaEnable { get; set; } = true;
 
     /// <summary>Disc lseek offset detected during verification, used in rewrite mode.</summary>
-    public static long XboxDiscLseek;
+    public static long XboxDiscLseek { get; set; }
 
     /// <summary>
     /// Writes a formatted message to <see cref="Out"/> unless <see cref="Quiet"/> is <c>true</c>.

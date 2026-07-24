@@ -7,7 +7,7 @@ namespace XISOSharp.Cli;
 /// Parses arguments and dispatches to <see cref="XisoReader"/> for extraction/listing/rewriting
 /// or <see cref="XisoWriter"/> for image creation.
 /// </summary>
-internal class Program
+internal static class Program
 {
     /// <summary>
     /// Entry point. Parses command-line flags and positional arguments,

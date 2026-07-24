@@ -194,7 +194,7 @@ public static class XisoReader
             ReadExact(fs, nameBuf);
             var filename = Encoding.ASCII.GetString(nameBuf);
 
-            if (filename == "." || filename == ".." ||
+            if (string.Equals(filename, ".", StringComparison.Ordinal) || string.Equals(filename, "..", StringComparison.Ordinal) ||
                 filename.Contains('/') || filename.Contains('\\'))
             {
                 Logger.LogErr($"filename '{filename}' contains invalid character(s), aborting.\n");
@@ -239,7 +239,7 @@ public static class XisoReader
                     fs.Seek((long)startSector * Constants.SectorSize + discLseek, SeekOrigin.Begin);
                 }
 
-                if (!Logger.RemoveSystemUpdate || !filename.Contains("$SystemUpdate"))
+                if (!Logger.RemoveSystemUpdate || !filename.Contains("$SystemUpdate", StringComparison.Ordinal))
                 {
                     if (mode == ExtractMode.Extract)
                     {
@@ -285,7 +285,7 @@ public static class XisoReader
             }
             else if (mode != ExtractMode.GenerateAvl)
             {
-                if (!Logger.RemoveSystemUpdate || !(path?.Contains("$SystemUpdate") ?? false))
+                if (!Logger.RemoveSystemUpdate || !(path?.Contains("$SystemUpdate", StringComparison.Ordinal) ?? false))
                 {
                     if (mode == ExtractMode.Extract)
                     {
@@ -350,7 +350,7 @@ public static class XisoReader
         string? path,
         long discLseek)
     {
-        if (Logger.RemoveSystemUpdate && path != null && path.Contains("$SystemUpdate"))
+        if (Logger.RemoveSystemUpdate && path != null && path.Contains("$SystemUpdate", StringComparison.Ordinal))
         {
             fs.Seek((long)startSector * Constants.SectorSize + discLseek, SeekOrigin.Begin);
             return;
@@ -627,7 +627,7 @@ public static class XisoReader
         {
             var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken);
             return (result, outPath);
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -651,21 +651,4 @@ public static class XisoReader
     }
 }
 
-/// <summary>
-/// Exception thrown for non-fatal XISO extraction errors such as an empty ISO image.
-/// The <see cref="ErrorCode"/> property identifies the specific error.
-/// </summary>
-public class ExtractErrorException : Exception
-{
-    /// <summary>The specific error code that caused this exception.</summary>
-    public ExtractError ErrorCode { get; }
-
-    /// <summary>
-    /// Creates a new <see cref="ExtractErrorException"/> with the given error code.
-    /// </summary>
-    /// <param name="code">The <see cref="ExtractError"/> value describing the failure.</param>
-    public ExtractErrorException(ExtractError code) : base($"Extract error: {code}")
-    {
-        ErrorCode = code;
-    }
-}
+// ExtractErrorException is defined in ExtractErrorException.cs

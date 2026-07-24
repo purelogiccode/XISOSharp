@@ -16,5 +16,5 @@ public class TestConfiguration
     /// Gets or sets the collection of XISO file entries to include
     /// in the test run.
     /// </summary>
-    public List<XisoFileEntry> Files { get; set; } = [];
+    public IList<XisoFileEntry> Files { get; set; } = [];
 }

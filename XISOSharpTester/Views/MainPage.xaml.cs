@@ -24,6 +24,8 @@ internal partial class MainPage
     }
 }
 
+#pragma warning disable MA0048 // File name must match type name — converter is scoped to this page
+
 /// <summary>
 /// Converts a <see cref="TestStatus"/> value to a single-character
 /// display icon for use in WPF data binding scenarios.

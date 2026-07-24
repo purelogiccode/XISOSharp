@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 
+#pragma warning disable MA0048 // File name must match type name — class name intentionally differs from file name
+
 namespace XISOSharpTester.Services;
 
 /// <summary>

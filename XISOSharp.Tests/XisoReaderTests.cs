@@ -239,7 +239,7 @@ public class XisoReaderTests : IDisposable
     public void ExtractErrorException_MessageContainsErrorCode()
     {
         var ex = new ExtractErrorException(ExtractError.ErrEndOfSector);
-        Assert.Contains("ErrEndOfSector", ex.Message);
+        Assert.Contains("ErrEndOfSector", ex.Message, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -249,6 +249,6 @@ public class XisoReaderTests : IDisposable
     public void ExtractErrorException_MessageContainsErrorCode_NoFiles()
     {
         var ex = new ExtractErrorException(ExtractError.ErrIsoNoFiles);
-        Assert.Contains("ErrIsoNoFiles", ex.Message);
+        Assert.Contains("ErrIsoNoFiles", ex.Message, StringComparison.Ordinal);
     }
 }

@@ -387,3 +387,5 @@ dotnet_naming_style.s_camelcase.required_suffix =
 dotnet_naming_style.s_camelcase.word_separator = 
 dotnet_naming_style.s_camelcase.capitalization = camel_case
 
+MA0051.maximum_lines_per_method = 240
+MA0051.maximum_statements_per_method = 240

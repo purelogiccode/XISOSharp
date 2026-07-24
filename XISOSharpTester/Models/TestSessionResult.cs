@@ -11,7 +11,7 @@ public class TestSessionResult
     /// Gets or sets the list of individual per-file test results
     /// that make up this session.
     /// </summary>
-    public List<PerFileResult> FileResults { get; set; } = [];
+    public IList<PerFileResult> FileResults { get; set; } = [];
 
     /// <summary>
     /// Gets the total number of files that were tested.

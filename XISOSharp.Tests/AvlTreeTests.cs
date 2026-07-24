@@ -348,7 +348,7 @@ public class AvlTreeTests
         var rng = new Random(42);
         var names = Enumerable.Range(0, 200)
             .Select(_ => $"file_{rng.Next():X8}")
-            .Distinct()
+            .Distinct(StringComparer.Ordinal)
             .ToList();
 
         foreach (var name in names)

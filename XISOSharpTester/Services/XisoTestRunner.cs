@@ -15,15 +15,13 @@ namespace XISOSharpTester.Services;
 /// the managed XISOSharp.Core library and the native extract-xiso.exe
 /// tool (when available).
 /// </summary>
-public class XisoTestRunner
+public static class XisoTestRunner
 {
-    private static string? _xisoSharpVersion;
-
     /// <summary>
     /// Gets the version string of the extract-xiso.exe executable,
     /// if it was successfully detected during the last run.
     /// </summary>
-    public string? XisoSharpVersion => _xisoSharpVersion;
+    public static string? XisoSharpVersion { get; private set; }
 
     /// <summary>
     /// Runs the full test suite against all specified XISO files,
@@ -37,8 +35,8 @@ public class XisoTestRunner
     /// </param>
     /// <param name="progress">Optional progress reporter invoked after each file.</param>
     /// <returns>A <see cref="TestSessionResult"/> aggregating all per-file results.</returns>
-    public async Task<TestSessionResult> RunAsync(
-        List<XisoFileEntry> files,
+    public static async Task<TestSessionResult> RunAsync(
+        IList<XisoFileEntry> files,
         string xisoSharpExePath,
         IProgress<TestProgress>? progress = null)
     {
@@ -49,16 +47,18 @@ public class XisoTestRunner
 
         if (wrapper != null)
         {
-            _xisoSharpVersion = wrapper.GetVersion();
+            XisoSharpVersion = wrapper.GetVersion();
         }
 
         for (var i = 0; i < files.Count; i++)
         {
             var file = files[i];
-            progress?.Report(new TestProgress(file.FileName, i + 1, files.Count,
+            var fileIndex = i;
+            var currentWrapper = wrapper;
+            progress?.Report(new TestProgress(file.FileName, fileIndex + 1, files.Count,
                 "Starting", $"Testing {file.FileName}..."));
 
-            var result = await Task.Run(() => TestSingleFile(file, wrapper, progress, i, files.Count));
+            var result = await Task.Run(() => TestSingleFile(file, currentWrapper, progress, fileIndex, files.Count)).ConfigureAwait(false);
             session.FileResults.Add(result);
         }
 
@@ -412,7 +412,7 @@ public class XisoTestRunner
                     Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTag.Length];
                     fs.ReadExactly(tagBuf);
                     var tag = Encoding.ASCII.GetString(tagBuf);
-                    if (tag == Constants.OptimizedTag)
+                    if (string.Equals(tag, Constants.OptimizedTag, StringComparison.Ordinal))
                     {
                         tSw.Stop();
                         result.SubTests.Add(new SubTestResult
@@ -497,7 +497,7 @@ public class XisoTestRunner
 
             var csHash = HashUtil.ComputeSha256(csIsoOutput);
             var exeHash = HashUtil.ComputeSha256(exeIsoOutput);
-            var match = csHash == exeHash;
+            var match = string.Equals(csHash, exeHash, StringComparison.Ordinal);
             var csSize = new FileInfo(csIsoOutput).Length;
             var exeSize = new FileInfo(exeIsoOutput).Length;
 
@@ -567,20 +567,20 @@ public class XisoTestRunner
         // Matches: " - Path: filename                        Size: N bytes,  StartSector: S"
         // or with nesting: " - filename                        Size: N bytes,  StartSector: S"
         // or dir: " - dirname                                 DIR"
-        var fileRegex = new Regex(@"^\s*-\s+(.*?)\s{2,}Size:\s*(\d+)\s*bytes,\s*StartSector:\s*(\d+)", RegexOptions.Multiline);
-        var dirRegex = new Regex(@"^\s*-\s+(.*?)\s{2,}DIR", RegexOptions.Multiline);
+        var fileRegex = new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}Size:\s*(?<size>\d+)\s*bytes,\s*StartSector:\s*(?<sector>\d+)", RegexOptions.Multiline | RegexOptions.ExplicitCapture | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+        var dirRegex = new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}DIR", RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
         foreach (Match m in fileRegex.Matches(output))
         {
-            var path = m.Groups[1].Value.Trim();
-            var size = uint.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
-            var sector = uint.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture);
+            var path = m.Groups["path"].Value.Trim();
+            var size = uint.Parse(m.Groups["size"].Value, CultureInfo.InvariantCulture);
+            var sector = uint.Parse(m.Groups["sector"].Value, CultureInfo.InvariantCulture);
             entries.Add(new ListEntry(path, false, size, sector));
         }
 
         foreach (Match m in dirRegex.Matches(output))
         {
-            var path = m.Groups[1].Value.Trim();
+            var path = m.Groups["path"].Value.Trim();
             entries.Add(new ListEntry(path, true, 0, 0));
         }
 
@@ -667,7 +667,7 @@ public class XisoTestRunner
                 {
                     var csHash = HashUtil.ComputeSha256(csPath.FullPath);
                     var exeHash = HashUtil.ComputeSha256(exePath.FullPath);
-                    if (csHash == exeHash)
+                    if (string.Equals(csHash, exeHash, StringComparison.Ordinal))
                     {
                         matchCount++;
                         if (matchCount <= 5)

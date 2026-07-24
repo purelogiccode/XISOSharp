@@ -20,11 +20,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Serilog" Version="4.4.0" />
-        <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
-        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-        <PackageReference Include="WPF-UI" Version="4.3.0" />
-        <PackageReference Include="QuestPDF" Version="2026.7.1" />
+        <PackageReference Include="Serilog" />
+        <PackageReference Include="Serilog.Sinks.Debug" />
+        <PackageReference Include="Serilog.Sinks.File" />
+        <PackageReference Include="WPF-UI" />
+        <PackageReference Include="QuestPDF" />
     </ItemGroup>
 
     <ItemGroup>

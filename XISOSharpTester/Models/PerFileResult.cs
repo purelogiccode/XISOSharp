@@ -1,5 +1,7 @@
 namespace XISOSharpTester.Models;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 /// <summary>
 /// Contains the test results for a single XISO file, including
 /// the aggregated counts and the collection of sub-test details.
@@ -25,7 +27,7 @@ public class PerFileResult
     /// Gets or sets the collection of individual sub-test results
     /// executed against this file.
     /// </summary>
-    public List<SubTestResult> SubTests { get; set; } = [];
+    public IList<SubTestResult> SubTests { get; set; } = [];
 
     /// <summary>
     /// Gets the number of sub-tests that passed for this file.

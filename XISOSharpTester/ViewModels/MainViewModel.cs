@@ -14,10 +14,10 @@ using XISOSharpTester.Views;
 
 namespace XISOSharpTester.ViewModels;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 internal class MainViewModel : INotifyPropertyChanged
 {
-    private readonly XisoTestRunner _runner = new();
-
     internal MainViewModel()
     {
         BrowseXisoSharpCommand = new RelayCommand(_ => BrowseXisoSharp());
@@ -311,7 +311,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
         try
         {
-            var session = await _runner.RunAsync(Files.ToList(), exePath, progress);
+            var session = await XisoTestRunner.RunAsync(Files.ToList(), exePath, progress).ConfigureAwait(false);
             SessionResult = session;
 
             ProgressValue = 100;
@@ -352,7 +352,7 @@ internal class MainViewModel : INotifyPropertyChanged
         {
             try
             {
-                PdfExporter.Export(SessionResult, _runner.XisoSharpVersion, dlg.FileName);
+                PdfExporter.Export(SessionResult, XisoTestRunner.XisoSharpVersion, dlg.FileName);
                 AddLog($"PDF exported: {dlg.FileName}");
                 MessageBox.Show($"Results exported successfully to:\n{dlg.FileName}",
                     "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
