@@ -292,8 +292,7 @@ public class XisoTestRunner
                     Logger.Quiet = true;
                     try
                     {
-                        XisoReader.DecodeXiso(entry.FilePath, csTempDir,
-                            ExtractMode.Extract, out _, false);
+                        XisoReader.Extract(entry.FilePath, csTempDir, false);
                     }
                     finally
                     {
@@ -435,7 +434,7 @@ public class XisoTestRunner
             Logger.Quiet = true;
             try
             {
-                XisoReader.DecodeXiso(csInput, csOutDir, ExtractMode.Rewrite, out _, false);
+                XisoReader.Rewrite(csInput, csOutDir, out _);
             }
             catch (ExtractErrorException ex) when (
                 ex.ErrorCode is ExtractError.ErrIsoRewritten or ExtractError.ErrIsoNoFiles)
@@ -540,7 +539,7 @@ public class XisoTestRunner
             Logger.Quiet = false;
             using var sw = new StringWriter();
             Console.SetOut(sw);
-            XisoReader.DecodeXiso(isoPath, null, ExtractMode.List, out _, false);
+            XisoReader.List(isoPath, false);
             sw.Flush();
             return sw.ToString();
         }

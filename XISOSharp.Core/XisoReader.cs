@@ -228,6 +228,7 @@ public static class XisoReader
             }
 
             dir.Left = null;
+            var curpos = fs.Position;
 
             if ((attributes & Constants.AttributeDir) != 0)
             {
@@ -307,7 +308,7 @@ public static class XisoReader
             {
                 if (llCompat)
                 {
-                    var sector = (int)((fs.Position - dirStart) / Constants.SectorSize);
+                    var sector = (int)((curpos - dirStart) / Constants.SectorSize);
                     if ((long)rOffset * Constants.DwordSize / Constants.SectorSize > sector)
                     {
                         rOffset = (ushort)(sector * (Constants.SectorSize / Constants.DwordSize) +
@@ -406,8 +407,67 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Rewrites (optimizes) an XISO image. The source ISO is renamed to <c>.old</c>
+    /// and a new optimized ISO is created in its place.
+    /// Always uses <c>llCompat=true</c> to handle linked-list-style directory entries.
+    /// </summary>
+    /// <param name="xisoPath">Path to the XISO file to rewrite.</param>
+    /// <param name="outputPath">Output directory for the rewritten ISO, or <c>null</c> for the current directory.</param>
+    /// <param name="outIsoPath">Receives the path to the output ISO file.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    public static int Rewrite(
+        string xisoPath,
+        string? outputPath,
+        out string? outIsoPath,
+        CancellationToken cancellationToken = default)
+    {
+        return DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken);
+    }
+
+    /// <summary>
+    /// Extracts files from an XISO image to a directory.
+    /// </summary>
+    /// <param name="xisoPath">Path to the XISO file.</param>
+    /// <param name="outputPath">Output directory, or <c>null</c> to extract to an ISO-named subdirectory.</param>
+    /// <param name="llCompat">
+    /// If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.
+    /// Pass <c>false</c> for already-optimized ISOs.
+    /// </param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    public static int Extract(
+        string xisoPath,
+        string? outputPath,
+        bool llCompat,
+        CancellationToken cancellationToken = default)
+    {
+        return DecodeXiso(xisoPath, outputPath, ExtractMode.Extract, out _, llCompat, cancellationToken);
+    }
+
+    /// <summary>
+    /// Lists files in an XISO image without extracting.
+    /// </summary>
+    /// <param name="xisoPath">Path to the XISO file.</param>
+    /// <param name="llCompat">
+    /// If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.
+    /// Pass <c>false</c> for already-optimized ISOs.
+    /// </param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    public static int List(
+        string xisoPath,
+        bool llCompat,
+        CancellationToken cancellationToken = default)
+    {
+        return DecodeXiso(xisoPath, null, ExtractMode.List, out _, llCompat, cancellationToken);
+    }
+
+    /// <summary>
     /// Main entry point for processing an XISO image. Verifies the image, then
     /// performs extraction, listing, or rewriting based on the specified mode.
+    /// Prefer using <see cref="Rewrite"/>, <see cref="Extract"/>, or <see cref="List"/>
+    /// for mode-specific operations.
     /// </summary>
     /// <param name="xisoPath">Path to the XISO file (or <c>.old</c> file for rewrite mode).</param>
     /// <param name="outputPath">

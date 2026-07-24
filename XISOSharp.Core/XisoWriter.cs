@@ -408,7 +408,7 @@ public static class XisoWriter
         xisoFs.Seek((long)avl.StartSector * Constants.SectorSize, SeekOrigin.Begin);
 
         var bufSize = Math.Max(Constants.SectorSize, Constants.ReadWriteBufferSize) + 1;
-        var buf = new byte[bufSize];
+        var buf = new byte[bufSize + 1];
 
         Stream srcStream;
         if (ctx.SourceStream == null)

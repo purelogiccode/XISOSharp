@@ -198,7 +198,7 @@ internal class Program
                 try
                 {
                     File.Move(xisoPath, oldPath);
-                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out var newIsoPath, optimized);
+                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out var newIsoPath, true);
 
                     if (err == 0)
                     {
@@ -218,8 +218,10 @@ internal class Program
             {
                 try
                 {
-                    XisoReader.DecodeXiso(xisoPath, path, extract ? ExtractMode.Extract : ExtractMode.List,
-                        out _, !optimized);
+                    if (extract)
+                        XisoReader.Extract(xisoPath, path, !optimized);
+                    else
+                        XisoReader.List(xisoPath, !optimized);
                 }
                 catch (ExtractErrorException ex) when (ex.ErrorCode == ExtractError.ErrIsoNoFiles)
                 {
