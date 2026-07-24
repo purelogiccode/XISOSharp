@@ -18,6 +18,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **XisoReader.CopyOut** — single file and directory extraction
 - **XisoReader.ComputeFileHash** — MD5 and SHA-256 per-file hashing
 - **XisoReader.ComputeDirectoryHashes** — batch hashing of all files in a directory
+- **XisoReader.AuditXiso** — deep integrity audit (header, tree, sectors, cycles)
 
 ## Running Tests
 

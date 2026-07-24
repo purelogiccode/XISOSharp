@@ -9,6 +9,7 @@ A WPF desktop application for regression testing the XISOSharp C# implementation
 - **List** — compares file listing output
 - **Extract** — extracts files with both tools and compares SHA-256 hashes of every file
 - **Rewrite** — rewrites with both tools and compares output ISO hashes
+- **Audit** — deep integrity verification (header, tree, sector bounds, cycle detection)
 - **Round-trip** — creates XISO from extracted files and verifies the output
 - **PDF export** — exports detailed test results to PDF via QuestPDF
 - **Side-by-side comparison** with the original `extract-xiso.exe` (included)

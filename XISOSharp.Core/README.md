@@ -103,7 +103,8 @@ public static int DecodeXiso(
     ExtractMode mode,
     out string? outIsoPath,
     bool llCompat = false,
-    CancellationToken cancellationToken = default)
+    CancellationToken cancellationToken = default,
+    string? outputName = null)
 ```
 
 | Parameter | Type | Description |
@@ -114,6 +115,7 @@ public static int DecodeXiso(
 | `outIsoPath` | `out string?` | Receives the path to the output ISO file when in rewrite mode. |
 | `llCompat` | `bool` | If `true`, uses backwards-compatible (non-optimized) right-offset calculation. Defaults to `false`. |
 | `cancellationToken` | `CancellationToken` | Token to monitor for cancellation requests. |
+| `outputName` | `string?` | Custom output filename for rewrite mode. When `null`, the original filename with `.iso` extension is used. |
 
 **Returns**: `0` on success, non-zero on error.
 
@@ -243,6 +245,24 @@ public static List<(string Path, byte[] Hash)> ComputeDirectoryHashes(
 ```
 
 **Returns**: List of `(path, hash)` tuples for all files.
+
+#### `AuditXiso`
+
+Performs a deep integrity audit of an XISO image. Validates the header, walks the entire directory tree, checks sector bounds, detects cycles, validates filenames and attributes, and verifies the optimized tag.
+
+```csharp
+public static AuditResult AuditXiso(string isoPath)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `isoPath` | `string` | Path to the XISO file to audit. |
+
+**Returns**: An `AuditResult` record with `IsValid`, `FilesChecked`, `DirsChecked`, and `Issues`.
+
+**Exceptions**:
+- `FileNotFoundException` — input file does not exist
+- `IOException` — read errors
 
 ---
 
@@ -476,6 +496,7 @@ Operating mode for XISO image processing.
 | `List` | List the contents of the XISO image to the logger. |
 | `Rewrite` | Rewrite the XISO image with an optimized AVL directory structure. |
 | `Tree` | Recursively list all files with sizes in a tree format. |
+| `Verify` | Deep-audit the XISO image: validate header, walk tree, check sector bounds, detect cycles. |
 
 #### `ExtractError`
 
@@ -532,7 +553,7 @@ Metadata about an XISO volume descriptor.
 | `RootDirSize` | `uint` | Size of the root directory table in bytes. |
 | `DiscLseek` | `long` | Disc lseek offset detected during probing. |
 | `FileLength` | `long` | Total size of the ISO file in bytes. |
-| `TotalSectors` | `uint` | Total number of sectors in the ISO. |
+| `TotalSectors` | `long` | Total number of sectors in the ISO. |
 
 #### `EntryInfo`
 
@@ -547,6 +568,17 @@ Metadata about a single directory entry within an XISO image.
 | `Attributes` | `byte` | Raw attribute byte (see `Constants` for flag definitions). |
 | `LeftChildOffset` | `ushort` | Left child offset in the directory tree (0 if none). |
 | `RightChildOffset` | `ushort` | Right child offset in the directory tree (0 if none). |
+
+#### `AuditResult`
+
+Result of a deep integrity audit of an XISO image.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `IsValid` | `bool` | Whether the image passed all checks. |
+| `FilesChecked` | `int` | Number of file entries audited. |
+| `DirsChecked` | `int` | Number of directory entries audited. |
+| `Issues` | `IReadOnlyList<string>` | List of human-readable issues found during the audit. |
 
 ---
 

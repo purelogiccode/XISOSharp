@@ -30,6 +30,7 @@ internal static class Program
         var info = false;
         var hashMode = false;
         var copyOut = false;
+        var auditMode = false;
         string? hashAlgo = null;
         var xSeen = false;
         var deleteOld = false;
@@ -99,6 +100,12 @@ internal static class Program
                         extract = false;
                         hashMode = true;
                         hashAlgo = "SHA256";
+                        break;
+                    case "-V":
+                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
+                            return 1; }
+                        extract = false;
+                        auditMode = true;
                         break;
                     case "--copy-out":
                         if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
@@ -337,6 +344,44 @@ internal static class Program
             return 0;
         }
 
+        if (auditMode)
+        {
+            var allValid = true;
+            for (var i = optind; i < args.Length; i++)
+            {
+                var xisoPath = args[i];
+                try
+                {
+                    var result = XisoReader.AuditXiso(xisoPath);
+                    Logger.Log($"Auditing {xisoPath}:\n\n");
+                    Logger.Log($"  Files checked:  {result.FilesChecked}\n");
+                    Logger.Log($"  Dirs checked:   {result.DirsChecked}\n");
+
+                    if (result.Issues.Count == 0)
+                    {
+                        Logger.Log($"  Result:         PASS\n");
+                    }
+                    else
+                    {
+                        allValid = false;
+                        Logger.Log($"  Result:         FAIL ({result.Issues.Count} issue(s))\n");
+                        foreach (var issue in result.Issues)
+                        {
+                            Logger.LogErr($"    - {issue}\n");
+                        }
+                    }
+
+                    Logger.Log("\n");
+                }
+                catch (Exception ex) when (ex is InvalidDataException or IOException)
+                {
+                    Logger.LogErr($"Error auditing {xisoPath}: {ex.Message}\n");
+                    allValid = false;
+                }
+            }
+            return allValid ? 0 : 1;
+        }
+
         for (var i = optind; i < args.Length; i++)
         {
             isos++;
@@ -496,6 +541,7 @@ internal static class Program
                                   -r                  Rewrite xiso(s) as optimized xiso(s).
                                   --sha256 <file> [path] Compute SHA-256 hash of file(s) in xiso.
                                   -t                  List all files recursively with sizes (tree).
+                                  -V <file1.xiso> ... Deep-audit xiso(s): validate header, tree, sectors.
                                   -x                  Extract xiso(s) (the default mode if none is given).
 
                                 Options:

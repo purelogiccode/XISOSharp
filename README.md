@@ -23,6 +23,7 @@ This project is a **direct rewrite** of the original C codebase into idiomatic, 
 - **Info** — display volume metadata and directory entry details
 - **Copy-out** — extract individual files or directories without full unpack
 - **Hash** — compute MD5 or SHA-256 hashes of files within an XISO
+- **Audit** — deep integrity verification: header, tree, sector bounds, cycle detection
 - Supports **GLOBAL**, **XGD2**, **XGD3**, and **XGD1** disc formats
 - Automatic `.xbe` media-enable patching
 - Async APIs for non-blocking I/O

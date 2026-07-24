@@ -37,3 +37,16 @@ public record EntryInfo(
     byte Attributes,
     ushort LeftChildOffset,
     ushort RightChildOffset);
+
+/// <summary>
+/// Result of a deep integrity audit of an XISO image.
+/// </summary>
+/// <param name="IsValid">Whether the image passed all checks.</param>
+/// <param name="FilesChecked">Number of file entries audited.</param>
+/// <param name="DirsChecked">Number of directory entries audited.</param>
+/// <param name="Issues">List of human-readable issues found during the audit.</param>
+public record AuditResult(
+    bool IsValid,
+    int FilesChecked,
+    int DirsChecked,
+    IReadOnlyList<string> Issues);

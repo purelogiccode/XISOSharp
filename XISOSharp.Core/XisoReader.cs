@@ -814,6 +814,205 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Performs a deep integrity audit of an XISO image. Validates the header,
+    /// walks the entire directory tree, checks sector bounds, detects cycles,
+    /// validates filenames and attributes, and verifies the optimized tag.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file to audit.</param>
+    /// <returns>An <see cref="AuditResult"/> describing the outcome.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static AuditResult AuditXiso(string isoPath)
+    {
+        var issues = new List<string>();
+        var filesChecked = 0;
+        var dirsChecked = 0;
+
+        var volInfo = GetVolumeInfo(isoPath);
+        if (!volInfo.IsValid)
+        {
+            issues.Add("Header magic not found at any known disc offset.");
+            return new AuditResult(false, 0, 0, issues);
+        }
+
+        if (volInfo.RootDirSector == 0 && volInfo.RootDirSize == 0)
+        {
+            return new AuditResult(true, 0, 0, issues);
+        }
+
+        using var fs = new FileStream(
+            isoPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                BufferSize = 65536
+            });
+
+        try
+        {
+            fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
+            Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];
+            ReadExact(fs, tagBuf);
+            var tag = Encoding.ASCII.GetString(tagBuf);
+            if (!tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin], StringComparison.Ordinal))
+            {
+                issues.Add("Optimized tag not found at offset 31337.");
+            }
+        }
+        catch (IOException)
+        {
+            issues.Add("Could not read optimized tag (file too short).");
+        }
+
+        var fileLength = fs.Length;
+        var discLseek = volInfo.DiscLseek;
+        var rootDirStart = (long)volInfo.RootDirSector * Constants.SectorSize + discLseek;
+
+        if (rootDirStart >= fileLength)
+        {
+            issues.Add($"Root directory sector {volInfo.RootDirSector} (offset {rootDirStart}) exceeds file length {fileLength}.");
+            return new AuditResult(false, 0, 0, issues);
+        }
+
+        var visited = new HashSet<long>();
+
+        AuditWalk(fs, rootDirStart, "/", fileLength, discLseek, issues, visited, ref filesChecked, ref dirsChecked);
+
+        return new AuditResult(issues.Count == 0, filesChecked, dirsChecked, issues);
+    }
+
+    private static void AuditWalk(
+        FileStream fs,
+        long dirStart,
+        string path,
+        long fileLength,
+        long discLseek,
+        List<string> issues,
+        HashSet<long> visited,
+        ref int filesChecked,
+        ref int dirsChecked)
+    {
+        Span<byte> shortBuf = stackalloc byte[2];
+        Span<byte> intBuf = stackalloc byte[4];
+        Span<byte> byteBuf = stackalloc byte[1];
+
+        while (true)
+        {
+            if (dirStart >= fileLength)
+            {
+                issues.Add($"Directory offset {dirStart} ({path}) exceeds file length {fileLength}.");
+                return;
+            }
+
+            if (!visited.Add(dirStart))
+            {
+                issues.Add($"Cycle detected: directory entry at offset {dirStart} ({path}) was already visited on this path.");
+                return;
+            }
+
+            fs.Seek(dirStart, SeekOrigin.Begin);
+
+            ReadExact(fs, shortBuf);
+            var lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+
+            if (lOffset == Constants.PadShort)
+            {
+                return;
+            }
+
+            if (lOffset != 0)
+            {
+                var leftSeek = dirStart + (long)lOffset * Constants.DwordSize;
+                if (leftSeek >= fileLength)
+                {
+                    issues.Add($"Left child offset {lOffset} (seek {leftSeek}) exceeds file length in {path}.");
+                }
+                else
+                {
+                    var childVisited = new HashSet<long>(visited);
+                    AuditWalk(fs, leftSeek, path, fileLength, discLseek, issues, childVisited, ref filesChecked, ref dirsChecked);
+                }
+            }
+
+            fs.Seek(dirStart + 2, SeekOrigin.Begin);
+            ReadExact(fs, shortBuf);
+            var rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+
+            ReadExact(fs, intBuf);
+            var startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+            ReadExact(fs, intBuf);
+            var fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+            ReadExact(fs, byteBuf);
+            var attributes = byteBuf[0];
+
+            ReadExact(fs, byteBuf);
+            var filenameLength = byteBuf[0];
+
+            var nameBuf = new byte[filenameLength];
+            ReadExact(fs, nameBuf);
+            var filename = Latin1Encoding.Instance.GetString(nameBuf);
+
+            if (filename.Contains('/') || filename.Contains('\\'))
+            {
+                issues.Add($"Filename '{filename}' contains path separator in {path}.");
+            }
+
+            var sectorOffset = (long)startSector * Constants.SectorSize + discLseek;
+            if (sectorOffset >= fileLength)
+            {
+                issues.Add($"Sector {startSector} (offset {sectorOffset}) for '{path}{filename}' exceeds file length {fileLength}.");
+            }
+
+            if ((attributes & 0x48) != 0)
+            {
+                issues.Add($"Reserved attribute bits set in '{path}{filename}': 0x{attributes:X2}.");
+            }
+
+            var isDir = (attributes & Constants.AttributeDir) != 0;
+
+            if (isDir)
+            {
+                dirsChecked++;
+
+                if (fileSize > 0 && sectorOffset < fileLength)
+                {
+                    var endOffset = sectorOffset + fileSize;
+                    if (endOffset > fileLength)
+                    {
+                        issues.Add($"Directory '{path}{filename}' size {fileSize} (ends at {endOffset}) exceeds file length {fileLength}.");
+                    }
+
+                    var subDirStart = sectorOffset;
+                    AuditWalk(fs, subDirStart, path + filename + "/", fileLength, discLseek, issues, new HashSet<long>(), ref filesChecked, ref dirsChecked);
+                }
+            }
+            else
+            {
+                filesChecked++;
+            }
+
+            if (rOffset != 0)
+            {
+                var rightSeek = dirStart + (long)rOffset * Constants.DwordSize;
+                if (rightSeek >= fileLength)
+                {
+                    issues.Add($"Right child offset {rOffset} (seek {rightSeek}) exceeds file length in {path}.");
+                    break;
+                }
+
+                dirStart = rightSeek;
+                continue;
+            }
+
+            break;
+        }
+    }
+
+    /// <summary>
     /// Returns metadata about all entries in the specified directory within an XISO image.
     /// </summary>
     /// <param name="isoPath">Path to the XISO file.</param>

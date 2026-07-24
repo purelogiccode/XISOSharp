@@ -23,6 +23,7 @@ extract-xiso [options] -c <dir> [name] [-c <dir> [name]] ...
 | `-r` | Rewrite xiso(s) as optimized xiso(s) |
 | `--sha256 <file> [path]` | Compute SHA-256 hash of file(s) in xiso |
 | `-t` | List all files recursively with sizes (tree) |
+| `-V <file1.xiso> ...` | Deep-audit xiso(s): validate header, tree, sectors |
 | `-x` | Extract xiso(s) (the default mode) |
 
 ### Options
@@ -33,6 +34,7 @@ extract-xiso [options] -c <dir> [name] [-c <dir> [name]] ...
 | `-D` | In rewrite mode, delete old xiso after processing |
 | `-h` | Print help text and exit |
 | `-m` | Disable automatic `.xbe` media enable patching |
+| `-o <filename>` | In rewrite mode, set custom output filename (default: original name with `.iso` extension) |
 | `-q` | Quiet (suppress all non-error output) |
 | `-Q` | Silent (suppress all output) |
 | `-s` | Skip `$SystemUpdate` folder |
@@ -44,6 +46,8 @@ These commands are not present in the original C tool:
 
 - **`-t`** — Tree listing with file sizes and totals
 - **`-i`** — Volume metadata and directory entry inspection
+- **`-V`** — Deep integrity audit (header, tree, sector bounds, cycle detection)
+- **`-o`** — Custom output filename for rewrite mode
 - **`--copy-out`** — Selective file/directory extraction
 - **`--md5` / `--sha256`** — Per-file hash computation
 
