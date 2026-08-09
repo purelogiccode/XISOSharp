@@ -8,4 +8,7 @@ internal class OffsetCalcContext
 {
     /// <summary>Current sector number being assigned by the offset calculator.</summary>
     public uint CurrentSector;
+
+    /// <summary>Byte offset prepended to all physical write positions (skip/prepend support).</summary>
+    public long PrependOffset;
 }

@@ -46,6 +46,10 @@ internal static class Program
         var validateStrict = false;
         string? validateReport = null;
 
+        int? skipSectors = null;
+        int? prependSectors = null;
+        var excludePatterns = new List<string>();
+
         var optind = 0;
 
         // Handle standalone 'validate' command early (doesn't start with '-')
@@ -85,6 +89,15 @@ internal static class Program
                             break;
                         }
                     case "-x": xSeen = true; break;
+                    case "-X":
+                        if (i + 1 < args.Length)
+                        {
+                            excludePatterns.Add(args[++i]);
+                        }
+                        else { PrintUsage();
+                            return 1; }
+
+                        break;
                     case "-l":
                         if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
                             return 1; }
@@ -193,6 +206,32 @@ internal static class Program
                     case "-p":
                         PrintUsage();
                         return 1;
+                    case "--skip-sectors":
+                        if (i + 1 < args.Length && int.TryParse(args[i + 1], System.Globalization.CultureInfo.InvariantCulture, out var skipVal) && skipVal >= 0)
+                        {
+                            skipSectors = skipVal;
+                            i++;
+                        }
+                        else
+                        {
+                            Logger.LogErr("Error: --skip-sectors requires a non-negative integer (number of 2048-byte sectors)\n");
+                            return 1;
+                        }
+
+                        break;
+                    case "--prepend-sectors":
+                        if (i + 1 < args.Length && int.TryParse(args[i + 1], System.Globalization.CultureInfo.InvariantCulture, out var prependVal) && prependVal >= 0)
+                        {
+                            prependSectors = prependVal;
+                            i++;
+                        }
+                        else
+                        {
+                            Logger.LogErr("Error: --prepend-sectors requires a non-negative integer (number of 2048-byte sectors)\n");
+                            return 1;
+                        }
+
+                        break;
                     default:
                         optind = i;
                         goto parse_done;
@@ -208,6 +247,31 @@ internal static class Program
         }
 
         parse_done:
+
+        if (createList.Count > 0 && skipSectors.HasValue)
+        {
+            Logger.LogErr("Error: --skip-sectors cannot be combined with -c (create mode)\n");
+            return 1;
+        }
+
+        if (prependSectors.HasValue && createList.Count == 0 && !rewrite)
+        {
+            Logger.LogErr("Error: --prepend-sectors requires -c (create) or -r (rewrite) mode\n");
+            return 1;
+        }
+
+        if ((skipSectors.HasValue || prependSectors.HasValue) &&
+            (info || hashMode || copyOut || auditMode || validateMode || validateFlag))
+        {
+            Logger.LogErr("Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), and create (-c) modes\n");
+            return 1;
+        }
+
+        if (excludePatterns.Count > 0 && createList.Count == 0)
+        {
+            Logger.LogErr("Error: -X (exclude pattern) requires -c (create) mode\n");
+            return 1;
+        }
 
         if (createList.Count > 0)
         {
@@ -245,7 +309,9 @@ internal static class Program
 
                 try
                 {
-                    XisoWriter.CreateXiso(dir, outputDir, null, null, out _, isoName, null);
+                    XisoWriter.CreateXiso(dir, outputDir, null, null, out _, isoName, null,
+                        prependSectors: prependSectors,
+                        excludePatterns: excludePatterns.Count > 0 ? excludePatterns : null);
                 }
                 catch (UnauthorizedAccessException ex)
                 {
@@ -253,6 +319,11 @@ internal static class Program
                     return 1;
                 }
                 catch (IOException ex)
+                {
+                    Logger.LogErr($"Error: {ex.Message}\n");
+                    return 1;
+                }
+                catch (Exception ex)
                 {
                     Logger.LogErr($"Error: {ex.Message}\n");
                     return 1;
@@ -526,7 +597,7 @@ internal static class Program
                 try
                 {
                     File.Move(xisoPath, oldPath);
-                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out var newIsoPath, true, outputName: outputName);
+                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out var newIsoPath, true, outputName: outputName, skipSectors: skipSectors, prependSectors: prependSectors);
 
                     if (err == 0)
                     {
@@ -565,11 +636,11 @@ internal static class Program
                 try
                 {
                     if (extract)
-                        XisoReader.Extract(xisoPath, path, !optimized);
+                        XisoReader.Extract(xisoPath, path, !optimized, skipSectors: skipSectors);
                     else if (tree)
-                        XisoReader.Tree(xisoPath, !optimized);
+                        XisoReader.Tree(xisoPath, !optimized, skipSectors: skipSectors);
                     else
-                        XisoReader.List(xisoPath, !optimized);
+                        XisoReader.List(xisoPath, !optimized, skipSectors: skipSectors);
                 }
                 catch (ExtractErrorException ex) when (ex.ErrorCode == ExtractError.ErrIsoNoFiles)
                 {
@@ -650,6 +721,11 @@ internal static class Program
                                   -V <file1.xiso> ... Deep-audit xiso(s): validate header, tree, sectors.
                                   validate <src> <out> Validate conversion by comparing source and output ISOs.
                                   -x                  Extract xiso(s) (the default mode if none is given).
+                                  -X <glob_pattern>   In create mode (-c), exclude files/directories
+                                                        matching the glob pattern from the image.
+                                                        Repeatable. Examples: "*.tmp", "**/node_modules/**",
+                                                        "screenshots/**". Use "/" as the path separator.
+                                                        With -s, $SystemUpdate is excluded automatically.
 
                                 Options:
 
@@ -661,6 +737,16 @@ internal static class Program
                                                         media enable patching (not recommended).
                                   -o <filename>       In rewrite mode, set custom output filename
                                                         (default: original name with .iso extension).
+                                  --skip-sectors N     Treat the image as if the XISO filesystem
+                                                        begins N sectors (2048 bytes each) into the
+                                                        file. Use for Redump images where a video
+                                                        partition precedes the game partition.
+                                                        Valid in extract, list, tree, and rewrite mode.
+                                  --prepend-sectors N  Write the output image with N empty sectors
+                                                        before the XISO filesystem, leaving room for
+                                                        a video partition. Valid in create (-c) and
+                                                        rewrite (-r) mode. Combine with --skip-sectors
+                                                        for round-trip Redump-style reconstruction.
                                   -q                  Run quiet (suppress all non-error output).
                                   -Q                  Run silent (suppress all output).
                                   -s                  Skip $SystemUpdate folder.

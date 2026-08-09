@@ -42,6 +42,20 @@ public static class XisoWriter
     /// Optional callback invoked with (<c>currentBytes</c>, <c>totalBytes</c>) during write.
     /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="prependSectors">
+    /// Optional number of 2048-byte sectors to prepend to the output image before the
+    /// XISO filesystem begins, leaving room for a video partition (e.g. for Redump-style
+    /// reconstruction). Sector numbers stored in directory entries remain partition-relative;
+    /// only the physical file positions shift by <c>prependSectors * SectorSize</c>.
+    /// </param>
+    /// <param name="excludePatterns">
+    /// Optional glob patterns of files and directories to omit from the image when creating
+    /// from a file system. Paths are matched relative to <paramref name="rootDirectory"/>
+    /// using <c>/</c> separators (see <see cref="GlobMatcher"/> for the supported syntax).
+    /// Excluded directories are not recursed into. Ignored in rewrite mode.
+    /// When <see cref="Logger.RemoveSystemUpdate"/> is set, the pattern
+    /// <c>**/$SystemUpdate/**</c> is implicitly added.
+    /// </param>
     /// <returns>0 on success, 1 on error.</returns>
     public static int CreateXiso(
         string rootDirectory,
@@ -51,11 +65,21 @@ public static class XisoWriter
         out string? outIsoPath,
         string? inName,
         ProgressCallback? progressCallback,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? prependSectors = null,
+        IReadOnlyList<string>? excludePatterns = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
         var err = 0;
+
+        if (prependSectors.HasValue && prependSectors.Value < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(prependSectors), prependSectors.Value,
+                "Prepend sectors must be non-negative.");
+        }
+
+        var prependOffset = (long)(prependSectors ?? 0) * Constants.SectorSize;
 
         Logger.TotalBytes = Logger.TotalFiles = 0;
 
@@ -131,7 +155,20 @@ public static class XisoWriter
             Logger.Log("generating avl tree from filesystem: ");
             Logger.Flush();
 
-            err = GenerateAvlTreeLocal(ref root.Subdirectory, ref n, ref filesSkipped);
+            // The -s flag (skip $SystemUpdate) becomes an implicit exclude pattern.
+            IReadOnlyList<string>? effectivePatterns = excludePatterns;
+            if (Logger.RemoveSystemUpdate)
+            {
+                var patterns = new List<string> { "**/$SystemUpdate/**" };
+                if (excludePatterns != null)
+                {
+                    patterns.AddRange(excludePatterns);
+                }
+
+                effectivePatterns = patterns;
+            }
+
+            err = GenerateAvlTreeLocal(ref root.Subdirectory, ref n, ref filesSkipped, effectivePatterns);
 
             for (var i = 0; i < n; i++) Logger.Log("\b");
             for (var i = 0; i < n; i++) Logger.Log(" ");
@@ -157,7 +194,7 @@ public static class XisoWriter
         AvlTree.AvlTraverseDepthFirst(root, CalculateDirectoryRequirements, null,
             AvlTraversalMethod.Prefix, 0);
 
-        var offsetCtx = new OffsetCalcContext { CurrentSector = startSector };
+        var offsetCtx = new OffsetCalcContext { CurrentSector = startSector, PrependOffset = prependOffset };
         AvlTree.AvlTraverseDepthFirst(root, static (n, c, d) =>
         {
             CalculateDirectoryOffsets(n, (OffsetCalcContext)c!, d);
@@ -178,6 +215,13 @@ public static class XisoWriter
             });
 
             outIsoPath = xisoPath;
+
+            if (prependOffset > 0)
+            {
+                // Extend the file with zero-filled space for the video partition / header area.
+                xisoFs.SetLength(prependOffset);
+                xisoFs.Seek(prependOffset, SeekOrigin.Begin);
+            }
 
             Array.Clear(buf, 0, Constants.HeaderOffset);
             xisoFs.Write(buf, 0, Constants.HeaderOffset);
@@ -222,7 +266,7 @@ public static class XisoWriter
 
             root.Filename = isoDir;
 
-            xisoFs.Seek((long)root.StartSector * Constants.SectorSize, SeekOrigin.Begin);
+            xisoFs.Seek(prependOffset + (long)root.StartSector * Constants.SectorSize, SeekOrigin.Begin);
 
             var wtContext = new WriteTreeContext
             {
@@ -231,7 +275,8 @@ public static class XisoWriter
                 SourceStream = sourceStream,
                 Progress = progressCallback,
                 FinalBytes = Logger.TotalBytes,
-                CancellationToken = cancellationToken
+                CancellationToken = cancellationToken,
+                PrependOffset = prependOffset
             };
 
             AvlTree.AvlTraverseDepthFirst(root, WriteTreeCallback, wtContext,
@@ -251,9 +296,9 @@ public static class XisoWriter
                 throw new XisoFileTooLargeException(isoName, pos + pad);
             }
 
-            WriteVolumeDescriptors(xisoFs, (uint)totalSectors);
+            WriteVolumeDescriptors(xisoFs, (uint)totalSectors, prependOffset);
 
-            xisoFs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
+            xisoFs.Seek(prependOffset + Constants.OptimizedTagOffset, SeekOrigin.Begin);
             var tagBytes = Encoding.ASCII.GetBytes(Constants.OptimizedTag);
             xisoFs.Write(tagBytes, 0, Constants.OptimizedTagLength);
 
@@ -311,7 +356,8 @@ public static class XisoWriter
                 FinalBytes = ctx.FinalBytes,
                 Path = ctx.Path != null
                     ? ctx.Path + avl.Filename + Constants.PathCharStr
-                    : Constants.PathCharStr
+                    : Constants.PathCharStr,
+                PrependOffset = ctx.PrependOffset
             };
 
             Logger.Log($"adding {subCtx.Path} (0 bytes) [OK]\n");
@@ -330,7 +376,7 @@ public static class XisoWriter
                     AvlTraversalMethod.Prefix, 0);
 
                 var xisoFs = (FileStream)ctx.XisoStream;
-                xisoFs.Seek((long)avl.StartSector * Constants.SectorSize, SeekOrigin.Begin);
+                xisoFs.Seek(ctx.PrependOffset + (long)avl.StartSector * Constants.SectorSize, SeekOrigin.Begin);
                 AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, WriteDirectoryCallback, xisoFs,
                     AvlTraversalMethod.Prefix, 0);
 
@@ -351,7 +397,7 @@ public static class XisoWriter
             else
             {
                 var xisoFs = (FileStream)ctx.XisoStream;
-                xisoFs.Seek((long)avl.StartSector * Constants.SectorSize, SeekOrigin.Begin);
+                xisoFs.Seek(ctx.PrependOffset + (long)avl.StartSector * Constants.SectorSize, SeekOrigin.Begin);
                 Span<byte> emptySector = stackalloc byte[Constants.SectorSize];
                 emptySector.Fill(Constants.PadByte);
                 xisoFs.Write(emptySector);
@@ -434,7 +480,7 @@ public static class XisoWriter
     private static void WriteFileData(AvlNode avl, WriteTreeContext ctx)
     {
         var xisoFs = (FileStream)ctx.XisoStream;
-        xisoFs.Seek((long)avl.StartSector * Constants.SectorSize, SeekOrigin.Begin);
+        xisoFs.Seek(ctx.PrependOffset + (long)avl.StartSector * Constants.SectorSize, SeekOrigin.Begin);
 
         var bufSize = Math.Max(Constants.SectorSize, Constants.ReadWriteBufferSize) + 1;
         var buf = new byte[bufSize + 1];
@@ -541,12 +587,34 @@ public static class XisoWriter
     /// Recursively descends into the current working directory, building an AVL tree
     /// of all files and subdirectories found. Updates the progress display as it goes.
     /// Inaccessible entries are skipped with a warning rather than aborting.
+    /// Entries matching an exclude pattern are skipped silently.
     /// </summary>
     /// <param name="outRoot">Receives the root of the generated AVL tree.</param>
     /// <param name="ioN">Running count of filename characters for progress display.</param>
     /// <param name="filesSkipped">Running count of entries skipped due to access errors.</param>
+    /// <param name="excludePatterns">
+    /// Optional glob patterns of files and directories to omit. Paths are matched relative
+    /// to the source root with <c>/</c> separators; matching directories are not recursed into.
+    /// </param>
+    /// <param name="relativePath">Relative path of the current directory within the source root.</param>
     /// <returns>0 on success.</returns>
-    internal static int GenerateAvlTreeLocal(ref AvlNode? outRoot, ref int ioN, ref int filesSkipped)
+    internal static int GenerateAvlTreeLocal(
+        ref AvlNode? outRoot,
+        ref int ioN,
+        ref int filesSkipped,
+        IReadOnlyList<string>? excludePatterns = null,
+        string relativePath = "")
+    {
+        GlobMatcher? matcher = excludePatterns is { Count: > 0 } ? new GlobMatcher(excludePatterns) : null;
+        return GenerateAvlTreeLocalCore(ref outRoot, ref ioN, ref filesSkipped, matcher, relativePath);
+    }
+
+    private static int GenerateAvlTreeLocalCore(
+        ref AvlNode? outRoot,
+        ref int ioN,
+        ref int filesSkipped,
+        GlobMatcher? matcher,
+        string relativePath)
     {
         var entries = Directory.GetFileSystemEntries(".");
         var emptyDir = true;
@@ -557,6 +625,13 @@ public static class XisoWriter
 
             if (entryName is "." or "..")
                 continue;
+
+            var entryRelPath = relativePath.Length == 0 ? entryName : relativePath + "/" + entryName;
+
+            if (matcher?.IsMatch(entryRelPath) == true)
+            {
+                continue;
+            }
 
             try
             {
@@ -573,14 +648,11 @@ public static class XisoWriter
 
                 if ((attr & FileAttributes.Directory) != FileAttributes.None)
                 {
-                    if (Logger.RemoveSystemUpdate && entryName.Contains("$SystemUpdate", StringComparison.Ordinal))
-                        continue;
-
                     emptyDir = false;
                     var prevDir = Directory.GetCurrentDirectory();
                     Directory.SetCurrentDirectory(entryName);
 
-                    GenerateAvlTreeLocal(ref avl.Subdirectory, ref ioN, ref filesSkipped);
+                    GenerateAvlTreeLocalCore(ref avl.Subdirectory, ref ioN, ref filesSkipped, matcher, entryRelPath);
 
                     Directory.SetCurrentDirectory(prevDir);
                 }
@@ -734,7 +806,7 @@ public static class XisoWriter
             else
             {
                 avl.StartSector = ctx.CurrentSector;
-                var dirStart = (long)avl.StartSector * Constants.SectorSize;
+                var dirStart = ctx.PrependOffset + (long)avl.StartSector * Constants.SectorSize;
                 ctx.CurrentSector += NumSectors(avl.FileSize);
 
                 var wdsafp = new WdsafpContext
@@ -788,14 +860,15 @@ public static class XisoWriter
     /// </summary>
     /// <param name="fs">File stream positioned at the data area start offset.</param>
     /// <param name="totalSectors">Total number of sectors in the image.</param>
-    internal static void WriteVolumeDescriptors(FileStream fs, uint totalSectors)
+    /// <param name="prependOffset">Byte offset prepended to all physical positions (skip/prepend support).</param>
+    internal static void WriteVolumeDescriptors(FileStream fs, uint totalSectors, long prependOffset = 0)
     {
-        fs.Seek(Constants.Ecma119DataAreaStart, SeekOrigin.Begin);
+        fs.Seek(prependOffset + Constants.Ecma119DataAreaStart, SeekOrigin.Begin);
         fs.WriteByte(0x01);
         fs.Write("CD001"u8);
         fs.WriteByte(0x01);
 
-        fs.Seek(Constants.Ecma119VolumeSpaceSize, SeekOrigin.Begin);
+        fs.Seek(prependOffset + Constants.Ecma119VolumeSpaceSize, SeekOrigin.Begin);
         Span<byte> leBuf = stackalloc byte[4];
         Span<byte> beBuf = stackalloc byte[4];
         BinaryPrimitives.WriteUInt32LittleEndian(leBuf, totalSectors);
@@ -803,11 +876,11 @@ public static class XisoWriter
         BinaryPrimitives.WriteUInt32BigEndian(beBuf, totalSectors);
         fs.Write(beBuf);
 
-        fs.Seek(Constants.Ecma119VolumeSetSize, SeekOrigin.Begin);
+        fs.Seek(prependOffset + Constants.Ecma119VolumeSetSize, SeekOrigin.Begin);
         byte[] volumeSetSize = [0x01, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x08, 0x08, 0x00];
         fs.Write(volumeSetSize, 0, 12);
 
-        fs.Seek(Constants.Ecma119VolumeSetIdentifier, SeekOrigin.Begin);
+        fs.Seek(prependOffset + Constants.Ecma119VolumeSetIdentifier, SeekOrigin.Begin);
         const int spacesSize = Constants.Ecma119VolumeCreationDate - Constants.Ecma119VolumeSetIdentifier;
         var spaces = new byte[spacesSize];
         Array.Fill(spaces, (byte)0x20);
@@ -822,7 +895,7 @@ public static class XisoWriter
         fs.Write(date, 0, 17);
         fs.WriteByte(0x01);
 
-        fs.Seek(Constants.Ecma119DataAreaStart + Constants.SectorSize, SeekOrigin.Begin);
+        fs.Seek(prependOffset + Constants.Ecma119DataAreaStart + Constants.SectorSize, SeekOrigin.Begin);
         fs.WriteByte(0xFF);
         fs.Write("CD001"u8);
         fs.WriteByte(0x01);
@@ -841,6 +914,16 @@ public static class XisoWriter
     /// <param name="inName">Explicit output filename. When <c>null</c>, the directory name plus <c>.iso</c> is used.</param>
     /// <param name="progressCallback">Optional callback invoked with (<c>currentBytes</c>, <c>totalBytes</c>) during write.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="prependSectors">
+    /// Optional number of 2048-byte sectors to prepend to the output image before the
+    /// XISO filesystem begins, leaving room for a video partition. Sector numbers stored
+    /// in directory entries remain partition-relative; only physical file positions shift.
+    /// </param>
+    /// <param name="excludePatterns">
+    /// Optional glob patterns of files and directories to omit from the image when creating
+    /// from a file system (see <see cref="GlobMatcher"/> for the supported syntax).
+    /// Ignored in rewrite mode.
+    /// </param>
     /// <returns>A task that completes with 0 on success, 1 on error. The first tuple element is the result code; the second is the output ISO path.</returns>
     public static async Task<(int Result, string? OutIsoPath)> CreateXisoAsync(
         string rootDirectory,
@@ -849,12 +932,14 @@ public static class XisoWriter
         Stream? sourceStream,
         string? inName,
         ProgressCallback? progressCallback,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? prependSectors = null,
+        IReadOnlyList<string>? excludePatterns = null)
     {
         return await Task.Run(() =>
         {
             var result = CreateXiso(rootDirectory, outputDirectory, inRoot, sourceStream,
-                out var outPath, inName, progressCallback, cancellationToken);
+                out var outPath, inName, progressCallback, cancellationToken, prependSectors, excludePatterns);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
     }

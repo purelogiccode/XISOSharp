@@ -2,6 +2,16 @@
 
 All notable changes to the XISOSharp library will be documented in this file.
 
+## [Unreleased]
+
+- `VerifyXiso`/`DecodeXiso` accept `skipSectors` to read Redump-style images whose game
+  partition does not start at file offset 0 (extract-xiso issue #33)
+- `CreateXiso` accepts `prependSectors` to write images with room for a video partition;
+  symmetric with `skipSectors` for round-trip reconstruction
+- CLI: new `--skip-sectors N` and `--prepend-sectors N` flags
+- `CreateXiso` accepts `excludePatterns` (glob patterns); new `GlobMatcher` utility;
+  CLI: repeatable `-X <glob>` flag, `-s` implicitly excludes `$SystemUpdate` on create
+
 ## [2.7.1] - 2025-07-21
 
 - Initial NuGet release

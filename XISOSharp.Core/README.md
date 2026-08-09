@@ -104,7 +104,9 @@ public static int DecodeXiso(
     out string? outIsoPath,
     bool llCompat = false,
     CancellationToken cancellationToken = default,
-    string? outputName = null)
+    string? outputName = null,
+    int? skipSectors = null,
+    int? prependSectors = null)
 ```
 
 | Parameter | Type | Description |
@@ -116,6 +118,8 @@ public static int DecodeXiso(
 | `llCompat` | `bool` | If `true`, uses backwards-compatible (non-optimized) right-offset calculation. Defaults to `false`. |
 | `cancellationToken` | `CancellationToken` | Token to monitor for cancellation requests. |
 | `outputName` | `string?` | Custom output filename for rewrite mode. When `null`, the original filename with `.iso` extension is used. |
+| `skipSectors` | `int?` | Optional number of 2048-byte sectors to skip in the source file before the XISO filesystem begins (Redump-style images with a video partition). When set, offset probing is skipped and the header must be at `skipSectors * 2048 + 0x10000`. |
+| `prependSectors` | `int?` | Optional number of 2048-byte sectors to prepend to the output image in rewrite mode, leaving room for a video partition. Stored sector numbers remain partition-relative. Ignored in non-rewrite modes. |
 
 **Returns**: `0` on success, non-zero on error.
 
@@ -146,13 +150,14 @@ Low-level method that validates the XISO header and returns root directory metad
 
 ```csharp
 public static (uint rootDirSector, uint rootDirSize, long discLseek) VerifyXiso(
-    FileStream fs, string isoName)
+    FileStream fs, string isoName, int? skipSectors = null)
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `fs` | `FileStream` | Open file stream positioned anywhere. |
 | `isoName` | `string` | Display name for error messages. |
+| `skipSectors` | `int?` | Optional number of 2048-byte sectors to skip from the start of the file before the XISO filesystem begins. When set, the header magic is verified at `skipSectors * SectorSize + HeaderOffset` and offset probing is skipped. Negative values throw `ArgumentOutOfRangeException`. |
 
 **Returns**: Tuple of `(rootDirSector, rootDirSize, discLseek)`.
 
@@ -281,7 +286,9 @@ public static int CreateXiso(
     out string? outIsoPath,
     string? inName,
     ProgressCallback? progressCallback = null,
-    CancellationToken cancellationToken = default)
+    CancellationToken cancellationToken = default,
+    int? prependSectors = null,
+    IReadOnlyList<string>? excludePatterns = null)
 ```
 
 | Parameter | Type | Description |
@@ -294,6 +301,8 @@ public static int CreateXiso(
 | `inName` | `string?` | Explicit output filename. When `null`, the directory name plus `.iso` is used. |
 | `progressCallback` | `ProgressCallback?` | Optional callback invoked with `(currentBytes, totalBytes)` during write. |
 | `cancellationToken` | `CancellationToken` | Token to monitor for cancellation requests. |
+| `prependSectors` | `int?` | Optional number of 2048-byte sectors to prepend to the output image before the XISO filesystem begins, leaving room for a video partition. The placeholder area is zero-filled; stored sector numbers remain partition-relative. Negative values throw `ArgumentOutOfRangeException`. |
+| `excludePatterns` | `IReadOnlyList<string>?` | Optional glob patterns of files/directories to omit from the image when creating from a file system (see [`GlobMatcher`](#globmatcher)). Excluded directories are not recursed into. When `Logger.RemoveSystemUpdate` is set, `**/$SystemUpdate/**` is implicitly added. Ignored in rewrite mode. |
 
 **Returns**: `0` on success, `1` on error.
 
@@ -313,6 +322,54 @@ public static async Task<(int Result, string? OutIsoPath)> CreateXisoAsync(
 ```
 
 **Returns**: A tuple containing `Result` (0 on success) and `OutIsoPath`.
+
+### Skip / Prepend Sectors (Redump-style images)
+
+Xbox disc images (especially Redump dumps) contain a **video partition** followed by the
+**game partition** (the XISO filesystem). When the game partition does not start at file
+offset 0, pass the partition start to the read APIs via `skipSectors`:
+
+```csharp
+// XGD1 Redump image: game partition starts at sector 0xC180 (0x18300000 bytes)
+int result = XisoReader.Extract("game.iso", "output", llCompat: false, skipSectors: 0xC180);
+```
+
+When creating an image that must sit after a video partition, use `prependSectors` to leave
+zero-filled space at the start of the file. The two options are symmetric, enabling
+round-trip reconstruction:
+
+```csharp
+// Write the game partition at the same offset it was read from
+XisoWriter.CreateXiso(srcDir, outputDir, null, null, out _, "game.iso", null,
+    prependSectors: 0xC180);
+```
+
+Both parameters are also exposed on the CLI as `--skip-sectors N` and `--prepend-sectors N`.
+
+### `GlobMatcher`
+
+Matches relative paths against shell-style glob patterns. Used by `CreateXiso`
+`excludePatterns`; also available as a standalone utility.
+
+```csharp
+var matcher = new GlobMatcher(["**/*.tmp", "**/node_modules/**"]);
+bool excluded = matcher.IsMatch("sub/notes.tmp"); // true
+```
+
+Supported syntax (use `/` as the separator; matching is case-insensitive):
+
+| Pattern | Meaning |
+|---|---|
+| `*` | Any characters within a single path segment |
+| `?` | Exactly one character within a single path segment |
+| `**` | As a complete segment: zero or more path segments. A trailing `/**` also matches the directory itself |
+| `[abc]`, `[a-z]`, `[!abc]` | Character classes with optional `!`/`^` negation |
+| `\x` | Escapes the next character |
+
+Patterns without a leading `**/` are anchored to the source root. A trailing `/` is
+treated as `/**`. On the CLI, patterns are passed via the repeatable `-X <glob>` flag;
+`-s` implicitly adds `**/$SystemUpdate/**` (create side matches entries named exactly
+`$SystemUpdate`, unlike the extract-side `-s` check which uses substring matching).
 
 ---
 

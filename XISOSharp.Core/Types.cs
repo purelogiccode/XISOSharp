@@ -163,4 +163,7 @@ internal class WriteTreeContext
 
     /// <summary>Cancellation token to observe during file writes.</summary>
     public CancellationToken CancellationToken;
+
+    /// <summary>Byte offset prepended to all physical write positions (skip/prepend support).</summary>
+    public long PrependOffset;
 }

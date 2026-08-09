@@ -13,6 +13,17 @@ This project is a **direct rewrite** of the original C codebase into idiomatic, 
 | [XISOSharp.Tests](XISOSharp.Tests/) | Unit tests for the core library |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI for batch regression testing against the C tool |
 
+## Documentation
+
+The full documentation (repository wiki) lives in [`docs/`](docs/README.md):
+
+- [Getting Started](docs/getting-started.md) — install, first extract/create/list
+- [CLI Reference](docs/cli.md) — every command, flag, and exit code
+- [Library API](docs/library.md) — XisoReader, XisoWriter, and utilities
+- [XISO Format](docs/xiso-format.md) — the on-disk format
+- [Redump & Disc Layouts](docs/redump-workflows.md) — XGD offsets, video partitions
+- [FAQ](docs/faq.md) · [Troubleshooting](docs/troubleshooting.md) · [Contributing](docs/contributing.md)
+
 ## Features
 
 - **Create** XISO images from a directory
@@ -25,6 +36,8 @@ This project is a **direct rewrite** of the original C codebase into idiomatic, 
 - **Hash** — compute MD5 or SHA-256 hashes of files within an XISO
 - **Audit** — deep integrity verification: header, tree, sector bounds, cycle detection
 - Supports **GLOBAL**, **XGD2**, **XGD3**, and **XGD1** disc formats
+- **Skip/Prepend sectors** — read Redump-style images where a video partition precedes the game partition (`--skip-sectors`), and write images with room for one (`--prepend-sectors`)
+- **Exclude patterns** — omit files/folders when creating an image (`-X <glob_pattern>`, repeatable; `-s` implicitly excludes `$SystemUpdate`)
 - Automatic `.xbe` media-enable patching
 - Async APIs for non-blocking I/O
 - Strong-named assembly

@@ -26,10 +26,19 @@ public static class XisoReader
     /// </summary>
     /// <param name="fs">Open file stream positioned anywhere.</param>
     /// <param name="isoName">Display name of the ISO (used in error messages).</param>
+    /// <param name="skipSectors">
+    /// Optional number of 2048-byte sectors to skip from the start of the file before
+    /// the XISO filesystem begins. When provided, the header magic is verified at
+    /// <c>skipSectors * SectorSize + HeaderOffset</c> and offset probing is skipped.
+    /// Use for Redump-style images where a video partition precedes the game partition.
+    /// </param>
     /// <returns>
     /// Tuple containing the root directory sector index, root directory size in bytes,
-    /// and the detected disc lseek offset.
+    /// and the detected disc lseek offset (which includes the skip offset when provided).
     /// </returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="skipSectors"/> is negative.
+    /// </exception>
     /// <exception cref="XisoFormatException">
     /// Thrown when no valid XISO header is found at any known offset,
     /// or when the trailing magic byte does not match.
@@ -42,48 +51,70 @@ public static class XisoReader
     /// Thrown when the root directory sector and size are both zero (empty ISO).
     /// </exception>
     public static (uint rootDirSector, uint rootDirSize, long discLseek) VerifyXiso(
-        FileStream fs, string isoName)
+        FileStream fs, string isoName, int? skipSectors = null)
     {
         Span<byte> buffer = stackalloc byte[Constants.HeaderDataLength];
         long discLseek = 0;
 
-        fs.Seek(Constants.HeaderOffset, SeekOrigin.Begin);
-
-        ReadExact(fs, buffer);
-
-        if (!buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+        if (skipSectors.HasValue)
         {
-            fs.Seek((long)Constants.HeaderOffset + Constants.GlobalLseekOffset, SeekOrigin.Begin);
+            if (skipSectors.Value < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value,
+                    "Skip sectors must be non-negative.");
+            }
+
+            discLseek = (long)skipSectors.Value * Constants.SectorSize;
+            fs.Seek(Constants.HeaderOffset + discLseek, SeekOrigin.Begin);
             ReadExact(fs, buffer);
 
-            if (!buffer.SequenceEqual(HeaderDataBytes))
+            if (!buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
             {
-                fs.Seek((long)Constants.HeaderOffset + Constants.Xgd3LseekOffset, SeekOrigin.Begin);
+                Logger.LogErr($"{isoName} does not appear to be a valid xbox iso image at skip offset {discLseek} (sector {skipSectors.Value})\n");
+                throw new XisoFormatException(
+                    $"Invalid XISO: {isoName} — no XISO header found at sector {skipSectors.Value} (byte offset {discLseek}).");
+            }
+        }
+        else
+        {
+            fs.Seek(Constants.HeaderOffset, SeekOrigin.Begin);
+
+            ReadExact(fs, buffer);
+
+            if (!buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+            {
+                fs.Seek((long)Constants.HeaderOffset + Constants.GlobalLseekOffset, SeekOrigin.Begin);
                 ReadExact(fs, buffer);
 
                 if (!buffer.SequenceEqual(HeaderDataBytes))
                 {
-                    fs.Seek((long)Constants.HeaderOffset + Constants.Xgd1LseekOffset, SeekOrigin.Begin);
+                    fs.Seek((long)Constants.HeaderOffset + Constants.Xgd3LseekOffset, SeekOrigin.Begin);
                     ReadExact(fs, buffer);
 
                     if (!buffer.SequenceEqual(HeaderDataBytes))
                     {
-                        Logger.LogErr($"{isoName} does not appear to be a valid xbox iso image\n");
-                        throw new XisoFormatException($"Invalid XISO: {isoName}");
+                        fs.Seek((long)Constants.HeaderOffset + Constants.Xgd1LseekOffset, SeekOrigin.Begin);
+                        ReadExact(fs, buffer);
+
+                        if (!buffer.SequenceEqual(HeaderDataBytes))
+                        {
+                            Logger.LogErr($"{isoName} does not appear to be a valid xbox iso image\n");
+                            throw new XisoFormatException($"Invalid XISO: {isoName}");
+                        }
+                        else
+                        {
+                            discLseek = Constants.Xgd1LseekOffset;
+                        }
                     }
                     else
                     {
-                        discLseek = Constants.Xgd1LseekOffset;
+                        discLseek = Constants.Xgd3LseekOffset;
                     }
                 }
                 else
                 {
-                    discLseek = Constants.Xgd3LseekOffset;
+                    discLseek = Constants.GlobalLseekOffset;
                 }
-            }
-            else
-            {
-                discLseek = Constants.GlobalLseekOffset;
             }
         }
 
@@ -460,15 +491,25 @@ public static class XisoReader
     /// <param name="outputName">
     /// Custom output filename. When <c>null</c>, the original filename with <c>.iso</c> extension is used.
     /// </param>
+    /// <param name="skipSectors">
+    /// Optional number of 2048-byte sectors to skip in the source file before the XISO
+    /// filesystem begins (for Redump-style images with a video partition).
+    /// </param>
+    /// <param name="prependSectors">
+    /// Optional number of 2048-byte sectors to prepend to the output image, leaving room
+    /// for a video partition. Sector numbers inside the image remain partition-relative.
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     public static int Rewrite(
         string xisoPath,
         string? outputPath,
         out string? outIsoPath,
         CancellationToken cancellationToken = default,
-        string? outputName = null)
+        string? outputName = null,
+        int? skipSectors = null,
+        int? prependSectors = null)
     {
-        return DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken, outputName);
+        return DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken, outputName, skipSectors, prependSectors);
     }
 
     /// <summary>
@@ -481,14 +522,19 @@ public static class XisoReader
     /// Pass <c>false</c> for already-optimized ISOs.
     /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="skipSectors">
+    /// Optional number of 2048-byte sectors to skip in the source file before the XISO
+    /// filesystem begins (for Redump-style images with a video partition).
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     public static int Extract(
         string xisoPath,
         string? outputPath,
         bool llCompat,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? skipSectors = null)
     {
-        return DecodeXiso(xisoPath, outputPath, ExtractMode.Extract, out _, llCompat, cancellationToken);
+        return DecodeXiso(xisoPath, outputPath, ExtractMode.Extract, out _, llCompat, cancellationToken, skipSectors: skipSectors);
     }
 
     /// <summary>
@@ -500,13 +546,18 @@ public static class XisoReader
     /// Pass <c>false</c> for already-optimized ISOs.
     /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="skipSectors">
+    /// Optional number of 2048-byte sectors to skip in the source file before the XISO
+    /// filesystem begins (for Redump-style images with a video partition).
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     public static int List(
         string xisoPath,
         bool llCompat,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? skipSectors = null)
     {
-        return DecodeXiso(xisoPath, null, ExtractMode.List, out _, llCompat, cancellationToken);
+        return DecodeXiso(xisoPath, null, ExtractMode.List, out _, llCompat, cancellationToken, skipSectors: skipSectors);
     }
 
     /// <summary>
@@ -519,13 +570,18 @@ public static class XisoReader
     /// Pass <c>false</c> for already-optimized ISOs.
     /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="skipSectors">
+    /// Optional number of 2048-byte sectors to skip in the source file before the XISO
+    /// filesystem begins (for Redump-style images with a video partition).
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     public static int Tree(
         string xisoPath,
         bool llCompat,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? skipSectors = null)
     {
-        return DecodeXiso(xisoPath, null, ExtractMode.Tree, out _, llCompat, cancellationToken);
+        return DecodeXiso(xisoPath, null, ExtractMode.Tree, out _, llCompat, cancellationToken, skipSectors: skipSectors);
     }
 
     /// <summary>
@@ -551,6 +607,15 @@ public static class XisoReader
     /// Custom output filename for rewrite mode. When <c>null</c>, the original filename with <c>.iso</c> extension is used.
     /// Ignored in non-rewrite modes.
     /// </param>
+    /// <param name="skipSectors">
+    /// Optional number of 2048-byte sectors to skip in the source file before the XISO
+    /// filesystem begins (for Redump-style images with a video partition).
+    /// </param>
+    /// <param name="prependSectors">
+    /// Optional number of 2048-byte sectors to prepend to the output image in rewrite mode,
+    /// leaving room for a video partition. Sector numbers inside the image remain
+    /// partition-relative. Ignored in non-rewrite modes.
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     /// <exception cref="XisoFormatException">
     /// Thrown when the file is not a valid XISO image.
@@ -567,7 +632,9 @@ public static class XisoReader
         out string? outIsoPath,
         bool llCompat,
         CancellationToken cancellationToken = default,
-        string? outputName = null)
+        string? outputName = null,
+        int? skipSectors = null,
+        int? prependSectors = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
@@ -627,7 +694,7 @@ public static class XisoReader
                 BufferSize = 65536
             });
 
-        (uint rootDirSect, uint rootDirSize, long discLseek) = VerifyXiso(fs, name);
+        (uint rootDirSect, uint rootDirSize, long discLseek) = VerifyXiso(fs, name, skipSectors);
 
         Logger.XboxDiscLseek = discLseek;
 
@@ -678,7 +745,7 @@ public static class XisoReader
                 TraverseXiso(fs, null, (long)rootDirSect * Constants.SectorSize + discLseek,
                     buf, ExtractMode.GenerateAvl, ref avlRoot, llCompat, discLseek);
 
-                XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null);
+                XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null, prependSectors: prependSectors);
             }
             else
             {
@@ -715,6 +782,15 @@ public static class XisoReader
     /// <param name="llCompat">If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <param name="outputName">Custom output filename for rewrite mode. When <c>null</c>, the original filename with <c>.iso</c> extension is used.</param>
+    /// <param name="skipSectors">
+    /// Optional number of 2048-byte sectors to skip in the source file before the XISO
+    /// filesystem begins (for Redump-style images with a video partition).
+    /// </param>
+    /// <param name="prependSectors">
+    /// Optional number of 2048-byte sectors to prepend to the output image in rewrite mode,
+    /// leaving room for a video partition. Sector numbers inside the image remain
+    /// partition-relative.
+    /// </param>
     /// <returns>A task that completes with the result code (0 on success, non-zero on error) and the output ISO path when in rewrite mode.</returns>
     public static async Task<(int Result, string? OutIsoPath)> DecodeXisoAsync(
         string xisoPath,
@@ -722,11 +798,13 @@ public static class XisoReader
         ExtractMode mode,
         bool llCompat = false,
         CancellationToken cancellationToken = default,
-        string? outputName = null)
+        string? outputName = null,
+        int? skipSectors = null,
+        int? prependSectors = null)
     {
         return await Task.Run(() =>
         {
-            var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken, outputName);
+            var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken, outputName, skipSectors, prependSectors);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
     }
