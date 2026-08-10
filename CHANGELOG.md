@@ -19,6 +19,12 @@ All notable changes to the XISOSharp library will be documented in this file.
 - Media-enable patch verification: byte-asserting unit tests (incl. read-buffer
   boundary crossing) and `Scripts/Verify-MediaPatch.ps1` cross-check against the
   reference C tool on real game ISOs
+- Xbox 360 XEX support (issue #28): `XisoReader.GetXexInfo`/`XexInfo` XEX2 header
+  parsing and the `--xex-info` CLI flag; `.xex` files verified never media-patched;
+  overflow-safe bounds checks for malformed XEX headers
+- Batch processing (issue #114): `--batch <dir>` processes all `.iso` files in a
+  directory (with `--batch-recursive` for subdirectories) in extract/list/tree/
+  rewrite/audit modes
 
 ## [2.7.1] - 2025-07-21
 

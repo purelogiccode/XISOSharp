@@ -34,6 +34,7 @@ directory listing, auditing, hashing, and copy-out.
 | `CopyOut` | Copy one file or directory out of an image |
 | `ComputeFileHash` | Hash one file (MD5/SHA-256/… via `HashAlgorithmName`) |
 | `ComputeDirectoryHashes` | Hash every file under a path |
+| `GetXexInfo` | Parse the Xbox 360 XEX2 header of a `.xex` file |
 | `AuditXiso` | Deep integrity audit |
 
 ## VerifyXiso
@@ -176,6 +177,33 @@ public static IReadOnlyList<(string Path, byte[] Hash)> ComputeDirectoryHashes(
 
 - Hash one file (`null` if not found) or every file under a directory (recursive).
 - Any `HashAlgorithmName` works — the CLI exposes `--md5` and `--sha256`.
+
+## GetXexInfo
+
+```csharp
+public static XexInfo? GetXexInfo(string isoPath, string internalPath)
+```
+
+Parses the Xbox 360 executable (XEX2) header of a `.xex` file inside the image. All
+fields are read big-endian per the XEX2 specification (see `xex2_info.h` in
+[xenia](https://github.com/xenia-project/xenia)):
+
+| `XexInfo` member | Meaning |
+|---|---|
+| `ModuleFlags` | Title / DLL / user-mode etc. bit flags |
+| `HeaderSize` | XEX header region size (typically `0x4000`) |
+| `EntryPoint` | Entry point RVA (optional header) |
+| `ImageBaseAddress` | Image base address (optional header) |
+| `ImageSize` / `LoadAddress` | Security info |
+| `Region` | NTSC-U / NTSC-J / PAL bit flags |
+| `AllowedMediaTypes` | Media type bitmask (hard disk, DVD-9, …) |
+| `MediaId` / `TitleId` / `Version` | Execution info |
+| `Platform` / `DiscNumber` / `DiscCount` | Execution info |
+| `EncryptionType` / `CompressionType` | File format info |
+
+Returns `null` when the path does not exist, points to a directory, or the file is not
+an XEX2 executable. Validated against retail Xbox 360 Redump images (`Perfect Dark
+Zero`, `Payday 2`). The CLI exposes this as `--xex-info`.
 
 ## AuditXiso
 

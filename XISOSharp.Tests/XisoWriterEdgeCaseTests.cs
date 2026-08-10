@@ -447,4 +447,22 @@ public class XisoWriterEdgeCaseTests : IDisposable
 
         AssertPatchedBytes(isoPath, original, "not_an_xbe.bin");
     }
+
+    [Fact]
+    public void CreateXiso_MediaEnable_IgnoresXexFiles()
+    {
+        // Xbox 360 executables are never patched: the media-enable patch is an XBE-only
+        // concept (issue #28) — a .xex containing the XBE pattern must be copied verbatim.
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        (byte[] original, _) = BuildXbeWithPattern(0, 0x2000);
+        File.WriteAllBytes(Path.Combine(srcDir, "default.xex"), original);
+
+        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.Equal(0, result);
+        Assert.NotNull(isoPath);
+
+        AssertPatchedBytes(isoPath, original, "default.xex");
+    }
 }

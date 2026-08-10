@@ -181,8 +181,7 @@ public static class XisoReader
     /// <param name="avlRoot">Reference to the AVL root being built.</param>
     /// <param name="llCompat">If <c>true</c>, uses backwards-compatible right-offset calculation.</param>
     /// <param name="discLseek">Disc lseek offset for sector address calculation.</param>
-    /// <returns>0 on success, non-zero on error.</returns>
-    internal static int TraverseXiso(
+    internal static void TraverseXiso(
         FileStream fs,
         DirEntry? inDirNode,
         long dirStart,
@@ -205,7 +204,6 @@ public static class XisoReader
         dir.Filename = "";
 
         ushort lOffset = 0;
-        const int err = 0;
 
         while (true)
         {
@@ -400,8 +398,7 @@ public static class XisoReader
             break;
         }
 
-        end_traverse:
-        return err;
+        end_traverse: ;
     }
 
     /// <summary>
@@ -1398,15 +1395,175 @@ public static class XisoReader
         if (!volInfo.IsValid || volInfo.RootDirSector == 0)
             return results;
 
-        CollectHashes(isoPath, internalPath, algorithm, volInfo, results);
+        CollectHashes(isoPath, internalPath, algorithm, results);
         return results;
+    }
+
+    // XEX2 optional-header keys (see xenia's xex2_info.h).
+    private const uint XexKeyFileFormatInfo = 0x000003FF;
+    private const uint XexKeyEntryPoint = 0x00010100;
+    private const uint XexKeyImageBaseAddress = 0x00010201;
+    private const uint XexKeyExecutionInfo = 0x00040006;
+
+    /// <summary>Maximum number of XEX optional-header entries accepted.</summary>
+    private const uint XexMaxHeaderCount = 64;
+
+    /// <summary>Maximum number of header bytes read from the executable (retail headers are 0x4000).</summary>
+    private const int XexHeaderReadLimit = 0x8000;
+
+    /// <summary>
+    /// Parses the Xbox 360 XEX2 header of an executable file inside an XISO image.
+    /// All fields are read big-endian per the XEX2 specification.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="internalPath">
+    /// Path of the <c>.xex</c> file within the ISO (e.g. <c>"/default.xex"</c>).
+    /// Use forward slashes as separators.
+    /// </param>
+    /// <returns>
+    /// The parsed <see cref="XexInfo"/>, or <c>null</c> when the path does not exist,
+    /// points to a directory, or the file is not an XEX2 executable.
+    /// </returns>
+    /// <exception cref="FileNotFoundException">Thrown when the ISO file does not exist.</exception>
+    /// <exception cref="XisoFormatException">Thrown when the ISO is not a valid XISO image.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static XexInfo? GetXexInfo(string isoPath, string internalPath)
+    {
+        var entry = GetEntryInfo(isoPath, internalPath);
+        if (entry == null || entry.IsDirectory || entry.FileSize < 0x18)
+            return null;
+
+        var volInfo = GetVolumeInfo(isoPath);
+        if (!volInfo.IsValid)
+            throw new XisoFormatException($"Not a valid XISO: {isoPath}");
+
+        using var fs = new FileStream(
+            isoPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                BufferSize = 65536
+            });
+
+        fs.Seek((long)entry.StartSector * Constants.SectorSize + volInfo.DiscLseek, SeekOrigin.Begin);
+
+        var header = new byte[Math.Min(entry.FileSize, XexHeaderReadLimit)];
+        fs.ReadExactly(header);
+
+        return ParseXexHeader(header);
+    }
+
+    private static XexInfo? ParseXexHeader(byte[] header)
+    {
+        // Magic: 'XEX2'
+        if (header.Length < 0x18 ||
+            header[0] != (byte)'X' || header[1] != (byte)'E' || header[2] != (byte)'X' || header[3] != (byte)'2')
+        {
+            return null;
+        }
+
+        var moduleFlags = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(0x04));
+        var headerSize = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(0x08));
+        var securityOffset = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(0x10));
+        var headerCount = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(0x14));
+
+        if (headerCount > XexMaxHeaderCount || 0x18 + headerCount * 8 > header.Length)
+            return null;
+
+        uint entryPoint = 0;
+        uint imageBaseAddress = 0;
+        uint executionOffset = 0;
+        uint formatOffset = 0;
+
+        for (var i = 0; i < headerCount; i++)
+        {
+            var offset = 0x18 + i * 8;
+            var key = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(offset));
+            var value = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(offset + 4));
+
+            switch (key)
+            {
+                case XexKeyEntryPoint:
+                    entryPoint = value;
+                    break;
+                case XexKeyImageBaseAddress:
+                    imageBaseAddress = value;
+                    break;
+                case XexKeyExecutionInfo:
+                    executionOffset = value;
+                    break;
+                case XexKeyFileFormatInfo:
+                    formatOffset = value;
+                    break;
+            }
+        }
+
+        // Security info: image size @+4, load address @+0x110, region @+0x178, media types @+0x17C.
+        // Long arithmetic keeps the bounds check overflow-safe for malformed headers.
+        uint imageSize = 0;
+        uint loadAddress = 0;
+        uint region = 0;
+        uint allowedMediaTypes = 0;
+        if ((long)securityOffset + 0x180 <= header.Length)
+        {
+            imageSize = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan((int)securityOffset + 4));
+            loadAddress = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan((int)securityOffset + 0x110));
+            region = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan((int)securityOffset + 0x178));
+            allowedMediaTypes = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan((int)securityOffset + 0x17C));
+        }
+
+        // Execution info (0x18 bytes): media id, version, base version, title id,
+        // platform, executable table, disc number, disc count, savegame id.
+        uint mediaId = 0;
+        uint titleId = 0;
+        uint version = 0;
+        byte platform = 0;
+        byte discNumber = 0;
+        byte discCount = 0;
+        if (executionOffset != 0 && (long)executionOffset + 0x18 <= header.Length)
+        {
+            mediaId = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan((int)executionOffset));
+            version = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan((int)executionOffset + 4));
+            titleId = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan((int)executionOffset + 0x0C));
+            platform = header[(int)executionOffset + 0x10];
+            discNumber = header[(int)executionOffset + 0x12];
+            discCount = header[(int)executionOffset + 0x13];
+        }
+
+        // File format info: info size @0, encryption type (u16) @+4, compression type (u16) @+6.
+        ushort encryptionType = 0;
+        ushort compressionType = 0;
+        if (formatOffset != 0 && (long)formatOffset + 8 <= header.Length)
+        {
+            encryptionType = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan((int)formatOffset + 4));
+            compressionType = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan((int)formatOffset + 6));
+        }
+
+        return new XexInfo(
+            moduleFlags,
+            headerSize,
+            entryPoint,
+            imageBaseAddress,
+            imageSize,
+            loadAddress,
+            region,
+            allowedMediaTypes,
+            mediaId,
+            titleId,
+            version,
+            platform,
+            discNumber,
+            discCount,
+            encryptionType,
+            compressionType);
     }
 
     private static void CollectHashes(
         string isoPath,
         string currentPath,
         HashAlgorithmName algorithm,
-        VolumeInfo volInfo,
         List<(string Path, byte[] Hash)> results)
     {
         var entries = ListDirectory(isoPath, currentPath);
@@ -1417,7 +1574,7 @@ public static class XisoReader
 
             if (entry.IsDirectory)
             {
-                CollectHashes(isoPath, fullPath, algorithm, volInfo, results);
+                CollectHashes(isoPath, fullPath, algorithm, results);
             }
             else
             {

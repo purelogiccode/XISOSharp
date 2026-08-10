@@ -146,6 +146,7 @@ writes the current Windows FILETIME (8 bytes, little-endian) into the header are
 | `ValidationIssue` | `Type`, `Path`, `SourceSize`, `OutputSize`, `SourceHash`, `OutputHash` |
 | `ValidationResult` | `Passed`, `SourceFileCount`, `OutputFileCount`, `SourceDirCount`, `OutputDirCount`, `SourceTotalBytes`, `OutputTotalBytes`, `Issues` |
 | `ProgressInfo` | `Type` (`ProgressInfoType`), `Count`, `Path`, `Sector`, `Size` — structured write-progress event (see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo)) |
+| `XexInfo` | `ModuleFlags`, `HeaderSize`, `EntryPoint`, `ImageBaseAddress`, `ImageSize`, `LoadAddress`, `Region`, `AllowedMediaTypes`, `MediaId`, `TitleId`, `Version`, `Platform`, `DiscNumber`, `DiscCount`, `EncryptionType`, `CompressionType` — Xbox 360 XEX2 header (see [XisoReader API](api-xisoreader.md#getxexinfo)) |
 
 ## Enums
 

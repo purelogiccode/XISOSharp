@@ -41,9 +41,12 @@ Modes are mutually exclusive. If no mode is given, **extract** is the default.
 | `-t` | **Tree** — recursive listing with full paths, sizes, and totals. |
 | `-i <file> [path]` | **Info** — volume descriptor metadata plus per-entry details (sector, size, attributes, left/right child offsets). `path` defaults to `/`. |
 | `--ls <file> [path]` | **List directory** — entry names of a directory (default `/`), **without recursion**. Prints one name per line; `/path: empty directory` when empty. Mirrors `ls` on the image. |
+| `--xex-info <file> <path>` | **XEX info** — parse and display the Xbox 360 XEX2 executable header of a `.xex` file inside the image (module flags, entry point, image base/size, region, media types, media/title ID, version, disc, encryption/compression). |
 | `--md5 <file> [path]` | Compute **MD5** hashes of files **inside** the image. No `path` → hash every file in the image; directory → recursive; file → single hash. Output: lowercase hex + two spaces + path. |
 | `--sha256 <file> [path]` | Compute **SHA-256** hashes of files inside the image (same semantics as `--md5`). |
 | `-V <file1.xiso> ...` | **Audit** — deep integrity check of one or more images: header, tree walk, sector bounds, cycle detection, reserved attribute bits, optimized tag. Prints `Files checked` / `Dirs checked` / `Result: PASS|FAIL (N issue(s))`. |
+| `--batch <dir>` | Process **all `.iso` files** in `<dir>` instead of explicit filenames. Sorted for deterministic order. Works with extract, list, tree, rewrite (`-r`), and audit (`-V`); rejected with single-ISO modes and explicit filenames. |
+| `--batch-recursive` | With `--batch`, search subdirectories recursively. |
 | `--copy-out <iso> <path> <dest>` | Copy a single file **or an entire directory** out of an ISO to `<dest>`. |
 | `-r` | **Rewrite** each ISO as an optimized ISO (see [Optimized-tag detection](#optimized-tag-detection)). Already-optimized images are skipped. |
 | `validate <src> <out>` | Standalone **validation** command — must be the **first** token. See [Validation](validation.md). |
@@ -176,6 +179,10 @@ extract-xiso validate source.iso rebuilt.iso --validate-checksums --validate-rep
 # Deep-audit several images
 extract-xiso -V game1.iso game2.iso
 
+# Batch-process every ISO in a directory (recursive)
+extract-xiso -r --batch ./isos --batch-recursive
+extract-xiso --batch ./isos -d ./extracted
+
 # Hash all files in an image with SHA-256
 extract-xiso --sha256 game.iso
 
@@ -184,6 +191,10 @@ extract-xiso --ls game.iso
 
 # List a subdirectory
 extract-xiso --ls game.iso /media
+
+# Show the Xbox 360 executable header of a game
+# (title ID, entry point, region, media types, ...)
+extract-xiso --xex-info game360.iso /default.xex
 
 # Copy one directory out of an image
 extract-xiso --copy-out game.iso /media ./media_out

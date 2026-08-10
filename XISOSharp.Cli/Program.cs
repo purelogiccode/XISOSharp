@@ -30,6 +30,7 @@ internal static class Program
         var tree = false;
         var info = false;
         var lsMode = false;
+        var xexInfoMode = false;
         var hashMode = false;
         var copyOut = false;
         var auditMode = false;
@@ -51,6 +52,8 @@ internal static class Program
         int? skipSectors = null;
         int? prependSectors = null;
         var excludePatterns = new List<string>();
+        string? batchDir = null;
+        var batchRecursive = false;
 
         var optind = 0;
 
@@ -144,6 +147,16 @@ internal static class Program
 
                         extract = false;
                         lsMode = true;
+                        break;
+                    case "--xex-info":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        xexInfoMode = true;
                         break;
                     case "--md5":
                         if (xSeen || rewrite || createList.Count > 0)
@@ -286,6 +299,21 @@ internal static class Program
                         }
 
                         break;
+                    case "--batch":
+                        if (i + 1 < args.Length)
+                        {
+                            batchDir = args[++i];
+                        }
+                        else
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        break;
+                    case "--batch-recursive":
+                        batchRecursive = true;
+                        break;
                     default:
                         optind = i;
                         goto parse_done;
@@ -315,7 +343,7 @@ internal static class Program
         }
 
         if ((skipSectors.HasValue || prependSectors.HasValue) &&
-            (info || lsMode || hashMode || copyOut || auditMode || validateMode || validateFlag))
+            (info || lsMode || xexInfoMode || hashMode || copyOut || auditMode || validateMode || validateFlag))
         {
             Logger.LogErr("Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), and create (-c) modes\n");
             return 1;
@@ -327,6 +355,61 @@ internal static class Program
             return 1;
         }
 
+        if (batchRecursive && batchDir == null)
+        {
+            Logger.LogErr("Error: --batch-recursive requires --batch <directory>\n");
+            return 1;
+        }
+
+        if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || hashMode || copyOut || validateMode))
+        {
+            Logger.LogErr("Error: --batch is only supported in extract, list, tree, rewrite (-r), and audit (-V) modes\n");
+            return 1;
+        }
+
+        // The list of ISO files to process: explicit filenames, or a directory scan (--batch).
+        List<string> isoFiles;
+        if (batchDir != null)
+        {
+            if (optind < args.Length)
+            {
+                Logger.LogErr("Error: --batch cannot be combined with explicit ISO filenames\n");
+                return 1;
+            }
+
+            try
+            {
+                // Case-insensitive *.iso matching on every platform (the SearchOption
+                // overload would be case-sensitive on Linux/macOS).
+                var options = new EnumerationOptions
+                {
+                    MatchCasing = MatchCasing.CaseInsensitive,
+                    RecurseSubdirectories = batchRecursive,
+                    AttributesToSkip = FileAttributes.None // include hidden files, like the SearchOption overload
+                };
+                isoFiles = Directory.EnumerateFiles(batchDir, "*.iso", options)
+                    .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+            catch (Exception ex) when (ex is DirectoryNotFoundException or UnauthorizedAccessException or IOException)
+            {
+                Logger.LogErr($"Error: cannot read batch directory {batchDir}: {ex.Message}\n");
+                return 1;
+            }
+
+            if (isoFiles.Count == 0)
+            {
+                Logger.LogErr($"Error: no .iso files found in {batchDir}\n");
+                return 1;
+            }
+
+            Logger.Log($"batch: processing {isoFiles.Count} ISO file(s) from {batchDir}{(batchRecursive ? " (recursive)" : "")}\n");
+        }
+        else
+        {
+            isoFiles = args.Skip(optind).ToList();
+        }
+
         if (createList.Count > 0)
         {
             if (optind < args.Length)
@@ -335,7 +418,7 @@ internal static class Program
                 return 1;
             }
         }
-        else if (optind >= args.Length)
+        else if (isoFiles.Count == 0)
         {
             PrintUsage();
             return 1;
@@ -484,6 +567,52 @@ internal static class Program
             return 0;
         }
 
+        if (xexInfoMode)
+        {
+            if (optind + 1 >= args.Length)
+            {
+                PrintUsage();
+                return 1;
+            }
+
+            var xisoPath = args[optind];
+            var internalPath = args[optind + 1];
+
+            try
+            {
+                var xex = XisoReader.GetXexInfo(xisoPath, internalPath);
+                if (xex == null)
+                {
+                    Logger.LogErr($"Not an XEX2 executable: {internalPath}\n");
+                    return 1;
+                }
+
+                Logger.Log($"XEX info: {internalPath}\n");
+                Logger.Log($"  Module flags:      0x{xex.ModuleFlags:X8}{FormatXexModuleFlags(xex.ModuleFlags)}\n");
+                Logger.Log($"  Header size:       0x{xex.HeaderSize:X8}\n");
+                Logger.Log($"  Entry point:       0x{xex.EntryPoint:X8}\n");
+                Logger.Log($"  Image base:        0x{xex.ImageBaseAddress:X8}\n");
+                Logger.Log($"  Image size:        0x{xex.ImageSize:X8}\n");
+                Logger.Log($"  Load address:      0x{xex.LoadAddress:X8}\n");
+                Logger.Log($"  Region:            0x{xex.Region:X8}{FormatXexRegion(xex.Region)}\n");
+                Logger.Log($"  Media types:       0x{xex.AllowedMediaTypes:X8}{FormatXexMediaTypes(xex.AllowedMediaTypes)}\n");
+                Logger.Log($"  Media ID:          0x{xex.MediaId:X8}\n");
+                Logger.Log($"  Title ID:          0x{xex.TitleId:X8}\n");
+                Logger.Log($"  Version:           0x{xex.Version:X8}\n");
+                Logger.Log($"  Platform:          0x{xex.Platform:X2}\n");
+                Logger.Log($"  Disc:              {xex.DiscNumber}/{xex.DiscCount}\n");
+                Logger.Log($"  Encryption:        {xex.EncryptionType} ({FormatXexEncryption(xex.EncryptionType)})\n");
+                Logger.Log($"  Compression:       {xex.CompressionType} ({FormatXexCompression(xex.CompressionType)})\n");
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IOException)
+            {
+                Logger.LogErr($"Error: {ex.Message}\n");
+                return 1;
+            }
+
+            return 0;
+        }
+
         if (hashMode)
         {
             if (optind >= args.Length)
@@ -577,10 +706,16 @@ internal static class Program
 
         if (auditMode)
         {
-            var allValid = true;
-            for (var i = optind; i < args.Length; i++)
+            if (isoFiles.Count == 0)
             {
-                var xisoPath = args[i];
+                PrintUsage();
+                return 1;
+            }
+
+            var allValid = true;
+            for (var i = 0; i < isoFiles.Count; i++)
+            {
+                var xisoPath = isoFiles[i];
                 try
                 {
                     var result = XisoReader.AuditXiso(xisoPath);
@@ -645,13 +780,13 @@ internal static class Program
             }
         }
 
-        for (var i = optind; i < args.Length; i++)
+        for (var i = 0; i < isoFiles.Count; i++)
         {
             isos++;
             Logger.Log("\n");
             Logger.TotalBytes = Logger.TotalFiles = 0;
 
-            var xisoPath = args[i];
+            var xisoPath = isoFiles[i];
             var optimized = false;
 
             try
@@ -786,6 +921,81 @@ internal static class Program
     }
 
     /// <summary>
+    /// Formats the XEX module flags as a comma-separated list of names.
+    /// </summary>
+    private static string FormatXexModuleFlags(uint flags)
+    {
+        var parts = new List<string>();
+        if ((flags & 0x01) != 0) parts.Add("Title");
+        if ((flags & 0x02) != 0) parts.Add("ExportsToTitle");
+        if ((flags & 0x04) != 0) parts.Add("SystemDebugger");
+        if ((flags & 0x08) != 0) parts.Add("DllModule");
+        if ((flags & 0x10) != 0) parts.Add("ModulePatch");
+        if ((flags & 0x20) != 0) parts.Add("PatchFull");
+        if ((flags & 0x40) != 0) parts.Add("PatchDelta");
+        if ((flags & 0x80) != 0) parts.Add("UserMode");
+        return parts.Count > 0 ? $" ({string.Join(", ", parts)})" : "";
+    }
+
+    /// <summary>
+    /// Formats the XEX region flags as the best-matching region name.
+    /// </summary>
+    private static string FormatXexRegion(uint region)
+    {
+        if (region == 0xFFFFFFFF) return " (All)";
+        if ((region & 0x000000FF) != 0) return " (NTSC-U)";
+        if ((region & 0x0000FF00) != 0) return " (NTSC-J)";
+        if ((region & 0x00FF0000) != 0) return " (PAL)";
+        if ((region & 0xFF000000) != 0) return " (Other)";
+
+        return "";
+    }
+
+    /// <summary>
+    /// Formats the XEX allowed-media-types bitmask as a comma-separated list of names.
+    /// </summary>
+    private static string FormatXexMediaTypes(uint media)
+    {
+        var parts = new List<string>();
+        if ((media & 0x00000001) != 0) parts.Add("HardDisk");
+        if ((media & 0x00000002) != 0) parts.Add("DvdX2");
+        if ((media & 0x00000004) != 0) parts.Add("DvdCd");
+        if ((media & 0x00000008) != 0) parts.Add("Dvd5");
+        if ((media & 0x00000010) != 0) parts.Add("Dvd9");
+        if ((media & 0x00000020) != 0) parts.Add("SystemFlash");
+        if ((media & 0x00000080) != 0) parts.Add("MemoryUnit");
+        if ((media & 0x00000100) != 0) parts.Add("UsbMassStorage");
+        if ((media & 0x00000200) != 0) parts.Add("Network");
+        if ((media & 0x00000400) != 0) parts.Add("DirectFromMemory");
+        if ((media & 0x00000800) != 0) parts.Add("RamDrive");
+        if ((media & 0x00001000) != 0) parts.Add("Svod");
+        if ((media & 0x01000000) != 0) parts.Add("InsecurePackage");
+        if ((media & 0x02000000) != 0) parts.Add("SavegamePackage");
+        if ((media & 0x04000000) != 0) parts.Add("LocallySignedPackage");
+        if ((media & 0x08000000) != 0) parts.Add("LiveSignedPackage");
+        if ((media & 0x10000000) != 0) parts.Add("XboxPackage");
+        return parts.Count > 0 ? $" ({string.Join(", ", parts)})" : "";
+    }
+
+    /// <summary>Formats the XEX encryption type as a name.</summary>
+    private static string FormatXexEncryption(ushort encryption) => encryption switch
+    {
+        0 => "None",
+        1 => "Normal",
+        _ => "Unknown"
+    };
+
+    /// <summary>Formats the XEX compression type as a name.</summary>
+    private static string FormatXexCompression(ushort compression) => compression switch
+    {
+        0 => "None",
+        1 => "Basic",
+        2 => "Normal",
+        3 => "Delta",
+        _ => "Unknown"
+    };
+
+    /// <summary>
     /// Formats a directory entry attribute byte as a human-readable string.
     /// </summary>
     private static string FormatAttributes(byte attrs)
@@ -819,12 +1029,19 @@ internal static class Program
                                   -i <file> [path]    Show volume info and directory entry metadata.
                                   --ls <file> [path]   List the entries of a directory (default root)
                                                         without recursion. Mirrors 'ls' on the image.
+                                  --xex-info <file> <path>  Show the Xbox 360 XEX2 executable
+                                                        header of a .xex file inside the image
+                                                        (module flags, entry point, title ID, ...).
                                   -l                  List files in xiso(s).
                                   --md5 <file> [path] Compute MD5 hash of file(s) in xiso.
                                   -r                  Rewrite xiso(s) as optimized xiso(s).
                                   --sha256 <file> [path] Compute SHA-256 hash of file(s) in xiso.
                                   -t                  List all files recursively with sizes (tree).
-                                  -V <file1.xiso> ... Deep-audit xiso(s): validate header, tree, sectors.
+                                  -V <file1.xiso> ...  Deep-audit xiso(s): validate header, tree, sectors.
+                                  --batch <dir>        Process all .iso files in <dir> instead of
+                                                        explicit filenames. Works with extract,
+                                                        list, tree, rewrite (-r), and audit (-V).
+                                  --batch-recursive    With --batch, search subdirectories recursively.
                                   validate <src> <out> Validate conversion by comparing source and output ISOs.
                                   -x                  Extract xiso(s) (the default mode if none is given).
                                   -X <glob_pattern>   In create mode (-c), exclude files/directories
