@@ -211,9 +211,9 @@ public static class XisoWriter
             AvlTraversalMethod.Prefix, 0);
 
         var offsetCtx = new OffsetCalcContext { CurrentSector = startSector, PrependOffset = prependOffset };
-        AvlTree.AvlTraverseDepthFirst(root, static (n, c, d) =>
+        AvlTree.AvlTraverseDepthFirst(root, static (n, c, _) =>
         {
-            CalculateDirectoryOffsets(n, (OffsetCalcContext)c!, d);
+            CalculateDirectoryOffsets(n, (OffsetCalcContext)c!);
             return 0;
         }, offsetCtx, AvlTraversalMethod.Prefix, 0);
 
@@ -748,27 +748,29 @@ public static class XisoWriter
 
         void CountCore(AvlNode? node)
         {
-            // The sentinel represents "no entries" (e.g. an empty source directory);
-            // it is not itself an entry.
-            if (node == null || ReferenceEquals(node, AvlNode.EmptySubdirectory))
-                return;
-
-            if (node.Subdirectory != null)
+            while (true)
             {
-                dirs++;
+                // The sentinel represents "no entries" (e.g. an empty source directory);
+                // it is not itself an entry.
+                if (node == null || ReferenceEquals(node, AvlNode.EmptySubdirectory)) return;
 
-                if (!ReferenceEquals(node.Subdirectory, AvlNode.EmptySubdirectory))
+                if (node.Subdirectory != null)
                 {
-                    CountCore(node.Subdirectory);
-                }
-            }
-            else
-            {
-                files++;
-            }
+                    dirs++;
 
-            CountCore(node.Left);
-            CountCore(node.Right);
+                    if (!ReferenceEquals(node.Subdirectory, AvlNode.EmptySubdirectory))
+                    {
+                        CountCore(node.Subdirectory);
+                    }
+                }
+                else
+                {
+                    files++;
+                }
+
+                CountCore(node.Left);
+                node = node.Right;
+            }
         }
     }
 
@@ -827,9 +829,9 @@ public static class XisoWriter
             if (!ReferenceEquals(avl.Subdirectory, AvlNode.EmptySubdirectory))
             {
                 avl.FileSize = 0;
-                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, (n, _, d) =>
+                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, (n, _, _) =>
                 {
-                    CalculateDirectorySize(n, ref avl.FileSize, d);
+                    CalculateDirectorySize(n, ref avl.FileSize);
                     return 0;
                 }, null, AvlTraversalMethod.Prefix, 0);
 
@@ -851,8 +853,7 @@ public static class XisoWriter
     /// </summary>
     /// <param name="avl">Node whose entry size is being calculated.</param>
     /// <param name="outSize">Running total size of the directory table; updated in place.</param>
-    /// <param name="depth">Not used.</param>
-    internal static void CalculateDirectorySize(AvlNode avl, ref uint outSize, int depth)
+    internal static void CalculateDirectorySize(AvlNode avl, ref uint outSize)
     {
         var length = (uint)(Constants.FilenameOffset + avl.Filename.Length);
         length += (Constants.DwordSize - (length % Constants.DwordSize)) % Constants.DwordSize;
@@ -878,8 +879,7 @@ public static class XisoWriter
     /// </summary>
     /// <param name="avl">Current node being visited.</param>
     /// <param name="ctx">Context tracking the current sector counter.</param>
-    /// <param name="depth">Not used.</param>
-    internal static void CalculateDirectoryOffsets(AvlNode avl, OffsetCalcContext ctx, int depth)
+    internal static void CalculateDirectoryOffsets(AvlNode avl, OffsetCalcContext ctx)
     {
         if (avl.Subdirectory != null)
         {
@@ -900,17 +900,17 @@ public static class XisoWriter
                     DirStart = dirStart
                 };
 
-                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, static (n, c, d) =>
+                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, static (n, c, _) =>
                 {
-                    WriteDirStartAndFilePositions(n, (WdsafpContext)c!, d);
+                    WriteDirStartAndFilePositions(n, (WdsafpContext)c!);
                     return 0;
                 }, wdsafp, AvlTraversalMethod.Prefix, 0);
 
                 ctx.CurrentSector = wdsafp.CurrentSector;
 
-                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, static (n, c, d) =>
+                AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, static (n, c, _) =>
                 {
-                    CalculateDirectoryOffsets(n, (OffsetCalcContext)c!, d);
+                    CalculateDirectoryOffsets(n, (OffsetCalcContext)c!);
                     return 0;
                 }, ctx, AvlTraversalMethod.Prefix, 0);
             }
@@ -923,9 +923,7 @@ public static class XisoWriter
     /// </summary>
     /// <param name="avl">Current node.</param>
     /// <param name="ctx">Context carrying the directory start and current sector.</param>
-    /// <param name="depth">Not used.</param>
-    /// <returns>Always 0.</returns>
-    internal static int WriteDirStartAndFilePositions(AvlNode avl, WdsafpContext ctx, int depth)
+    internal static void WriteDirStartAndFilePositions(AvlNode avl, WdsafpContext ctx)
     {
         avl.DirStart = ctx.DirStart;
 
@@ -934,8 +932,6 @@ public static class XisoWriter
             avl.StartSector = ctx.CurrentSector;
             ctx.CurrentSector += NumSectors(avl.FileSize);
         }
-
-        return 0;
     }
 
     /// <summary>

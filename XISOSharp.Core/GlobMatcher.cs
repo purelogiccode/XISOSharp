@@ -145,30 +145,28 @@ public sealed class GlobMatcher
         while (i < segment.Length)
         {
             var c = segment[i];
-            if (c == '*')
+            switch (c)
             {
-                sb.Append("[^/]*");
-                i++;
-            }
-            else if (c == '?')
-            {
-                sb.Append("[^/]");
-                i++;
-            }
-            else if (c == '[' && TryParseCharClass(segment, i, out var charClass, out var end))
-            {
-                sb.Append(charClass);
-                i = end;
-            }
-            else if (c == '\\' && i + 1 < segment.Length)
-            {
-                sb.Append(Regex.Escape(segment[i + 1].ToString()));
-                i += 2;
-            }
-            else
-            {
-                sb.Append(Regex.Escape(c.ToString()));
-                i++;
+                case '*':
+                    sb.Append("[^/]*");
+                    i++;
+                    break;
+                case '?':
+                    sb.Append("[^/]");
+                    i++;
+                    break;
+                case '[' when TryParseCharClass(segment, i, out var charClass, out var end):
+                    sb.Append(charClass);
+                    i = end;
+                    break;
+                case '\\' when i + 1 < segment.Length:
+                    sb.Append(Regex.Escape(segment[i + 1].ToString()));
+                    i += 2;
+                    break;
+                default:
+                    sb.Append(Regex.Escape(c.ToString()));
+                    i++;
+                    break;
             }
         }
     }
