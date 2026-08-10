@@ -89,6 +89,40 @@ Parameters (all optional):
 > (`C:\Sincronizar\source\repos\CSharp_ExtractXiso`). Pass explicit paths if your
 > checkout differs.
 
+## Media-patch integration verification
+
+The `.xbe` media-enable patch (pattern `E8 CA FD FF FF 85 C0 7D`, byte 7 → `0xEB`) is
+applied when **writing** an ISO (create/rewrite), never when extracting. It is covered
+at three levels:
+
+1. **Unit tests** — `BoyerMooreTests` (search semantics) and `XisoWriterEdgeCaseTests`
+   (`CreateXiso_MediaEnable_*`): create→extract round-trips that assert the patched
+   bytes, including a pattern straddling the 2 MB read-buffer boundary (exercises the
+   Boyer-Moore overlap logic), the disabled mode (`-m` / `Logger.MediaEnable = false`),
+   and that non-`.xbe` files are untouched.
+2. **Reference cross-check script** — `Scripts/Verify-MediaPatch.ps1`:
+   1. extracts a real game ISO once (extraction never patches → original `.xbe` bytes),
+   2. creates an ISO from those files with the reference C tool and this
+      implementation, patched (default) and unpatched (`-m`),
+   3. reads the `.xbe` files back out of each created ISO and proves: patched and
+      unpatched files are byte-identical between the two tools; at every pattern site
+      the patched file differs from the original exactly at byte 7 (`0x7D` → `0xEB`)
+      and nowhere else; `.xbe` files without the pattern are untouched; unpatched
+      creates keep the original bytes.
+3. **Real-ISO validation** (Redump dumps of original Xbox games):
+   - *007 – Everything or Nothing*: `default.xbe` and `driving.xbe` each contain one
+     pattern site (`0x5399C` / `0x2561A1`) — patched output byte-identical between
+     tools and matching the exact expected transformation; 16/16 checks passed.
+   - *007 – Agent Under Fire*: `bond.xbe` has no pattern site — untouched by both
+     tools.
+
+```powershell
+.\Scripts\Verify-MediaPatch.ps1 -IsoPath "H:\XBOXTest\007 - Everything or Nothing [NTSC-U][Redump].iso"
+```
+
+Parameters: `-IsoPath`, `-CExtractXiso` (reference C tool), `-CsExtractXiso` (this
+implementation), `-WorkDir`, `-SkipExtract` (reuse an existing extraction).
+
 ## Coverage
 
 The CI collects coverage with XPlat code coverage:

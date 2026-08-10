@@ -344,4 +344,111 @@ public class XisoWriterEdgeCaseTests : IDisposable
             Logger.MediaEnable = true;
         }
     }
+
+    /// <summary>
+    /// Builds a synthetic .xbe containing the media-enable pattern at the given offsets
+    /// and returns the expected patched copy (pattern byte 7 replaced with 0xEB).
+    /// </summary>
+    private static (byte[] Original, byte[] ExpectedPatched, int[] Offsets) BuildXbeWithPattern(params int[] offsets)
+    {
+        var data = new byte[0x00210000]; // ~2.1 MB: larger than the 2 MB read buffer
+        Array.Fill(data, (byte)0x41);
+
+        foreach (var offset in offsets)
+        {
+            Constants.MediaEnable.CopyTo(data, offset);
+        }
+
+        var expected = (byte[])data.Clone();
+        foreach (var offset in offsets)
+        {
+            expected[offset + Constants.MediaEnableBytePos] = Constants.MediaEnableByte;
+        }
+
+        return (data, expected, offsets);
+    }
+
+    private static void AssertPatchedBytes(string isoPath, byte[] expected, string xbeRelPath)
+    {
+        var extractDir = Path.Combine(Path.GetTempPath(), $"xiso_mp_out_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(extractDir);
+        try
+        {
+            var result = XisoReader.Extract(isoPath, extractDir, false);
+            Assert.Equal(0, result);
+
+            var actual = File.ReadAllBytes(Path.Combine(extractDir, xbeRelPath));
+            Assert.Equal(expected, actual);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
+            }
+            catch
+            {
+                /* best effort cleanup */
+            }
+        }
+    }
+
+    [Fact]
+    public void CreateXiso_MediaEnable_PatchesPatternBytesEndToEnd()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        // Offsets: start of file, mid-file, and straddling the 2 MB read-buffer boundary
+        // (0x200000) so the Boyer-Moore overlap logic is exercised.
+        (byte[] original, byte[] expected, _) = BuildXbeWithPattern(0, 0x1234, 0x1FFFFC, 0x200004, 0x200100);
+        File.WriteAllBytes(Path.Combine(srcDir, "test.xbe"), original);
+        File.WriteAllText(Path.Combine(srcDir, "readme.txt"), "text");
+
+        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.Equal(0, result);
+        Assert.NotNull(isoPath);
+
+        AssertPatchedBytes(isoPath, expected, "test.xbe");
+    }
+
+    [Fact]
+    public void CreateXiso_MediaEnableDisabled_LeavesPatternBytesUntouched()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        (byte[] original, _, _) = BuildXbeWithPattern(0, 0x1234, 0x1FFFFC);
+        File.WriteAllBytes(Path.Combine(srcDir, "test.xbe"), original);
+
+        Logger.MediaEnable = false;
+        try
+        {
+            var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+            Assert.Equal(0, result);
+            Assert.NotNull(isoPath);
+
+            AssertPatchedBytes(isoPath, original, "test.xbe");
+        }
+        finally
+        {
+            Logger.MediaEnable = true;
+        }
+    }
+
+    [Fact]
+    public void CreateXiso_MediaEnable_IgnoresNonXbeFiles()
+    {
+        var srcDir = CreateTempDir();
+        var outputDir = CreateTempDir();
+
+        (byte[] original, _, _) = BuildXbeWithPattern(0);
+        File.WriteAllBytes(Path.Combine(srcDir, "not_an_xbe.bin"), original);
+
+        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.Equal(0, result);
+        Assert.NotNull(isoPath);
+
+        AssertPatchedBytes(isoPath, original, "not_an_xbe.bin");
+    }
 }

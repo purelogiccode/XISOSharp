@@ -16,6 +16,9 @@ All notable changes to the XISOSharp library will be documented in this file.
   `FinishedPacking`) on `CreateXiso`/`CreateXisoAsync` and rewrite APIs
 - `--ls <file> [path]` CLI flag and `XisoReader.ListDirectoryFlat` — non-recursive
   directory listing (default root, optional subdirectory path)
+- Media-enable patch verification: byte-asserting unit tests (incl. read-buffer
+  boundary crossing) and `Scripts/Verify-MediaPatch.ps1` cross-check against the
+  reference C tool on real game ISOs
 
 ## [2.7.1] - 2025-07-21
 
