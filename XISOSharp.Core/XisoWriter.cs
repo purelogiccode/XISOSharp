@@ -56,6 +56,13 @@ public static class XisoWriter
     /// When <see cref="Logger.RemoveSystemUpdate"/> is set, the pattern
     /// <c>**/$SystemUpdate/**</c> is implicitly added.
     /// </param>
+    /// <param name="progress">
+    /// Optional structured progress channel. Receives <see cref="ProgressInfo"/> events:
+    /// <see cref="ProgressInfoType.FileCount"/> and <see cref="ProgressInfoType.DirCount"/>
+    /// before writing starts, <see cref="ProgressInfoType.DirAdded"/> /
+    /// <see cref="ProgressInfoType.FileAdded"/> as entries are written, and
+    /// <see cref="ProgressInfoType.FinishedPacking"/> when the image is complete.
+    /// </param>
     /// <returns>0 on success, 1 on error.</returns>
     public static int CreateXiso(
         string rootDirectory,
@@ -67,13 +74,14 @@ public static class XisoWriter
         ProgressCallback? progressCallback,
         CancellationToken cancellationToken = default,
         int? prependSectors = null,
-        IReadOnlyList<string>? excludePatterns = null)
+        IReadOnlyList<string>? excludePatterns = null,
+        IProgress<ProgressInfo>? progress = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
         var err = 0;
 
-        if (prependSectors.HasValue && prependSectors.Value < 0)
+        if (prependSectors is < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(prependSectors), prependSectors.Value,
                 "Prepend sectors must be non-negative.");
@@ -185,6 +193,14 @@ public static class XisoWriter
         if (err != 0) goto cleanup;
 
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (progress != null)
+        {
+            (int fileCount, int dirCount) = CountTreeEntries(root.Subdirectory);
+            progress.Report(new ProgressInfo(ProgressInfoType.FileCount, Count: fileCount));
+            progress.Report(new ProgressInfo(ProgressInfoType.DirCount, Count: dirCount));
+        }
+
         progressCallback?.Invoke(0, Logger.TotalBytes);
 
         Logger.TotalBytes = Logger.TotalFiles = 0;
@@ -273,7 +289,8 @@ public static class XisoWriter
                 XisoStream = xisoFs,
                 Path = null,
                 SourceStream = sourceStream,
-                Progress = progressCallback,
+                ProgressCallback = progressCallback,
+                StructuredProgress = progress,
                 FinalBytes = Logger.TotalBytes,
                 CancellationToken = cancellationToken,
                 PrependOffset = prependOffset
@@ -306,6 +323,8 @@ public static class XisoWriter
             {
                 Logger.Log($"\nsucessfully created {isoName}{(inName != null ? "" : ".iso")} ({Logger.TotalFiles} files totalling {Logger.TotalBytes} bytes added)\n");
             }
+
+            progress?.Report(new ProgressInfo(ProgressInfoType.FinishedPacking));
         }
         catch (OperationCanceledException)
         {
@@ -352,13 +371,19 @@ public static class XisoWriter
             {
                 XisoStream = ctx.XisoStream,
                 SourceStream = ctx.SourceStream,
-                Progress = ctx.Progress,
+                ProgressCallback = ctx.ProgressCallback,
+                StructuredProgress = ctx.StructuredProgress,
                 FinalBytes = ctx.FinalBytes,
                 Path = ctx.Path != null
                     ? ctx.Path + avl.Filename + Constants.PathCharStr
                     : Constants.PathCharStr,
                 PrependOffset = ctx.PrependOffset
             };
+
+            ctx.StructuredProgress?.Report(new ProgressInfo(
+                ProgressInfoType.DirAdded,
+                Path: ToInternalPath(subCtx.Path),
+                Sector: avl.StartSector));
 
             Logger.Log($"adding {subCtx.Path} (0 bytes) [OK]\n");
 
@@ -579,7 +604,12 @@ public static class XisoWriter
 
             Logger.TotalFiles++;
             Logger.TotalBytes += avl.FileSize;
-            ctx.Progress?.Invoke(Logger.TotalBytes, ctx.FinalBytes);
+            ctx.ProgressCallback?.Invoke(Logger.TotalBytes, ctx.FinalBytes);
+            ctx.StructuredProgress?.Report(new ProgressInfo(
+                ProgressInfoType.FileAdded,
+                Path: ToInternalPath(ctx.Path + avl.Filename),
+                Sector: avl.StartSector,
+                Size: avl.FileSize));
         }
     }
 
@@ -700,6 +730,61 @@ public static class XisoWriter
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// Recursively counts the file and directory nodes in a generated AVL tree.
+    /// The root node itself is not counted; the empty-directory sentinel contributes nothing
+    /// (it represents the absence of entries, not an entry).
+    /// </summary>
+    /// <param name="root">Root of the tree to count (may be <c>null</c>).</param>
+    /// <returns>The number of file nodes and directory nodes.</returns>
+    private static (int Files, int Dirs) CountTreeEntries(AvlNode? root)
+    {
+        var files = 0;
+        var dirs = 0;
+        CountCore(root);
+        return (files, dirs);
+
+        void CountCore(AvlNode? node)
+        {
+            // The sentinel represents "no entries" (e.g. an empty source directory);
+            // it is not itself an entry.
+            if (node == null || ReferenceEquals(node, AvlNode.EmptySubdirectory))
+                return;
+
+            if (node.Subdirectory != null)
+            {
+                dirs++;
+
+                if (!ReferenceEquals(node.Subdirectory, AvlNode.EmptySubdirectory))
+                {
+                    CountCore(node.Subdirectory);
+                }
+            }
+            else
+            {
+                files++;
+            }
+
+            CountCore(node.Left);
+            CountCore(node.Right);
+        }
+    }
+
+    /// <summary>
+    /// Converts a platform-separator path (e.g. <c>"\\subdir\\"</c>) into the internal
+    /// forward-slash form used by progress events (e.g. <c>"/subdir"</c>; the root is <c>"/"</c>).
+    /// </summary>
+    private static string ToInternalPath(string? path)
+    {
+        var p = (path ?? "").Replace(Constants.PathChar, '/');
+        if (p.Length > 1 && p.EndsWith('/'))
+        {
+            p = p[..^1];
+        }
+
+        return p.Length == 0 ? "/" : p;
     }
 
     /// <summary>
@@ -924,6 +1009,10 @@ public static class XisoWriter
     /// from a file system (see <see cref="GlobMatcher"/> for the supported syntax).
     /// Ignored in rewrite mode.
     /// </param>
+    /// <param name="progress">
+    /// Optional structured progress channel; receives <see cref="ProgressInfo"/> events
+    /// (counts, per-entry additions, completion) — see <see cref="CreateXiso"/>.
+    /// </param>
     /// <returns>A task that completes with 0 on success, 1 on error. The first tuple element is the result code; the second is the output ISO path.</returns>
     public static async Task<(int Result, string? OutIsoPath)> CreateXisoAsync(
         string rootDirectory,
@@ -934,12 +1023,13 @@ public static class XisoWriter
         ProgressCallback? progressCallback,
         CancellationToken cancellationToken = default,
         int? prependSectors = null,
-        IReadOnlyList<string>? excludePatterns = null)
+        IReadOnlyList<string>? excludePatterns = null,
+        IProgress<ProgressInfo>? progress = null)
     {
         return await Task.Run(() =>
         {
             var result = CreateXiso(rootDirectory, outputDirectory, inRoot, sourceStream,
-                out var outPath, inName, progressCallback, cancellationToken, prependSectors, excludePatterns);
+                out var outPath, inName, progressCallback, cancellationToken, prependSectors, excludePatterns, progress);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
     }

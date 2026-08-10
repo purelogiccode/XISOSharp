@@ -75,6 +75,45 @@ public enum ExtractError
 public delegate void ProgressCallback(long currentValue, long finalValue);
 
 /// <summary>
+/// Type of a structured progress event emitted during write operations
+/// (create/rewrite). See <see cref="ProgressInfo"/> for the payload semantics.
+/// </summary>
+public enum ProgressInfoType
+{
+    /// <summary>Total number of files in the image, emitted once before writing starts.</summary>
+    FileCount,
+
+    /// <summary>Total number of directories in the image, emitted once before writing starts.</summary>
+    DirCount,
+
+    /// <summary>A directory has been written. Payload: <see cref="ProgressInfo.Path"/> (internal path), <see cref="ProgressInfo.Sector"/>.</summary>
+    DirAdded,
+
+    /// <summary>A file has been written. Payload: <see cref="ProgressInfo.Path"/>, <see cref="ProgressInfo.Sector"/>, <see cref="ProgressInfo.Size"/>.</summary>
+    FileAdded,
+
+    /// <summary>All data has been written; the image is complete. Emitted once, last.</summary>
+    FinishedPacking
+}
+
+/// <summary>
+/// A structured progress event emitted during <see cref="XisoWriter.CreateXiso"/>
+/// operations. Delivered through <see cref="IProgress{T}"/> so consumers can drive
+/// progress bars, tree views, and logging from a single channel.
+/// </summary>
+/// <param name="Type">The kind of event; determines which payload fields are populated.</param>
+/// <param name="Count">Total count for <see cref="ProgressInfoType.FileCount"/> and <see cref="ProgressInfoType.DirCount"/>; 0 otherwise.</param>
+/// <param name="Path">Internal path with forward slashes for <see cref="ProgressInfoType.DirAdded"/> (e.g. <c>"/"</c>, <c>"/subdir"</c>) and <see cref="ProgressInfoType.FileAdded"/> (e.g. <c>"/subdir/file.bin"</c>); <c>null</c> otherwise.</param>
+/// <param name="Sector">Start sector (partition-relative) for <see cref="ProgressInfoType.DirAdded"/> and <see cref="ProgressInfoType.FileAdded"/>; 0 otherwise.</param>
+/// <param name="Size">Byte size written for <see cref="ProgressInfoType.FileAdded"/>; 0 otherwise.</param>
+public readonly record struct ProgressInfo(
+    ProgressInfoType Type,
+    long Count = 0,
+    string? Path = null,
+    long Sector = 0,
+    long Size = 0);
+
+/// <summary>
 /// Callback invoked for each node during an AVL tree traversal.
 /// </summary>
 /// <param name="node">The current tree node being visited.</param>
@@ -155,8 +194,11 @@ internal class WriteTreeContext
     /// </summary>
     public Stream? SourceStream;
 
-    /// <summary>Optional progress callback invoked during file writes.</summary>
-    public ProgressCallback? Progress;
+    /// <summary>Optional byte-progress callback invoked during file writes.</summary>
+    public ProgressCallback? ProgressCallback;
+
+    /// <summary>Optional structured progress channel (create/rewrite events).</summary>
+    public IProgress<ProgressInfo>? StructuredProgress;
 
     /// <summary>Total expected byte count used for progress reporting.</summary>
     public long FinalBytes;

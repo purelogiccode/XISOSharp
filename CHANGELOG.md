@@ -11,6 +11,9 @@ All notable changes to the XISOSharp library will be documented in this file.
 - CLI: new `--skip-sectors N` and `--prepend-sectors N` flags
 - `CreateXiso` accepts `excludePatterns` (glob patterns); new `GlobMatcher` utility;
   CLI: repeatable `-X <glob>` flag, `-s` implicitly excludes `$SystemUpdate` on create
+- Structured write progress: `IProgress<ProgressInfo>` channel with
+  `ProgressInfoType` events (`FileCount`, `DirCount`, `DirAdded`, `FileAdded`,
+  `FinishedPacking`) on `CreateXiso`/`CreateXisoAsync` and rewrite APIs
 
 ## [2.7.1] - 2025-07-21
 

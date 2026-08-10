@@ -288,7 +288,8 @@ public static int CreateXiso(
     ProgressCallback? progressCallback = null,
     CancellationToken cancellationToken = default,
     int? prependSectors = null,
-    IReadOnlyList<string>? excludePatterns = null)
+    IReadOnlyList<string>? excludePatterns = null,
+    IProgress<ProgressInfo>? progress = null)
 ```
 
 | Parameter | Type | Description |

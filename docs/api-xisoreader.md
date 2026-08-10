@@ -72,7 +72,8 @@ public static int Tree(
 public static int Rewrite(
     string xisoPath, string? outputPath, out string? outIsoPath,
     CancellationToken cancellationToken = default,
-    string? outputName = null, int? skipSectors = null, int? prependSectors = null)
+    string? outputName = null, int? skipSectors = null, int? prependSectors = null,
+    IProgress<ProgressInfo>? progress = null)
 ```
 
 | Parameter | Meaning |
@@ -83,6 +84,7 @@ public static int Rewrite(
 | `outputName` | Rewrite only: custom output filename (default: original name with `.iso`) |
 | `skipSectors` | Read offset (Redump video partition), in 2048-byte sectors |
 | `prependSectors` | Rewrite only: reserve zero-filled sectors before the filesystem |
+| `progress` | Rewrite only: structured progress channel (`IProgress<ProgressInfo>`) — see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo) |
 
 All return 0 on success.
 
@@ -98,7 +100,8 @@ public static int DecodeXiso(
     CancellationToken cancellationToken = default,
     string? outputName = null,
     int? skipSectors = null,
-    int? prependSectors = null)
+    int? prependSectors = null,
+    IProgress<ProgressInfo>? progress = null)
 ```
 
 The generic entry point used by the wrappers above. `mode` is one of `ExtractMode`:
@@ -110,7 +113,8 @@ The generic entry point used by the wrappers above. `mode` is one of `ExtractMod
 public static async Task<(int Result, string? OutIsoPath)> DecodeXisoAsync(
     string xisoPath, string? outputPath, ExtractMode mode,
     bool llCompat = false, CancellationToken cancellationToken = default,
-    string? outputName = null, int? skipSectors = null, int? prependSectors = null)
+    string? outputName = null, int? skipSectors = null, int? prependSectors = null,
+    IProgress<ProgressInfo>? progress = null)
 ```
 
 Runs `DecodeXiso` on the thread pool. Returns the result code and, in rewrite mode,

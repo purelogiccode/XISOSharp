@@ -499,6 +499,10 @@ public static class XisoReader
     /// Optional number of 2048-byte sectors to prepend to the output image, leaving room
     /// for a video partition. Sector numbers inside the image remain partition-relative.
     /// </param>
+    /// <param name="progress">
+    /// Optional structured progress channel; receives <see cref="ProgressInfo"/> events
+    /// during the rewrite write phase.
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     public static int Rewrite(
         string xisoPath,
@@ -507,9 +511,10 @@ public static class XisoReader
         CancellationToken cancellationToken = default,
         string? outputName = null,
         int? skipSectors = null,
-        int? prependSectors = null)
+        int? prependSectors = null,
+        IProgress<ProgressInfo>? progress = null)
     {
-        return DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken, outputName, skipSectors, prependSectors);
+        return DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken, outputName, skipSectors, prependSectors, progress);
     }
 
     /// <summary>
@@ -616,6 +621,10 @@ public static class XisoReader
     /// leaving room for a video partition. Sector numbers inside the image remain
     /// partition-relative. Ignored in non-rewrite modes.
     /// </param>
+    /// <param name="progress">
+    /// Optional structured progress channel; receives <see cref="ProgressInfo"/> events
+    /// during the rewrite write phase. Ignored in non-rewrite modes.
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     /// <exception cref="XisoFormatException">
     /// Thrown when the file is not a valid XISO image.
@@ -634,7 +643,8 @@ public static class XisoReader
         CancellationToken cancellationToken = default,
         string? outputName = null,
         int? skipSectors = null,
-        int? prependSectors = null)
+        int? prependSectors = null,
+        IProgress<ProgressInfo>? progress = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
@@ -745,7 +755,7 @@ public static class XisoReader
                 TraverseXiso(fs, null, (long)rootDirSect * Constants.SectorSize + discLseek,
                     buf, ExtractMode.GenerateAvl, ref avlRoot, llCompat, discLseek);
 
-                XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null, prependSectors: prependSectors);
+                XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null, prependSectors: prependSectors, progress: progress);
             }
             else
             {
@@ -791,6 +801,10 @@ public static class XisoReader
     /// leaving room for a video partition. Sector numbers inside the image remain
     /// partition-relative.
     /// </param>
+    /// <param name="progress">
+    /// Optional structured progress channel; receives <see cref="ProgressInfo"/> events
+    /// during the rewrite write phase.
+    /// </param>
     /// <returns>A task that completes with the result code (0 on success, non-zero on error) and the output ISO path when in rewrite mode.</returns>
     public static async Task<(int Result, string? OutIsoPath)> DecodeXisoAsync(
         string xisoPath,
@@ -800,11 +814,12 @@ public static class XisoReader
         CancellationToken cancellationToken = default,
         string? outputName = null,
         int? skipSectors = null,
-        int? prependSectors = null)
+        int? prependSectors = null,
+        IProgress<ProgressInfo>? progress = null)
     {
         return await Task.Run(() =>
         {
-            var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken, outputName, skipSectors, prependSectors);
+            var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken, outputName, skipSectors, prependSectors, progress);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
     }

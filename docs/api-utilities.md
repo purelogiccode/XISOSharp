@@ -145,6 +145,7 @@ writes the current Windows FILETIME (8 bytes, little-endian) into the header are
 | `AuditResult` | `IsValid`, `FilesChecked`, `DirsChecked`, `Issues` |
 | `ValidationIssue` | `Type`, `Path`, `SourceSize`, `OutputSize`, `SourceHash`, `OutputHash` |
 | `ValidationResult` | `Passed`, `SourceFileCount`, `OutputFileCount`, `SourceDirCount`, `OutputDirCount`, `SourceTotalBytes`, `OutputTotalBytes`, `Issues` |
+| `ProgressInfo` | `Type` (`ProgressInfoType`), `Count`, `Path`, `Sector`, `Size` — structured write-progress event (see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo)) |
 
 ## Enums
 
@@ -155,6 +156,7 @@ writes the current Windows FILETIME (8 bytes, little-endian) into the header are
 | `AvlResult` | `NoErr`, `AvlError`, `AvlBalanced` |
 | `AvlTraversalMethod` | `Prefix`, `Infix`, `Postfix` |
 | `ValidationIssueType` | `MissingInOutput`, `ExtraInOutput`, `SizeMismatch`, `ChecksumMismatch` |
+| `ProgressInfoType` | `FileCount`, `DirCount`, `DirAdded`, `FileAdded`, `FinishedPacking` — write-progress event kinds |
 
 ## Delegates
 

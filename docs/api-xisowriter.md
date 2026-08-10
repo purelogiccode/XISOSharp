@@ -24,7 +24,8 @@ public static int CreateXiso(
     ProgressCallback? progressCallback,
     CancellationToken cancellationToken = default,
     int? prependSectors = null,
-    IReadOnlyList<string>? excludePatterns = null)
+    IReadOnlyList<string>? excludePatterns = null,
+    IProgress<ProgressInfo>? progress = null)
 ```
 
 | Parameter | Meaning |
@@ -39,6 +40,7 @@ public static int CreateXiso(
 | `cancellationToken` | Cancellation support |
 | `prependSectors` | Reserve `N` zero-filled sectors before the filesystem (Redump layouts) |
 | `excludePatterns` | Glob patterns of files/directories to omit (create mode only) |
+| `progress` | Structured progress channel — `IProgress<ProgressInfo>` events (counts, per-entry additions, completion). See [Progress reporting](#progress-reporting) |
 
 Returns 0 on success, 1 on error (permission, I/O, or any exception while writing —
 errors are logged and converted to the return code).
@@ -58,7 +60,8 @@ public static async Task<(int Result, string? OutIsoPath)> CreateXisoAsync(
     ProgressCallback? progressCallback,
     CancellationToken cancellationToken = default,
     int? prependSectors = null,
-    IReadOnlyList<string>? excludePatterns = null)
+    IReadOnlyList<string>? excludePatterns = null,
+    IProgress<ProgressInfo>? progress = null)
 ```
 
 Async wrapper returning the result code and the output path.
@@ -98,6 +101,46 @@ XisoWriter.CreateXiso(src, outDir, null, null, out _, "game.iso", null,
 The optional `progressCallback` receives cumulative written bytes. `Logger.TotalFiles`
 and `Logger.TotalBytes` additionally track per-operation totals, and
 `Logger.TotalFilesAllIsos` / `Logger.TotalBytesAllIsos` accumulate across operations.
+
+### Structured progress (`IProgress<ProgressInfo>`)
+
+For UI progress bars and tree views, pass an `IProgress<ProgressInfo>` channel. Events
+are delivered synchronously in order:
+
+| Event (`ProgressInfoType`) | Payload | When |
+|---|---|---|
+| `FileCount` / `DirCount` | `Count` (totals) | Before writing starts. `DirCount` counts directory entries only (the image root `/` itself is not counted) |
+| `DirAdded` | `Path` (e.g. `"/subdir"`), `Sector` | When each directory's write begins (parent before children; includes the root `/`) |
+| `FileAdded` | `Path`, `Sector`, `Size` (written bytes) | After each file's data is written |
+| `FinishedPacking` | — | Last, on success only |
+
+Paths use forward slashes (`"/"` = root). The channel is honored in create **and**
+rewrite modes (`XisoReader.Rewrite` / `DecodeXiso` also accept it).
+
+```csharp
+var progress = new Progress<ProgressInfo>(info =>
+{
+    switch (info.Type)
+    {
+        case ProgressInfoType.FileCount:
+            Console.WriteLine($"{info.Count} files to write");
+            break;
+        case ProgressInfoType.FileAdded:
+            Console.WriteLine($"added {info.Path} ({info.Size} bytes)");
+            break;
+        case ProgressInfoType.FinishedPacking:
+            Console.WriteLine("done");
+            break;
+    }
+});
+
+XisoWriter.CreateXiso(src, outDir, null, null, out _, "game.iso", null, progress: progress);
+```
+
+> [!TIP]
+> The built-in `Progress<T>` posts callbacks asynchronously when no synchronization
+> context is present. For strict in-order delivery, implement `IProgress<ProgressInfo>`
+> directly (as the test suite does).
 
 ```csharp
 XisoWriter.CreateXiso(src, outDir, null, null, out _, "game.iso",

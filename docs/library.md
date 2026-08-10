@@ -84,7 +84,9 @@ Logger.RealQuiet = true;          // suppress everything
 
 Progress during extraction/creation is reported through `Logger` and — for write
 operations — through the optional `ProgressCallback` (`long currentBytes, long
-totalBytes`).
+totalBytes`) and the structured `IProgress<ProgressInfo>` channel (`FileCount`,
+`DirCount`, `DirAdded`, `FileAdded`, `FinishedPacking` events — see
+[`ProgressInfo`](api-utilities.md#records)).
 
 ## Quick samples
 
