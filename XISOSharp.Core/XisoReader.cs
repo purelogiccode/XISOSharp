@@ -1110,6 +1110,25 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Returns the names of all entries in the specified directory within an XISO image,
+    /// without recursing into subdirectories.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="internalPath">
+    /// Path within the ISO to list (e.g. <c>"/"</c> for root, <c>"/subdir"</c> for a subdirectory).
+    /// Use forward slashes as separators.
+    /// </param>
+    /// <returns>The entry names, or an empty list if the directory is empty.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="XisoFormatException">Thrown when the ISO is not a valid XISO image.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the path does not exist in the ISO.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static IReadOnlyList<string> ListDirectoryFlat(string isoPath, string internalPath = "/")
+    {
+        return ListDirectory(isoPath, internalPath).Select(static e => e.Name).ToArray();
+    }
+
+    /// <summary>
     /// Returns metadata about all entries in the specified directory within an XISO image.
     /// </summary>
     /// <param name="isoPath">Path to the XISO file.</param>
@@ -1119,7 +1138,8 @@ public static class XisoReader
     /// </param>
     /// <returns>List of directory entries, or empty if the directory is empty.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
-    /// <exception cref="InvalidDataException">Thrown when the ISO is invalid.</exception>
+    /// <exception cref="XisoFormatException">Thrown when the ISO is not a valid XISO image.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the path does not exist in the ISO.</exception>
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public static IReadOnlyList<EntryInfo> ListDirectory(string isoPath, string internalPath = "/")
     {

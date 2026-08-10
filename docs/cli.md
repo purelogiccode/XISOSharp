@@ -40,6 +40,7 @@ Modes are mutually exclusive. If no mode is given, **extract** is the default.
 | `-l` | **List** the top-level entries of each ISO (non-recursive). |
 | `-t` | **Tree** — recursive listing with full paths, sizes, and totals. |
 | `-i <file> [path]` | **Info** — volume descriptor metadata plus per-entry details (sector, size, attributes, left/right child offsets). `path` defaults to `/`. |
+| `--ls <file> [path]` | **List directory** — entry names of a directory (default `/`), **without recursion**. Prints one name per line; `/path: empty directory` when empty. Mirrors `ls` on the image. |
 | `--md5 <file> [path]` | Compute **MD5** hashes of files **inside** the image. No `path` → hash every file in the image; directory → recursive; file → single hash. Output: lowercase hex + two spaces + path. |
 | `--sha256 <file> [path]` | Compute **SHA-256** hashes of files inside the image (same semantics as `--md5`). |
 | `-V <file1.xiso> ...` | **Audit** — deep integrity check of one or more images: header, tree walk, sector bounds, cycle detection, reserved attribute bits, optimized tag. Prints `Files checked` / `Dirs checked` / `Result: PASS|FAIL (N issue(s))`. |
@@ -177,6 +178,12 @@ extract-xiso -V game1.iso game2.iso
 
 # Hash all files in an image with SHA-256
 extract-xiso --sha256 game.iso
+
+# List the root directory of an image (non-recursive)
+extract-xiso --ls game.iso
+
+# List a subdirectory
+extract-xiso --ls game.iso /media
 
 # Copy one directory out of an image
 extract-xiso --copy-out game.iso /media ./media_out

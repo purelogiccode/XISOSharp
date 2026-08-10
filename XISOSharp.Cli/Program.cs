@@ -29,6 +29,7 @@ internal static class Program
         var rewrite = false;
         var tree = false;
         var info = false;
+        var lsMode = false;
         var hashMode = false;
         var copyOut = false;
         var auditMode = false;
@@ -133,6 +134,16 @@ internal static class Program
 
                         extract = false;
                         info = true;
+                        break;
+                    case "--ls":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        lsMode = true;
                         break;
                     case "--md5":
                         if (xSeen || rewrite || createList.Count > 0)
@@ -304,7 +315,7 @@ internal static class Program
         }
 
         if ((skipSectors.HasValue || prependSectors.HasValue) &&
-            (info || hashMode || copyOut || auditMode || validateMode || validateFlag))
+            (info || lsMode || hashMode || copyOut || auditMode || validateMode || validateFlag))
         {
             Logger.LogErr("Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), and create (-c) modes\n");
             return 1;
@@ -426,6 +437,41 @@ internal static class Program
                         Logger.Log($"    L-Offset:  {(entry.LeftChildOffset == 0 ? "none" : entry.LeftChildOffset.ToString())}\n");
                         Logger.Log($"    R-Offset:  {(entry.RightChildOffset == 0 ? "none" : entry.RightChildOffset.ToString())}\n");
                         Logger.Log("\n");
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IOException)
+            {
+                Logger.LogErr($"Error: {ex.Message}\n");
+                return 1;
+            }
+
+            return 0;
+        }
+
+        if (lsMode)
+        {
+            if (optind >= args.Length)
+            {
+                PrintUsage();
+                return 1;
+            }
+
+            var xisoPath = args[optind];
+            var internalPath = optind + 1 < args.Length ? args[optind + 1] : "/";
+
+            try
+            {
+                var entries = XisoReader.ListDirectoryFlat(xisoPath, internalPath);
+                if (entries.Count == 0)
+                {
+                    Logger.Log($"{internalPath}: empty directory\n");
+                }
+                else
+                {
+                    foreach (var name in entries)
+                    {
+                        Logger.Log($"{name}\n");
                     }
                 }
             }
@@ -771,6 +817,8 @@ internal static class Program
                                   -c <dir> [name]     Create xiso from file(s) starting in <dir>.
                                   --copy-out <iso> <path> <dest>  Copy a file or directory out of an xiso.
                                   -i <file> [path]    Show volume info and directory entry metadata.
+                                  --ls <file> [path]   List the entries of a directory (default root)
+                                                        without recursion. Mirrors 'ls' on the image.
                                   -l                  List files in xiso(s).
                                   --md5 <file> [path] Compute MD5 hash of file(s) in xiso.
                                   -r                  Rewrite xiso(s) as optimized xiso(s).

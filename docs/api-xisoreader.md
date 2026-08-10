@@ -29,6 +29,7 @@ directory listing, auditing, hashing, and copy-out.
 | `DecodeXisoAsync` | Async wrapper of `DecodeXiso` |
 | `GetVolumeInfo` | Volume descriptor metadata without throwing |
 | `ListDirectory` | Metadata of entries in a directory |
+| `ListDirectoryFlat` | Entry **names** of a directory (non-recursive convenience) |
 | `GetEntryInfo` | Metadata of one entry by path |
 | `CopyOut` | Copy one file or directory out of an image |
 | `ComputeFileHash` | Hash one file (MD5/SHA-256/… via `HashAlgorithmName`) |
@@ -138,16 +139,19 @@ Reads the volume descriptor **without throwing** on validation errors. Returns a
 | `FileLength` | `long` | File size |
 | `TotalSectors` | `long` | Total sectors |
 
-## ListDirectory / GetEntryInfo
+## ListDirectory / ListDirectoryFlat / GetEntryInfo
 
 ```csharp
 public static IReadOnlyList<EntryInfo> ListDirectory(string isoPath, string internalPath = "/")
+public static IReadOnlyList<string> ListDirectoryFlat(string isoPath, string internalPath = "/")
 public static EntryInfo? GetEntryInfo(string isoPath, string internalPath)
 ```
 
 - `internalPath` uses forward slashes, e.g. `"/"`, `"/subdir"`, `"/subdir/file.bin"`.
 - `ListDirectory` returns `EntryInfo` records: `Name`, `IsDirectory`, `StartSector`,
   `FileSize`, `Attributes`, `LeftChildOffset`, `RightChildOffset`.
+- `ListDirectoryFlat` returns just the entry names — the library behind the CLI's
+  `--ls` flag.
 - Throws `InvalidDataException` when a path does not exist.
 - `GetEntryInfo` returns `null` for a missing path.
 

@@ -737,7 +737,7 @@ public class ExtractErrorException : Exception
 Thrown when an XISO image has an invalid format — missing or corrupt header magic, truncated image, or sector pointers that exceed file bounds.
 
 ```csharp
-public class XisoFormatException : InvalidDataException
+public class XisoFormatException : IOException
 {
     public XisoFormatException(string message)
 }

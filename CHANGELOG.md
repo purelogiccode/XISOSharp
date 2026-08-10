@@ -14,6 +14,8 @@ All notable changes to the XISOSharp library will be documented in this file.
 - Structured write progress: `IProgress<ProgressInfo>` channel with
   `ProgressInfoType` events (`FileCount`, `DirCount`, `DirAdded`, `FileAdded`,
   `FinishedPacking`) on `CreateXiso`/`CreateXisoAsync` and rewrite APIs
+- `--ls <file> [path]` CLI flag and `XisoReader.ListDirectoryFlat` — non-recursive
+  directory listing (default root, optional subdirectory path)
 
 ## [2.7.1] - 2025-07-21
 
