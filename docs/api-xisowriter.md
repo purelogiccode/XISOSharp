@@ -11,7 +11,30 @@ three passes.
 - [Exclusion patterns](#exclusion-patterns)
 - [Progress reporting](#progress-reporting)
 
-## CreateXiso
+## CreateXiso / PackFromDirectory
+
+```csharp
+public static int PackFromDirectory(
+    string sourceDirectory,
+    string outputIsoPath,
+    IReadOnlyList<string>? excludePatterns = null,
+    ProgressCallback? progressCallback = null,
+    CancellationToken cancellationToken = default,
+    IProgress<ProgressInfo>? progress = null)
+
+public static async Task<int> PackFromDirectoryAsync(
+    string sourceDirectory,
+    string outputIsoPath,
+    IReadOnlyList<string>? excludePatterns = null,
+    ProgressCallback? progressCallback = null,
+    CancellationToken cancellationToken = default,
+    IProgress<ProgressInfo>? progress = null)
+```
+
+`PackFromDirectory` is the convenience form of `CreateXiso` for packing a directory
+into an ISO with a 1:1 mapping: it takes a single output ISO path (creating the
+output directory as needed) instead of separate directory/name arguments. Repacking an
+existing ISO is `XisoReader.Rewrite` (the CLI's `--pack <iso>` maps to it).
 
 ```csharp
 public static int CreateXiso(

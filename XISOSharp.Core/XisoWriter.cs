@@ -733,6 +733,68 @@ public static class XisoWriter
     }
 
     /// <summary>
+    /// Packs a local directory into an XISO image with a 1:1 mapping of all entries.
+    /// Convenience wrapper around <see cref="CreateXiso"/> that takes a single output
+    /// ISO path instead of separate directory/name arguments.
+    /// </summary>
+    /// <param name="sourceDirectory">Source directory whose contents are packed.</param>
+    /// <param name="outputIsoPath">Full path of the ISO to create (may include a directory).</param>
+    /// <param name="excludePatterns">
+    /// Optional glob patterns of files/directories to omit (see <see cref="GlobMatcher"/>).
+    /// </param>
+    /// <param name="progressCallback">Optional byte-progress callback.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="progress">
+    /// Optional structured progress channel (<see cref="ProgressInfo"/> events).
+    /// </param>
+    /// <returns>0 on success, 1 on error.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="outputIsoPath"/> is null or empty.</exception>
+    /// <exception cref="DirectoryNotFoundException">Thrown when the source directory does not exist.</exception>
+    /// <exception cref="XisoFileTooLargeException">Thrown when a source file exceeds ~4 GB.</exception>
+    public static int PackFromDirectory(
+        string sourceDirectory,
+        string outputIsoPath,
+        IReadOnlyList<string>? excludePatterns = null,
+        ProgressCallback? progressCallback = null,
+        CancellationToken cancellationToken = default,
+        IProgress<ProgressInfo>? progress = null)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
+
+        var fullOutput = Path.GetFullPath(outputIsoPath);
+        var outputDirectory = Path.GetDirectoryName(fullOutput) ?? Directory.GetCurrentDirectory();
+        var inName = Path.GetFileName(fullOutput);
+
+        Directory.CreateDirectory(outputDirectory);
+
+        return CreateXiso(sourceDirectory, outputDirectory, null, null, out _, inName,
+            progressCallback, cancellationToken, excludePatterns: excludePatterns, progress: progress);
+    }
+
+    /// <summary>
+    /// Asynchronously packs a local directory into an XISO image with a 1:1 mapping.
+    /// </summary>
+    /// <param name="sourceDirectory">Source directory whose contents are packed.</param>
+    /// <param name="outputIsoPath">Full path of the ISO to create (may include a directory).</param>
+    /// <param name="excludePatterns">Optional glob patterns of files/directories to omit.</param>
+    /// <param name="progressCallback">Optional byte-progress callback.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <returns>A task that completes with 0 on success, 1 on error.</returns>
+    public static async Task<int> PackFromDirectoryAsync(
+        string sourceDirectory,
+        string outputIsoPath,
+        IReadOnlyList<string>? excludePatterns = null,
+        ProgressCallback? progressCallback = null,
+        CancellationToken cancellationToken = default,
+        IProgress<ProgressInfo>? progress = null)
+    {
+        return await Task.Run(() => PackFromDirectory(
+            sourceDirectory, outputIsoPath, excludePatterns, progressCallback, cancellationToken, progress),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Recursively counts the file and directory nodes in a generated AVL tree.
     /// The root node itself is not counted; the empty-directory sentinel contributes nothing
     /// (it represents the absence of entries, not an entry).

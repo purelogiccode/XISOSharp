@@ -25,6 +25,10 @@ All notable changes to the XISOSharp library will be documented in this file.
 - Batch processing (issue #114): `--batch <dir>` processes all `.iso` files in a
   directory (with `--batch-recursive` for subdirectories) in extract/list/tree/
   rewrite/audit modes
+- `unpack` command: `XisoReader.UnpackImage` (auto-detects the optimized layout,
+  ISO-named default output directory) and the `--unpack <file> [dest]` CLI flag
+- `pack` command: `XisoWriter.PackFromDirectory`/`PackFromDirectoryAsync` and the
+  `--pack <input> [name]` CLI flag (directory → ISO, ISO → in-place repack)
 
 ## [2.7.1] - 2025-07-21
 

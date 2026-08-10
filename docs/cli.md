@@ -36,7 +36,9 @@ Modes are mutually exclusive. If no mode is given, **extract** is the default.
 | Flag | Description |
 |---|---|
 | `-c <dir> [name]` | **Create** an ISO from the contents of `<dir>`. Optional `name` overrides the output filename (may include a path). Repeatable for batch creation. Excludes `-X` patterns; with `-s`, `$SystemUpdate` is skipped automatically. |
+| `--pack <input> [name]` | **Pack** a directory into an ISO (1:1 mapping; `name` defaults to the directory name and may include a path), or **repack** an existing ISO in place (rewrite mode, source renamed to `.old`). Translates internally to create or rewrite mode. Already-optimized images are skipped. |
 | `-x` | **Extract** (explicit; the default mode). |
+| `--unpack <file> [dest]` | **Unpack** the whole image to `dest`, or to a directory named after the ISO (minus `.iso`) in the current directory when omitted. Detects the optimized layout automatically; supports `--skip-sectors`. |
 | `-l` | **List** the top-level entries of each ISO (non-recursive). |
 | `-t` | **Tree** — recursive listing with full paths, sizes, and totals. |
 | `-i <file> [path]` | **Info** — volume descriptor metadata plus per-entry details (sector, size, attributes, left/right child offsets). `path` defaults to `/`. |
@@ -63,7 +65,7 @@ Modes are mutually exclusive. If no mode is given, **extract** is the default.
 | `-Q` | Silent — suppress all output, including errors. |
 | `-s` | Skip `$SystemUpdate` entries. On create this is equivalent to `-X "**/$SystemUpdate/**"`; on extract/rewrite it filters `$SystemUpdate` paths while reading. |
 | `-X <glob_pattern>` | **Create mode only.** Exclude files/directories matching the glob pattern. Repeatable. See [Exclude patterns](#exclude-patterns). |
-| `--skip-sectors N` | Treat the image as if the XISO filesystem starts `N` sectors (2048 bytes each) into the file — for Redump images with a video partition. Valid in extract, list, tree, and rewrite modes. See [Redump & Disc Layouts](redump-workflows.md). |
+| `--skip-sectors N` | Treat the image as if the XISO filesystem starts `N` sectors (2048 bytes each) into the file — for Redump images with a video partition. Valid in extract, list, tree, rewrite, and unpack modes. See [Redump & Disc Layouts](redump-workflows.md). |
 | `--prepend-sectors N` | Write the output image with `N` empty sectors before the XISO filesystem, reserving room for a video partition. Valid in create (`-c`) and rewrite (`-r`) modes. See [Redump & Disc Layouts](redump-workflows.md). |
 | `-p` | (Hidden) Print usage and exit 1. |
 
@@ -158,6 +160,12 @@ sufficient). Consequences:
 # Extract one ISO to a specific directory
 extract-xiso -d ./out game.iso
 
+# Unpack the whole image (auto-named output directory)
+extract-xiso --unpack game.iso
+
+# Unpack to a specific destination
+extract-xiso --unpack game.iso ./out
+
 # Extract several ISOs (default mode)
 extract-xiso game1.iso game2.iso game3.iso
 
@@ -166,6 +174,12 @@ extract-xiso -s -X "**/*.tmp" -c ./game_files custom_name.iso
 
 # Create a Redump-style image (game partition at the XGD2 offset)
 extract-xiso -c ./game_files redump.iso --prepend-sectors 129824
+
+# Pack a directory into an ISO (alias-style convenience)
+extract-xiso --pack ./game_files
+
+# Repack an existing ISO in place (optimizes it, keeping a .old copy)
+extract-xiso --pack game.iso
 
 # Extract a Redump image whose game partition starts at a nonstandard offset
 extract-xiso --skip-sectors 129824 -d ./out redump.iso

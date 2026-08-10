@@ -22,6 +22,7 @@ directory listing, auditing, hashing, and copy-out.
 |---|---|
 | `VerifyXiso` | Low-level header verification; returns root directory metadata + disc offset |
 | `Extract` | Extract an image to a directory |
+| `UnpackImage` | Unpack the whole image; auto-detects the optimized layout and ISO-named default output |
 | `List` | List top-level entries |
 | `Tree` | Recursive listing with sizes and totals |
 | `Rewrite` | Rewrite an image into the optimized layout |
@@ -56,11 +57,15 @@ when given) and returns the root directory table location and the detected disc 
 Throws: `XisoFormatException` (invalid/corrupt), `IOException` (file too short),
 `XisoEmptyException` (no files).
 
-## Extract / List / Tree / Rewrite
+## Extract / Unpack / List / Tree / Rewrite
 
 ```csharp
 public static int Extract(
     string xisoPath, string? outputPath, bool llCompat,
+    CancellationToken cancellationToken = default, int? skipSectors = null)
+
+public static int UnpackImage(
+    string isoPath, string? outputPath = null,
     CancellationToken cancellationToken = default, int? skipSectors = null)
 
 public static int List(
@@ -87,6 +92,10 @@ public static int Rewrite(
 | `skipSectors` | Read offset (Redump video partition), in 2048-byte sectors |
 | `prependSectors` | Rewrite only: reserve zero-filled sectors before the filesystem |
 | `progress` | Rewrite only: structured progress channel (`IProgress<ProgressInfo>`) — see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo) |
+
+`UnpackImage` is the convenience form of `Extract`: it probes the optimized-tag marker
+to pick `llCompat` automatically and defaults the output directory to the ISO name
+(minus `.iso`), so callers never need to know the image layout.
 
 All return 0 on success.
 

@@ -540,6 +540,73 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Unpacks an entire XISO image to a directory.
+    /// The optimized-tag marker is probed automatically, so callers do not need to know
+    /// the image layout (unlike <see cref="Extract"/>, which takes <c>llCompat</c>).
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="outputPath">
+    /// Destination directory. When <c>null</c>, a directory named after the ISO file
+    /// (without the <c>.iso</c> extension) is created in the current directory.
+    /// </param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="skipSectors">
+    /// Optional number of 2048-byte sectors to skip in the source file before the XISO
+    /// filesystem begins (for Redump-style images with a video partition).
+    /// </param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    /// <exception cref="XisoFormatException">
+    /// Thrown when the file is not a valid XISO image.
+    /// </exception>
+    /// <exception cref="XisoEmptyException">
+    /// Thrown when the XISO image contains no files.
+    /// </exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when the input file does not exist.</exception>
+    public static int UnpackImage(
+        string isoPath,
+        string? outputPath = null,
+        CancellationToken cancellationToken = default,
+        int? skipSectors = null)
+    {
+        if (skipSectors.HasValue && skipSectors.Value < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value,
+                "Skip sectors must be non-negative.");
+        }
+
+        return Extract(isoPath, outputPath, !IsOptimized(isoPath, skipSectors), cancellationToken, skipSectors);
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the image carries the extract-xiso optimized tag
+    /// at byte offset 31337 (shifted by the skip offset when reading offset images),
+    /// meaning it uses the optimized directory layout.
+    /// </summary>
+    private static bool IsOptimized(string isoPath, int? skipSectors = null)
+    {
+        using var fs = new FileStream(
+            isoPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                BufferSize = 256
+            });
+
+        fs.Seek((long)(skipSectors ?? 0) * Constants.SectorSize + Constants.OptimizedTagOffset, SeekOrigin.Begin);
+        Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];
+        if (fs.Read(tagBuf) != Constants.OptimizedTagLength)
+        {
+            return false;
+        }
+
+        var tag = Encoding.ASCII.GetString(tagBuf);
+        return tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin], StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Lists files in an XISO image without extracting.
     /// </summary>
     /// <param name="xisoPath">Path to the XISO file.</param>
@@ -671,6 +738,23 @@ public static class XisoReader
         }
 
         string? cwd = null;
+
+        using var fs = new FileStream(
+            xisoPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                BufferSize = 65536
+            });
+
+        (uint rootDirSect, uint rootDirSize, long discLseek) = VerifyXiso(fs, name, skipSectors);
+
+        Logger.XboxDiscLseek = discLseek;
+
+        // Change into the output directory only after the image verified successfully,
+        // so an invalid image can never leave the process working directory modified.
         if (mode == ExtractMode.Extract && outputPath != null)
         {
             cwd = Directory.GetCurrentDirectory();
@@ -690,20 +774,6 @@ public static class XisoReader
                 throw;
             }
         }
-
-        using var fs = new FileStream(
-            xisoPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read,
-                BufferSize = 65536
-            });
-
-        (uint rootDirSect, uint rootDirSize, long discLseek) = VerifyXiso(fs, name, skipSectors);
-
-        Logger.XboxDiscLseek = discLseek;
 
         var isoName = shortName ?? name;
 

@@ -31,6 +31,7 @@ internal static class Program
         var info = false;
         var lsMode = false;
         var xexInfoMode = false;
+        var unpackMode = false;
         var hashMode = false;
         var copyOut = false;
         var auditMode = false;
@@ -54,6 +55,9 @@ internal static class Program
         var excludePatterns = new List<string>();
         string? batchDir = null;
         var batchRecursive = false;
+        string? packInput = null;
+        string? packName = null;
+        string? packIsoFile = null;
 
         var optind = 0;
 
@@ -97,6 +101,16 @@ internal static class Program
                             break;
                         }
                     case "-x": xSeen = true; break;
+                    case "--unpack":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        unpackMode = true;
+                        break;
                     case "-X":
                         if (i + 1 < args.Length)
                         {
@@ -314,6 +328,26 @@ internal static class Program
                     case "--batch-recursive":
                         batchRecursive = true;
                         break;
+                    case "--pack":
+                        if (packInput != null || xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        if (i + 1 >= args.Length)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        packInput = args[++i];
+                        if (i + 1 < args.Length && !args[i + 1].StartsWith('-'))
+                        {
+                            packName = args[++i];
+                        }
+
+                        break;
                     default:
                         optind = i;
                         goto parse_done;
@@ -330,6 +364,15 @@ internal static class Program
 
         parse_done:
 
+        // --pack translates to create mode (directory input) or rewrite mode (ISO input),
+        // reusing the existing create/rewrite machinery.
+        if (TranslatePackInput(packInput, packName, batchDir, rewrite, info, lsMode, xexInfoMode,
+                unpackMode, hashMode, copyOut, auditMode, validateMode, tree, extract,
+                optind, args.Length, createList, ref rewrite, ref packIsoFile, ref path) != 0)
+        {
+            return 1;
+        }
+
         if (createList.Count > 0 && skipSectors.HasValue)
         {
             Logger.LogErr("Error: --skip-sectors cannot be combined with -c (create mode)\n");
@@ -345,7 +388,7 @@ internal static class Program
         if ((skipSectors.HasValue || prependSectors.HasValue) &&
             (info || lsMode || xexInfoMode || hashMode || copyOut || auditMode || validateMode || validateFlag))
         {
-            Logger.LogErr("Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), and create (-c) modes\n");
+            Logger.LogErr("Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, and create (-c) modes\n");
             return 1;
         }
 
@@ -361,53 +404,24 @@ internal static class Program
             return 1;
         }
 
-        if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || hashMode || copyOut || validateMode))
+        if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || unpackMode || hashMode || copyOut || validateMode))
         {
             Logger.LogErr("Error: --batch is only supported in extract, list, tree, rewrite (-r), and audit (-V) modes\n");
             return 1;
         }
 
-        // The list of ISO files to process: explicit filenames, or a directory scan (--batch).
-        List<string> isoFiles;
-        if (batchDir != null)
+        if (unpackMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode || validateMode))
         {
-            if (optind < args.Length)
-            {
-                Logger.LogErr("Error: --batch cannot be combined with explicit ISO filenames\n");
-                return 1;
-            }
-
-            try
-            {
-                // Case-insensitive *.iso matching on every platform (the SearchOption
-                // overload would be case-sensitive on Linux/macOS).
-                var options = new EnumerationOptions
-                {
-                    MatchCasing = MatchCasing.CaseInsensitive,
-                    RecurseSubdirectories = batchRecursive,
-                    AttributesToSkip = FileAttributes.None // include hidden files, like the SearchOption overload
-                };
-                isoFiles = Directory.EnumerateFiles(batchDir, "*.iso", options)
-                    .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            }
-            catch (Exception ex) when (ex is DirectoryNotFoundException or UnauthorizedAccessException or IOException)
-            {
-                Logger.LogErr($"Error: cannot read batch directory {batchDir}: {ex.Message}\n");
-                return 1;
-            }
-
-            if (isoFiles.Count == 0)
-            {
-                Logger.LogErr($"Error: no .iso files found in {batchDir}\n");
-                return 1;
-            }
-
-            Logger.Log($"batch: processing {isoFiles.Count} ISO file(s) from {batchDir}{(batchRecursive ? " (recursive)" : "")}\n");
+            Logger.LogErr("Error: --unpack cannot be combined with other modes\n");
+            return 1;
         }
-        else
+
+        // The list of ISO files to process: explicit filenames, a --batch directory scan,
+        // or a --pack ISO input.
+        var isoFiles = ExpandIsoFiles(batchDir, batchRecursive, args, optind, packIsoFile);
+        if (isoFiles == null)
         {
-            isoFiles = args.Skip(optind).ToList();
+            return 1;
         }
 
         if (createList.Count > 0)
@@ -449,6 +463,12 @@ internal static class Program
 
                 try
                 {
+                    // Allow the output name to include a not-yet-existing directory.
+                    if (outputDir != null)
+                    {
+                        Directory.CreateDirectory(outputDir);
+                    }
+
                     XisoWriter.CreateXiso(dir, outputDir, null, null, out _, isoName, null,
                         prependSectors: prependSectors,
                         excludePatterns: excludePatterns.Count > 0 ? excludePatterns : null);
@@ -611,6 +631,11 @@ internal static class Program
             }
 
             return 0;
+        }
+
+        if (unpackMode)
+        {
+            return RunUnpackMode(args, optind, path, skipSectors);
         }
 
         if (hashMode)
@@ -921,6 +946,195 @@ internal static class Program
     }
 
     /// <summary>
+    /// Executes the <c>--unpack</c> mode: unpack one ISO to a destination directory
+    /// (defaulting to the ISO name). Returns the process exit code.
+    /// </summary>
+    private static int RunUnpackMode(string[] args, int optind, string? path, int? skipSectors)
+    {
+        if (optind >= args.Length)
+        {
+            PrintUsage();
+            return 1;
+        }
+
+        if (path != null)
+        {
+            Logger.LogErr("Error: --unpack takes the destination as an argument; -d is not used with --unpack\n");
+            return 1;
+        }
+
+        var xisoPath = args[optind];
+        var destPath = optind + 1 < args.Length ? args[optind + 1] : null;
+
+        try
+        {
+            var result = XisoReader.UnpackImage(xisoPath, destPath, skipSectors: skipSectors);
+            return result == 0 ? 0 : 1;
+        }
+        catch (ExtractErrorException ex) when (ex.ErrorCode == ExtractError.ErrIsoNoFiles)
+        {
+            return 0;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Logger.LogErr($"Error: permission denied: {ex.Message}\n");
+            return 1;
+        }
+        catch (IOException ex)
+        {
+            Logger.LogErr($"Error: {ex.Message}\n");
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogErr($"failed to unpack xbox iso image {xisoPath}: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// Translates a <c>--pack</c> input: a directory becomes a create-mode entry, an
+    /// existing ISO file becomes an in-place rewrite. Returns 0 on success, 1 on error
+    /// (the message is logged). Invalid combinations are rejected.
+    /// </summary>
+    private static int TranslatePackInput(
+        string? packInput,
+        string? packName,
+        string? batchDir,
+        bool rewrite,
+        bool info,
+        bool lsMode,
+        bool xexInfoMode,
+        bool unpackMode,
+        bool hashMode,
+        bool copyOut,
+        bool auditMode,
+        bool validateMode,
+        bool tree,
+        bool extract,
+        int optind,
+        int argsLength,
+        List<(string Dir, string? Name)> createList,
+        ref bool rewriteFlag,
+        ref string? packIsoFile,
+        ref string? outputPath)
+    {
+        if (packInput == null)
+        {
+            return 0;
+        }
+
+        if (rewrite || info || lsMode || xexInfoMode || unpackMode || hashMode || copyOut || auditMode || validateMode || tree || !extract)
+        {
+            Logger.LogErr("Error: --pack cannot be combined with other modes\n");
+            return 1;
+        }
+
+        if (batchDir != null)
+        {
+            Logger.LogErr("Error: --pack cannot be combined with --batch\n");
+            return 1;
+        }
+
+        if (optind < argsLength)
+        {
+            Logger.LogErr("Error: --pack takes the input as an argument; extra filenames are not allowed\n");
+            return 1;
+        }
+
+        if (Directory.Exists(packInput))
+        {
+            if (outputPath != null)
+            {
+                Logger.LogErr("Error: --pack <dir> does not use -d; put the destination path in the output name\n");
+                return 1;
+            }
+
+            createList.Add((packInput, packName));
+        }
+        else if (File.Exists(packInput))
+        {
+            if (packName != null)
+            {
+                Logger.LogErr("Error: --pack <iso> rewrites the image in place and does not take an output name\n");
+                return 1;
+            }
+
+            rewriteFlag = true;
+            packIsoFile = packInput;
+
+            // Repack in place: default the rewrite output to the source's directory
+            // (an explicit -d still wins).
+            outputPath ??= Path.GetDirectoryName(Path.GetFullPath(packInput));
+        }
+        else
+        {
+            Logger.LogErr($"Error: {packInput} is not a directory or an ISO file\n");
+            return 1;
+        }
+
+        return 0;
+    }
+    /// <summary>
+    /// Resolves the list of ISO files to process: explicit filenames, a <c>--batch</c>
+    /// directory scan, or a <c>--pack</c> ISO input. Returns <c>null</c> (after logging
+    /// the error) when the inputs are invalid.
+    /// </summary>
+    private static List<string>? ExpandIsoFiles(
+        string? batchDir,
+        bool batchRecursive,
+        string[] args,
+        int optind,
+        string? packIsoFile)
+    {
+        if (batchDir != null)
+        {
+            if (optind < args.Length)
+            {
+                Logger.LogErr("Error: --batch cannot be combined with explicit ISO filenames\n");
+                return null;
+            }
+
+            try
+            {
+                // Case-insensitive *.iso matching on every platform (the SearchOption
+                // overload would be case-sensitive on Linux/macOS).
+                var options = new EnumerationOptions
+                {
+                    MatchCasing = MatchCasing.CaseInsensitive,
+                    RecurseSubdirectories = batchRecursive,
+                    AttributesToSkip = FileAttributes.None // include hidden files, like the SearchOption overload
+                };
+                var isoFiles = Directory.EnumerateFiles(batchDir, "*.iso", options)
+                    .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (isoFiles.Count == 0)
+                {
+                    Logger.LogErr($"Error: no .iso files found in {batchDir}\n");
+                    return null;
+                }
+
+                Logger.Log($"batch: processing {isoFiles.Count} ISO file(s) from {batchDir}{(batchRecursive ? " (recursive)" : "")}\n");
+                return isoFiles;
+            }
+            catch (Exception ex) when (ex is DirectoryNotFoundException or UnauthorizedAccessException or IOException)
+            {
+                Logger.LogErr($"Error: cannot read batch directory {batchDir}: {ex.Message}\n");
+                return null;
+            }
+        }
+
+        var files = args.Skip(optind).ToList();
+        if (packIsoFile != null)
+        {
+            files.Insert(0, packIsoFile);
+        }
+
+        return files;
+    }
+
+    /// <summary>
     /// Formats the XEX module flags as a comma-separated list of names.
     /// </summary>
     private static string FormatXexModuleFlags(uint flags)
@@ -1042,8 +1256,13 @@ internal static class Program
                                                         explicit filenames. Works with extract,
                                                         list, tree, rewrite (-r), and audit (-V).
                                   --batch-recursive    With --batch, search subdirectories recursively.
+                                  --pack <input> [name]  Pack a directory into an ISO (name defaults
+                                                        to the directory name; may include a path),
+                                                        or repack an existing ISO in place (rewrite).
                                   validate <src> <out> Validate conversion by comparing source and output ISOs.
                                   -x                  Extract xiso(s) (the default mode if none is given).
+                                  --unpack <file> [dest]  Unpack the whole image to <dest>, or to a
+                                                        directory named after the ISO when omitted.
                                   -X <glob_pattern>   In create mode (-c), exclude files/directories
                                                         matching the glob pattern from the image.
                                                         Repeatable. Examples: "*.tmp", "**/node_modules/**",
