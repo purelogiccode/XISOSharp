@@ -13,7 +13,6 @@ public class IntegrationTests : IDisposable
         Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData"));
 
     private static readonly string SourceDir = Path.Combine(TestDataRoot, "source");
-    private static readonly string OutputIso = Path.Combine(TestDataRoot, "output", "source.iso");
 
     private readonly List<string> _tempDirs = [];
 

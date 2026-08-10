@@ -66,9 +66,9 @@ public class SkipPrependSectorsTests : IDisposable
         return result;
     }
 
-    private static string CreatePrependedIso(string srcDir, string outputDir, out string? isoPath)
+    private static string CreatePrependedIso(string srcDir, string outputDir)
     {
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out isoPath, null, null,
+        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null,
             prependSectors: PrependSectors);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
@@ -84,7 +84,16 @@ public class SkipPrependSectorsTests : IDisposable
     private static void AssertNotReadableWithoutSkip(string isoPath)
     {
         using var fs = File.OpenRead(isoPath);
-        var ex = Record.Exception(() => XisoReader.VerifyXiso(fs, "prepended.iso"));
+        Exception? ex = null;
+        try
+        {
+            XisoReader.VerifyXiso(fs, "prepended.iso");
+        }
+        catch (Exception e)
+        {
+            ex = e;
+        }
+
         Assert.True(ex is XisoFormatException or IOException,
             $"Expected XisoFormatException or IOException, got {(ex == null ? "no exception" : ex.GetType().Name)}");
     }
@@ -96,7 +105,7 @@ public class SkipPrependSectorsTests : IDisposable
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
 
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         const long prependOffset = (long)PrependSectors * Constants.SectorSize;
         var fileLength = new FileInfo(isoPath).Length;
@@ -132,7 +141,7 @@ public class SkipPrependSectorsTests : IDisposable
         var srcDir = CreateTempDir();
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         using var fs = File.OpenRead(isoPath);
         (uint rootDirSector, uint rootDirSize, long discLseek) = XisoReader.VerifyXiso(fs, "prepended.iso", PrependSectors);
@@ -148,7 +157,7 @@ public class SkipPrependSectorsTests : IDisposable
         var srcDir = CreateTempDir();
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         AssertNotReadableWithoutSkip(isoPath);
     }
@@ -159,7 +168,7 @@ public class SkipPrependSectorsTests : IDisposable
         var srcDir = CreateTempDir();
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         using var fs = File.OpenRead(isoPath);
         Assert.Throws<XisoFormatException>(() => XisoReader.VerifyXiso(fs, "prepended.iso", PrependSectors + 1));
@@ -171,7 +180,7 @@ public class SkipPrependSectorsTests : IDisposable
         var srcDir = CreateTempDir();
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         using var fs = File.OpenRead(isoPath);
         Assert.Throws<ArgumentOutOfRangeException>(() => XisoReader.VerifyXiso(fs, "prepended.iso", -1));
@@ -194,7 +203,7 @@ public class SkipPrependSectorsTests : IDisposable
         var srcDir = CreateTempDir();
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         var extractDir = CreateTempDir();
         var extractResult = XisoReader.Extract(isoPath, extractDir, false, skipSectors: PrependSectors);
@@ -209,7 +218,7 @@ public class SkipPrependSectorsTests : IDisposable
         var srcDir = CreateTempDir();
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         AssertNotReadableWithoutSkip(isoPath);
 
@@ -225,7 +234,7 @@ public class SkipPrependSectorsTests : IDisposable
         var srcDir = CreateTempDir();
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         var listResult = XisoReader.List(isoPath, false, skipSectors: PrependSectors);
         Assert.Equal(0, listResult);
@@ -237,7 +246,7 @@ public class SkipPrependSectorsTests : IDisposable
         var srcDir = CreateTempDir();
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         var treeResult = XisoReader.Tree(isoPath, false, skipSectors: PrependSectors);
         Assert.Equal(0, treeResult);
@@ -275,7 +284,7 @@ public class SkipPrependSectorsTests : IDisposable
         var srcDir = CreateTempDir();
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         // Rewrite reads the source at the skip offset and produces a normal (unshifted) ISO.
         var rewriteDir = CreateTempDir();
@@ -297,7 +306,7 @@ public class SkipPrependSectorsTests : IDisposable
         var srcDir = CreateTempDir();
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         // Rewrite: read at the skip offset, write back with the same prepend.
         var rewriteDir = CreateTempDir();
@@ -341,7 +350,7 @@ public class SkipPrependSectorsTests : IDisposable
         var srcDir = CreateTempDir();
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
-        var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
+        var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         var extractDir = CreateTempDir();
         (int result, _) = await XisoReader.DecodeXisoAsync(isoPath, extractDir, ExtractMode.Extract,

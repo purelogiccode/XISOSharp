@@ -16,8 +16,14 @@ public class ListDirectoryFlatTests : IDisposable
 
         foreach (var dir in _tempDirs)
         {
-            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
-            catch { /* best effort cleanup */ }
+            try
+            {
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            }
+            catch
+            {
+                /* best effort cleanup */
+            }
         }
     }
 

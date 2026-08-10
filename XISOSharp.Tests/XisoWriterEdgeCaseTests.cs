@@ -7,11 +7,6 @@ namespace XISOSharp.Tests;
 [Collection("Sequential")]
 public class XisoWriterEdgeCaseTests : IDisposable
 {
-    private static readonly string TestDataRoot = Path.GetFullPath(
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData"));
-
-    private static readonly string SourceDir = Path.Combine(TestDataRoot, "source");
-
     private readonly List<string> _tempDirs = [];
 
     public void Dispose()
@@ -268,6 +263,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
             });
 
         Assert.True(lastCurrent > 0, "Should have reported progress");
+        Assert.True(finalBytes > 0, "Should have reported the final byte total");
     }
 
     [Fact]
@@ -349,7 +345,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
     /// Builds a synthetic .xbe containing the media-enable pattern at the given offsets
     /// and returns the expected patched copy (pattern byte 7 replaced with 0xEB).
     /// </summary>
-    private static (byte[] Original, byte[] ExpectedPatched, int[] Offsets) BuildXbeWithPattern(params int[] offsets)
+    private static (byte[] Original, byte[] ExpectedPatched) BuildXbeWithPattern(params int[] offsets)
     {
         var data = new byte[0x00210000]; // ~2.1 MB: larger than the 2 MB read buffer
         Array.Fill(data, (byte)0x41);
@@ -365,7 +361,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
             expected[offset + Constants.MediaEnableBytePos] = Constants.MediaEnableByte;
         }
 
-        return (data, expected, offsets);
+        return (data, expected);
     }
 
     private static void AssertPatchedBytes(string isoPath, byte[] expected, string xbeRelPath)
@@ -401,7 +397,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
 
         // Offsets: start of file, mid-file, and straddling the 2 MB read-buffer boundary
         // (0x200000) so the Boyer-Moore overlap logic is exercised.
-        (byte[] original, byte[] expected, _) = BuildXbeWithPattern(0, 0x1234, 0x1FFFFC, 0x200004, 0x200100);
+        (byte[] original, byte[] expected) = BuildXbeWithPattern(0, 0x1234, 0x1FFFFC, 0x200004, 0x200100);
         File.WriteAllBytes(Path.Combine(srcDir, "test.xbe"), original);
         File.WriteAllText(Path.Combine(srcDir, "readme.txt"), "text");
 
@@ -418,7 +414,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
         var srcDir = CreateTempDir();
         var outputDir = CreateTempDir();
 
-        (byte[] original, _, _) = BuildXbeWithPattern(0, 0x1234, 0x1FFFFC);
+        (byte[] original, _) = BuildXbeWithPattern(0, 0x1234, 0x1FFFFC);
         File.WriteAllBytes(Path.Combine(srcDir, "test.xbe"), original);
 
         Logger.MediaEnable = false;
@@ -442,7 +438,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
         var srcDir = CreateTempDir();
         var outputDir = CreateTempDir();
 
-        (byte[] original, _, _) = BuildXbeWithPattern(0);
+        (byte[] original, _) = BuildXbeWithPattern(0);
         File.WriteAllBytes(Path.Combine(srcDir, "not_an_xbe.bin"), original);
 
         var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);

@@ -125,13 +125,14 @@ public class XisoReaderEdgeCaseTests : IDisposable
     }
 
     [Fact]
-    public void GetEntryInfo_PathWithTrailingSlash_ReturnsNull()
+    public void GetEntryInfo_PathWithTrailingSlash_ReturnsDirectoryEntry()
     {
         var isoPath = CreateTestIso();
-        // "/subdir/" should not find an entry named "subdir/"
+        // A trailing slash is ignored: "/subdir/" resolves to the "subdir" directory entry.
         var entry = XisoReader.GetEntryInfo(isoPath, "/subdir/");
-        // It may return null or the subdir depending on implementation
-        // The important thing is it doesn't crash
+        Assert.NotNull(entry);
+        Assert.Equal("subdir", entry.Name);
+        Assert.True(entry.IsDirectory);
     }
 
     #endregion

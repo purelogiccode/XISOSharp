@@ -202,7 +202,7 @@ public static class XisoWriter
         }
 
         progressCallback?.Invoke(0, Logger.TotalBytes);
-
+        var finalTotal = Logger.TotalBytes;
         Logger.TotalBytes = Logger.TotalFiles = 0;
 
         var startSector = root.StartSector;
@@ -291,7 +291,7 @@ public static class XisoWriter
                 SourceStream = sourceStream,
                 ProgressCallback = progressCallback,
                 StructuredProgress = progress,
-                FinalBytes = Logger.TotalBytes,
+                FinalBytes = finalTotal,
                 CancellationToken = cancellationToken,
                 PrependOffset = prependOffset
             };
