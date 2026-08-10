@@ -156,7 +156,7 @@ public static class XisoReader
                 $"Corrupt XISO: {isoName} — root directory size is zero with non-zero sector pointer.");
         }
 
-        var availableBytes = (totalSectors - rootDirSector) * (long)Constants.SectorSize;
+        var availableBytes = (totalSectors - rootDirSector) * Constants.SectorSize;
         if (rootDirSize > availableBytes)
         {
             Logger.LogErr($"{isoName}: root directory size {rootDirSize} exceeds available space {availableBytes}\n");
@@ -225,7 +225,7 @@ public static class XisoReader
                 }
 
                 lOffset = (ushort)(lOffset * Constants.DwordSize +
-                    (Constants.SectorSize - (lOffset * Constants.DwordSize) % Constants.SectorSize));
+                                   (Constants.SectorSize - (lOffset * Constants.DwordSize) % Constants.SectorSize));
                 fs.Seek(dirStart + lOffset, SeekOrigin.Begin);
                 continue;
             }

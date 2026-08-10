@@ -724,8 +724,14 @@ public static class XisoTestRunner
 
     private static void DeleteDirectorySafe(string path)
     {
-        try { if (Directory.Exists(path)) Directory.Delete(path, true); }
-        catch { /* best effort */ }
+        try
+        {
+            if (Directory.Exists(path)) Directory.Delete(path, true);
+        }
+        catch
+        {
+            /* best effort */
+        }
     }
 
     private static string CreateTempSubDir(string name)

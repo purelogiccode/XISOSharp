@@ -30,7 +30,9 @@ public static class HashUtil
     /// <returns><c>true</c> if all bytes are zero; otherwise <c>false</c>.</returns>
     public static bool IsAllZero(byte[] a)
     {
-        foreach (var b in a) if (b != 0) return false;
+        foreach (var b in a)
+            if (b != 0)
+                return false;
 
         return true;
     }

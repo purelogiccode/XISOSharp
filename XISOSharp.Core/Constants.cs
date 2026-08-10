@@ -151,8 +151,8 @@ public static class Constants
         get
         {
             var platform = OperatingSystem.IsWindows() ? "win" :
-                           OperatingSystem.IsLinux() ? "linux" :
-                           OperatingSystem.IsMacOS() ? "macos" : "cross-platform";
+                OperatingSystem.IsLinux() ? "linux" :
+                OperatingSystem.IsMacOS() ? "macos" : "cross-platform";
             return $"extract-xiso v{ExisoVersion} for {platform} - written by in <in@fishtank.com>\n";
         }
     }

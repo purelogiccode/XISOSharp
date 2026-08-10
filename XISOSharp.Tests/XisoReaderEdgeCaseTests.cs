@@ -23,8 +23,14 @@ public class XisoReaderEdgeCaseTests : IDisposable
 
         foreach (var dir in _tempDirs)
         {
-            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
-            catch { /* best effort cleanup */ }
+            try
+            {
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            }
+            catch
+            {
+                /* best effort cleanup */
+            }
         }
     }
 
@@ -364,7 +370,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
 #pragma warning disable MA0004
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
             await XisoReader.DecodeXisoAsync(isoPath, extractDir, ExtractMode.Extract, false, cts.Token));
-        #pragma warning restore MA0004
+#pragma warning restore MA0004
     }
 
     #endregion

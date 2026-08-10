@@ -92,6 +92,7 @@ public sealed class GlobMatcher
                 ? trimmed
                 : trimmed + "/**";
         }
+
         var segments = normalized.Split('/');
         var sb = new StringBuilder("^");
         var count = segments.Length;

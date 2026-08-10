@@ -18,8 +18,14 @@ public class ExcludePatternsTests : IDisposable
 
         foreach (var dir in _tempDirs)
         {
-            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
-            catch { /* best effort cleanup */ }
+            try
+            {
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            }
+            catch
+            {
+                /* best effort cleanup */
+            }
         }
     }
 
@@ -70,8 +76,14 @@ public class ExcludePatternsTests : IDisposable
         }
         finally
         {
-            try { if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true); }
-            catch { /* best effort cleanup */ }
+            try
+            {
+                if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
+            }
+            catch
+            {
+                /* best effort cleanup */
+            }
         }
     }
 
@@ -137,8 +149,14 @@ public class ExcludePatternsTests : IDisposable
         }
         finally
         {
-            try { if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true); }
-            catch { /* best effort cleanup */ }
+            try
+            {
+                if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
+            }
+            catch
+            {
+                /* best effort cleanup */
+            }
         }
     }
 

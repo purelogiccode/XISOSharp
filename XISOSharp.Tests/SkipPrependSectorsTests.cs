@@ -22,8 +22,14 @@ public class SkipPrependSectorsTests : IDisposable
 
         foreach (var dir in _tempDirs)
         {
-            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
-            catch { /* best effort cleanup */ }
+            try
+            {
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            }
+            catch
+            {
+                /* best effort cleanup */
+            }
         }
     }
 
@@ -67,7 +73,7 @@ public class SkipPrependSectorsTests : IDisposable
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         Assert.True(File.Exists(isoPath));
-        return isoPath!;
+        return isoPath;
     }
 
     /// <summary>
@@ -92,7 +98,7 @@ public class SkipPrependSectorsTests : IDisposable
 
         var isoPath = CreatePrependedIso(srcDir, outputDir, out _);
 
-        var prependOffset = (long)PrependSectors * Constants.SectorSize;
+        const long prependOffset = (long)PrependSectors * Constants.SectorSize;
         var fileLength = new FileInfo(isoPath).Length;
 
         // The whole image (placeholder + game partition) is 64 KB aligned.
@@ -359,7 +365,7 @@ public class SkipPrependSectorsTests : IDisposable
         Assert.NotNull(isoPath);
         Assert.True(File.Exists(isoPath));
 
-        using var fs = File.OpenRead(isoPath);
+        await using var fs = File.OpenRead(isoPath);
         (_, _, long discLseek) = XisoReader.VerifyXiso(fs, "async.iso", PrependSectors);
         Assert.Equal((long)PrependSectors * Constants.SectorSize, discLseek);
     }

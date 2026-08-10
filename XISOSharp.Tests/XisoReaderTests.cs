@@ -41,7 +41,10 @@ public class XisoReaderTests : IDisposable
         if (!string.IsNullOrEmpty(_tempDir) && Directory.Exists(_tempDir))
         {
             try { Directory.Delete(_tempDir, true); }
-            catch { /* cleanup best-effort */ }
+            catch
+            {
+                /* cleanup best-effort */
+            }
         }
     }
 

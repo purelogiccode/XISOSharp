@@ -111,7 +111,7 @@ public class GlobMatcherTests
     [Theory]
     [InlineData("a\\*b", "a*b", true)]
     [InlineData("a\\*b", "axb", false)]
-    [InlineData("a\\[b\\]", "a[b]", true)]
+    [InlineData(@"a\[b\]", "a[b]", true)]
     public void Escaping(string pattern, string path, bool expected)
     {
         Assert.Equal(expected, Matches(pattern, path));

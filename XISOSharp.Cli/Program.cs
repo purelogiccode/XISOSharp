@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace XISOSharp.Cli;
@@ -75,8 +76,11 @@ internal static class Program
                         return 0;
                     case "-c":
                         {
-                            if (xSeen || rewrite || !extract || i + 1 >= args.Length) { PrintUsage();
-                                return 1; }
+                            if (xSeen || rewrite || !extract || i + 1 >= args.Length)
+                            {
+                                PrintUsage();
+                                return 1;
+                            }
 
                             var dir = args[++i];
                             string? name = null;
@@ -94,56 +98,80 @@ internal static class Program
                         {
                             excludePatterns.Add(args[++i]);
                         }
-                        else { PrintUsage();
-                            return 1; }
+                        else
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         break;
                     case "-l":
-                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
-                            return 1; }
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         extract = false;
                         break;
                     case "-t":
-                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
-                            return 1; }
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         extract = false;
                         tree = true;
                         break;
                     case "-i":
-                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
-                            return 1; }
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         extract = false;
                         info = true;
                         break;
                     case "--md5":
-                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
-                            return 1; }
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         extract = false;
                         hashMode = true;
                         hashAlgo = "MD5";
                         break;
                     case "--sha256":
-                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
-                            return 1; }
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         extract = false;
                         hashMode = true;
                         hashAlgo = "SHA256";
                         break;
                     case "-V":
-                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
-                            return 1; }
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         extract = false;
                         auditMode = true;
                         break;
                     case "validate":
-                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
-                            return 1; }
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         extract = false;
                         validateMode = true;
@@ -163,20 +191,29 @@ internal static class Program
                         {
                             validateReport = args[++i];
                         }
-                        else { PrintUsage();
-                            return 1; }
+                        else
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         break;
                     case "--copy-out":
-                        if (xSeen || rewrite || createList.Count > 0) { PrintUsage();
-                            return 1; }
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         extract = false;
                         copyOut = true;
                         break;
                     case "-r":
-                        if (xSeen || !extract || createList.Count > 0) { PrintUsage();
-                            return 1; }
+                        if (xSeen || !extract || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         rewrite = true;
                         break;
@@ -190,8 +227,11 @@ internal static class Program
                         {
                             path = args[++i];
                         }
-                        else { PrintUsage();
-                            return 1; }
+                        else
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         break;
                     case "-o":
@@ -199,15 +239,18 @@ internal static class Program
                         {
                             outputName = args[++i];
                         }
-                        else { PrintUsage();
-                            return 1; }
+                        else
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
 
                         break;
                     case "-p":
                         PrintUsage();
                         return 1;
                     case "--skip-sectors":
-                        if (i + 1 < args.Length && int.TryParse(args[i + 1], System.Globalization.CultureInfo.InvariantCulture, out var skipVal) && skipVal >= 0)
+                        if (i + 1 < args.Length && int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var skipVal) && skipVal >= 0)
                         {
                             skipSectors = skipVal;
                             i++;
@@ -220,7 +263,7 @@ internal static class Program
 
                         break;
                     case "--prepend-sectors":
-                        if (i + 1 < args.Length && int.TryParse(args[i + 1], System.Globalization.CultureInfo.InvariantCulture, out var prependVal) && prependVal >= 0)
+                        if (i + 1 < args.Length && int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var prependVal) && prependVal >= 0)
                         {
                             prependSectors = prependVal;
                             i++;
@@ -275,8 +318,11 @@ internal static class Program
 
         if (createList.Count > 0)
         {
-            if (optind < args.Length) { PrintUsage();
-                return 1; }
+            if (optind < args.Length)
+            {
+                PrintUsage();
+                return 1;
+            }
         }
         else if (optind >= args.Length)
         {
@@ -335,8 +381,11 @@ internal static class Program
 
         if (info)
         {
-            if (optind >= args.Length) { PrintUsage();
-                return 1; }
+            if (optind >= args.Length)
+            {
+                PrintUsage();
+                return 1;
+            }
 
             var xisoPath = args[optind];
             var internalPath = optind + 1 < args.Length ? args[optind + 1] : "/";
@@ -391,8 +440,11 @@ internal static class Program
 
         if (hashMode)
         {
-            if (optind >= args.Length) { PrintUsage();
-                return 1; }
+            if (optind >= args.Length)
+            {
+                PrintUsage();
+                return 1;
+            }
 
             var xisoPath = args[optind];
             var internalPath = optind + 1 < args.Length ? args[optind + 1] : null;
@@ -446,8 +498,11 @@ internal static class Program
 
         if (copyOut)
         {
-            if (optind + 2 >= args.Length) { PrintUsage();
-                return 1; }
+            if (optind + 2 >= args.Length)
+            {
+                PrintUsage();
+                return 1;
+            }
 
             var xisoPath = args[optind];
             var internalPath = args[optind + 1];
@@ -515,8 +570,11 @@ internal static class Program
 
         if (validateMode)
         {
-            if (optind + 1 >= args.Length) { PrintUsage();
-                return 1; }
+            if (optind + 1 >= args.Length)
+            {
+                PrintUsage();
+                return 1;
+            }
 
             var sourcePath = args[optind];
             var outputPath = args[optind + 1];

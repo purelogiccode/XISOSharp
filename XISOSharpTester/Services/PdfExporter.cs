@@ -57,13 +57,13 @@ public static class PdfExporter
                         row.RelativeItem().Column(c =>
                         {
                             c.Item().Text($"Files: {session.TotalFiles}  |  " +
-                                $"Passed: {session.PassedFiles}  |  " +
-                                $"Failed: {session.FailedFiles}  |  " +
-                                $"Skipped: {session.SkippedFiles}").Bold();
+                                          $"Passed: {session.PassedFiles}  |  " +
+                                          $"Failed: {session.FailedFiles}  |  " +
+                                          $"Skipped: {session.SkippedFiles}").Bold();
                             c.Item().Text($"SubTests: {session.TotalSubTests} total, " +
-                                $"{session.PassedSubTests} passed, " +
-                                $"{session.FailedSubTests} failed, " +
-                                $"{session.SkippedSubTests} skipped").FontSize(8);
+                                          $"{session.PassedSubTests} passed, " +
+                                          $"{session.FailedSubTests} failed, " +
+                                          $"{session.SkippedSubTests} skipped").FontSize(8);
                         });
                         row.ConstantItem(100).Text($"Time: {session.TotalElapsedSeconds:N1}s")
                             .FontSize(8).FontColor(Colors.Grey.Darken1);
