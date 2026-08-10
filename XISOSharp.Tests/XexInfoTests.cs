@@ -62,7 +62,8 @@ public class XexInfoTests : IDisposable
         WriteU32(span, 0x18 + 1 * 8 + 4, 0x82000000); // image base
         WriteU32(span, 0x18 + 2 * 8, 0x00040006);
         WriteU32(span, 0x18 + 2 * 8 + 4, 0x200); // execution info
-        WriteU32(span, 0x18 + 3 * 8, 0x000003FF); WriteU32(span, 0x18 + 3 * 8 + 4, 0x218); // file format info
+        WriteU32(span, 0x18 + 3 * 8, 0x000003FF);
+        WriteU32(span, 0x18 + 3 * 8 + 4, 0x218); // file format info
 
         // Execution info (0x18 bytes)
         WriteU32(span, 0x200, 0x2B35C136); // media id
@@ -91,9 +92,15 @@ public class XexInfoTests : IDisposable
 
         return data;
 
-        static void WriteU32(Span<byte> s, int offset, uint value) => BinaryPrimitives.WriteUInt32BigEndian(s[offset..], value);
+        static void WriteU32(Span<byte> s, int offset, uint value)
+        {
+            BinaryPrimitives.WriteUInt32BigEndian(s[offset..], value);
+        }
 
-        static void WriteU16(Span<byte> s, int offset, ushort value) => BinaryPrimitives.WriteUInt16BigEndian(s[offset..], value);
+        static void WriteU16(Span<byte> s, int offset, ushort value)
+        {
+            BinaryPrimitives.WriteUInt16BigEndian(s[offset..], value);
+        }
     }
 
     private string CreateIsoWithFile(string fileName, byte[] content)
