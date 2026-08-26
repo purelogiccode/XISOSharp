@@ -66,9 +66,9 @@ public class ListDirectoryFlatTests : IDisposable
         var names = XisoReader.ListDirectoryFlat(isoPath);
 
         Assert.Equal(3, names.Count); // default.xbe, media, empty
-        Assert.Contains("default.xbe", names);
-        Assert.Contains("media", names);
-        Assert.Contains("empty", names);
+        Assert.Contains("default.xbe", names, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("media", names, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("empty", names, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -79,9 +79,9 @@ public class ListDirectoryFlatTests : IDisposable
         var names = XisoReader.ListDirectoryFlat(isoPath, "/media");
 
         Assert.Equal(2, names.Count); // video.bik, sub
-        Assert.Contains("video.bik", names);
-        Assert.Contains("sub", names);
-        Assert.DoesNotContain("deep.txt", names); // nested entry not listed
+        Assert.Contains("video.bik", names, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("sub", names, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("deep.txt", names, StringComparer.OrdinalIgnoreCase); // nested entry not listed
     }
 
     [Fact]

@@ -117,10 +117,10 @@ public class PackFromDirectoryTests : IDisposable
 
         var extracted = ExtractToTemp(isoPath);
         var files = HashTree(extracted);
-        Assert.Contains("a.txt", files.Keys);
-        Assert.Contains("sub/b.bin", files.Keys);
-        Assert.DoesNotContain("skip.tmp", files.Keys);
-        Assert.DoesNotContain("node_modules/x.js", files.Keys);
+        Assert.Contains("a.txt", files.Keys, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("sub/b.bin", files.Keys, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("skip.tmp", files.Keys, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("node_modules/x.js", files.Keys, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]

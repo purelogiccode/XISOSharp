@@ -44,4 +44,11 @@ public class AvlNode
 
     /// <summary>Right child in the AVL tree.</summary>
     public AvlNode? Right;
+
+    /// <summary>
+    /// Absolute host file path for remapped images (build-image). When set, file
+    /// data is read from this path instead of using the current directory +
+    /// <see cref="Filename"/>. <c>null</c> for normal pack or directories.
+    /// </summary>
+    public string? HostPath;
 }

@@ -89,32 +89,48 @@ public static class XisoReader
 
                 if (!buffer.SequenceEqual(HeaderDataBytes))
                 {
-                    fs.Seek((long)Constants.HeaderOffset + Constants.Xgd3LseekOffset, SeekOrigin.Begin);
+                    fs.Seek((long)Constants.HeaderOffset + Constants.GlobalLseekOffset, SeekOrigin.Begin);
                     ReadExact(fs, buffer);
 
                     if (!buffer.SequenceEqual(HeaderDataBytes))
                     {
-                        fs.Seek((long)Constants.HeaderOffset + Constants.Xgd1LseekOffset, SeekOrigin.Begin);
+                        fs.Seek((long)Constants.HeaderOffset + Constants.Xgd3LseekOffset, SeekOrigin.Begin);
                         ReadExact(fs, buffer);
 
                         if (!buffer.SequenceEqual(HeaderDataBytes))
                         {
-                            Logger.LogErr($"{isoName} does not appear to be a valid xbox iso image\n");
-                            throw new XisoFormatException($"Invalid XISO: {isoName}");
+                            fs.Seek((long)Constants.HeaderOffset + Constants.Xgd2HybridLseekOffset, SeekOrigin.Begin);
+                            ReadExact(fs, buffer);
+
+                            if (!buffer.SequenceEqual(HeaderDataBytes))
+                            {
+                                fs.Seek((long)Constants.HeaderOffset + Constants.Xgd1LseekOffset, SeekOrigin.Begin);
+                                ReadExact(fs, buffer);
+
+                                if (!buffer.SequenceEqual(HeaderDataBytes))
+                                {
+                                    Logger.LogErr($"{isoName} does not appear to be a valid xbox iso image\n");
+                                    throw new XisoFormatException($"Invalid XISO: {isoName}");
+                                }
+                                else
+                                {
+                                    discLseek = Constants.Xgd1LseekOffset;
+                                }
+                            }
+                            else
+                            {
+                                discLseek = Constants.Xgd2HybridLseekOffset;
+                            }
                         }
                         else
                         {
-                            discLseek = Constants.Xgd1LseekOffset;
+                            discLseek = Constants.Xgd3LseekOffset;
                         }
                     }
                     else
                     {
-                        discLseek = Constants.Xgd3LseekOffset;
+                        discLseek = Constants.GlobalLseekOffset;
                     }
-                }
-                else
-                {
-                    discLseek = Constants.GlobalLseekOffset;
                 }
             }
         }
@@ -991,12 +1007,22 @@ public static class XisoReader
                     }
                     else
                     {
-                        fs.Seek((long)Constants.HeaderOffset + Constants.Xgd1LseekOffset, SeekOrigin.Begin);
+                        fs.Seek((long)Constants.HeaderOffset + Constants.Xgd2HybridLseekOffset, SeekOrigin.Begin);
                         ReadExact(fs, buffer);
                         if (buffer.SequenceEqual(HeaderDataBytes))
                         {
-                            discLseek = Constants.Xgd1LseekOffset;
+                            discLseek = Constants.Xgd2HybridLseekOffset;
                             isValid = true;
+                        }
+                        else
+                        {
+                            fs.Seek((long)Constants.HeaderOffset + Constants.Xgd1LseekOffset, SeekOrigin.Begin);
+                            ReadExact(fs, buffer);
+                            if (buffer.SequenceEqual(HeaderDataBytes))
+                            {
+                                discLseek = Constants.Xgd1LseekOffset;
+                                isValid = true;
+                            }
                         }
                     }
                 }

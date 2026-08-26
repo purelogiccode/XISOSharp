@@ -59,14 +59,42 @@ internal static class Program
         string? packName = null;
         string? packIsoFile = null;
 
+        // XboxKit redump / archival modes
+        var videoMode = false;
+        var randomMode = false;
+        var seedMode = false;
+        var wipeMode = false;
+        var trimMode = false;
+        var petrifyMode = false;
+        var updateMode = false;
+        var zarMode = false;
+        var allMode = false;
+        var bestMode = false;
+        var compressAlias = false;
+        var rebuildMode = false;
+        string? securitySectorsPath = null;
+
         var optind = 0;
 
-        // Handle standalone 'validate' command early (doesn't start with '-')
+        // Handle standalone verb commands early (don't start with '-')
         if (args.Length > 0 && string.Equals(args[0], "validate", StringComparison.OrdinalIgnoreCase))
         {
             validateMode = true;
             extract = false;
             optind = 1;
+        }
+        else if (args.Length > 0 && string.Equals(args[0], "rebuild", StringComparison.OrdinalIgnoreCase))
+        {
+            // Rebuild has its own positional+flag parsing (files may appear before -o), handle directly
+            return RunRebuildMode(args, 1, null, null);
+        }
+        else if (args.Length > 0 && string.Equals(args[0], "build-image", StringComparison.OrdinalIgnoreCase))
+        {
+            return RunBuildImage(args, 1);
+        }
+        else if (args.Length > 0 && string.Equals(args[0], "image-spec", StringComparison.OrdinalIgnoreCase))
+        {
+            return RunImageSpec(args, 1);
         }
 
         for (var i = optind; i < args.Length; i++)
@@ -353,6 +381,129 @@ internal static class Program
                         }
 
                         break;
+                    case "--video":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        videoMode = true;
+                        break;
+                    case "--random":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        randomMode = true;
+                        break;
+                    case "--seed":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        seedMode = true;
+                        break;
+                    case "--wipe":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        wipeMode = true;
+                        break;
+                    case "--trim":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        trimMode = true;
+                        break;
+                    case "--petrify":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        petrifyMode = true;
+                        break;
+                    case "--update":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        updateMode = true;
+                        break;
+                    case "--zar":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        zarMode = true;
+                        break;
+                    case "--all":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        allMode = true;
+                        break;
+                    case "--best":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        bestMode = true;
+                        break;
+                    case "--compress":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        compressAlias = true;
+                        break;
+                    case "--security-sectors":
+                    case "--sectors":
+                        if (i + 1 < args.Length)
+                        {
+                            securitySectorsPath = args[++i];
+                        }
+                        else
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        break;
                     default:
                         optind = i;
                         goto parse_done;
@@ -424,6 +575,48 @@ internal static class Program
             return 1;
         }
 
+        // XboxKit redump modes are mutually exclusive with other operational modes
+        var anyRedumpMode = videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode ||
+                            zarMode || allMode || bestMode || compressAlias || rebuildMode;
+        if (anyRedumpMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode ||
+                              validateMode || unpackMode || createList.Count > 0 || rewrite))
+        {
+            Logger.LogErr(
+                "Error: --video/--random/--seed/--wipe/--trim/--petrify/--update/--zar/--all/--best/--compress/rebuild cannot be combined with other modes\n");
+            return 1;
+        }
+
+        if ((anyRedumpMode || rebuildMode) && batchDir != null)
+        {
+            Logger.LogErr("Error: --batch cannot be combined with redump modes\n");
+            return 1;
+        }
+
+        // Expand --all / --best / --compress aliases into individual flags
+        if (allMode)
+        {
+            randomMode = true;
+            seedMode = true;
+            trimMode = true;
+            updateMode = true;
+            videoMode = true;
+            wipeMode = true;
+        }
+
+        if (bestMode)
+        {
+            trimMode = true;
+            wipeMode = true;
+        }
+
+        if (compressAlias)
+        {
+            petrifyMode = true;
+            updateMode = true;
+            videoMode = true;
+            zarMode = true;
+        }
+
         // The list of ISO files to process: explicit filenames, a --batch directory scan,
         // or a --pack ISO input.
         var isoFiles = ExpandIsoFiles(batchDir, batchRecursive, args, optind, packIsoFile);
@@ -447,6 +640,14 @@ internal static class Program
         }
 
         Logger.Log(Constants.Banner);
+
+        // Dispatch XboxKit redump modes (batch) — after expansion so --batch handling is uniform,
+        // but rebuild already returned above.
+        if (videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode || zarMode)
+        {
+            return RunRedumpBatch(isoFiles, videoMode, randomMode, seedMode, wipeMode, trimMode, petrifyMode,
+                updateMode, zarMode, securitySectorsPath, outputName);
+        }
 
         if (createList.Count > 0)
         {
@@ -1006,6 +1207,834 @@ internal static class Program
         }
     }
 
+    private static int RunRebuildMode(string[] args, int optind, string? outputName, string? securitySectorsPath)
+    {
+        string? outRebuild = outputName;
+        string? secPath = securitySectorsPath;
+        var positionals = new List<string>();
+        for (int i = optind; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -o requires a filename\n");
+                    return 1;
+                }
+
+                outRebuild = args[++i];
+            }
+            else if (string.Equals(a, "--security-sectors", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--sectors", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    PrintUsage();
+                    return 1;
+                }
+
+                secPath = args[++i];
+            }
+            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = true;
+            }
+            else if (string.Equals(a, "-Q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = Logger.RealQuiet = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Write(Constants.Banner);
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for rebuild: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count == 0)
+        {
+            Logger.LogErr("Error: rebuild requires at least <xiso> [video.iso] [filler|seed] [su...]\n");
+            PrintUsage();
+            return 1;
+        }
+
+        string xisoPath = positionals[0];
+        string? videoPath = positionals.Count > 1 ? positionals[1] : null;
+        string? fillerOrSeed = positionals.Count > 2 ? positionals[2] : null;
+        string? updatePath = positionals.Count > 3 ? positionals[3] : null;
+
+        if (positionals.Count > 4)
+        {
+            Logger.LogErr(
+                "Error: rebuild takes at most 4 positional files: <xiso> [video.iso] [filler|seed] [update]\n");
+            return 1;
+        }
+
+        // If video path not provided, try to derive from xiso directory
+        if (videoPath == null)
+        {
+            string dir = Path.GetDirectoryName(xisoPath) ?? ".";
+            string baseName = Path.GetFileNameWithoutExtension(xisoPath);
+            // Strip compound .xiso etc.
+            if (baseName.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase)) baseName = baseName[..^5];
+            string candidate = Path.Combine(dir, baseName + ".video.iso");
+            if (File.Exists(candidate))
+            {
+                videoPath = candidate;
+            }
+            else
+            {
+                // Also try sibling redump video naming
+                candidate = Path.Combine(dir, baseName + ".video.iso");
+                // If still not found, keep null and let Rebuild fail with clear message
+                videoPath = candidate;
+            }
+        }
+
+        string outRedump = outRebuild ?? DeriveRedumpPath(xisoPath);
+
+        try
+        {
+            bool ok = XisoRedump.RebuildRedump(xisoPath, videoPath, fillerOrSeed, updatePath, outRedump, secPath,
+                quiet: Logger.Quiet);
+            if (!ok)
+            {
+                Logger.LogErr($"[ERROR] Rebuild failed for {xisoPath}\n");
+                return 1;
+            }
+
+            Logger.Log($"Rebuilt {outRedump} ({new FileInfo(outRedump).Length} bytes)\n");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogErr($"Error rebuilding: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    private static int RunBuildImage(string[] args, int optind)
+    {
+        string? specFile = null;
+        var mapRaw = new List<string>();
+        string? metaOutput = null;
+        bool dryRun = false;
+        var positionals = new List<string>();
+
+        for (int i = optind; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (string.Equals(a, "-f", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--file", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -f requires a filename\n");
+                    return 1;
+                }
+
+                specFile = args[++i];
+            }
+            else if (string.Equals(a, "-m", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--map", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -m requires a rule\n");
+                    return 1;
+                }
+
+                mapRaw.Add(args[++i]);
+            }
+            else if (string.Equals(a, "-O", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -O requires a path\n");
+                    return 1;
+                }
+
+                metaOutput = args[++i];
+            }
+            else if (string.Equals(a, "-D", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--dry-run", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--dryrun", StringComparison.OrdinalIgnoreCase))
+            {
+                dryRun = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Write(Constants.Banner);
+                return 0;
+            }
+            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = true;
+            }
+            else if (string.Equals(a, "-Q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = Logger.RealQuiet = true;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for build-image: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (specFile != null && mapRaw.Count > 0)
+        {
+            Logger.LogErr("Error: --file and --map are mutually exclusive\n");
+            return 1;
+        }
+
+        if (specFile != null && metaOutput != null)
+        {
+            Logger.LogErr("Error: --file and --output are mutually exclusive (use output inside spec file)\n");
+            return 1;
+        }
+
+        if (positionals.Count > 2)
+        {
+            Logger.LogErr("Error: build-image takes at most 2 positional arguments: [sourceDir] [output.iso]\n");
+            return 1;
+        }
+
+        string sourcePathStr = positionals.Count >= 1 ? positionals[0] : Directory.GetCurrentDirectory();
+        string? imagePathStr = positionals.Count >= 2 ? positionals[1] : null;
+
+        // Resolve sourceDir and specPath candidate
+        string sourceDir;
+        string specPath;
+        {
+            bool isDir = false;
+            bool isFile = false;
+            try
+            {
+                isDir = Directory.Exists(sourcePathStr) &&
+                        (File.GetAttributes(sourcePathStr) & FileAttributes.Directory) != 0;
+            }
+            catch
+            {
+                // ignored
+            }
+
+            try { isFile = File.Exists(sourcePathStr); }
+            catch
+            {
+                // ignored
+            }
+
+            if (isDir)
+            {
+                sourceDir = Path.GetFullPath(sourcePathStr);
+                specPath = Path.Combine(sourceDir, "xdvdfs.toml");
+            }
+            else if (isFile)
+            {
+                specPath = Path.GetFullPath(sourcePathStr);
+                sourceDir = Path.GetDirectoryName(specPath) ?? Directory.GetCurrentDirectory();
+            }
+            else
+            {
+                // Non-existent path – treat as directory to be created / must exist
+                sourceDir = Path.GetFullPath(sourcePathStr);
+                specPath = Path.Combine(sourceDir, "xdvdfs.toml");
+            }
+
+            if (specFile != null)
+                specPath = Path.GetFullPath(specFile);
+        }
+
+        var rules = new List<RemapRule>();
+        string? specOutput = null;
+
+        if (mapRaw.Count > 0)
+        {
+            foreach (var raw in mapRaw)
+            {
+                if (!RemapRule.TryParse(raw, out var r, out var err))
+                {
+                    Logger.LogErr($"Error: invalid map rule \"{raw}\": {err}\n");
+                    return 1;
+                }
+
+                rules.Add(r!);
+            }
+
+            specOutput = metaOutput;
+        }
+        else
+        {
+            if (File.Exists(specPath))
+            {
+                try
+                {
+                    (string? outp, List<RemapRule> parsed) = RemapFilesystem.ParseSpecFile(specPath);
+                    specOutput = outp;
+                    rules.AddRange(parsed);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogErr($"Error reading spec file {specPath}: {ex.Message}\n");
+                    return 1;
+                }
+            }
+        }
+
+        if (rules.Count == 0)
+        {
+            Logger.LogErr("Must specify at least one map rule (via -m or xdvdfs.toml)\n");
+            PrintUsage();
+            return 1;
+        }
+
+        string outputIso;
+        if (imagePathStr != null)
+        {
+            outputIso = Path.GetFullPath(imagePathStr);
+        }
+        else if (specOutput != null)
+        {
+            outputIso = Path.IsPathRooted(specOutput) ? specOutput : Path.Combine(sourceDir, specOutput);
+            outputIso = Path.GetFullPath(outputIso);
+        }
+        else if (metaOutput != null && mapRaw.Count > 0)
+        {
+            outputIso = Path.IsPathRooted(metaOutput) ? metaOutput : Path.Combine(sourceDir, metaOutput);
+            outputIso = Path.GetFullPath(outputIso);
+        }
+        else
+        {
+            // Default: <sourceDir>.xiso.iso sibling of sourceDir
+            var trimmed = sourceDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var parent = Path.GetDirectoryName(trimmed) ?? Directory.GetCurrentDirectory();
+            var name = Path.GetFileName(trimmed);
+            if (string.IsNullOrEmpty(name)) name = "image";
+            // with_extension is_dir=true logic: append .xiso.iso
+            if (Path.HasExtension(name))
+                outputIso = Path.Combine(parent, name + ".xiso.iso");
+            else
+                outputIso = Path.Combine(parent, name + ".xiso.iso");
+            outputIso = Path.GetFullPath(outputIso);
+        }
+
+        if (dryRun)
+        {
+            try
+            {
+                var list = RemapFilesystem.DryRunRemap(sourceDir, rules);
+                foreach ((string host, string guest) in list)
+                    Console.WriteLine($"{host} -> {guest}");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogErr($"Dry-run failed: {ex.Message}\n");
+                return 1;
+            }
+        }
+        else
+        {
+            if (!Directory.Exists(sourceDir))
+            {
+                Logger.LogErr($"Source directory not found: {sourceDir}\n");
+                return 1;
+            }
+
+            // Ensure output directory exists
+            var outDir = Path.GetDirectoryName(outputIso);
+            if (!string.IsNullOrEmpty(outDir))
+                Directory.CreateDirectory(outDir);
+            Logger.Log($"{Constants.Banner}");
+            return RemapFilesystem.BuildImage(sourceDir, outputIso, rules);
+        }
+    }
+
+    private static int RunImageSpec(string[] args, int optind)
+    {
+        if (optind >= args.Length || !string.Equals(args[optind], "from", StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.LogErr("Error: image-spec requires 'from' subcommand\n");
+            PrintUsage();
+            return 1;
+        }
+
+        optind++;
+        var mapRaw = new List<string>();
+        string? metaOutput = null;
+        var positionals = new List<string>();
+        for (int i = optind; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (string.Equals(a, "-m", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--map", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -m requires a rule\n");
+                    return 1;
+                }
+
+                mapRaw.Add(args[++i]);
+            }
+            else if (string.Equals(a, "-O", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -O requires a path\n");
+                    return 1;
+                }
+
+                metaOutput = args[++i];
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Write(Constants.Banner);
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for image-spec from: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count > 1)
+        {
+            Logger.LogErr("Error: image-spec from takes at most one output file\n");
+            return 1;
+        }
+
+        var rules = new List<RemapRule>();
+        foreach (var raw in mapRaw)
+        {
+            if (!RemapRule.TryParse(raw, out var r, out var err))
+            {
+                Logger.LogErr($"Error: invalid map rule \"{raw}\": {err}\n");
+                return 1;
+            }
+
+            rules.Add(r!);
+        }
+
+        string? outFile = positionals.Count == 1 ? positionals[0] : null;
+        var toml = RemapFilesystem.GenerateSpecText(rules, metaOutput);
+        if (outFile != null)
+        {
+            try
+            {
+                File.WriteAllText(outFile, toml, Encoding.UTF8);
+                Logger.Log($"Wrote {outFile}\n");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogErr($"Failed to write {outFile}: {ex.Message}\n");
+                return 1;
+            }
+        }
+        else
+        {
+            Console.Write(toml);
+        }
+
+        return 0;
+    }
+
+    private static string DeriveRedumpPath(string xisoPath)
+    {
+        string dir = Path.GetDirectoryName(xisoPath) ?? "";
+        string full = Path.GetFileName(xisoPath) ?? "redump";
+        string baseName = full;
+        if (full.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase)) baseName = full[..^5];
+        else if (full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) baseName = full[..^4];
+        return Path.Combine(dir, baseName + ".redump.iso");
+    }
+
+    private static int RunRedumpBatch(List<string> isoFiles, bool video, bool random, bool seed, bool wipe, bool trim,
+        bool petrify, bool update, bool zar, string? securitySectorsPath, string? outputName)
+    {
+        // Single-output guard
+        bool singleModeCount = new[] { video, random, seed, wipe, trim, petrify, update, zar }.Count(b => b) == 1;
+        if (outputName != null && isoFiles.Count != 1 && singleModeCount)
+        {
+            Logger.LogErr("Error: -o <output> can only be used with a single input file\n");
+            return 1;
+        }
+
+        int exit = 0;
+        foreach (var iso in isoFiles)
+        {
+            long size = 0;
+            try { size = new FileInfo(iso).Length; }
+            catch
+            {
+                Logger.LogErr($"Cannot stat {iso}\n");
+                exit = 1;
+                continue;
+            }
+
+            int redumpType = XgdTables.GetRedumpIsoTypeBySize(size);
+            int xisoType = XgdTables.GetXisoTypeBySize(size);
+            int vidType = XgdTables.GetVideoTypeBySize(size);
+            bool isRedump = redumpType >= 0;
+            bool isXiso = xisoType >= 0;
+            bool isVideo = vidType >= 0;
+
+            // Derive isoOffset / length for partition ops
+            long isoOffset = 0;
+            long xisoLen = size;
+            if (isRedump)
+            {
+                int videoTypeForRedump = -1;
+                // Need to get videoType via PVD for wave-dependent sizes — open file
+                try
+                {
+                    using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+                    videoTypeForRedump = XgdTables.GetVideoType(fs, redumpType);
+                }
+                catch
+                {
+                    // ignored
+                }
+
+                int vType = videoTypeForRedump >= 0 ? videoTypeForRedump : 0;
+                int xsType = XgdTables.GetXisoTypeFromVideo(vType >= 0 ? vType : 0);
+                if (xsType < 0 || xsType >= XgdTables.XisoOffset.Length)
+                    xsType = redumpType >= 0 ? XgdTables.GetXgdType(redumpType) : 0;
+                isoOffset = XgdTables.XisoOffset[xsType];
+                xisoLen = XgdTables.XisoLength[xsType];
+            }
+
+            string dir = Path.GetDirectoryName(iso) ?? "";
+            string full = Path.GetFileName(iso) ?? "output";
+            string baseName = full;
+            if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase))
+                baseName = full[..^".redump.iso".Length];
+            else if (full.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase))
+                baseName = full[..^".video.iso".Length];
+            else if (full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) baseName = full[..^".iso".Length];
+            else if (full.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase)) baseName = full[..^".xiso".Length];
+
+            if (video)
+            {
+                if (!isRedump)
+                {
+                    if (singleModeCount)
+                    {
+                        Logger.LogErr($"[ERROR] --video requires a Redump ISO (got {iso} size {size})\n");
+                        exit = 1;
+                    }
+                    else
+                    {
+                        Logger.Log($"[INFO] Skipping --video for non-Redump {iso}\n");
+                    }
+                }
+                else
+                {
+                    string outVideo = (outputName != null && singleModeCount)
+                        ? outputName
+                        : Path.Combine(dir, baseName + ".video.iso");
+                    if (!XisoRedump.TryExtractVideo(iso, outVideo, out var outPath, Logger.Quiet))
+                    {
+                        Logger.LogErr($"[ERROR] Failed extracting video from {iso}\n");
+                        exit = 1;
+                    }
+                    else
+                    {
+                        Logger.Log($"Video extracted to {outPath}\n");
+                    }
+                }
+            }
+
+            if (update)
+            {
+                if (isVideo)
+                {
+                    string outUpd = (outputName != null && singleModeCount)
+                        ? outputName
+                        : Path.Combine(dir, "su20076000_00000000");
+                    if (!XisoRedump.TryExtractUpdate(iso, outUpd, wipe: true, quiet: Logger.Quiet))
+                    {
+                        Logger.LogErr($"[ERROR] Failed extracting update from video {iso}\n");
+                        exit = 1;
+                    }
+                    else
+                    {
+                        Logger.Log($"Update extracted to {outUpd}\n");
+                    }
+                }
+                else if (isRedump)
+                {
+                    // Need video file — if video was just extracted, it will exist at derived path
+                    string videoPath = Path.Combine(dir, baseName + ".video.iso");
+                    if (!File.Exists(videoPath))
+                    {
+                        if (singleModeCount)
+                        {
+                            Logger.LogErr(
+                                $"[ERROR] --update for Redump requires video partition {videoPath} (run --video first)\n");
+                            exit = 1;
+                        }
+                        else
+                        {
+                            Logger.Log($"[INFO] Skipping --update (video {videoPath} not found) for {iso}\n");
+                        }
+                    }
+                    else
+                    {
+                        string outUpd = (outputName != null && singleModeCount)
+                            ? outputName
+                            : Path.Combine(dir, "su20076000_00000000");
+                        if (!XisoRedump.TryExtractUpdate(videoPath, outUpd, wipe: true, quiet: Logger.Quiet))
+                        {
+                            Logger.LogErr($"[ERROR] Failed extracting update from {videoPath}\n");
+                            exit = 1;
+                        }
+                        else
+                        {
+                            Logger.Log($"Update extracted to {outUpd}\n");
+                        }
+                    }
+                }
+                else
+                {
+                    if (singleModeCount)
+                    {
+                        Logger.LogErr($"[ERROR] --update requires a video or Redump ISO (got {iso})\n");
+                        exit = 1;
+                    }
+                    else
+                    {
+                        Logger.Log($"[INFO] Skipping --update for {iso}\n");
+                    }
+                }
+            }
+
+            if (random)
+            {
+                // Extract filler
+                string outFiller = (outputName != null && singleModeCount)
+                    ? outputName
+                    : Path.Combine(dir, baseName + ".filler");
+                bool ok;
+                if (isRedump)
+                    ok = XisoOperations.ExtractFiller(iso, outFiller, isoOffset, xisoLen, Logger.Quiet);
+                else
+                    ok = XisoOperations.ExtractFiller(iso, outFiller, 0, null, Logger.Quiet);
+                if (!ok)
+                {
+                    Logger.LogErr($"[ERROR] Failed extracting filler from {iso}\n");
+                    exit = 1;
+                }
+                else
+                {
+                    Logger.Log($"Filler extracted to {outFiller} ({new FileInfo(outFiller).Length} bytes)\n");
+                }
+            }
+
+            if (seed)
+            {
+                string outSeed = (outputName != null && singleModeCount)
+                    ? outputName
+                    : Path.Combine(dir, baseName + ".seed");
+                bool ok = XisoOperations.TryExtractSeed(iso, outSeed, isRedump ? isoOffset : 0, Logger.Quiet);
+                if (!ok)
+                {
+                    if (singleModeCount)
+                    {
+                        Logger.LogErr($"[ERROR] Failed extracting seed from {iso} (only XGD1)\n");
+                        exit = 1;
+                    }
+                    else
+                    {
+                        Logger.Log($"[INFO] Skipping --seed for {iso} (only XGD1)\n");
+                        try
+                        {
+                            if (File.Exists(outSeed)) File.Delete(outSeed);
+                        }
+                        catch
+                        {
+                            // ignored
+                        }
+                    }
+                }
+                else
+                {
+                    Logger.Log($"Seed extracted to {outSeed}\n");
+                }
+            }
+
+            if (wipe)
+            {
+                string outWiped = (outputName != null && singleModeCount)
+                    ? outputName
+                    : Path.Combine(dir, baseName + ".wiped.xiso");
+                bool ok;
+                if (isRedump)
+                {
+                    // Produce wiped game partition from Redump
+                    ok = XisoOperations.WipeFiller(iso, outWiped, isoOffset, Logger.Quiet);
+                }
+                else
+                {
+                    ok = XisoOperations.WipeFiller(iso, outWiped, 0, Logger.Quiet);
+                }
+
+                if (!ok)
+                {
+                    Logger.LogErr($"[ERROR] Failed wiping {iso}\n");
+                    exit = 1;
+                }
+                else
+                {
+                    Logger.Log($"Wiped XISO written to {outWiped}\n");
+                }
+
+                // If trim also requested and wiping produced a file, trim that file instead of doing separate
+                // To avoid double I/O when both --wipe and --trim are set, the batch will handle --best as wipe+trim
+                // via WipeAndTrim below.
+            }
+
+            if (trim)
+            {
+                // If both wipe and trim are set (e.g. --best/--all), do combined operation to avoid double work
+                bool combinedWipeTrim = wipe;
+                if (combinedWipeTrim)
+                {
+                    string outTrimWiped = (outputName != null && singleModeCount)
+                        ? outputName
+                        : Path.Combine(dir, baseName + ".trim.wiped.xiso");
+                    // The wiped file from previous step is at .wiped.xiso; we could do WipeAndTrim directly from original
+                    string wipedPath = Path.Combine(dir, baseName + ".wiped.xiso");
+                    // If we already produced wiped, trim it; else do combined
+                    if (File.Exists(wipedPath) && !singleModeCount)
+                    {
+                        // Trim the already-wiped file
+                        if (!XisoOperations.TrimXiso(wipedPath, outTrimWiped, 0, Logger.Quiet))
+                        {
+                            Logger.LogErr($"[ERROR] Failed trimming {wipedPath}\n");
+                            exit = 1;
+                        }
+                        else
+                        {
+                            try { File.Delete(wipedPath); }
+                            catch
+                            {
+                                // ignored
+                            }
+
+                            Logger.Log($"Wiped+trimmed XISO written to {outTrimWiped}\n");
+                        }
+                    }
+                    else
+                    {
+                        string outPath2 = (outputName != null && singleModeCount)
+                            ? outputName
+                            : Path.Combine(dir, baseName + ".wiped.xiso");
+                        // Do combined directly
+                        bool ok = XisoOperations.WipeAndTrim(iso, outPath2, isRedump ? isoOffset : 0, Logger.Quiet);
+                        if (!ok)
+                        {
+                            Logger.LogErr($"[ERROR] Failed wiping+trimming {iso}\n");
+                            exit = 1;
+                        }
+                        else
+                        {
+                            Logger.Log($"Wiped+trimmed XISO written to {outPath2}\n");
+                        }
+
+                        // Skip separate trim below
+                        continue;
+                    }
+                }
+                else
+                {
+                    string outTrim = (outputName != null && singleModeCount)
+                        ? outputName
+                        : Path.Combine(dir, baseName + ".trim.xiso");
+                    bool ok = XisoOperations.TrimXiso(iso, outTrim, isRedump ? isoOffset : 0, Logger.Quiet);
+                    if (!ok)
+                    {
+                        Logger.LogErr($"[ERROR] Failed trimming {iso}\n");
+                        exit = 1;
+                    }
+                    else
+                    {
+                        Logger.Log($"Trimmed XISO written to {outTrim}\n");
+                    }
+                }
+            }
+
+            if (petrify)
+            {
+                string outSkel = (outputName != null && singleModeCount)
+                    ? outputName
+                    : Path.Combine(dir, baseName + ".skeleton.xiso");
+                string outHash = Path.Combine(dir, baseName + ".hash");
+                // petrify already derives hash path internally if null, but we pass explicit
+                bool ok = XisoSkeleton.Petrify(iso, outSkel, outHash, isRedump ? isoOffset : 0, Logger.Quiet);
+                if (!ok)
+                {
+                    Logger.LogErr($"[ERROR] Failed petrifying {iso}\n");
+                    exit = 1;
+                }
+                else
+                {
+                    Logger.Log($"Skeleton written to {outSkel}, hash to {outHash}\n");
+                }
+            }
+
+            if (zar)
+            {
+                string outZar = (outputName != null && singleModeCount)
+                    ? outputName
+                    : Path.Combine(dir, baseName + ".zar");
+                bool ok = XisoZarchive.CreateZar(iso, outZar, isRedump ? isoOffset : 0, Logger.Quiet);
+                if (!ok)
+                {
+                    Logger.LogErr($"[ERROR] Failed creating ZAR for {iso}\n");
+                    exit = 1;
+                }
+                else
+                {
+                    Logger.Log($"ZAR written to {outZar}\n");
+                }
+            }
+        }
+
+        return exit;
+    }
+
     /// <summary>
     /// Translates a <c>--pack</c> input: a directory becomes a create-mode entry, an
     /// existing ISO file becomes an in-place rewrite. Returns 0 on success, 1 on error
@@ -1246,78 +2275,111 @@ internal static class Program
     /// </summary>
     private static void PrintUsage()
     {
-        Console.Error.Write($"""
-                             {Constants.Banner}
-                               Usage:
+        Console.Error.Write(Constants.Banner + """
+                                                 Usage:
+                                                 Usage:
 
-                                 extract-xiso [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
-                                 extract-xiso [options] -c <dir> [name] [-c <dir> [name]] ...
+                                                   extract-xiso [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
+                                                   extract-xiso [options] -c <dir> [name] [-c <dir> [name]] ...
 
-                                Mutually exclusive modes:
+                                                   Mutually exclusive modes:
 
-                                  -c <dir> [name]     Create xiso from file(s) starting in <dir>.
-                                  --copy-out <iso> <path> <dest>  Copy a file or directory out of an xiso.
-                                  -i <file> [path]    Show volume info and directory entry metadata.
-                                  --ls <file> [path]   List the entries of a directory (default root)
-                                                        without recursion. Mirrors 'ls' on the image.
-                                  --xex-info <file> <path>  Show the Xbox 360 XEX2 executable
-                                                        header of a .xex file inside the image
-                                                        (module flags, entry point, title ID, ...).
-                                  -l                  List files in xiso(s).
-                                  --md5 <file> [path] Compute MD5 hash of file(s) in xiso.
-                                  -r                  Rewrite xiso(s) as optimized xiso(s).
-                                  --sha256 <file> [path] Compute SHA-256 hash of file(s) in xiso.
-                                  -t                  List all files recursively with sizes (tree).
-                                  -V <file1.xiso> ...  Deep-audit xiso(s): validate header, tree, sectors.
-                                  --batch <dir>        Process all .iso files in <dir> instead of
-                                                        explicit filenames. Works with extract,
-                                                        list, tree, rewrite (-r), and audit (-V).
-                                  --batch-recursive    With --batch, search subdirectories recursively.
-                                  --pack <input> [name]  Pack a directory into an ISO (name defaults
-                                                        to the directory name; may include a path),
-                                                        or repack an existing ISO in place (rewrite).
-                                  validate <src> <out> Validate conversion by comparing source and output ISOs.
-                                  -x                  Extract xiso(s) (the default mode if none is given).
-                                  --unpack <file> [dest]  Unpack the whole image to <dest>, or to a
-                                                        directory named after the ISO when omitted.
-                                  -X <glob_pattern>   In create mode (-c), exclude files/directories
-                                                        matching the glob pattern from the image.
-                                                        Repeatable. Examples: "*.tmp", "**/node_modules/**",
-                                                        "screenshots/**". Use "/" as the path separator.
-                                                        With -s, $SystemUpdate is excluded automatically.
+                                                     -c <dir> [name]     Create xiso from file(s) starting in <dir>.
+                                                     --copy-out <iso> <path> <dest>  Copy a file or directory out of an xiso.
+                                                     -i <file> [path]    Show volume info and directory entry metadata.
+                                                     --ls <file> [path]   List the entries of a directory (default root)
+                                                                           without recursion. Mirrors 'ls' on the image.
+                                                     --xex-info <file> <path>  Show the Xbox 360 XEX2 executable
+                                                                           header of a .xex file inside the image
+                                                                           (module flags, entry point, title ID, ...).
+                                                     -l                  List files in xiso(s).
+                                                     --md5 <file> [path] Compute MD5 hash of file(s) in xiso.
+                                                     -r                  Rewrite xiso(s) as optimized xiso(s).
+                                                     --sha256 <file> [path] Compute SHA-256 hash of file(s) in xiso.
+                                                     -t                  List all files recursively with sizes (tree).
+                                                     -V <file1.xiso> ...  Deep-audit xiso(s): validate header, tree, sectors.
+                                                     --batch <dir>        Process all .iso files in <dir> instead of
+                                                                           explicit filenames. Works with extract,
+                                                                           list, tree, rewrite (-r), and audit (-V).
+                                                     --batch-recursive    With --batch, search subdirectories recursively.
+                                                     --pack <input> [name]  Pack a directory into an ISO (name defaults
+                                                                           to the directory name; may include a path),
+                                                                           or repack an existing ISO in place (rewrite).
+                                                     validate <src> <out> Validate conversion by comparing source and output ISOs.
+                                                     -x                  Extract xiso(s) (the default mode if none is given).
+                                                     --unpack <file> [dest]  Unpack the whole image to <dest>, or to a
+                                                                           directory named after the ISO when omitted.
+                                                     -X <glob_pattern>   In create mode (-c), exclude files/directories
+                                                                           matching the glob pattern from the image.
+                                                                           Repeatable. Examples: "*.tmp", "**/node_modules/**",
+                                                                           "screenshots/**". Use "/" as the path separator.
+                                                                           With -s, $SystemUpdate is excluded automatically.
 
-                                Options:
+                                                     Redump / XboxKit modes (lossless archival):
 
-                                  -d <directory>      In extract mode, expand xiso in <directory>.
-                                                      In rewrite mode, rewrite xiso in <directory>.
-                                  -D                  In rewrite mode, delete old xiso after processing.
-                                  -h                  Print this help text and exit.
-                                  -m                  In create or rewrite mode, disable automatic .xbe
-                                                        media enable patching (not recommended).
-                                  -o <filename>       In rewrite mode, set custom output filename
-                                                        (default: original name with .iso extension).
-                                  --skip-sectors N     Treat the image as if the XISO filesystem
-                                                        begins N sectors (2048 bytes each) into the
-                                                        file. Use for Redump images where a video
-                                                        partition precedes the game partition.
-                                                        Valid in extract, list, tree, and rewrite mode.
-                                  --prepend-sectors N  Write the output image with N empty sectors
-                                                        before the XISO filesystem, leaving room for
-                                                        a video partition. Valid in create (-c) and
-                                                        rewrite (-r) mode. Combine with --skip-sectors
-                                                        for round-trip Redump-style reconstruction.
-                                  -q                  Run quiet (suppress all non-error output).
-                                  -Q                  Run silent (suppress all output).
-                                  -s                  Skip $SystemUpdate folder.
-                                  -v                  Print version information and exit.
+                                                     rebuild <xiso> [video.iso] [filler|seed] [su...] -o <redump.iso>
+                                                                           Rebuild a Redump ISO from its components.
+                                                                           Auto-detects XGD type by size; video type via
+                                                                           PVD at 0x832D. Supports filler file or 4-byte
+                                                                           seed (XGD1 PRNG) plus optional sectors.txt for
+                                                                           security sectors (--security-sectors).
+                                                     --video <redump.iso> [video.iso]  Extract video partition (L0+L1).
+                                                     --random <iso> [filler.bin]  Extract random filler gaps.
+                                                     --seed <iso> [seed.bin]    Extract XGD1 PRNG seed (brute-force, 4 bytes).
+                                                     --wipe <iso> [wiped.xiso]  Write XISO with filler zeroed.
+                                                     --trim <iso> [trimmed.xiso]  Trim XISO after last file extent.
+                                                     --petrify <iso> [skeleton.xiso] [hash]  Zero file data, emit SHA1 hashes.
+                                                     --update <video.iso|redump.iso> [update]  Extract su20076000_00000000 (XGD3) and zero it in video.
+                                                     --zar <iso> [out.zar]      Create ZArchive (zstd blocks, raw fallback; trimmable).
+                                                     --all <redump.iso>         Alias: --random --seed --trim --update --video --wipe
+                                                     --best <iso>               Alias: --trim --wipe
+                                                     --compress <iso>           Alias: --petrify --update --video --zar
+                                                      --security-sectors <sectors.txt>  Override security sector ranges (start-end, 4096 sectors).
 
-                                  Validation options (with -r or validate command):
+                                                      XDVDFS / Packing modes (ordered remapping):
 
-                                  --validate          Enable post-conversion validation after rewrite.
-                                  --validate-checksums  Also verify SHA-256 checksums (slower).
-                                  --validate-strict   Fail with exit code 2 on any mismatch.
-                                  --validate-report <file>  Write JSON validation report to file.
+                                                      build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run]
+                                                                            Pack an image with ordered wax-glob remapping ({0} whole match, {1..n} per '*'/'**' capture, '!' exclusion). Examples:
+                                                                              build-image -m "bin:/" -m "assets/**:/assets/{1}" ./src dist/final.xiso.iso
+                                                                              build-image --dry-run -f xdvdfs.toml ./src
+                                                                            Globs support '*', '?', '**', '[]', '{a,b}'. Order matters; first match wins, negation clears and allows re-inclusion.
+                                                                            When -m is used, -f is ignored; -O sets output when no positional is given. Dry-run prints "host -> image".
+                                                      image-spec from -O <out> -m <host:image> ... [specPath]
+                                                                            Generate an xdvdfs.toml from map rules (stdout when omitted, file when given). Example:
+                                                                              image-spec from -O dist/image.xiso.iso -m "bin:/" -m "assets/**:/{0}" xdvdfs.toml
 
-                             """);
+                                                    Options:
+
+                                                    -d <directory>      In extract mode, expand xiso in <directory>.
+                                                                        In rewrite mode, rewrite xiso in <directory>.
+                                                    -D                  In rewrite mode, delete old xiso after processing.
+                                                    -h                  Print this help text and exit.
+                                                    -m                  In create or rewrite mode, disable automatic .xbe
+                                                                          media enable patching (not recommended).
+                                                    -o <filename>       In rewrite mode, set custom output filename
+                                                                          (default: original name with .iso extension).
+                                                    --skip-sectors N     Treat the image as if the XISO filesystem
+                                                                          begins N sectors (2048 bytes each) into the
+                                                                          file. Use for Redump images where a video
+                                                                          partition precedes the game partition.
+                                                                          Valid in extract, list, tree, and rewrite mode.
+                                                    --prepend-sectors N  Write the output image with N empty sectors
+                                                                          before the XISO filesystem, leaving room for
+                                                                          a video partition. Valid in create (-c) and
+                                                                          rewrite (-r) mode. Combine with --skip-sectors
+                                                                          for round-trip Redump-style reconstruction.
+                                                    -q                  Run quiet (suppress all non-error output).
+                                                    -Q                  Run silent (suppress all output).
+                                                    -s                  Skip $SystemUpdate folder.
+                                                    -v                  Print version information and exit.
+
+                                                    Validation options (with -r or validate command):
+
+                                                    --validate          Enable post-conversion validation after rewrite.
+                                                    --validate-checksums  Also verify SHA-256 checksums (slower).
+                                                    --validate-strict   Fail with exit code 2 on any mismatch.
+                                                    --validate-report <file>  Write JSON validation report to file.
+
+                                               """);
     }
 }

@@ -208,4 +208,7 @@ internal class WriteTreeContext
 
     /// <summary>Byte offset prepended to all physical write positions (skip/prepend support).</summary>
     public long PrependOffset;
+
+    /// <summary>When <c>true</c>, file data is read from <see cref="DataStructures.AvlNode.HostPath"/> instead of the current directory.</summary>
+    public bool IsRemap;
 }

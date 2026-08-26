@@ -197,6 +197,15 @@ csharp_preserve_single_line_blocks = true
 csharp_preserve_single_line_statements = true
 
 #### Naming styles ####
+
+
+dotnet_diagnostic.MA0048.severity = none
+
+
+dotnet_diagnostic.MA0015.severity = none
+
+
+dotnet_diagnostic.MA0016.severity = none
 [*.{cs,vb}]
 
 # Naming rules

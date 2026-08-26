@@ -387,10 +387,13 @@ public static class XisoWriter
 
             if (!ReferenceEquals(avl.Subdirectory, AvlNode.EmptySubdirectory))
             {
-                if (ctx.SourceStream == null)
+                if (ctx.SourceStream == null && !ctx.IsRemap)
                 {
                     Directory.SetCurrentDirectory(avl.Filename);
                 }
+
+                // Propagate remap flag to child context
+                subCtx.IsRemap = ctx.IsRemap;
 
                 AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, WriteFileCallback, subCtx,
                     AvlTraversalMethod.Prefix, 0);
@@ -412,7 +415,7 @@ public static class XisoWriter
                     xisoFs.Write(padBuf);
                 }
 
-                if (ctx.SourceStream == null)
+                if (ctx.SourceStream == null && !ctx.IsRemap)
                 {
                     Directory.SetCurrentDirectory("..");
                 }
@@ -511,7 +514,9 @@ public static class XisoWriter
         Stream srcStream;
         if (ctx.SourceStream == null)
         {
-            srcStream = new FileStream(avl.Filename,
+            var hostPath = avl.HostPath ?? avl.Filename;
+            // For remap, HostPath is absolute; for normal, it's bare filename with CWD already set.
+            srcStream = new FileStream(hostPath,
                 new FileStreamOptions
                 {
                     Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
@@ -789,6 +794,173 @@ public static class XisoWriter
         return await Task.Run(() => PackFromDirectory(
                 sourceDirectory, outputIsoPath, excludePatterns, progressCallback, cancellationToken, progress),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Creates an XISO from a pre-built remap AVL tree (used by <c>build-image</c>).
+    /// The tree is expected to have <see cref="AvlNode.HostPath"/> set for file nodes.
+    /// </summary>
+    internal static int CreateFromRemapTree(AvlNode? remapRoot, string outputIsoPath, string? volumeName = null,
+        IProgress<ProgressInfo>? progress = null, ProgressCallback? progressCallback = null,
+        CancellationToken cancellationToken = default, int? prependSectors = null)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var fullOutput = Path.GetFullPath(outputIsoPath);
+        var outputDir = Path.GetDirectoryName(fullOutput) ?? Directory.GetCurrentDirectory();
+        var outFileName = Path.GetFileName(fullOutput);
+        Directory.CreateDirectory(outputDir);
+        var xisoPath = Path.Combine(outputDir, outFileName);
+
+        var isoName = volumeName ?? Path.GetFileNameWithoutExtension(outFileName);
+        if (string.IsNullOrEmpty(isoName)) isoName = "IMAGE";
+        var isoDir = isoName;
+
+        var xisoSettingsName = isoName;
+        // Build synthetic root
+        var root = new AvlNode
+        {
+            Filename = isoDir,
+            StartSector = Constants.RootDirectorySector,
+            Subdirectory = remapRoot ?? AvlNode.EmptySubdirectory
+        };
+
+        // Compute totals from remap tree for progress
+        long totalBytes = 0;
+        int totalFiles = 0;
+
+        SumFiles(root.Subdirectory);
+        Logger.TotalFiles = totalFiles;
+        Logger.TotalBytes = (uint)Math.Min(totalBytes, uint.MaxValue);
+
+        if (progress != null)
+        {
+            (int fc, int dc) = CountTreeEntries(root.Subdirectory);
+            progress.Report(new ProgressInfo(ProgressInfoType.FileCount, Count: fc));
+            progress.Report(new ProgressInfo(ProgressInfoType.DirCount, Count: dc));
+        }
+
+        progressCallback?.Invoke(0, totalBytes);
+        var finalTotal = totalBytes;
+        Logger.TotalBytes = Logger.TotalFiles = 0;
+
+        var prependOffset = (long)(prependSectors ?? 0) * Constants.SectorSize;
+        if (prependOffset < 0) throw new ArgumentOutOfRangeException(nameof(prependSectors));
+
+        var err = 0;
+        var cwd = Directory.GetCurrentDirectory();
+        try
+        {
+            // Directory layout
+            AvlTree.AvlTraverseDepthFirst(root, CalculateDirectoryRequirements, null, AvlTraversalMethod.Prefix, 0);
+            var offsetCtx = new OffsetCalcContext { CurrentSector = root.StartSector, PrependOffset = prependOffset };
+            AvlTree.AvlTraverseDepthFirst(root, static (n, c, _) =>
+            {
+                CalculateDirectoryOffsets(n, (OffsetCalcContext)c!);
+                return 0;
+            }, offsetCtx, AvlTraversalMethod.Prefix, 0);
+
+            var bufSize = Math.Max(Constants.ReadWriteBufferSize, Constants.HeaderOffset);
+            var buf = new byte[bufSize];
+
+            using var xisoFs = new FileStream(xisoPath,
+                new FileStreamOptions
+                {
+                    Mode = FileMode.Create,
+                    Access = FileAccess.ReadWrite,
+                    Share = FileShare.None,
+                    BufferSize = 65536
+                });
+            if (prependOffset > 0)
+            {
+                xisoFs.SetLength(prependOffset);
+                xisoFs.Seek(prependOffset, SeekOrigin.Begin);
+            }
+
+            Array.Clear(buf, 0, Constants.HeaderOffset);
+            xisoFs.Write(buf, 0, Constants.HeaderOffset);
+            var magicBytes = Encoding.ASCII.GetBytes(Constants.HeaderData);
+            xisoFs.Write(magicBytes, 0, Constants.HeaderDataLength);
+            Span<byte> leBuf = stackalloc byte[4];
+            BinaryPrimitives.WriteUInt32LittleEndian(leBuf, root.StartSector);
+            xisoFs.Write(leBuf);
+            BinaryPrimitives.WriteUInt32LittleEndian(leBuf, root.FileSize);
+            xisoFs.Write(leBuf);
+            Span<byte> ftBuf = stackalloc byte[8];
+            FileTimeHelper.WriteFileTimeNow(ftBuf);
+            xisoFs.Write(ftBuf);
+            Span<byte> unused = stackalloc byte[Constants.UnusedSize];
+            unused.Clear();
+            xisoFs.Write(unused);
+            xisoFs.Write(magicBytes, 0, Constants.HeaderDataLength);
+
+            xisoFs.Seek(prependOffset + (long)root.StartSector * Constants.SectorSize, SeekOrigin.Begin);
+
+            var wtContext = new WriteTreeContext
+            {
+                XisoStream = xisoFs,
+                Path = null,
+                SourceStream = null,
+                ProgressCallback = progressCallback,
+                StructuredProgress = progress,
+                FinalBytes = finalTotal,
+                CancellationToken = cancellationToken,
+                PrependOffset = prependOffset,
+                IsRemap = true
+            };
+
+            AvlTree.AvlTraverseDepthFirst(root, WriteTreeCallback, wtContext, AvlTraversalMethod.Prefix, 0);
+
+            var pos = xisoFs.Seek(0, SeekOrigin.End);
+            var pad = ((Constants.FileModulus - pos % Constants.FileModulus) % Constants.FileModulus);
+            if (pad > 0)
+            {
+                Array.Clear(buf, 0, (int)pad);
+                xisoFs.Write(buf, 0, (int)pad);
+            }
+
+            var totalSectors = (pos + pad) / Constants.SectorSize;
+            if (totalSectors > uint.MaxValue) throw new XisoFileTooLargeException(xisoSettingsName, pos + pad);
+            WriteVolumeDescriptors(xisoFs, (uint)totalSectors, prependOffset);
+            xisoFs.Seek(prependOffset + Constants.OptimizedTagOffset, SeekOrigin.Begin);
+            var tagBytes = Encoding.ASCII.GetBytes(Constants.OptimizedTag);
+            xisoFs.Write(tagBytes, 0, Constants.OptimizedTagLength);
+            Logger.Log($"\nsucessfully created {xisoSettingsName} ({totalFiles} files)\n");
+            progress?.Report(new ProgressInfo(ProgressInfoType.FinishedPacking));
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            Logger.LogErr($"{ex.Message}\n");
+            err = 1;
+        }
+        finally
+        {
+            if (root.Subdirectory != null && !ReferenceEquals(root.Subdirectory, AvlNode.EmptySubdirectory))
+                AvlTree.FreeTree(root.Subdirectory);
+            try { Directory.SetCurrentDirectory(cwd); }
+            catch { }
+        }
+
+        return err;
+
+        void SumFiles(AvlNode? n)
+        {
+            if (n == null || ReferenceEquals(n, AvlNode.EmptySubdirectory)) return;
+            if (n.Subdirectory == null)
+            {
+                totalFiles++;
+                totalBytes += n.FileSize;
+            }
+            else if (!ReferenceEquals(n.Subdirectory, AvlNode.EmptySubdirectory))
+            {
+                SumFiles(n.Subdirectory);
+            }
+
+            SumFiles(n.Left);
+            SumFiles(n.Right);
+        }
     }
 
     /// <summary>

@@ -63,16 +63,16 @@ public static class Constants
         if (header.Length < FilenameOffset)
             return false;
 
-        bool allFF = true;
+        bool allFf = true;
         bool allZero = true;
         for (int i = 0; i < FilenameOffset; i++)
         {
-            if (header[i] != 0xFF) allFF = false;
+            if (header[i] != 0xFF) allFf = false;
             if (header[i] != 0x00) allZero = false;
-            if (!allFF && !allZero) return false;
+            if (!allFf && !allZero) return false;
         }
 
-        return allFF || allZero;
+        return allFf || allZero;
     }
 
     /// <summary>Offset within a directory entry where the filename begins.</summary>
@@ -134,6 +134,12 @@ public static class Constants
 
     /// <summary>Sector lseek offset for XGD1 disc layout.</summary>
     public const uint Xgd1LseekOffset = 0x18300000;
+
+    /// <summary>Sector lseek offset for XGD2-Hybrid disc layout (XGD2 with XGD3-like video).</summary>
+    public const uint Xgd2HybridLseekOffset = 0x89D80000;
+
+    /// <summary>Alias for <see cref="Xgd2HybridLseekOffset"/>.</summary>
+    public const uint HybridLseekOffset = Xgd2HybridLseekOffset;
 
     /// <summary>Byte offset where the ECMA-119 primary volume descriptor data area begins.</summary>
     public const int Ecma119DataAreaStart = 0x8000;

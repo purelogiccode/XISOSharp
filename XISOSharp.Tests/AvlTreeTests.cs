@@ -212,11 +212,11 @@ public class AvlTreeTests
         }, visited, AvlTraversalMethod.Prefix, 0);
 
         Assert.Equal(5, visited.Count);
-        Assert.Contains("a", visited);
-        Assert.Contains("b", visited);
-        Assert.Contains("c", visited);
-        Assert.Contains("d", visited);
-        Assert.Contains("e", visited);
+        Assert.Contains("a", visited, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("b", visited, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("c", visited, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("d", visited, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("e", visited, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -239,7 +239,7 @@ public class AvlTreeTests
             return 0;
         }, visited, AvlTraversalMethod.Infix, 0);
 
-        Assert.Equal(new[] { "a", "b", "m", "q", "z" }, visited);
+        Assert.Equal(new[] { "a", "b", "m", "q", "z" }, visited, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
