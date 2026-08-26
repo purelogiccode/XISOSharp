@@ -28,6 +28,7 @@ namespace XISOSharp;
 public sealed class GlobMatcher
 {
     private readonly Regex[] _patterns;
+    private readonly string[] _originalPatterns;
 
     /// <summary>
     /// Initializes a new matcher from the given glob patterns.
@@ -40,8 +41,9 @@ public sealed class GlobMatcher
     {
         ArgumentNullException.ThrowIfNull(patterns);
 
-        _patterns = patterns
-            .Where(static p => !string.IsNullOrEmpty(p))
+        var list = patterns.Where(static p => !string.IsNullOrEmpty(p)).ToList();
+        _originalPatterns = list.ToArray();
+        _patterns = list
             .Select(static p => new Regex(
                 GlobToRegex(p),
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking))
@@ -70,6 +72,57 @@ public sealed class GlobMatcher
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Result of a glob match with capture groups, mirroring <c>wax</c> semantics:
+    /// <c>Groups[0]</c> is the whole match, <c>Groups[1..n]</c> are per-wildcard captures.
+    /// </summary>
+    /// <param name="IsMatch">Whether the path matched.</param>
+    /// <param name="Groups">Capture groups (empty when no match).</param>
+    public readonly record struct GlobMatchResult(bool IsMatch, string[] Groups);
+
+    /// <summary>
+    /// Matches <paramref name="relativePath"/> and returns capture groups
+    /// (<c>{0}</c> whole match, <c>{1..n}</c> per <c>*</c>/<c>**</c>).
+    /// Reuses <see cref="WaxGlob"/> for group-aware semantics while keeping
+    /// <see cref="GlobMatcher"/> as the single matcher entry point (2.6 parity).
+    /// </summary>
+    public GlobMatchResult MatchWithGroups(string? relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath))
+            return new GlobMatchResult(false, []);
+        var path = relativePath.Replace('\\', '/');
+        // Prefer WaxGlob for capturing, fallback to regex match (no groups)
+        foreach (var pat in _originalPatterns)
+        {
+            try
+            {
+                var wg = new WaxGlob(pat);
+                var caps = wg.GetCaptures(path);
+                if (caps != null)
+                    return new GlobMatchResult(true, caps.ToArray());
+            }
+            catch
+            {
+                // Invalid wax pattern (e.g. pure exclude) — fall through to regex check
+            }
+        }
+        // No wax capture but regex matched → return whole path as group 0
+        if (IsMatch(relativePath))
+            return new GlobMatchResult(true, [path]);
+        return new GlobMatchResult(false, []);
+    }
+
+    /// <summary>
+    /// Tries to match with groups; returns <c>true</c> and populates <paramref name="groups"/>
+    /// on success, mirroring <c>xdvdfs</c> glob group usage.
+    /// </summary>
+    public bool TryMatch(string? relativePath, out string[] groups)
+    {
+        var r = MatchWithGroups(relativePath);
+        groups = r.Groups;
+        return r.IsMatch;
     }
 
     /// <summary>

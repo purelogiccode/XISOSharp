@@ -96,6 +96,21 @@ internal static class Program
         {
             return RunImageSpec(args, 1);
         }
+        else if (args.Length > 0 && (string.Equals(args[0], "compress", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(args[0], "cso", StringComparison.OrdinalIgnoreCase)))
+        {
+            return RunCompressMode(args, 1);
+        }
+        else if (args.Length > 0 && (string.Equals(args[0], "decompress", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(args[0], "uncso", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(args[0], "decso", StringComparison.OrdinalIgnoreCase)))
+        {
+            return RunDecompressMode(args, 1);
+        }
+        else if (args.Length > 0 && string.Equals(args[0], "checksum", StringComparison.OrdinalIgnoreCase))
+        {
+            return RunChecksumMode(args, 1);
+        }
 
         for (var i = optind; i < args.Length; i++)
         {
@@ -1670,6 +1685,249 @@ internal static class Program
         return 0;
     }
 
+    private static int RunCompressMode(string[] args, int optind)
+    {
+        string? output = null;
+        int level = 9;
+        long? splitBytes = null;
+        var positionals = new List<string>();
+
+        for (int i = optind; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -o requires a filename\n");
+                    return 1;
+                }
+                output = args[++i];
+            }
+            else if (string.Equals(a, "--ciso-level", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "-l", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--level", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length || !int.TryParse(args[i + 1], out level) || level < 0 || level > 9)
+                {
+                    Logger.LogErr("Error: --ciso-level requires an integer 0..9\n");
+                    return 1;
+                }
+                i++;
+            }
+            else if (string.Equals(a, "--ciso-split", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--split", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length || !long.TryParse(args[i + 1], out var sb) || sb <= 0)
+                {
+                    Logger.LogErr("Error: --ciso-split requires a positive integer (bytes)\n");
+                    return 1;
+                }
+                splitBytes = sb;
+                i++;
+            }
+            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = true;
+            }
+            else if (string.Equals(a, "-Q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = Logger.RealQuiet = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Write(Constants.Banner);
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for compress: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count < 1 || positionals.Count > 2)
+        {
+            Logger.LogErr("Error: compress requires <source> [output.cso]\n");
+            PrintUsage();
+            return 1;
+        }
+
+        string source = positionals[0];
+        string? outCso = positionals.Count == 2 ? positionals[1] : output;
+
+        try
+        {
+            Logger.Log(Constants.Banner);
+            int rc = CisoWriter.CompressToCso(source, outCso, level, splitBytes);
+            return rc;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogErr($"Error compressing: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    private static int RunDecompressMode(string[] args, int optind)
+    {
+        string? output = null;
+        var positionals = new List<string>();
+
+        for (int i = optind; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -o requires a filename\n");
+                    return 1;
+                }
+                output = args[++i];
+            }
+            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = true;
+            }
+            else if (string.Equals(a, "-Q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = Logger.RealQuiet = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Write(Constants.Banner);
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for decompress: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count < 1 || positionals.Count > 2)
+        {
+            Logger.LogErr("Error: decompress requires <cso> [output.iso]\n");
+            PrintUsage();
+            return 1;
+        }
+
+        string source = positionals[0];
+        string? outIso = positionals.Count == 2 ? positionals[1] : output;
+
+        try
+        {
+            Logger.Log(Constants.Banner);
+            int rc = CisoReader.DecompressToIso(source, outIso);
+            return rc;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogErr($"Error decompressing: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    private static int RunChecksumMode(string[] args, int optind)
+    {
+        bool silent = false;
+        var positionals = new List<string>();
+
+        for (int i = optind; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (string.Equals(a, "--silent", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "-s", StringComparison.OrdinalIgnoreCase))
+            {
+                silent = true;
+            }
+            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = true;
+            }
+            else if (string.Equals(a, "-Q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = Logger.RealQuiet = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Write(Constants.Banner);
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for checksum: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count == 0)
+        {
+            Logger.LogErr("Error: checksum requires at least one image\n");
+            PrintUsage();
+            return 1;
+        }
+
+        int exit = 0;
+        foreach (var iso in positionals)
+        {
+            try
+            {
+                byte[] hash = XisoChecksum.ComputeImageChecksum(iso);
+                string hex = Convert.ToHexString(hash).ToLowerInvariant();
+                if (silent)
+                    Logger.Log($"{hex}\n");
+                else
+                    Logger.Log($"{hex}\t{iso}\n");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogErr($"Error checksumming {iso}: {ex.Message}\n");
+                exit = 1;
+            }
+        }
+        return exit;
+    }
+
     private static string DeriveRedumpPath(string xisoPath)
     {
         string dir = Path.GetDirectoryName(xisoPath) ?? "";
@@ -2335,6 +2593,18 @@ internal static class Program
                                                      --best <iso>               Alias: --trim --wipe
                                                      --compress <iso>           Alias: --petrify --update --video --zar
                                                       --security-sectors <sectors.txt>  Override security sector ranges (start-end, 4096 sectors).
+
+                                                      CISO / Compression modes:
+
+                                                      compress <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-split bytes]
+                                                                            Pack and compress to CISO (CSO). Source may be a directory (packed then compressed)
+                                                                            or an existing ISO. Level 0=store, 1=fastest … 9=smallest. Default 9.
+                                                                            Deflate per 2048-byte sector (version 1, BCL) with LZ4 read compat.
+                                                                            Alias: cso. Split threshold is reserved (single-file now).
+                                                      decompress <cso> [output.iso]    Decompress CISO/CSO to ISO (handles DEFLATE v1 and LZ4 v2).
+                                                                            Aliases: uncso, decso.
+                                                      checksum <image> [images...] [--silent]  Compute SHA3-256 image checksum (xdvdfs-compatible:
+                                                                            SHA3-256 over sorted path bytes + file data). Output: hex tab path.
 
                                                       XDVDFS / Packing modes (ordered remapping):
 
