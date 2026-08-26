@@ -61,7 +61,8 @@ public static class XisoTestRunner
             progress?.Report(new TestProgress(file.FileName, fileIndex + 1, files.Count,
                 "Starting", $"Testing {file.FileName}..."));
 
-            var result = await Task.Run(() => TestSingleFile(file, currentWrapper, progress, fileIndex, files.Count)).ConfigureAwait(false);
+            var result = await Task.Run(() => TestSingleFile(file, currentWrapper, progress, fileIndex, files.Count))
+                .ConfigureAwait(false);
             session.FileResults.Add(result);
         }
 
@@ -81,9 +82,7 @@ public static class XisoTestRunner
         var sw = Stopwatch.StartNew();
         var result = new PerFileResult
         {
-            FileName = entry.FileName,
-            FilePath = entry.FilePath,
-            FileSize = entry.FileSize
+            FileName = entry.FileName, FilePath = entry.FilePath, FileSize = entry.FileSize
         };
 
         var path = entry.FilePath;
@@ -92,9 +91,7 @@ public static class XisoTestRunner
         {
             result.SubTests.Add(new SubTestResult
             {
-                TestName = "All Tests",
-                Status = TestStatus.Skipped,
-                Detail = "File not found on disk."
+                TestName = "All Tests", Status = TestStatus.Skipped, Detail = "File not found on disk."
             });
             result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
             return result;
@@ -459,7 +456,8 @@ public static class XisoTestRunner
 
             // Find the C# output ISO
             // Maybe in csWorkDir
-            var csIsoOutput = Directory.GetFiles(csOutDir, "*.iso").FirstOrDefault() ?? Directory.GetFiles(csWorkDir, "*.iso", SearchOption.AllDirectories)
+            var csIsoOutput = Directory.GetFiles(csOutDir, "*.iso").FirstOrDefault() ?? Directory
+                .GetFiles(csWorkDir, "*.iso", SearchOption.AllDirectories)
                 .FirstOrDefault(static f => !f.EndsWith(".old", StringComparison.OrdinalIgnoreCase));
 
             // extract-xiso rewrite
@@ -492,7 +490,8 @@ public static class XisoTestRunner
                 {
                     TestName = "Rewrite Compare",
                     Status = TestStatus.Failed,
-                    Detail = $"Could not locate output ISOs. C#: {(csIsoOutput ?? "null")} | exe: {(exeIsoOutput ?? "null")}",
+                    Detail =
+                        $"Could not locate output ISOs. C#: {(csIsoOutput ?? "null")} | exe: {(exeIsoOutput ?? "null")}",
                     ElapsedSeconds = tSw.Elapsed.TotalSeconds
                 });
                 return;
@@ -570,8 +569,11 @@ public static class XisoTestRunner
         // Matches: " - Path: filename                        Size: N bytes,  StartSector: S"
         // or with nesting: " - filename                        Size: N bytes,  StartSector: S"
         // or dir: " - dirname                                 DIR"
-        var fileRegex = new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}Size:\s*(?<size>\d+)\s*bytes,\s*StartSector:\s*(?<sector>\d+)", RegexOptions.Multiline | RegexOptions.ExplicitCapture | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-        var dirRegex = new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}DIR", RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+        var fileRegex =
+            new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}Size:\s*(?<size>\d+)\s*bytes,\s*StartSector:\s*(?<sector>\d+)",
+                RegexOptions.Multiline | RegexOptions.ExplicitCapture | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+        var dirRegex = new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}DIR", RegexOptions.Multiline | RegexOptions.Compiled,
+            TimeSpan.FromSeconds(5));
 
         foreach (Match m in fileRegex.Matches(output))
         {
@@ -621,7 +623,8 @@ public static class XisoTestRunner
                 else
                 {
                     mismatchCount++;
-                    details.Add($"MISMATCH: {path} (C# size={csEntry.Size} sector={csEntry.StartSector} | exe size={exeEntry.Size} sector={exeEntry.StartSector})");
+                    details.Add(
+                        $"MISMATCH: {path} (C# size={csEntry.Size} sector={csEntry.StartSector} | exe size={exeEntry.Size} sector={exeEntry.StartSector})");
                 }
             }
             else

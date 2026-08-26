@@ -17,7 +17,8 @@ public static class FileTimeHelper
     public static void WriteFileTimeNow(Span<byte> destination)
     {
         double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var tmp = (now + (369.0 * 365.25 * 24.0 * 60.0 * 60.0 - (3.0 * 24.0 * 60.0 * 60.0 + 6.0 * 60.0 * 60.0))) * 1.0e7;
+        var tmp = (now + (369.0 * 365.25 * 24.0 * 60.0 * 60.0 - (3.0 * 24.0 * 60.0 * 60.0 + 6.0 * 60.0 * 60.0))) *
+                  1.0e7;
 
         var h = (uint)(tmp * (1.0 / (4.0 * (1L << 30))));
         var l = (uint)(tmp - h * 4.0 * (1L << 30));

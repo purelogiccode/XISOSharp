@@ -144,7 +144,8 @@ public class SkipPrependSectorsTests : IDisposable
         var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         using var fs = File.OpenRead(isoPath);
-        (uint rootDirSector, uint rootDirSize, long discLseek) = XisoReader.VerifyXiso(fs, "prepended.iso", PrependSectors);
+        (uint rootDirSector, uint rootDirSize, long discLseek) =
+            XisoReader.VerifyXiso(fs, "prepended.iso", PrependSectors);
 
         Assert.True(rootDirSector > 0);
         Assert.True(rootDirSize > 0);

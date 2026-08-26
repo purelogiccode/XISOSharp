@@ -212,7 +212,8 @@ public class Latin1EncodingTests : IDisposable
 
         var names = new[]
         {
-            "normal.txt", "with spaces.txt", "with-dashes.txt", "with.dots.txt", "UPPERCASE.TXT", "MiXeD.CaSe", "123numeric.txt"
+            "normal.txt", "with spaces.txt", "with-dashes.txt", "with.dots.txt", "UPPERCASE.TXT", "MiXeD.CaSe",
+            "123numeric.txt"
         };
 
         foreach (var name in names)

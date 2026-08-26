@@ -43,6 +43,38 @@ public static class Constants
     /// <summary>16-bit word value used for padding directory entries.</summary>
     public const ushort PadShort = 0xFFFF;
 
+    /// <summary>Alternative empty-directory sentinel used by some tools (xdvdfs compatibility).</summary>
+    public const ushort EmptyDirectorySentinel = 0x0000;
+
+    /// <summary>
+    /// Returns true if <paramref name="value"/> is an empty-directory sentinel
+    /// (<c>0xFFFF</c> or <c>0x0000</c>), matching xdvdfs behaviour.
+    /// </summary>
+    public static bool IsEmptyDirectorySentinel(ushort value)
+        => value == PadShort || value == EmptyDirectorySentinel;
+
+    /// <summary>
+    /// Returns true if the 14-byte directory entry header at <paramref name="header"/>
+    /// is an empty-directory sentinel (all <c>0xFF</c> or all <c>0x00</c>),
+    /// matching <c>xdvdfs-core/src/read.rs:38-39</c>.
+    /// </summary>
+    public static bool IsEmptyDirectoryHeader(ReadOnlySpan<byte> header)
+    {
+        if (header.Length < FilenameOffset)
+            return false;
+
+        bool allFF = true;
+        bool allZero = true;
+        for (int i = 0; i < FilenameOffset; i++)
+        {
+            if (header[i] != 0xFF) allFF = false;
+            if (header[i] != 0x00) allZero = false;
+            if (!allFF && !allZero) return false;
+        }
+
+        return allFF || allZero;
+    }
+
     /// <summary>Offset within a directory entry where the filename begins.</summary>
     public const int FilenameOffset = 14;
 

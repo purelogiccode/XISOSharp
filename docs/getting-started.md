@@ -22,7 +22,7 @@ command-line tool or the .NET library.
 ### Build or download
 
 ```bash
-git clone https://github.com/drpetersonfernandes/XISOSharp.git
+git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 
 # Framework-dependent build (requires the .NET 10 SDK)

@@ -4,15 +4,15 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Build & Analyzers -->
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.125" />
-    <PackageVersion Include="Roslynator.Analyzers" Version="4.15.0" />
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.301" />
-    <PackageVersion Include="MinVer" Version="6.0.0" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.178" />
+    <PackageVersion Include="Roslynator.Analyzers" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.400" />
+    <PackageVersion Include="MinVer" Version="7.0.0" />
     <!-- Test -->
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <!-- Benchmarks -->
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <!-- XISOSharpTester -->
@@ -20,6 +20,6 @@
     <PackageVersion Include="Serilog.Sinks.Debug" Version="3.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageVersion Include="WPF-UI" Version="4.3.0" />
-    <PackageVersion Include="QuestPDF" Version="2026.7.1" />
+    <PackageVersion Include="QuestPDF" Version="2026.8.0" />
   </ItemGroup>
 </Project>

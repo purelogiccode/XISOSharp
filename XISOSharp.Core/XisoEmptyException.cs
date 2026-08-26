@@ -17,6 +17,9 @@ public class XisoEmptyException : ExtractErrorException
     /// <summary>Creates a new <see cref="XisoEmptyException"/> with a message and inner exception.</summary>
     /// <param name="message">Description of the empty-ISO condition.</param>
     /// <param name="innerException">The underlying cause.</param>
-    public XisoEmptyException(string message, Exception innerException) : base(ExtractError.ErrIsoNoFiles, message, innerException) { }
+    public XisoEmptyException(string message, Exception innerException) : base(ExtractError.ErrIsoNoFiles, message,
+        innerException)
+    {
+    }
 }
 #pragma warning restore RCS1194

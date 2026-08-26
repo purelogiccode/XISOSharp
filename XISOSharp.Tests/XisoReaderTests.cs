@@ -9,10 +9,12 @@ namespace XISOSharp.Tests;
 public class XisoReaderTests : IDisposable
 {
     private static readonly string TestIsoPath =
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData", "output", "source.iso"));
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData", "output",
+            "source.iso"));
 
     private static readonly string InvalidFilePath =
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData", "source", "binary.bin"));
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData", "source",
+            "binary.bin"));
 
     private static readonly string NonExistentPath =
         Path.Combine(Path.GetTempPath(), $"non_existent_{Guid.NewGuid()}.iso");
@@ -54,12 +56,8 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void VerifyXiso_ValidFile_ReturnsExpectedValues()
     {
-        using var fs = new FileStream(TestIsoPath, new FileStreamOptions
-        {
-            Mode = FileMode.Open,
-            Access = FileAccess.Read,
-            Share = FileShare.Read
-        });
+        using var fs = new FileStream(TestIsoPath,
+            new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
 
         (uint rootDirSector, uint rootDirSize, long discLseek) = XisoReader.VerifyXiso(fs, "source.iso");
 
@@ -76,12 +74,8 @@ public class XisoReaderTests : IDisposable
     {
         Assert.Throws<FileNotFoundException>(static () =>
         {
-            using var fs = new FileStream(NonExistentPath, new FileStreamOptions
-            {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read
-            });
+            using var fs = new FileStream(NonExistentPath,
+                new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
             XisoReader.VerifyXiso(fs, "missing.iso");
         });
     }
@@ -94,12 +88,8 @@ public class XisoReaderTests : IDisposable
     {
         Assert.Throws<IOException>(static () =>
         {
-            using var fs = new FileStream(InvalidFilePath, new FileStreamOptions
-            {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read
-            });
+            using var fs = new FileStream(InvalidFilePath,
+                new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
             XisoReader.VerifyXiso(fs, "binary.bin");
         });
     }
@@ -119,12 +109,8 @@ public class XisoReaderTests : IDisposable
 
             Assert.Throws<IOException>(() =>
             {
-                using var fs = new FileStream(invalidPath, new FileStreamOptions
-                {
-                    Mode = FileMode.Open,
-                    Access = FileAccess.Read,
-                    Share = FileShare.Read
-                });
+                using var fs = new FileStream(invalidPath,
+                    new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
                 XisoReader.VerifyXiso(fs, "garbage.bin");
             });
         }
@@ -298,12 +284,8 @@ public class XisoReaderTests : IDisposable
 
             Assert.Throws<XisoFormatException>(() =>
             {
-                using var fs = new FileStream(invalidPath, new FileStreamOptions
-                {
-                    Mode = FileMode.Open,
-                    Access = FileAccess.Read,
-                    Share = FileShare.Read
-                });
+                using var fs = new FileStream(invalidPath,
+                    new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
                 XisoReader.VerifyXiso(fs, "bad_toc.iso");
             });
         }

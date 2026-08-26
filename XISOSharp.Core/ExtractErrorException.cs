@@ -42,7 +42,8 @@ public class ExtractErrorException : Exception
     /// <param name="code">The <see cref="ExtractError"/> value describing the failure.</param>
     /// <param name="message">The error message.</param>
     /// <param name="innerException">The inner exception.</param>
-    public ExtractErrorException(ExtractError code, string message, Exception innerException) : base(message, innerException)
+    public ExtractErrorException(ExtractError code, string message, Exception innerException) : base(message,
+        innerException)
     {
         ErrorCode = code;
     }

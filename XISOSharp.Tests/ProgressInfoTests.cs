@@ -124,8 +124,10 @@ public class ProgressInfoTests : IDisposable
             .ToDictionary(x => (x.e.Type, x.e.Path), x => x.i);
 
         Assert.True(indexOf[(ProgressInfoType.DirAdded, "/sub")] < indexOf[(ProgressInfoType.DirAdded, "/sub/deep")]);
-        Assert.True(indexOf[(ProgressInfoType.DirAdded, "/sub")] < indexOf[(ProgressInfoType.FileAdded, "/sub/data.bin")]);
-        Assert.True(indexOf[(ProgressInfoType.DirAdded, "/sub/deep")] < indexOf[(ProgressInfoType.FileAdded, "/sub/deep/nested.txt")]);
+        Assert.True(indexOf[(ProgressInfoType.DirAdded, "/sub")] <
+                    indexOf[(ProgressInfoType.FileAdded, "/sub/data.bin")]);
+        Assert.True(indexOf[(ProgressInfoType.DirAdded, "/sub/deep")] <
+                    indexOf[(ProgressInfoType.FileAdded, "/sub/deep/nested.txt")]);
     }
 
     [Fact]
@@ -139,8 +141,10 @@ public class ProgressInfoTests : IDisposable
 
         XisoWriter.CreateXiso(src, outputDir, null, null, out _, null, null, progress: progress);
 
-        Assert.Contains(progress.Events, e => e.Type == ProgressInfoType.DirAdded && string.Equals(e.Path, "/empty", StringComparison.Ordinal));
-        Assert.DoesNotContain(progress.Events, e => e.Type == ProgressInfoType.FileAdded && string.Equals(e.Path, "/empty", StringComparison.Ordinal));
+        Assert.Contains(progress.Events,
+            e => e.Type == ProgressInfoType.DirAdded && string.Equals(e.Path, "/empty", StringComparison.Ordinal));
+        Assert.DoesNotContain(progress.Events,
+            e => e.Type == ProgressInfoType.FileAdded && string.Equals(e.Path, "/empty", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -171,7 +175,7 @@ public class ProgressInfoTests : IDisposable
         // try-block, so the callback must fail on a later invocation to exercise it.)
         var calls = 0;
         var result = XisoWriter.CreateXiso(src, outputDir, null, null, out _, null,
-            progressCallback: (_, _) =>
+            (_, _) =>
             {
                 if (++calls > 1) throw new InvalidOperationException("abort");
             },
@@ -196,7 +200,8 @@ public class ProgressInfoTests : IDisposable
         Assert.Equal(0, progress.Events[0].Count);
         Assert.Equal(ProgressInfoType.DirCount, progress.Events[1].Type);
         Assert.Equal(0, progress.Events[1].Count);
-        Assert.Contains(progress.Events, e => e.Type == ProgressInfoType.DirAdded && string.Equals(e.Path, "/", StringComparison.Ordinal));
+        Assert.Contains(progress.Events,
+            e => e.Type == ProgressInfoType.DirAdded && string.Equals(e.Path, "/", StringComparison.Ordinal));
         Assert.Equal(ProgressInfoType.FinishedPacking, progress.Events[^1].Type);
     }
 
@@ -219,8 +224,11 @@ public class ProgressInfoTests : IDisposable
         Assert.Equal(ProgressInfoType.FileCount, progress.Events[0].Type);
         Assert.Equal(ProgressInfoType.DirCount, progress.Events[1].Type);
         Assert.Equal(ProgressInfoType.FinishedPacking, progress.Events[^1].Type);
-        Assert.Contains(progress.Events, e => e.Type == ProgressInfoType.FileAdded && string.Equals(e.Path, "/sub/data.bin", StringComparison.Ordinal));
-        Assert.Contains(progress.Events, e => e.Type == ProgressInfoType.DirAdded && string.Equals(e.Path, "/sub/deep", StringComparison.Ordinal));
+        Assert.Contains(progress.Events,
+            e => e.Type == ProgressInfoType.FileAdded &&
+                 string.Equals(e.Path, "/sub/data.bin", StringComparison.Ordinal));
+        Assert.Contains(progress.Events,
+            e => e.Type == ProgressInfoType.DirAdded && string.Equals(e.Path, "/sub/deep", StringComparison.Ordinal));
     }
 
     [Fact]

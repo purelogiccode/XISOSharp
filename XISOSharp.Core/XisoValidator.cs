@@ -181,14 +181,17 @@ public static class XisoValidator
         var sourceName = Path.GetFileName(sourcePath);
         var outputName = Path.GetFileName(outputPath);
 
-        Logger.Log($"[VALIDATE] Source: {sourceName} ({result.SourceFileCount} files, {result.SourceTotalBytes:N0} bytes)\n");
-        Logger.Log($"[VALIDATE] Output: {outputName} ({result.OutputFileCount} files, {result.OutputTotalBytes:N0} bytes)\n");
+        Logger.Log(
+            $"[VALIDATE] Source: {sourceName} ({result.SourceFileCount} files, {result.SourceTotalBytes:N0} bytes)\n");
+        Logger.Log(
+            $"[VALIDATE] Output: {outputName} ({result.OutputFileCount} files, {result.OutputTotalBytes:N0} bytes)\n");
 
         // File count
         if (result.SourceFileCount == result.OutputFileCount)
             Logger.Log("[VALIDATE] File count: MATCH\n");
         else
-            Logger.Log($"[VALIDATE] File count: MISMATCH — source: {result.SourceFileCount}, output: {result.OutputFileCount}\n");
+            Logger.Log(
+                $"[VALIDATE] File count: MISMATCH — source: {result.SourceFileCount}, output: {result.OutputFileCount}\n");
 
         // File paths
         var pathIssues = result.Issues.Where(static i =>
@@ -225,12 +228,18 @@ public static class XisoValidator
                     Logger.LogErr($"[VALIDATE] EXTRA: {issue.Path} ({issue.OutputSize:N0} bytes)\n");
                     break;
                 case ValidationIssueType.SizeMismatch:
-                    Logger.LogErr($"[VALIDATE] SIZE MISMATCH: {issue.Path} — source: {issue.SourceSize:N0}, output: {issue.OutputSize:N0}\n");
+                    Logger.LogErr(
+                        $"[VALIDATE] SIZE MISMATCH: {issue.Path} — source: {issue.SourceSize:N0}, output: {issue.OutputSize:N0}\n");
                     break;
                 case ValidationIssueType.ChecksumMismatch:
-                    var srcHex = issue.SourceHash != null ? Convert.ToHexString(issue.SourceHash).ToLowerInvariant() : "?";
-                    var outHex = issue.OutputHash != null ? Convert.ToHexString(issue.OutputHash).ToLowerInvariant() : "?";
-                    Logger.LogErr($"[VALIDATE] CHECKSUM FAIL: {issue.Path} — source: {srcHex}..., output: {outHex}...\n");
+                    var srcHex = issue.SourceHash != null
+                        ? Convert.ToHexString(issue.SourceHash).ToLowerInvariant()
+                        : "?";
+                    var outHex = issue.OutputHash != null
+                        ? Convert.ToHexString(issue.OutputHash).ToLowerInvariant()
+                        : "?";
+                    Logger.LogErr(
+                        $"[VALIDATE] CHECKSUM FAIL: {issue.Path} — source: {srcHex}..., output: {outHex}...\n");
                     break;
             }
         }
@@ -257,20 +266,22 @@ public static class XisoValidator
     {
         var report = new
         {
-            source = new
-            {
-                path = sourcePath,
-                fileCount = result.SourceFileCount,
-                dirCount = result.SourceDirCount,
-                totalBytes = result.SourceTotalBytes
-            },
-            output = new
-            {
-                path = outputPath,
-                fileCount = result.OutputFileCount,
-                dirCount = result.OutputDirCount,
-                totalBytes = result.OutputTotalBytes
-            },
+            source =
+                new
+                {
+                    path = sourcePath,
+                    fileCount = result.SourceFileCount,
+                    dirCount = result.SourceDirCount,
+                    totalBytes = result.SourceTotalBytes
+                },
+            output =
+                new
+                {
+                    path = outputPath,
+                    fileCount = result.OutputFileCount,
+                    dirCount = result.OutputDirCount,
+                    totalBytes = result.OutputTotalBytes
+                },
             passed = result.Passed,
             issueCount = result.Issues.Count,
             issues = result.Issues.Select(static i => new

@@ -39,7 +39,8 @@ public class TestSessionResult
     /// Gets the total number of sub-tests that were not skipped
     /// across all files.
     /// </summary>
-    public int TotalSubTests => FileResults.Sum(static r => r.SubTests.Count(static t => t.Status != TestStatus.Skipped));
+    public int TotalSubTests =>
+        FileResults.Sum(static r => r.SubTests.Count(static t => t.Status != TestStatus.Skipped));
 
     /// <summary>
     /// Gets the total number of passing sub-tests across all files.

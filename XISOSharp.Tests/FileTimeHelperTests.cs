@@ -69,7 +69,8 @@ public class FileTimeHelperTests
         Assert.NotEqual(0u, high | low);
 
         var filetime = high * 4.0 * (1L << 30) + low;
-        var unixTime = filetime / 1.0e7 - (369.0 * 365.25 * 24.0 * 60.0 * 60.0 - (3.0 * 24.0 * 60.0 * 60.0 + 6.0 * 60.0 * 60.0));
+        var unixTime = filetime / 1.0e7 -
+                       (369.0 * 365.25 * 24.0 * 60.0 * 60.0 - (3.0 * 24.0 * 60.0 * 60.0 + 6.0 * 60.0 * 60.0));
 
         double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 

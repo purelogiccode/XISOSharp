@@ -142,11 +142,7 @@ public static class XisoWriter
 
         Logger.Log($"{(inRoot != null ? "rewriting" : "\ncreating")} {isoName}{(inName != null ? "" : ".iso")}:\n\n");
 
-        var root = new AvlNode
-        {
-            Filename = isoDir,
-            StartSector = Constants.RootDirectorySector
-        };
+        var root = new AvlNode { Filename = isoDir, StartSector = Constants.RootDirectorySector };
 
         Logger.TotalBytes = Logger.TotalFiles = 0;
 
@@ -222,13 +218,14 @@ public static class XisoWriter
 
         try
         {
-            using var xisoFs = new FileStream(xisoPath, new FileStreamOptions
-            {
-                Mode = FileMode.Create,
-                Access = FileAccess.ReadWrite,
-                Share = FileShare.None,
-                BufferSize = 65536
-            });
+            using var xisoFs = new FileStream(xisoPath,
+                new FileStreamOptions
+                {
+                    Mode = FileMode.Create,
+                    Access = FileAccess.ReadWrite,
+                    Share = FileShare.None,
+                    BufferSize = 65536
+                });
 
             outIsoPath = xisoPath;
 
@@ -321,7 +318,8 @@ public static class XisoWriter
 
             if (inRoot == null)
             {
-                Logger.Log($"\nsucessfully created {isoName}{(inName != null ? "" : ".iso")} ({Logger.TotalFiles} files totalling {Logger.TotalBytes} bytes added)\n");
+                Logger.Log(
+                    $"\nsucessfully created {isoName}{(inName != null ? "" : ".iso")} ({Logger.TotalFiles} files totalling {Logger.TotalBytes} bytes added)\n");
             }
 
             progress?.Report(new ProgressInfo(ProgressInfoType.FinishedPacking));
@@ -513,13 +511,11 @@ public static class XisoWriter
         Stream srcStream;
         if (ctx.SourceStream == null)
         {
-            srcStream = new FileStream(avl.Filename, new FileStreamOptions
-            {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read,
-                BufferSize = 65536
-            });
+            srcStream = new FileStream(avl.Filename,
+                new FileStreamOptions
+                {
+                    Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
+                });
         }
         else
         {
@@ -599,7 +595,8 @@ public static class XisoWriter
 
             if (originalSize != avl.FileSize)
             {
-                Logger.LogErr($"WARNING: File {avl.Filename} is truncated. Reported size: {originalSize} bytes, wrote size: {avl.FileSize} bytes!\n");
+                Logger.LogErr(
+                    $"WARNING: File {avl.Filename} is truncated. Reported size: {originalSize} bytes, wrote size: {avl.FileSize} bytes!\n");
             }
 
             Logger.TotalFiles++;
@@ -790,7 +787,7 @@ public static class XisoWriter
         IProgress<ProgressInfo>? progress = null)
     {
         return await Task.Run(() => PackFromDirectory(
-            sourceDirectory, outputIsoPath, excludePatterns, progressCallback, cancellationToken, progress),
+                sourceDirectory, outputIsoPath, excludePatterns, progressCallback, cancellationToken, progress),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -956,11 +953,7 @@ public static class XisoWriter
                 var dirStart = ctx.PrependOffset + (long)avl.StartSector * Constants.SectorSize;
                 ctx.CurrentSector += NumSectors(avl.FileSize);
 
-                var wdsafp = new WdsafpContext
-                {
-                    CurrentSector = ctx.CurrentSector,
-                    DirStart = dirStart
-                };
+                var wdsafp = new WdsafpContext { CurrentSector = ctx.CurrentSector, DirStart = dirStart };
 
                 AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, static (n, c, _) =>
                 {
@@ -1087,7 +1080,8 @@ public static class XisoWriter
         return await Task.Run(() =>
         {
             var result = CreateXiso(rootDirectory, outputDirectory, inRoot, sourceStream,
-                out var outPath, inName, progressCallback, cancellationToken, prependSectors, excludePatterns, progress);
+                out var outPath, inName, progressCallback, cancellationToken, prependSectors, excludePatterns,
+                progress);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
     }

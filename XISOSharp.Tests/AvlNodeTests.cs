@@ -131,10 +131,7 @@ public class AvlNodeTests
     [Fact]
     public void AvlNode_AllSkewValues_CanBeSet()
     {
-        var node = new AvlNode
-        {
-            Skew = AvlSkew.NoSkew
-        };
+        var node = new AvlNode { Skew = AvlSkew.NoSkew };
 
         Assert.Equal(AvlSkew.NoSkew, node.Skew);
 

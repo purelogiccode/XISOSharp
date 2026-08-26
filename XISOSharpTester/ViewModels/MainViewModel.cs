@@ -249,9 +249,7 @@ internal class MainViewModel : INotifyPropertyChanged
     {
         var dlg = new OpenFileDialog
         {
-            Title = "Select XISO files",
-            Filter = "ISO files (*.iso)|*.iso|All files (*.*)|*.*",
-            Multiselect = true
+            Title = "Select XISO files", Filter = "ISO files (*.iso)|*.iso|All files (*.*)|*.*", Multiselect = true
         };
         if (dlg.ShowDialog() == true)
         {
@@ -267,10 +265,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private void AddFolder()
     {
-        var dlg = new OpenFolderDialog
-        {
-            Title = "Select folder with ISO files"
-        };
+        var dlg = new OpenFolderDialog { Title = "Select folder with ISO files" };
         if (dlg.ShowDialog() == true)
         {
             try
@@ -361,9 +356,11 @@ internal class MainViewModel : INotifyPropertyChanged
             SessionResult = session;
 
             ProgressValue = 100;
-            ProgressText = $"Completed: {session.PassedFiles} passed, {session.FailedFiles} failed, {session.SkippedFiles} skipped";
+            ProgressText =
+                $"Completed: {session.PassedFiles} passed, {session.FailedFiles} failed, {session.SkippedFiles} skipped";
             CurrentTest = "Done";
-            StatusText = $"Completed: {session.PassedFiles} passed, {session.FailedFiles} failed, {session.SkippedFiles} skipped";
+            StatusText =
+                $"Completed: {session.PassedFiles} passed, {session.FailedFiles} failed, {session.SkippedFiles} skipped";
 
             SummarySubText = $"Sub-tests: {session.PassedSubTests} passed, {session.FailedSubTests} failed, " +
                              $"{session.SkippedSubTests} skipped | {session.TotalElapsedSeconds:N1}s";
@@ -434,7 +431,8 @@ internal class MainViewModel : INotifyPropertyChanged
         foreach (var file in SessionResult.FileResults)
         {
             var status = file.AllPassed ? "PASS" : file.Failed > 0 ? "FAIL" : "SKIP";
-            sb.AppendLine(CultureInfo.InvariantCulture, $"--- {file.FileName} ({file.FileSize}) [{status}] {file.ElapsedSeconds:N2}s ---");
+            sb.AppendLine(CultureInfo.InvariantCulture,
+                $"--- {file.FileName} ({file.FileSize}) [{status}] {file.ElapsedSeconds:N2}s ---");
             foreach (var t in file.SubTests)
             {
                 var icon = t.Status switch
@@ -443,7 +441,8 @@ internal class MainViewModel : INotifyPropertyChanged
                     TestStatus.Failed => "[FAIL]",
                     _ => "[SKIP]"
                 };
-                sb.AppendLine(CultureInfo.InvariantCulture, $"  {icon} {t.TestName,-22} {t.ElapsedSeconds,6:N2}s  {t.Detail}");
+                sb.AppendLine(CultureInfo.InvariantCulture,
+                    $"  {icon} {t.TestName,-22} {t.ElapsedSeconds,6:N2}s  {t.Detail}");
             }
 
             sb.AppendLine();
@@ -461,10 +460,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private static void ShowAbout()
     {
-        var about = new AboutWindow
-        {
-            Owner = Application.Current.MainWindow
-        };
+        var about = new AboutWindow { Owner = Application.Current.MainWindow };
         about.ShowDialog();
     }
 

@@ -2,7 +2,7 @@
 
 ![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)
 ![License](https://img.shields.io/badge/License-MIT-green)
-[![CI](https://github.com/drpetersonfernandes/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/drpetersonfernandes/XISOSharp/actions/workflows/ci.yml)
+[![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
 
 **XISOSharp** is a pure C# implementation of [extract-xiso](https://github.com/XboxDev/extract-xiso)
 v2.7.1 — the tool and library for creating, extracting, listing, auditing, and rewriting

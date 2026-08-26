@@ -70,7 +70,8 @@ public static class XisoReader
 
             if (!buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
             {
-                Logger.LogErr($"{isoName} does not appear to be a valid xbox iso image at skip offset {discLseek} (sector {skipSectors.Value})\n");
+                Logger.LogErr(
+                    $"{isoName} does not appear to be a valid xbox iso image at skip offset {discLseek} (sector {skipSectors.Value})\n");
                 throw new XisoFormatException(
                     $"Invalid XISO: {isoName} — no XISO header found at sector {skipSectors.Value} (byte offset {discLseek}).");
             }
@@ -227,6 +228,51 @@ public static class XisoReader
                 fs.Seek(dirStart + lOffset, SeekOrigin.Begin);
                 continue;
             }
+            else if (tmp == Constants.EmptyDirectorySentinel)
+            {
+                // 0x0000 may be a valid left child offset (no left child) for a real entry,
+                // or it may be the xdvdfs empty-directory sentinel (14 bytes all zeros).
+                // Peek the remaining 12 bytes of the header to distinguish.
+                var peekPos = fs.Position;
+                Span<byte> headerRest = stackalloc byte[12];
+                bool isAllZeros = false;
+                try
+                {
+                    ReadExact(fs, headerRest);
+                    isAllZeros = headerRest[0] == 0 && headerRest[1] == 0 && headerRest[2] == 0 &&
+                                 headerRest[3] == 0 && headerRest[4] == 0 && headerRest[5] == 0 &&
+                                 headerRest[6] == 0 && headerRest[7] == 0 && headerRest[8] == 0 &&
+                                 headerRest[9] == 0 && headerRest[10] == 0 && headerRest[11] == 0;
+                }
+                catch
+                {
+                    isAllZeros = false;
+                }
+
+                fs.Seek(peekPos, SeekOrigin.Begin);
+
+                if (isAllZeros)
+                {
+                    if (lOffset == 0)
+                    {
+                        if (mode == ExtractMode.GenerateAvl)
+                        {
+                            AvlTree.AvlInsert(ref avlRoot, AvlNode.EmptySubdirectory);
+                        }
+
+                        goto end_traverse;
+                    }
+
+                    lOffset = (ushort)(lOffset * Constants.DwordSize +
+                                       (Constants.SectorSize - (lOffset * Constants.DwordSize) % Constants.SectorSize));
+                    fs.Seek(dirStart + lOffset, SeekOrigin.Begin);
+                    continue;
+                }
+                else
+                {
+                    lOffset = tmp;
+                }
+            }
             else
             {
                 lOffset = tmp;
@@ -251,7 +297,8 @@ public static class XisoReader
             ReadExact(fs, nameBuf);
             var filename = Latin1Encoding.Instance.GetString(nameBuf);
 
-            if (string.Equals(filename, ".", StringComparison.Ordinal) || string.Equals(filename, "..", StringComparison.Ordinal) ||
+            if (string.Equals(filename, ".", StringComparison.Ordinal) ||
+                string.Equals(filename, "..", StringComparison.Ordinal) ||
                 filename.Contains('/') || filename.Contains('\\'))
             {
                 Logger.LogErr($"filename '{filename}' contains invalid character(s), aborting.\n");
@@ -260,12 +307,7 @@ public static class XisoReader
 
             if (mode == ExtractMode.GenerateAvl)
             {
-                var avl = new AvlNode
-                {
-                    Filename = filename,
-                    FileSize = fileSize,
-                    OldStartSector = startSector
-                };
+                var avl = new AvlNode { Filename = filename, FileSize = fileSize, OldStartSector = startSector };
                 dir.AvlNode = avl;
                 AvlTree.AvlInsert(ref avlRoot, avl);
             }
@@ -277,7 +319,8 @@ public static class XisoReader
                 var leftSeek = dirStart + (long)lOffset * Constants.DwordSize;
                 if (leftSeek >= fs.Length)
                 {
-                    Logger.LogErr($"warning: left offset {lOffset} (seek {leftSeek}) exceeds file length {fs.Length}, truncating directory.\n");
+                    Logger.LogErr(
+                        $"warning: left offset {lOffset} (seek {leftSeek}) exceeds file length {fs.Length}, truncating directory.\n");
                     goto end_traverse;
                 }
 
@@ -313,7 +356,8 @@ public static class XisoReader
 
                     if (mode != ExtractMode.GenerateAvl)
                     {
-                        Logger.Log($"{mode switch { ExtractMode.Extract => "creating ", _ => "" }}{path}{filename}{Constants.PathCharStr} (0 bytes){mode switch { ExtractMode.Extract => " [OK]", _ => "" }}\n");
+                        Logger.Log(
+                            $"{mode switch { ExtractMode.Extract => "creating ", _ => "" }}{path}{filename}{Constants.PathCharStr} (0 bytes){mode switch { ExtractMode.Extract => " [OK]", _ => "" }}\n");
                         Logger.Flush();
                     }
 
@@ -383,7 +427,8 @@ public static class XisoReader
                 var rightSeek = dirStart + (long)rOffset * Constants.DwordSize;
                 if (rightSeek >= fs.Length)
                 {
-                    Logger.LogErr($"warning: right offset {rOffset} (seek {rightSeek}) exceeds file length {fs.Length}, truncating directory.\n");
+                    Logger.LogErr(
+                        $"warning: right offset {rOffset} (seek {rightSeek}) exceeds file length {fs.Length}, truncating directory.\n");
                     break;
                 }
 
@@ -430,17 +475,15 @@ public static class XisoReader
             filename,
             new FileStreamOptions
             {
-                Mode = FileMode.Create,
-                Access = FileAccess.Write,
-                Share = FileShare.None,
-                BufferSize = 65536
+                Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
             });
 
         fs.Seek((long)startSector * Constants.SectorSize + discLseek, SeekOrigin.Begin);
 
         if (fileSize == 0)
         {
-            Logger.Log($"extracting {path}{filename} (0 bytes) [100%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
+            Logger.Log(
+                $"extracting {path}{filename} (0 bytes) [100%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
             Logger.Flush();
         }
         else
@@ -461,7 +504,8 @@ public static class XisoReader
 
                 totalSize += (uint)readSize;
                 var percent = (uint)(totalSize * 100.0 / fileSize);
-                Logger.Log($"extracting {path}{filename} ({fileSize} bytes) [{percent}%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
+                Logger.Log(
+                    $"extracting {path}{filename} ({fileSize} bytes) [{percent}%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
                 Logger.Flush();
 
                 size = Math.Min(fileSize - totalSize, Constants.ReadWriteBufferSize);
@@ -469,7 +513,8 @@ public static class XisoReader
 
             if (totalSize < fileSize)
             {
-                Logger.Log($"\nWARNING: File {filename} is truncated. Reported size: {fileSize} bytes, read size: {totalSize} bytes!\n");
+                Logger.Log(
+                    $"\nWARNING: File {filename} is truncated. Reported size: {fileSize} bytes, read size: {totalSize} bytes!\n");
             }
         }
 
@@ -511,7 +556,8 @@ public static class XisoReader
         int? prependSectors = null,
         IProgress<ProgressInfo>? progress = null)
     {
-        return DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken, outputName, skipSectors, prependSectors, progress);
+        return DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken,
+            outputName, skipSectors, prependSectors, progress);
     }
 
     /// <summary>
@@ -536,7 +582,8 @@ public static class XisoReader
         CancellationToken cancellationToken = default,
         int? skipSectors = null)
     {
-        return DecodeXiso(xisoPath, outputPath, ExtractMode.Extract, out _, llCompat, cancellationToken, skipSectors: skipSectors);
+        return DecodeXiso(xisoPath, outputPath, ExtractMode.Extract, out _, llCompat, cancellationToken,
+            skipSectors: skipSectors);
     }
 
     /// <summary>
@@ -569,7 +616,7 @@ public static class XisoReader
         CancellationToken cancellationToken = default,
         int? skipSectors = null)
     {
-        if (skipSectors.HasValue && skipSectors.Value < 0)
+        if (skipSectors < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value,
                 "Skip sectors must be non-negative.");
@@ -589,10 +636,7 @@ public static class XisoReader
             isoPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read,
-                BufferSize = 256
+                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
             });
 
         fs.Seek((long)(skipSectors ?? 0) * Constants.SectorSize + Constants.OptimizedTagOffset, SeekOrigin.Begin);
@@ -626,7 +670,8 @@ public static class XisoReader
         CancellationToken cancellationToken = default,
         int? skipSectors = null)
     {
-        return DecodeXiso(xisoPath, null, ExtractMode.List, out _, llCompat, cancellationToken, skipSectors: skipSectors);
+        return DecodeXiso(xisoPath, null, ExtractMode.List, out _, llCompat, cancellationToken,
+            skipSectors: skipSectors);
     }
 
     /// <summary>
@@ -650,7 +695,8 @@ public static class XisoReader
         CancellationToken cancellationToken = default,
         int? skipSectors = null)
     {
-        return DecodeXiso(xisoPath, null, ExtractMode.Tree, out _, llCompat, cancellationToken, skipSectors: skipSectors);
+        return DecodeXiso(xisoPath, null, ExtractMode.Tree, out _, llCompat, cancellationToken,
+            skipSectors: skipSectors);
     }
 
     /// <summary>
@@ -743,10 +789,7 @@ public static class XisoReader
             xisoPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read,
-                BufferSize = 65536
+                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
             });
 
         (uint rootDirSect, uint rootDirSize, long discLseek) = VerifyXiso(fs, name, skipSectors);
@@ -822,7 +865,8 @@ public static class XisoReader
                 TraverseXiso(fs, null, (long)rootDirSect * Constants.SectorSize + discLseek,
                     buf, ExtractMode.GenerateAvl, ref avlRoot, llCompat, discLseek);
 
-                XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null, prependSectors: prependSectors, progress: progress);
+                XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null,
+                    prependSectors: prependSectors, progress: progress);
             }
             else
             {
@@ -886,7 +930,8 @@ public static class XisoReader
     {
         return await Task.Run(() =>
         {
-            var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken, outputName, skipSectors, prependSectors, progress);
+            var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken,
+                outputName, skipSectors, prependSectors, progress);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
     }
@@ -904,10 +949,7 @@ public static class XisoReader
             isoPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read,
-                BufferSize = 256
+                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
             });
 
         var fileLength = fs.Length;
@@ -1009,10 +1051,7 @@ public static class XisoReader
             isoPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read,
-                BufferSize = 65536
+                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
             });
 
         try
@@ -1037,7 +1076,8 @@ public static class XisoReader
 
         if (rootDirStart >= fileLength)
         {
-            issues.Add($"Root directory sector {volInfo.RootDirSector} (offset {rootDirStart}) exceeds file length {fileLength}.");
+            issues.Add(
+                $"Root directory sector {volInfo.RootDirSector} (offset {rootDirStart}) exceeds file length {fileLength}.");
             return new AuditResult(false, 0, 0, issues);
         }
 
@@ -1073,7 +1113,8 @@ public static class XisoReader
 
             if (!visited.Add(dirStart))
             {
-                issues.Add($"Cycle detected: directory entry at offset {dirStart} ({path}) was already visited on this path.");
+                issues.Add(
+                    $"Cycle detected: directory entry at offset {dirStart} ({path}) was already visited on this path.");
                 return;
             }
 
@@ -1087,6 +1128,32 @@ public static class XisoReader
                 return;
             }
 
+            if (lOffset == Constants.EmptyDirectorySentinel)
+            {
+                var peekPos = fs.Position;
+                Span<byte> headerRest = stackalloc byte[12];
+                bool isAllZeros = false;
+                try
+                {
+                    ReadExact(fs, headerRest);
+                    isAllZeros = headerRest[0] == 0 && headerRest[1] == 0 && headerRest[2] == 0 &&
+                                 headerRest[3] == 0 && headerRest[4] == 0 && headerRest[5] == 0 &&
+                                 headerRest[6] == 0 && headerRest[7] == 0 && headerRest[8] == 0 &&
+                                 headerRest[9] == 0 && headerRest[10] == 0 && headerRest[11] == 0;
+                }
+                catch
+                {
+                    isAllZeros = false;
+                }
+
+                fs.Seek(peekPos, SeekOrigin.Begin);
+
+                if (isAllZeros)
+                {
+                    return;
+                }
+            }
+
             if (lOffset != 0)
             {
                 var leftSeek = dirStart + (long)lOffset * Constants.DwordSize;
@@ -1097,7 +1164,8 @@ public static class XisoReader
                 else
                 {
                     var childVisited = new HashSet<long>(visited);
-                    AuditWalk(fs, leftSeek, path, fileLength, discLseek, issues, childVisited, ref filesChecked, ref dirsChecked);
+                    AuditWalk(fs, leftSeek, path, fileLength, discLseek, issues, childVisited, ref filesChecked,
+                        ref dirsChecked);
                 }
             }
 
@@ -1129,7 +1197,8 @@ public static class XisoReader
             var sectorOffset = (long)startSector * Constants.SectorSize + discLseek;
             if (sectorOffset >= fileLength)
             {
-                issues.Add($"Sector {startSector} (offset {sectorOffset}) for '{path}{filename}' exceeds file length {fileLength}.");
+                issues.Add(
+                    $"Sector {startSector} (offset {sectorOffset}) for '{path}{filename}' exceeds file length {fileLength}.");
             }
 
             if ((attributes & 0x48) != 0)
@@ -1148,10 +1217,12 @@ public static class XisoReader
                     var endOffset = sectorOffset + fileSize;
                     if (endOffset > fileLength)
                     {
-                        issues.Add($"Directory '{path}{filename}' size {fileSize} (ends at {endOffset}) exceeds file length {fileLength}.");
+                        issues.Add(
+                            $"Directory '{path}{filename}' size {fileSize} (ends at {endOffset}) exceeds file length {fileLength}.");
                     }
 
-                    AuditWalk(fs, sectorOffset, path + filename + "/", fileLength, discLseek, issues, new HashSet<long>(), ref filesChecked, ref dirsChecked);
+                    AuditWalk(fs, sectorOffset, path + filename + "/", fileLength, discLseek, issues,
+                        new HashSet<long>(), ref filesChecked, ref dirsChecked);
                 }
             }
             else
@@ -1214,10 +1285,7 @@ public static class XisoReader
             isoPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read,
-                BufferSize = 65536
+                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
             });
 
         var volInfo = GetVolumeInfo(isoPath);
@@ -1303,10 +1371,7 @@ public static class XisoReader
             isoPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read,
-                BufferSize = 65536
+                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
             });
 
         if (entry.IsDirectory)
@@ -1329,10 +1394,7 @@ public static class XisoReader
             destPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Create,
-                Access = FileAccess.Write,
-                Share = FileShare.None,
-                BufferSize = 65536
+                Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
             });
 
         fs.Seek((long)entry.StartSector * Constants.SectorSize + volInfo.DiscLseek, SeekOrigin.Begin);
@@ -1352,7 +1414,8 @@ public static class XisoReader
         }
     }
 
-    private static void CopyOutDirectory(FileStream fs, string isoPath, string internalPath, string destPath, VolumeInfo volInfo)
+    private static void CopyOutDirectory(FileStream fs, string isoPath, string internalPath, string destPath,
+        VolumeInfo volInfo)
     {
         Directory.CreateDirectory(destPath);
 
@@ -1408,10 +1471,7 @@ public static class XisoReader
             isoPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read,
-                BufferSize = 65536
+                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
             });
 
         fs.Seek((long)entry.StartSector * Constants.SectorSize + volInfo.DiscLseek, SeekOrigin.Begin);
@@ -1511,10 +1571,7 @@ public static class XisoReader
             isoPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read,
-                BufferSize = 65536
+                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
             });
 
         fs.Seek((long)entry.StartSector * Constants.SectorSize + volInfo.DiscLseek, SeekOrigin.Begin);
@@ -1677,9 +1734,35 @@ public static class XisoReader
             ReadExact(fs, shortBuf);
             var lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
 
-            // Empty directory or end of entries
+            // Empty directory — xdvdfs fills with 0xFF or 0x00 (14 bytes all same). Original
+            // code only handled 0xFFFF; 0x0000 needs a 14-byte check to distinguish a valid
+            // entry whose left child offset is 0 (no left child) from a truly empty table.
             if (lOffset == Constants.PadShort && offset == 0)
                 continue;
+
+            if (lOffset == Constants.EmptyDirectorySentinel && offset == 0)
+            {
+                var peekPos = fs.Position;
+                Span<byte> headerRest = stackalloc byte[12];
+                bool isAllZeros = false;
+                try
+                {
+                    ReadExact(fs, headerRest);
+                    isAllZeros = headerRest[0] == 0 && headerRest[1] == 0 && headerRest[2] == 0 &&
+                                 headerRest[3] == 0 && headerRest[4] == 0 && headerRest[5] == 0 &&
+                                 headerRest[6] == 0 && headerRest[7] == 0 && headerRest[8] == 0 &&
+                                 headerRest[9] == 0 && headerRest[10] == 0 && headerRest[11] == 0;
+                }
+                catch
+                {
+                    isAllZeros = false;
+                }
+
+                fs.Seek(peekPos, SeekOrigin.Begin);
+
+                if (isAllZeros)
+                    continue;
+            }
 
             // Read right offset
             ReadExact(fs, shortBuf);

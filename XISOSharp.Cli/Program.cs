@@ -288,27 +288,32 @@ internal static class Program
                         PrintUsage();
                         return 1;
                     case "--skip-sectors":
-                        if (i + 1 < args.Length && int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var skipVal) && skipVal >= 0)
+                        if (i + 1 < args.Length &&
+                            int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var skipVal) && skipVal >= 0)
                         {
                             skipSectors = skipVal;
                             i++;
                         }
                         else
                         {
-                            Logger.LogErr("Error: --skip-sectors requires a non-negative integer (number of 2048-byte sectors)\n");
+                            Logger.LogErr(
+                                "Error: --skip-sectors requires a non-negative integer (number of 2048-byte sectors)\n");
                             return 1;
                         }
 
                         break;
                     case "--prepend-sectors":
-                        if (i + 1 < args.Length && int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var prependVal) && prependVal >= 0)
+                        if (i + 1 < args.Length &&
+                            int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var prependVal) &&
+                            prependVal >= 0)
                         {
                             prependSectors = prependVal;
                             i++;
                         }
                         else
                         {
-                            Logger.LogErr("Error: --prepend-sectors requires a non-negative integer (number of 2048-byte sectors)\n");
+                            Logger.LogErr(
+                                "Error: --prepend-sectors requires a non-negative integer (number of 2048-byte sectors)\n");
                             return 1;
                         }
 
@@ -388,7 +393,8 @@ internal static class Program
         if ((skipSectors.HasValue || prependSectors.HasValue) &&
             (info || lsMode || xexInfoMode || hashMode || copyOut || auditMode || validateMode || validateFlag))
         {
-            Logger.LogErr("Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, and create (-c) modes\n");
+            Logger.LogErr(
+                "Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, and create (-c) modes\n");
             return 1;
         }
 
@@ -404,9 +410,11 @@ internal static class Program
             return 1;
         }
 
-        if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || unpackMode || hashMode || copyOut || validateMode))
+        if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || unpackMode || hashMode ||
+                                 copyOut || validateMode))
         {
-            Logger.LogErr("Error: --batch is only supported in extract, list, tree, rewrite (-r), and audit (-V) modes\n");
+            Logger.LogErr(
+                "Error: --batch is only supported in extract, list, tree, rewrite (-r), and audit (-V) modes\n");
             return 1;
         }
 
@@ -537,8 +545,10 @@ internal static class Program
                         Logger.Log($"    Sector:    {entry.StartSector}\n");
                         Logger.Log($"    Size:      {entry.FileSize} bytes\n");
                         Logger.Log($"    Attrs:     0x{entry.Attributes:X2}{FormatAttributes(entry.Attributes)}\n");
-                        Logger.Log($"    L-Offset:  {(entry.LeftChildOffset == 0 ? "none" : entry.LeftChildOffset.ToString())}\n");
-                        Logger.Log($"    R-Offset:  {(entry.RightChildOffset == 0 ? "none" : entry.RightChildOffset.ToString())}\n");
+                        Logger.Log(
+                            $"    L-Offset:  {(entry.LeftChildOffset == 0 ? "none" : entry.LeftChildOffset.ToString())}\n");
+                        Logger.Log(
+                            $"    R-Offset:  {(entry.RightChildOffset == 0 ? "none" : entry.RightChildOffset.ToString())}\n");
                         Logger.Log("\n");
                     }
                 }
@@ -615,14 +625,16 @@ internal static class Program
                 Logger.Log($"  Image size:        0x{xex.ImageSize:X8}\n");
                 Logger.Log($"  Load address:      0x{xex.LoadAddress:X8}\n");
                 Logger.Log($"  Region:            0x{xex.Region:X8}{FormatXexRegion(xex.Region)}\n");
-                Logger.Log($"  Media types:       0x{xex.AllowedMediaTypes:X8}{FormatXexMediaTypes(xex.AllowedMediaTypes)}\n");
+                Logger.Log(
+                    $"  Media types:       0x{xex.AllowedMediaTypes:X8}{FormatXexMediaTypes(xex.AllowedMediaTypes)}\n");
                 Logger.Log($"  Media ID:          0x{xex.MediaId:X8}\n");
                 Logger.Log($"  Title ID:          0x{xex.TitleId:X8}\n");
                 Logger.Log($"  Version:           0x{xex.Version:X8}\n");
                 Logger.Log($"  Platform:          0x{xex.Platform:X2}\n");
                 Logger.Log($"  Disc:              {xex.DiscNumber}/{xex.DiscCount}\n");
                 Logger.Log($"  Encryption:        {xex.EncryptionType} ({FormatXexEncryption(xex.EncryptionType)})\n");
-                Logger.Log($"  Compression:       {xex.CompressionType} ({FormatXexCompression(xex.CompressionType)})\n");
+                Logger.Log(
+                    $"  Compression:       {xex.CompressionType} ({FormatXexCompression(xex.CompressionType)})\n");
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
             {
@@ -816,13 +828,11 @@ internal static class Program
 
             try
             {
-                using var tagFs = new FileStream(xisoPath, new FileStreamOptions
-                {
-                    Mode = FileMode.Open,
-                    Access = FileAccess.Read,
-                    Share = FileShare.Read,
-                    BufferSize = 256
-                });
+                using var tagFs = new FileStream(xisoPath,
+                    new FileStreamOptions
+                    {
+                        Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
+                    });
 
                 tagFs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
                 var tagBuf = new byte[Constants.OptimizedTagLength];
@@ -830,7 +840,8 @@ internal static class Program
                 if (tagRead == Constants.OptimizedTagLength)
                 {
                     var tag = Encoding.ASCII.GetString(tagBuf);
-                    if (tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin], StringComparison.Ordinal))
+                    if (tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin],
+                            StringComparison.Ordinal))
                     {
                         optimized = true;
                     }
@@ -861,12 +872,14 @@ internal static class Program
                 try
                 {
                     File.Move(xisoPath, oldPath);
-                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out var newIsoPath, true, outputName: outputName, skipSectors: skipSectors, prependSectors: prependSectors);
+                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out var newIsoPath, true,
+                        outputName: outputName, skipSectors: skipSectors, prependSectors: prependSectors);
 
                     if (err == 0)
                     {
                         Logger.Log($"\n{Logger.TotalFiles} files in {newIsoPath} total {Logger.TotalBytes} bytes\n");
-                        Logger.Log($"\n{xisoPath} successfully rewritten{(path != null ? " as " : ".")}{(path != null ? newIsoPath : "")}\n");
+                        Logger.Log(
+                            $"\n{xisoPath} successfully rewritten{(path != null ? " as " : ".")}{(path != null ? newIsoPath : "")}\n");
                     }
 
                     if (err == 0 && validateFlag && newIsoPath != null)
@@ -922,7 +935,8 @@ internal static class Program
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogErr($"failed to {(extract ? "extract" : tree ? "tree" : "list")} xbox iso image {xisoPath}: {ex.Message}\n");
+                    Logger.LogErr(
+                        $"failed to {(extract ? "extract" : tree ? "tree" : "list")} xbox iso image {xisoPath}: {ex.Message}\n");
                     err = 1;
                 }
             }
@@ -1024,7 +1038,8 @@ internal static class Program
             return 0;
         }
 
-        if (rewrite || info || lsMode || xexInfoMode || unpackMode || hashMode || copyOut || auditMode || validateMode || tree || !extract)
+        if (rewrite || info || lsMode || xexInfoMode || unpackMode || hashMode || copyOut || auditMode ||
+            validateMode || tree || !extract)
         {
             Logger.LogErr("Error: --pack cannot be combined with other modes\n");
             return 1;
@@ -1075,6 +1090,7 @@ internal static class Program
 
         return 0;
     }
+
     /// <summary>
     /// Resolves the list of ISO files to process: explicit filenames, a <c>--batch</c>
     /// directory scan, or a <c>--pack</c> ISO input. Returns <c>null</c> (after logging
@@ -1115,7 +1131,8 @@ internal static class Program
                     return null;
                 }
 
-                Logger.Log($"batch: processing {isoFiles.Count} ISO file(s) from {batchDir}{(batchRecursive ? " (recursive)" : "")}\n");
+                Logger.Log(
+                    $"batch: processing {isoFiles.Count} ISO file(s) from {batchDir}{(batchRecursive ? " (recursive)" : "")}\n");
                 return isoFiles;
             }
             catch (Exception ex) when (ex is DirectoryNotFoundException or UnauthorizedAccessException or IOException)

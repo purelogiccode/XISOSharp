@@ -1,65 +1,65 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-        <LangVersion>14</LangVersion>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <RootNamespace>XISOSharp</RootNamespace>
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <LangVersion>14</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>XISOSharp</RootNamespace>
 
-        <!-- Strong name signing -->
-        <SignAssembly>true</SignAssembly>
-        <AssemblyOriginatorKeyFile>XISOSharp.snk</AssemblyOriginatorKeyFile>
+    <!-- Strong name signing -->
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>XISOSharp.snk</AssemblyOriginatorKeyFile>
 
-        <!-- NuGet metadata -->
-        <PackageId>XISOSharp</PackageId>
-        <!-- Version is derived from git tags via MinVer. Tag format: v2.7.1 or 2.7.1 -->
-        <Title>XISOSharp</Title>
-        <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats.</Description>
-        <PackageDescription>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats. Provides both synchronous and asynchronous APIs with cancellation support. Strong-named, trimmable, and AOT-compatible.</PackageDescription>
-        <PackageTags>xiso;xbox;iso;extract-xiso;xgd3;xgd1;xbe;disc-image;original-xbox</PackageTags>
-        <PackageReadmeFile>README.md</PackageReadmeFile>
-        <PackageIcon>icon.png</PackageIcon>
-        <PackageReleaseNotes>See https://github.com/drpetersonfernandes/XISOSharp/releases</PackageReleaseNotes>
-        <MinClientVersion>5.0</MinClientVersion>
+    <!-- NuGet metadata -->
+    <PackageId>XISOSharp</PackageId>
+    <!-- Version is derived from git tags via MinVer. Tag format: v2.7.1 or 2.7.1 -->
+    <Title>XISOSharp</Title>
+    <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats.</Description>
+    <PackageDescription>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats. Provides both synchronous and asynchronous APIs with cancellation support. Strong-named, trimmable, and AOT-compatible.</PackageDescription>
+    <PackageTags>xiso;xbox;iso;extract-xiso;xgd3;xgd1;xbe;disc-image;original-xbox</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>See https://github.com/purelogiccode/XISOSharp/releases</PackageReleaseNotes>
+    <MinClientVersion>5.0</MinClientVersion>
 
-        <!-- XML documentation -->
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- XML documentation -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
-        <!-- Trimming and AOT compatibility -->
-        <IsTrimmable>true</IsTrimmable>
-        <IsAotCompatible>true</IsAotCompatible>
+    <!-- Trimming and AOT compatibility -->
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
 
-        <!-- Source Link + reproducible builds -->
-        <PublishRepositoryUrl>true</PublishRepositoryUrl>
-        <EmbedAllSources>true</EmbedAllSources>
-        <EmbedUntrackedSources>true</EmbedUntrackedSources>
-        <DebugType>portable</DebugType>
-        <Deterministic>true</Deterministic>
-        <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <!-- Source Link + reproducible builds -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedAllSources>true</EmbedAllSources>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <DebugType>portable</DebugType>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
 
-        <!-- Package output -->
-        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <IncludeSymbols>true</IncludeSymbols>
-        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!-- Package output -->
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
 
-        <!-- API compatibility validation across target frameworks -->
-        <EnablePackageValidation>true</EnablePackageValidation>
-        <EnableStrictModeForPackageValidation>true</EnableStrictModeForPackageValidation>
-    </PropertyGroup>
+    <!-- API compatibility validation across target frameworks -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <EnableStrictModeForPackageValidation>true</EnableStrictModeForPackageValidation>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <None Include="README.md" Pack="true" PackagePath="\" />
-        <None Include="LICENSE" Pack="true" PackagePath="\" />
-        <None Include="icon\icon.png" Pack="true" PackagePath="\" />
-    </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="LICENSE" Pack="true" PackagePath="\" />
+    <None Include="icon\icon.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
-    <!-- Source Link + versioning -->
-    <ItemGroup>
-        <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
-        <PackageReference Include="MinVer" PrivateAssets="All">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-    </ItemGroup>
+  <!-- Source Link + versioning -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+    <PackageReference Include="MinVer" PrivateAssets="all">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 
 </Project>

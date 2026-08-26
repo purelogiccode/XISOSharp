@@ -381,7 +381,8 @@ public class AvlTreeTests
 
             var leftDepth = GetTreeDepth(node.Left);
             var rightDepth = GetTreeDepth(node.Right);
-            Assert.True(Math.Abs(leftDepth - rightDepth) <= 1, $"Unbalanced at node '{node.Filename}': left={leftDepth}, right={rightDepth}");
+            Assert.True(Math.Abs(leftDepth - rightDepth) <= 1,
+                $"Unbalanced at node '{node.Filename}': left={leftDepth}, right={rightDepth}");
 
             VerifyAvlBalance(node.Left);
             node = node.Right;

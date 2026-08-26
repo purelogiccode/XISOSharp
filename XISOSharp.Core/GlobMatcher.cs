@@ -88,7 +88,8 @@ public sealed class GlobMatcher
         if (glob.EndsWith('/'))
         {
             var trimmed = glob.TrimEnd('/');
-            normalized = trimmed.EndsWith("/**", StringComparison.Ordinal) || string.Equals(trimmed, "**", StringComparison.Ordinal)
+            normalized = trimmed.EndsWith("/**", StringComparison.Ordinal) ||
+                         string.Equals(trimmed, "**", StringComparison.Ordinal)
                 ? trimmed
                 : trimmed + "/**";
         }

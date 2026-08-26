@@ -73,7 +73,8 @@ public class IntegrationTests : IDisposable
         Assert.True(File.Exists(Path.Combine(extractDir, "binary.bin")), "binary.bin missing after extract");
         Assert.True(File.Exists(Path.Combine(extractDir, "test.xbe")), "test.xbe missing after extract");
         Assert.True(Directory.Exists(Path.Combine(extractDir, "subdir")), "subdir missing after extract");
-        Assert.True(File.Exists(Path.Combine(extractDir, "subdir", "subfile.txt")), "subfile.txt missing after extract");
+        Assert.True(File.Exists(Path.Combine(extractDir, "subdir", "subfile.txt")),
+            "subfile.txt missing after extract");
     }
 
     [Fact]
@@ -349,7 +350,8 @@ public class IntegrationTests : IDisposable
         Assert.Contains(entries, static e => string.Equals(e.Name, "file2.txt", StringComparison.Ordinal));
         Assert.Contains(entries, static e => string.Equals(e.Name, "binary.bin", StringComparison.Ordinal));
         Assert.Contains(entries, static e => string.Equals(e.Name, "test.xbe", StringComparison.Ordinal));
-        Assert.Contains(entries, static e => string.Equals(e.Name, "subdir", StringComparison.Ordinal) && e.IsDirectory);
+        Assert.Contains(entries,
+            static e => string.Equals(e.Name, "subdir", StringComparison.Ordinal) && e.IsDirectory);
     }
 
     [Fact]
@@ -591,7 +593,8 @@ public class IntegrationTests : IDisposable
         Assert.NotNull(hash);
         Assert.Equal(32, hash.Length);
         // SHA-256 of empty input is a known value
-        Assert.Equal("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Convert.ToHexString(hash).ToLowerInvariant());
+        Assert.Equal("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            Convert.ToHexString(hash).ToLowerInvariant());
     }
 
     [Fact]

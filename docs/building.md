@@ -19,7 +19,7 @@ This page covers SDK requirements, build and publish commands, and the CI pipeli
 ## Build
 
 ```bash
-git clone https://github.com/drpetersonfernandes/XISOSharp.git
+git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 
 # Restore + build everything (Debug)
