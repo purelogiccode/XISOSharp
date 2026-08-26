@@ -70,7 +70,8 @@ public static class XisoOperations
         bool quiet = false, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) = XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
+        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+            XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
         var ranges = XisoRanges.MergeRanges(bones, fileRanges);
         if (!quiet)
             foreach ((uint s, uint e) in ranges)
@@ -183,7 +184,8 @@ public static class XisoOperations
         long isoSize = isoFs.Length;
         long xisoLength = isoSize - isoOffset;
         // If input is standalone XISO, isoOffset is 0; for Redump game partition, caller passes offset.
-        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) = XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
+        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+            XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
         var ranges = XisoRanges.MergeRanges(bones, fileRanges);
 
         long totalLength = xisoLength;
@@ -276,7 +278,8 @@ public static class XisoOperations
         {
             // Trim in place: compute trimmed length and SetLength
             using var fs = new FileStream(inputPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None, 65536);
-            (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) = XisoRanges.GetXisoRanges(fs, isoOffset, quiet);
+            (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+                XisoRanges.GetXisoRanges(fs, isoOffset, quiet);
             var ranges = XisoRanges.MergeRanges(bones, fileRanges);
             if (ranges.Count == 0) return false;
             long trimmedLen = ((long)ranges[^1].End + 1) * SectorSize;
@@ -290,7 +293,8 @@ public static class XisoOperations
         else
         {
             using var isoFs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-            (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) = XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
+            (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+                XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
             var ranges = XisoRanges.MergeRanges(bones, fileRanges);
             if (ranges.Count == 0) return false;
             long trimmedLen = ((long)ranges[^1].End + 1) * SectorSize;
@@ -313,7 +317,8 @@ public static class XisoOperations
     {
         ct.ThrowIfCancellationRequested();
         using var isoFs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) = XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
+        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+            XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
         var ranges = XisoRanges.MergeRanges(bones, fileRanges);
         if (ranges.Count == 0) return false;
         long trimmedLen = ((long)ranges[^1].End + 1) * SectorSize;

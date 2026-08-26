@@ -60,7 +60,8 @@ public static class XisoSkeleton
         long xisoLength = isoLen - isoOffset;
         if (xisoLength <= 0) return false;
 
-        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) = XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
+        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+            XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
         var ranges = XisoRanges.MergeRanges(bones, fileRanges);
         var fileEntries = XisoRanges.GetFileEntries(isoFs, isoOffset);
 

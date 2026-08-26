@@ -213,7 +213,9 @@ public static class XisoZarchive
         var lookup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         rootNode = new PathNode();
         ParseNode(isoFs, isoOffset, dirOffset, dirSize, 0, rootNode, nameList, lookup);
-        if (removeUpdate) rootNode.Subnodes.RemoveAll(n => !n.IsFile && string.Equals(nameList[n.NameIndex], "$SystemUpdate", StringComparison.OrdinalIgnoreCase));
+        if (removeUpdate)
+            rootNode.Subnodes.RemoveAll(n =>
+                !n.IsFile && string.Equals(nameList[n.NameIndex], "$SystemUpdate", StringComparison.OrdinalIgnoreCase));
         rootNode.Subnodes.Sort((a, b) => CompareNodeName(nameList[a.NameIndex], nameList[b.NameIndex]));
         names = nameList;
     }

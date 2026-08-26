@@ -30,7 +30,8 @@ public static class XisoChecksum
     }
 
     /// <summary>Computes checksum from an open stream with known disc name (for error reporting).</summary>
-    public static byte[] ComputeImageChecksum(FileStream fs, string isoName, int? skipSectors = null, CancellationToken ct = default)
+    public static byte[] ComputeImageChecksum(FileStream fs, string isoName, int? skipSectors = null,
+        CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         // Detect discLseek / root table via VerifyXiso probe (supports skipSectors override)
@@ -72,8 +73,10 @@ public static class XisoChecksum
                     hasher.AppendData(buf, 0, n);
                     remaining -= n;
                 }
+
                 if (remaining != 0)
-                    throw new IOException($"Truncated file data for {path}: expected {entry.Size}, remaining {remaining}");
+                    throw new IOException(
+                        $"Truncated file data for {path}: expected {entry.Size}, remaining {remaining}");
             }
         }
 
@@ -81,7 +84,8 @@ public static class XisoChecksum
     }
 
     /// <summary>Returns the hex (lowercase) representation of the checksum.</summary>
-    public static string ComputeImageChecksumHex(string isoPath, int? skipSectors = null, CancellationToken ct = default)
+    public static string ComputeImageChecksumHex(string isoPath, int? skipSectors = null,
+        CancellationToken ct = default)
         => Convert.ToHexString(ComputeImageChecksum(isoPath, skipSectors, ct)).ToLowerInvariant();
 
     // -----------------------------------------------------------------------
@@ -156,10 +160,7 @@ public static class XisoChecksum
             // Add to result (preorder)
             result.Add(new DirEnt
             {
-                Name = node.Name,
-                StartSector = node.StartSector,
-                Size = node.Size,
-                IsDirectory = node.IsDirectory
+                Name = node.Name, StartSector = node.StartSector, Size = node.Size, IsDirectory = node.IsDirectory
             });
         }
 
@@ -193,6 +194,7 @@ public static class XisoChecksum
             if (hdr[i] != 0x00) allZero = false;
             if (!allFf && !allZero) break;
         }
+
         if (allFf || allZero) return null;
 
         ushort left = BinaryPrimitives.ReadUInt16LittleEndian(hdr[0..2]);
@@ -212,6 +214,7 @@ public static class XisoChecksum
             if (r == 0) return null;
             rn += r;
         }
+
         // Xbox uses Windows-1252; xdvdfs uses encoding_rs WINDOWS_1252.
         // Latin1Encoding covers the same range for test vectors (ASCII).
         string name = Latin1Encoding.Instance.GetString(nameBuf);

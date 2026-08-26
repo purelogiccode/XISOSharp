@@ -20,9 +20,11 @@ public sealed class FileBlockDevice : IBlockDevice
     }
 
     /// <summary>Opens a file as a block device.</summary>
-    public FileBlockDevice(string path, FileMode mode = FileMode.Open, FileAccess access = FileAccess.ReadWrite, FileShare share = FileShare.Read, int bufferSize = 65536)
+    public FileBlockDevice(string path, FileMode mode = FileMode.Open, FileAccess access = FileAccess.ReadWrite,
+        FileShare share = FileShare.Read, int bufferSize = 65536)
     {
-        _fs = new FileStream(path, new FileStreamOptions { Mode = mode, Access = access, Share = share, BufferSize = bufferSize });
+        _fs = new FileStream(path,
+            new FileStreamOptions { Mode = mode, Access = access, Share = share, BufferSize = bufferSize });
         _leaveOpen = false;
     }
 
@@ -40,6 +42,7 @@ public sealed class FileBlockDevice : IBlockDevice
             if (n == 0) break;
             total += n;
         }
+
         return total;
     }
 

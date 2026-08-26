@@ -32,7 +32,8 @@ public static class CisoWriter
     /// <param name="progress">Optional progress channel.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>0 on success, 1 on error.</returns>
-    public static int CompressToCso(string sourcePath, string? outputCsoPath = null, int level = 6, long? splitBytes = null,
+    public static int CompressToCso(string sourcePath, string? outputCsoPath = null, int level = 6,
+        long? splitBytes = null,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -88,7 +89,8 @@ public static class CisoWriter
         {
             if (tempIso != null)
             {
-                try { File.Delete(tempIso); } catch { }
+                try { File.Delete(tempIso); }
+                catch { }
             }
         }
     }
@@ -96,7 +98,8 @@ public static class CisoWriter
     /// <summary>Asynchronous variant of <see cref="CompressToCso"/>.</summary>
     public static async Task<int> CompressToCsoAsync(string sourcePath, string? outputCsoPath = null, int level = 6,
         long? splitBytes = null, IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
-        => await Task.Run(() => CompressToCso(sourcePath, outputCsoPath, level, splitBytes, progress, ct), ct).ConfigureAwait(false);
+        => await Task.Run(() => CompressToCso(sourcePath, outputCsoPath, level, splitBytes, progress, ct), ct)
+            .ConfigureAwait(false);
 
     /// <summary>
     /// Compresses a seekable source stream (uncompressed ISO) to a seekable destination stream (CISO).
@@ -183,6 +186,7 @@ public static class CisoWriter
                 if (n == 0) break;
                 read += n;
             }
+
             if (read < BlockSize)
                 Array.Clear(blockBuf, read, BlockSize - read);
 
@@ -224,7 +228,8 @@ public static class CisoWriter
             position += dataToWrite.Length;
 
             // Progress: report file added? Use Sector
-            progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded, Path: $"/sector/{sector}", Sector: sector, Size: dataToWrite.Length));
+            progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded, Path: $"/sector/{sector}", Sector: sector,
+                Size: dataToWrite.Length));
         }
 
         // Final index entry (end of file) — never plain
@@ -256,6 +261,7 @@ public static class CisoWriter
         {
             ds.Write(data, 0, data.Length);
         }
+
         return ms.ToArray();
     }
 
@@ -297,6 +303,7 @@ public static class CisoWriter
                 else
                     file = file + ".cso";
             }
+
             return Path.Combine(dir, file);
         }
     }

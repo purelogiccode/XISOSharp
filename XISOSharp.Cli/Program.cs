@@ -1230,7 +1230,8 @@ internal static class Program
         for (int i = optind; i < args.Length; i++)
         {
             var a = args[i];
-            if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length)
                 {
@@ -1240,7 +1241,8 @@ internal static class Program
 
                 outRebuild = args[++i];
             }
-            else if (string.Equals(a, "--security-sectors", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--sectors", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "--security-sectors", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--sectors", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length)
                 {
@@ -1258,12 +1260,14 @@ internal static class Program
             {
                 Logger.Quiet = Logger.RealQuiet = true;
             }
-            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
             {
                 PrintUsage();
                 return 0;
             }
-            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
             {
                 Console.Write(Constants.Banner);
                 return 0;
@@ -1353,7 +1357,8 @@ internal static class Program
         for (int i = optind; i < args.Length; i++)
         {
             var a = args[i];
-            if (string.Equals(a, "-f", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--file", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(a, "-f", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--file", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length)
                 {
@@ -1363,7 +1368,8 @@ internal static class Program
 
                 specFile = args[++i];
             }
-            else if (string.Equals(a, "-m", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--map", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-m", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--map", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length)
                 {
@@ -1373,7 +1379,8 @@ internal static class Program
 
                 mapRaw.Add(args[++i]);
             }
-            else if (string.Equals(a, "-O", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-O", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length)
                 {
@@ -1383,16 +1390,20 @@ internal static class Program
 
                 metaOutput = args[++i];
             }
-            else if (string.Equals(a, "-D", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--dry-run", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--dryrun", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-D", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--dry-run", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--dryrun", StringComparison.OrdinalIgnoreCase))
             {
                 dryRun = true;
             }
-            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
             {
                 PrintUsage();
                 return 0;
             }
-            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
             {
                 Console.Write(Constants.Banner);
                 return 0;
@@ -1602,7 +1613,8 @@ internal static class Program
         for (int i = optind; i < args.Length; i++)
         {
             var a = args[i];
-            if (string.Equals(a, "-m", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--map", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(a, "-m", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--map", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length)
                 {
@@ -1612,7 +1624,8 @@ internal static class Program
 
                 mapRaw.Add(args[++i]);
             }
-            else if (string.Equals(a, "-O", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-O", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length)
                 {
@@ -1622,12 +1635,14 @@ internal static class Program
 
                 metaOutput = args[++i];
             }
-            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
             {
                 PrintUsage();
                 return 0;
             }
-            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
             {
                 Console.Write(Constants.Banner);
                 return 0;
@@ -1703,6 +1718,7 @@ internal static class Program
                     Logger.LogErr("Error: -o requires a filename\n");
                     return 1;
                 }
+
                 output = args[++i];
             }
             else if (string.Equals(a, "--ciso-level", StringComparison.OrdinalIgnoreCase) ||
@@ -1714,6 +1730,7 @@ internal static class Program
                     Logger.LogErr("Error: --ciso-level requires an integer 0..9\n");
                     return 1;
                 }
+
                 i++;
             }
             else if (string.Equals(a, "--ciso-split", StringComparison.OrdinalIgnoreCase) ||
@@ -1724,6 +1741,7 @@ internal static class Program
                     Logger.LogErr("Error: --ciso-split requires a positive integer (bytes)\n");
                     return 1;
                 }
+
                 splitBytes = sb;
                 i++;
             }
@@ -1798,6 +1816,7 @@ internal static class Program
                     Logger.LogErr("Error: -o requires a filename\n");
                     return 1;
                 }
+
                 output = args[++i];
             }
             else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
@@ -1925,6 +1944,7 @@ internal static class Program
                 exit = 1;
             }
         }
+
         return exit;
     }
 

@@ -29,7 +29,8 @@ public static class CisoReader
             uint magic = BinaryPrimitives.ReadUInt32LittleEndian(hdr[..4]);
             uint hsize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
             byte ver = hdr[20];
-            return magic == Magic && hsize == HeaderSize && (ver == CisoWriter.VersionDeflate || ver == CisoWriter.VersionLz4);
+            return magic == Magic && hsize == HeaderSize &&
+                   (ver == CisoWriter.VersionDeflate || ver == CisoWriter.VersionLz4);
         }
         catch { return false; }
     }
@@ -130,7 +131,8 @@ public static class CisoReader
             ulong offset = (rawEntry & 0x7FFFFFFFu) * (ulong)(1u << align);
             ulong nextOffset = (rawNext & 0x7FFFFFFFu) * (ulong)(1u << align);
             if (nextOffset < offset)
-                throw new InvalidDataException($"CISO index corruption at sector {sector}: next {nextOffset} < offset {offset}");
+                throw new InvalidDataException(
+                    $"CISO index corruption at sector {sector}: next {nextOffset} < offset {offset}");
 
             long dataLen = (long)(nextOffset - offset);
             if (dataLen < 0) throw new InvalidDataException($"Negative data length at sector {sector}");
@@ -189,7 +191,12 @@ public static class CisoReader
                     // Quick check: trailing bytes we trim should be zeros (pad)
                     bool tailZero = true;
                     for (int z = tryLen; z < compBuf.Length; z++)
-                        if (compBuf[z] != 0) { tailZero = false; break; }
+                        if (compBuf[z] != 0)
+                        {
+                            tailZero = false;
+                            break;
+                        }
+
                     if (!tailZero && trim != 0) continue;
 
                     try
@@ -259,18 +266,21 @@ public static class CisoReader
                                 decompressedBytes = tmp;
                             }
                         }
+
                         dest.Write(decompressedBytes, 0, decompressedBytes.Length);
                         written += decompressedBytes.Length;
                         decompressed = true;
                     }
                     catch (Exception ex)
                     {
-                        throw new InvalidDataException($"Failed to decompress sector {sector} (version {version}, dataLen {dataLen})", ex);
+                        throw new InvalidDataException(
+                            $"Failed to decompress sector {sector} (version {version}, dataLen {dataLen})", ex);
                     }
                 }
             }
 
-            progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded, Path: $"/sector/{sector}", Sector: sector, Size: BlockSize));
+            progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded, Path: $"/sector/{sector}", Sector: sector,
+                Size: BlockSize));
         }
 
         // Truncate/ensure dest length equals uncompressedSize
@@ -283,7 +293,8 @@ public static class CisoReader
             // For MemoryStream etc., truncate if needed
             if (dest.Length != (long)uncompressedSize)
             {
-                try { dest.SetLength((long)uncompressedSize); } catch { }
+                try { dest.SetLength((long)uncompressedSize); }
+                catch { }
             }
         }
 
@@ -368,6 +379,7 @@ public static class CisoReader
                     if (r == 0) throw new EndOfStreamException();
                     n += r;
                 }
+
                 // Trim pad if needed
                 byte[] dec;
                 if (version == CisoWriter.VersionDeflate)
@@ -396,7 +408,13 @@ public static class CisoReader
             int tryLen = compBuf.Length - trim;
             if (tryLen <= 0) continue;
             bool tailZero = true;
-            for (int z = tryLen; z < compBuf.Length; z++) if (compBuf[z] != 0) { tailZero = false; break; }
+            for (int z = tryLen; z < compBuf.Length; z++)
+                if (compBuf[z] != 0)
+                {
+                    tailZero = false;
+                    break;
+                }
+
             if (!tailZero && trim != 0) continue;
             try
             {
@@ -405,6 +423,7 @@ public static class CisoReader
             }
             catch { }
         }
+
         return DeflateDecompress(compBuf);
     }
 
@@ -417,7 +436,13 @@ public static class CisoReader
             int tryLen = compBuf.Length - trim;
             if (tryLen <= 0) continue;
             bool tailZero = true;
-            for (int z = tryLen; z < compBuf.Length; z++) if (compBuf[z] != 0) { tailZero = false; break; }
+            for (int z = tryLen; z < compBuf.Length; z++)
+                if (compBuf[z] != 0)
+                {
+                    tailZero = false;
+                    break;
+                }
+
             if (!tailZero && trim != 0) continue;
             try
             {
@@ -426,6 +451,7 @@ public static class CisoReader
             }
             catch { }
         }
+
         return Lz4Decompress(compBuf);
     }
 
@@ -467,7 +493,9 @@ public static class CisoReader
         catch (Exception ex)
         {
             // As last resort, try DEFLATE again without length check
-            try { return DeflateDecompress(data); } catch { }
+            try { return DeflateDecompress(data); }
+            catch { }
+
             throw new InvalidDataException("LZ4 decompress failed", ex);
         }
     }
@@ -519,6 +547,7 @@ public static class CisoReader
                     matchLen += len;
                 } while (len == 255);
             }
+
             matchLen += 4;
 
             if (dstPos - offset < 0) throw new InvalidDataException("LZ4 offset out of range");
@@ -569,6 +598,7 @@ public static class CisoReader
             else
                 file = file + ".iso";
         }
+
         return Path.Combine(dir, file);
     }
 }

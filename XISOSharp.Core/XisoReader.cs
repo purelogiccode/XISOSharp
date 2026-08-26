@@ -204,7 +204,8 @@ public static class XisoReader
         if (skipSectors.HasValue)
         {
             if (skipSectors.Value < 0)
-                throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value, "Skip sectors must be non-negative.");
+                throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value,
+                    "Skip sectors must be non-negative.");
             discLseek = (long)skipSectors.Value * Constants.SectorSize;
             if (dev.Read(Constants.HeaderOffset + discLseek, buffer) != buffer.Length)
                 throw new IOException("Failed to read header");
@@ -214,7 +215,11 @@ public static class XisoReader
         else
         {
             bool ok = false;
-            long[] probes = [0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset, Constants.Xgd1LseekOffset];
+            long[] probes =
+            [
+                0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
+                Constants.Xgd1LseekOffset
+            ];
             foreach (long probe in probes)
             {
                 if (dev.Read(Constants.HeaderOffset + probe, buffer) != buffer.Length) continue;
@@ -225,6 +230,7 @@ public static class XisoReader
                     break;
                 }
             }
+
             if (!ok)
                 throw new XisoFormatException($"Invalid XISO: {isoName}");
         }
@@ -238,7 +244,9 @@ public static class XisoReader
 
         // skip filetime + unused (8 + 0x7C8)
         Span<byte> tail = stackalloc byte[Constants.HeaderDataLength];
-        if (dev.Read(Constants.HeaderOffset + discLseek + Constants.HeaderDataLength + 4 + 4 + Constants.FileTimeSize + Constants.UnusedSize, tail) != tail.Length)
+        if (dev.Read(
+                Constants.HeaderOffset + discLseek + Constants.HeaderDataLength + 4 + 4 + Constants.FileTimeSize +
+                Constants.UnusedSize, tail) != tail.Length)
             throw new IOException("Failed to read trailing magic");
         if (!tail.SequenceEqual(HeaderDataBytes.AsSpan()))
             throw new XisoFormatException($"Corrupt XISO: {isoName}");
@@ -248,7 +256,8 @@ public static class XisoReader
 
         long totalSectors = dev.Length / Constants.SectorSize;
         if (rootDirSector >= totalSectors)
-            throw new XisoFormatException($"Corrupt XISO: {isoName} — root sector {rootDirSector} beyond end ({totalSectors} sectors).");
+            throw new XisoFormatException(
+                $"Corrupt XISO: {isoName} — root sector {rootDirSector} beyond end ({totalSectors} sectors).");
 
         return (rootDirSector, rootDirSize, discLseek);
     }

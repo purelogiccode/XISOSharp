@@ -22,7 +22,10 @@ public sealed class CisoBlockDevice : IBlockDevice
     private byte[]? _cachedData;
 
     /// <summary>Opens a CISO file as a block device.</summary>
-    public CisoBlockDevice(string csoPath) : this(new FileStream(csoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536), leaveOpen: false) { }
+    public CisoBlockDevice(string csoPath) : this(
+        new FileStream(csoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536), leaveOpen: false)
+    {
+    }
 
     /// <summary>Wraps an open CISO stream.</summary>
     public CisoBlockDevice(FileStream csoFs, bool leaveOpen = false)
@@ -89,7 +92,8 @@ public sealed class CisoBlockDevice : IBlockDevice
     }
 
     /// <inheritdoc/>
-    public void Write(long offset, ReadOnlySpan<byte> buffer) => throw new NotSupportedException("CISO block device is read-only");
+    public void Write(long offset, ReadOnlySpan<byte> buffer) =>
+        throw new NotSupportedException("CISO block device is read-only");
 
     /// <inheritdoc/>
     public void Dispose()
@@ -136,6 +140,7 @@ public sealed class CisoBlockDevice : IBlockDevice
                 if (r == 0) throw new EndOfStreamException($"Unexpected EOF at compressed sector {sector}");
                 n += r;
             }
+
             data = DecompressWithTrim(compBuf, _align, _version);
             if (data.Length != _blockSize)
             {
@@ -167,7 +172,13 @@ public sealed class CisoBlockDevice : IBlockDevice
             int tryLen = compBuf.Length - trim;
             if (tryLen <= 0) continue;
             bool tailZero = true;
-            for (int z = tryLen; z < compBuf.Length; z++) if (compBuf[z] != 0) { tailZero = false; break; }
+            for (int z = tryLen; z < compBuf.Length; z++)
+                if (compBuf[z] != 0)
+                {
+                    tailZero = false;
+                    break;
+                }
+
             if (!tailZero && trim != 0) continue;
             try
             {
@@ -178,6 +189,7 @@ public sealed class CisoBlockDevice : IBlockDevice
             }
             catch { }
         }
+
         // fallback
         return version == CisoWriter.VersionDeflate
             ? CisoReaderDeflate(compBuf)
@@ -201,6 +213,7 @@ public sealed class CisoBlockDevice : IBlockDevice
             if (dec.Length == 2048) return dec;
         }
         catch { }
+
         return Lz4BlockDecompress(data, 2048);
     }
 
@@ -222,6 +235,7 @@ public sealed class CisoBlockDevice : IBlockDevice
                     litLen += len;
                 } while (len == 255);
             }
+
             if (srcPos + litLen > src.Length) throw new InvalidDataException("LZ4 literal overrun");
             src.Slice(srcPos, litLen).CopyTo(dst.AsSpan(dstPos, litLen));
             srcPos += litLen;
@@ -241,11 +255,13 @@ public sealed class CisoBlockDevice : IBlockDevice
                     mLen += len;
                 } while (len == 255);
             }
+
             mLen += 4;
             if (mLen > expectedSize - dstPos) mLen = expectedSize - dstPos;
             for (int i = 0; i < mLen; i++) dst[dstPos + i] = dst[dstPos - offset + i];
             dstPos += mLen;
         }
+
         if (dstPos != expectedSize) throw new InvalidDataException($"LZ4 decompressed {dstPos} != {expectedSize}");
         return dst;
     }

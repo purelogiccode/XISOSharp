@@ -67,7 +67,8 @@ internal sealed class WaxGlob
         // Also trim leading "./"
         while (trimmed.StartsWith("./", StringComparison.Ordinal))
             trimmed = trimmed[2..];
-        if (string.Equals(trimmed, ".", StringComparison.OrdinalIgnoreCase) || string.Equals(trimmed, "./", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(trimmed, ".", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "./", StringComparison.OrdinalIgnoreCase))
             trimmed = string.Empty;
 
         if (string.IsNullOrEmpty(trimmed))
@@ -298,7 +299,8 @@ internal sealed class WaxGlob
 
         if (hasLower && hasUpper)
         {
-            if (int.TryParse(lowerStr, System.Globalization.CultureInfo.InvariantCulture, out var lower) && int.TryParse(upperStr, System.Globalization.CultureInfo.InvariantCulture, out var upper))
+            if (int.TryParse(lowerStr, System.Globalization.CultureInfo.InvariantCulture, out var lower) &&
+                int.TryParse(upperStr, System.Globalization.CultureInfo.InvariantCulture, out var upper))
                 return $"{{{lower},{upper}}}";
             return "+";
         }

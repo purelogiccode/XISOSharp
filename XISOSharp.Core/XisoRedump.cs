@@ -388,7 +388,8 @@ public static class XisoRedump
 
     private static long GetExpectedFillerSize(FileStream isoFs, long xisoLength, bool quiet)
     {
-        (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> file) = XisoRanges.GetXisoRanges(isoFs, 0, quiet);
+        (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> file) =
+            XisoRanges.GetXisoRanges(isoFs, 0, quiet);
         var all = XisoRanges.MergeRanges(sys, file);
         long validBytes = 0;
         foreach ((uint s, uint e) in all) validBytes += (e - s + 1) * SectorSize;
@@ -428,7 +429,8 @@ public static class XisoRedump
         }
         else
         {
-            (List<(uint Start, uint End)> sysRanges, List<(uint Start, uint End)> fileRanges) = XisoRanges.GetXisoRanges(isoFs, 0, quiet);
+            (List<(uint Start, uint End)> sysRanges, List<(uint Start, uint End)> fileRanges) =
+                XisoRanges.GetXisoRanges(isoFs, 0, quiet);
             var ranges = XisoRanges.MergeRanges(sysRanges, fileRanges);
             if (!quiet)
                 foreach ((uint start, uint end) in ranges)

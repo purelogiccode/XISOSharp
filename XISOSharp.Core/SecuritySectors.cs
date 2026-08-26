@@ -35,7 +35,8 @@ public static class SecuritySectors
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
             string[] range = line.Split('-');
-            if (range.Length == 2 && int.TryParse(range[0].Trim(), System.Globalization.CultureInfo.InvariantCulture, out int startSector) &&
+            if (range.Length == 2 && int.TryParse(range[0].Trim(), System.Globalization.CultureInfo.InvariantCulture,
+                    out int startSector) &&
                 int.TryParse(range[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out int endSector))
             {
                 if (startSector < 0 || startSector > maxStart || endSector - startSector != 4095)
@@ -86,7 +87,8 @@ public static class SecuritySectors
             var line = raw.Trim();
             if (line.Length == 0) continue;
             string[] range = line.Split('-');
-            if (range.Length == 2 && int.TryParse(range[0].Trim(), System.Globalization.CultureInfo.InvariantCulture, out int s) &&
+            if (range.Length == 2 &&
+                int.TryParse(range[0].Trim(), System.Globalization.CultureInfo.InvariantCulture, out int s) &&
                 int.TryParse(range[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out int e))
             {
                 if (s < 0 || s > maxStart || e - s != 4095)

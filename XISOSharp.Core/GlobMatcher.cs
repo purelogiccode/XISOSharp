@@ -108,6 +108,7 @@ public sealed class GlobMatcher
                 // Invalid wax pattern (e.g. pure exclude) — fall through to regex check
             }
         }
+
         // No wax capture but regex matched → return whole path as group 0
         if (IsMatch(relativePath))
             return new GlobMatchResult(true, [path]);

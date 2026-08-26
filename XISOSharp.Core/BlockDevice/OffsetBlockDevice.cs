@@ -64,7 +64,11 @@ public sealed class OffsetBlockDevice : IBlockDevice
     /// </summary>
     public static OffsetBlockDevice Probe(IBlockDevice inner, string isoName)
     {
-        long[] offsets = [0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset, Constants.Xgd1LseekOffset];
+        long[] offsets =
+        [
+            0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
+            Constants.Xgd1LseekOffset
+        ];
         foreach (long off in offsets)
         {
             var view = new OffsetBlockDevice(inner, off, leaveOpen: true);
@@ -79,8 +83,10 @@ public sealed class OffsetBlockDevice : IBlockDevice
                     return view;
             }
             catch { }
+
             view.Dispose();
         }
+
         throw new XisoFormatException($"Invalid XISO: {isoName} — no header found at any known offset");
     }
 }
