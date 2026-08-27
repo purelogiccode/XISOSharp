@@ -19,11 +19,20 @@ public class RemapFilesystemTests : IDisposable
 
         foreach (var dir in _tempDirs)
         {
-            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch { }
+            try
+            {
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            }
+            catch { }
         }
+
         foreach (var file in _tempFiles)
         {
-            try { if (File.Exists(file)) File.Delete(file); } catch { }
+            try
+            {
+                if (File.Exists(file)) File.Delete(file);
+            }
+            catch { }
         }
     }
 
@@ -180,14 +189,14 @@ public class RemapFilesystemTests : IDisposable
     public void ParseSpecText_WithMetadataAndRules_ParsesCorrectly()
     {
         string toml = """
-            [metadata]
-            output = "out.iso"
+                      [metadata]
+                      output = "out.iso"
 
-            [map_rules]
-            "src/**" = "dest/{1}"
-            "!skip/**" = ""
-            "*.txt" = "docs/{0}"
-            """;
+                      [map_rules]
+                      "src/**" = "dest/{1}"
+                      "!skip/**" = ""
+                      "*.txt" = "docs/{0}"
+                      """;
 
         var (output, rules) = RemapFilesystem.ParseSpecText(toml);
         Assert.Equal("out.iso", output);
@@ -204,16 +213,16 @@ public class RemapFilesystemTests : IDisposable
     public void ParseSpecText_IgnoresCommentsAndEmptyLines()
     {
         string toml = """
-            # comment
-            [metadata]
-            # another
-            output = "a.iso"
+                      # comment
+                      [metadata]
+                      # another
+                      output = "a.iso"
 
-            [map_rules]
-            ; semicolon comment
-            "a/**" = "b/{1}"
+                      [map_rules]
+                      ; semicolon comment
+                      "a/**" = "b/{1}"
 
-            """;
+                      """;
         var (output, rules) = RemapFilesystem.ParseSpecText(toml);
         Assert.Equal("a.iso", output);
         Assert.Single(rules);
@@ -223,11 +232,11 @@ public class RemapFilesystemTests : IDisposable
     public void ParseSpecFile_ReadsFromFile()
     {
         string toml = """
-            [metadata]
-            output = "fromfile.iso"
-            [map_rules]
-            "**" = "{0}"
-            """;
+                      [metadata]
+                      output = "fromfile.iso"
+                      [map_rules]
+                      "**" = "{0}"
+                      """;
         var tmp = Path.Combine(Path.GetTempPath(), $"xiso_spec_{Guid.NewGuid():N}.toml");
         File.WriteAllText(tmp, toml, Encoding.UTF8);
         _tempFiles.Add(tmp);
@@ -371,7 +380,8 @@ public class RemapFilesystemTests : IDisposable
     {
         var missing = Path.Combine(Path.GetTempPath(), $"missing_{Guid.NewGuid():N}");
         Assert.True(RemapRule.TryParse("**:{0}", out var r, out _));
-        Assert.Throws<DirectoryNotFoundException>(() => RemapFilesystem.DryRunRemap(missing, new List<RemapRule> { r! }));
+        Assert.Throws<DirectoryNotFoundException>(() =>
+            RemapFilesystem.DryRunRemap(missing, new List<RemapRule> { r! }));
     }
 
     [Fact]

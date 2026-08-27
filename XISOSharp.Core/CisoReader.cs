@@ -12,8 +12,10 @@ public static class CisoReader
 {
     /// <summary>CISO block size in bytes (2048, matches XISO sector size).</summary>
     public const int BlockSize = 2048;
+
     /// <summary>CISO magic <c>0x4F534943</c> ("CISO" little-endian).</summary>
     public const uint Magic = 0x4F534943u;
+
     /// <summary>CISO header size in bytes (24).</summary>
     public const uint HeaderSize = 24;
 

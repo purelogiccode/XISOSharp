@@ -13,7 +13,11 @@ public class XisoRedumpAndSkeletonTests : IDisposable
     {
         foreach (var dir in _tempDirs)
         {
-            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch { }
+            try
+            {
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            }
+            catch { }
         }
     }
 
@@ -37,7 +41,8 @@ public class XisoRedumpAndSkeletonTests : IDisposable
     private string CreateIso(string srcDir, int? prependSectors = null)
     {
         var outDir = CreateTempDir();
-        var result = XisoWriter.CreateXiso(srcDir, outDir, null, null, out var isoPath, null, null, prependSectors: prependSectors);
+        var result = XisoWriter.CreateXiso(srcDir, outDir, null, null, out var isoPath, null, null,
+            prependSectors: prependSectors);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         return isoPath!;
@@ -221,7 +226,8 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         var missingVideo = Path.Combine(outDir, "missing.video.iso");
         var outRedump = Path.Combine(outDir, "rebuilt.iso");
 
-        Assert.Throws<FileNotFoundException>(() => XisoRedump.RebuildRedump(iso, missingVideo, null, null, outRedump, null, true));
+        Assert.Throws<FileNotFoundException>(() =>
+            XisoRedump.RebuildRedump(iso, missingVideo, null, null, outRedump, null, true));
     }
 
     [Fact]
@@ -236,7 +242,8 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        Assert.Throws<OperationCanceledException>(() => XisoRedump.RebuildRedump(iso, fakeVideo, null, null, outRedump, null, true, cts.Token));
+        Assert.Throws<OperationCanceledException>(() =>
+            XisoRedump.RebuildRedump(iso, fakeVideo, null, null, outRedump, null, true, cts.Token));
     }
 
     [Fact]
@@ -557,6 +564,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
             var ok1 = XisoZarchive.CreateZar(fs, 0, zarNoRemove, removeUpdate: false, quiet: true);
             Assert.True(ok1);
         }
+
         using (var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
         {
             var ok2 = XisoZarchive.CreateZar(fs, 0, zarRemove, removeUpdate: true, quiet: true);

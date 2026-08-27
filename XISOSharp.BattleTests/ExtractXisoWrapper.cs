@@ -47,10 +47,12 @@ internal sealed class ExtractXisoWrapper : IDisposable
     public (int ExitCode, string StdOut, string StdErr) ListFiles(string isoPath) => Run("-l", isoPath);
 
     /// <summary>Extracts via <c>-x -d &lt;out&gt;</c>.</summary>
-    public (int ExitCode, string StdOut, string StdErr) ExtractFiles(string isoPath, string outDir) => Run("-x", "-d", outDir, isoPath);
+    public (int ExitCode, string StdOut, string StdErr) ExtractFiles(string isoPath, string outDir) =>
+        Run("-x", "-d", outDir, isoPath);
 
     /// <summary>Rewrites via <c>-r -d &lt;out&gt;</c>.</summary>
-    public (int ExitCode, string StdOut, string StdErr) Rewrite(string isoPath, string outDir) => Run("-r", "-d", outDir, isoPath);
+    public (int ExitCode, string StdOut, string StdErr) Rewrite(string isoPath, string outDir) =>
+        Run("-r", "-d", outDir, isoPath);
 
     /// <summary>Creates via <c>-c &lt;dir&gt; [name]</c>.</summary>
     public (int ExitCode, string StdOut, string StdErr) Create(string dir, string? outName = null)

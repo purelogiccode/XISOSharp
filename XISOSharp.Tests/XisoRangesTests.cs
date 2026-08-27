@@ -17,10 +17,15 @@ public class XisoRangesTests : IDisposable
             {
                 if (Directory.Exists(dir)) Directory.Delete(dir, true);
             }
-            catch { /* best effort */ }
+            catch
+            {
+                /* best effort */
+            }
+
             if (File.Exists(dir))
             {
-                try { File.Delete(dir); } catch { }
+                try { File.Delete(dir); }
+                catch { }
             }
         }
     }
@@ -45,7 +50,8 @@ public class XisoRangesTests : IDisposable
     private string CreateIso(string srcDir, int? prependSectors = null)
     {
         var outDir = CreateTempDir();
-        var result = XisoWriter.CreateXiso(srcDir, outDir, null, null, out var isoPath, null, null, prependSectors: prependSectors);
+        var result = XisoWriter.CreateXiso(srcDir, outDir, null, null, out var isoPath, null, null,
+            prependSectors: prependSectors);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         return isoPath!;
@@ -74,10 +80,14 @@ public class XisoRangesTests : IDisposable
         // Sys ranges should be sorted and non-overlapping
         for (int i = 1; i < sys.Count; i++)
         {
-            Assert.True(sys[i].Start > sys[i - 1].End, $"Sys ranges should be sorted and non-overlapping: {sys[i - 1]} then {sys[i]}");
+            Assert.True(sys[i].Start > sys[i - 1].End,
+                $"Sys ranges should be sorted and non-overlapping: {sys[i - 1]} then {sys[i]}");
         }
+
         // First sys range should include header sector (HeaderOffset / SectorSize = 32)
-        Assert.Contains(sys, r => r.Start <= Constants.HeaderOffset / Constants.SectorSize && r.End >= Constants.HeaderOffset / Constants.SectorSize);
+        Assert.Contains(sys,
+            r => r.Start <= Constants.HeaderOffset / Constants.SectorSize &&
+                 r.End >= Constants.HeaderOffset / Constants.SectorSize);
     }
 
     [Fact]
@@ -239,10 +249,13 @@ public class XisoRangesTests : IDisposable
             Assert.True(entries[i].Offset >= entries[i - 1].Offset,
                 $"Entries not sorted by offset: {entries[i - 1].Offset} > {entries[i].Offset}");
         }
+
         // Paths should be present (without leading slash per XisoRanges impl)
         Assert.Contains(entries, e => string.Equals(e.Path, "a.txt", StringComparison.Ordinal));
         Assert.Contains(entries, e => string.Equals(e.Path, "b.txt", StringComparison.Ordinal));
-        Assert.Contains(entries, e => string.Equals(e.Path, "sub/c.txt", StringComparison.Ordinal) || string.Equals(e.Path, "sub\\c.txt", StringComparison.Ordinal));
+        Assert.Contains(entries,
+            e => string.Equals(e.Path, "sub/c.txt", StringComparison.Ordinal) ||
+                 string.Equals(e.Path, "sub\\c.txt", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -311,7 +324,8 @@ public class XisoRangesTests : IDisposable
         long headerOffsetSector = headerOffset / Constants.SectorSize;
         sysSectors.Add((uint)headerOffsetSector);
         // Call GetValidSectors directly
-        XisoRanges.GetValidSectors(fs, isoOffset, sysSectors, fileSectors, rootOffset * Constants.SectorSize, rootSize, 0, true);
+        XisoRanges.GetValidSectors(fs, isoOffset, sysSectors, fileSectors, rootOffset * Constants.SectorSize, rootSize,
+            0, true);
 
         Assert.NotEmpty(sysSectors);
         Assert.NotEmpty(fileSectors);

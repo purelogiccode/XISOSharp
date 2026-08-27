@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+
 using XISOSharp.BlockDevice;
 
 namespace XISOSharp.Tests;
@@ -24,15 +25,29 @@ public class BlockDeviceTests : IDisposable
     {
         foreach (var d in _devices)
         {
-            try { d.Dispose(); } catch { /* ignore */ }
+            try { d.Dispose(); }
+            catch
+            {
+                /* ignore */
+            }
         }
+
         foreach (var dir in _tempDirs)
         {
-            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch { }
+            try
+            {
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            }
+            catch { }
         }
+
         foreach (var f in _tempFiles)
         {
-            try { if (File.Exists(f)) File.Delete(f); } catch { }
+            try
+            {
+                if (File.Exists(f)) File.Delete(f);
+            }
+            catch { }
         }
     }
 
@@ -475,6 +490,7 @@ public class BlockDeviceTests : IDisposable
             if (r == 0) break;
             totalRead += r;
         }
+
         Assert.Equal(all.Length, totalRead);
         Assert.Equal(expectedHash, SHA256.HashData(all));
     }

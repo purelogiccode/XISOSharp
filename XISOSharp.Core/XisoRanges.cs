@@ -61,7 +61,8 @@ public static class XisoRanges
     /// <param name="rootSize">Byte size of the current directory table.</param>
     /// <param name="childOffset">Child offset within the directory table.</param>
     /// <param name="quiet">When <c>true</c>, suppresses logging.</param>
-    public static void GetValidSectors(FileStream isoFs, long isoOffset, List<uint> sysSectors, List<uint> fileSectors, long rootOffset, uint rootSize, long childOffset, bool quiet)
+    public static void GetValidSectors(FileStream isoFs, long isoOffset, List<uint> sysSectors, List<uint> fileSectors,
+        long rootOffset, uint rootSize, long childOffset, bool quiet)
     {
         while (true)
         {
@@ -81,7 +82,9 @@ public static class XisoRanges
             uint entrySize = ReadUInt(isoFs);
             bool isDirectory = ((byte)isoFs.ReadByte() & 0x10) != 0;
 
-            if (leftChildOffset != 0) GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize, (long)leftChildOffset * 4, quiet);
+            if (leftChildOffset != 0)
+                GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize,
+                    (long)leftChildOffset * 4, quiet);
 
             if (isDirectory)
             {

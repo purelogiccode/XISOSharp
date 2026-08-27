@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+
 using XISOSharp.BlockDevice;
 
 namespace XISOSharp.Tests;
@@ -26,13 +27,19 @@ public class CisoTests : IDisposable
             {
                 if (Directory.Exists(dir)) Directory.Delete(dir, true);
             }
-            catch { /* best effort */ }
+            catch
+            {
+                /* best effort */
+            }
 
             try
             {
                 if (File.Exists(dir)) File.Delete(dir);
             }
-            catch { /* best effort */ }
+            catch
+            {
+                /* best effort */
+            }
         }
     }
 
@@ -204,6 +211,7 @@ public class CisoTests : IDisposable
         {
             CisoWriter.CompressStream(src, dst, level: 6);
         }
+
         Assert.True(CisoReader.IsCso(csoPath));
 
         var decDir = CreateTempDir();
@@ -213,6 +221,7 @@ public class CisoTests : IDisposable
         {
             CisoReader.DecompressStream(src, dst);
         }
+
         Assert.Equal(origHash, ComputeSha256(decPath));
     }
 
@@ -400,6 +409,7 @@ public class CisoTests : IDisposable
                 System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(28, 4), second);
             }
         }
+
         var corruptPath = Path.Combine(csoDir, "corrupt2.cso");
         File.WriteAllBytes(corruptPath, bytes);
 
@@ -408,5 +418,3 @@ public class CisoTests : IDisposable
         Assert.Throws<InvalidDataException>(() => CisoReader.DecompressStream(src, dst));
     }
 }
-
-

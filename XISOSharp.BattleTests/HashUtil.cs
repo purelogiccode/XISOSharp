@@ -30,6 +30,7 @@ internal static class HashUtil
             var rel = Path.GetRelativePath(root, file);
             dict[rel] = ComputeSha256(file);
         }
+
         return dict;
     }
 }

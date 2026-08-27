@@ -17,11 +17,20 @@ public class SecurityAndPrngTests : IDisposable
         Logger.RealQuiet = false;
         foreach (var dir in _tempDirs)
         {
-            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch { }
+            try
+            {
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            }
+            catch { }
         }
+
         foreach (var file in _tempFiles)
         {
-            try { if (File.Exists(file)) File.Delete(file); } catch { }
+            try
+            {
+                if (File.Exists(file)) File.Delete(file);
+            }
+            catch { }
         }
     }
 
@@ -304,6 +313,7 @@ public class SecurityAndPrngTests : IDisposable
         {
             prng.WriteSectors(fs, 1);
         }
+
         Assert.Equal(Constants.SectorSize, new FileInfo(tmp).Length);
         // Write via MemoryStream and compare
         var prng2 = new XboxPrng(99);

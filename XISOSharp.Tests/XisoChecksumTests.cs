@@ -20,10 +20,15 @@ public class XisoChecksumTests : IDisposable
             {
                 if (Directory.Exists(dir)) Directory.Delete(dir, true);
             }
-            catch { /* best effort */ }
+            catch
+            {
+                /* best effort */
+            }
+
             if (File.Exists(dir))
             {
-                try { File.Delete(dir); } catch { }
+                try { File.Delete(dir); }
+                catch { }
             }
         }
     }
@@ -48,7 +53,8 @@ public class XisoChecksumTests : IDisposable
     private string CreateIso(string srcDir, string? outputDir = null, int? prependSectors = null)
     {
         outputDir ??= CreateTempDir();
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null, prependSectors: prependSectors);
+        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null,
+            prependSectors: prependSectors);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         Assert.True(File.Exists(isoPath));

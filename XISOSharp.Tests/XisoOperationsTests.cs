@@ -13,11 +13,20 @@ public class XisoOperationsTests : IDisposable
     {
         foreach (var dir in _tempDirs)
         {
-            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch { }
+            try
+            {
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            }
+            catch { }
         }
+
         foreach (var f in _tempFiles)
         {
-            try { if (File.Exists(f)) File.Delete(f); } catch { }
+            try
+            {
+                if (File.Exists(f)) File.Delete(f);
+            }
+            catch { }
         }
     }
 
@@ -41,7 +50,8 @@ public class XisoOperationsTests : IDisposable
     private string CreateIso(string srcDir, int? prependSectors = null)
     {
         var outDir = CreateTempDir();
-        var result = XisoWriter.CreateXiso(srcDir, outDir, null, null, out var isoPath, null, null, prependSectors: prependSectors);
+        var result = XisoWriter.CreateXiso(srcDir, outDir, null, null, out var isoPath, null, null,
+            prependSectors: prependSectors);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         Assert.True(File.Exists(isoPath));
@@ -199,7 +209,8 @@ public class XisoOperationsTests : IDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        Assert.Throws<OperationCanceledException>(() => XisoOperations.ExtractFiller(iso, filler, 0, null, true, cts.Token));
+        Assert.Throws<OperationCanceledException>(() =>
+            XisoOperations.ExtractFiller(iso, filler, 0, null, true, cts.Token));
     }
 
     // -----------------------------------------------------------------------

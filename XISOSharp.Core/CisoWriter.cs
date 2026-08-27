@@ -15,12 +15,16 @@ public static class CisoWriter
 {
     /// <summary>CISO block size in bytes (2048, matches XISO sector size).</summary>
     public const int BlockSize = 2048;
+
     /// <summary>CISO magic <c>0x4F534943</c> ("CISO" little-endian).</summary>
     public const uint Magic = 0x4F534943u; // "CISO" LE
+
     /// <summary>CISO header size in bytes (24).</summary>
     public const uint HeaderSize = 24;
+
     /// <summary>CISO version 1 — classic DEFLATE payload where high bit means plain.</summary>
     public const byte VersionDeflate = 1; // classic CISO with DEFLATE
+
     /// <summary>CISO version 2 — xdvdfs / ciso 0.2 LZ4 payload where high bit means compressed.</summary>
     public const byte VersionLz4 = 2; // xdvdfs / ciso 0.2 (LZ4)
 

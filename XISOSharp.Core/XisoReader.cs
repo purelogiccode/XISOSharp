@@ -1148,6 +1148,182 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Reads the raw 64-bit Windows FILETIME stored in an XISO image header.
+    /// The FILETIME is at <c>HeaderOffset+20+4+4 (+ discLseek)</c> (8 bytes LE) and counts
+    /// 100ns intervals since 1601-01-01 UTC. xdvdfs generates 0; extract-xiso writes
+    /// the current time via <see cref="FileTimeHelper.WriteFileTimeNow"/>.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="skipSectors">
+    /// Optional number of 2048-byte sectors to skip before the XISO filesystem
+    /// (for Redump-style images with a video partition).
+    /// </param>
+    /// <returns>Raw FILETIME value (little-endian on disk).</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="XisoFormatException">Thrown when the file is not a valid XISO image.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static ulong GetFileTimeRaw(string isoPath, int? skipSectors = null)
+    {
+        using var fs = new FileStream(
+            isoPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
+            });
+        long discLseek = FindDiscLseekForFileTime(fs, isoPath, skipSectors);
+        Span<byte> buf = stackalloc byte[8];
+        fs.Seek(Constants.HeaderOffset + discLseek + Constants.HeaderDataLength + 4 + 4, SeekOrigin.Begin);
+        ReadExact(fs, buf);
+        return BinaryPrimitives.ReadUInt64LittleEndian(buf);
+    }
+
+    /// <summary>
+    /// Reads the XISO FILETIME as a <see cref="DateTimeOffset"/> (UTC).
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="skipSectors">Optional skip sectors for Redump images.</param>
+    /// <returns>UTC time; raw 0 maps to 1601-01-01.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="XisoFormatException">Thrown when the file is not a valid XISO image.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static DateTimeOffset GetFileTime(string isoPath, int? skipSectors = null)
+    {
+        ulong raw = GetFileTimeRaw(isoPath, skipSectors);
+        return FileTimeHelper.FromFileTimeRaw(raw);
+    }
+
+    /// <summary>
+    /// Block-device overload of <see cref="GetFileTimeRaw(string,int?)"/>.
+    /// </summary>
+    /// <param name="dev">Block device containing the XISO.</param>
+    /// <param name="isoName">Display name for error messages.</param>
+    /// <param name="skipSectors">Optional skip sectors.</param>
+    /// <returns>Raw FILETIME.</returns>
+    public static ulong GetFileTimeRaw(BlockDevice.IBlockDevice dev, string isoName = "memory", int? skipSectors = null)
+    {
+        long discLseek = FindDiscLseekForFileTime(dev, isoName, skipSectors);
+        Span<byte> buf = stackalloc byte[8];
+        long off = Constants.HeaderOffset + discLseek + Constants.HeaderDataLength + 4 + 4;
+        if (dev.Read(off, buf) != 8)
+            throw new IOException("Failed to read FILETIME");
+        return BinaryPrimitives.ReadUInt64LittleEndian(buf);
+    }
+
+    /// <summary>
+    /// Block-device overload of <see cref="GetFileTime(string,int?)"/>.
+    /// </summary>
+    public static DateTimeOffset GetFileTime(BlockDevice.IBlockDevice dev, string isoName = "memory",
+        int? skipSectors = null)
+    {
+        return FileTimeHelper.FromFileTimeRaw(GetFileTimeRaw(dev, isoName, skipSectors));
+    }
+
+    /// <summary>
+    /// Overwrites the 8-byte FILETIME header field in an existing XISO image.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file (opened read-write).</param>
+    /// <param name="fileTime">Raw FILETIME to write (LE on disk).</param>
+    /// <param name="skipSectors">Optional skip sectors for Redump images.</param>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="XisoFormatException">Thrown when the file is not a valid XISO image.</exception>
+    /// <exception cref="IOException">Thrown on I/O errors.</exception>
+    public static void SetFileTime(string isoPath, ulong fileTime, int? skipSectors = null)
+    {
+        using var fs = new FileStream(
+            isoPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open, Access = FileAccess.ReadWrite, Share = FileShare.None, BufferSize = 256
+            });
+        long discLseek = FindDiscLseekForFileTime(fs, isoPath, skipSectors);
+        Span<byte> buf = stackalloc byte[8];
+        BinaryPrimitives.WriteUInt64LittleEndian(buf, fileTime);
+        fs.Seek(Constants.HeaderOffset + discLseek + Constants.HeaderDataLength + 4 + 4, SeekOrigin.Begin);
+        fs.Write(buf);
+        fs.Flush();
+    }
+
+    /// <summary>
+    /// Overwrites the 8-byte FILETIME header field with a <see cref="DateTimeOffset"/> (UTC).
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="dateTime">UTC time to write (offset normalized).</param>
+    /// <param name="skipSectors">Optional skip sectors for Redump images.</param>
+    public static void SetFileTime(string isoPath, DateTimeOffset dateTime, int? skipSectors = null)
+    {
+        SetFileTime(isoPath, FileTimeHelper.ToFileTimeRaw(dateTime), skipSectors);
+    }
+
+    /// <summary>
+    /// Probes the header magic at known disc offsets (or the skip offset when provided)
+    /// and returns the detected <c>discLseek</c>, throwing if no valid header is found.
+    /// Shared by <see cref="GetFileTimeRaw(string,int?)"/> and <see cref="SetFileTime(string,ulong,int?)"/>.
+    /// </summary>
+    private static long FindDiscLseekForFileTime(FileStream fs, string isoName, int? skipSectors)
+    {
+        Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
+        if (skipSectors.HasValue)
+        {
+            if (skipSectors.Value < 0)
+                throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value,
+                    "Skip sectors must be non-negative.");
+            long discLseek = (long)skipSectors.Value * Constants.SectorSize;
+            fs.Seek(Constants.HeaderOffset + discLseek, SeekOrigin.Begin);
+            ReadExact(fs, buf);
+            if (!buf.SequenceEqual(HeaderDataBytes.AsSpan()))
+                throw new XisoFormatException($"Invalid XISO: {isoName} — no header at sector {skipSectors.Value}");
+            return discLseek;
+        }
+
+        long[] probes =
+        [
+            0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
+            Constants.Xgd1LseekOffset
+        ];
+        foreach (long probe in probes)
+        {
+            fs.Seek(Constants.HeaderOffset + probe, SeekOrigin.Begin);
+            try { ReadExact(fs, buf); }
+            catch { continue; }
+
+            if (buf.SequenceEqual(HeaderDataBytes.AsSpan()))
+                return probe;
+        }
+
+        throw new XisoFormatException($"Invalid XISO: {isoName}");
+    }
+
+    private static long FindDiscLseekForFileTime(BlockDevice.IBlockDevice dev, string isoName, int? skipSectors)
+    {
+        Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
+        if (skipSectors.HasValue)
+        {
+            if (skipSectors.Value < 0)
+                throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value,
+                    "Skip sectors must be non-negative.");
+            long discLseek = (long)skipSectors.Value * Constants.SectorSize;
+            if (dev.Read(Constants.HeaderOffset + discLseek, buf) != buf.Length ||
+                !buf.SequenceEqual(HeaderDataBytes.AsSpan()))
+                throw new XisoFormatException($"Invalid XISO: {isoName} — no header at sector {skipSectors.Value}");
+            return discLseek;
+        }
+
+        long[] probes =
+        [
+            0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
+            Constants.Xgd1LseekOffset
+        ];
+        foreach (long probe in probes)
+        {
+            if (dev.Read(Constants.HeaderOffset + probe, buf) != buf.Length) continue;
+            if (buf.SequenceEqual(HeaderDataBytes.AsSpan()))
+                return probe;
+        }
+
+        throw new XisoFormatException($"Invalid XISO: {isoName}");
+    }
+
+    /// <summary>
     /// Performs a deep integrity audit of an XISO image. Validates the header,
     /// walks the entire directory tree, checks sector bounds, detects cycles,
     /// validates filenames and attributes, and verifies the optimized tag.

@@ -61,6 +61,9 @@ internal static class Program
         string? packName = null;
         string? packIsoFile = null;
 
+        var filetimeMode = false;
+        var setFiletimeMode = false;
+
         // XboxKit redump / archival modes
         var videoMode = false;
         var randomMode = false;
@@ -532,6 +535,27 @@ internal static class Program
                         extract = false;
                         checksumFlagMode = true;
                         break;
+                    case "--filetime":
+                    case "--get-filetime":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        filetimeMode = true;
+                        break;
+                    case "--set-filetime":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        setFiletimeMode = true;
+                        break;
                     case "--silent":
                         // --silent is an alias for checksum --silent when --checksum is active;
                         // otherwise it is a checksum-specific flag handled by the verb subcommand.
@@ -571,9 +595,26 @@ internal static class Program
         }
 
         if (checksumFlagMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode ||
-                                 validateMode || unpackMode || createList.Count > 0 || rewrite))
+                                 validateMode || unpackMode || createList.Count > 0 || rewrite || filetimeMode ||
+                                 setFiletimeMode))
         {
             Logger.LogErr("Error: --checksum cannot be combined with other modes\n");
+            return 1;
+        }
+
+        if (filetimeMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode ||
+                             validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
+                             setFiletimeMode))
+        {
+            Logger.LogErr("Error: --filetime cannot be combined with other modes\n");
+            return 1;
+        }
+
+        if (setFiletimeMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode ||
+                                validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
+                                filetimeMode))
+        {
+            Logger.LogErr("Error: --set-filetime cannot be combined with other modes\n");
             return 1;
         }
 
@@ -610,7 +651,7 @@ internal static class Program
         }
 
         if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || unpackMode || hashMode ||
-                                 copyOut || validateMode || checksumFlagMode))
+                                 copyOut || validateMode || checksumFlagMode || filetimeMode || setFiletimeMode))
         {
             Logger.LogErr(
                 "Error: --batch is only supported in extract, list, tree, rewrite (-r), and audit (-V) modes\n");
@@ -618,7 +659,7 @@ internal static class Program
         }
 
         if (unpackMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode || validateMode ||
-                           checksumFlagMode))
+                           checksumFlagMode || filetimeMode || setFiletimeMode))
         {
             Logger.LogErr("Error: --unpack cannot be combined with other modes\n");
             return 1;
@@ -628,10 +669,17 @@ internal static class Program
         var anyRedumpMode = videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode ||
                             zarMode || allMode || bestMode || compressAlias || rebuildMode;
         if (anyRedumpMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode ||
-                              validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode))
+                              validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
+                              filetimeMode || setFiletimeMode))
         {
             Logger.LogErr(
                 "Error: --video/--random/--seed/--wipe/--trim/--petrify/--update/--zar/--all/--best/--compress/rebuild cannot be combined with other modes\n");
+            return 1;
+        }
+
+        if ((filetimeMode || setFiletimeMode) && (anyRedumpMode || batchDir != null))
+        {
+            Logger.LogErr("Error: --filetime/--set-filetime cannot be combined with redump or --batch modes\n");
             return 1;
         }
 
@@ -664,6 +712,82 @@ internal static class Program
             updateMode = true;
             videoMode = true;
             zarMode = true;
+        }
+
+        // --filetime / --set-filetime dispatch before batch expansion (positional value handling).
+        if (filetimeMode)
+        {
+            if (optind >= args.Length)
+            {
+                Logger.LogErr("Error: --filetime requires <iso>\n");
+                PrintUsage();
+                return 1;
+            }
+
+            if (optind + 1 < args.Length)
+            {
+                Logger.LogErr("Error: --filetime takes exactly one <iso> (extra arguments not allowed)\n");
+                PrintUsage();
+                return 1;
+            }
+
+            string isoPath = args[optind];
+            try
+            {
+                ulong raw = XisoReader.GetFileTimeRaw(isoPath, skipSectors);
+                DateTimeOffset dto = FileTimeHelper.FromFileTimeRaw(raw);
+                string iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
+                Logger.Log($"FileTime: {iso8601} ({raw}) 0x{raw:X16}\n");
+                // Also emit raw only to stdout for scripting when quiet? Match xdvdfs raw behavior on --silent?
+                return 0;
+            }
+            catch (Exception ex) when (ex is XisoFormatException or IOException or FileNotFoundException
+                                           or DirectoryNotFoundException)
+            {
+                Logger.LogErr($"Error reading filetime from {isoPath}: {ex.Message}\n");
+                return 1;
+            }
+        }
+
+        if (setFiletimeMode)
+        {
+            if (optind + 1 >= args.Length)
+            {
+                Logger.LogErr(
+                    "Error: --set-filetime requires <iso> <value> (value: ISO-8601, decimal raw, 0x hex, or 'now')\n");
+                PrintUsage();
+                return 1;
+            }
+
+            if (optind + 2 < args.Length)
+            {
+                Logger.LogErr("Error: --set-filetime takes exactly <iso> <value>\n");
+                PrintUsage();
+                return 1;
+            }
+
+            string isoPath = args[optind];
+            string valueStr = args[optind + 1];
+            if (!FileTimeHelper.TryParseFileTime(valueStr, out ulong raw, out DateTimeOffset dto))
+            {
+                Logger.LogErr(
+                    $"Error: invalid filetime value '{valueStr}' (expected ISO-8601, decimal, 0x hex, 'now', or '0')\n");
+                return 1;
+            }
+
+            try
+            {
+                XisoReader.SetFileTime(isoPath, raw, skipSectors);
+                string iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
+                Logger.Log($"Set FileTime for {isoPath} to {iso8601} ({raw}) 0x{raw:X16}\n");
+                return 0;
+            }
+            catch (Exception ex) when (ex is XisoFormatException or IOException or FileNotFoundException
+                                           or UnauthorizedAccessException)
+            {
+                Logger.LogErr($"Error setting filetime for {isoPath}: {ex.Message}\n");
+                return 1;
+            }
         }
 
         // The list of ISO files to process: explicit filenames, a --batch directory scan,
@@ -779,6 +903,19 @@ internal static class Program
                 Logger.Log($"  Disc Offset:    0x{volInfo.DiscLseek:X8}\n");
                 Logger.Log($"  Root Sector:    {volInfo.RootDirSector}\n");
                 Logger.Log($"  Root Size:      {volInfo.RootDirSize} bytes\n");
+                try
+                {
+                    ulong raw = XisoReader.GetFileTimeRaw(xisoPath, skipSectors);
+                    DateTimeOffset dto = FileTimeHelper.FromFileTimeRaw(raw);
+                    string iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
+                    Logger.Log($"  FileTime:       {iso8601} ({raw})\n");
+                    Logger.Log($"  FileTime raw:   0x{raw:X16} ({raw})\n");
+                }
+                catch (Exception ex) when (ex is XisoFormatException or IOException)
+                {
+                    Logger.Log($"  FileTime:       (unavailable: {ex.Message})\n");
+                }
+
                 Logger.Log("\n");
 
                 var entries = XisoReader.ListDirectory(xisoPath, internalPath);
@@ -1759,7 +1896,8 @@ internal static class Program
                      string.Equals(a, "-l", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(a, "--level", StringComparison.OrdinalIgnoreCase))
             {
-                if (i + 1 >= args.Length || !int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out level) || level < 0 || level > 9)
+                if (i + 1 >= args.Length || !int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out level) ||
+                    level < 0 || level > 9)
                 {
                     Logger.LogErr("Error: --ciso-level requires an integer 0..9\n");
                     return 1;
@@ -1770,7 +1908,8 @@ internal static class Program
             else if (string.Equals(a, "--ciso-split", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(a, "--split", StringComparison.OrdinalIgnoreCase))
             {
-                if (i + 1 >= args.Length || !long.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var sb) || sb <= 0)
+                if (i + 1 >= args.Length || !long.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var sb) ||
+                    sb <= 0)
                 {
                     Logger.LogErr("Error: --ciso-split requires a positive integer (bytes)\n");
                     return 1;
@@ -2609,9 +2748,11 @@ internal static class Program
                                                      --md5 <file> [path] Compute MD5 hash of file(s) in xiso.
                                                      -r                  Rewrite xiso(s) as optimized xiso(s).
                                                      --sha256 <file> [path] Compute SHA-256 hash of file(s) in xiso.
-                                                     -t                  List all files recursively with sizes (tree).
-                                                     -V <file1.xiso> ...  Deep-audit xiso(s): validate header, tree, sectors.
-                                                     --batch <dir>        Process all .iso files in <dir> instead of
+                                                      -t                  List all files recursively with sizes (tree).
+                                                      -V <file1.xiso> ...  Deep-audit xiso(s): validate header, tree, sectors.
+                                                      --filetime <image>   Show FILETIME header field (ISO-8601 + raw u64, xdvdfs compatible; 0 = 1601-01-01).
+                                                      --set-filetime <image> <value>  Set FILETIME field: value may be ISO-8601 (2023-08-26T15:00:00Z), decimal raw, 0x hex, 'now', or '0'.
+                                                      --batch <dir>        Process all .iso files in <dir> instead of
                                                                            explicit filenames. Works with extract,
                                                                            list, tree, rewrite (-r), and audit (-V).
                                                      --batch-recursive    With --batch, search subdirectories recursively.
@@ -2658,10 +2799,12 @@ internal static class Program
                                                                             Alias: cso. Split threshold is reserved (single-file now).
                                                       decompress <cso> [output.iso]    Decompress CISO/CSO to ISO (handles DEFLATE v1 and LZ4 v2).
                                                                             Aliases: uncso, decso.
-                                                      checksum <image> [images...] [--silent]  Compute SHA3-256 image checksum (xdvdfs-compatible:
-                                                                            SHA3-256 over sorted path bytes + file data). Output: hex tab path.
+                                                       checksum <image> [images...] [--silent]  Compute SHA3-256 image checksum (xdvdfs-compatible:
+                                                                             SHA3-256 over sorted path bytes + file data). Output: hex tab path.
+                                                       --filetime <image>             Show FILETIME header field (human-readable + raw, supports --skip-sectors).
+                                                       --set-filetime <image> <value> Set FILETIME header field (value: ISO-8601, decimal raw, 0x hex, 'now', '0').
 
-                                                      XDVDFS / Packing modes (ordered remapping):
+                                                       XDVDFS / Packing modes (ordered remapping):
 
                                                       build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run]
                                                                             Pack an image with ordered wax-glob remapping ({0} whole match, {1..n} per '*'/'**' capture, '!' exclusion). Examples:
@@ -2683,12 +2826,12 @@ internal static class Program
                                                                           media enable patching (not recommended).
                                                     -o <filename>       In rewrite mode, set custom output filename
                                                                           (default: original name with .iso extension).
-                                                    --skip-sectors N     Treat the image as if the XISO filesystem
-                                                                          begins N sectors (2048 bytes each) into the
-                                                                          file. Use for Redump images where a video
-                                                                          partition precedes the game partition.
-                                                                          Valid in extract, list, tree, and rewrite mode.
-                                                    --prepend-sectors N  Write the output image with N empty sectors
+                                                     --skip-sectors N     Treat the image as if the XISO filesystem
+                                                                           begins N sectors (2048 bytes each) into the
+                                                                           file. Use for Redump images where a video
+                                                                           partition precedes the game partition.
+                                                                           Valid in extract, list, tree, rewrite, unpack, and filetime modes.
+                                                     --prepend-sectors N  Write the output image with N empty sectors
                                                                           before the XISO filesystem, leaving room for
                                                                           a video partition. Valid in create (-c) and
                                                                           rewrite (-r) mode. Combine with --skip-sectors
