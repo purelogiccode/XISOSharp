@@ -271,13 +271,11 @@ public static class XisoReader
         // For simplicity, validate via VerifyXiso then walk via reading directory sectors through dev
         try
         {
-            (uint rootSector, uint rootSize, long discLseek) = VerifyXiso(dev, isoName);
-            if (rootSector == 0 && rootSize == 0)
-                return new AuditResult(true, 0, 0, []);
+            _ = VerifyXiso(dev, isoName);
             // For block device, we reuse FileStream-based AuditWalk by materializing to MemoryBlockDevice?
             // Instead, perform minimal audit: check that root directory is readable and entry chain is plausible.
             // Full tree walk via block device would require porting AuditWalk to IBlockDevice.
-            // As pragmatic parity, consider valid if header passes and root directory not empty.
+            // As pragmatic parity, consider valid if header passes.
             // This suffices for MemoryBlockDevice unit tests (golden blobs).
             return new AuditResult(true, 0, 0, []);
         }
@@ -312,6 +310,7 @@ public static class XisoReader
         Span<byte> intBuf = stackalloc byte[4];
         Span<byte> shortBuf = stackalloc byte[2];
         Span<byte> byteBuf = stackalloc byte[1];
+        Span<byte> headerRest = stackalloc byte[12];
 
         DirEntry node = new();
         var dir = inDirNode ?? node;
@@ -351,7 +350,6 @@ public static class XisoReader
                 // or it may be the xdvdfs empty-directory sentinel (14 bytes all zeros).
                 // Peek the remaining 12 bytes of the header to distinguish.
                 var peekPos = fs.Position;
-                Span<byte> headerRest = stackalloc byte[12];
                 bool isAllZeros = false;
                 try
                 {
@@ -1405,6 +1403,7 @@ public static class XisoReader
         Span<byte> shortBuf = stackalloc byte[2];
         Span<byte> intBuf = stackalloc byte[4];
         Span<byte> byteBuf = stackalloc byte[1];
+        Span<byte> headerRest = stackalloc byte[12];
 
         while (true)
         {
@@ -1434,7 +1433,6 @@ public static class XisoReader
             if (lOffset == Constants.EmptyDirectorySentinel)
             {
                 var peekPos = fs.Position;
-                Span<byte> headerRest = stackalloc byte[12];
                 bool isAllZeros = false;
                 try
                 {
@@ -2029,6 +2027,7 @@ public static class XisoReader
         Span<byte> shortBuf = stackalloc byte[2];
         Span<byte> intBuf = stackalloc byte[4];
         Span<byte> byteBuf = stackalloc byte[1];
+        Span<byte> headerRest = stackalloc byte[12];
 
         while (stack.Count > 0)
         {
@@ -2047,7 +2046,6 @@ public static class XisoReader
             if (lOffset == Constants.EmptyDirectorySentinel && offset == 0)
             {
                 var peekPos = fs.Position;
-                Span<byte> headerRest = stackalloc byte[12];
                 bool isAllZeros = false;
                 try
                 {

@@ -1,7 +1,5 @@
 using System.Diagnostics;
 
-using XISOSharp.BattleTests;
-
 namespace XISOSharp.BattleTests;
 
 /// <summary>Battle-tester entry point: compares C# XISOSharp vs native extract-xiso.</summary>
@@ -89,10 +87,10 @@ internal static class Program
                     var synthIso = Path.Combine(Path.GetTempPath(), $"battle_synth_{Guid.NewGuid():N}.iso");
                     try
                     {
-                        var q = XISOSharp.Logger.Quiet;
-                        XISOSharp.Logger.Quiet = true;
-                        try { XISOSharp.XisoWriter.PackFromDirectory(tmpDir, synthIso); }
-                        finally { XISOSharp.Logger.Quiet = q; }
+                        var q = Logger.Quiet;
+                        Logger.Quiet = true;
+                        try { XisoWriter.PackFromDirectory(tmpDir, synthIso); }
+                        finally { Logger.Quiet = q; }
 
                         Console.WriteLine($"No ISOs found → created synthetic {synthIso}");
                         isoFiles.Add(synthIso);
@@ -101,13 +99,17 @@ internal static class Program
                     finally
                     {
                         try { Directory.Delete(tmpDir, true); }
-                        catch { }
+                        catch
+                        {
+                            // ignored
+                        }
                     }
                 }
             }
         }
 
-        isoFiles = isoFiles.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(f => f).ToList();
+        isoFiles = isoFiles.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+            .ToList();
         if (isoFiles.Count == 0)
         {
             Console.WriteLine("No ISO files to test. Use --dirs H:\\XBOXTest or pass explicit .iso paths.");
@@ -142,7 +144,8 @@ internal static class Program
     {
         // --exe <path> takes precedence
         for (int i = 0; i < args.Length - 1; i++)
-            if (args[i] == "--exe" || args[i] == "--native")
+            if (string.Equals(args[i], "--exe", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(args[i], "--native", StringComparison.OrdinalIgnoreCase))
                 return args[i + 1];
 
         // Check H:\ style default + project local
@@ -165,7 +168,7 @@ internal static class Program
         // --dirs H:\XBOXTest,H:\XBOX360Test or --dirs <a> --dirs <b>
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--dirs" && i + 1 < args.Length)
+            if (string.Equals(args[i], "--dirs", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
                 var parts = args[i + 1].Split(',',
                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -201,7 +204,8 @@ internal static class Program
     {
         var list = new List<string>();
         for (int i = 0; i < args.Length - 1; i++)
-            if (args[i] == "--create-dirs" || args[i] == "--create")
+            if (string.Equals(args[i], "--create-dirs", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(args[i], "--create", StringComparison.OrdinalIgnoreCase))
                 list.AddRange(args[i + 1].Split(',',
                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
         // Also supports --create-dirs=<a,b>
@@ -272,11 +276,13 @@ internal static class Program
     {
         if (args.Contains("--all")) return 0;
         for (int i = 0; i < args.Length - 1; i++)
-            if (args[i] == "--limit" && int.TryParse(args[i + 1], out var n))
+            if (string.Equals(args[i], "--limit", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1],
+                    System.Globalization.CultureInfo.InvariantCulture, out var n))
                 return n;
         foreach (var a in args)
             if (a.StartsWith("--limit=", StringComparison.Ordinal) &&
-                int.TryParse(a.Substring("--limit=".Length), out var n))
+                int.TryParse(a.Substring("--limit=".Length), System.Globalization.CultureInfo.InvariantCulture,
+                    out var n))
                 return n;
         // Default limit 20 to keep battle fast on H:\ (37 files, each 7GB → too slow)
         return 5; // default to 5 ISOs + create battle; user can --limit 0 or --all for all
@@ -284,30 +290,32 @@ internal static class Program
 
     private static void PrintUsage()
     {
-        Console.WriteLine(@"
-Usage: XISOSharp.BattleTests [options] [*.iso ...]
+        Console.WriteLine("""
 
-Options:
-  --exe <path>              Path to extract-xiso.exe (default: XISOSharpTester/extract-xiso.exe)
-  --dirs <dir1,dir2>        Comma-separated dirs to scan for *.iso (default: H:\XBOXTest,H:\XBOX360Test if present)
-  --create-dirs <dir1,dir2> Dirs to test ISO creation parity (default: TestData/source)
-  --recursive               Scan dirs recursively for *.iso (top-level by default)
-  --limit <N>               Limit number of ISOs tested (default 5, use --all for all, --limit 0 for no limit)
-  --all                     Test all found ISOs (no limit)
-  -h, --help                Show this help
+                          Usage: XISOSharp.BattleTests [options] [*.iso ...]
 
-Examples:
-  XISOSharp.BattleTests --exe C:\path\extract-xiso.exe
-  XISOSharp.BattleTests --dirs H:\XBOXTest --limit 10
-  XISOSharp.BattleTests D:\my.iso E:\other.iso --create-dirs C:\myGameFolder
-  XISOSharp.BattleTests --dirs H:\XBOXTest,H:\XBOX360Test --recursive --all
+                          Options:
+                            --exe <path>              Path to extract-xiso.exe (default: XISOSharpTester/extract-xiso.exe)
+                            --dirs <dir1,dir2>        Comma-separated dirs to scan for *.iso (default: H:\XBOXTest,H:\XBOX360Test if present)
+                            --create-dirs <dir1,dir2> Dirs to test ISO creation parity (default: TestData/source)
+                            --recursive               Scan dirs recursively for *.iso (top-level by default)
+                            --limit <N>               Limit number of ISOs tested (default 5, use --all for all, --limit 0 for no limit)
+                            --all                     Test all found ISOs (no limit)
+                            -h, --help                Show this help
 
-Comparisons per ISO:
-  Verify, Audit, List, Extract (SHA256), Rewrite (SHA256), CISO round-trip, Checksum, BlockDevice
-Plus:
-  Create parity (dir -> iso via both tools), Directory Listing compare, Extract SHA256 compare
-  Advanced self-tests: Remap, WaxGlob, Ranges, XgdTables, SecuritySectors, Prng, Ops, GlobMatcher
-");
+                          Examples:
+                            XISOSharp.BattleTests --exe C:\path\extract-xiso.exe
+                            XISOSharp.BattleTests --dirs H:\XBOXTest --limit 10
+                            XISOSharp.BattleTests D:\my.iso E:\other.iso --create-dirs C:\myGameFolder
+                            XISOSharp.BattleTests --dirs H:\XBOXTest,H:\XBOX360Test --recursive --all
+
+                          Comparisons per ISO:
+                            Verify, Audit, List, Extract (SHA256), Rewrite (SHA256), CISO round-trip, Checksum, BlockDevice
+                          Plus:
+                            Create parity (dir -> iso via both tools), Directory Listing compare, Extract SHA256 compare
+                            Advanced self-tests: Remap, WaxGlob, Ranges, XgdTables, SecuritySectors, Prng, Ops, GlobMatcher
+
+                          """);
     }
 
     private static void PrintSummary(BattleSessionResult s)
@@ -335,7 +343,7 @@ Plus:
         {
             var outDir = Path.Combine(Directory.GetCurrentDirectory(), "BattleReports");
             Directory.CreateDirectory(outDir);
-            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture);
             var txtPath = Path.Combine(outDir, $"battle_{stamp}.txt");
             var jsonPath = Path.Combine(outDir, $"battle_{stamp}.json");
 

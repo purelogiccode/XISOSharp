@@ -327,8 +327,6 @@ public static class CisoWriter
         {
             // Use XisoWriter.CreateXiso directly with explicit output name to avoid extra .iso
             string dir = Path.GetDirectoryName(Path.GetFullPath(outputIsoPath)) ?? Directory.GetCurrentDirectory();
-            string name = Path.GetFileName(outputIsoPath);
-            // name includes .iso already (temp file)
             Directory.CreateDirectory(dir);
             // CreateXiso expects rootDirectory + outputDirectory + inName; we want exact path
             // Use PackFromDirectory with outputIsoPath

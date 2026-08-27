@@ -97,7 +97,7 @@ public static class XisoChecksum
     {
         ct.ThrowIfCancellationRequested();
         // Gather immediate children of this directory table
-        var children = WalkDirentTree(fs, dirStart, dirSize, discLseek);
+        var children = WalkDirentTree(fs, dirStart, dirSize);
 
         // For each child, insert into map and recurse if directory
         foreach (var child in children)
@@ -127,7 +127,7 @@ public static class XisoChecksum
         public bool IsDirectory;
     }
 
-    private static List<DirEnt> WalkDirentTree(FileStream fs, long dirStart, uint dirSize, long discLseek)
+    private static List<DirEnt> WalkDirentTree(FileStream fs, long dirStart, uint dirSize)
     {
         var result = new List<DirEnt>();
         if (dirSize == 0) return result;

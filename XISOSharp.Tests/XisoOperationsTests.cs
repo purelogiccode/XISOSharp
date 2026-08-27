@@ -17,7 +17,10 @@ public class XisoOperationsTests : IDisposable
             {
                 if (Directory.Exists(dir)) Directory.Delete(dir, true);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
 
         foreach (var f in _tempFiles)
@@ -26,7 +29,10 @@ public class XisoOperationsTests : IDisposable
             {
                 if (File.Exists(f)) File.Delete(f);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
     }
 
@@ -55,7 +61,7 @@ public class XisoOperationsTests : IDisposable
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         Assert.True(File.Exists(isoPath));
-        return isoPath!;
+        return isoPath;
     }
 
     private static void PopulateSimple(string dir)
@@ -68,11 +74,6 @@ public class XisoOperationsTests : IDisposable
         var data = new byte[7000];
         rnd.NextBytes(data);
         File.WriteAllBytes(Path.Combine(dir, "data.bin"), data);
-    }
-
-    private static void PopulateSingle(string dir)
-    {
-        File.WriteAllText(Path.Combine(dir, "file.txt"), "single");
     }
 
     // -----------------------------------------------------------------------
@@ -169,10 +170,10 @@ public class XisoOperationsTests : IDisposable
 
         // Compute expected filler size via XisoRanges
         using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        var (sys, files) = XisoRanges.GetXisoRanges(fs, 0, true);
+        (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> files) = XisoRanges.GetXisoRanges(fs, 0, true);
         var merged = XisoRanges.MergeRanges(sys, files);
         long validBytes = 0;
-        foreach (var (s, e) in merged) validBytes += (e - s + 1L) * Constants.SectorSize;
+        foreach ((uint s, uint e) in merged) validBytes += (e - s + 1L) * Constants.SectorSize;
         long expectedFiller = fs.Length - validBytes;
 
         Assert.Equal(expectedFiller, new FileInfo(fillerPath).Length);
@@ -519,10 +520,10 @@ public class XisoOperationsTests : IDisposable
         // Wiped should be same size as original, filler + valid data == iso size
         Assert.Equal(isoLen, wipedLen);
         using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        var (sys, files) = XisoRanges.GetXisoRanges(fs, 0, true);
+        (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> files) = XisoRanges.GetXisoRanges(fs, 0, true);
         var merged = XisoRanges.MergeRanges(sys, files);
         long validBytes = 0;
-        foreach (var (s, e) in merged) validBytes += (e - s + 1L) * Constants.SectorSize;
+        foreach ((uint s, uint e) in merged) validBytes += (e - s + 1L) * Constants.SectorSize;
         Assert.Equal(validBytes + fillerLen, isoLen);
     }
 }

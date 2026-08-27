@@ -17,7 +17,10 @@ public class XisoRedumpAndSkeletonTests : IDisposable
             {
                 if (Directory.Exists(dir)) Directory.Delete(dir, true);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
     }
 
@@ -45,7 +48,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
             prependSectors: prependSectors);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
-        return isoPath!;
+        return isoPath;
     }
 
     private static void PopulateSimple(string dir)
@@ -356,9 +359,9 @@ public class XisoRedumpAndSkeletonTests : IDisposable
 
         // Hash entries sorted? Verify they contain expected file paths
         var joined = string.Join("\n", lines);
-        Assert.Contains("a.txt", joined);
-        Assert.Contains("b.txt", joined);
-        Assert.Contains("c.txt", joined);
+        Assert.Contains("a.txt", joined, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("b.txt", joined, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("c.txt", joined, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

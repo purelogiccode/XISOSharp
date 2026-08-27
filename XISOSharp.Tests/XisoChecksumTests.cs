@@ -1,6 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
-
 namespace XISOSharp.Tests;
 
 /// <summary>
@@ -28,7 +25,10 @@ public class XisoChecksumTests : IDisposable
             if (File.Exists(dir))
             {
                 try { File.Delete(dir); }
-                catch { }
+                catch
+                {
+                    // ignored
+                }
             }
         }
     }
@@ -59,7 +59,7 @@ public class XisoChecksumTests : IDisposable
         Assert.NotNull(isoPath);
         Assert.True(File.Exists(isoPath));
         // isoPath is inside outputDir which is already tracked; also track file explicitly for cleanup if needed
-        return isoPath!;
+        return isoPath;
     }
 
     private static void PopulateSimple(string dir)

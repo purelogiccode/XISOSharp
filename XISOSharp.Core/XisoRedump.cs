@@ -257,10 +257,7 @@ public static class XisoRedump
 
         int xisoType = XgdTables.GetXisoTypeFromVideo(videoType);
         long xisoLength = XgdTables.XisoLength[xisoType];
-        long xisoOffset = XgdTables.XisoOffset[xisoType];
         long redumpLength = XgdTables.GetRedumpLength(videoType);
-        long l0Length = XgdTables.VideoL0Length[videoType];
-        long l1Length = XgdTables.VideoL1Length[videoType];
         int
             xgdType = xisoType; // XisoType maps 1:1 to XGD type for security-sector validation (Hybrid maps to 2, which follows XGD2 rule of 1 sector range)
 

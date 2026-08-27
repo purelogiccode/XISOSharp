@@ -260,11 +260,6 @@ public class XgdTablesTests
             using var fs = new FileStream(tmp, FileMode.Open, FileAccess.Read, FileShare.Read);
             Assert.Equal(0, XgdTables.GetWave(fs, 5));
             Assert.Equal(0, XgdTables.GetWave(fs, 7));
-
-            // Overwrite with another known PVD
-            var pvd14 = System.Text.Encoding.ASCII.GetBytes("2011120716000000"); // index 14
-            fs.Seek(0x832D, SeekOrigin.Begin);
-            // Need to write via file, reopen for write
         }
         finally
         {

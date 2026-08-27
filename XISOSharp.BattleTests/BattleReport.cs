@@ -61,7 +61,7 @@ internal sealed class BattleSessionResult
 
     /// <summary>Passed files (no failures).</summary>
     public int PassedFiles =>
-        FileResults.Count(r => r.AllPassed && !r.SubTests.All(s => s.Status == BattleStatus.Skipped));
+        FileResults.Count(r => r.AllPassed && r.SubTests.Any(s => s.Status != BattleStatus.Skipped));
 
     /// <summary>Failed files.</summary>
     public int FailedFiles => FileResults.Count(r => r.HasFailures);

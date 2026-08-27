@@ -61,13 +61,6 @@ public sealed class XboxPrng
         }
     }
 
-    private byte[] GenerateSector()
-    {
-        byte[] sector = new byte[Constants.SectorSize];
-        GenerateSector(sector);
-        return sector;
-    }
-
     /// <summary>
     /// Extract initial seed from an XGD1 XISO at <paramref name="xisoOffset"/> (byte offset).
     /// Returns null if magic/version checks fail or brute-force fails.

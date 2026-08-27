@@ -22,7 +22,8 @@ public sealed class WaxGlob
         ArgumentNullException.ThrowIfNull(pattern);
         Pattern = pattern;
         var regexStr = BuildRegex(pattern);
-        _regex = new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        _regex = new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+            TimeSpan.FromSeconds(2));
     }
 
     /// <summary>Gets the original wax pattern string.</summary>
@@ -438,7 +439,7 @@ public sealed class WaxGlob
         charClass = "[" + (negate ? "^" : string.Empty) + content + "]";
         try
         {
-            _ = new Regex(charClass);
+            _ = new Regex(charClass, RegexOptions.None, TimeSpan.FromMilliseconds(200));
         }
         catch (ArgumentException)
         {

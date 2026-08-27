@@ -20,7 +20,10 @@ public class XisoFileTimeTests : IDisposable
             {
                 if (Directory.Exists(dir)) Directory.Delete(dir, true);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
     }
 
@@ -32,9 +35,9 @@ public class XisoFileTimeTests : IDisposable
         return dir;
     }
 
-    private string CreateSimpleIso(out string srcDir, out string outDir)
+    private string CreateSimpleIso(out string outDir)
     {
-        srcDir = CreateTempDir();
+        string srcDir = CreateTempDir();
         outDir = CreateTempDir();
         File.WriteAllText(Path.Combine(srcDir, "hello.txt"), "hello world");
         File.WriteAllText(Path.Combine(srcDir, "data.bin"), "12345");
@@ -42,7 +45,7 @@ public class XisoFileTimeTests : IDisposable
         Assert.Equal(0, rc);
         Assert.NotNull(isoPath);
         Assert.True(File.Exists(isoPath));
-        return isoPath!;
+        return isoPath;
     }
 
     [Fact]
@@ -110,7 +113,7 @@ public class XisoFileTimeTests : IDisposable
     [Fact]
     public void XisoReader_GetSetFileTime_RoundTrip()
     {
-        string isoPath = CreateSimpleIso(out _, out _);
+        string isoPath = CreateSimpleIso(out _);
 
         // Initial filetime is non-zero (current time)
         ulong initialRaw = XisoReader.GetFileTimeRaw(isoPath);
@@ -139,7 +142,7 @@ public class XisoFileTimeTests : IDisposable
 
         // BlockDevice overload parity
         using var fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        var dev = new XISOSharp.BlockDevice.FileBlockDevice(fs, false);
+        var dev = new BlockDevice.FileBlockDevice(fs, false);
         ulong devRaw = XisoReader.GetFileTimeRaw(dev, "test.iso");
         Assert.Equal(hexRaw, devRaw);
     }
@@ -148,26 +151,26 @@ public class XisoFileTimeTests : IDisposable
     public void XisoReader_FileTime_RewritePreserved()
     {
         // Create ISO, set known filetime, rewrite via XisoReader.Rewrite (which copies filetime from source stream)
-        string isoPath = CreateSimpleIso(out _, out var outDir);
+        string isoPath = CreateSimpleIso(out var outDir);
         var knownDto = new DateTimeOffset(2019, 5, 17, 10, 0, 0, TimeSpan.Zero);
         XisoReader.SetFileTime(isoPath, knownDto);
         ulong beforeRaw = XisoReader.GetFileTimeRaw(isoPath);
 
         // Rewrite: requires .old dance as in Program.cs rewrite path; use XisoReader.Rewrite wrapper
-        string? rewriteOut;
         // XisoReader.Rewrite expects .old file handling via DecodeXiso; easier to test via direct CreateXiso rewrite path:
         // Use XisoReader.DecodeXiso with Rewrite mode requires renaming to .old.
         string oldPath = isoPath + ".old";
         File.Move(isoPath, oldPath);
         try
         {
-            int rc = XisoReader.Rewrite(oldPath, outDir, out rewriteOut, CancellationToken.None, null, null, null,
+            int rc = XisoReader.Rewrite(oldPath, outDir, out string? rewriteOut, CancellationToken.None, null, null,
+                null,
                 null);
             Assert.Equal(0, rc);
             // Rewrite may create new file in outDir or cwd; find it
             // Rewrite creates file named after source without .old suffix, with .iso if needed
             // Locate the rewritten iso (newIsoPath)
-            string? rewrittenIso = rewriteOut ?? Directory.GetFiles(outDir, "*.iso").FirstOrDefault() ?? isoPath;
+            string rewrittenIso = rewriteOut ?? Directory.GetFiles(outDir, "*.iso").FirstOrDefault() ?? isoPath;
             Assert.NotNull(rewrittenIso);
             if (!File.Exists(rewrittenIso))
             {
@@ -190,7 +193,10 @@ public class XisoFileTimeTests : IDisposable
             {
                 if (File.Exists(oldPath)) File.Delete(oldPath);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
     }
 

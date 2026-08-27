@@ -67,16 +67,16 @@ public sealed class OffsetBlockDevice : IBlockDevice
             0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
             Constants.Xgd1LseekOffset
         ];
+        Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
+        var magic = System.Text.Encoding.ASCII.GetBytes(Constants.HeaderData);
         foreach (long off in offsets)
         {
             var view = new OffsetBlockDevice(inner, off, leaveOpen: true);
             try
             {
                 // Try to validate header at HeaderOffset within view
-                Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
                 int n = view.Read(Constants.HeaderOffset, buf);
                 if (n != Constants.HeaderDataLength) continue;
-                var magic = System.Text.Encoding.ASCII.GetBytes(Constants.HeaderData);
                 if (buf.SequenceEqual(magic))
                     return view;
             }

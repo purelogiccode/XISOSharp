@@ -23,7 +23,10 @@ public class RemapFilesystemTests : IDisposable
             {
                 if (Directory.Exists(dir)) Directory.Delete(dir, true);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
 
         foreach (var file in _tempFiles)
@@ -32,7 +35,10 @@ public class RemapFilesystemTests : IDisposable
             {
                 if (File.Exists(file)) File.Delete(file);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
     }
 
@@ -135,8 +141,8 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void TryParse_ExclusionEmptyHost_Fails()
     {
-        bool ok = RemapRule.TryParse("! :dest", out var rule, out var error);
-        // Host after trimming "! " becomes ""? Actually raw ":dest" host empty, but for "!" case:
+        Assert.False(RemapRule.TryParse("! :dest", out _, out var error));
+        Assert.NotNull(error);
         // Try another: "!"
         bool ok2 = RemapRule.TryParse("!", out _, out var err2);
         Assert.False(ok2);
@@ -198,7 +204,7 @@ public class RemapFilesystemTests : IDisposable
                       "*.txt" = "docs/{0}"
                       """;
 
-        var (output, rules) = RemapFilesystem.ParseSpecText(toml);
+        (string? output, List<RemapRule> rules) = RemapFilesystem.ParseSpecText(toml);
         Assert.Equal("out.iso", output);
         Assert.Equal(3, rules.Count);
         Assert.Equal("src/**", rules[0].HostGlob);
@@ -223,7 +229,7 @@ public class RemapFilesystemTests : IDisposable
                       "a/**" = "b/{1}"
 
                       """;
-        var (output, rules) = RemapFilesystem.ParseSpecText(toml);
+        (string? output, List<RemapRule> rules) = RemapFilesystem.ParseSpecText(toml);
         Assert.Equal("a.iso", output);
         Assert.Single(rules);
     }
@@ -241,7 +247,7 @@ public class RemapFilesystemTests : IDisposable
         File.WriteAllText(tmp, toml, Encoding.UTF8);
         _tempFiles.Add(tmp);
 
-        var (output, rules) = RemapFilesystem.ParseSpecFile(tmp);
+        (string? output, List<RemapRule> rules) = RemapFilesystem.ParseSpecFile(tmp);
         Assert.Equal("fromfile.iso", output);
         Assert.Single(rules);
         Assert.Equal("**", rules[0].HostGlob);
@@ -263,11 +269,11 @@ public class RemapFilesystemTests : IDisposable
             new() { HostGlob = "skip/**", ImagePath = "", IsExclusion = true },
         };
         string toml = RemapFilesystem.GenerateSpecText(rules, "out.iso");
-        Assert.Contains("output = \"out.iso\"", toml);
-        Assert.Contains("src/**", toml);
-        Assert.Contains("!skip/**", toml);
+        Assert.Contains("output = \"out.iso\"", toml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("src/**", toml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("!skip/**", toml, StringComparison.OrdinalIgnoreCase);
 
-        var (output, parsed) = RemapFilesystem.ParseSpecText(toml);
+        (string? output, List<RemapRule> parsed) = RemapFilesystem.ParseSpecText(toml);
         Assert.Equal("out.iso", output);
         Assert.Equal(2, parsed.Count);
         Assert.Equal(rules[0].HostGlob, parsed[0].HostGlob);
@@ -281,8 +287,8 @@ public class RemapFilesystemTests : IDisposable
     {
         var rules = new List<RemapRule> { new() { HostGlob = "**", ImagePath = "{0}" } };
         string toml = RemapFilesystem.GenerateSpecText(rules, null);
-        Assert.DoesNotContain("[metadata]", toml);
-        Assert.Contains("[map_rules]", toml);
+        Assert.DoesNotContain("[metadata]", toml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("[map_rules]", toml, StringComparison.OrdinalIgnoreCase);
     }
 
     // -----------------------------------------------------------------
@@ -298,7 +304,7 @@ public class RemapFilesystemTests : IDisposable
         CreateFile(src, "sub/c.txt", "c");
 
         // Map all txt files to docs/
-        Assert.True(RemapRule.TryParse("**/*.txt:docs/{0}", out var r1, out _));
+        Assert.True(RemapRule.TryParse("**/*.txt:docs/{0}", out _, out _));
         // Actually "**/*.txt" captures via WaxGlob? For remap, {0} is whole match, should produce docs/<path>. DryRun will rewrite via caps[0].
         // Simpler: map everything to root via "**"
         Assert.True(RemapRule.TryParse("**:{0}", out var rAll, out _));
@@ -306,8 +312,12 @@ public class RemapFilesystemTests : IDisposable
 
         var mappings = RemapFilesystem.DryRunRemap(src, rules);
         // Every file should be mapped to itself (since {0} is whole)
-        Assert.Contains(mappings, m => m.HostPath == "/a.txt" && m.ImagePath == "/a.txt");
-        Assert.Contains(mappings, m => m.HostPath == "/sub/c.txt" && m.ImagePath == "/sub/c.txt");
+        Assert.Contains(mappings,
+            m => string.Equals(m.HostPath, "/a.txt", StringComparison.OrdinalIgnoreCase) &&
+                 string.Equals(m.ImagePath, "/a.txt", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(mappings,
+            m => string.Equals(m.HostPath, "/sub/c.txt", StringComparison.OrdinalIgnoreCase) &&
+                 string.Equals(m.ImagePath, "/sub/c.txt", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -323,11 +333,16 @@ public class RemapFilesystemTests : IDisposable
 
         var mappings = RemapFilesystem.DryRunRemap(src, rules);
         // src/* should be mapped to dest/*
-        Assert.Contains(mappings, m => m.HostPath == "/src/file.txt" && m.ImagePath == "/dest/file.txt");
-        Assert.Contains(mappings, m => m.HostPath == "/src/sub/nested.txt" && m.ImagePath == "/dest/sub/nested.txt");
+        Assert.Contains(mappings,
+            m => string.Equals(m.HostPath, "/src/file.txt", StringComparison.OrdinalIgnoreCase) &&
+                 string.Equals(m.ImagePath, "/dest/file.txt", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(mappings,
+            m => string.Equals(m.HostPath, "/src/sub/nested.txt", StringComparison.OrdinalIgnoreCase) &&
+                 string.Equals(m.ImagePath, "/dest/sub/nested.txt", StringComparison.OrdinalIgnoreCase));
         // other.txt is child of ? It is not under src, and src/** does not match other.txt, so it should not be mapped.
         // But due to parentPrefix logic, only descendants of matched prefix are mapped. other.txt has no prefix, so omitted.
-        Assert.DoesNotContain(mappings, m => m.HostPath == "/other.txt");
+        Assert.DoesNotContain(mappings,
+            m => string.Equals(m.HostPath, "/other.txt", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -355,9 +370,9 @@ public class RemapFilesystemTests : IDisposable
         // For rules [all, excl]: for prefix "skip.txt": idx0 all caps not null, IsExclusion false, rewritten=null so it sets rewritten to "skip.txt"; idx1 excl caps not null, IsExclusion true => rewritten=null (clears). So final null -> omitted.
         // For order [excl, all]: for "skip.txt": idx0 excl matches -> rewritten stays null; idx1 all matches but IsExclusion false, but rewritten==null so it would set. So order matters differently.
         // We test inclusion then exclusion should exclude.
-        Assert.DoesNotContain(mappings, m => m.HostPath.Contains("skip"));
-        Assert.Contains(mappings, m => m.HostPath == "/keep.txt");
-        Assert.Contains(mappings, m => m.HostPath == "/sub/keep2.txt");
+        Assert.DoesNotContain(mappings, m => m.HostPath.Contains("skip", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(mappings, m => string.Equals(m.HostPath, "/keep.txt", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(mappings, m => string.Equals(m.HostPath, "/sub/keep2.txt", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -371,8 +386,12 @@ public class RemapFilesystemTests : IDisposable
         Assert.True(RemapRule.TryParse("srcdir:destdir", out var rule, out _));
         var mappings = RemapFilesystem.DryRunRemap(src, new List<RemapRule> { rule! });
 
-        Assert.Contains(mappings, m => m.HostPath == "/srcdir/file.txt" && m.ImagePath == "/destdir/file.txt");
-        Assert.Contains(mappings, m => m.HostPath == "/srcdir/sub/b.txt" && m.ImagePath == "/destdir/sub/b.txt");
+        Assert.Contains(mappings,
+            m => string.Equals(m.HostPath, "/srcdir/file.txt", StringComparison.OrdinalIgnoreCase) &&
+                 string.Equals(m.ImagePath, "/destdir/file.txt", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(mappings,
+            m => string.Equals(m.HostPath, "/srcdir/sub/b.txt", StringComparison.OrdinalIgnoreCase) &&
+                 string.Equals(m.ImagePath, "/destdir/sub/b.txt", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

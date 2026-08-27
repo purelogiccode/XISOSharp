@@ -119,7 +119,6 @@ public static class CisoReader
         // Verify last index roughly matches data size (allow alignment slack)
         // Decompress each sector
         var blockBuf = new byte[BlockSize];
-        var outBuf = new byte[BlockSize];
         long written = 0;
 
         progress?.Report(new ProgressInfo(ProgressInfoType.FileCount, Count: totalBlocks));

@@ -790,6 +790,38 @@ internal static class Program
             }
         }
 
+        if (checksumFlagMode)
+        {
+            if (optind >= args.Length)
+            {
+                Logger.LogErr("Error: --checksum requires <iso>\n");
+                PrintUsage();
+                return 1;
+            }
+
+            int cExit = 0;
+            for (int k = optind; k < args.Length; k++)
+            {
+                string iso = args[k];
+                try
+                {
+                    byte[] hash = XisoChecksum.ComputeImageChecksum(iso);
+                    string hex = Convert.ToHexString(hash).ToLowerInvariant();
+                    if (checksumSilent)
+                        Logger.Log($"{hex}\n");
+                    else
+                        Logger.Log($"{hex}\t{iso}\n");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogErr($"Error checksumming {iso}: {ex.Message}\n");
+                    cExit = 1;
+                }
+            }
+
+            return cExit;
+        }
+
         // The list of ISO files to process: explicit filenames, a --batch directory scan,
         // or a --pack ISO input.
         var isoFiles = ExpandIsoFiles(batchDir, batchRecursive, args, optind, packIsoFile);
@@ -1729,10 +1761,7 @@ internal static class Program
             var name = Path.GetFileName(trimmed);
             if (string.IsNullOrEmpty(name)) name = "image";
             // with_extension is_dir=true logic: append .xiso.iso
-            if (Path.HasExtension(name))
-                outputIso = Path.Combine(parent, name + ".xiso.iso");
-            else
-                outputIso = Path.Combine(parent, name + ".xiso.iso");
+            outputIso = Path.Combine(parent, name + ".xiso.iso");
             outputIso = Path.GetFullPath(outputIso);
         }
 
@@ -2134,6 +2163,7 @@ internal static class Program
     private static int RunRedumpBatch(List<string> isoFiles, bool video, bool random, bool seed, bool wipe, bool trim,
         bool petrify, bool update, bool zar, string? securitySectorsPath, string? outputName)
     {
+        _ = securitySectorsPath;
         // Single-output guard
         bool singleModeCount = new[] { video, random, seed, wipe, trim, petrify, update, zar }.Count(b => b) == 1;
         if (outputName != null && isoFiles.Count != 1 && singleModeCount)
@@ -2155,10 +2185,8 @@ internal static class Program
             }
 
             int redumpType = XgdTables.GetRedumpIsoTypeBySize(size);
-            int xisoType = XgdTables.GetXisoTypeBySize(size);
             int vidType = XgdTables.GetVideoTypeBySize(size);
             bool isRedump = redumpType >= 0;
-            bool isXiso = xisoType >= 0;
             bool isVideo = vidType >= 0;
 
             // Derive isoOffset / length for partition ops
@@ -2520,7 +2548,7 @@ internal static class Program
         }
 
         if (rewrite || info || lsMode || xexInfoMode || unpackMode || hashMode || copyOut || auditMode ||
-            validateMode || tree || !extract)
+            validateMode || tree || !extract || checksumFlagMode)
         {
             Logger.LogErr("Error: --pack cannot be combined with other modes\n");
             return 1;

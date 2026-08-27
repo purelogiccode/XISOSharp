@@ -1,7 +1,5 @@
 using System.Security.Cryptography;
 
-using XISOSharp.BlockDevice;
-
 namespace XISOSharp.Tests;
 
 /// <summary>
@@ -60,7 +58,7 @@ public class CisoTests : IDisposable
         Assert.NotNull(outPath);
         Assert.True(File.Exists(outPath));
         _tempDirs.Add(Path.GetDirectoryName(outPath)!);
-        return outPath!;
+        return outPath;
     }
 
     private static byte[] ComputeSha256(string path) => SHA256.HashData(File.ReadAllBytes(path));

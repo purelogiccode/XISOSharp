@@ -1,7 +1,7 @@
 namespace XISOSharp.Tests;
 
 /// <summary>
-/// Tests for <see cref="XisoReader.AuditXiso"/>, verifying deep integrity
+/// Tests for <see cref="XisoReader.AuditXiso(string)"/>, verifying deep integrity
 /// auditing of XISO images.
 /// </summary>
 [Collection("Sequential")]

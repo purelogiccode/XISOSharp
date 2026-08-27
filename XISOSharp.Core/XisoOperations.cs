@@ -79,11 +79,11 @@ public static class XisoOperations
 
         using var fillerFs = new FileStream(outputFillerPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
         isoFs.Seek(isoOffset, SeekOrigin.Begin);
-        return ProcessExtractFiller(isoFs, isoOffset, xisoLength, ranges, fillerFs, quiet, cancellationToken);
+        return ProcessExtractFiller(isoFs, isoOffset, xisoLength, ranges, fillerFs, cancellationToken);
     }
 
     private static bool ProcessExtractFiller(FileStream isoFs, long isoOffset, long xisoLength,
-        List<(uint Start, uint End)> ranges, FileStream fillerFs, bool quiet, CancellationToken ct)
+        List<(uint Start, uint End)> ranges, FileStream fillerFs, CancellationToken ct)
     {
         long numBytes = 0;
         isoFs.Seek(isoOffset, SeekOrigin.Begin);
@@ -193,12 +193,11 @@ public static class XisoOperations
         // For XISO inputs, keep file size as length.
 
         using var outFs = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
-        return ProcessWipe(isoFs, isoOffset, totalLength, bones, ranges, outFs, quiet, cancellationToken);
+        return ProcessWipe(isoFs, isoOffset, totalLength, ranges, outFs, cancellationToken);
     }
 
     private static bool ProcessWipe(FileStream isoFs, long isoOffset, long xisoLength,
-        List<(uint Start, uint End)> bones, List<(uint Start, uint End)> ranges, FileStream outFs, bool quiet,
-        CancellationToken ct)
+        List<(uint Start, uint End)> ranges, FileStream outFs, CancellationToken ct)
     {
         long numBytes = 0;
         isoFs.Seek(isoOffset, SeekOrigin.Begin);
@@ -207,7 +206,6 @@ public static class XisoOperations
             ct.ThrowIfCancellationRequested();
             long currentByte = isoOffset + numBytes;
             long currentSector = (currentByte + SectorSize - 1) / SectorSize;
-            bool skipEnd = false;
             long bytesUntilEndOfExtent = 0;
             long bytesToWipe = 0;
 

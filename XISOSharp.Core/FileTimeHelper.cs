@@ -101,7 +101,7 @@ public static class FileTimeHelper
     {
         if (fileTime == 0UL)
             return FileTimeEpoch;
-        if (fileTime <= (ulong)long.MaxValue)
+        if (fileTime <= long.MaxValue)
         {
             try
             {

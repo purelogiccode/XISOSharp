@@ -288,8 +288,8 @@ public class WaxGlobTests
     {
         var g = new WaxGlob("src/*.txt");
         Assert.False(string.IsNullOrEmpty(g.RegexPattern));
-        Assert.StartsWith("^", g.RegexPattern);
-        Assert.EndsWith("$", g.RegexPattern);
+        Assert.StartsWith("^", g.RegexPattern, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith("$", g.RegexPattern, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]

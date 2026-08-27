@@ -21,7 +21,10 @@ public class SecurityAndPrngTests : IDisposable
             {
                 if (Directory.Exists(dir)) Directory.Delete(dir, true);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
 
         foreach (var file in _tempFiles)
@@ -30,16 +33,11 @@ public class SecurityAndPrngTests : IDisposable
             {
                 if (File.Exists(file)) File.Delete(file);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
-    }
-
-    private string CreateTempDir()
-    {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_sec_{Guid.NewGuid():N}");
-        Directory.CreateDirectory(dir);
-        _tempDirs.Add(dir);
-        return dir;
     }
 
     private static long RedumpLengthForTest(long maxStartSectors = 6000000)

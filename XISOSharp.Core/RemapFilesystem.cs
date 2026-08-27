@@ -77,7 +77,7 @@ public sealed class RemapRule
 
         try
         {
-            var g = new WaxGlob(hostForGlob);
+            _ = new WaxGlob(hostForGlob);
         }
         catch (Exception ex)
         {
@@ -217,7 +217,7 @@ public static class RemapFilesystem
                 // Validate
                 try
                 {
-                    var g = new WaxGlob(hostForGlob);
+                    _ = new WaxGlob(hostForGlob);
                 }
                 catch { continue; }
 
@@ -304,9 +304,8 @@ public static class RemapFilesystem
         if (!Directory.Exists(sourceDir))
             throw new DirectoryNotFoundException($"Source directory not found: {sourceDir}");
 
-        var mappings = BuildMappings(sourceDir, rules);
         var result = new List<(string, string)>();
-        foreach ((string hostRel, string guestRel) in mappings)
+        foreach ((string hostRel, string guestRel) in BuildMappings(sourceDir, rules))
         {
             var host = "/" + hostRel;
             var guest = "/" + guestRel;
@@ -550,7 +549,6 @@ public static class RemapFilesystem
 
     private static AvlNode BuildAvlTree(string sourceDir, IReadOnlyList<RemapRule> rules, CancellationToken ct)
     {
-        var mappings = BuildMappings(sourceDir, rules);
         // Build AVL tree incrementally
         var dirCache = new Dictionary<string, AvlNode>(StringComparer.OrdinalIgnoreCase);
         var imageRoot = new AvlNode
@@ -609,7 +607,7 @@ public static class RemapFilesystem
                     Filename = fileName, FileSize = (uint)fi.Length, Subdirectory = null, HostPath = fi.FullName
                 };
                 AvlNode? tmp = parentNode.Subdirectory;
-                var res = AvlTree.AvlInsert(ref tmp, fileNode);
+                AvlTree.AvlInsert(ref tmp, fileNode);
                 parentNode.Subdirectory = tmp;
                 // If duplicate due to case-insensitive, we already checked, but insert may still fail if race.
             }

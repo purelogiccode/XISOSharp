@@ -64,7 +64,7 @@ internal sealed class ExtractXisoWrapper : IDisposable
     /// <summary>Gets version via <c>-v</c>.</summary>
     public string GetVersion()
     {
-        var (code, so, se) = Run("-v");
+        (int code, string so, string se) = Run("-v");
         var txt = string.IsNullOrWhiteSpace(so) ? se : so;
         return txt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? $"exit:{code}";
     }

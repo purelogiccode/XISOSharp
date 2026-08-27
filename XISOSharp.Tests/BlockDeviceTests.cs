@@ -38,7 +38,10 @@ public class BlockDeviceTests : IDisposable
             {
                 if (Directory.Exists(dir)) Directory.Delete(dir, true);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
 
         foreach (var f in _tempFiles)
@@ -47,7 +50,10 @@ public class BlockDeviceTests : IDisposable
             {
                 if (File.Exists(f)) File.Delete(f);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
     }
 
@@ -66,7 +72,7 @@ public class BlockDeviceTests : IDisposable
         int rc = XisoWriter.CreateXiso(sourceDir, outDir, null, null, out var outPath, null, null);
         Assert.Equal(0, rc);
         Assert.NotNull(outPath);
-        return outPath!;
+        return outPath;
     }
 
     // ---- MemoryBlockDevice ----
