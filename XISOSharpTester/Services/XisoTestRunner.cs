@@ -15,7 +15,7 @@ namespace XISOSharpTester.Services;
 /// <summary>
 /// Orchestrates batch testing of XISO disc images by running
 /// verify, list, extract, and rewrite comparisons against both
-/// the managed XISOSharp.Core library and the native extract-xiso.exe
+/// the managed XISOSharp library and the native extract-xiso.exe
 /// tool (when available).
 /// </summary>
 public static class XisoTestRunner

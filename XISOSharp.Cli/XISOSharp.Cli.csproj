@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\XISOSharp.Core\XISOSharp.Core.csproj" />
+    <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
   </ItemGroup>
 
 </Project>

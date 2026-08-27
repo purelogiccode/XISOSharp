@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XISOSharp.Cli", "XISOSharp.Cli\XISOSharp.Cli.csproj", "{E84ECD0A-6231-4E6E-BE73-020A0AC5323F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XISOSharp.Core", "XISOSharp.Core\XISOSharp.Core.csproj", "{A1B2C3D4-5678-90AB-CDEF-123456789ABC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XISOSharp", "XISOSharp\XISOSharp.csproj", "{A1B2C3D4-5678-90AB-CDEF-123456789ABC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XISOSharpTester", "XISOSharpTester\XISOSharpTester.csproj", "{B2C3D4E5-6789-0ABC-DEF1-234567890BCD}"
 EndProject

@@ -64,6 +64,13 @@ public static class XisoRanges
     public static void GetValidSectors(FileStream isoFs, long isoOffset, List<uint> sysSectors, List<uint> fileSectors,
         long rootOffset, uint rootSize, long childOffset, bool quiet)
     {
+        _ = quiet;
+        GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize, childOffset);
+    }
+
+    private static void GetValidSectors(FileStream isoFs, long isoOffset, List<uint> sysSectors, List<uint> fileSectors,
+        long rootOffset, uint rootSize, long childOffset)
+    {
         while (true)
         {
             if (childOffset >= rootSize) return;
@@ -84,11 +91,11 @@ public static class XisoRanges
 
             if (leftChildOffset != 0)
                 GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize,
-                    (long)leftChildOffset * 4, quiet);
+                    (long)leftChildOffset * 4);
 
             if (isDirectory)
             {
-                GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, entryOffset, entrySize, 0, quiet);
+                GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, entryOffset, entrySize, 0);
             }
             else
             {
@@ -143,6 +150,7 @@ public static class XisoRanges
     public static (List<(uint Start, uint End)> Sys, List<(uint Start, uint End)> Files) GetXisoRanges(
         FileStream isoFs, long offset, bool quiet)
     {
+        _ = quiet;
         List<uint> sysSectors = [];
         List<uint> fileSectors = [];
         long headerOffset = offset + HeaderOffset;
@@ -170,7 +178,7 @@ public static class XisoRanges
         if (hasMagic2)
             sysSectors.Add((uint)headerOffsetSector + 1);
 
-        GetValidSectors(isoFs, offset, sysSectors, fileSectors, rootOffset * SectorSize, rootSize, 0, quiet);
+        GetValidSectors(isoFs, offset, sysSectors, fileSectors, rootOffset * SectorSize, rootSize, 0);
 
         var sysRanges = BuildRanges(sysSectors);
         var fileRanges = BuildRanges(fileSectors);
@@ -213,6 +221,7 @@ public static class XisoRanges
     public static (List<(uint Start, uint End)> Sys, List<(uint Start, uint End)> Files) GetXisoRanges(
         string isoPath, long offset = 0, bool quiet = false)
     {
+        _ = quiet;
         using var fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
         return GetXisoRanges(fs, offset, quiet);
     }
@@ -264,8 +273,6 @@ public static class XisoRanges
         uint entrySize = ReadUInt(isoFs);
         byte attributes = (byte)isoFs.ReadByte();
         byte nameLength = (byte)isoFs.ReadByte();
-        Span<byte> nameBytes = nameLength > 0 ? stackalloc byte[nameLength] : Span<byte>.Empty;
-        // Use heap for variable length > stack safety is fine with stackalloc? Use byte[] for simplicity
         byte[] nameBuf = new byte[nameLength];
         if (nameLength > 0)
         {
