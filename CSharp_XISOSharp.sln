@@ -10,6 +10,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XISOSharp.Tests", "XISOShar
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XISOSharp.Benchmarks", "XISOSharp.Benchmarks\XISOSharp.Benchmarks.csproj", "{B8415CC4-1E84-4A55-AEAA-D93704FFD787}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XISOSharp.BattleTests", "XISOSharp.BattleTests\XISOSharp.BattleTests.csproj", "{534751CA-E263-4163-9E39-5BDBDF184BC8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -80,6 +82,18 @@ Global
 		{B8415CC4-1E84-4A55-AEAA-D93704FFD787}.Release|x64.Build.0 = Release|Any CPU
 		{B8415CC4-1E84-4A55-AEAA-D93704FFD787}.Release|x86.ActiveCfg = Release|Any CPU
 		{B8415CC4-1E84-4A55-AEAA-D93704FFD787}.Release|x86.Build.0 = Release|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Debug|x64.Build.0 = Debug|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Debug|x86.Build.0 = Debug|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Release|x64.ActiveCfg = Release|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Release|x64.Build.0 = Release|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Release|x86.ActiveCfg = Release|Any CPU
+		{534751CA-E263-4163-9E39-5BDBDF184BC8}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -6,7 +6,6 @@ namespace XISOSharp.BlockDevice;
 /// </summary>
 public sealed class FileBlockDevice : IBlockDevice
 {
-    private readonly FileStream _fs;
     private readonly bool _leaveOpen;
 
     /// <summary>Wraps an existing <see cref="FileStream"/>.</summary>
@@ -14,7 +13,7 @@ public sealed class FileBlockDevice : IBlockDevice
     /// <param name="leaveOpen">When <c>true</c>, disposing this device does not close <paramref name="fs"/>.</param>
     public FileBlockDevice(FileStream fs, bool leaveOpen = false)
     {
-        _fs = fs ?? throw new ArgumentNullException(nameof(fs));
+        BaseStream = fs ?? throw new ArgumentNullException(nameof(fs));
         if (!fs.CanSeek) throw new ArgumentException("Stream must be seekable", nameof(fs));
         _leaveOpen = leaveOpen;
     }
@@ -23,22 +22,22 @@ public sealed class FileBlockDevice : IBlockDevice
     public FileBlockDevice(string path, FileMode mode = FileMode.Open, FileAccess access = FileAccess.ReadWrite,
         FileShare share = FileShare.Read, int bufferSize = 65536)
     {
-        _fs = new FileStream(path,
+        BaseStream = new FileStream(path,
             new FileStreamOptions { Mode = mode, Access = access, Share = share, BufferSize = bufferSize });
         _leaveOpen = false;
     }
 
     /// <inheritdoc/>
-    public long Length => _fs.Length;
+    public long Length => BaseStream.Length;
 
     /// <inheritdoc/>
     public int Read(long offset, Span<byte> buffer)
     {
-        _fs.Seek(offset, SeekOrigin.Begin);
+        BaseStream.Seek(offset, SeekOrigin.Begin);
         int total = 0;
         while (total < buffer.Length)
         {
-            int n = _fs.Read(buffer[total..]);
+            int n = BaseStream.Read(buffer[total..]);
             if (n == 0) break;
             total += n;
         }
@@ -49,16 +48,16 @@ public sealed class FileBlockDevice : IBlockDevice
     /// <inheritdoc/>
     public void Write(long offset, ReadOnlySpan<byte> buffer)
     {
-        _fs.Seek(offset, SeekOrigin.Begin);
-        _fs.Write(buffer);
+        BaseStream.Seek(offset, SeekOrigin.Begin);
+        BaseStream.Write(buffer);
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (!_leaveOpen) _fs.Dispose();
+        if (!_leaveOpen) BaseStream.Dispose();
     }
 
     /// <summary>Exposes the underlying stream for interop.</summary>
-    public FileStream BaseStream => _fs;
+    public FileStream BaseStream { get; }
 }

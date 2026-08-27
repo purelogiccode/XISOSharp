@@ -13,10 +13,15 @@ namespace XISOSharp;
 /// </summary>
 public static class CisoWriter
 {
+    /// <summary>CISO block size in bytes (2048, matches XISO sector size).</summary>
     public const int BlockSize = 2048;
+    /// <summary>CISO magic <c>0x4F534943</c> ("CISO" little-endian).</summary>
     public const uint Magic = 0x4F534943u; // "CISO" LE
+    /// <summary>CISO header size in bytes (24).</summary>
     public const uint HeaderSize = 24;
+    /// <summary>CISO version 1 — classic DEFLATE payload where high bit means plain.</summary>
     public const byte VersionDeflate = 1; // classic CISO with DEFLATE
+    /// <summary>CISO version 2 — xdvdfs / ciso 0.2 LZ4 payload where high bit means compressed.</summary>
     public const byte VersionLz4 = 2; // xdvdfs / ciso 0.2 (LZ4)
 
     // Threshold mirroring ciso write.rs: only store compressed if it saves >12 bytes (7 header +4 footer +1)
@@ -41,7 +46,7 @@ public static class CisoWriter
         if (level < 0 || level > 9)
             throw new ArgumentOutOfRangeException(nameof(level), "CISO level must be 0..9");
 
-        if (splitBytes.HasValue && splitBytes.Value <= 0)
+        if (splitBytes is <= 0)
             throw new ArgumentOutOfRangeException(nameof(splitBytes));
 
         // Split not yet implemented — validate but ignore for now; future work will use ciso::split semantics
@@ -90,7 +95,10 @@ public static class CisoWriter
             if (tempIso != null)
             {
                 try { File.Delete(tempIso); }
-                catch { }
+                catch
+                {
+                    // ignored
+                }
             }
         }
     }
@@ -135,7 +143,7 @@ public static class CisoWriter
         BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(0, 4), Magic);
         BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(4, 4), HeaderSize);
         BinaryPrimitives.WriteUInt64LittleEndian(header.AsSpan(8, 8), (ulong)uncompressedSize);
-        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(16, 4), (uint)BlockSize);
+        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(16, 4), BlockSize);
         header[20] = version;
         header[21] = (byte)align;
         header[22] = 0;

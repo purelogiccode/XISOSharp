@@ -201,7 +201,7 @@ public static class XisoChecksum
         ushort right = BinaryPrimitives.ReadUInt16LittleEndian(hdr[2..4]);
         uint sector = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
         uint size = BinaryPrimitives.ReadUInt32LittleEndian(hdr[8..12]);
-        byte attrs = hdr[12];
+        byte attrs = Constants.MaskAttributes(hdr[12]);
         byte nameLen = hdr[13];
 
         if (nameLen == 0) return null; // shouldn't happen, but treat as empty

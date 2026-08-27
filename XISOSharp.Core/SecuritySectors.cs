@@ -28,10 +28,9 @@ public static class SecuritySectors
 
         var securitySectors = new List<int>();
         using var sr = new StreamReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read));
-        string? line;
         int lineCount = 0;
         long maxStart = redumpLength / Constants.SectorSize - 4096;
-        while ((line = sr.ReadLine()) != null)
+        while (sr.ReadLine() is { } line)
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
             string[] range = line.Split('-');

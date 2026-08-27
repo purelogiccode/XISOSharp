@@ -10,7 +10,6 @@ namespace XISOSharp.BlockDevice;
 public sealed class CisoBlockDevice : IBlockDevice
 {
     private readonly FileStream _csoFs;
-    private readonly long _uncompressedSize;
     private readonly uint _blockSize;
     private readonly byte _version;
     private readonly byte _align;
@@ -39,7 +38,7 @@ public sealed class CisoBlockDevice : IBlockDevice
         ReadExact(csoFs, hdr);
         uint magic = BinaryPrimitives.ReadUInt32LittleEndian(hdr[..4]);
         uint hsize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
-        _uncompressedSize = (long)BinaryPrimitives.ReadUInt64LittleEndian(hdr[8..16]);
+        Length = (long)BinaryPrimitives.ReadUInt64LittleEndian(hdr[8..16]);
         _blockSize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[16..20]);
         _version = hdr[20];
         _align = hdr[21];
@@ -50,7 +49,7 @@ public sealed class CisoBlockDevice : IBlockDevice
             throw new InvalidDataException($"Unsupported CISO version {_version}");
         if (_blockSize != 2048) throw new InvalidDataException($"Unsupported CISO block size {_blockSize}");
 
-        long totalBlocks = (_uncompressedSize + _blockSize - 1) / _blockSize;
+        long totalBlocks = (Length + _blockSize - 1) / _blockSize;
         long indexLen = totalBlocks + 1;
         _index = new uint[indexLen];
         Span<byte> leBuf = stackalloc byte[4];
@@ -62,14 +61,14 @@ public sealed class CisoBlockDevice : IBlockDevice
     }
 
     /// <inheritdoc/>
-    public long Length => _uncompressedSize;
+    public long Length { get; }
 
     /// <inheritdoc/>
     public int Read(long offset, Span<byte> buffer)
     {
         if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
-        if (offset >= _uncompressedSize) return 0;
-        long toRead = Math.Min(buffer.Length, _uncompressedSize - offset);
+        if (offset >= Length) return 0;
+        long toRead = Math.Min(buffer.Length, Length - offset);
         long sector = offset / _blockSize;
         long sectorOff = offset % _blockSize;
         int bufPos = 0;
@@ -187,7 +186,10 @@ public sealed class CisoBlockDevice : IBlockDevice
                     : CisoReaderLz4(compBuf.AsSpan(0, tryLen));
                 if (dec.Length == 2048) return dec;
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
 
         // fallback
@@ -212,7 +214,10 @@ public sealed class CisoBlockDevice : IBlockDevice
             var dec = CisoReaderDeflate(data);
             if (dec.Length == 2048) return dec;
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
 
         return Lz4BlockDecompress(data, 2048);
     }

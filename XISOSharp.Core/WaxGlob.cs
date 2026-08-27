@@ -9,10 +9,14 @@ namespace XISOSharp;
 /// <c>xdvdfs-core/src/write/fs/remap.rs</c>: every pattern element forms a capture,
 /// the whole match is index 0, subsequent indices are left-to-right pattern captures.
 /// </summary>
-internal sealed class WaxGlob
+public sealed class WaxGlob
 {
     private readonly Regex _regex;
 
+    /// <summary>
+    /// Initializes a new <see cref="WaxGlob"/> with the specified wax pattern.
+    /// </summary>
+    /// <param name="pattern">Wax glob pattern (e.g., <c>**/*.txt</c>, <c>src/**</c>).</param>
     public WaxGlob(string pattern)
     {
         ArgumentNullException.ThrowIfNull(pattern);
@@ -21,8 +25,10 @@ internal sealed class WaxGlob
         _regex = new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
+    /// <summary>Gets the original wax pattern string.</summary>
     public string Pattern { get; }
 
+    /// <summary>Returns true if <paramref name="candidate"/> matches the wax pattern.</summary>
     public bool IsMatch(string candidate) => _regex.IsMatch(candidate);
 
     /// <summary>
@@ -44,6 +50,9 @@ internal sealed class WaxGlob
         return list;
     }
 
+    /// <summary>
+    /// Returns the capture at <paramref name="index"/> (0 is whole match) or empty if no match or out of range.
+    /// </summary>
     public string GetCapture(string candidate, int index)
     {
         var caps = GetCaptures(candidate);
@@ -52,7 +61,8 @@ internal sealed class WaxGlob
         return caps[index];
     }
 
-    internal string RegexPattern => _regex.ToString();
+    /// <summary>Gets the generated regex pattern for diagnostics.</summary>
+    public string RegexPattern => _regex.ToString();
 
     // --- regex building ---
 

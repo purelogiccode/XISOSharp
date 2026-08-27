@@ -1,232 +1,432 @@
 # XISOSharp
 
-A **pure C#** implementation of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2.7.1 — the tool for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images.
+[![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](global.json)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
+[![NuGet](https://img.shields.io/nuget/v/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 
-This project is a **direct rewrite** of the original C codebase into idiomatic, managed C#. No native dependencies, no P/Invoke — just .NET.
+A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2.7.1 for Xbox ISO (XISO / XDVDFS) images — **byte-identical** output, no native dependencies, no P/Invoke, just .NET. Beyond the C baseline it merges the archival power of [XboxKit 0.7](References/XboxKit-0.7/) and the modern packing of [xdvdfs 0.8.3](References/xdvdfs-0.8.3/) into one trimmable, AOT-compatible library + CLI.
 
 ## Projects
 
 | Project | Description |
 |---|---|
-| [XISOSharp.Core](XISOSharp.Core/) | Core class library with the complete XISO read/write engine |
-| [XISOSharp.Cli](XISOSharp.Cli/) | CLI tool compatible with the original extract-xiso |
-| [XISOSharp.Tests](XISOSharp.Tests/) | Unit tests for the core library |
-| [XISOSharpTester](XISOSharpTester/) | WPF GUI for batch regression testing against the C tool |
+| [XISOSharp.Core](XISOSharp.Core/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
+| [XISOSharp.Cli](XISOSharp.Cli/) | CLI `extract-xiso` (`net10.0`, `AssemblyName extract-xiso`) — byte-compatible + 20 extra modes |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (675 tests) — golden fixtures + `MemoryBlockDevice` |
+| [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
+| [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
+| [XISOSharp.BattleTests](XISOSharp.BattleTests/) | Battle harness vs `References/extract-xiso-build-202505152050/extract-xiso.c` |
 
 ## Documentation
 
-The full documentation (repository wiki) lives in [`docs/`](docs/README.md):
+Full docs live in [`docs/`](docs/README.md) — also served as a **Docsify site with a left sidebar** at [`docs/index.html`](docs/index.html) (GitHub Pages) and mirrored in [`wiki/`](wiki/Home.md):
 
 - [Getting Started](docs/getting-started.md) — install, first extract/create/list
-- [CLI Reference](docs/cli.md) — every command, flag, and exit code
-- [Library API](docs/library.md) — XisoReader, XisoWriter, and utilities
-- [XISO Format](docs/xiso-format.md) — the on-disk format
-- [Redump & Disc Layouts](docs/redump-workflows.md) — XGD offsets, video partitions
-- [FAQ](docs/faq.md) · [Troubleshooting](docs/troubleshooting.md) · [Contributing](docs/contributing.md)
+- [CLI Reference](docs/cli.md) — every flag, verb, exit code
+- [Archival Workflows](docs/archival.md) — `--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`rebuild`
+- [Build-Image & Image-Spec](docs/xdvdfs-compat.md#build-image) — ordered `wax` remapping, `xdvdfs.toml`
+- [Compression (CISO)](docs/compression.md) — `compress`/`decompress`, `CisoBlockDevice`
+- [Checksums](docs/xdvdfs-compat.md#checksum) — SHA3-256 `checksum` vs MD5/SHA-256
+- [XISO Format](docs/xiso-format.md) — header, dirtab, AVL, ECMA-119, `0x0000` sentinel
+- [Redump & Disc Layouts](docs/redump-workflows.md) — XGD offsets incl. hybrid `0x89D80000`
+- [Library Overview](docs/library.md) · [XisoReader](docs/api-xisoreader.md) · [XisoWriter](docs/api-xisowriter.md) · [Utilities](docs/api-utilities.md)
 
-## Features
+> **Left menu:** open `docs/index.html` locally or via Pages — [`docs/_sidebar.md`](docs/_sidebar.md) (mirrored as [`wiki/_Sidebar.md`](wiki/_Sidebar.md)) is the sidebar.
 
-- **Create** XISO images from a directory
-- **Extract** XISO contents to a directory
-- **List** files inside an XISO
-- **Tree** — recursive file listing with sizes and totals
-- **Rewrite** an XISO to optimize its filesystem layout
-- **Info** — display volume metadata and directory entry details
-- **Copy-out** — extract individual files or directories without full unpack
-- **Hash** — compute MD5 or SHA-256 hashes of files within an XISO
-- **Audit** — deep integrity verification: header, tree, sector bounds, cycle detection
-- Supports **GLOBAL**, **XGD2**, **XGD3**, and **XGD1** disc formats
-- **Skip/Prepend sectors** — read Redump-style images where a video partition precedes the game partition (`--skip-sectors`), and write images with room for one (`--prepend-sectors`)
-- **Exclude patterns** — omit files/folders when creating an image (`-X <glob_pattern>`, repeatable; `-s` implicitly excludes `$SystemUpdate`)
-- Automatic `.xbe` media-enable patching
-- Async APIs for non-blocking I/O
-- Strong-named assembly
-- Targets .NET 8, .NET 9, and .NET 10
+## Install
 
-## NuGet Package
+### NuGet (library)
 
-The core library is available as the **`XISOSharp`** NuGet package.
-
-### Install
-
-```
+```bash
 dotnet add package XISOSharp
-```
-
-Or via the NuGet Package Manager:
-
-```
+# or
 Install-Package XISOSharp
 ```
 
-### Package Manager UI
+Package targets `net8.0`, `net9.0`, `net10.0`, zero runtime dependencies (BCL only), strong-named, `IsTrimmable`+`IsAotCompatible`, `snupkg` via SourceLink.
 
-Search for `XISOSharp` in the NuGet Package Manager in Visual Studio and install it.
+### CLI (tool)
 
-## Usage
+```bash
+git clone https://github.com/purelogiccode/XISOSharp.git
+cd XISOSharp
 
-### Extract an XISO
+# framework-dependent (needs .NET 10 SDK, pinned in global.json)
+dotnet build XISOSharp.Cli -c Release
+# bin: XISOSharp.Cli/bin/Release/net10.0/extract-xiso(.exe)
+
+# self-contained single-file (no runtime)
+dotnet publish XISOSharp.Cli -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+dotnet publish XISOSharp.Cli -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true
+dotnet publish XISOSharp.Cli -c Release -r osx-arm64 --self-contained -p:PublishSingleFile=true
+```
+
+## Using the CLI
+
+The CLI is `extract-xiso`-compatible (`-c`/`-x`/`-l`/`-r`/`-d`/`-D`/`-m`/`-q`/`-Q`/`-s`/`-X`/`-h`/`-v`) plus XboxKit + xdvdfs verbs. Flags must precede positionals; `-h`/`-v` exit 0.
+
+### Basics
+
+```bash
+# Extract (auto-detects RAW/GLOBAL/XGD2/XGD3/Hybrid/XGD1)
+extract-xiso -d ./out game.iso
+extract-xiso --unpack game.iso              # auto-named ./game/
+extract-xiso --unpack game.iso ./out
+
+# List / tree / info / audit
+extract-xiso -l game.iso
+extract-xiso -t game.iso                     # recursive with sizes
+extract-xiso -i game.iso /                  # volume + dir entries
+extract-xiso --ls game.iso /media           # flat directory
+extract-xiso -V game.iso game2.iso         # deep audit (header/tag/cycles/bounds/0x48)
+
+# Create / pack / rewrite
+extract-xiso -c ./game_files                # -> ./game_files.iso
+extract-xiso -c ./game_files custom.iso
+extract-xiso -c ./src ./out.iso -s -X "**/*.tmp" -X "**/node_modules/**"
+extract-xiso --pack ./game_files            # dir → create
+extract-xiso --pack game.iso                # iso → rewrite (keeps .old)
+extract-xiso -r game.iso                    # rewrite optimized (skips if already in!xiso)
+extract-xiso -r -D game.iso                 # + delete .old
+
+# Copy-out / hash / XEX / batch
+extract-xiso --copy-out game.iso /media ./media_out
+extract-xiso --md5 game.iso                 # or --sha256
+extract-xiso --xex-info game360.iso /default.xex
+extract-xiso --batch ./isos -d ./out        # all *.iso sorted
+extract-xiso --batch ./isos --batch-recursive -r
+```
+
+### Redump & disc offsets
+
+```bash
+# Video partition precedes game partition — auto-probed, or explicit
+extract-xiso --skip-sectors 129824 -d ./out redump.iso     # GLOBAL/XGD2
+extract-xiso -c ./files redump.iso --prepend-sectors 16640 # XGD3
+extract-xiso -c ./files hybrid.iso --prepend-sectors 283392 # Hybrid 0x89D80000
+extract-xiso -r --skip-sectors 283392 game.iso             # rewrite offset image to bare
+
+# Validate lossless round-trip
+extract-xiso validate game.redump.iso rebuilt.iso --validate-checksums
+extract-xiso -r --validate --validate-strict --validate-report report.json game.iso
+```
+
+### Archival (Redump lossless, XboxKit parity)
+
+```bash
+# Extract components
+extract-xiso --video game.redump.iso                  # -> game.video.iso (L0 head + L1 tail)
+extract-xiso --random game.iso                        # -> game.filler (gap bytes)
+extract-xiso --seed game.iso                          # -> game.seed (XGD1 PRNG brute-force, 4-byte LE)
+extract-xiso --wipe game.iso -o wiped.iso             # zero filler gaps
+extract-xiso --trim game.iso -o trimmed.iso           # truncate after last extent
+extract-xiso --petrify game.iso                       # -> skeleton.iso + .hash (SHA-1 per file)
+extract-xiso --update game.redump.iso                 # XGD3 -> su20076000_00000000 (+ zeroes it in video)
+extract-xiso --zar game.iso -o game.zar               # ZArchive/zstd
+
+# Aliases (mirrors xboxkit -a/-b/-c)
+extract-xiso --all game.redump.iso                    # --random --seed --trim --update --video --wipe
+extract-xiso --best game.redump.iso                   # --trim --wipe
+extract-xiso --compress game.iso                      # --petrify --update --video --zar
+
+# Security sectors (4096-sector ranges)
+extract-xiso --video --security-sectors sectors.txt game.redump.iso
+extract-xiso rebuild --security-sectors sectors.txt -o rebuilt.iso # or:
+
+# Rebuild lossless Redump from components
+extract-xiso rebuild game.xiso video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso
+extract-xiso rebuild game.xiso video.iso seed.bin -o rebuilt.redump.iso          # XGD1 seed variant
+extract-xiso rebuild game.xiso video.iso --security-sectors sectors.txt -o rebuilt.redump.iso
+```
+
+### Packing & compression (xdvdfs parity)
+
+```bash
+# Ordered remapping (wax captures, ! negation, xdvdfs.toml, --dry-run)
+extract-xiso build-image ./src -m "bin:/" -m "assets/**:/assets/{1}" -O out.iso
+extract-xiso build-image -D -m "!secret/**" -m "**:/{0}" ./src      # dry-run
+extract-xiso build-image -f xdvdfs.toml ./src -O out.iso
+
+# TOML generation
+extract-xiso image-spec from -O dist/image.iso -m "bin:/" -m "assets:/{0}" xdvdfs.toml
+# -> stdout if specPath omitted
+
+# CISO (DEFLATE v1 0x80000000 + LZ4 v2, align 0/1/2)
+extract-xiso compress ./game_dir game.cso --ciso-level 9       # 0=NoComp,1-3=Fastest,4-6=Optimal,7-9=Smallest
+extract-xiso cso game.iso game.cso                             # alias
+extract-xiso decompress game.cso game.iso
+extract-xiso uncso game.cso                                    # decso alias
+
+# Deterministic image checksum (SHA3-256 over sorted BTreeMap, xdvdfs compat)
+extract-xiso checksum game.iso
+extract-xiso checksum --silent game1.iso game2.iso            # hex only, multiple images
+extract-xiso --checksum game.iso --silent                     # flag form
+```
+
+Exit codes: `0` success/`-v`/`-h`/`validate` pass, `1` usage/I/O, `2` validation failure (`--validate-strict`).
+
+## Using the Library
+
+All in `XISOSharp` namespace (`XISOSharp.Core`). Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
+
+### Extract / list / info
+
+```csharp
+using XISOSharp;
+using XISOSharp.DataStructures; // AvlNode, etc.
+
+// Extract (llCompat auto via tag; pass false for optimized, true for legacy)
+int rc = XisoReader.Extract("game.iso", "./out", llCompat: false);
+int rc2 = XisoReader.UnpackImage("game.iso", "./out"); // auto IsOptimized, skipSectors aware
+
+// List / tree / directory
+XisoReader.List("game.iso", llCompat: false);
+XisoReader.Tree("game.iso", llCompat: false);
+IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory("game.iso", "/");
+IReadOnlyList<string> names = XisoReader.ListDirectoryFlat("game.iso", "/media");
+EntryInfo? e = XisoReader.GetEntryInfo("game.iso", "/default.xbe");
+
+// Volume & copy-out
+VolumeInfo vol = XisoReader.GetVolumeInfo("game.iso"); // IsValid, RootDirSector/Size, DiscLseek, FileLength
+XisoReader.CopyOut("game.iso", "/media", "./media_out");
+
+// Hash / audit / validate
+byte[]? md5 = XisoReader.ComputeFileHash("game.iso", "/default.xbe", System.Security.Cryptography.HashAlgorithmName.MD5);
+var hashes = XisoReader.ComputeDirectoryHashes("game.iso", "/", System.Security.Cryptography.HashAlgorithmName.SHA256);
+AuditResult audit = XisoReader.AuditXiso("game.iso"); // header/tag/cycles/bounds/0x48/0x0000
+ValidationResult vr = XisoValidator.ValidateConversion("src.iso", "out.iso", verifyChecksums: true);
+XisoValidator.LogResult(vr, "src.iso", "out.iso");
+XisoValidator.WriteReport(vr, "src.iso", "out.iso", "report.json");
+
+// XEX2 (Xbox 360)
+XexInfo? xex = XisoReader.GetXexInfo("game360.iso", "/default.xex");
+Console.WriteLine($"{xex?.TitleId:X8} entry 0x{xex?.EntryPoint:X8} region {xex?.Region}");
+```
+
+### Create / rewrite
+
+```csharp
+// Simple create (1:1 directory → ISO) — convenience
+int rc = XisoWriter.PackFromDirectory("source_dir", "out/game.iso",
+    excludePatterns: ["**/*.tmp", "**/node_modules/**"],
+    progressCallback: (cur, total) => Console.Write($"\r{cur}/{total}"),
+    progress: myProgress); // IProgress<ProgressInfo> FileCount/DirCount/DirAdded/FileAdded/FinishedPacking
+
+// Full control (mirrors extract-xiso.c three-pass layout)
+int rc2 = XisoWriter.CreateXiso(
+    rootDirectory: "source_dir", outputDirectory: "./out", inRoot: null, sourceStream: null,
+    out string? outIsoPath, inName: "game.iso", progressCallback: null,
+    prependSectors: 129824, // GLOBAL/XGD2
+    excludePatterns: ["**/$SystemUpdate/**"],
+    cancellationToken: ct);
+
+// Rewrite optimized (AVL) — or PackFromDirectory for iso input
+int rw = XisoReader.Rewrite("game.iso", outputDirectory: "./out", deleteOriginal: false, outputName: "game.opt.iso");
+var (res, outPath) = await XisoWriter.CreateXisoAsync("source_dir", "./out", null, null, "game.iso", null, ct);
+var (res2, out2) = await XisoReader.DecodeXisoAsync("game.iso", "./out", ExtractMode.Rewrite, llCompat: false, ct);
+```
+
+### Redump archival
 
 ```csharp
 using XISOSharp;
 
-int result = XisoReader.Extract("game.iso", "output_directory");
+// Video (L0 head + L1 tail via XgdTables VIDEO_L*_LENGTH, PVD 0x832D)
+bool ok = XisoRedump.TryExtractVideo("game.redump.iso", "game.video.iso", out var videoPath);
+
+// Filler gaps via ranges (sys + file extents)
+byte[] filler = XisoOperations.ExtractFiller("game.iso");           // GapBytes = xisoLength - MergeRanges(sys,file)
+uint? seed = XisoOperations.ExtractSeed("game.iso");                // XGD1 only, XboxPrng brutal 4-byte LE
+bool hasSeed = XisoOperations.TryExtractSeed("game.iso", out uint seedVal);
+
+// Wipe / trim / petrify
+int wiped = XisoOperations.WipeFiller("game.iso", "wiped.iso");     // zero filler extents
+int trimmed = XisoOperations.TrimXiso("game.iso", "trimmed.iso");   // (last.End+1)*2048
+int petr = XisoSkeleton.Petrify("game.iso", "skeleton.iso", "hash.txt"); // zeroed + SHA-1 hex lines
+
+// System update (XGD3 tail scan ABCDABCD)
+bool upd = XisoRedump.TryExtractUpdate("game.redump.iso", "su20076000_00000000", "game.video.iso");
+
+// Security sectors (4096-aligned ranges)
+int[] sectors = SecuritySectors.Parse("sectors.txt"); // validates 4095 length, sorted
+
+// Rebuild lossless Redump (L0+l0Padding+game+l1Padding+L1, PRNG or filler file)
+int rebuilt = XisoRedump.RebuildRedump(
+    xisoPath: "game.xiso", videoPath: "game.video.iso",
+    fillerOrSeedPath: "filler.bin", // or seed.bin for XGD1
+    updatePath: "su20076000_00000000",
+    outputRedumpPath: "rebuilt.redump.iso",
+    securitySectors: sectors, progress: myProgress, ct: ct);
+
+// Ranges (XboxKit GetValidSectors / GetXISORanges parity)
+var (sys, file) = XisoRanges.GetXisoRanges("game.iso", isoOffset: 0);
+var merged = XisoRanges.MergeRanges(sys, file);
+var files = XisoRanges.CollectFileEntries(File.OpenRead("game.iso"), isoOffset: 0); // sorted by Offset
+
+// ZAR (zstd)
+int zar = XisoZarchive.CreateZar("game.iso", "game.zar");
+
+// Tables & PRNG
+int videoType = XgdTables.GetVideoType("game.redump.iso"); // via PVD 0x832D → WAVE_PVD
+int isoType = XgdTables.GetRedumpIsoTypeBySize(new FileInfo("game.redump.iso").Length);
+var prng = new XboxPrng(seedVal); prng.SimulateSectors(100); prng.WriteSectors(stream, 100);
 ```
 
-### List contents of an XISO
+### Packing, CISO & checksums (xdvdfs parity)
 
 ```csharp
-using XISOSharp;
+// Build-image ordered remapping (WaxGlob *,**,?,[],{a,b} + {0}/{n} captures, ! negation)
+var rules = new List<RemapRule>
+{
+    new("bin", "/"),
+    new("assets/**", "/assets/{1}"), // {1} = first ** capture
+    new("!secret/**", ""),            // exclusion (IsExclusion)
+};
+var preview = RemapFilesystem.DryRunRemap("./src", rules); // HostPath→ImagePath without writing
+int built = RemapFilesystem.BuildImage("./src", "out.iso", rules, progress: myProgress);
+string toml = RemapFilesystem.GenerateSpecText(rules, "dist/out.iso");
+RemapFilesystem.WriteSpec("xdvdfs.toml", rules, "dist/out.iso");
+var loaded = RemapFilesystem.ParseSpecFile("xdvdfs.toml"); // preserve-order [map_rules]
 
-int result = XisoReader.List("game.iso");
+// CISO (pure-managed: DEFLATE v1 0x80000000 + LZ4 v2, align 0/1/2, threshold +12)
+int cso = CisoWriter.CompressToCso("game.iso", "game.cso", level: 9, splitBytes: null);
+int iso = CisoReader.DecompressToIso("game.cso", "rebuilt.iso");
+bool isCso = CisoReader.IsCso("game.cso"); // magic CISO + blockSize 2048 + ver 1/2
+
+// BlockDevice — in-memory golden fixtures without temp files (no_std parity)
+using var mem = new MemoryBlockDevice(File.ReadAllBytes("game.iso"));
+var (rootSector, rootSize, discLseek) = XisoReader.VerifyXiso(mem, "game.iso");
+AuditResult a2 = XisoReader.AuditXiso(mem);
+using var cisoDev = new CisoBlockDevice(new FileBlockDevice(File.OpenRead("game.cso"))); // single-sector cache
+var files2 = XisoReader.ListDirectory(cisoDev, "/");
+
+// Deterministic image checksum (SHA3-256, SortedDictionary Ordinal, /path UTF-8 + streamed data — xdvdfs compat)
+byte[] hash = XisoChecksum.ComputeImageChecksum("game.iso");
+string hex = XisoChecksum.ComputeImageChecksumHex("game.iso"); // 64-char lowercase hex
+// CLI prints "hex<TAB>path", --silent → hex only
 ```
 
-### Create an XISO from a directory
+### Async, progress & cancellation
 
 ```csharp
-using XISOSharp;
+var cts = new CancellationTokenSource();
+var progress = new Progress<ProgressInfo>(info =>
+{
+    switch (info.Type)
+    {
+        case ProgressInfoType.FileCount: Console.WriteLine($"{info.Count} files"); break;
+        case ProgressInfoType.FileAdded: Console.WriteLine($"added {info.Path} @ {info.Sector}"); break;
+        case ProgressInfoType.FinishedPacking: Console.WriteLine("done"); break;
+    }
+});
 
-int result = XisoWriter.CreateXiso("source_directory", "output.iso");
+// All long-running ops accept CancellationToken + IProgress<ProgressInfo>
+var (rc, outPath) = await XisoWriter.CreateXisoAsync("src", "./out", null, null, "game.iso", null, cts.Token, progress: progress);
+int ex = await XisoReader.DecodeXisoAsync("game.iso", "./out", ExtractMode.Extract, llCompat: false, cancellationToken: cts.Token);
+int rb = await Task.Run(() => XisoRedump.RebuildRedump("a.xiso","v.iso","f.bin",null,"out.iso", null, progress, cts.Token));
 ```
 
-### Rewrite an XISO (optimize layout)
+Errors are typed: `XisoFormatException` (corrupt), `XisoEmptyException` (no files), `XisoFileTooLargeException` (>4 GB, `FileName`/`FileSize`), `ExtractErrorException` (`ErrorCode` `ErrEndOfSector`/`ErrIsoRewritten`/`ErrIsoNoFiles`). `Logger` (`Out`/`Error`/`Quiet`/`RealQuiet`/`MediaEnable`/`RemoveSystemUpdate`/`XboxDiscLseek`) is redirectable for embedding.
 
-```csharp
-using XISOSharp;
+## Comparison
 
-int result = XisoReader.Rewrite("game.iso", outputDirectory: null, deleteOriginal: false);
-```
+File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`extract-xiso.c`), `XboxKit-0.7` (`LibXGD/`), `xdvdfs-0.8.3` (`xdvdfs-core`/`cli`). Single matrix (✅ native, 🟡 partial/opt-in, ❌ absent, — n/a):
 
-### Async create
+| Capability | XISOSharp | `extract-xiso` v2.7.1 | XboxKit 0.7 | `xdvdfs` 0.8.3 |
+|---|:---:|:---:|:---:|:---:|
+| **Reading** | | | | |
+| Extract / Unpack | ✅ | ✅ | ✅ | ✅ |
+| List top-level / Tree recursive | ✅ | 🟡 list only | ❌ | ✅ |
+| `info` / `ls` / `xex-info` | ✅ | ❌ | ❌ | 🟡 `info` only |
+| Per-file MD5 / SHA-256 | ✅ | ❌ | ❌ | 🟡 MD5 |
+| SHA3-256 image checksum (`checksum`) | ✅ | ❌ | ❌ | ✅ |
+| `copy-out` single file/dir | ✅ | ❌ | ❌ | ✅ |
+| Deep audit `-V` (header/tag/cycles/bounds/0x48/0x0000) | ✅ | ❌ | ❌ | ❌ |
+| `validate` + `--validate*` JSON report | ✅ | ❌ | ❌ | ❌ |
+| Disc probe RAW/GLOBAL/XGD3/Hybrid/XGD1 (5) | ✅ | 🟡 4 | ✅ +tables | ❌ trimmed only |
+| Empty-dir sentinel `0xFFFF` + `0x0000` header | ✅ | 🟡 `0xFFFF` only | 🟡 `0xFFFF` only | ✅ |
+| Reserved bits `0x08`/`0x40` masked | ✅ | ❌ | ❌ | 🟡 flag only |
+| `llCompat` linked-list fix (auto via tag) | ✅ | ✅ | ❌ | ❌ |
+| Encoding Latin-1 / WINDOWS_1252 | ✅ | 🟡 `FORCE_ASCII` | 🟡 ASCII | ✅ |
+| ECMA-119 descriptors `0x8000` | ✅ | ✅ | ❌ | 🟡 sector 32 |
+| Optimized tag `in!xiso` at 31337 | ✅ | ✅ | ❌ | ❌ |
+| CISO decompress (DEFLATE v1 + LZ4 v2) | ✅ | ❌ | ❌ | ✅ |
+| BlockDevice random-access (File/Memory/Offset/Ciso) | ✅ | ❌ | ❌ | ✅ |
+| Track/TOC parsing | ✅* | — | — | 🟡 |
+| **Writing** | | | | |
+| Write V5 (optimized AVL) | ✅ | ✅ | 🟡 ranges only | ✅ |
+| `FileModulus 0x10000` + sector `0xFF` pad | ✅ | ✅ | ✅ | 🟡 `0x00` pad |
+| Empty dir → 1 sector `0xFF` sentinel | ✅ | ✅ | ❌ | ✅ |
+| `.xbe` media patch `E8…7D→EB` (Boyer-Moore, overlap 7) | ✅ | ✅ | ❌ | ❌ |
+| Media patch disable `-m` | ✅ | ✅ | ❌ | ❌ |
+| Custom `-o` filename | ✅ | ❌ | — | — |
+| **Redump / Archival** | | | | |
+| `--video` L0 head + L1 tail (PVD `0x832D`) | ✅ | ❌ | ✅ | ❌ |
+| `--random` filler gaps (`GetXisoRanges`/`MergeRanges`) | ✅ | ❌ | ✅ | ❌ |
+| `--seed` XGD1 PRNG brute-force 4-byte LE | ✅ | ❌ | ✅ | ❌ |
+| `--wipe` zero filler | ✅ | ❌ | ✅ | ❌ |
+| `--trim` truncate after last extent | ✅ | ❌ | ✅ | ❌ |
+| `--petrify` skeleton + SHA-1 per file | ✅ | ❌ | ✅ | ❌ |
+| `--update` tail `su20076000_00000000` (XGD3) | ✅ | ❌ | ✅ | ❌ |
+| `--zar` ZArchive/zstd | ✅ | ❌ | ✅ | ❌ |
+| `rebuild` lossless (L0/`l0Padding`+game+`l1Padding`+L1) | ✅ | ❌ | ✅ | ❌ |
+| `--security-sectors` `4096`-aligned `sectors.txt` | ✅ | ❌ | ✅ | ❌ |
+| Aliases `--all`/`--best`/`--compress` | ✅ | ❌ | ✅ | ❌ |
+| Wave tables `XISO_OFFSET`/`REDUMP_ISO_LENGTH`/`VIDEO_Lx`/`WAVE_PVD` | ✅ | ❌ | ✅ | ❌ |
+| `--skip-sectors` / `--prepend-sectors` arbitrary | ✅ | ❌ | 🟡 built-in tables | ❌ |
+| **Packing / xdvdfs** | | | | |
+| `build-image` ordered `host/**:image/{n}` + `!` + `{0}` | ✅ | ❌ | ❌ | ✅ |
+| `image-spec from` TOML preserve-order | ✅ | ❌ | ❌ | ✅ |
+| CISO compress DEFLATE `align` 0/1/2 threshold `+12` | ✅ | ❌ | ❌ | ✅ |
+| `--ciso-level` 0..9 / `--ciso-split` shim | ✅ | ❌ | ❌ | 🟡 |
+| `wax` glob `*`/`**`/`?`/`[]`/`{a,b}` | ✅ | ❌ | ❌ | ✅ |
+| `xdvdfs.toml` `[map_rules]` | ✅ | ❌ | ❌ | ✅ |
+| `--dry-run` preview | ✅ | ❌ | ❌ | ✅ |
+| `RemapFilesystem` / `SectorAllocator` | ✅ | ❌ | ❌ | ✅ |
+| **API** | | | | |
+| Byte-range reads | ✅ | — | 🟡 | ✅ |
+| LBA sector reads | ✅ | — | ✅ | ✅ |
+| Thread-safe random-access | ✅ | ❌ | ❌ | ✅ |
+| `CancellationToken` | ✅ | ❌ | ❌ | ❌ |
+| `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FinishedPacking`) | ✅ | 🟡 `progress_callback` | ❌ | 🟡 `ProgressInfo` |
+| `*Async` (`Task.Run`) | ✅ | ❌ | ❌ | 🟡 `maybe-async` |
+| Parallel verify / encode | ✅ verify | ❌ | ❌ | ❌ |
+| Typed errors (`XisoFormatException` etc.) | ✅ | ❌ | ❌ | 🟡 `InvalidVolume` |
+| `VerifyXiso(IBlockDevice)` overload | ✅ | ❌ | ❌ | ✅ trait |
+| Glob `-X` / `WaxGlob` captures | ✅ | 🟡 `-s` only | ❌ | ✅ `wax` |
+| **CLI** | | | | |
+| `-c` repeatable + `-X` excludes + `-s` | ✅ | ✅* | — | ✅ `pack` |
+| `--pack` dir→create / iso→rewrite | ✅ | ❌ | — | ✅ |
+| Batch `--batch` sorted + `--batch-recursive` | ✅ | 🟡 explicit args only | ❌ | 🟡 `checksum` multi |
+| Quiet `-q` / silent `-Q` | ✅ | ✅ | 🟡 | ❌ |
+| Help `-h` / banner `-v` `2.7.1 (01.11.14)` | ✅ | ✅ | ❌ | 🟡 `clap` |
+| Exit `0`/`1` + `2` for `validate --strict` | ✅ | 🟡 `0`/`1` only | ❌ | ❌ |
+| **Extras** | | | | |
+| Extraction to dir | ✅ | ✅ | ✅ | ✅ |
+| Platform detection (`OperatingSystem.Is*`) | ✅ | 🟡 `#if` | 🟡 | ✅ |
+| Per-hunk CRC / full-image verify | ✅ | — | — | 🟡 SHA3 |
+| Native dependencies | **none** | none | zstd/ZArchive | `bincode`/`serde`/`clap`/`wax`/`ciso`/`md-5`/`sha3` |
+| Distribution | NuGet + `extract-xiso` bin | `cmake` bin | `dotnet` + CMake | `cargo` crate |
 
-```csharp
-using XISOSharp;
-
-var (result, outputPath) = await XisoWriter.CreateXisoAsync("source_directory", "output.iso");
-```
+<sub>*XISOSharp `Track/TOC` = `GetVolumeInfo`/`ListDirectory`/`GetXisoRanges` sector map; 🟡 = partial/opt-in/different pad or trimmed-only semantics.</sub>
 
 ## Build
 
-Open `CSharp_XISOSharp.sln` in Visual Studio or run:
-
+```bash
+git clone https://github.com/purelogiccode/XISOSharp.git
+cd XISOSharp
+dotnet build CSharp_XISOSharp.sln            # Debug
+dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
+dotnet test -c Release                       # 675 tests
 ```
-dotnet build
-```
 
-## Comparison with Related Projects
-
-This project was compared file-by-file against the three reference implementations shipped in
-[`References/`](References/):
-
-* [`extract-xiso-build-202505152050`](References/extract-xiso-build-202505152050/) — C port of **extract-xiso v2.7.1** (`extract-xiso.c`, `CMakeLists.txt`, `win32/`)
-* [`XboxKit-0.7`](References/XboxKit-0.7/) — C# archival toolkit (`XboxKit/`, `LibXGD/`) for lossless Redump ↔ XISO/ZAR conversion
-* [`xdvdfs-0.8.3`](References/xdvdfs-0.8.3/) — Rust `xdvdfs-core` + `xdvdfs-cli` (+ `xdvdfs-desktop`/`xdvdfs-web`)
-
-The tables below are derived from those sources and from [`XISOSharp.Core/`](XISOSharp.Core/) + [`XISOSharp.Cli/Program.cs`](XISOSharp.Cli/Program.cs).
-
-### 1 — Project overview
-
-| Dimension | **XISOSharp (this repo)** | **extract-xiso v2.7.1 (C)** | **XboxKit 0.7** | **xdvdfs 0.8.3 (Rust)** |
-|---|---|---|---|---|
-| **Language / Runtime** | C# 14, .NET 8/9/10, `Nullable`, strong-named, trimmable, AOT-compatible, SourceLink + MinVer | C89/C99, single `extract-xiso.c` ~2 800 LOC, no headers | C# (.NET) `LibXGD` library + `XboxKit` console + native `ZArchive`/zstd | Rust (workspace, `no_std` + `alloc` optional), `maybe-async` |
-| **Platforms** | `win-x64`/`linux-x64`/`osx-x64`/`osx-arm64`, banner via `OperatingSystem.Is*()` (`Constants.Banner` at `XISOSharp.Core/Constants.cs:181`) | `#if _WIN32/__LINUX__/__DARWIN__/__FREEBSD__/__OPENBSD__`, shims `win32/getopt.c`/`dirent.c`/`asprintf.c` | .NET cross-platform (Windows-centric), `FileStream`-based | Cross-platform CLI + Tauri desktop + WASM web, `cargo install xdvdfs-cli` |
-| **Build** | `dotnet build`, `CSharp_XISOSharp.sln`, `Directory.Build.props`, NuGet `XISOSharp` + `snupkg` | `cmake .. && make`, `CMakeLists.txt: cmake_minimum_required 3.5` | `dotnet build` (`LibXGD.csproj`/`XboxKit.csproj`) + CMake for `ZArchive` | `cargo build`, `Cargo.toml` workspace `v0.8.3`, `flake.nix`/`default.nix` |
-| **Dependencies (runtime)** | **Zero** — only BCL (`System.Buffers.Binary`, `System.Security.Cryptography`), build-time `SourceLink.GitHub`+`MinVer` | None — `time.h`/`fcntl.h`/`sys/stat.h` only | `LibXGD`, `ZArchive` (zstd), `SabreTools.Wrappers.XboxISO` | `bincode`, `serde`, `encoding_rs` (WINDOWS_1252), `clap`, `wax` (glob), `ciso`, `md-5`, `sha3` |
-| **Distribution** | NuGet `XISOSharp`, CLI `XISOSharp.Cli` (`AssemblyName extract-xiso`) | Binary `extract-xiso` in `build/` | Binary `xboxkit.exe` | Crates `xdvdfs` + `xdvdfs-cli`, GitHub releases (`xdvdfs` binary) |
-| **License** | MIT | BSD-3-clause variant by `in@fishtank.com` (`LICENSE.TXT`) | (per `README.md` in `XboxKit-0.7`, lossless archival tool) | MIT/Apache-2.0 (per `LICENSE` in `xdvdfs-0.8.3`) |
-| **Primary goal** | **Byte-identical** managed rewrite of `extract-xiso` + modern library/CLI extensions | Create/list/extract/rewrite XISO (game partition) | **Lossless** Redump ↔ XISO/ZAR archival with deduplication | Modern XDVDFS filesystem library (embeddable, `no_std`) |
-
-### 2 — Disc layout & Redump support
-
-| Capability | **XISOSharp** | **extract-xiso** | **XboxKit** | **xdvdfs** |
-|---|---|---|---|---|
-| **Header magic** | `MICROSOFT*XBOX*MEDIA` (20 B) at `0x10000`, trailing magic after `FILETIME`+`0x7C8` — all 4 probe (`XisoReader.VerifyXiso` at `XISOSharp.Core/XisoReader.cs:53`) | Same, nested `lseek`/`read`/`memcmp` chain in `extract-xiso.c:verify_xiso` | `XDVDFS.IsValidXISO` checks magic at `offset+XISO_HEADER_OFFSET`; higher-level uses file-length tables | `VolumeDescriptor::deserialize` at `32*2048`, checks `magic0 && magic1` (`layout.rs`/`read.rs`) |
-| **Fixed disc offsets probed** | `0` (raw/trimmed), `0x0FD90000` GLOBAL/XGD2, `0x02080000` XGD3, `0x18300000` XGD1 (`Constants.cs:127-136`) — order `0→GLOBAL→XGD3→XGD1` | Identical (`#define GLOBAL_LSEEK_OFFSET 0x0FD90000ul` etc. at `extract-xiso.c:447`) | Full table: `XISO_OFFSET [0x18300000, 0x0FD90000, 0x89D80000, 0x02080000]` = XGD1/XGD2/Hybrid/XGD3 + `REDUMP_ISO_LENGTH[9]` + `VIDEO_Lx[19]` (`LibXGD/XGD.cs:11`) — **only one that knows `0x89D80000` hybrid** | **None** — expects already-trimmed game partition, `BlockDeviceRead::read(offset,buf)` with `sector*2048` |
-| **Arbitrary Redump video partition** | ✅ `--skip-sectors N` (read) + `--prepend-sectors N` (write), `VerifyXiso(..., skipSectors)` skips probing, sector numbers stay partition-relative, tag written at `prependOffset+31337` | ❌ fixed 4 only; hybrid/non-standard Redumps fail | ✅ true dual-partition: PFI vs SS layerbreak, joins `L0` head + `L1` tail, derives wave from PVD at `0x832D` via `WAVE_PVD[24]`, splits `l0Padding`/`l1Padding` | ❌ bare partition only |
-| **Security sectors (mastering errors)** | Not modelled (XISO contains only game partition) | Not modelled | ✅ reads external `sectors.txt` (`4096`-sector ranges), zeroes in Redump, skips via `XboxPRNG.SimulateSectors` (`XGD.cs:209`) | Not modelled |
-| **Hybrid `0x89D80000`** | Only via `--skip-sectors 283392` (documented in `docs/redump-workflows.md`) | Not supported | Native (`XGD.cs:11`) | Not applicable |
-
-### 3 — Filesystem implementation
-
-| Capability | **XISOSharp** | **extract-xiso** | **XboxKit** | **xdvdfs** |
-|---|---|---|---|---|
-| **Sector / alignment** | `2048` B sector, `0x10000` file modulus, `RootDirectorySector 0x108`, dir-entry `14 B + name` padded to `*4`, sector-boundary pad, image padded to `0x10000` | Same (`#define XISO_SECTOR_SIZE 2048`, `XISO_FILE_MODULUS 0x10000` etc.) | Same via `XDVDFS.SECTOR_SIZE`, merges `sysRanges/fileRanges` via `MergeRanges`/`GetValidSectors` | Same `SectorAllocator` (`32*2048`), `dirtab: pad to sector`, volume at `32*2048` with `0x00` zero-pad (not `0xFF`) |
-| **Empty-directory sentinel** | `0xFFFF` (`PadShort`) **and** `0x0000` + 12-byte `0x00` header (`Constants.IsEmptyDirectoryHeader` at `Constants.cs:61`, `XisoReader.TraverseXiso` at `XisoReader.cs:231`) — xdvdfs compat; `0x0000` with non-zero tail treated as real `left=0` | `0xFFFF` only (`extract-xiso.c:1384`, `traverse_xiso`) | `0xFFFF` only (`XDVDFS.GetValidSectors`) — would mis-detect xdvdfs empty dirs | `0xFFFF` and `0x0000` (`read_dirent` `[0xFF;0xE]`/`[0x00;0xE]`, `left/right !=0 && !=0xFFFF`) — XISOSharp matches this |
-| **AVL tree** | Case-insensitive `AvlTree.cs` (port of `avl_compare_key`/`avl_insert`/`AvlTraverseDepthFirst`), balanced BST, `EmptySubdirectory` sentinel | Same (`avl_compare_key` via `strcasecmp`/`_stricmp`, `avl_left_grown` etc.) | File-extent ranges (`GetXISORanges`) sorted by offset, not AVL rebuild | `write::avl` + `DirectoryEntryTableWriter` (`write/dirtab.rs`) |
-| **`llCompat` linked-list fix** | Preserved (`TraverseXiso` at `XisoReader.cs:315`): `if(llCompat) rOffset sector rounding`; auto-selected via optimized-tag (`llCompat = !IsOptimized`) | Same (`traverse_xiso` `in_ll_compat`, first non-zero left clears flag, right fix) — callers pass `!optimized` for list/extract, `true` for rewrite | No `llCompat` | No `llCompat` |
-| **Filename encoding** | `Latin1Encoding` (Windows-1252) (`Latin1Encoding.cs`) | `char*` filesystem bytes, `FORCE_ASCII` on Linux/FreeBSD | `Encoding.ASCII` | `encoding_rs::WINDOWS_1252` (`read.rs`) |
-| **ECMA-119 / ISO9660 descriptors** | ✅ `XisoWriter.WriteVolumeDescriptors` at `XISOSharp.Core/XisoWriter.cs:1000` (`0x8000 CD001`, volume space LE+BE, set size, creation dates) | ✅ `write_volume_descriptors` (`extract-xiso.c:212x`) | Not emitted per-XISO | Only `VolumeDescriptor` at sector 32 |
-| **Optimized tag** | `in!xiso!2.7.1 (01.11.14)` at `31337`, prefix `in!xiso` (`Constants.cs:29`), `IsOptimized` at `XisoReader.cs:633`, rewrite skip, prepend-aware | Same (`XISO_OPTIMIZED_TAG_OFFSET 31337`, `XISO_OPTIMIZED_TAG "in!xiso!" v`) | Not used | Not used |
-
-### 4 — CLI commands & flags
-
-| Flag / Mode | **XISOSharp** (`Program.cs`) | **extract-xiso** (`GETOPT_STRING "c:d:Dhlmp:qQrsvx"` at `extract-xiso.c:503`) | **XboxKit** (`Options.cs` + README) | **xdvdfs** (`src/main.rs` `Cmd` enum) |
-|---|---|---|---|---|
-| `-c <dir> [name]` create | ✅ repeatable, `-X` excludes, `-s` → `**/$SystemUpdate/**`, `XisoWriter.CreateXiso` | ✅ `strdup`+`argv[optind]` peek, `create_xiso` | Not as flag — rebuild mode is positional `<input.xiso> [files...]` | `pack <source> [image]` dir branch (via `StdFilesystem`) |
-| `--pack <input> [name]` | ✅ dir→create / file→rewrite alias (`TranslatePackInput` at `Program.cs:1014`) | — | — | `pack` also handles both |
-| `-x` extract (default) | ✅ explicit, default when no mode | ✅ `x_seen` guard, default `extract=true` | Extract mode `xboxkit.exe [options] <input.iso>` | `unpack <image> [dest]` |
-| `--unpack <file> [dest]` | ✅ auto `IsOptimized`, `--skip-sectors` aware (`RunUnpackMode` at `Program.cs:966`) | — | — | `unpack` (same) |
-| `-l` list (top-level) | ✅ `XisoReader.List` | ✅ `k_list` | — | `ls <image> [path]` default `/` |
-| `-t` tree (recursive) | ✅ `XisoReader.Tree` | — (plain `extract-xiso` has no tree) | — | `tree <image>` |
-| `-i <file> [path]` info | ✅ `GetVolumeInfo` + `ListDirectory` (sector/size/attrs/left/right) | — | — | `info <image> [file]` |
-| `--ls <file> [path]` | ✅ `ListDirectoryFlat` | — | — | `ls` (same) |
-| `--xex-info <file> <path>` | ✅ `GetXexInfo` (big-endian XEX2 header, media types bitmask) (`XexInfo.cs`) | — | — | — |
-| `--md5 <file> [path]` | ✅ `ComputeFileHashes` (MD5) | — | — | `md5 <image> [path]` (`md-5` crate) |
-| `--sha256 <file> [path]` | ✅ `ComputeFileHash(SHA256)` | — | — | — (`checksum` is **SHA3-256** deterministic over `BTreeMap<path,data>`, not per-file) |
-| `--copy-out <iso> <path> <dest>` | ✅ file or directory recursive | — | `Wrapper.ExtractGamePartition` extracts all (not single arbitrary path) | `copy-out <image> <src> <dest>` |
-| `-r` rewrite (optimize) | ✅ `XisoReader.DecodeXiso(..., Rewrite)`, `IsOptimized` check, `.old` dance, `-D` delete | ✅ `rename(argv[i],".old")`, `decode_xiso(buf, k_rewrite, true)` | Partial — `ProcessXISO` wipe/trim path only | `pack` via `XDVDFSFilesystem` (repack) |
-| `-V` audit | ✅ `AuditXiso` deep check (header, tag, sector bounds, cycles, reserved `0x48`, dir size) (`XisoReader.cs:1032`) | — | — | — |
-| `validate <src> <out>` + `--validate*` | ✅ `XisoValidator.ValidateConversion` (counts/paths/sizes + optional SHA-256), JSON `--validate-report`, exit `2` on fail | — | — | — |
-| `--batch <dir>` (+ `--batch-recursive`) | ✅ case-insensitive `*.iso` scan (`ExpandIsoFiles` at `Program.cs:1099`), sorted, works with extract/list/tree/rewrite/audit | — (loop `for(i=optind;i<argc;++i)` handles multiple explicit files only) | — | `checksum [images...]` takes multiple images but no `--batch` scan |
-| `-h` / `-v` | ✅ help to stderr / banner `v2.7.1 (01.11.14)` to stdout | ✅ `usage()` macro / `printf banner` | — | `xdvdfs --help` per subcommand (`clap`) |
-| `-d <dir>` | ✅ extract/rewrite output dir | ✅ `path` strdup, `mkdir`/`chdir` | (`-o --output` = game files, different meaning) | — (dest is positional) |
-| `-D` / `-m` / `-q`/`-Q` / `-s` | ✅ delete old / disable `.xbe` patch / quiet/silent / skip `$SystemUpdate` | ✅ identical | `q --quiet` only | — |
-| `-o <filename>` (rewrite custom name) | ✅ `outputName` | — | `-o` means extraction output dir | — |
-| `--skip-sectors N` | ✅ non-negative int, forbidden with `-c`, allowed with `-i`/hash/copy/audit not allowed | — | — | — |
-| `--prepend-sectors N` | ✅ requires `-c` or `-r` | — | Rebuild rebuilds via `L0`/`L1` tables instead | — |
-| `-X <glob>` exclude | ✅ repeatable, `GlobMatcher.cs` (`* ? ** [] [!] \`, `/` sep, anchored `**/`, case-insensitive) | — (`-s` only) | — | Only via `build-image` ordered map rules (`wax` glob `host/**:image/{1}`, `!excluded`, `{n}`) |
-
-### 5 — Library / API surface
-
-| Capability | **XISOSharp** (`XISOSharp.Core`) | **extract-xiso** | **XboxKit (`LibXGD`)** | **xdvdfs (`xdvdfs-core`)** |
-|---|---|---|---|---|
-| **API style** | Static `XisoReader`/`XisoWriter`/`XisoValidator` + typed `VolumeInfo`/`EntryInfo`/`AuditResult`/`ValidationResult`/`XexInfo`, `CancellationToken`, `IProgress<ProgressInfo>` (`Types.cs`), async `*Async` via `Task.Run` | Single TU globals (`s_total_bytes`, `s_xbox_disc_lseek` etc.), `int verify_xiso(int fd, int32_t*, ...)` / `create_xiso` / `traverse_xiso`, progress `progress_callback(xoff_t cur,xoff_t total)` | `XDVDFS` (`GetValidSectors`, `GetXISORanges`, `ProcessXISO`, `CollectFileEntries`), `XGD` (`GetWave`, `ExtractVideo`, `RebuildRedump`, tables), `Utils`/`XboxPRNG`/`ZArchive` | Traits `BlockDeviceRead`/`BlockDeviceWrite`, `Filesystem<H,FE,HE>` (`StdFilesystem`, `XDVDFSFilesystem`, `RemapOverlayFilesystem`), `VolumeDescriptor`/`DirectoryEntryDiskNode`/`DirectoryEntryTableWriter`/`SectorAllocator`, `maybe-async` |
-| **Hashing** | `ComputeFileHash`/`ComputeDirectoryHashes` — **MD5** + **SHA-256** (`System.Security.Cryptography.IncrementalHash`), lowercase hex + two spaces | None | Skeleton hashes **SHA-1** per file via `GetFileEntries` + `hashWriter` hex+path | `md5` subcommand (**MD5** per-file) + `checksum` (**SHA3-256** combined over sorted paths) |
-| **Audit / deep validation** | `AuditXiso` (`XisoReader.cs:1032`) — header magic, optimized tag at `31337`, root bounds, cycle `HashSet<long>`, sector overflow, reserved attrs `0x48`, dir-size, filename sep | None (only `s_warned` warning counter) | `Validate()` stub only | Only `InvalidVolume`/`DoesNotExist` errors |
-| **Validation / report** | `XisoValidator.ValidateConversion` (missing/extra/size/checksum `SHA-256`, case-insensitive dict, `WriteReport` JSON + `LogResult` at `XisoValidator.cs:254`) | None | None | None |
-| **Media-enable `.xbe` patch** | ✅ `BoyerMoore.cs` (`E8 CA FD FF FF 85 C0 7D → EB` at byte 7, overlap `Length-1`, `Logger.MediaEnable` toggle `-m`) (`XisoWriter.cs:543`) | ✅ `boyer_moore_init`/`search`/`done` in `write_file` | None | None |
-| **Glob / remapping** | `GlobMatcher` (`* ? ** [] \`), anchored vs `**/`, trailing `/`→`/**` | `-s` substring `"$SystemUpdate"` only | None | `wax` crate via `RemapOverlayFilesystem`, `!negation` + `{n}` substitution + `xdvdfs.toml` (`build-image`/`image-spec from`) |
-| **Archival extras** | Only `$SystemUpdate` filtering | Same | ✅ **random filler** (`--random` → `.filler`), **seed** (`--seed` brute-force `XboxPRNG`), **wipe** (`--wipe` zero gaps), **trim** (`--trim` truncate), **petrify/skeleton** (`--petrify` zeroed XISO + `.hash`), **ZArchive** (`--zar` zstd) | ✅ **CISO** `compress` (`ciso` crate, `SectorLinearBlockDevice`, `SplitOutput` parts) |
-| **Video ISO (Redump)** | Reconstruction only via `--prepend-sectors` round-trip (documented `redump-workflows.md`); no `L0`/`L1` split | None | ✅ `XGD.ExtractVideo` (`L0` head + `L1` tail) + update extraction (`--update` zeros update in video ISO for XGD3) | None |
-| **Progress / cancellation** | `ProgressCallback(long cur,long total)` + structured `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FinishedPacking`) + `CancellationToken` throughout `DecodeXiso`/`CreateXiso` | `progress_callback` param (mostly `nil`) | Console `[INFO]` only | `ProgressInfo::{DiscoveredDirectory/FileCount/DirCount/DirAdded/FileAdded/FinishedPacking}` (+ CISO `SectorCount/Finished`), `maybe-async` but no cancellation token |
-| **Batch / multi-image summary** | Per-ISO `"\nN files in <path> total M bytes"` + batch `"\nN files in K xiso's total M bytes"` + `WARNING` banner (`Logger.TotalBytesAllIsos`) | Same counters `s_total_files_all_isos`/`s_total_bytes_all_isos` | Single-image only | `checksum` loops `Vec<String> images` individually |
-
-### 6 — What XISOSharp uniquely adds vs. all three
-
-* **Full CLI parity with `extract-xiso v2.7.1` plus 10 extra modes** (`-t`/`-i`/`--ls`/`--xex-info`/`--md5`/`--sha256`/`-V`/`--copy-out`/`--unpack`/`validate`) — none exist in the C tool.
-* **Arbitrary Redump reconstruction** without hard-coded wave tables: `--skip-sectors`/`--prepend-sectors` handle any video-partition size, including hybrid `0x89D80000` (XboxKit) and future layouts.
-* **xdvdfs compatibility**: empty-directory `0x0000` sentinel + 12-byte header peek — extract-xiso and XboxKit both miss this.
-* **Managed safety & ergonomics**: typed exceptions (`XisoFormatException`/`XisoEmptyException`/`XisoFileTooLargeException`), `CancellationToken`, `IProgress<ProgressInfo>`, `*Async` methods, strong-named trimmable library — none of the other tools expose a consumable .NET/Rust-style library with cancellation and progress.
-* **Post-conversion assurance**: `--validate`/`--validate-checksums`/`--validate-strict`/`--validate-report` with JSON and exit-code `2` — absent in all three references.
-* **Glob excludes** (`-X`) for creation — absent in C (`-s` only) and XboxKit, and coarser than xdvdfs `build-image` ordered map rules.
-
-### 7 — What the references have that XISOSharp intentionally does **not**
-
-| Feature | Where it lives | Why XISOSharp omits it |
-|---|---|---|
-| **Full Redump video/filler/seed/skeleton/ZAR pipeline** (16 `L0`/`L1` wave tables, `REDUMP_ISO_LENGTH[9]`, PVD wave inference at `0x832D`, `XISO_LENGTH[4]`, `GetValidSectors`/`ProcessXISO` filler ranges, `XboxPRNG` seed extraction, `RebuildRedump` with `l0Padding`/`l1Padding` and `prng.WriteSectors`) | XboxKit `LibXGD/XGD.cs:11` + `LibXGD/XDVDFS.cs:ProcessXISO` | Out of scope — XISOSharp is a **game-partition (XDVDFS)** tool. Use XboxKit for lossless archival collections; use XISOSharp for XISO create/extract/validate workflows. Redump round-trip is via explicit `--skip-sectors`/`--prepend-sectors`. |
-| **`build-image` path remapping** (`xdvdfs.toml` `[map_rules]`, ordered `host/**:image/{1}` with `{0}`/`{1}` captures, `!excluded`, `--dry-run`, `image-spec from`) | xdvdfs `xdvdfs-cli/src/cmd_build_image.rs` + `xdvdfs-core/src/write/fs.rs:RemapOverlayFilesystem` | Out of scope — XISOSharp creation is **1:1** directory ↔ image. Use xdvdfs for arbitrary host→image remapping and CISO. |
-| **CISO (`.cso`) compression** (`ciso` crate, `SectorLinearBlockDevice` → `CisoSectorInput` → `SplitOutput`) | xdvdfs `compress` (`cmd_compress.rs`) | Not implemented — use xdvdfs `compress` for CISO. |
-| **ZArchive/ZAR** (zstd game-file archive, skeleton SHA-1 hashes) | XboxKit `--zar`/`--petrify` (`LibXGD/ZArchive.cs`) | Not implemented — use XboxKit for ZAR. |
-| **FTP / Darwin burn / hybrid `0x89D80000` built-in** | extract-xiso historical `generate_avl_tree_remote` / Darwin `#if __DARWIN__` (removed in XboxDev fork) | Not ported — network/burn paths were already absent in the XboxDev `v2.7.1` baseline. |
-| **Web / desktop front-ends** | xdvdfs `xdvdfs-web` (WASM) + `xdvdfs-desktop` (Tauri) | Out of scope — XISOSharp ships a WPF batch tester (`XISOSharpTester/`) for regression vs. the C tool instead. |
-
-> **Rule of thumb:** for *playable* XISO workflows (create, extract, list, tree, rewrite, info, copy-out, hash, audit, validate) use **XISOSharp**; for *archival* lossless Redump ↔ XISO/ZAR with filler/seed/video/skeleton use **XboxKit**; for *embedded* no_std, WASM, or CISO/`build-image` remapping use **xdvdfs**; for the *historical* single-file C baseline see **extract-xiso**.
+Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF). CI builds on `ubuntu`/`windows`/`macos`.
 
 ## Requirements
 
-- .NET 8 SDK or later
+- .NET 8 SDK or newer (pinned `10.0.301` in `global.json`, `rollForward: latestFeature`)
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

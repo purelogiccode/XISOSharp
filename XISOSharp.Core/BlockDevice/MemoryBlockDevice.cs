@@ -7,7 +7,6 @@ namespace XISOSharp.BlockDevice;
 public sealed class MemoryBlockDevice : IBlockDevice
 {
     private byte[] _data;
-    private long _length;
 
     /// <summary>Creates an empty device.</summary>
     public MemoryBlockDevice() => _data = [];
@@ -16,7 +15,7 @@ public sealed class MemoryBlockDevice : IBlockDevice
     public MemoryBlockDevice(ReadOnlySpan<byte> data)
     {
         _data = data.ToArray();
-        _length = _data.Length;
+        Length = _data.Length;
     }
 
     /// <summary>Creates a device with a fixed capacity (zero-filled).</summary>
@@ -24,18 +23,18 @@ public sealed class MemoryBlockDevice : IBlockDevice
     {
         if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity));
         _data = new byte[capacity];
-        _length = capacity;
+        Length = capacity;
     }
 
     /// <inheritdoc/>
-    public long Length => _length;
+    public long Length { get; private set; }
 
     /// <inheritdoc/>
     public int Read(long offset, Span<byte> buffer)
     {
         if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
-        if (offset >= _length) return 0;
-        int available = (int)Math.Min(buffer.Length, _length - offset);
+        if (offset >= Length) return 0;
+        int available = (int)Math.Min(buffer.Length, Length - offset);
         _data.AsSpan((int)offset, available).CopyTo(buffer);
         // Zero-fill remainder if reading beyond written length but within buffer
         if (available < buffer.Length)
@@ -50,7 +49,7 @@ public sealed class MemoryBlockDevice : IBlockDevice
         long end = offset + buffer.Length;
         EnsureCapacity(end);
         buffer.CopyTo(_data.AsSpan((int)offset, buffer.Length));
-        if (end > _length) _length = end;
+        if (end > Length) Length = end;
     }
 
     private void EnsureCapacity(long needed)
@@ -64,13 +63,13 @@ public sealed class MemoryBlockDevice : IBlockDevice
     /// <summary>Returns a copy of the written bytes.</summary>
     public byte[] ToArray()
     {
-        var outArr = new byte[_length];
-        Array.Copy(_data, outArr, _length);
+        var outArr = new byte[Length];
+        Array.Copy(_data, outArr, Length);
         return outArr;
     }
 
     /// <summary>Returns a span over the written bytes (read-only).</summary>
-    public ReadOnlySpan<byte> AsSpan() => _data.AsSpan(0, (int)_length);
+    public ReadOnlySpan<byte> AsSpan() => _data.AsSpan(0, (int)Length);
 
     /// <inheritdoc/>
     public void Dispose() { }

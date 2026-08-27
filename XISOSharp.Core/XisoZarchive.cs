@@ -102,7 +102,7 @@ public static class XisoZarchive
             char c1 = n1[i], c2 = n2[i];
             if (c1 >= 'A' && c1 <= 'Z') c1 = (char)(c1 + 32);
             if (c2 >= 'A' && c2 <= 'Z') c2 = (char)(c2 + 32);
-            if (c1 != c2) return (int)(byte)c1 - (int)(byte)c2;
+            if (c1 != c2) return (byte)c1 - (byte)c2;
         }
 
         return n1.Length.CompareTo(n2.Length);
@@ -191,7 +191,7 @@ public static class XisoZarchive
             return false;
         ulong compressedDataEnd = (ulong)hs.Position;
 
-        while (hs.Position % 8 != 0) hs.Write((byte)0);
+        while (hs.Position % 8 != 0) hs.Write(0);
 
         ulong offsetRecordsStart = (ulong)hs.Position;
         WriteOffsetRecords(hs, offsetRecords);
@@ -343,7 +343,7 @@ public static class XisoZarchive
 
         // No compression: store raw block verbatim (ZArchive readers accept this)
         hs.Write(data, 0, BlockSize);
-        sizes[count++] = (ushort)(BlockSize - 1);
+        sizes[count++] = BlockSize - 1;
     }
 
     private static void WriteOffsetRecords(HashingStream hs, List<(ulong BaseOffset, ushort[] Sizes)> records)
@@ -398,7 +398,7 @@ public static class XisoZarchive
 
         foreach (var n in nodes)
         {
-            if (n == root) hs.Write((uint)0x7FFFFFFF);
+            if (n == root) hs.Write(0x7FFFFFFF);
             else if (n.IsFile) hs.Write(0x80000000u | nameOffsets[n.NameIndex]);
             else hs.Write(nameOffsets[n.NameIndex]);
 

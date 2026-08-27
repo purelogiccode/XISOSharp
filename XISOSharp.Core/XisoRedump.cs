@@ -268,6 +268,7 @@ public static class XisoRedump
         using var isoFs = new FileStream(xisoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
         // Validate magic via Verify-like check (optional but preserves XboxKit IsValidXISO)
         // We'll just check header at 0x10000
+
         {
             Span<byte> magic = stackalloc byte[Constants.HeaderDataLength];
             if (!TryReadAt(isoFs, Constants.HeaderOffset, magic) ||
@@ -302,7 +303,7 @@ public static class XisoRedump
                 // Need security sectors
                 if (!string.IsNullOrEmpty(securitySectorsPath))
                 {
-                    securitySectors = SecuritySectors.ParseFile(securitySectorsPath!, redumpLength, xgdType, quiet) ??
+                    securitySectors = SecuritySectors.ParseFile(securitySectorsPath, redumpLength, xgdType, quiet) ??
                                       [];
                 }
                 else if (File.Exists("sectors.txt"))

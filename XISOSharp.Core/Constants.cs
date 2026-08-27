@@ -177,6 +177,17 @@ public static class Constants
     /// <summary>File attribute: normal.</summary>
     public const byte AttributeNor = 0x80;
 
+    /// <summary>Mask of reserved attribute bits (3 and 6, i.e. <c>0x08</c> and <c>0x40</c>) that are unused per xdvdfs <c>DirentAttributes</c>.</summary>
+    public const byte AttributeReservedMask = 0x48;
+
+    /// <summary>Mask of valid attribute bits (all bits except reserved bits 3 and 6).</summary>
+    public const byte AttributeValidMask = 0xB7;
+
+    /// <summary>Masks out reserved attribute bits (3 and 6) from a raw attribute byte, matching xdvdfs behavior.</summary>
+    /// <param name="attrs">Raw attribute byte read from disk.</param>
+    /// <returns>Attribute byte with reserved bits cleared.</returns>
+    public static byte MaskAttributes(byte attrs) => (byte)(attrs & AttributeValidMask);
+
     /// <summary>Version string reported by the tool and written into the optimized tag.</summary>
     public const string ExisoVersion = "2.7.1 (01.11.14)";
 

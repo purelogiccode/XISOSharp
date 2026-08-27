@@ -36,6 +36,8 @@ internal static class Program
         var copyOut = false;
         var auditMode = false;
         var validateMode = false;
+        var checksumFlagMode = false;
+        var checksumSilent = false;
         string? hashAlgo = null;
         var xSeen = false;
         var deleteOld = false;
@@ -107,7 +109,8 @@ internal static class Program
         {
             return RunDecompressMode(args, 1);
         }
-        else if (args.Length > 0 && string.Equals(args[0], "checksum", StringComparison.OrdinalIgnoreCase))
+        else if (args.Length > 0 && (string.Equals(args[0], "checksum", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(args[0], "--checksum", StringComparison.OrdinalIgnoreCase)))
         {
             return RunChecksumMode(args, 1);
         }
@@ -519,6 +522,29 @@ internal static class Program
                         }
 
                         break;
+                    case "--checksum":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        checksumFlagMode = true;
+                        break;
+                    case "--silent":
+                        // --silent is an alias for checksum --silent when --checksum is active;
+                        // otherwise it is a checksum-specific flag handled by the verb subcommand.
+                        if (checksumFlagMode)
+                            checksumSilent = true;
+                        else
+                        {
+                            Logger.LogErr("Error: --silent requires --checksum\n");
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        break;
                     default:
                         optind = i;
                         goto parse_done;
@@ -538,9 +564,16 @@ internal static class Program
         // --pack translates to create mode (directory input) or rewrite mode (ISO input),
         // reusing the existing create/rewrite machinery.
         if (TranslatePackInput(packInput, packName, batchDir, rewrite, info, lsMode, xexInfoMode,
-                unpackMode, hashMode, copyOut, auditMode, validateMode, tree, extract,
+                unpackMode, hashMode, copyOut, auditMode, validateMode, tree, extract, checksumFlagMode,
                 optind, args.Length, createList, ref rewrite, ref packIsoFile, ref path) != 0)
         {
+            return 1;
+        }
+
+        if (checksumFlagMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode ||
+                                 validateMode || unpackMode || createList.Count > 0 || rewrite))
+        {
+            Logger.LogErr("Error: --checksum cannot be combined with other modes\n");
             return 1;
         }
 
@@ -577,14 +610,15 @@ internal static class Program
         }
 
         if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || unpackMode || hashMode ||
-                                 copyOut || validateMode))
+                                 copyOut || validateMode || checksumFlagMode))
         {
             Logger.LogErr(
                 "Error: --batch is only supported in extract, list, tree, rewrite (-r), and audit (-V) modes\n");
             return 1;
         }
 
-        if (unpackMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode || validateMode))
+        if (unpackMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode || validateMode ||
+                           checksumFlagMode))
         {
             Logger.LogErr("Error: --unpack cannot be combined with other modes\n");
             return 1;
@@ -594,7 +628,7 @@ internal static class Program
         var anyRedumpMode = videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode ||
                             zarMode || allMode || bestMode || compressAlias || rebuildMode;
         if (anyRedumpMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode ||
-                              validateMode || unpackMode || createList.Count > 0 || rewrite))
+                              validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode))
         {
             Logger.LogErr(
                 "Error: --video/--random/--seed/--wipe/--trim/--petrify/--update/--zar/--all/--best/--compress/rebuild cannot be combined with other modes\n");
@@ -1458,7 +1492,7 @@ internal static class Program
             try
             {
                 isDir = Directory.Exists(sourcePathStr) &&
-                        (File.GetAttributes(sourcePathStr) & FileAttributes.Directory) != 0;
+                        (File.GetAttributes(sourcePathStr) & FileAttributes.Directory) != FileAttributes.None;
             }
             catch
             {
@@ -1725,7 +1759,7 @@ internal static class Program
                      string.Equals(a, "-l", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(a, "--level", StringComparison.OrdinalIgnoreCase))
             {
-                if (i + 1 >= args.Length || !int.TryParse(args[i + 1], out level) || level < 0 || level > 9)
+                if (i + 1 >= args.Length || !int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out level) || level < 0 || level > 9)
                 {
                     Logger.LogErr("Error: --ciso-level requires an integer 0..9\n");
                     return 1;
@@ -1736,7 +1770,7 @@ internal static class Program
             else if (string.Equals(a, "--ciso-split", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(a, "--split", StringComparison.OrdinalIgnoreCase))
             {
-                if (i + 1 >= args.Length || !long.TryParse(args[i + 1], out var sb) || sb <= 0)
+                if (i + 1 >= args.Length || !long.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var sb) || sb <= 0)
                 {
                     Logger.LogErr("Error: --ciso-split requires a positive integer (bytes)\n");
                     return 1;
@@ -2333,6 +2367,7 @@ internal static class Program
         bool validateMode,
         bool tree,
         bool extract,
+        bool checksumFlagMode,
         int optind,
         int argsLength,
         List<(string Dir, string? Name)> createList,

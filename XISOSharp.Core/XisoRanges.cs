@@ -5,7 +5,7 @@ namespace XISOSharp;
 
 /// <summary>
 /// File-extent discovery ported from <c>References/XboxKit-0.7/LibXGD/XDVDFS.cs</c>.
-/// Provides <see cref="GetXisoRanges"/> / <see cref="MergeRanges"/> and file-entry enumeration
+/// Provides <see cref="GetXisoRanges(string,long,bool)"/> / <see cref="MergeRanges"/> and file-entry enumeration
 /// needed by filler/seed/wiped/trim/skeleton/ZAR and Redump rebuild.
 /// </summary>
 public static class XisoRanges
@@ -61,47 +61,47 @@ public static class XisoRanges
     /// <param name="rootSize">Byte size of the current directory table.</param>
     /// <param name="childOffset">Child offset within the directory table.</param>
     /// <param name="quiet">When <c>true</c>, suppresses logging.</param>
-    public static void GetValidSectors(FileStream isoFs, long isoOffset, List<uint> sysSectors,
-        List<uint> fileSectors, long rootOffset, uint rootSize, long childOffset, bool quiet)
+    public static void GetValidSectors(FileStream isoFs, long isoOffset, List<uint> sysSectors, List<uint> fileSectors, long rootOffset, uint rootSize, long childOffset, bool quiet)
     {
-        if (childOffset >= rootSize)
-            return;
-
-        long cur = isoOffset + rootOffset + childOffset;
-        long curOffset = cur / SectorSize;
-        long curSize = (rootSize - childOffset + SectorSize - 1) / SectorSize;
-        for (long i = curOffset; i < curOffset + curSize; i++)
-            sysSectors.Add((uint)i);
-
-        isoFs.Seek(cur, SeekOrigin.Begin);
-
-        ushort leftChildOffset = ReadUShort(isoFs);
-        if (leftChildOffset == 0xFFFF)
-            return;
-        ushort rightChildOffset = ReadUShort(isoFs);
-        long entryOffset = (long)ReadUInt(isoFs) * SectorSize;
-        uint entrySize = ReadUInt(isoFs);
-        bool isDirectory = ((byte)isoFs.ReadByte() & 0x10) != 0;
-
-        if (leftChildOffset != 0)
-            GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize,
-                (long)leftChildOffset * 4, quiet);
-
-        if (isDirectory)
+        while (true)
         {
-            GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, entryOffset, entrySize, 0, quiet);
-        }
-        else
-        {
-            long fileOffset = (isoOffset + entryOffset) / SectorSize;
-            long fileSize = (entrySize + SectorSize - 1) / SectorSize;
-            for (long i = fileOffset; i < fileOffset + fileSize; i++)
-                fileSectors.Add((uint)i);
-        }
+            if (childOffset >= rootSize) return;
 
-        if (rightChildOffset != 0)
-            GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize,
-                (long)rightChildOffset * 4, quiet);
+            long cur = isoOffset + rootOffset + childOffset;
+            long curOffset = cur / SectorSize;
+            long curSize = (rootSize - childOffset + SectorSize - 1) / SectorSize;
+            for (long i = curOffset; i < curOffset + curSize; i++) sysSectors.Add((uint)i);
+
+            isoFs.Seek(cur, SeekOrigin.Begin);
+
+            ushort leftChildOffset = ReadUShort(isoFs);
+            if (leftChildOffset == 0xFFFF) return;
+            ushort rightChildOffset = ReadUShort(isoFs);
+            long entryOffset = ReadUInt(isoFs) * SectorSize;
+            uint entrySize = ReadUInt(isoFs);
+            bool isDirectory = ((byte)isoFs.ReadByte() & 0x10) != 0;
+
+            if (leftChildOffset != 0) GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize, (long)leftChildOffset * 4, quiet);
+
+            if (isDirectory)
+            {
+                GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, entryOffset, entrySize, 0, quiet);
+            }
+            else
+            {
+                long fileOffset = (isoOffset + entryOffset) / SectorSize;
+                long fileSize = (entrySize + SectorSize - 1) / SectorSize;
+                for (long i = fileOffset; i < fileOffset + fileSize; i++) fileSectors.Add((uint)i);
+            }
+
+            if (rightChildOffset != 0)
+            {
+                childOffset = (long)rightChildOffset * 4;
+                continue;
+            }
+
+            break;
+        }
     }
 
     /// <summary>
@@ -167,7 +167,7 @@ public static class XisoRanges
         if (hasMagic2)
             sysSectors.Add((uint)headerOffsetSector + 1);
 
-        GetValidSectors(isoFs, offset, sysSectors, fileSectors, (long)rootOffset * SectorSize, rootSize, 0, quiet);
+        GetValidSectors(isoFs, offset, sysSectors, fileSectors, rootOffset * SectorSize, rootSize, 0, quiet);
 
         var sysRanges = BuildRanges(sysSectors);
         var fileRanges = BuildRanges(fileSectors);
@@ -230,7 +230,7 @@ public static class XisoRanges
         uint rootSize = ReadUInt(isoFs);
 
         var results = new List<(string Path, long Offset, uint Size)>();
-        CollectFileEntries(isoFs, isoOffset, (long)rootOffset * SectorSize, rootSize, 0, "", results);
+        CollectFileEntries(isoFs, isoOffset, rootOffset * SectorSize, rootSize, 0, "", results);
         results.Sort((a, b) => a.Offset.CompareTo(b.Offset));
         return results;
     }
@@ -277,7 +277,7 @@ public static class XisoRanges
 
         string name = Encoding.ASCII.GetString(nameBuf);
         bool isDirectory = (attributes & 0x10) != 0;
-        long entryOffset = (long)entrySector * SectorSize;
+        long entryOffset = entrySector * SectorSize;
         string entryPath = dirPath.Length > 0 ? dirPath + "/" + name : name;
 
         if (leftChild != 0 && leftChild != 0xFFFF)

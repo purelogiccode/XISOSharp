@@ -92,6 +92,27 @@ public static class XisoWriter
         Logger.TotalBytes = Logger.TotalFiles = 0;
 
         var cwd = Directory.GetCurrentDirectory();
+
+        // Capture full source path before chdir for #55 validation (relative paths resolve against original CWD).
+        string? fullSourceForValidation = null;
+        if (inRoot == null)
+        {
+            try
+            {
+                fullSourceForValidation = Path.IsPathRooted(rootDirectory)
+                    ? Path.GetFullPath(rootDirectory)
+                    : Path.GetFullPath(Path.Combine(cwd, rootDirectory));
+                fullSourceForValidation = fullSourceForValidation.TrimEnd(Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar);
+                if (fullSourceForValidation.Length == 0)
+                    fullSourceForValidation = cwd;
+            }
+            catch
+            {
+                fullSourceForValidation = null;
+            }
+        }
+
         string isoName;
         string isoDir;
 
@@ -139,6 +160,32 @@ public static class XisoWriter
         }
 
         var xisoPath = Path.Combine(outputDirectory, isoName + (inName != null ? "" : ".iso"));
+
+        // #55 — Cannot generate ISO when output path equals input directory.
+        if (inRoot == null && fullSourceForValidation != null)
+        {
+            try
+            {
+                var fullOutput = Path.IsPathRooted(xisoPath)
+                    ? Path.GetFullPath(xisoPath)
+                    : Path.GetFullPath(Path.Combine(cwd, xisoPath));
+                ValidateOutputNotColliding(fullSourceForValidation, fullOutput);
+            }
+            catch (ArgumentException)
+            {
+                // Ensure CWD is restored before throwing (cleanup label expects original CWD).
+                try
+                {
+                    Directory.SetCurrentDirectory(cwd);
+                }
+                catch
+                {
+                    // ignored
+                }
+
+                throw;
+            }
+        }
 
         Logger.Log($"{(inRoot != null ? "rewriting" : "\ncreating")} {isoName}{(inName != null ? "" : ".iso")}:\n\n");
 
@@ -764,6 +811,10 @@ public static class XisoWriter
         ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
 
         var fullOutput = Path.GetFullPath(outputIsoPath);
+        var fullSource = Path.GetFullPath(sourceDirectory).TrimEnd(Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar);
+        ValidateOutputNotColliding(fullSource, fullOutput);
+
         var outputDirectory = Path.GetDirectoryName(fullOutput) ?? Directory.GetCurrentDirectory();
         var inName = Path.GetFileName(fullOutput);
 
@@ -940,26 +991,32 @@ public static class XisoWriter
             if (root.Subdirectory != null && !ReferenceEquals(root.Subdirectory, AvlNode.EmptySubdirectory))
                 AvlTree.FreeTree(root.Subdirectory);
             try { Directory.SetCurrentDirectory(cwd); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
 
         return err;
 
         void SumFiles(AvlNode? n)
         {
-            if (n == null || ReferenceEquals(n, AvlNode.EmptySubdirectory)) return;
-            if (n.Subdirectory == null)
+            while (true)
             {
-                totalFiles++;
-                totalBytes += n.FileSize;
-            }
-            else if (!ReferenceEquals(n.Subdirectory, AvlNode.EmptySubdirectory))
-            {
-                SumFiles(n.Subdirectory);
-            }
+                if (n == null || ReferenceEquals(n, AvlNode.EmptySubdirectory)) return;
+                if (n.Subdirectory == null)
+                {
+                    totalFiles++;
+                    totalBytes += n.FileSize;
+                }
+                else if (!ReferenceEquals(n.Subdirectory, AvlNode.EmptySubdirectory))
+                {
+                    SumFiles(n.Subdirectory);
+                }
 
-            SumFiles(n.Left);
-            SumFiles(n.Right);
+                SumFiles(n.Left);
+                n = n.Right;
+            }
         }
     }
 
@@ -1256,6 +1313,47 @@ public static class XisoWriter
                 progress);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Validates that the output ISO path does not collide with the source directory.
+    /// Covers #55: <c>extract-xiso -c &lt;dir&gt;</c> creating <c>&lt;dir&gt;.iso</c> inside <c>&lt;dir&gt;</c>
+    /// with the same leaf name collides on case-insensitive filesystems, and direct equality
+    /// (<c>output == source</c>) which is a user error.
+    /// </summary>
+    /// <param name="fullSource">Full normalized source directory path (trimmed, no trailing separator).</param>
+    /// <param name="fullOutput">Full normalized output file path.</param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the output path equals the source directory or is inside it with the same leaf name.
+    /// </exception>
+    private static void ValidateOutputNotColliding(string fullSource, string fullOutput)
+    {
+        var trimmedOutput = fullOutput.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        // Direct equality (e.g. -c src -o src or --pack src src)
+        if (string.Equals(fullSource, trimmedOutput, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "Output ISO path must not be the same as source directory; use -o <file> or --pack <dir> <out.iso>");
+        }
+
+        // Inside with same leaf name (e.g. src/src.iso where src leaf is "src")
+        if (trimmedOutput.Length > fullSource.Length &&
+            trimmedOutput.StartsWith(fullSource, StringComparison.OrdinalIgnoreCase) &&
+            (trimmedOutput[fullSource.Length] == Path.DirectorySeparatorChar ||
+             trimmedOutput[fullSource.Length] == Path.AltDirectorySeparatorChar))
+        {
+            var sourceLeaf = Path.GetFileName(fullSource);
+            if (!string.IsNullOrEmpty(sourceLeaf))
+            {
+                var outFileNameNoExt = Path.GetFileNameWithoutExtension(trimmedOutput);
+                if (string.Equals(outFileNameNoExt, sourceLeaf, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new ArgumentException(
+                        "Output ISO path must not be the same as source directory; use -o <file> or --pack <dir> <out.iso>");
+                }
+            }
+        }
     }
 }
 

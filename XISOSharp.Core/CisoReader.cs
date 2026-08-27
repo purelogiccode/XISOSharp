@@ -10,8 +10,11 @@ namespace XISOSharp;
 /// </summary>
 public static class CisoReader
 {
+    /// <summary>CISO block size in bytes (2048, matches XISO sector size).</summary>
     public const int BlockSize = 2048;
+    /// <summary>CISO magic <c>0x4F534943</c> ("CISO" little-endian).</summary>
     public const uint Magic = 0x4F534943u;
+    /// <summary>CISO header size in bytes (24).</summary>
     public const uint HeaderSize = 24;
 
     /// <summary>
@@ -55,6 +58,15 @@ public static class CisoReader
         return 0;
     }
 
+    /// <summary>
+    /// Asynchronous variant of <see cref="DecompressToIso"/>.
+    /// Decompresses a CISO/CSO file to an ISO file on a thread-pool thread.
+    /// </summary>
+    /// <param name="csoPath">Source CISO/CSO path.</param>
+    /// <param name="outputIsoPath">Destination ISO path; if <c>null</c>, derived from <paramref name="csoPath"/> (<c>.iso</c>).</param>
+    /// <param name="progress">Optional progress channel.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>0 on success, 1 on error; throws on invalid arguments.</returns>
     public static async Task<int> DecompressToIsoAsync(string csoPath, string? outputIsoPath = null,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
         => await Task.Run(() => DecompressToIso(csoPath, outputIsoPath, progress, ct), ct).ConfigureAwait(false);
@@ -294,7 +306,10 @@ public static class CisoReader
             if (dest.Length != (long)uncompressedSize)
             {
                 try { dest.SetLength((long)uncompressedSize); }
-                catch { }
+                catch
+                {
+                    // ignored
+                }
             }
         }
 
@@ -311,6 +326,12 @@ public static class CisoReader
         ReadFromCso(fs, offset, buffer);
     }
 
+    /// <summary>
+    /// Random-access read from an open CISO file stream (decompresses the sector(s) containing the requested range).
+    /// </summary>
+    /// <param name="csoFs">Open CISO file stream (seekable, readable).</param>
+    /// <param name="offset">Byte offset in the uncompressed image.</param>
+    /// <param name="buffer">Destination buffer to fill.</param>
     public static void ReadFromCso(FileStream csoFs, long offset, Span<byte> buffer)
     {
         // Minimal random-access: decompress whole needed sectors
@@ -421,7 +442,10 @@ public static class CisoReader
                 var dec = DeflateDecompress(compBuf.AsSpan(0, tryLen));
                 if (dec.Length == BlockSize) return dec;
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
 
         return DeflateDecompress(compBuf);
@@ -449,7 +473,10 @@ public static class CisoReader
                 var dec = Lz4Decompress(compBuf.AsSpan(0, tryLen));
                 if (dec.Length == BlockSize) return dec;
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
 
         return Lz4Decompress(compBuf);
@@ -483,7 +510,10 @@ public static class CisoReader
             var def = DeflateDecompress(data);
             if (def.Length == BlockSize) return def;
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
 
         // Try managed LZ4 block decode
         try
@@ -494,7 +524,10 @@ public static class CisoReader
         {
             // As last resort, try DEFLATE again without length check
             try { return DeflateDecompress(data); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             throw new InvalidDataException("LZ4 decompress failed", ex);
         }

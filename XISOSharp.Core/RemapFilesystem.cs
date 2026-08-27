@@ -417,7 +417,7 @@ public static class RemapFilesystem
                 try
                 {
                     var attr = File.GetAttributes(fullEntry);
-                    isDir = (attr & FileAttributes.Directory) != 0;
+                    isDir = (attr & FileAttributes.Directory) != FileAttributes.None;
                     if (!isDir)
                     {
                         len = new FileInfo(fullEntry).Length;
@@ -548,7 +548,7 @@ public static class RemapFilesystem
         return string.Join("/", parts);
     }
 
-    private static AvlNode? BuildAvlTree(string sourceDir, IReadOnlyList<RemapRule> rules, CancellationToken ct)
+    private static AvlNode BuildAvlTree(string sourceDir, IReadOnlyList<RemapRule> rules, CancellationToken ct)
     {
         var mappings = BuildMappings(sourceDir, rules);
         // Build AVL tree incrementally
@@ -729,7 +729,7 @@ public static class RemapFilesystem
                 try
                 {
                     var attr = File.GetAttributes(fullEntry);
-                    isDir = (attr & FileAttributes.Directory) != 0;
+                    isDir = (attr & FileAttributes.Directory) != FileAttributes.None;
                     if (!isDir) len = new FileInfo(fullEntry).Length;
                 }
                 catch { continue; }

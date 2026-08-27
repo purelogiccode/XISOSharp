@@ -7,32 +7,30 @@ namespace XISOSharp.BlockDevice;
 /// </summary>
 public sealed class OffsetBlockDevice : IBlockDevice
 {
-    private readonly IBlockDevice _inner;
-    private readonly long _offset;
     private readonly bool _leaveOpen;
 
     /// <summary>Creates an offset view starting at <paramref name="offset"/> bytes into <paramref name="inner"/>.</summary>
     public OffsetBlockDevice(IBlockDevice inner, long offset, bool leaveOpen = false)
     {
-        _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+        Inner = inner ?? throw new ArgumentNullException(nameof(inner));
         if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
-        _offset = offset;
+        Offset = offset;
         _leaveOpen = leaveOpen;
     }
 
     /// <summary>Byte offset of this view within the inner device.</summary>
-    public long Offset => _offset;
+    public long Offset { get; }
 
     /// <summary>Inner device.</summary>
-    public IBlockDevice Inner => _inner;
+    public IBlockDevice Inner { get; }
 
     /// <inheritdoc/>
     public long Length
     {
         get
         {
-            long innerLen = _inner.Length;
-            long len = innerLen - _offset;
+            long innerLen = Inner.Length;
+            long len = innerLen - Offset;
             return len < 0 ? 0 : len;
         }
     }
@@ -41,20 +39,20 @@ public sealed class OffsetBlockDevice : IBlockDevice
     public int Read(long offset, Span<byte> buffer)
     {
         if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
-        return _inner.Read(_offset + offset, buffer);
+        return Inner.Read(Offset + offset, buffer);
     }
 
     /// <inheritdoc/>
     public void Write(long offset, ReadOnlySpan<byte> buffer)
     {
         if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
-        _inner.Write(_offset + offset, buffer);
+        Inner.Write(Offset + offset, buffer);
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (!_leaveOpen) _inner.Dispose();
+        if (!_leaveOpen) Inner.Dispose();
     }
 
     /// <summary>
@@ -82,7 +80,10 @@ public sealed class OffsetBlockDevice : IBlockDevice
                 if (buf.SequenceEqual(magic))
                     return view;
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             view.Dispose();
         }

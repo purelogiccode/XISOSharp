@@ -271,7 +271,7 @@ public static class XisoReader
         // For simplicity, validate via VerifyXiso then walk via reading directory sectors through dev
         try
         {
-            var (rootSector, rootSize, discLseek) = VerifyXiso(dev, isoName);
+            (uint rootSector, uint rootSize, long discLseek) = VerifyXiso(dev, isoName);
             if (rootSector == 0 && rootSize == 0)
                 return new AuditResult(true, 0, 0, []);
             // For block device, we reuse FileStream-based AuditWalk by materializing to MemoryBlockDevice?
@@ -405,7 +405,7 @@ public static class XisoReader
             var fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
 
             ReadExact(fs, byteBuf);
-            var attributes = byteBuf[0];
+            var attributes = Constants.MaskAttributes(byteBuf[0]);
 
             ReadExact(fs, byteBuf);
             var filenameLength = byteBuf[0];
@@ -1307,7 +1307,7 @@ public static class XisoReader
             var fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
 
             ReadExact(fs, byteBuf);
-            var attributes = byteBuf[0];
+            var rawAttributes = byteBuf[0];
 
             ReadExact(fs, byteBuf);
             var filenameLength = byteBuf[0];
@@ -1328,11 +1328,12 @@ public static class XisoReader
                     $"Sector {startSector} (offset {sectorOffset}) for '{path}{filename}' exceeds file length {fileLength}.");
             }
 
-            if ((attributes & 0x48) != 0)
+            if ((rawAttributes & Constants.AttributeReservedMask) != 0)
             {
-                issues.Add($"Reserved attribute bits set in '{path}{filename}': 0x{attributes:X2}.");
+                issues.Add($"Reserved attribute bits set in '{path}{filename}': 0x{rawAttributes:X2}.");
             }
 
+            var attributes = Constants.MaskAttributes(rawAttributes);
             var isDir = (attributes & Constants.AttributeDir) != 0;
 
             if (isDir)
@@ -1902,7 +1903,7 @@ public static class XisoReader
             var fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
 
             ReadExact(fs, byteBuf);
-            var attributes = byteBuf[0];
+            var attributes = Constants.MaskAttributes(byteBuf[0]);
 
             ReadExact(fs, byteBuf);
             var filenameLength = byteBuf[0];

@@ -47,6 +47,7 @@ public static class XisoSkeleton
     /// <param name="hashPath">Optional hash file path (<c>sha1 hex + space + path</c> per line). If null, derives <c>.hash</c>.</param>
     /// <param name="isoOffset">Byte offset of the XISO partition within the file (for Redump).</param>
     /// <param name="quiet">Suppress info.</param>
+    /// <param name="ct">Cancellation token.</param>
     public static bool Petrify(string inputPath, string? skeletonPath = null, string? hashPath = null,
         long isoOffset = 0, bool quiet = false, CancellationToken ct = default)
     {
