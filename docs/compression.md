@@ -12,7 +12,7 @@ Pure-managed **CISO** (Compressed ISO) with BCL DEFLATE (version 1) + LZ4 read i
 
 ## Format
 
-CISO header (24 bytes, LE): `CISO 00 00 00 01 | blockSize=2048 (u32 LE) | totalBlocks (u64 LE) | align (u8) | ver (u8)` then `index[totalBlocks+1]` LE `u32` offsets (0x80000000 = not compressed) + compressed 2048-byte sectors (DEFLATE per block via `DeflateStream`, LZ4 for read). `align` is dynamic: `0` if `<2 GB`, `1` if `<4 GB`, `2` else — matches `ciso` crate. Saving threshold: skip compression when `compressed+12 >= 2048` (write plain).
+CISO header (24 bytes, LE): `CISO 00 00 00 01 | blockSize=2048 (u32 LE) | totalBlocks (u64 LE) | align (u8) | ver (u8)` then `index[totalBlocks+1]` LE `u32` offsets (0x80000000 = not compressed) + compressed 2048-byte sectors (DEFLATE per block via `DeflateStream`, LZ4 for read). `align` is dynamic: `0` if `<2 GB`, `1` if `<4 GB`, `2` else (the reference `ciso` crate 0.2 in `xdvdfs` 0.8.3 writes fixed `align 2` + LZ4 v2; the C# reader accepts any `align` and both `ver`). Saving threshold: skip compression when `compressed+12 >= 2048` (write plain).
 
 ```
 CISO header: magic "CISO" (4) | 0x00*4 | blockSize=2048 (4 LE) | totalBlocks (8 LE) | align (1) | ver=1 DEFLATE or 2 LZ4

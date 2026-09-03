@@ -2,7 +2,6 @@
 
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](global.json)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 
 A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2.7.1 for Xbox ISO (XISO / XDVDFS) images — **byte-identical** output, no native dependencies, no P/Invoke, just .NET. Beyond the C baseline it merges the archival power of [XboxKit 0.7](References/XboxKit-0.7/) and the modern packing of [xdvdfs 0.8.3](References/xdvdfs-0.8.3/) into one trimmable, AOT-compatible library + CLI.
@@ -11,7 +10,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 
 | Project | Description |
 |---|---|
-| [XISOSharp.Core](XISOSharp.Core/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
+| [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI `extract-xiso` (`net10.0`, `AssemblyName extract-xiso`) — byte-compatible + 20 extra modes |
 | [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (675 tests) — golden fixtures + `MemoryBlockDevice` |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
@@ -338,25 +337,25 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | **Reading** | | | | |
 | Extract / Unpack | ✅ | ✅ | ✅ | ✅ |
 | List top-level / Tree recursive | ✅ | 🟡 list only | ❌ | ✅ |
-| `info` / `ls` / `xex-info` | ✅ | ❌ | ❌ | 🟡 `info` only |
+| `info` / `ls` / `xex-info` | ✅ | ❌ | ❌ | 🟡 `info`/`ls` only |
 | Per-file MD5 / SHA-256 | ✅ | ❌ | ❌ | 🟡 MD5 |
 | SHA3-256 image checksum (`checksum`) | ✅ | ❌ | ❌ | ✅ |
 | `copy-out` single file/dir | ✅ | ❌ | ❌ | ✅ |
 | Deep audit `-V` (header/tag/cycles/bounds/0x48/0x0000) | ✅ | ❌ | ❌ | ❌ |
 | `validate` + `--validate*` JSON report | ✅ | ❌ | ❌ | ❌ |
-| Disc probe RAW/GLOBAL/XGD3/Hybrid/XGD1 (5) | ✅ | 🟡 4 | ✅ +tables | ❌ trimmed only |
+| Disc probe RAW/GLOBAL/XGD3/Hybrid/XGD1 (5) | ✅ | 🟡 4 | ✅ +tables | 🟡 4 (`XDVD_OFFSETS`, no Hybrid) |
 | Empty-dir sentinel `0xFFFF` + `0x0000` header | ✅ | 🟡 `0xFFFF` only | 🟡 `0xFFFF` only | ✅ |
 | Reserved bits `0x08`/`0x40` masked | ✅ | ❌ | ❌ | 🟡 flag only |
 | `llCompat` linked-list fix (auto via tag) | ✅ | ✅ | ❌ | ❌ |
-| Encoding Latin-1 / WINDOWS_1252 | ✅ | 🟡 `FORCE_ASCII` | 🟡 ASCII | ✅ |
+| Encoding Latin-1 / WINDOWS_1252 | ✅ | 🟡 raw bytes (`FORCE_ASCII` dead) | 🟡 ASCII | ✅ |
 | ECMA-119 descriptors `0x8000` | ✅ | ✅ | ❌ | 🟡 sector 32 |
 | Optimized tag `in!xiso` at 31337 | ✅ | ✅ | ❌ | ❌ |
-| CISO decompress (DEFLATE v1 + LZ4 v2) | ✅ | ❌ | ❌ | ✅ |
+| CISO decompress (DEFLATE v1 + LZ4 v2) | ✅ | ❌ | ❌ | 🟡 v2 LZ4 read (no verb) |
 | BlockDevice random-access (File/Memory/Offset/Ciso) | ✅ | ❌ | ❌ | ✅ |
 | Track/TOC parsing | ✅* | — | — | 🟡 |
 | **Writing** | | | | |
 | Write V5 (optimized AVL) | ✅ | ✅ | 🟡 ranges only | ✅ |
-| `FileModulus 0x10000` + sector `0xFF` pad | ✅ | ✅ | ✅ | 🟡 `0x00` pad |
+| `FileModulus 0x10000` + sector `0xFF` pad | ✅ | ✅ | 🟡 range-copy only | 🟡 `0x00` pad |
 | Empty dir → 1 sector `0xFF` sentinel | ✅ | ✅ | ❌ | ✅ |
 | `.xbe` media patch `E8…7D→EB` (Boyer-Moore, overlap 7) | ✅ | ✅ | ❌ | ❌ |
 | Media patch disable `-m` | ✅ | ✅ | ❌ | ❌ |
@@ -371,14 +370,14 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | `--update` tail `su20076000_00000000` (XGD3) | ✅ | ❌ | ✅ | ❌ |
 | `--zar` ZArchive/zstd | ✅ | ❌ | ✅ | ❌ |
 | `rebuild` lossless (L0/`l0Padding`+game+`l1Padding`+L1) | ✅ | ❌ | ✅ | ❌ |
-| `--security-sectors` `4096`-aligned `sectors.txt` | ✅ | ❌ | ✅ | ❌ |
+| `--security-sectors` `4096`-aligned `sectors.txt` | ✅ | ❌ | 🟡 `sectors.txt` sidecar | ❌ |
 | Aliases `--all`/`--best`/`--compress` | ✅ | ❌ | ✅ | ❌ |
 | Wave tables `XISO_OFFSET`/`REDUMP_ISO_LENGTH`/`VIDEO_Lx`/`WAVE_PVD` | ✅ | ❌ | ✅ | ❌ |
 | `--skip-sectors` / `--prepend-sectors` arbitrary | ✅ | ❌ | 🟡 built-in tables | ❌ |
 | **Packing / xdvdfs** | | | | |
 | `build-image` ordered `host/**:image/{n}` + `!` + `{0}` | ✅ | ❌ | ❌ | ✅ |
 | `image-spec from` TOML preserve-order | ✅ | ❌ | ❌ | ✅ |
-| CISO compress DEFLATE `align` 0/1/2 threshold `+12` | ✅ | ❌ | ❌ | ✅ |
+| CISO compress DEFLATE `align` 0/1/2 threshold `+12` | ✅ | ❌ | ❌ | 🟡 LZ4 v2, fixed `align 2` |
 | `--ciso-level` 0..9 / `--ciso-split` shim | ✅ | ❌ | ❌ | 🟡 |
 | `wax` glob `*`/`**`/`?`/`[]`/`{a,b}` | ✅ | ❌ | ❌ | ✅ |
 | `xdvdfs.toml` `[map_rules]` | ✅ | ❌ | ❌ | ✅ |
@@ -396,20 +395,23 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | `VerifyXiso(IBlockDevice)` overload | ✅ | ❌ | ❌ | ✅ trait |
 | Glob `-X` / `WaxGlob` captures | ✅ | 🟡 `-s` only | ❌ | ✅ `wax` |
 | **CLI** | | | | |
-| `-c` repeatable + `-X` excludes + `-s` | ✅ | ✅* | — | ✅ `pack` |
+| `-c` repeatable + `-X` excludes + `-s` | ✅ | 🟡 no `-X` | — | ✅ `pack` |
 | `--pack` dir→create / iso→rewrite | ✅ | ❌ | — | ✅ |
 | Batch `--batch` sorted + `--batch-recursive` | ✅ | 🟡 explicit args only | ❌ | 🟡 `checksum` multi |
 | Quiet `-q` / silent `-Q` | ✅ | ✅ | 🟡 | ❌ |
-| Help `-h` / banner `-v` `2.7.1 (01.11.14)` | ✅ | ✅ | ❌ | 🟡 `clap` |
+| Help `-h` / banner `-v` `2.7.1 (01.11.14)` | ✅ | ✅ | 🟡 `-h` only | 🟡 `clap` |
 | Exit `0`/`1` + `2` for `validate --strict` | ✅ | 🟡 `0`/`1` only | ❌ | ❌ |
 | **Extras** | | | | |
 | Extraction to dir | ✅ | ✅ | ✅ | ✅ |
 | Platform detection (`OperatingSystem.Is*`) | ✅ | 🟡 `#if` | 🟡 | ✅ |
 | Per-hunk CRC / full-image verify | ✅ | — | — | 🟡 SHA3 |
-| Native dependencies | **none** | none | zstd/ZArchive | `bincode`/`serde`/`clap`/`wax`/`ciso`/`md-5`/`sha3` |
-| Distribution | NuGet + `extract-xiso` bin | `cmake` bin | `dotnet` + CMake | `cargo` crate |
+| Multi-target builds | ✅ `net8`/`net9`/`net10` | — | ✅ `net6`–`net10` (`LibXGD` `net20`–`net10`) | — (Rust) |
+| Strong-name signing (`snk`) | ✅ | — | ❌ | — |
+| Trimmable + AOT (`IsTrimmable`/`IsAotCompatible`) | ✅ | — | ❌ | ✅ native/`no_std` |
+| Native dependencies | **none** | none | none (managed NuGet `GrindCore`/`SabreTools`) | `bincode`/`serde`/`clap`/`wax`/`ciso`/`md-5`/`sha3` |
+| Distribution | NuGet + `extract-xiso` bin | `cmake` bin | `dotnet` publish + NuGet `LibXGD` | `cargo` crate |
 
-<sub>*XISOSharp `Track/TOC` = `GetVolumeInfo`/`ListDirectory`/`GetXisoRanges` sector map; 🟡 = partial/opt-in/different pad or trimmed-only semantics.</sub>
+<sub>*XISOSharp `Track/TOC` = `GetVolumeInfo`/`ListDirectory`/`GetXisoRanges` sector map; 🟡 = partial/opt-in/different pad or trimmed-only semantics. xdvdfs CISO = `ciso` crate 0.2 — LZ4 v2 with fixed `align 2`; DEFLATE v1 neither written nor read (`ciso` reader rejects `version != 2`), and no `decompress` verb (`.cso` read via `CSOBlockDevice` only). extract-xiso `-p` is parsed but unhandled (dead); `FORCE_ASCII` is a dead macro.</sub>
 
 ## Build
 
