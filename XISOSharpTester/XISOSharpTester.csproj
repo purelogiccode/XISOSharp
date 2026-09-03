@@ -20,19 +20,27 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
+        <PackageReference Include="Meziantou.Analyzer" Version="3.0.201">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Roslynator.Analyzers" Version="5.0.0">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers" Version="5.0.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Formatting.Analyzers">
+        <PackageReference Include="Roslynator.Formatting.Analyzers" Version="5.0.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Serilog" />
-        <PackageReference Include="Serilog.Sinks.Debug" />
-        <PackageReference Include="Serilog.Sinks.File" />
-        <PackageReference Include="WPF-UI" />
-        <PackageReference Include="QuestPDF" />
+        <PackageReference Include="Serilog" Version="4.4.0" />
+        <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
+        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+        <PackageReference Include="WPF-UI" Version="4.3.0" />
+        <PackageReference Include="QuestPDF" Version="2026.8.0" />
     </ItemGroup>
 
     <ItemGroup>
