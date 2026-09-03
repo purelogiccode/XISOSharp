@@ -29,8 +29,10 @@ public sealed class XboxPrng
     public void SimulateSectors(long count)
     {
         for (long i = 0; i < count; i++)
-        for (int j = 0; j < Constants.SectorSize; j += 2)
-            _state = (uint)(((_state + 1UL) * _mult) % 0xFFFFFFFB);
+        {
+            for (var j = 0; j < Constants.SectorSize; j += 2)
+                _state = (uint)(((_state + 1UL) * _mult) % 0xFFFFFFFB);
+        }
     }
 
     /// <summary>Write <paramref name="count"/> PRNG sectors to <paramref name="fs"/>.</summary>
@@ -42,7 +44,7 @@ public sealed class XboxPrng
     /// <param name="count">Number of 2048-byte sectors to generate.</param>
     public void WriteSectors(Stream output, long count)
     {
-        byte[] sector = new byte[Constants.SectorSize];
+        var sector = new byte[Constants.SectorSize];
         for (long i = 0; i < count; i++)
         {
             GenerateSector(sector);
@@ -52,10 +54,10 @@ public sealed class XboxPrng
 
     private void GenerateSector(Span<byte> sector)
     {
-        for (int j = 0; j < Constants.SectorSize; j += 2)
+        for (var j = 0; j < Constants.SectorSize; j += 2)
         {
             _state = (uint)(((_state + 1UL) * _mult) % 0xFFFFFFFB);
-            ushort sample = (ushort)((_state ^ _mask) >> 8);
+            var sample = (ushort)((_state ^ _mask) >> 8);
             sector[j] = (byte)sample;
             sector[j + 1] = (byte)(sample >> 8);
         }
@@ -73,35 +75,37 @@ public sealed class XboxPrng
         Span<byte> magic = stackalloc byte[24];
         if (!TryReadAt(isoFs, xisoOffset + 0x10800, magic))
             return null;
-        ReadOnlySpan<byte> magic2 = "XBOX_DVD_LAYOUT_TOOL_SIG"u8;
+        var magic2 = "XBOX_DVD_LAYOUT_TOOL_SIG"u8;
         if (!magic[..magic2.Length].SequenceEqual(magic2))
             return null;
 
         Span<byte> nextBuf = stackalloc byte[8];
         if (!TryReadAt(isoFs, xisoOffset + 0x10820, nextBuf))
             return null;
-        int versionOffset = 0x10824;
-        bool allZero = true;
-        for (int k = 0; k < 8; k++)
+        var versionOffset = 0x10824;
+        var allZero = true;
+        for (var k = 0; k < 8; k++)
+        {
             if (nextBuf[k] != 0)
             {
                 allZero = false;
                 break;
             }
+        }
 
         if (allZero) versionOffset += 0x10;
 
         Span<byte> versionBuf = stackalloc byte[2];
         if (!TryReadAt(isoFs, xisoOffset + versionOffset, versionBuf))
             return null;
-        ushort version = (ushort)(versionBuf[0] | (versionBuf[1] << 8));
+        var version = (ushort)(versionBuf[0] | (versionBuf[1] << 8));
         if (version == 0) return null;
         if (!quiet) Logger.Log($"[INFO] XGD1 Version: {version}\n");
 
-        byte[] firstSector = new byte[Constants.SectorSize * 2];
+        var firstSector = new byte[Constants.SectorSize * 2];
         if (!TryReadAtArray(isoFs, xisoOffset, firstSector))
             return null;
-        if (TryGetSeed(firstSector, out uint seed))
+        if (TryGetSeed(firstSector, out var seed))
             return seed;
         return null;
     }
@@ -121,13 +125,19 @@ public sealed class XboxPrng
 
     private static bool TryReadAt(FileStream fs, long offset, Span<byte> buf)
     {
-        try { fs.Seek(offset, SeekOrigin.Begin); }
-        catch { return false; }
+        try
+        {
+            fs.Seek(offset, SeekOrigin.Begin);
+        }
+        catch
+        {
+            return false;
+        }
 
-        int total = 0;
+        var total = 0;
         while (total < buf.Length)
         {
-            int n = fs.Read(buf[total..]);
+            var n = fs.Read(buf[total..]);
             if (n == 0) break;
             total += n;
         }
@@ -137,13 +147,19 @@ public sealed class XboxPrng
 
     private static bool TryReadAtArray(FileStream fs, long offset, byte[] buf)
     {
-        try { fs.Seek(offset, SeekOrigin.Begin); }
-        catch { return false; }
+        try
+        {
+            fs.Seek(offset, SeekOrigin.Begin);
+        }
+        catch
+        {
+            return false;
+        }
 
-        int total = 0;
+        var total = 0;
         while (total < buf.Length)
         {
-            int n = fs.Read(buf, total, buf.Length - total);
+            var n = fs.Read(buf, total, buf.Length - total);
             if (n == 0) break;
             total += n;
         }
@@ -155,25 +171,25 @@ public sealed class XboxPrng
     public static bool TryGetSeed(byte[] sector, out uint outSeed)
     {
         uint foundSeed = 0;
-        bool seedFound = false;
+        var seedFound = false;
 
         const long maxUInt32 = (long)uint.MaxValue + 1;
         var range = Partitioner.Create(0L, maxUInt32);
         Parallel.ForEach(range, (chunk, state) =>
         {
-            for (long i = chunk.Item1; i < chunk.Item2; i++)
+            for (var i = chunk.Item1; i < chunk.Item2; i++)
             {
                 if (Volatile.Read(ref seedFound))
                     break;
-                uint seedGuess = (uint)i;
-                uint multGuess = FixedSeeds[seedGuess & 7];
-                uint stateGuess = (uint)(((seedGuess + 1UL) * multGuess) % 0xFFFFFFFB);
-                uint maskAttempt = stateGuess;
-                bool match = true;
-                for (int j = 0; j < Constants.SectorSize * 2; j += 2)
+                var seedGuess = (uint)i;
+                var multGuess = FixedSeeds[seedGuess & 7];
+                var stateGuess = (uint)(((seedGuess + 1UL) * multGuess) % 0xFFFFFFFB);
+                var maskAttempt = stateGuess;
+                var match = true;
+                for (var j = 0; j < Constants.SectorSize * 2; j += 2)
                 {
                     stateGuess = (uint)(((stateGuess + 1UL) * multGuess) % 0xFFFFFFFB);
-                    ushort sample = (ushort)((stateGuess ^ maskAttempt) >> 8);
+                    var sample = (ushort)((stateGuess ^ maskAttempt) >> 8);
                     if (sector[j] != (byte)sample || sector[j + 1] != (byte)(sample >> 8))
                     {
                         match = false;

@@ -37,10 +37,10 @@ public static class XisoRanges
 
     private static void ReadExact(FileStream fs, Span<byte> buffer)
     {
-        int offset = 0;
+        var offset = 0;
         while (offset < buffer.Length)
         {
-            int n = fs.Read(buffer[offset..]);
+            var n = fs.Read(buffer[offset..]);
             if (n == 0) throw new EndOfStreamException("Failed to read XDVDFS header");
             offset += n;
         }
@@ -75,23 +75,25 @@ public static class XisoRanges
         {
             if (childOffset >= rootSize) return;
 
-            long cur = isoOffset + rootOffset + childOffset;
-            long curOffset = cur / SectorSize;
-            long curSize = (rootSize - childOffset + SectorSize - 1) / SectorSize;
-            for (long i = curOffset; i < curOffset + curSize; i++) sysSectors.Add((uint)i);
+            var cur = isoOffset + rootOffset + childOffset;
+            var curOffset = cur / SectorSize;
+            var curSize = (rootSize - childOffset + SectorSize - 1) / SectorSize;
+            for (var i = curOffset; i < curOffset + curSize; i++) sysSectors.Add((uint)i);
 
             isoFs.Seek(cur, SeekOrigin.Begin);
 
-            ushort leftChildOffset = ReadUShort(isoFs);
+            var leftChildOffset = ReadUShort(isoFs);
             if (leftChildOffset == 0xFFFF) return;
-            ushort rightChildOffset = ReadUShort(isoFs);
-            long entryOffset = ReadUInt(isoFs) * SectorSize;
-            uint entrySize = ReadUInt(isoFs);
-            bool isDirectory = ((byte)isoFs.ReadByte() & 0x10) != 0;
+            var rightChildOffset = ReadUShort(isoFs);
+            var entryOffset = ReadUInt(isoFs) * SectorSize;
+            var entrySize = ReadUInt(isoFs);
+            var isDirectory = ((byte)isoFs.ReadByte() & 0x10) != 0;
 
             if (leftChildOffset != 0)
+            {
                 GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize,
                     (long)leftChildOffset * 4);
+            }
 
             if (isDirectory)
             {
@@ -99,9 +101,9 @@ public static class XisoRanges
             }
             else
             {
-                long fileOffset = (isoOffset + entryOffset) / SectorSize;
-                long fileSize = (entrySize + SectorSize - 1) / SectorSize;
-                for (long i = fileOffset; i < fileOffset + fileSize; i++) fileSectors.Add((uint)i);
+                var fileOffset = (isoOffset + entryOffset) / SectorSize;
+                var fileSize = (entrySize + SectorSize - 1) / SectorSize;
+                for (var i = fileOffset; i < fileOffset + fileSize; i++) fileSectors.Add((uint)i);
             }
 
             if (rightChildOffset != 0)
@@ -131,7 +133,7 @@ public static class XisoRanges
         if (merged.Count == 0) return merged;
 
         var result = new List<(uint, uint)> { merged[0] };
-        for (int k = 1; k < merged.Count; k++)
+        for (var k = 1; k < merged.Count; k++)
         {
             var last = result[^1];
             if (merged[k].Item1 <= last.Item2 + 1)
@@ -153,20 +155,20 @@ public static class XisoRanges
         _ = quiet;
         List<uint> sysSectors = [];
         List<uint> fileSectors = [];
-        long headerOffset = offset + HeaderOffset;
-        long headerOffsetSector = headerOffset / SectorSize;
+        var headerOffset = offset + HeaderOffset;
+        var headerOffsetSector = headerOffset / SectorSize;
         sysSectors.Add((uint)headerOffsetSector);
 
         isoFs.Seek(headerOffset + 20, SeekOrigin.Begin);
-        uint rootOffset = ReadUInt(isoFs);
-        uint rootSize = ReadUInt(isoFs);
+        var rootOffset = ReadUInt(isoFs);
+        var rootSize = ReadUInt(isoFs);
 
         isoFs.Seek(headerOffset + SectorSize, SeekOrigin.Begin);
         Span<byte> magic = stackalloc byte[24];
         ReadExact(isoFs, magic);
         // XBOX_DVD_LAYOUT_TOOL_SIG occupies the first bytes of the second sector when present.
-        bool hasMagic2 = true;
-        for (int m = 0; m < Magic2.Length; m++)
+        var hasMagic2 = true;
+        for (var m = 0; m < Magic2.Length; m++)
         {
             if (magic[m] != Magic2[m])
             {
@@ -188,13 +190,13 @@ public static class XisoRanges
     private static List<(uint, uint)> BuildRanges(List<uint> sectors)
     {
         if (sectors.Count == 0) return [];
-        var sorted = sectors.Distinct().OrderBy(x => x).ToList();
+        var sorted = sectors.Distinct().Order().ToList();
         var ranges = new List<(uint, uint)>();
-        uint start = sorted[0];
-        uint prev = sorted[0];
-        for (int i = 1; i < sorted.Count; i++)
+        var start = sorted[0];
+        var prev = sorted[0];
+        for (var i = 1; i < sorted.Count; i++)
         {
-            uint cur = sorted[i];
+            var cur = sorted[i];
             if (cur == prev + 1)
             {
                 prev = cur;
@@ -236,10 +238,10 @@ public static class XisoRanges
     /// </summary>
     public static List<(string Path, long Offset, uint Size)> GetFileEntries(FileStream isoFs, long isoOffset)
     {
-        long headerOffset = isoOffset + HeaderOffset;
+        var headerOffset = isoOffset + HeaderOffset;
         isoFs.Seek(headerOffset + 20, SeekOrigin.Begin);
-        uint rootOffset = ReadUInt(isoFs);
-        uint rootSize = ReadUInt(isoFs);
+        var rootOffset = ReadUInt(isoFs);
+        var rootSize = ReadUInt(isoFs);
 
         var results = new List<(string Path, long Offset, uint Size)>();
         CollectFileEntries(isoFs, isoOffset, rootOffset * SectorSize, rootSize, 0, "", results);
@@ -264,31 +266,31 @@ public static class XisoRanges
     {
         if (childOffset >= dirSize) return;
 
-        long pos = isoOffset + dirOffset + childOffset;
+        var pos = isoOffset + dirOffset + childOffset;
         isoFs.Seek(pos, SeekOrigin.Begin);
 
-        ushort leftChild = ReadUShort(isoFs);
-        ushort rightChild = ReadUShort(isoFs);
-        uint entrySector = ReadUInt(isoFs);
-        uint entrySize = ReadUInt(isoFs);
-        byte attributes = (byte)isoFs.ReadByte();
-        byte nameLength = (byte)isoFs.ReadByte();
-        byte[] nameBuf = new byte[nameLength];
+        var leftChild = ReadUShort(isoFs);
+        var rightChild = ReadUShort(isoFs);
+        var entrySector = ReadUInt(isoFs);
+        var entrySize = ReadUInt(isoFs);
+        var attributes = (byte)isoFs.ReadByte();
+        var nameLength = (byte)isoFs.ReadByte();
+        var nameBuf = new byte[nameLength];
         if (nameLength > 0)
         {
-            int read = 0;
+            var read = 0;
             while (read < nameLength)
             {
-                int n = isoFs.Read(nameBuf, read, nameLength - read);
+                var n = isoFs.Read(nameBuf, read, nameLength - read);
                 if (n == 0) return;
                 read += n;
             }
         }
 
-        string name = Encoding.ASCII.GetString(nameBuf);
-        bool isDirectory = (attributes & 0x10) != 0;
-        long entryOffset = entrySector * SectorSize;
-        string entryPath = dirPath.Length > 0 ? dirPath + "/" + name : name;
+        var name = Encoding.ASCII.GetString(nameBuf);
+        var isDirectory = (attributes & 0x10) != 0;
+        var entryOffset = entrySector * SectorSize;
+        var entryPath = dirPath.Length > 0 ? dirPath + "/" + name : name;
 
         if (leftChild != 0 && leftChild != 0xFFFF)
             CollectFileEntries(isoFs, isoOffset, dirOffset, dirSize, (long)leftChild * 4, dirPath, results);

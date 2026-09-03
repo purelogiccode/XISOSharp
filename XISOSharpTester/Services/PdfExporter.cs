@@ -2,7 +2,6 @@ using QuestPDF;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
-
 using XISOSharpTester.Models;
 
 namespace XISOSharpTester.Services;
@@ -132,12 +131,12 @@ public static class PdfExporter
     private static string FormatSubTests(PerFileResult file)
     {
         var parts = file.SubTests.Select(static t =>
-            $"{(t.Status switch
+            $"{t.Status switch
             {
                 TestStatus.Passed => "\u2713",
                 TestStatus.Failed => "\u2717",
                 _ => "\u25CB"
-            })} {t.TestName}");
+            }} {t.TestName}");
         return string.Join("  ", parts);
     }
 }

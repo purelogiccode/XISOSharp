@@ -3,11 +3,8 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-
 using Serilog;
-
 using XISOSharp;
-
 using XISOSharpTester.Models;
 
 namespace XISOSharpTester.Services;
@@ -131,7 +128,7 @@ public static class XisoTestRunner
         try
         {
             using var fs = File.OpenRead(entry.FilePath);
-            (uint rootDirSector, uint rootDirSize, long discLseek) = XisoReader.VerifyXiso(fs, entry.FileName);
+            (var rootDirSector, var rootDirSize, var discLseek) = XisoReader.VerifyXiso(fs, entry.FileName);
             tSw.Stop();
 
             var csDetail = $"Valid XISO | RootSector={rootDirSector} RootSize={rootDirSize} DiscLseek={discLseek}";
@@ -491,7 +488,7 @@ public static class XisoTestRunner
                     TestName = "Rewrite Compare",
                     Status = TestStatus.Failed,
                     Detail =
-                        $"Could not locate output ISOs. C#: {(csIsoOutput ?? "null")} | exe: {(exeIsoOutput ?? "null")}",
+                        $"Could not locate output ISOs. C#: {csIsoOutput ?? "null"} | exe: {exeIsoOutput ?? "null"}",
                     ElapsedSeconds = tSw.Elapsed.TotalSeconds
                 });
                 return;
@@ -509,8 +506,8 @@ public static class XisoTestRunner
                 TestName = "Rewrite Compare",
                 Status = match ? TestStatus.Passed : TestStatus.Failed,
                 Detail = match
-                    ? $"SHA-256: {csHash} \u2713 ({(csSize / (1024.0 * 1024)):F1} MB vs {(exeSize / (1024.0 * 1024)):F1} MB)"
-                    : $"SHA-256 MISMATCH\nC#:      {csHash} ({(csSize / (1024.0 * 1024)):F1} MB)\nextract-xiso: {exeHash} ({(exeSize / (1024.0 * 1024)):F1} MB)",
+                    ? $"SHA-256: {csHash} \u2713 ({csSize / (1024.0 * 1024):F1} MB vs {exeSize / (1024.0 * 1024):F1} MB)"
+                    : $"SHA-256 MISMATCH\nC#:      {csHash} ({csSize / (1024.0 * 1024):F1} MB)\nextract-xiso: {exeHash} ({exeSize / (1024.0 * 1024):F1} MB)",
                 ElapsedSeconds = tSw.Elapsed.TotalSeconds
             });
         }
@@ -610,7 +607,7 @@ public static class XisoTestRunner
         var matchCount = 0;
         var mismatchCount = 0;
 
-        foreach ((string path, ListEntry csEntry) in csByPath)
+        foreach ((var path, ListEntry csEntry) in csByPath)
         {
             if (exeByPath.TryGetValue(path, out var exeEntry))
             {
@@ -665,7 +662,7 @@ public static class XisoTestRunner
             .Select(f => (FullPath: f, Relative: Path.GetRelativePath(exeDir, f)))
             .ToDictionary(static x => x.Relative, StringComparer.OrdinalIgnoreCase);
 
-        foreach ((string relative, (string FullPath, string Relative) csPath) in csFiles)
+        foreach ((var relative, (string FullPath, string Relative) csPath) in csFiles)
         {
             if (exeFiles.TryGetValue(relative, out var exePath))
             {
@@ -721,8 +718,14 @@ public static class XisoTestRunner
 
     private static int CountFiles(string dir)
     {
-        try { return Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Length; }
-        catch { return 0; }
+        try
+        {
+            return Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Length;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     private static void DeleteDirectorySafe(string path)

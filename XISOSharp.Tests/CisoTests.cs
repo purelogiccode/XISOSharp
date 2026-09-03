@@ -53,7 +53,7 @@ public class CisoTests : IDisposable
     {
         sourceDir ??= SourceDir;
         var outDir = CreateTempDir();
-        int rc = XisoWriter.CreateXiso(sourceDir, outDir, null, null, out var outPath, null, null);
+        var rc = XisoWriter.CreateXiso(sourceDir, outDir, null, null, out var outPath, null, null);
         Assert.Equal(0, rc);
         Assert.NotNull(outPath);
         Assert.True(File.Exists(outPath));
@@ -72,7 +72,7 @@ public class CisoTests : IDisposable
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "out.cso");
 
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
         Assert.True(File.Exists(csoPath));
         Assert.True(CisoReader.IsCso(csoPath));
@@ -86,7 +86,7 @@ public class CisoTests : IDisposable
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "dir.cso");
 
-        int rc = CisoWriter.CompressToCso(SourceDir, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(SourceDir, csoPath, level: 6);
         Assert.Equal(0, rc);
         Assert.True(File.Exists(csoPath));
         Assert.True(CisoReader.IsCso(csoPath));
@@ -100,12 +100,12 @@ public class CisoTests : IDisposable
 
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "rt.cso");
-        int cRc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var cRc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, cRc);
 
         var decDir = CreateTempDir();
         var decPath = Path.Combine(decDir, "rt.iso");
-        int dRc = CisoReader.DecompressToIso(csoPath, decPath);
+        var dRc = CisoReader.DecompressToIso(csoPath, decPath);
         Assert.Equal(0, dRc);
         Assert.True(File.Exists(decPath));
 
@@ -143,13 +143,13 @@ public class CisoTests : IDisposable
 
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "level0.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 0);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 0);
         Assert.Equal(0, rc);
         Assert.True(CisoReader.IsCso(csoPath));
 
         var decDir = CreateTempDir();
         var decPath = Path.Combine(decDir, "level0.iso");
-        int dRc = CisoReader.DecompressToIso(csoPath, decPath);
+        var dRc = CisoReader.DecompressToIso(csoPath, decPath);
         Assert.Equal(0, dRc);
         Assert.Equal(origHash, ComputeSha256(decPath));
     }
@@ -160,17 +160,17 @@ public class CisoTests : IDisposable
         var isoPath = CreateTempIso();
         var origHash = ComputeSha256(isoPath);
 
-        foreach (int level in new[] { 1, 6, 9 })
+        foreach (var level in new[] { 1, 6, 9 })
         {
             var csoDir = CreateTempDir();
             var csoPath = Path.Combine(csoDir, $"level{level}.cso");
-            int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: level);
+            var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: level);
             Assert.Equal(0, rc);
             Assert.True(CisoReader.IsCso(csoPath));
 
             var decDir = CreateTempDir();
             var decPath = Path.Combine(decDir, $"level{level}.iso");
-            int dRc = CisoReader.DecompressToIso(csoPath, decPath);
+            var dRc = CisoReader.DecompressToIso(csoPath, decPath);
             Assert.Equal(0, dRc);
             Assert.Equal(origHash, ComputeSha256(decPath));
         }
@@ -185,13 +185,13 @@ public class CisoTests : IDisposable
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "async.cso");
 
-        int cRc = await CisoWriter.CompressToCsoAsync(isoPath, csoPath, level: 6);
+        var cRc = await CisoWriter.CompressToCsoAsync(isoPath, csoPath, level: 6);
         Assert.Equal(0, cRc);
         Assert.True(CisoReader.IsCso(csoPath));
 
         var decDir = CreateTempDir();
         var decPath = Path.Combine(decDir, "async.iso");
-        int dRc = await CisoReader.DecompressToIsoAsync(csoPath, decPath);
+        var dRc = await CisoReader.DecompressToIsoAsync(csoPath, decPath);
         Assert.Equal(0, dRc);
         Assert.Equal(origHash, ComputeSha256(decPath));
     }
@@ -231,7 +231,7 @@ public class CisoTests : IDisposable
 
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "read.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
 
         Span<byte> buf = stackalloc byte[512];
@@ -247,7 +247,7 @@ public class CisoTests : IDisposable
 
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "read2.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
 
         using var fs = new FileStream(csoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
@@ -264,12 +264,12 @@ public class CisoTests : IDisposable
 
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "read3.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
 
         // Read 3000 bytes starting at 1000 (crosses sector boundary at 2048)
-        long offset = 1000;
-        int len = 3000;
+        const long offset = 1000;
+        var len = 3000;
         // Ensure we don't go past EOF
         if (offset + len > isoBytes.Length) len = isoBytes.Length - (int)offset;
         Assert.True(len > 2048);
@@ -280,8 +280,8 @@ public class CisoTests : IDisposable
 
         // Same via FileStream overload at different offset
         using var fs = new FileStream(csoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        long offset2 = 2048;
-        int len2 = 2048;
+        const long offset2 = 2048;
+        const int len2 = 2048;
         if (offset2 + len2 <= isoBytes.Length)
         {
             var buf2 = new byte[len2];
@@ -338,7 +338,7 @@ public class CisoTests : IDisposable
         var isoPath = CreateTempIso();
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "trunc2.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
 
         var bytes = File.ReadAllBytes(csoPath);
@@ -368,7 +368,7 @@ public class CisoTests : IDisposable
         var isoPath = CreateTempIso();
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "oor.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
 
         var isoLen = new FileInfo(isoPath).Length;
@@ -383,7 +383,7 @@ public class CisoTests : IDisposable
         var isoPath = CreateTempIso();
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "corrupt.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
 
         var bytes = File.ReadAllBytes(csoPath);
@@ -392,18 +392,18 @@ public class CisoTests : IDisposable
         if (bytes.Length > 32)
         {
             // Read total blocks to find index offset
-            ulong uncompressedSize = System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(8, 8));
-            uint blockSize = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(16, 4));
-            long totalBlocks = (long)((uncompressedSize + blockSize - 1) / blockSize);
-            long indexLen = totalBlocks + 1;
+            var uncompressedSize = System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(8, 8));
+            var blockSize = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(16, 4));
+            var totalBlocks = (long)((uncompressedSize + blockSize - 1) / blockSize);
+            var indexLen = totalBlocks + 1;
             // index starts at 24
             // Make entry 1 < entry 0 by swapping bytes
             if (indexLen >= 2 && bytes.Length >= 24 + 8)
             {
                 // Set second entry to 0x00000000 (plain bit clear, offset 0) while first is plain with high offset -> next < offset will trigger
                 // Simpler: copy first entry's value minus 1 into second entry
-                uint first = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(24, 4));
-                uint second = first - 1;
+                var first = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(24, 4));
+                var second = first - 1;
                 System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(28, 4), second);
             }
         }

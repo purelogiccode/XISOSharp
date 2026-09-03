@@ -1,152 +1,7 @@
 using System.Text;
-
 using XISOSharp.DataStructures;
 
 namespace XISOSharp;
-
-/// <summary>
-/// Represents a host-to-image path mapping rule for <c>build-image</c>.
-/// Mirrors <c>RemapOverlayConfig.map_rules</c> in <c>xdvdfs-core/src/write/fs/remap.rs</c>.
-/// </summary>
-public sealed class RemapRule
-{
-    /// <summary>Host glob pattern (without leading '!').</summary>
-    public string HostGlob { get; set; } = string.Empty;
-
-    /// <summary>Image rewrite path (may contain <c>{0}</c>, <c>{1}</c> captures).</summary>
-    public string ImagePath { get; set; } = string.Empty;
-
-    /// <summary>When <c>true</c>, this rule is an exclusion (host starts with '!').</summary>
-    public bool IsExclusion { get; set; }
-
-    /// <summary>
-    /// Tries to parse a remap rule string of the form <c>hostGlob[:imagePath]</c>.
-    /// </summary>
-    /// <param name="raw">Raw rule text to parse.</param>
-    /// <param name="rule">Parsed rule on success; otherwise <c>null</c>.</param>
-    /// <param name="error">Error message on failure; otherwise <c>null</c>.</param>
-    /// <returns><c>true</c> if parsing succeeded; otherwise <c>false</c>.</returns>
-    public static bool TryParse(string raw, out RemapRule? rule, out string? error)
-    {
-        rule = null;
-        error = null;
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            error = "Map rule cannot be empty";
-            return false;
-        }
-
-        // Split on first ':'
-        int colon = raw.IndexOf(':');
-        string host;
-        string image;
-        if (colon >= 0)
-        {
-            host = raw.Substring(0, colon);
-            image = raw.Substring(colon + 1);
-        }
-        else
-        {
-            host = raw;
-            image = string.Empty;
-        }
-
-        host = host.Trim();
-        image = image.Trim();
-
-        if (string.IsNullOrEmpty(host))
-        {
-            error = $"Map rule \"{raw}\" has empty host pattern";
-            return false;
-        }
-
-        bool isExclusion = host.StartsWith("!", StringComparison.Ordinal);
-        if (!isExclusion && string.IsNullOrEmpty(image))
-        {
-            error = $"Map rule \"{host}\" must have an image path unless it is an exclusion rule (starting with '!')";
-            return false;
-        }
-
-        // Validate host glob can be built (strip !)
-        var hostForGlob = isExclusion ? host.Substring(1) : host;
-        if (string.IsNullOrEmpty(hostForGlob))
-        {
-            error = $"Exclusion rule \"{host}\" has empty host pattern after '!'";
-            return false;
-        }
-
-        try
-        {
-            _ = new WaxGlob(hostForGlob);
-        }
-        catch (Exception ex)
-        {
-            error = $"Invalid host glob \"{hostForGlob}\": {ex.Message}";
-            return false;
-        }
-
-        // Validate image rewrite substitutions
-        try
-        {
-            FindMatchIndices(image);
-        }
-        catch (Exception ex)
-        {
-            error = ex.Message;
-            return false;
-        }
-
-        rule = new RemapRule { HostGlob = hostForGlob, ImagePath = image, IsExclusion = isExclusion };
-        // Store original host with '!'? Keep without '!' but IsExclusion flag indicates.
-        // For serialization we need to know original host string including '!'? HostGlob stripped is fine.
-        // Keep original host for dry-run display? We'll reconstruct as needed.
-        return true;
-    }
-
-    internal string HostWithBang => IsExclusion ? "!" + HostGlob : HostGlob;
-
-    internal static List<int> FindMatchIndices(string rewrite)
-    {
-        var indices = new List<int>();
-        bool matching = false;
-        int current = 0;
-        for (int idx = 0; idx < rewrite.Length; idx++)
-        {
-            char c = rewrite[idx];
-            if (c == '{')
-            {
-                if (matching)
-                    throw new ArgumentException($"Invalid rewrite substitution \"{rewrite}\" (at {idx}): nested '{{'");
-                matching = true;
-                current = 0;
-                continue;
-            }
-
-            if (!matching) continue;
-            if (c == '}')
-            {
-                matching = false;
-                indices.Add(current);
-                current = 0;
-                continue;
-            }
-
-            if (c >= '0' && c <= '9')
-            {
-                current = current * 10 + (c - '0');
-                continue;
-            }
-
-            throw new ArgumentException(
-                $"Invalid rewrite substitution \"{rewrite}\" (at {idx}): expected digit character");
-        }
-
-        if (matching)
-            throw new ArgumentException(
-                $"Invalid rewrite substitution \"{rewrite}\" (at {rewrite.Length - 1}): unclosed brace");
-        return indices;
-    }
-}
 
 /// <summary>
 /// Implements ordered path remapping (xdvdfs <c>build-image</c> parity) using wax-compatible globs
@@ -181,7 +36,7 @@ public static class RemapFilesystem
     {
         string? output = null;
         var rules = new List<RemapRule>();
-        string currentSection = string.Empty;
+        var currentSection = string.Empty;
         foreach (var rawLine in toml.Split('\n'))
         {
             var line = rawLine.Trim();
@@ -193,7 +48,7 @@ public static class RemapFilesystem
                 continue;
             }
 
-            int eq = line.IndexOf('=');
+            var eq = line.IndexOf('=');
             if (eq < 0) continue;
             var keyPart = line.Substring(0, eq).Trim();
             var valPart = line.Substring(eq + 1).Trim();
@@ -201,8 +56,8 @@ public static class RemapFilesystem
             // Strip inline comments not inside quotes? Simple: ignore after # if not in quotes.
             // For simplicity, assume no inline comments.
 
-            string key = UnquoteTomlKey(keyPart);
-            string val = UnquoteTomlValue(valPart);
+            var key = UnquoteTomlKey(keyPart);
+            var val = UnquoteTomlValue(valPart);
 
             if (string.Equals(currentSection, "metadata", StringComparison.OrdinalIgnoreCase))
             {
@@ -212,14 +67,17 @@ public static class RemapFilesystem
             else if (string.Equals(currentSection, "map_rules", StringComparison.OrdinalIgnoreCase))
             {
                 // key is host glob, val is image path
-                bool isExcl = key.StartsWith("!", StringComparison.Ordinal);
+                var isExcl = key.StartsWith('!');
                 var hostForGlob = isExcl ? key.Substring(1) : key;
                 // Validate
                 try
                 {
                     _ = new WaxGlob(hostForGlob);
                 }
-                catch { continue; }
+                catch
+                {
+                    continue;
+                }
 
                 var rr = new RemapRule { HostGlob = hostForGlob, ImagePath = val, IsExclusion = isExcl };
                 rules.Add(rr);
@@ -258,7 +116,7 @@ public static class RemapFilesystem
 
         // Bare value (unlikely for our spec) – return as is without quotes
         // Strip possible trailing comment
-        int comment = s.IndexOf('#');
+        var comment = s.IndexOf('#');
         if (comment >= 0) s = s.Substring(0, comment).Trim();
         return s;
     }
@@ -305,7 +163,7 @@ public static class RemapFilesystem
             throw new DirectoryNotFoundException($"Source directory not found: {sourceDir}");
 
         var result = new List<(string, string)>();
-        foreach ((string hostRel, string guestRel) in BuildMappings(sourceDir, rules))
+        foreach ((var hostRel, var guestRel) in BuildMappings(sourceDir, rules))
         {
             var host = "/" + hostRel;
             var guest = "/" + guestRel;
@@ -351,7 +209,10 @@ public static class RemapFilesystem
         {
             avlRoot = BuildAvlTree(sourceDir, rules, ct);
         }
-        catch (OperationCanceledException) { throw; }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Logger.LogErr($"Failed to build remap filesystem: {ex.Message}\n");
@@ -363,7 +224,10 @@ public static class RemapFilesystem
         {
             return XisoWriter.CreateFromRemapTree(avlRoot, outputIsoPath, progress: progress, cancellationToken: ct);
         }
-        catch (OperationCanceledException) { throw; }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Logger.LogErr($"Failed to create image: {ex.Message}\n");
@@ -390,8 +254,8 @@ public static class RemapFilesystem
 
         while (dirStack.Count > 0)
         {
-            (string dirRel, string? parentPrefix) = dirStack.Pop();
-            string fullDir = string.IsNullOrEmpty(dirRel)
+            (var dirRel, var parentPrefix) = dirStack.Pop();
+            var fullDir = string.IsNullOrEmpty(dirRel)
                 ? sourceDir
                 : Path.Combine(sourceDir, dirRel.Replace('/', Path.DirectorySeparatorChar));
 
@@ -407,9 +271,9 @@ public static class RemapFilesystem
 
             foreach (var fullEntry in entries)
             {
-                string name = Path.GetFileName(fullEntry);
+                var name = Path.GetFileName(fullEntry);
                 if (name is "." or "..") continue;
-                string entryRel = string.IsNullOrEmpty(dirRel) ? name : dirRel + "/" + name;
+                var entryRel = string.IsNullOrEmpty(dirRel) ? name : dirRel + "/" + name;
 
                 bool isDir;
                 long len = 0;
@@ -422,11 +286,14 @@ public static class RemapFilesystem
                         len = new FileInfo(fullEntry).Length;
                     }
                 }
-                catch { continue; }
+                catch
+                {
+                    continue;
+                }
 
                 var fe = new FileEntry { Name = name, IsDirectory = isDir, Length = len };
 
-                bool directMatch = false;
+                var directMatch = false;
                 foreach (var g in waxGlobs)
                 {
                     if (g.IsMatch(entryRel))
@@ -461,11 +328,11 @@ public static class RemapFilesystem
         // they iterate over trie which already deduplicates (first wins). For dry-run list we should mimic deduplicated output.
         var guestSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach ((string path, FileEntry entry, string prefix) in matches)
+        foreach ((var path, FileEntry entry, var prefix) in matches)
         {
             string? rewritten = null;
             // Iterate rules in order
-            for (int idx = 0; idx < rules.Count; idx++)
+            for (var idx = 0; idx < rules.Count; idx++)
             {
                 var rule = rules[idx];
                 var glob = waxGlobs[idx];
@@ -480,17 +347,17 @@ public static class RemapFilesystem
 
                 if (rewritten != null) continue;
 
-                string rewrite = rule.ImagePath;
+                var rewrite = rule.ImagePath;
                 // Validate and substitute captures
                 var indices = RemapRule.FindMatchIndices(rewrite);
                 foreach (var mi in indices.Distinct())
                 {
-                    string repl = mi < caps.Count ? caps[mi] : string.Empty;
+                    var repl = mi < caps.Count ? caps[mi] : string.Empty;
                     rewrite = rewrite.Replace("{" + mi + "}", repl, StringComparison.Ordinal);
                 }
 
                 // Suffix handling
-                string suffix = string.Empty;
+                var suffix = string.Empty;
                 if (!string.Equals(path, prefix, StringComparison.OrdinalIgnoreCase))
                 {
                     // path is descendant of prefix – suffix is remainder including leading slash
@@ -515,7 +382,7 @@ public static class RemapFilesystem
             if (rewritten != null)
             {
                 // Normalize guest path for dedup: compare case-insensitive, keep first
-                string guestKey = rewritten; // already normalized without leading slash
+                var guestKey = rewritten; // already normalized without leading slash
                 // Also need to consider that rewritten may be empty (root). For a directory entry whose rewritten is empty ("/"), guestKey = "" (root). Should we add mapping for that directory itself? In dump they add only non-prefix-directory entries. For path that maps to root, the host directory itself maps to root, but we typically don't list that as a file mapping; its children will be listed. However if host is a file that maps to root file, guestKey will be file name, not empty.
                 // For DryRun we should include only entries where the mapping corresponds to a file or a directory that is leaf? But original dump includes both files and non-empty directories that are mapped (non-prefix). Our result currently includes both files and directories that survived. Should we filter to only leaf non-prefix? For dry-run, original Rust dumps only entries where !is_prefix_directory (leaf) or directories that are host directories (isDir). But our simplified approach includes every path/prefix that got a rewritten – that includes intermediate files and directories. Should we include directories? In BuildImage test, they expect to list files under dest, not directories themselves? Let's include files and directories but keep deduplication similar to trie: first-wins for same guest path.
 
@@ -571,7 +438,7 @@ public static class RemapFilesystem
         // For simplicity, call a variant that returns types.
         var typedMappings = BuildTypedMappings(sourceDir, rules);
 
-        foreach ((string hostRel, string guestRel, bool isDir) in typedMappings)
+        foreach ((var hostRel, var guestRel, var isDir) in typedMappings)
         {
             ct.ThrowIfCancellationRequested();
             if (isDir)
@@ -585,8 +452,8 @@ public static class RemapFilesystem
             else
             {
                 // File
-                string parentPath = GetParentPath(guestRel);
-                string fileName = GetFileName(guestRel);
+                var parentPath = GetParentPath(guestRel);
+                var fileName = GetFileName(guestRel);
                 if (string.IsNullOrEmpty(fileName))
                     continue; // should not happen (file at root with empty name)
 
@@ -595,7 +462,7 @@ public static class RemapFilesystem
                 if (AvlTree.AvlFetch(parentNode.Subdirectory, fileName) != null)
                     continue;
 
-                string hostFull = Path.Combine(sourceDir, hostRel.Replace('/', Path.DirectorySeparatorChar));
+                var hostFull = Path.Combine(sourceDir, hostRel.Replace('/', Path.DirectorySeparatorChar));
                 var fi = new FileInfo(hostFull);
                 if (!fi.Exists)
                     continue;
@@ -624,10 +491,10 @@ public static class RemapFilesystem
                 // But we want empty directories to be EmptySubdirectory, not null, so writer knows to emit empty sector.
                 // Determine if this node corresponds to a directory that should be empty vs has children but not yet set?
                 // If node has children in dirCache (i.e., any child path starts with dirPath + "/"), then it should have Subdirectory non-null (already set via insertions). If not, it's empty.
-                bool hasChild = false;
+                var hasChild = false;
                 if (!string.IsNullOrEmpty(kv.Key))
                 {
-                    string prefix = kv.Key + "/";
+                    var prefix = kv.Key + "/";
                     foreach (var otherKey in dirCache.Keys)
                     {
                         if (otherKey.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
@@ -653,10 +520,9 @@ public static class RemapFilesystem
             }
         }
 
-        var rootChildren = imageRoot.Subdirectory;
+        var rootChildren = imageRoot.Subdirectory ?? AvlNode.EmptySubdirectory;
         // If root has empty sentinel, keep it; if null and no mappings, set to Empty
-        if (rootChildren == null)
-            rootChildren = AvlNode.EmptySubdirectory;
+
 
         return rootChildren;
 
@@ -666,9 +532,9 @@ public static class RemapFilesystem
             if (dirCache.TryGetValue(dirPath, out var existing))
                 return existing;
             // Find parent
-            string parentPath = GetParentPath(dirPath);
+            var parentPath = GetParentPath(dirPath);
             var parentNode = EnsureDir(parentPath);
-            string name = GetFileName(dirPath);
+            var name = GetFileName(dirPath);
             // Check if already exists in parent's AVL
             var found = AvlTree.AvlFetch(parentNode.Subdirectory, name);
             if (found != null)
@@ -709,19 +575,25 @@ public static class RemapFilesystem
         dirStack.Push((string.Empty, null));
         while (dirStack.Count > 0)
         {
-            (string dirRel, string? parentPrefix) = dirStack.Pop();
-            string fullDir = string.IsNullOrEmpty(dirRel)
+            (var dirRel, var parentPrefix) = dirStack.Pop();
+            var fullDir = string.IsNullOrEmpty(dirRel)
                 ? sourceDir
                 : Path.Combine(sourceDir, dirRel.Replace('/', Path.DirectorySeparatorChar));
             string[] entries;
-            try { entries = Directory.GetFileSystemEntries(fullDir); }
-            catch { continue; }
+            try
+            {
+                entries = Directory.GetFileSystemEntries(fullDir);
+            }
+            catch
+            {
+                continue;
+            }
 
             foreach (var fullEntry in entries)
             {
-                string name = Path.GetFileName(fullEntry);
+                var name = Path.GetFileName(fullEntry);
                 if (name is "." or "..") continue;
-                string entryRel = string.IsNullOrEmpty(dirRel) ? name : dirRel + "/" + name;
+                var entryRel = string.IsNullOrEmpty(dirRel) ? name : dirRel + "/" + name;
                 bool isDir;
                 long len = 0;
                 try
@@ -730,18 +602,23 @@ public static class RemapFilesystem
                     isDir = (attr & FileAttributes.Directory) != FileAttributes.None;
                     if (!isDir) len = new FileInfo(fullEntry).Length;
                 }
-                catch { continue; }
+                catch
+                {
+                    continue;
+                }
 
                 var fe = new FileEntry { Name = name, IsDirectory = isDir, Length = len };
-                bool directMatch = false;
+                var directMatch = false;
                 foreach (var g in waxGlobs)
+                {
                     if (g.IsMatch(entryRel))
                     {
                         directMatch = true;
                         break;
                     }
+                }
 
-                string? matchPrefix = directMatch ? entryRel : parentPrefix;
+                var matchPrefix = directMatch ? entryRel : parentPrefix;
                 if (isDir) dirStack.Push((entryRel, matchPrefix));
                 if (matchPrefix != null) matches.Add((entryRel, fe, matchPrefix));
             }
@@ -749,10 +626,10 @@ public static class RemapFilesystem
 
         var result = new List<(string hostRel, string guestRel, bool isDir)>();
         var guestSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach ((string path, FileEntry entry, string prefix) in matches)
+        foreach ((var path, FileEntry entry, var prefix) in matches)
         {
             string? rewritten = null;
-            for (int idx = 0; idx < rules.Count; idx++)
+            for (var idx = 0; idx < rules.Count; idx++)
             {
                 var rule = rules[idx];
                 var glob = waxGlobs[idx];
@@ -765,15 +642,15 @@ public static class RemapFilesystem
                 }
 
                 if (rewritten != null) continue;
-                string rewrite = rule.ImagePath;
+                var rewrite = rule.ImagePath;
                 var indices = RemapRule.FindMatchIndices(rewrite);
                 foreach (var mi in indices.Distinct())
                 {
-                    string repl = mi < caps.Count ? caps[mi] : string.Empty;
+                    var repl = mi < caps.Count ? caps[mi] : string.Empty;
                     rewrite = rewrite.Replace("{" + mi + "}", repl, StringComparison.Ordinal);
                 }
 
-                string suffix = string.Empty;
+                var suffix = string.Empty;
                 if (!string.Equals(path, prefix, StringComparison.OrdinalIgnoreCase))
                 {
                     if (path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase))
@@ -802,7 +679,7 @@ public static class RemapFilesystem
     private static string GetParentPath(string path)
     {
         if (string.IsNullOrEmpty(path)) return string.Empty;
-        int slash = path.LastIndexOf('/');
+        var slash = path.LastIndexOf('/');
         if (slash < 0) return string.Empty;
         return path.Substring(0, slash);
     }
@@ -810,7 +687,7 @@ public static class RemapFilesystem
     private static string GetFileName(string path)
     {
         if (string.IsNullOrEmpty(path)) return string.Empty;
-        int slash = path.LastIndexOf('/');
+        var slash = path.LastIndexOf('/');
         if (slash < 0) return path;
         return path.Substring(slash + 1);
     }

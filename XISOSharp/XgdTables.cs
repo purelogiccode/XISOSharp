@@ -69,7 +69,7 @@ public static class XgdTables
     /// <summary>Gets video type index for a Redump ISO, or -1 if unknown. Mirrors XGD.GetVideoType.</summary>
     public static int GetVideoType(FileStream? isoFs, int redumpIsoType)
     {
-        int wave = -1;
+        var wave = -1;
         if (redumpIsoType == 5 || redumpIsoType == 7)
             wave = GetWave(isoFs, redumpIsoType);
 
@@ -120,10 +120,10 @@ public static class XgdTables
             isoFs.Seek(0x832D, SeekOrigin.Begin);
             Span<byte> pvd = stackalloc byte[16];
             // Use loop to handle partial reads.
-            int total = 0;
+            var total = 0;
             while (total < 16)
             {
-                int n = isoFs.Read(pvd[total..]);
+                var n = isoFs.Read(pvd[total..]);
                 if (n == 0) break;
                 total += n;
             }

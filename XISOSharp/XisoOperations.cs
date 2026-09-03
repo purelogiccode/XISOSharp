@@ -10,13 +10,13 @@ public static class XisoOperations
 
     private static bool WriteBytes(FileStream inFs, FileStream outFs, long offset, long length)
     {
-        byte[] buf = new byte[64 * SectorSize];
+        var buf = new byte[64 * SectorSize];
         long copied = 0;
         if (offset >= 0) inFs.Seek(offset, SeekOrigin.Begin);
         while (copied < length)
         {
-            int toRead = (int)Math.Min(buf.Length, length - copied);
-            int n = inFs.Read(buf, 0, toRead);
+            var toRead = (int)Math.Min(buf.Length, length - copied);
+            var n = inFs.Read(buf, 0, toRead);
             if (n == 0) break;
             outFs.Write(buf, 0, n);
             copied += n;
@@ -27,12 +27,12 @@ public static class XisoOperations
 
     private static void WriteZeroes(FileStream outFs, long offset, long length)
     {
-        byte[] buf = new byte[64 * SectorSize];
+        var buf = new byte[64 * SectorSize];
         long written = 0;
         if (offset >= 0) outFs.Seek(offset, SeekOrigin.Begin);
         while (written < length)
         {
-            int toWrite = (int)Math.Min(buf.Length, length - written);
+            var toWrite = (int)Math.Min(buf.Length, length - written);
             outFs.Write(buf, 0, toWrite);
             written += toWrite;
         }
@@ -50,7 +50,7 @@ public static class XisoOperations
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var isoFs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        long xisoLength = xisoLengthOverride ?? isoFs.Length - isoOffset;
+        var xisoLength = xisoLengthOverride ?? isoFs.Length - isoOffset;
         // If isoOffset lies inside a Redump, clamp to that partition's declared length via tables if possible
         // Caller may pass exact length; otherwise use file remainder.
         return ExtractFiller(isoFs, isoOffset, xisoLength, outputFillerPath, quiet, cancellationToken);
@@ -70,12 +70,14 @@ public static class XisoOperations
         bool quiet = false, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+        (var bones, var fileRanges) =
             XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
         var ranges = XisoRanges.MergeRanges(bones, fileRanges);
         if (!quiet)
-            foreach ((uint s, uint e) in ranges)
+        {
+            foreach ((var s, var e) in ranges)
                 Logger.Log($"[INFO] XISO File Extent: {s}-{e}\n");
+        }
 
         using var fillerFs = new FileStream(outputFillerPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
         isoFs.Seek(isoOffset, SeekOrigin.Begin);
@@ -90,8 +92,8 @@ public static class XisoOperations
         while (numBytes < xisoLength)
         {
             ct.ThrowIfCancellationRequested();
-            long currentByte = isoOffset + numBytes;
-            long currentSector = (currentByte + SectorSize - 1) / SectorSize;
+            var currentByte = isoOffset + numBytes;
+            var currentSector = (currentByte + SectorSize - 1) / SectorSize;
             long bytesToWipe = 0;
             long bytesUntilEndOfExtent = 0;
 
@@ -101,16 +103,16 @@ public static class XisoOperations
             }
             else
             {
-                for (int i = 0; i < ranges.Count; i++)
+                for (var i = 0; i < ranges.Count; i++)
                 {
                     if (currentSector >= ranges[i].Start && currentSector <= ranges[i].End)
                     {
-                        bytesUntilEndOfExtent = (ranges[i].End + 1) * SectorSize - currentByte;
+                        bytesUntilEndOfExtent = ((ranges[i].End + 1) * SectorSize) - currentByte;
                         break;
                     }
                     else if (currentSector < ranges[i].Start && (i == 0 || currentSector > ranges[i - 1].End))
                     {
-                        bytesToWipe = ranges[i].Start * SectorSize - currentByte;
+                        bytesToWipe = (ranges[i].Start * SectorSize) - currentByte;
                         break;
                     }
                 }
@@ -123,7 +125,7 @@ public static class XisoOperations
             }
             else
             {
-                long skip = bytesUntilEndOfExtent > 0 ? bytesUntilEndOfExtent : xisoLength - numBytes;
+                var skip = bytesUntilEndOfExtent > 0 ? bytesUntilEndOfExtent : xisoLength - numBytes;
                 isoFs.Seek(skip, SeekOrigin.Current);
                 numBytes += skip;
             }
@@ -181,14 +183,14 @@ public static class XisoOperations
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var isoFs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        long isoSize = isoFs.Length;
-        long xisoLength = isoSize - isoOffset;
+        var isoSize = isoFs.Length;
+        var xisoLength = isoSize - isoOffset;
         // If input is standalone XISO, isoOffset is 0; for Redump game partition, caller passes offset.
-        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+        (var bones, var fileRanges) =
             XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
         var ranges = XisoRanges.MergeRanges(bones, fileRanges);
 
-        long totalLength = xisoLength;
+        var totalLength = xisoLength;
         // Detect Redump XISO length truncation: if unknown size, use file size; else use declared length for completeness.
         // For XISO inputs, keep file size as length.
 
@@ -204,8 +206,8 @@ public static class XisoOperations
         while (numBytes < xisoLength)
         {
             ct.ThrowIfCancellationRequested();
-            long currentByte = isoOffset + numBytes;
-            long currentSector = (currentByte + SectorSize - 1) / SectorSize;
+            var currentByte = isoOffset + numBytes;
+            var currentSector = (currentByte + SectorSize - 1) / SectorSize;
             long bytesUntilEndOfExtent = 0;
             long bytesToWipe = 0;
 
@@ -215,16 +217,16 @@ public static class XisoOperations
             }
             else
             {
-                for (int i = 0; i < ranges.Count; i++)
+                for (var i = 0; i < ranges.Count; i++)
                 {
                     if (currentSector >= ranges[i].Start && currentSector <= ranges[i].End)
                     {
-                        bytesUntilEndOfExtent = (ranges[i].End + 1) * SectorSize - currentByte;
+                        bytesUntilEndOfExtent = ((ranges[i].End + 1) * SectorSize) - currentByte;
                         break;
                     }
                     else if (currentSector < ranges[i].Start && (i == 0 || currentSector > ranges[i - 1].End))
                     {
-                        bytesToWipe = ranges[i].Start * SectorSize - currentByte;
+                        bytesToWipe = (ranges[i].Start * SectorSize) - currentByte;
                         break;
                     }
                 }
@@ -268,21 +270,21 @@ public static class XisoOperations
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        string outPath = outputPath ?? inputPath; // if same, we'll truncate in place via temp
-        bool inPlace = string.Equals(Path.GetFullPath(inputPath), Path.GetFullPath(outPath),
+        var outPath = outputPath ?? inputPath; // if same, we'll truncate in place via temp
+        var inPlace = string.Equals(Path.GetFullPath(inputPath), Path.GetFullPath(outPath),
             StringComparison.OrdinalIgnoreCase);
 
         if (inPlace)
         {
             // Trim in place: compute trimmed length and SetLength
             using var fs = new FileStream(inputPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None, 65536);
-            (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+            (var bones, var fileRanges) =
                 XisoRanges.GetXisoRanges(fs, isoOffset, quiet);
             var ranges = XisoRanges.MergeRanges(bones, fileRanges);
             if (ranges.Count == 0) return false;
-            long trimmedLen = ((long)ranges[^1].End + 1) * SectorSize;
+            var trimmedLen = ((long)ranges[^1].End + 1) * SectorSize;
             // For standalone XISO, trimmedLen is within xiso partition; account for isoOffset
-            long totalTrimmed = isoOffset + trimmedLen;
+            var totalTrimmed = isoOffset + trimmedLen;
             if (!quiet) Logger.Log($"[INFO] Trimming XISO to {trimmedLen} bytes (partition) / {totalTrimmed} total\n");
             if (totalTrimmed < fs.Length)
                 fs.SetLength(totalTrimmed);
@@ -291,15 +293,15 @@ public static class XisoOperations
         else
         {
             using var isoFs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-            (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+            (var bones, var fileRanges) =
                 XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
             var ranges = XisoRanges.MergeRanges(bones, fileRanges);
             if (ranges.Count == 0) return false;
-            long trimmedLen = ((long)ranges[^1].End + 1) * SectorSize;
+            var trimmedLen = ((long)ranges[^1].End + 1) * SectorSize;
             // Need total bytes to copy: isoOffset + trimmedLen, but if isoOffset>0, copy prefix too.
             using var outFs = new FileStream(outPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
             isoFs.Seek(0, SeekOrigin.Begin);
-            long toCopy = isoOffset + trimmedLen;
+            var toCopy = isoOffset + trimmedLen;
             if (!WriteBytes(isoFs, outFs, -1, toCopy)) return false;
             if (!quiet) Logger.Log($"[INFO] Trimmed XISO written to {outPath} ({toCopy} bytes)\n");
             return true;
@@ -315,12 +317,12 @@ public static class XisoOperations
     {
         ct.ThrowIfCancellationRequested();
         using var isoFs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+        (var bones, var fileRanges) =
             XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
         var ranges = XisoRanges.MergeRanges(bones, fileRanges);
         if (ranges.Count == 0) return false;
-        long trimmedLen = ((long)ranges[^1].End + 1) * SectorSize;
-        long xisoLength = trimmedLen; // we cap at trimmed length
+        var trimmedLen = ((long)ranges[^1].End + 1) * SectorSize;
+        var xisoLength = trimmedLen; // we cap at trimmed length
 
         using var outFs = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
         // Write isoOffset prefix (if Redump) as-is? For standalone XISO, isoOffset 0.
@@ -335,8 +337,8 @@ public static class XisoOperations
         while (numBytes < xisoLength)
         {
             ct.ThrowIfCancellationRequested();
-            long currentByte = isoOffset + numBytes;
-            long currentSector = (currentByte + SectorSize - 1) / SectorSize;
+            var currentByte = isoOffset + numBytes;
+            var currentSector = (currentByte + SectorSize - 1) / SectorSize;
             long bytesToWipe = 0, bytesUntilEnd = 0;
             if (currentSector > ranges[^1].End)
             {
@@ -344,16 +346,16 @@ public static class XisoOperations
             }
             else
             {
-                for (int i = 0; i < ranges.Count; i++)
+                for (var i = 0; i < ranges.Count; i++)
                 {
                     if (currentSector >= ranges[i].Start && currentSector <= ranges[i].End)
                     {
-                        bytesUntilEnd = (ranges[i].End + 1) * SectorSize - currentByte;
+                        bytesUntilEnd = ((ranges[i].End + 1) * SectorSize) - currentByte;
                         break;
                     }
                     else if (currentSector < ranges[i].Start && (i == 0 || currentSector > ranges[i - 1].End))
                     {
-                        bytesToWipe = ranges[i].Start * SectorSize - currentByte;
+                        bytesToWipe = (ranges[i].Start * SectorSize) - currentByte;
                         break;
                     }
                 }
@@ -367,7 +369,7 @@ public static class XisoOperations
             }
             else
             {
-                long toRead = bytesUntilEnd > 0 ? bytesUntilEnd : xisoLength - numBytes;
+                var toRead = bytesUntilEnd > 0 ? bytesUntilEnd : xisoLength - numBytes;
                 if (!WriteBytes(isoFs, outFs, -1, toRead)) return false;
                 numBytes += toRead;
             }

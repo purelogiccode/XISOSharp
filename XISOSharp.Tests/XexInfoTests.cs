@@ -56,14 +56,14 @@ public class XexInfoTests : IDisposable
         WriteU32(span, 0x14, 4); // header count
 
         // Optional-header pairs
-        WriteU32(span, 0x18 + 0 * 8, 0x00010100);
-        WriteU32(span, 0x18 + 0 * 8 + 4, 0x12345678); // entry point
-        WriteU32(span, 0x18 + 1 * 8, 0x00010201);
-        WriteU32(span, 0x18 + 1 * 8 + 4, 0x82000000); // image base
-        WriteU32(span, 0x18 + 2 * 8, 0x00040006);
-        WriteU32(span, 0x18 + 2 * 8 + 4, 0x200); // execution info
-        WriteU32(span, 0x18 + 3 * 8, 0x000003FF);
-        WriteU32(span, 0x18 + 3 * 8 + 4, 0x218); // file format info
+        WriteU32(span, 0x18 + (0 * 8), 0x00010100);
+        WriteU32(span, 0x18 + (0 * 8) + 4, 0x12345678); // entry point
+        WriteU32(span, 0x18 + (1 * 8), 0x00010201);
+        WriteU32(span, 0x18 + (1 * 8) + 4, 0x82000000); // image base
+        WriteU32(span, 0x18 + (2 * 8), 0x00040006);
+        WriteU32(span, 0x18 + (2 * 8) + 4, 0x200); // execution info
+        WriteU32(span, 0x18 + (3 * 8), 0x000003FF);
+        WriteU32(span, 0x18 + (3 * 8) + 4, 0x218); // file format info
 
         // Execution info (0x18 bytes)
         WriteU32(span, 0x200, 0x2B35C136); // media id

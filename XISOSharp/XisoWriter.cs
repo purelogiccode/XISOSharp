@@ -1,6 +1,5 @@
 ﻿using System.Buffers.Binary;
 using System.Text;
-
 using XISOSharp.DataStructures;
 
 namespace XISOSharp;
@@ -207,7 +206,7 @@ public static class XisoWriter
             Logger.Flush();
 
             // The -s flag (skip $SystemUpdate) becomes an implicit exclude pattern.
-            IReadOnlyList<string>? effectivePatterns = excludePatterns;
+            var effectivePatterns = excludePatterns;
             if (Logger.RemoveSystemUpdate)
             {
                 var patterns = new List<string> { "**/$SystemUpdate/**" };
@@ -239,7 +238,7 @@ public static class XisoWriter
 
         if (progress != null)
         {
-            (int fileCount, int dirCount) = CountTreeEntries(root.Subdirectory);
+            (var fileCount, var dirCount) = CountTreeEntries(root.Subdirectory);
             progress.Report(new ProgressInfo(ProgressInfoType.FileCount, Count: fileCount));
             progress.Report(new ProgressInfo(ProgressInfoType.DirCount, Count: dirCount));
         }
@@ -326,7 +325,7 @@ public static class XisoWriter
 
             root.Filename = isoDir;
 
-            xisoFs.Seek(prependOffset + (long)root.StartSector * Constants.SectorSize, SeekOrigin.Begin);
+            xisoFs.Seek(prependOffset + ((long)root.StartSector * Constants.SectorSize), SeekOrigin.Begin);
 
             var wtContext = new WriteTreeContext
             {
@@ -344,7 +343,7 @@ public static class XisoWriter
                 AvlTraversalMethod.Prefix, 0);
 
             var pos = xisoFs.Seek(0, SeekOrigin.End);
-            var pad = ((Constants.FileModulus - pos % Constants.FileModulus) % Constants.FileModulus);
+            var pad = ((Constants.FileModulus - (pos % Constants.FileModulus)) % Constants.FileModulus);
             if (pad > 0)
             {
                 Array.Clear(buf, 0, (int)pad);
@@ -449,7 +448,7 @@ public static class XisoWriter
                     AvlTraversalMethod.Prefix, 0);
 
                 var xisoFs = (FileStream)ctx.XisoStream;
-                xisoFs.Seek(ctx.PrependOffset + (long)avl.StartSector * Constants.SectorSize, SeekOrigin.Begin);
+                xisoFs.Seek(ctx.PrependOffset + ((long)avl.StartSector * Constants.SectorSize), SeekOrigin.Begin);
                 AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, WriteDirectoryCallback, xisoFs,
                     AvlTraversalMethod.Prefix, 0);
 
@@ -470,7 +469,7 @@ public static class XisoWriter
             else
             {
                 var xisoFs = (FileStream)ctx.XisoStream;
-                xisoFs.Seek(ctx.PrependOffset + (long)avl.StartSector * Constants.SectorSize, SeekOrigin.Begin);
+                xisoFs.Seek(ctx.PrependOffset + ((long)avl.StartSector * Constants.SectorSize), SeekOrigin.Begin);
                 Span<byte> emptySector = stackalloc byte[Constants.SectorSize];
                 emptySector.Fill(Constants.PadByte);
                 xisoFs.Write(emptySector);
@@ -553,7 +552,7 @@ public static class XisoWriter
     private static void WriteFileData(AvlNode avl, WriteTreeContext ctx)
     {
         var xisoFs = (FileStream)ctx.XisoStream;
-        xisoFs.Seek(ctx.PrependOffset + (long)avl.StartSector * Constants.SectorSize, SeekOrigin.Begin);
+        xisoFs.Seek(ctx.PrependOffset + ((long)avl.StartSector * Constants.SectorSize), SeekOrigin.Begin);
 
         var bufSize = Math.Max(Constants.SectorSize, Constants.ReadWriteBufferSize) + 1;
         var buf = new byte[bufSize + 1];
@@ -572,7 +571,7 @@ public static class XisoWriter
         else
         {
             srcStream = ctx.SourceStream;
-            srcStream.Seek((long)avl.OldStartSector * Constants.SectorSize + Logger.XboxDiscLseek,
+            srcStream.Seek(((long)avl.OldStartSector * Constants.SectorSize) + Logger.XboxDiscLseek,
                 SeekOrigin.Begin);
         }
 
@@ -879,7 +878,7 @@ public static class XisoWriter
 
         // Compute totals from remap tree for progress
         long totalBytes = 0;
-        int totalFiles = 0;
+        var totalFiles = 0;
 
         SumFiles(root.Subdirectory);
         Logger.TotalFiles = totalFiles;
@@ -887,7 +886,7 @@ public static class XisoWriter
 
         if (progress != null)
         {
-            (int fc, int dc) = CountTreeEntries(root.Subdirectory);
+            (var fc, var dc) = CountTreeEntries(root.Subdirectory);
             progress.Report(new ProgressInfo(ProgressInfoType.FileCount, Count: fc));
             progress.Report(new ProgressInfo(ProgressInfoType.DirCount, Count: dc));
         }
@@ -946,7 +945,7 @@ public static class XisoWriter
             xisoFs.Write(unused);
             xisoFs.Write(magicBytes, 0, Constants.HeaderDataLength);
 
-            xisoFs.Seek(prependOffset + (long)root.StartSector * Constants.SectorSize, SeekOrigin.Begin);
+            xisoFs.Seek(prependOffset + ((long)root.StartSector * Constants.SectorSize), SeekOrigin.Begin);
 
             var wtContext = new WriteTreeContext
             {
@@ -964,7 +963,7 @@ public static class XisoWriter
             AvlTree.AvlTraverseDepthFirst(root, WriteTreeCallback, wtContext, AvlTraversalMethod.Prefix, 0);
 
             var pos = xisoFs.Seek(0, SeekOrigin.End);
-            var pad = ((Constants.FileModulus - pos % Constants.FileModulus) % Constants.FileModulus);
+            var pad = ((Constants.FileModulus - (pos % Constants.FileModulus)) % Constants.FileModulus);
             if (pad > 0)
             {
                 Array.Clear(buf, 0, (int)pad);
@@ -980,7 +979,10 @@ public static class XisoWriter
             Logger.Log($"\nsucessfully created {xisoSettingsName} ({totalFiles} files)\n");
             progress?.Report(new ProgressInfo(ProgressInfoType.FinishedPacking));
         }
-        catch (OperationCanceledException) { throw; }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Logger.LogErr($"{ex.Message}\n");
@@ -990,7 +992,10 @@ public static class XisoWriter
         {
             if (root.Subdirectory != null && !ReferenceEquals(root.Subdirectory, AvlNode.EmptySubdirectory))
                 AvlTree.FreeTree(root.Subdirectory);
-            try { Directory.SetCurrentDirectory(cwd); }
+            try
+            {
+                Directory.SetCurrentDirectory(cwd);
+            }
             catch
             {
                 // ignored
@@ -1158,7 +1163,7 @@ public static class XisoWriter
     /// <summary>Local helper for sector count calculation (ceiling division).</summary>
     private static uint NumSectors(uint size)
     {
-        return size / Constants.SectorSize + (size % Constants.SectorSize != 0 ? 1u : 0u);
+        return (size / Constants.SectorSize) + (size % Constants.SectorSize != 0 ? 1u : 0u);
     }
 
     /// <summary>
@@ -1174,12 +1179,12 @@ public static class XisoWriter
             if (ReferenceEquals(avl.Subdirectory, AvlNode.EmptySubdirectory))
             {
                 avl.StartSector = ctx.CurrentSector;
-                ctx.CurrentSector += 1;
+                ctx.CurrentSector++;
             }
             else
             {
                 avl.StartSector = ctx.CurrentSector;
-                var dirStart = ctx.PrependOffset + (long)avl.StartSector * Constants.SectorSize;
+                var dirStart = ctx.PrependOffset + ((long)avl.StartSector * Constants.SectorSize);
                 ctx.CurrentSector += NumSectors(avl.FileSize);
 
                 var wdsafp = new WdsafpContext { CurrentSector = ctx.CurrentSector, DirStart = dirStart };

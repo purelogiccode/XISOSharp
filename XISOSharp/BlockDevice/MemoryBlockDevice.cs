@@ -21,7 +21,7 @@ public sealed class MemoryBlockDevice : IBlockDevice
     /// <summary>Creates a device with a fixed capacity (zero-filled).</summary>
     public MemoryBlockDevice(long capacity)
     {
-        if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity));
+        ArgumentOutOfRangeException.ThrowIfNegative(capacity);
         _data = new byte[capacity];
         Length = capacity;
     }
@@ -32,9 +32,9 @@ public sealed class MemoryBlockDevice : IBlockDevice
     /// <inheritdoc/>
     public int Read(long offset, Span<byte> buffer)
     {
-        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
         if (offset >= Length) return 0;
-        int available = (int)Math.Min(buffer.Length, Length - offset);
+        var available = (int)Math.Min(buffer.Length, Length - offset);
         _data.AsSpan((int)offset, available).CopyTo(buffer);
         // Zero-fill remainder if reading beyond written length but within buffer
         if (available < buffer.Length)
@@ -45,8 +45,8 @@ public sealed class MemoryBlockDevice : IBlockDevice
     /// <inheritdoc/>
     public void Write(long offset, ReadOnlySpan<byte> buffer)
     {
-        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
-        long end = offset + buffer.Length;
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        var end = offset + buffer.Length;
         EnsureCapacity(end);
         buffer.CopyTo(_data.AsSpan((int)offset, buffer.Length));
         if (end > Length) Length = end;
@@ -55,7 +55,7 @@ public sealed class MemoryBlockDevice : IBlockDevice
     private void EnsureCapacity(long needed)
     {
         if (needed <= _data.Length) return;
-        long newSize = Math.Max(needed, _data.Length == 0 ? 4096 : _data.Length * 2);
+        var newSize = Math.Max(needed, _data.Length == 0 ? 4096 : _data.Length * 2);
         while (newSize < needed) newSize *= 2;
         Array.Resize(ref _data, (int)newSize);
     }
@@ -72,5 +72,7 @@ public sealed class MemoryBlockDevice : IBlockDevice
     public ReadOnlySpan<byte> AsSpan() => _data.AsSpan(0, (int)Length);
 
     /// <inheritdoc/>
-    public void Dispose() { }
+    public void Dispose()
+    {
+    }
 }

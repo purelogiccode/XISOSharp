@@ -252,7 +252,7 @@ public class XgdTablesTests
         // Need at least 0x832D + 16 bytes
         var data = new byte[0x9000];
         // Write known PVD at offset 0x832D
-        var pvd0 = System.Text.Encoding.ASCII.GetBytes("2004083110334900");
+        var pvd0 = "2004083110334900"u8.ToArray();
         Array.Copy(pvd0, 0, data, 0x832D, pvd0.Length);
         File.WriteAllBytes(tmp, data);
         try
@@ -269,8 +269,8 @@ public class XgdTablesTests
         // Second case: write different PVD and re-test
         var tmp2 = Path.Combine(Path.GetTempPath(), $"xgd_wave_pvd2_{Guid.NewGuid():N}.bin");
         var data2 = new byte[0x9000];
-        var pvd14b = System.Text.Encoding.ASCII.GetBytes("2011120716000000");
-        Array.Copy(pvd14b, 0, data2, 0x832D, pvd14b.Length);
+        var pvd14B = "2011120716000000"u8.ToArray();
+        Array.Copy(pvd14B, 0, data2, 0x832D, pvd14B.Length);
         File.WriteAllBytes(tmp2, data2);
         try
         {
@@ -288,7 +288,7 @@ public class XgdTablesTests
     {
         var tmp = Path.Combine(Path.GetTempPath(), $"xgd_wave_unknown_{Guid.NewGuid():N}.bin");
         var data = new byte[0x9000];
-        var unknown = System.Text.Encoding.ASCII.GetBytes("9999999999999999");
+        var unknown = "9999999999999999"u8.ToArray();
         Array.Copy(unknown, 0, data, 0x832D, unknown.Length);
         File.WriteAllBytes(tmp, data);
         try
@@ -332,7 +332,7 @@ public class XgdTablesTests
         // Create a file with wave 0 PVD (2004083110334900) => GetVideoType for redump 5 should be 2
         var tmp = Path.Combine(Path.GetTempPath(), $"xgd_vtype_{Guid.NewGuid():N}.bin");
         var data = new byte[0x9000];
-        var pvd0 = System.Text.Encoding.ASCII.GetBytes("2004083110334900"); // wave 0
+        var pvd0 = "2004083110334900"u8.ToArray(); // wave 0
         Array.Copy(pvd0, 0, data, 0x832D, pvd0.Length);
         File.WriteAllBytes(tmp, data);
         try
@@ -349,7 +349,7 @@ public class XgdTablesTests
         // Wave 23 is special case for redump 7 => returns 16
         var tmp2 = Path.Combine(Path.GetTempPath(), $"xgd_vtype2_{Guid.NewGuid():N}.bin");
         var data2 = new byte[0x9000];
-        var pvd23 = System.Text.Encoding.ASCII.GetBytes("2010121616000000"); // index 23
+        var pvd23 = "2010121616000000"u8.ToArray(); // index 23
         Array.Copy(pvd23, 0, data2, 0x832D, pvd23.Length);
         File.WriteAllBytes(tmp2, data2);
         try
@@ -367,8 +367,14 @@ public class XgdTablesTests
                 using var fs3 = new FileStream(tmp3, FileMode.Open, FileAccess.Read, FileShare.Read);
                 Assert.Equal(17, XgdTables.GetVideoType(fs3, 7));
             }
-            finally { File.Delete(tmp3); }
+            finally
+            {
+                File.Delete(tmp3);
+            }
         }
-        finally { File.Delete(tmp2); }
+        finally
+        {
+            File.Delete(tmp2);
+        }
     }
 }

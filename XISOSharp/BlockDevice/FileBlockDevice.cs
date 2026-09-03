@@ -34,10 +34,10 @@ public sealed class FileBlockDevice : IBlockDevice
     public int Read(long offset, Span<byte> buffer)
     {
         BaseStream.Seek(offset, SeekOrigin.Begin);
-        int total = 0;
+        var total = 0;
         while (total < buffer.Length)
         {
-            int n = BaseStream.Read(buffer[total..]);
+            var n = BaseStream.Read(buffer[total..]);
             if (n == 0) break;
             total += n;
         }

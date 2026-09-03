@@ -384,7 +384,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
         var isoPath = CreateTestIso();
 
         using var fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        (_, _, long discLseek) = XisoReader.VerifyXiso(fs, "test.iso");
+        (_, _, var discLseek) = XisoReader.VerifyXiso(fs, "test.iso");
 
         Assert.Equal(0, discLseek);
     }

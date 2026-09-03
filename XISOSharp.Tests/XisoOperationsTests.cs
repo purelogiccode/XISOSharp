@@ -149,7 +149,7 @@ public class XisoOperationsTests : IDisposable
         var iso = CreateIso(src, prependSectors: 16);
         var outDir = CreateTempDir();
         var fillerPath = Path.Combine(outDir, "prepend.filler");
-        long offset = 16L * Constants.SectorSize;
+        const long offset = 16L * Constants.SectorSize;
 
         var ok = XisoOperations.ExtractFiller(iso, fillerPath, offset, null, quiet: true);
 
@@ -170,11 +170,11 @@ public class XisoOperationsTests : IDisposable
 
         // Compute expected filler size via XisoRanges
         using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> files) = XisoRanges.GetXisoRanges(fs, 0, true);
+        (var sys, var files) = XisoRanges.GetXisoRanges(fs, 0, true);
         var merged = XisoRanges.MergeRanges(sys, files);
         long validBytes = 0;
-        foreach ((uint s, uint e) in merged) validBytes += (e - s + 1L) * Constants.SectorSize;
-        long expectedFiller = fs.Length - validBytes;
+        foreach ((var s, var e) in merged) validBytes += (e - s + 1L) * Constants.SectorSize;
+        var expectedFiller = fs.Length - validBytes;
 
         Assert.Equal(expectedFiller, new FileInfo(fillerPath).Length);
     }
@@ -259,7 +259,7 @@ public class XisoOperationsTests : IDisposable
     {
         var src = CreateSourceDir(PopulateSimple);
         var iso = CreateIso(src, prependSectors: 16);
-        long offset = 16L * Constants.SectorSize;
+        const long offset = 16L * Constants.SectorSize;
 
         var seed = XisoOperations.ExtractSeed(iso, offset, quiet: true);
 
@@ -342,13 +342,13 @@ public class XisoOperationsTests : IDisposable
         var iso = CreateIso(src);
         var outDir = CreateTempDir();
         var trimmed = Path.Combine(outDir, "trimmed.iso");
-        long origLen = new FileInfo(iso).Length;
+        var origLen = new FileInfo(iso).Length;
 
         var ok = XisoOperations.TrimXiso(iso, trimmed, 0, quiet: true);
 
         Assert.True(ok);
         Assert.True(File.Exists(trimmed));
-        long trimmedLen = new FileInfo(trimmed).Length;
+        var trimmedLen = new FileInfo(trimmed).Length;
         Assert.True(trimmedLen <= origLen, $"Trimmed length {trimmedLen} should be <= original {origLen}");
         Assert.Equal(0, trimmedLen % Constants.SectorSize);
 
@@ -367,12 +367,12 @@ public class XisoOperationsTests : IDisposable
         var outDir = CreateTempDir();
         var inPlace = Path.Combine(outDir, "inplace.iso");
         File.Copy(iso, inPlace, true);
-        long before = new FileInfo(inPlace).Length;
+        var before = new FileInfo(inPlace).Length;
 
         var ok = XisoOperations.TrimXiso(inPlace, null, 0, quiet: true);
 
         Assert.True(ok);
-        long after = new FileInfo(inPlace).Length;
+        var after = new FileInfo(inPlace).Length;
         Assert.True(after <= before);
         Assert.Equal(0, after % Constants.SectorSize);
 
@@ -390,7 +390,7 @@ public class XisoOperationsTests : IDisposable
         var outDir = CreateTempDir();
         var copy = Path.Combine(outDir, "copy.iso");
         File.Copy(iso, copy, true);
-        long before = new FileInfo(copy).Length;
+        var before = new FileInfo(copy).Length;
 
         // Passing the same path as output should trigger in-place logic
         var ok = XisoOperations.TrimXiso(copy, copy, 0, quiet: true);
@@ -444,13 +444,13 @@ public class XisoOperationsTests : IDisposable
         var iso = CreateIso(src);
         var outDir = CreateTempDir();
         var wipeTrimmed = Path.Combine(outDir, "wipetrim.iso");
-        long origLen = new FileInfo(iso).Length;
+        var origLen = new FileInfo(iso).Length;
 
         var ok = XisoOperations.WipeAndTrim(iso, wipeTrimmed, 0, quiet: true);
 
         Assert.True(ok);
         Assert.True(File.Exists(wipeTrimmed));
-        long newLen = new FileInfo(wipeTrimmed).Length;
+        var newLen = new FileInfo(wipeTrimmed).Length;
         Assert.True(newLen <= origLen);
         Assert.Equal(0, newLen % Constants.SectorSize);
 
@@ -513,17 +513,17 @@ public class XisoOperationsTests : IDisposable
         Assert.True(XisoOperations.ExtractFiller(iso, filler, 0, null, true));
         Assert.True(XisoOperations.WipeFiller(iso, wiped, 0, true));
 
-        long fillerLen = new FileInfo(filler).Length;
-        long isoLen = new FileInfo(iso).Length;
-        long wipedLen = new FileInfo(wiped).Length;
+        var fillerLen = new FileInfo(filler).Length;
+        var isoLen = new FileInfo(iso).Length;
+        var wipedLen = new FileInfo(wiped).Length;
 
         // Wiped should be same size as original, filler + valid data == iso size
         Assert.Equal(isoLen, wipedLen);
         using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> files) = XisoRanges.GetXisoRanges(fs, 0, true);
+        (var sys, var files) = XisoRanges.GetXisoRanges(fs, 0, true);
         var merged = XisoRanges.MergeRanges(sys, files);
         long validBytes = 0;
-        foreach ((uint s, uint e) in merged) validBytes += (e - s + 1L) * Constants.SectorSize;
+        foreach ((var s, var e) in merged) validBytes += (e - s + 1L) * Constants.SectorSize;
         Assert.Equal(validBytes + fillerLen, isoLen);
     }
 }

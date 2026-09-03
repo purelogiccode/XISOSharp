@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
-
 using XISOSharp.BlockDevice;
 
 namespace XISOSharp.BattleTests;
@@ -27,10 +26,10 @@ internal static class BattleRunner
 
         Console.WriteLine(
             $"Battle: {isoFiles.Count} ISO(s) — native: {(wrapper != null ? session.NativeVersion : "NOT FOUND (C# only)")}");
-        if (createDirs != null && createDirs.Length > 0)
+        if (createDirs?.Length > 0)
             Console.WriteLine($"Create dirs: {string.Join(", ", createDirs)}");
 
-        for (int i = 0; i < isoFiles.Count; i++)
+        for (var i = 0; i < isoFiles.Count; i++)
         {
             var file = isoFiles[i];
             var fi = new FileInfo(file);
@@ -123,11 +122,11 @@ internal static class BattleRunner
         try
         {
             using var fs = File.OpenRead(path);
-            (uint rootSector, uint rootSize, long lseek) = XisoReader.VerifyXiso(fs, Path.GetFileName(path));
+            (var rootSector, var rootSize, var lseek) = XisoReader.VerifyXiso(fs, Path.GetFileName(path));
             var csDetail = $"Valid RootSector={rootSector} RootSize={rootSize} Lseek=0x{lseek:X}";
             if (wrapper?.Available == true)
             {
-                (int code, _, _) = wrapper.ListFiles(path);
+                (var code, _, _) = wrapper.ListFiles(path);
                 var nativeOk = code == 0;
                 sw.Stop();
                 return new SubBattleResult
@@ -163,10 +162,11 @@ internal static class BattleRunner
         {
             if (wrapper?.Available == true)
             {
-                (int code, _, _) = wrapper.ListFiles(path);
+                (var code, _, _) = wrapper.ListFiles(path);
                 var bothFail = code != 0;
                 sw.Stop();
                 if (bothFail)
+                {
                     return new SubBattleResult
                     {
                         TestName = "Verify",
@@ -174,6 +174,7 @@ internal static class BattleRunner
                         Detail = $"Both fail as expected: C#: {ex.Message} | native exit {code}",
                         ElapsedSeconds = sw.Elapsed.TotalSeconds
                     };
+                }
             }
 
             sw.Stop();
@@ -208,6 +209,7 @@ internal static class BattleRunner
             var res = XisoReader.AuditXiso(path);
             sw.Stop();
             if (res.IsValid)
+            {
                 return new SubBattleResult
                 {
                     TestName = "Audit",
@@ -215,15 +217,18 @@ internal static class BattleRunner
                     Detail = $"Valid files={res.FilesChecked} dirs={res.DirsChecked}",
                     ElapsedSeconds = sw.Elapsed.TotalSeconds
                 };
+            }
             else
+            {
                 return new SubBattleResult
                 {
                     TestName = "Audit",
                     Status = BattleStatus.Failed,
                     Detail =
-                        $"Invalid files={res.FilesChecked} issues={res.Issues.Count} first={res.Issues.FirstOrDefault()}",
+                                    $"Invalid files={res.FilesChecked} issues={res.Issues.Count} first={res.Issues.FirstOrDefault()}",
                     ElapsedSeconds = sw.Elapsed.TotalSeconds
                 };
+            }
         }
         catch (Exception ex)
         {
@@ -276,7 +281,7 @@ internal static class BattleRunner
                     };
             }
 
-            (int code, string so, string se) = wrapper.ListFiles(path);
+            (var code, var so, var se) = wrapper.ListFiles(path);
             if (code != 0)
             {
                 sw.Stop();
@@ -384,7 +389,7 @@ internal static class BattleRunner
                 };
             }
 
-            (int code, _, string se) = wrapper.ExtractFiles(path, exeDir);
+            (var code, _, var se) = wrapper.ExtractFiles(path, exeDir);
             if (code != 0)
             {
                 sw.Stop();
@@ -511,7 +516,7 @@ internal static class BattleRunner
             File.Copy(path, exeInput, true);
             var exeOutDir = Path.Combine(exeWork, "out");
             Directory.CreateDirectory(exeOutDir);
-            (int code, _, string se) = wrapper.Rewrite(exeInput, exeOutDir);
+            (var code, _, var se) = wrapper.Rewrite(exeInput, exeOutDir);
             if (code != 0)
             {
                 sw.Stop();
@@ -653,6 +658,7 @@ internal static class BattleRunner
             var h2 = XisoChecksum.ComputeImageChecksumHex(path);
             sw.Stop();
             if (h1.Length != 64)
+            {
                 return new SubBattleResult
                 {
                     TestName = "Checksum",
@@ -660,6 +666,8 @@ internal static class BattleRunner
                     Detail = $"Invalid hex length {h1.Length}",
                     ElapsedSeconds = sw.Elapsed.TotalSeconds
                 };
+            }
+
             return string.Equals(h1, h2, StringComparison.Ordinal)
                 ? new SubBattleResult
                 {
@@ -710,7 +718,7 @@ internal static class BattleRunner
             if (fbd.Length > Constants.HeaderOffset + 32)
             {
                 Span<byte> buf = stackalloc byte[20];
-                int n = fbd.Read(Constants.HeaderOffset, buf);
+                var n = fbd.Read(Constants.HeaderOffset, buf);
                 // Sanity check we can read header area
                 if (n != 20)
                 {
@@ -814,7 +822,7 @@ internal static class BattleRunner
                 return result;
             }
 
-            (int code, string so, string se) = wrapper.Create(dir, exeIso);
+            (var code, var so, var se) = wrapper.Create(dir, exeIso);
             if (code != 0)
             {
                 var work = Path.Combine(tmp, "exe_fallback");
@@ -823,7 +831,7 @@ internal static class BattleRunner
                 try
                 {
                     Directory.SetCurrentDirectory(work);
-                    (int c2, string o2, string e2) = wrapper.Create(dir);
+                    (var c2, var o2, var e2) = wrapper.Create(dir);
                     code = c2;
                     so = o2;
                     se = e2;
@@ -880,8 +888,9 @@ internal static class BattleRunner
                 try { XisoReader.Extract(csIso, csExt, false); }
                 finally { Logger.Quiet = q; }
 
-                (int ec, _, string ese) = wrapper.ExtractFiles(exeIso, exeExt);
+                (var ec, _, var ese) = wrapper.ExtractFiles(exeIso, exeExt);
                 if (ec != 0)
+                {
                     result.SubTests.Add(new SubBattleResult
                     {
                         TestName = "Create-Extract",
@@ -889,6 +898,7 @@ internal static class BattleRunner
                         Detail = $"native extract exit {ec}: {ese.Trim()}",
                         ElapsedSeconds = 0
                     });
+                }
                 else
                 {
                     var cmpD = CompareDirs(csExt, exeExt);
@@ -1014,7 +1024,7 @@ internal static class BattleRunner
             }
 
             using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read);
-            (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> files) =
+            (var sys, var files) =
                 XisoRanges.GetXisoRanges(fs, 0, true);
             sw.Stop();
             return new SubBattleResult
@@ -1164,7 +1174,7 @@ internal static class BattleRunner
             {
                 // Old ISOs or empty root may throw; fallback to GetXisoRanges which is more robust
                 fs.Seek(0, SeekOrigin.Begin);
-                (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> files) =
+                (var sys, var files) =
                     XisoRanges.GetXisoRanges(fs, 0, true);
                 sw.Stop();
                 return new SubBattleResult
@@ -1189,12 +1199,14 @@ internal static class BattleRunner
         }
     }
 
+    internal static readonly string[] Patterns = new[] { "**/*.iso" };
+
     private static SubBattleResult CheckGlobMatcher()
     {
         var sw = Stopwatch.StartNew();
         try
         {
-            var m = new GlobMatcher(new[] { "**/*.iso" });
+            var m = new GlobMatcher(Patterns);
             var ok = m.IsMatch("a/b.iso") && !m.IsMatch("a/b.txt");
             sw.Stop();
             return new SubBattleResult
@@ -1280,11 +1292,14 @@ internal static class BattleRunner
         var csDict = cs.ToDictionary(e => e.Path, StringComparer.OrdinalIgnoreCase);
         var exeDict = exe.ToDictionary(e => e.Path, StringComparer.OrdinalIgnoreCase);
         int match = 0, mis = 0;
-        foreach ((string p, ListEntry ce) in csDict)
+        foreach ((var p, ListEntry ce) in csDict)
         {
             if (exeDict.TryGetValue(p, out var ee))
             {
-                if (ce.IsDirectory == ee.IsDirectory && ce.Size == ee.Size && ce.StartSector == ee.StartSector) match++;
+                if (ce.IsDirectory == ee.IsDirectory && ce.Size == ee.Size && ce.StartSector == ee.StartSector)
+                {
+                    match++;
+                }
                 else
                 {
                     mis++;
@@ -1321,7 +1336,7 @@ internal static class BattleRunner
         var exeFiles = Directory.GetFiles(exeDir, "*", SearchOption.AllDirectories)
             .Select(f => (Full: f, Rel: Path.GetRelativePath(exeDir, f)))
             .ToDictionary(x => x.Rel, StringComparer.OrdinalIgnoreCase);
-        foreach ((string rel, (string Full, string Rel) cs) in csFiles)
+        foreach ((var rel, (string Full, string Rel) cs) in csFiles)
         {
             if (exeFiles.TryGetValue(rel, out var exe))
             {

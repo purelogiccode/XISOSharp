@@ -64,11 +64,13 @@ internal sealed class ExtractXisoWrapper : IDisposable
     /// <summary>Gets version via <c>-v</c>.</summary>
     public string GetVersion()
     {
-        (int code, string so, string se) = Run("-v");
+        (var code, var so, var se) = Run("-v");
         var txt = string.IsNullOrWhiteSpace(so) ? se : so;
         return txt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? $"exit:{code}";
     }
 
     /// <inheritdoc/>
-    public void Dispose() { }
+    public void Dispose()
+    {
+    }
 }

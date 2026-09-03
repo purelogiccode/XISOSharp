@@ -13,7 +13,7 @@ public sealed class OffsetBlockDevice : IBlockDevice
     public OffsetBlockDevice(IBlockDevice inner, long offset, bool leaveOpen = false)
     {
         Inner = inner ?? throw new ArgumentNullException(nameof(inner));
-        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
         Offset = offset;
         _leaveOpen = leaveOpen;
     }
@@ -29,8 +29,8 @@ public sealed class OffsetBlockDevice : IBlockDevice
     {
         get
         {
-            long innerLen = Inner.Length;
-            long len = innerLen - Offset;
+            var innerLen = Inner.Length;
+            var len = innerLen - Offset;
             return len < 0 ? 0 : len;
         }
     }
@@ -38,14 +38,14 @@ public sealed class OffsetBlockDevice : IBlockDevice
     /// <inheritdoc/>
     public int Read(long offset, Span<byte> buffer)
     {
-        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
         return Inner.Read(Offset + offset, buffer);
     }
 
     /// <inheritdoc/>
     public void Write(long offset, ReadOnlySpan<byte> buffer)
     {
-        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
         Inner.Write(Offset + offset, buffer);
     }
 
@@ -69,13 +69,13 @@ public sealed class OffsetBlockDevice : IBlockDevice
         ];
         Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
         var magic = System.Text.Encoding.ASCII.GetBytes(Constants.HeaderData);
-        foreach (long off in offsets)
+        foreach (var off in offsets)
         {
             var view = new OffsetBlockDevice(inner, off, leaveOpen: true);
             try
             {
                 // Try to validate header at HeaderOffset within view
-                int n = view.Read(Constants.HeaderOffset, buf);
+                var n = view.Read(Constants.HeaderOffset, buf);
                 if (n != Constants.HeaderDataLength) continue;
                 if (buf.SequenceEqual(magic))
                     return view;

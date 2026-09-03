@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Windows.Controls;
 using System.Windows.Data;
-
 using XISOSharpTester.Models;
 using XISOSharpTester.ViewModels;
 

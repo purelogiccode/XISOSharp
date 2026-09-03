@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-
 using XISOSharp.BlockDevice;
 
 namespace XISOSharp.Tests;
@@ -25,7 +24,10 @@ public class BlockDeviceTests : IDisposable
     {
         foreach (var d in _devices)
         {
-            try { d.Dispose(); }
+            try
+            {
+                d.Dispose();
+            }
             catch
             {
                 /* ignore */
@@ -69,7 +71,7 @@ public class BlockDeviceTests : IDisposable
     {
         sourceDir ??= SourceDir;
         var outDir = CreateTempDir();
-        int rc = XisoWriter.CreateXiso(sourceDir, outDir, null, null, out var outPath, null, null);
+        var rc = XisoWriter.CreateXiso(sourceDir, outDir, null, null, out var outPath, null, null);
         Assert.Equal(0, rc);
         Assert.NotNull(outPath);
         return outPath;
@@ -83,13 +85,13 @@ public class BlockDeviceTests : IDisposable
         var dev = new MemoryBlockDevice();
         _devices.Add(dev);
 
-        var data = Encoding.ASCII.GetBytes("hello world");
+        var data = "hello world"u8.ToArray();
         dev.Write(0, data);
 
         Assert.Equal(data.Length, dev.Length);
 
         Span<byte> buf = stackalloc byte[data.Length];
-        int read = dev.Read(0, buf);
+        var read = dev.Read(0, buf);
         Assert.Equal(data.Length, read);
         Assert.True(buf.SequenceEqual(data));
     }
@@ -106,7 +108,7 @@ public class BlockDeviceTests : IDisposable
         Assert.True(dev.AsSpan().SequenceEqual(payload));
 
         // Mutating written data via Write should be reflected
-        dev.Write(2, new byte[] { 9, 9 });
+        dev.Write(2, "\t\t"u8);
         var expected = new byte[] { 1, 2, 9, 9, 5 };
         Assert.Equal(expected, dev.ToArray());
     }
@@ -128,7 +130,7 @@ public class BlockDeviceTests : IDisposable
         Assert.Equal(6002, dev.Length);
 
         Span<byte> buf = stackalloc byte[2];
-        int r = dev.Read(6000, buf);
+        var r = dev.Read(6000, buf);
         Assert.Equal(2, r);
         Assert.Equal(extra, buf.ToArray());
 
@@ -146,11 +148,11 @@ public class BlockDeviceTests : IDisposable
 
         Span<byte> buf = stackalloc byte[10];
         buf.Fill(0xFF);
-        int read = dev.Read(10, buf);
+        var read = dev.Read(10, buf);
         Assert.Equal(0, read);
         // When offset >= Length, method returns 0 without touching buffer? Implementation returns 0 immediately.
         // Ensure reading at exactly Length also returns 0
-        int read2 = dev.Read(dev.Length, buf);
+        var read2 = dev.Read(dev.Length, buf);
         Assert.Equal(0, read2);
     }
 
@@ -192,7 +194,7 @@ public class BlockDeviceTests : IDisposable
 
         Assert.Equal(1024, dev.Length);
         Span<byte> buf = stackalloc byte[1024];
-        int r = dev.Read(0, buf);
+        var r = dev.Read(0, buf);
         Assert.Equal(1024, r);
         Assert.True(buf.ToArray().All(static b => b == 0));
     }
@@ -209,12 +211,12 @@ public class BlockDeviceTests : IDisposable
         using (var fs = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.Read, 65536))
         {
             var dev = new FileBlockDevice(fs, leaveOpen: false);
-            var data = Encoding.ASCII.GetBytes("file block device payload");
+            var data = "file block device payload"u8.ToArray();
             dev.Write(0, data);
             Assert.Equal(data.Length, dev.Length);
 
             Span<byte> buf = stackalloc byte[data.Length];
-            int read = dev.Read(0, buf);
+            var read = dev.Read(0, buf);
             Assert.Equal(data.Length, read);
             Assert.True(buf.SequenceEqual(data));
             dev.Dispose();
@@ -224,9 +226,9 @@ public class BlockDeviceTests : IDisposable
         var dev2 = new FileBlockDevice(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         _devices.Add(dev2);
         Span<byte> buf2 = stackalloc byte[5];
-        int r2 = dev2.Read(0, buf2);
+        var r2 = dev2.Read(0, buf2);
         Assert.Equal(5, r2);
-        Assert.Equal(Encoding.ASCII.GetBytes("file "), buf2.ToArray());
+        Assert.Equal("file "u8.ToArray(), buf2.ToArray());
     }
 
     [Fact]
@@ -273,20 +275,20 @@ public class BlockDeviceTests : IDisposable
     [Fact]
     public void OffsetBlockDevice_WrapsWithOffset_ReadCorrectly()
     {
-        var inner = new MemoryBlockDevice(Encoding.ASCII.GetBytes("0123456789"));
+        var inner = new MemoryBlockDevice("0123456789"u8);
         _devices.Add(inner);
 
         var offsetDev = new OffsetBlockDevice(inner, 5, leaveOpen: true);
         _devices.Add(offsetDev);
 
         Span<byte> buf = stackalloc byte[5];
-        int r = offsetDev.Read(0, buf);
+        var r = offsetDev.Read(0, buf);
         Assert.Equal(5, r);
-        Assert.Equal(Encoding.ASCII.GetBytes("56789"), buf.ToArray());
+        Assert.Equal("56789"u8.ToArray(), buf.ToArray());
 
         // Reading beyond should clamp
         Span<byte> buf2 = stackalloc byte[10];
-        int r2 = offsetDev.Read(0, buf2);
+        var r2 = offsetDev.Read(0, buf2);
         Assert.Equal(5, r2); // only 5 bytes available after offset
     }
 
@@ -334,7 +336,7 @@ public class BlockDeviceTests : IDisposable
     public void OffsetBlockDevice_Probe_FindsHeaderAtZero()
     {
         // Build a fake XISO with header at offset 0x10000
-        int size = Constants.HeaderOffset + Constants.HeaderDataLength + 1024;
+        const int size = Constants.HeaderOffset + Constants.HeaderDataLength + 1024;
         var data = new byte[size];
         Encoding.ASCII.GetBytes(Constants.HeaderData).CopyTo(data.AsSpan(Constants.HeaderOffset));
         var inner = new MemoryBlockDevice(data);
@@ -373,7 +375,7 @@ public class BlockDeviceTests : IDisposable
 
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "ciso_dev.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
         _tempFiles.Add(csoPath);
 
@@ -388,13 +390,13 @@ public class BlockDeviceTests : IDisposable
         Assert.Equal(isoBytes.Length, cisoDev2.Length);
 
         Span<byte> buf = stackalloc byte[2048];
-        int read = cisoDev.Read(0, buf);
+        var read = cisoDev.Read(0, buf);
         Assert.Equal(Math.Min(2048, isoBytes.Length), read);
         Assert.True(buf[..read].SequenceEqual(isoBytes.AsSpan(0, read)));
 
         // Read via second device (string ctor) block 0 as well
         Span<byte> buf2 = stackalloc byte[512];
-        int read2 = cisoDev2.Read(0, buf2);
+        var read2 = cisoDev2.Read(0, buf2);
         Assert.Equal(512, read2);
         Assert.True(buf2.SequenceEqual(isoBytes.AsSpan(0, 512)));
     }
@@ -407,7 +409,7 @@ public class BlockDeviceTests : IDisposable
 
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "ciso_dev2.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
         _tempFiles.Add(csoPath);
 
@@ -418,18 +420,18 @@ public class BlockDeviceTests : IDisposable
         if (isoBytes.Length > 2048)
         {
             Span<byte> block1 = stackalloc byte[2048];
-            int r1 = cisoDev.Read(2048, block1);
+            var r1 = cisoDev.Read(2048, block1);
             Assert.Equal(2048, r1);
             Assert.True(block1.SequenceEqual(isoBytes.AsSpan(2048, 2048)));
         }
 
         // Cross-sector read (3000 bytes from offset 1000)
-        long offset = 1000;
-        int len = 3000;
+        const long offset = 1000;
+        const int len = 3000;
         if (offset + len <= isoBytes.Length)
         {
             var buf = new byte[len];
-            int r = cisoDev.Read(offset, buf.AsSpan());
+            var r = cisoDev.Read(offset, buf.AsSpan());
             Assert.Equal(len, r);
             Assert.True(buf.AsSpan().SequenceEqual(isoBytes.AsSpan((int)offset, len)));
         }
@@ -441,7 +443,7 @@ public class BlockDeviceTests : IDisposable
         var isoPath = CreateTempIso();
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "ciso_wr.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
 
         var dev = new CisoBlockDevice(csoPath);
@@ -456,17 +458,17 @@ public class BlockDeviceTests : IDisposable
         var isoPath = CreateTempIso();
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "ciso_oor.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
 
         var dev = new CisoBlockDevice(csoPath);
         _devices.Add(dev);
 
         Span<byte> buf = stackalloc byte[10];
-        int r = dev.Read(dev.Length + 100, buf);
+        var r = dev.Read(dev.Length + 100, buf);
         Assert.Equal(0, r);
 
-        int r2 = dev.Read(dev.Length, buf);
+        var r2 = dev.Read(dev.Length, buf);
         Assert.Equal(0, r2);
     }
 
@@ -479,7 +481,7 @@ public class BlockDeviceTests : IDisposable
 
         var csoDir = CreateTempDir();
         var csoPath = Path.Combine(csoDir, "ciso_len.cso");
-        int rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
         Assert.Equal(0, rc);
 
         var dev = new CisoBlockDevice(csoPath);
@@ -488,11 +490,11 @@ public class BlockDeviceTests : IDisposable
 
         // Read entire image via block device and hash
         var all = new byte[dev.Length];
-        int totalRead = 0;
+        var totalRead = 0;
         while (totalRead < all.Length)
         {
-            int toRead = Math.Min(4096, all.Length - totalRead);
-            int r = dev.Read(totalRead, all.AsSpan(totalRead, toRead));
+            var toRead = Math.Min(4096, all.Length - totalRead);
+            var r = dev.Read(totalRead, all.AsSpan(totalRead, toRead));
             if (r == 0) break;
             totalRead += r;
         }
@@ -507,7 +509,7 @@ public class BlockDeviceTests : IDisposable
         var tmpDir = CreateTempDir();
         var path = Path.Combine(tmpDir, "pathctor.bin");
         var payload = new byte[256];
-        for (int i = 0; i < payload.Length; i++) payload[i] = (byte)i;
+        for (var i = 0; i < payload.Length; i++) payload[i] = (byte)i;
         File.WriteAllBytes(path, payload);
 
         var dev = new FileBlockDevice(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -515,7 +517,7 @@ public class BlockDeviceTests : IDisposable
 
         Assert.Equal(256, dev.Length);
         Span<byte> buf = stackalloc byte[256];
-        int r = dev.Read(0, buf);
+        var r = dev.Read(0, buf);
         Assert.Equal(256, r);
         Assert.True(buf.SequenceEqual(payload));
     }

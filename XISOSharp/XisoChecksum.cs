@@ -35,9 +35,9 @@ public static class XisoChecksum
     {
         ct.ThrowIfCancellationRequested();
         // Detect discLseek / root table via VerifyXiso probe (supports skipSectors override)
-        (uint rootSector, uint rootSize, long discLseek) = XisoReader.VerifyXiso(fs, isoName, skipSectors);
+        (var rootSector, var rootSize, var discLseek) = XisoReader.VerifyXiso(fs, isoName, skipSectors);
 
-        long dirStart = (long)rootSector * Constants.SectorSize + discLseek;
+        var dirStart = ((long)rootSector * Constants.SectorSize) + discLseek;
 
         // Collect entries as xdvdfs does: file_tree returns (parentDirString, node)
         // where path = parent + "/" + name, including both files and directories.
@@ -53,30 +53,32 @@ public static class XisoChecksum
         foreach (var kv in map)
         {
             ct.ThrowIfCancellationRequested();
-            string path = kv.Key; // already "/name" or "/dir/file"
-            byte[] pathBytes = Encoding.UTF8.GetBytes(path);
+            var path = kv.Key; // already "/name" or "/dir/file"
+            var pathBytes = Encoding.UTF8.GetBytes(path);
             hasher.AppendData(pathBytes);
 
             var entry = kv.Value;
             if (!entry.IsDir && entry.Size > 0)
             {
                 // Stream file data without loading all at once (avoid read_data_all)
-                long fileOffset = entry.Offset;
+                var fileOffset = entry.Offset;
                 long remaining = entry.Size;
                 fs.Seek(fileOffset, SeekOrigin.Begin);
-                byte[] buf = new byte[Constants.ReadWriteBufferSize];
+                var buf = new byte[Constants.ReadWriteBufferSize];
                 while (remaining > 0)
                 {
-                    int toRead = (int)Math.Min(buf.Length, remaining);
-                    int n = fs.Read(buf, 0, toRead);
+                    var toRead = (int)Math.Min(buf.Length, remaining);
+                    var n = fs.Read(buf, 0, toRead);
                     if (n == 0) break;
                     hasher.AppendData(buf, 0, n);
                     remaining -= n;
                 }
 
                 if (remaining != 0)
+                {
                     throw new IOException(
                         $"Truncated file data for {path}: expected {entry.Size}, remaining {remaining}");
+                }
             }
         }
 
@@ -102,9 +104,9 @@ public static class XisoChecksum
         // For each child, insert into map and recurse if directory
         foreach (var child in children)
         {
-            string path = parent.Length == 0 ? "/" + child.Name : parent + "/" + child.Name;
-            bool isDir = child.IsDirectory;
-            long fileOffset = (long)child.StartSector * Constants.SectorSize + discLseek;
+            var path = parent.Length == 0 ? "/" + child.Name : parent + "/" + child.Name;
+            var isDir = child.IsDirectory;
+            var fileOffset = ((long)child.StartSector * Constants.SectorSize) + discLseek;
 
             // xdvdfs inserts (parent, node) where path = format!("{}/{}", parent, name)
             // For root, parent="" => path="/name"
@@ -112,8 +114,8 @@ public static class XisoChecksum
 
             if (isDir && child.Size > 0)
             {
-                long subDirStart = fileOffset;
-                uint subDirSize = child.Size;
+                var subDirStart = fileOffset;
+                var subDirSize = child.Size;
                 CollectFileTree(fs, subDirStart, subDirSize, discLseek, path, map, ct);
             }
         }
@@ -138,8 +140,8 @@ public static class XisoChecksum
 
         while (stack.Count > 0)
         {
-            uint top = stack.Pop();
-            long offset = dirStart + top;
+            var top = stack.Pop();
+            var offset = dirStart + top;
             // Bounds check: ensure we don't read beyond dir table
             if (top >= dirSize) continue;
 
@@ -149,11 +151,11 @@ public static class XisoChecksum
             var node = opt;
 
             // Push children using the same logic as xdvdfs: left then right (stack LIFO)
-            ushort left = node.LeftOffset;
+            var left = node.LeftOffset;
             if (left != 0 && left != 0xFFFF)
                 stack.Push((uint)left * 4);
 
-            ushort right = node.RightOffset;
+            var right = node.RightOffset;
             if (right != 0 && right != 0xFFFF)
                 stack.Push((uint)right * 4);
 
@@ -183,12 +185,12 @@ public static class XisoChecksum
     {
         Span<byte> hdr = stackalloc byte[14];
         fs.Seek(offset, SeekOrigin.Begin);
-        int n = fs.Read(hdr);
+        var n = fs.Read(hdr);
         if (n != 14) return null;
 
         // Check empty directory sentinel (14 bytes all 0xFF or all 0x00)
         bool allFf = true, allZero = true;
-        for (int i = 0; i < 14; i++)
+        for (var i = 0; i < 14; i++)
         {
             if (hdr[i] != 0xFF) allFf = false;
             if (hdr[i] != 0x00) allZero = false;
@@ -197,27 +199,27 @@ public static class XisoChecksum
 
         if (allFf || allZero) return null;
 
-        ushort left = BinaryPrimitives.ReadUInt16LittleEndian(hdr[0..2]);
-        ushort right = BinaryPrimitives.ReadUInt16LittleEndian(hdr[2..4]);
-        uint sector = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
-        uint size = BinaryPrimitives.ReadUInt32LittleEndian(hdr[8..12]);
-        byte attrs = Constants.MaskAttributes(hdr[12]);
-        byte nameLen = hdr[13];
+        var left = BinaryPrimitives.ReadUInt16LittleEndian(hdr[0..2]);
+        var right = BinaryPrimitives.ReadUInt16LittleEndian(hdr[2..4]);
+        var sector = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
+        var size = BinaryPrimitives.ReadUInt32LittleEndian(hdr[8..12]);
+        var attrs = Constants.MaskAttributes(hdr[12]);
+        var nameLen = hdr[13];
 
         if (nameLen == 0) return null; // shouldn't happen, but treat as empty
 
-        byte[] nameBuf = new byte[nameLen];
-        int rn = 0;
+        var nameBuf = new byte[nameLen];
+        var rn = 0;
         while (rn < nameLen)
         {
-            int r = fs.Read(nameBuf, rn, nameLen - rn);
+            var r = fs.Read(nameBuf, rn, nameLen - rn);
             if (r == 0) return null;
             rn += r;
         }
 
         // Xbox uses Windows-1252; xdvdfs uses encoding_rs WINDOWS_1252.
         // Latin1Encoding covers the same range for test vectors (ASCII).
-        string name = Latin1Encoding.Instance.GetString(nameBuf);
+        var name = Latin1Encoding.Instance.GetString(nameBuf);
 
         return new DirentNodeRaw
         {

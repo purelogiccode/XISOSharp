@@ -79,7 +79,7 @@ public static class XisoZarchive
         public byte[] FinalizeHash(byte[] lastBlock)
         {
             _sha.TransformFinalBlock(lastBlock, 0, lastBlock.Length);
-            byte[] hash = _sha.Hash!;
+            var hash = _sha.Hash!;
             _sha.Dispose();
             return hash;
         }
@@ -87,7 +87,7 @@ public static class XisoZarchive
 
     private static int GetOrAddName(List<string> names, Dictionary<string, int> lookup, string name)
     {
-        if (lookup.TryGetValue(name, out int idx)) return idx;
+        if (lookup.TryGetValue(name, out var idx)) return idx;
         idx = names.Count;
         names.Add(name);
         lookup[name] = idx;
@@ -96,8 +96,8 @@ public static class XisoZarchive
 
     private static int CompareNodeName(string n1, string n2)
     {
-        int min = Math.Min(n1.Length, n2.Length);
-        for (int i = 0; i < min; i++)
+        var min = Math.Min(n1.Length, n2.Length);
+        for (var i = 0; i < min; i++)
         {
             char c1 = n1[i], c2 = n2[i];
             if (c1 >= 'A' && c1 <= 'Z') c1 = (char)(c1 + 32);
@@ -111,10 +111,10 @@ public static class XisoZarchive
     private static ushort ReadUShort(FileStream fs)
     {
         Span<byte> buf = stackalloc byte[2];
-        int total = 0;
+        var total = 0;
         while (total < 2)
         {
-            int n = fs.Read(buf[total..]);
+            var n = fs.Read(buf[total..]);
             if (n == 0) throw new EndOfStreamException();
             total += n;
         }
@@ -125,10 +125,10 @@ public static class XisoZarchive
     private static uint ReadUInt(FileStream fs)
     {
         Span<byte> buf = stackalloc byte[4];
-        int total = 0;
+        var total = 0;
         while (total < 4)
         {
-            int n = fs.Read(buf[total..]);
+            var n = fs.Read(buf[total..]);
             if (n == 0) throw new EndOfStreamException();
             total += n;
         }
@@ -147,15 +147,15 @@ public static class XisoZarchive
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        string outZar = zarPath ?? DeriveZarPath(isoPath);
+        var outZar = zarPath ?? DeriveZarPath(isoPath);
         using var isoFs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
         return CreateZar(isoFs, isoOffset, outZar, false, quiet, ct);
     }
 
     private static string DeriveZarPath(string input)
     {
-        string dir = Path.GetDirectoryName(input) ?? "";
-        string full = Path.GetFileName(input) ?? "archive";
+        var dir = Path.GetDirectoryName(input) ?? "";
+        var full = Path.GetFileName(input) ?? "archive";
         if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".redump.iso".Length];
         else if (full.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".video.iso".Length];
         else if (full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".iso".Length];
@@ -175,10 +175,10 @@ public static class XisoZarchive
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        long headerOffset = xisoOffset + Constants.HeaderOffset;
+        var headerOffset = xisoOffset + Constants.HeaderOffset;
         isoFs.Seek(headerOffset + 20, SeekOrigin.Begin);
-        uint rootOffset = ReadUInt(isoFs);
-        uint rootSize = ReadUInt(isoFs);
+        var rootOffset = ReadUInt(isoFs);
+        var rootSize = ReadUInt(isoFs);
 
         ParseXdvdfs(isoFs, xisoOffset, (long)rootOffset * Constants.SectorSize, rootSize, removeUpdate,
             out var rootNode, out var names);
@@ -189,17 +189,17 @@ public static class XisoZarchive
 
         if (!WriteCompressedData(isoFs, xisoOffset, hs, rootNode, out var offsetRecords, ct))
             return false;
-        ulong compressedDataEnd = (ulong)hs.Position;
+        var compressedDataEnd = (ulong)hs.Position;
 
         while (hs.Position % 8 != 0) hs.Write(0);
 
-        ulong offsetRecordsStart = (ulong)hs.Position;
+        var offsetRecordsStart = (ulong)hs.Position;
         WriteOffsetRecords(hs, offsetRecords);
 
-        ulong nameTableStart = (ulong)hs.Position;
+        var nameTableStart = (ulong)hs.Position;
         WriteNameTable(hs, names, out var nameOffsets);
 
-        ulong fileTreeStart = (ulong)hs.Position;
+        var fileTreeStart = (ulong)hs.Position;
         WriteFileTree(hs, rootNode, nameOffsets);
 
         WriteFooter(zarFs, hs, compressedDataEnd, offsetRecordsStart, nameTableStart, fileTreeStart);
@@ -214,8 +214,11 @@ public static class XisoZarchive
         rootNode = new PathNode();
         ParseNode(isoFs, isoOffset, dirOffset, dirSize, 0, rootNode, nameList, lookup);
         if (removeUpdate)
+        {
             rootNode.Subnodes.RemoveAll(n =>
                 !n.IsFile && string.Equals(nameList[n.NameIndex], "$SystemUpdate", StringComparison.OrdinalIgnoreCase));
+        }
+
         rootNode.Subnodes.Sort((a, b) => CompareNodeName(nameList[a.NameIndex], nameList[b.NameIndex]));
         names = nameList;
     }
@@ -224,34 +227,34 @@ public static class XisoZarchive
         PathNode parent, List<string> names, Dictionary<string, int> lookup)
     {
         if (childOffset >= dirSize) return;
-        long pos = isoOffset + dirOffset + childOffset;
+        var pos = isoOffset + dirOffset + childOffset;
         isoFs.Seek(pos, SeekOrigin.Begin);
-        ushort left = ReadUShort(isoFs);
-        ushort right = ReadUShort(isoFs);
-        uint entrySector = ReadUInt(isoFs);
-        uint entrySize = ReadUInt(isoFs);
-        byte attrs = (byte)isoFs.ReadByte();
-        byte nameLen = (byte)isoFs.ReadByte();
-        byte[] nameBytes = new byte[nameLen];
+        var left = ReadUShort(isoFs);
+        var right = ReadUShort(isoFs);
+        var entrySector = ReadUInt(isoFs);
+        var entrySize = ReadUInt(isoFs);
+        var attrs = (byte)isoFs.ReadByte();
+        var nameLen = (byte)isoFs.ReadByte();
+        var nameBytes = new byte[nameLen];
         if (nameLen > 0)
         {
-            int read = 0;
+            var read = 0;
             while (read < nameLen)
             {
-                int n = isoFs.Read(nameBytes, read, nameLen - read);
+                var n = isoFs.Read(nameBytes, read, nameLen - read);
                 if (n == 0) return;
                 read += n;
             }
         }
 
-        string name = Encoding.ASCII.GetString(nameBytes);
-        bool isDir = (attrs & 0x10) != 0;
-        long entryOffset = (long)entrySector * Constants.SectorSize;
+        var name = Encoding.ASCII.GetString(nameBytes);
+        var isDir = (attrs & 0x10) != 0;
+        var entryOffset = (long)entrySector * Constants.SectorSize;
 
         if (left != 0 && left != 0xFFFF)
             ParseNode(isoFs, isoOffset, dirOffset, dirSize, (long)left * 4, parent, names, lookup);
 
-        int nameIdx = GetOrAddName(names, lookup, name);
+        var nameIdx = GetOrAddName(names, lookup, name);
         var node = new PathNode { IsFile = !isDir, NameIndex = nameIdx };
         if (isDir)
         {
@@ -273,11 +276,11 @@ public static class XisoZarchive
         out List<(ulong BaseOffset, ushort[] Sizes)> offsetRecords, CancellationToken ct)
     {
         offsetRecords = [];
-        ushort[] sizes = new ushort[BlocksPerRecord];
-        int count = 0;
+        var sizes = new ushort[BlocksPerRecord];
+        var count = 0;
         ulong recordBase = 0;
-        byte[] buf = new byte[BlockSize];
-        int bufPos = 0;
+        var buf = new byte[BlockSize];
+        var bufPos = 0;
         ulong inputOffset = 0;
 
         var stack = new Stack<(PathNode node, int idx)>();
@@ -285,7 +288,7 @@ public static class XisoZarchive
         while (stack.Count > 0)
         {
             ct.ThrowIfCancellationRequested();
-            (PathNode dir, int i) = stack.Pop();
+            (PathNode dir, var i) = stack.Pop();
             while (i < dir.Subnodes.Count)
             {
                 var child = dir.Subnodes[i++];
@@ -299,11 +302,11 @@ public static class XisoZarchive
 
                 child.FileOffset = inputOffset;
                 isoFs.Seek(xisoOffset + child.SourceOffset, SeekOrigin.Begin);
-                long remaining = (long)child.FileSize;
+                var remaining = (long)child.FileSize;
                 while (remaining > 0)
                 {
-                    int toRead = (int)Math.Min(BlockSize - bufPos, remaining);
-                    int n = isoFs.Read(buf, bufPos, toRead);
+                    var toRead = (int)Math.Min(BlockSize - bufPos, remaining);
+                    var n = isoFs.Read(buf, bufPos, toRead);
                     if (n == 0) return false;
                     bufPos += n;
                     remaining -= n;
@@ -348,10 +351,10 @@ public static class XisoZarchive
 
     private static void WriteOffsetRecords(HashingStream hs, List<(ulong BaseOffset, ushort[] Sizes)> records)
     {
-        foreach ((ulong baseOff, ushort[] sizes) in records)
+        foreach ((var baseOff, var sizes) in records)
         {
             hs.Write(baseOff);
-            foreach (ushort s in sizes) hs.Write(s);
+            foreach (var s in sizes) hs.Write(s);
         }
     }
 
@@ -359,11 +362,11 @@ public static class XisoZarchive
     {
         offsets = new uint[names.Count];
         uint pos = 0;
-        for (int i = 0; i < names.Count; i++)
+        for (var i = 0; i < names.Count; i++)
         {
             offsets[i] = pos;
-            byte[] nameBytes = Encoding.UTF8.GetBytes(names[i]);
-            int len = nameBytes.Length;
+            var nameBytes = Encoding.UTF8.GetBytes(names[i]);
+            var len = nameBytes.Length;
             if (len >= 0x80)
             {
                 byte[] hdr = [(byte)((len & 0x7F) | 0x80), (byte)(len >> 7)];
@@ -373,7 +376,7 @@ public static class XisoZarchive
             else
             {
                 hs.Write([(byte)(len & 0x7F)], 0, 1);
-                pos += 1;
+                pos++;
             }
 
             hs.Write(nameBytes, 0, nameBytes.Length);
@@ -421,8 +424,8 @@ public static class XisoZarchive
     private static void WriteFooter(FileStream zarFs, HashingStream hs, ulong compressedDataSize,
         ulong offsetRecordsStart, ulong nameTableStart, ulong fileTreeStart)
     {
-        ulong end = (ulong)hs.Position;
-        ulong totalSize = end + 144;
+        var end = (ulong)hs.Position;
+        var totalSize = end + 144;
         using var ms = new MemoryStream(144);
         using var bw = new BinaryWriter(ms);
         WriteBe(bw, 0UL);
@@ -441,8 +444,8 @@ public static class XisoZarchive
         WriteBe(bw, totalSize);
         bw.Write(Version1);
         bw.Write(Magic);
-        byte[] footer = ms.ToArray();
-        byte[] hash = hs.FinalizeHash(footer);
+        var footer = ms.ToArray();
+        var hash = hs.FinalizeHash(footer);
         Array.Copy(hash, 0, footer, 96, 32);
         zarFs.Write(footer, 0, footer.Length);
     }

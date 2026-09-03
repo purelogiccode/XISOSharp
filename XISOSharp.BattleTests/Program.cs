@@ -54,8 +54,11 @@ internal static class Program
                 var rec = Directory.GetFiles(dir, "*.iso", SearchOption.AllDirectories);
                 // dedup already added
                 foreach (var f in rec)
+                {
                     if (!isoFiles.Contains(f, StringComparer.OrdinalIgnoreCase))
                         isoFiles.Add(f);
+                }
+
                 Console.WriteLine($"Recursive total {rec.Length} iso");
             }
         }
@@ -75,7 +78,10 @@ internal static class Program
             {
                 // Also try relative TestData/source.iso generation on-the-fly?
                 var testDataIso = Path.Combine(Directory.GetCurrentDirectory(), "TestData", "output", "source.iso");
-                if (File.Exists(testDataIso)) isoFiles.Add(testDataIso);
+                if (File.Exists(testDataIso))
+                {
+                    isoFiles.Add(testDataIso);
+                }
                 else
                 {
                     // Create a tiny synthetic ISO from a temp dir if nothing else
@@ -89,16 +95,28 @@ internal static class Program
                     {
                         var q = Logger.Quiet;
                         Logger.Quiet = true;
-                        try { XisoWriter.PackFromDirectory(tmpDir, synthIso); }
-                        finally { Logger.Quiet = q; }
+                        try
+                        {
+                            XisoWriter.PackFromDirectory(tmpDir, synthIso);
+                        }
+                        finally
+                        {
+                            Logger.Quiet = q;
+                        }
 
                         Console.WriteLine($"No ISOs found → created synthetic {synthIso}");
                         isoFiles.Add(synthIso);
                     }
-                    catch (Exception ex) { Console.WriteLine($"Failed to create synthetic ISO: {ex.Message}"); }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Failed to create synthetic ISO: {ex.Message}");
+                    }
                     finally
                     {
-                        try { Directory.Delete(tmpDir, true); }
+                        try
+                        {
+                            Directory.Delete(tmpDir, true);
+                        }
                         catch
                         {
                             // ignored
@@ -123,7 +141,7 @@ internal static class Program
         Console.WriteLine($"Native exe: {exePath} {(File.Exists(exePath) ? "(found)" : "(NOT FOUND)")}");
 
         // Limit for performance if many files (H:\ has 37) — allow --all to force all, otherwise sample first 10 or use --limit
-        int limit = ParseLimit(args);
+        var limit = ParseLimit(args);
         if (limit > 0 && isoFiles.Count > limit)
         {
             Console.WriteLine($"Limiting to first {limit} files (use --all or --limit N to change).");
@@ -143,10 +161,14 @@ internal static class Program
     private static string FindExe(string[] args)
     {
         // --exe <path> takes precedence
-        for (int i = 0; i < args.Length - 1; i++)
+        for (var i = 0; i < args.Length - 1; i++)
+        {
             if (string.Equals(args[i], "--exe", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(args[i], "--native", StringComparison.OrdinalIgnoreCase))
+            {
                 return args[i + 1];
+            }
+        }
 
         // Check H:\ style default + project local
         var candidates = new[]
@@ -157,8 +179,11 @@ internal static class Program
             Path.Combine(Directory.GetCurrentDirectory(), "extract-xiso.exe"),
         };
         foreach (var c in candidates)
+        {
             if (File.Exists(c))
                 return c;
+        }
+
         return candidates[0];
     }
 
@@ -166,7 +191,7 @@ internal static class Program
     {
         var list = new List<string>();
         // --dirs H:\XBOXTest,H:\XBOX360Test or --dirs <a> --dirs <b>
-        for (int i = 0; i < args.Length; i++)
+        for (var i = 0; i < args.Length; i++)
         {
             if (string.Equals(args[i], "--dirs", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
@@ -187,8 +212,11 @@ internal static class Program
             // Default H:\ drives if present, else no dirs (will use fallback)
             var defaults = new[] { @"H:\XBOXTest", @"H:\XBOX360Test" };
             foreach (var d in defaults)
+            {
                 if (Directory.Exists(d))
                     list.Add(d);
+            }
+
             // Also include TestData dir if no H:
             if (list.Count == 0)
             {
@@ -203,22 +231,35 @@ internal static class Program
     private static string[] ParseCreateDirs(string[] args)
     {
         var list = new List<string>();
-        for (int i = 0; i < args.Length - 1; i++)
+        for (var i = 0; i < args.Length - 1; i++)
+        {
             if (string.Equals(args[i], "--create-dirs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(args[i], "--create", StringComparison.OrdinalIgnoreCase))
+            {
                 list.AddRange(args[i + 1].Split(',',
                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            }
+        }
+
         // Also supports --create-dirs=<a,b>
         foreach (var a in args)
+        {
             if (a.StartsWith("--create-dirs=", StringComparison.Ordinal))
+            {
                 list.AddRange(a.Substring("--create-dirs=".Length).Split(',',
                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            }
+        }
+
         // If not specified but we have a temp synth dir, we can test create via H:\XBOXTest extracted trees?
         // For now, also test create from TestData/source if no explicit create dirs
         if (list.Count == 0)
         {
             var src = Path.Combine(Directory.GetCurrentDirectory(), "TestData", "source");
-            if (Directory.Exists(src)) list.Add(src);
+            if (Directory.Exists(src))
+            {
+                list.Add(src);
+            }
             else
             {
                 var alt = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData",
@@ -244,7 +285,7 @@ internal static class Program
             "--create",
             "--limit"
         };
-        for (int i = 0; i < args.Length; i++)
+        for (var i = 0; i < args.Length; i++)
         {
             if (skipNext)
             {
@@ -261,7 +302,11 @@ internal static class Program
 
             if (a.StartsWith("--dirs=", StringComparison.Ordinal) ||
                 a.StartsWith("--create-dirs=", StringComparison.Ordinal) ||
-                a.StartsWith("--limit=", StringComparison.Ordinal)) continue;
+                a.StartsWith("--limit=", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             if (a is "--recursive" or "--all" or "-h" or "--help") continue;
             if (a.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) && File.Exists(a))
                 isos.Add(Path.GetFullPath(a));
@@ -275,15 +320,25 @@ internal static class Program
     private static int ParseLimit(string[] args)
     {
         if (args.Contains("--all")) return 0;
-        for (int i = 0; i < args.Length - 1; i++)
+        for (var i = 0; i < args.Length - 1; i++)
+        {
             if (string.Equals(args[i], "--limit", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1],
                     System.Globalization.CultureInfo.InvariantCulture, out var n))
+            {
                 return n;
+            }
+        }
+
         foreach (var a in args)
+        {
             if (a.StartsWith("--limit=", StringComparison.Ordinal) &&
-                int.TryParse(a.Substring("--limit=".Length), System.Globalization.CultureInfo.InvariantCulture,
+                int.TryParse(a.AsSpan("--limit=".Length), System.Globalization.CultureInfo.InvariantCulture,
                     out var n))
+            {
                 return n;
+            }
+        }
+
         // Default limit 20 to keep battle fast on H:\ (37 files, each 7GB → too slow)
         return 5; // default to 5 ISOs + create battle; user can --limit 0 or --all for all
     }

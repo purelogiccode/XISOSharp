@@ -63,9 +63,9 @@ public static class Constants
         if (header.Length < FilenameOffset)
             return false;
 
-        bool allFf = true;
-        bool allZero = true;
-        for (int i = 0; i < FilenameOffset; i++)
+        var allFf = true;
+        var allZero = true;
+        for (var i = 0; i < FilenameOffset; i++)
         {
             if (header[i] != 0xFF) allFf = false;
             if (header[i] != 0x00) allZero = false;
@@ -223,6 +223,6 @@ public static class Constants
     /// <returns>Number of 2048-byte sectors required.</returns>
     public static uint NumSectors(uint size)
     {
-        return size / SectorSize + (size % SectorSize != 0 ? 1u : 0u);
+        return (size / SectorSize) + (size % SectorSize != 0 ? 1u : 0u);
     }
 }

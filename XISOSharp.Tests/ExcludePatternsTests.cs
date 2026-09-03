@@ -328,7 +328,7 @@ public class ExcludePatternsTests : IDisposable
         var src = CreateSourceTree();
         var outputDir = CreateTempDir();
 
-        (int result, string? isoPath) = await XisoWriter.CreateXisoAsync(
+        (var result, var isoPath) = await XisoWriter.CreateXisoAsync(
             src, outputDir, null, null, null, null, excludePatterns: ["**/node_modules/**", "*.tmp"]);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);

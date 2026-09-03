@@ -144,7 +144,7 @@ public class SkipPrependSectorsTests : IDisposable
         var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         using var fs = File.OpenRead(isoPath);
-        (uint rootDirSector, uint rootDirSize, long discLseek) =
+        (var rootDirSector, var rootDirSize, var discLseek) =
             XisoReader.VerifyXiso(fs, "prepended.iso", PrependSectors);
 
         Assert.True(rootDirSector > 0);
@@ -339,7 +339,7 @@ public class SkipPrependSectorsTests : IDisposable
         Assert.NotNull(isoPath);
 
         using var fs = File.OpenRead(isoPath);
-        (uint rootDirSector, uint rootDirSize, long discLseek) = XisoReader.VerifyXiso(fs, "normal.iso");
+        (var rootDirSector, var rootDirSize, var discLseek) = XisoReader.VerifyXiso(fs, "normal.iso");
         Assert.True(rootDirSector > 0);
         Assert.True(rootDirSize > 0);
         Assert.Equal(0, discLseek);
@@ -354,7 +354,7 @@ public class SkipPrependSectorsTests : IDisposable
         var isoPath = CreatePrependedIso(srcDir, outputDir);
 
         var extractDir = CreateTempDir();
-        (int result, _) = await XisoReader.DecodeXisoAsync(isoPath, extractDir, ExtractMode.Extract,
+        (var result, _) = await XisoReader.DecodeXisoAsync(isoPath, extractDir, ExtractMode.Extract,
             llCompat: false, skipSectors: PrependSectors);
 
         Assert.Equal(0, result);
@@ -368,7 +368,7 @@ public class SkipPrependSectorsTests : IDisposable
         PopulateSourceDir(srcDir);
         var outputDir = CreateTempDir();
 
-        (int result, string? isoPath) = await XisoWriter.CreateXisoAsync(
+        (var result, var isoPath) = await XisoWriter.CreateXisoAsync(
             srcDir, outputDir, null, null, null, null, prependSectors: PrependSectors);
 
         Assert.Equal(0, result);
@@ -376,7 +376,7 @@ public class SkipPrependSectorsTests : IDisposable
         Assert.True(File.Exists(isoPath));
 
         await using var fs = File.OpenRead(isoPath);
-        (_, _, long discLseek) = XisoReader.VerifyXiso(fs, "async.iso", PrependSectors);
+        (_, _, var discLseek) = XisoReader.VerifyXiso(fs, "async.iso", PrependSectors);
         Assert.Equal((long)PrependSectors * Constants.SectorSize, discLseek);
     }
 }

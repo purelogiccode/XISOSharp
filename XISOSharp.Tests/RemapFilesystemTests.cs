@@ -64,7 +64,7 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void TryParse_ValidSimpleRule_Succeeds()
     {
-        bool ok = RemapRule.TryParse("src/**:dest/{1}", out var rule, out var error);
+        var ok = RemapRule.TryParse("src/**:dest/{1}", out var rule, out var error);
         Assert.True(ok);
         Assert.NotNull(rule);
         Assert.Null(error);
@@ -76,7 +76,7 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void TryParse_ValidSingleFileRule_Succeeds()
     {
-        bool ok = RemapRule.TryParse("*.txt:docs/{1}", out var rule, out _);
+        var ok = RemapRule.TryParse("*.txt:docs/{1}", out var rule, out _);
         Assert.True(ok);
         Assert.NotNull(rule);
         Assert.Equal("*.txt", rule.HostGlob);
@@ -86,7 +86,7 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void TryParse_ExclusionRule_SetsIsExclusion()
     {
-        bool ok = RemapRule.TryParse("!skip/**", out var rule, out var error);
+        var ok = RemapRule.TryParse("!skip/**", out var rule, out var error);
         Assert.True(ok);
         Assert.NotNull(rule);
         Assert.True(rule.IsExclusion);
@@ -99,7 +99,7 @@ public class RemapFilesystemTests : IDisposable
     public void TryParse_ExclusionWithImagePath_Succeeds()
     {
         // Exclusion may still have image part but it is ignored; host is !pattern
-        bool ok = RemapRule.TryParse("!skip/**:ignored", out var rule, out _);
+        var ok = RemapRule.TryParse("!skip/**:ignored", out var rule, out _);
         Assert.True(ok);
         Assert.NotNull(rule);
         Assert.True(rule.IsExclusion);
@@ -108,7 +108,7 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void TryParse_EmptyRaw_Fails()
     {
-        bool ok = RemapRule.TryParse("", out var rule, out var error);
+        var ok = RemapRule.TryParse("", out var rule, out var error);
         Assert.False(ok);
         Assert.Null(rule);
         Assert.NotNull(error);
@@ -122,7 +122,7 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void TryParse_MissingImagePath_ForNonExclusion_Fails()
     {
-        bool ok = RemapRule.TryParse("src/**", out var rule, out var error);
+        var ok = RemapRule.TryParse("src/**", out var rule, out var error);
         Assert.False(ok);
         Assert.Null(rule);
         Assert.NotNull(error);
@@ -132,7 +132,7 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void TryParse_EmptyHost_Fails()
     {
-        bool ok = RemapRule.TryParse(":dest", out var rule, out var error);
+        var ok = RemapRule.TryParse(":dest", out var rule, out var error);
         Assert.False(ok);
         Assert.Null(rule);
         Assert.NotNull(error);
@@ -144,7 +144,7 @@ public class RemapFilesystemTests : IDisposable
         Assert.False(RemapRule.TryParse("! :dest", out _, out var error));
         Assert.NotNull(error);
         // Try another: "!"
-        bool ok2 = RemapRule.TryParse("!", out _, out var err2);
+        var ok2 = RemapRule.TryParse("!", out _, out var err2);
         Assert.False(ok2);
         Assert.NotNull(err2);
     }
@@ -152,7 +152,7 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void TryParse_InvalidHostGlob_EmbeddedDoubleStar_Fails()
     {
-        bool ok = RemapRule.TryParse("a**/b:dest", out var rule, out var error);
+        var ok = RemapRule.TryParse("a**/b:dest", out var rule, out var error);
         Assert.False(ok);
         Assert.Null(rule);
         Assert.NotNull(error);
@@ -162,7 +162,7 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void TryParse_InvalidRewrite_NonDigitInBraces_Fails()
     {
-        bool ok = RemapRule.TryParse("src/**:dest/{a}", out var rule, out var error);
+        var ok = RemapRule.TryParse("src/**:dest/{a}", out var rule, out var error);
         Assert.False(ok);
         Assert.Null(rule);
         Assert.NotNull(error);
@@ -172,7 +172,7 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void TryParse_InvalidRewrite_NestedBrace_Fails()
     {
-        bool ok = RemapRule.TryParse("src/**:dest/{{1}", out var rule, out var error);
+        var ok = RemapRule.TryParse("src/**:dest/{{1}", out var rule, out var error);
         Assert.False(ok);
         Assert.Null(rule);
         Assert.NotNull(error);
@@ -181,7 +181,7 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void TryParse_InvalidRewrite_UnclosedBrace_Fails()
     {
-        bool ok = RemapRule.TryParse("src/**:dest/{1", out var rule, out var error);
+        var ok = RemapRule.TryParse("src/**:dest/{1", out var rule, out var error);
         Assert.False(ok);
         Assert.Null(rule);
         Assert.NotNull(error);
@@ -194,17 +194,17 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void ParseSpecText_WithMetadataAndRules_ParsesCorrectly()
     {
-        string toml = """
-                      [metadata]
-                      output = "out.iso"
+        const string toml = """
+                            [metadata]
+                            output = "out.iso"
 
-                      [map_rules]
-                      "src/**" = "dest/{1}"
-                      "!skip/**" = ""
-                      "*.txt" = "docs/{0}"
-                      """;
+                            [map_rules]
+                            "src/**" = "dest/{1}"
+                            "!skip/**" = ""
+                            "*.txt" = "docs/{0}"
+                            """;
 
-        (string? output, List<RemapRule> rules) = RemapFilesystem.ParseSpecText(toml);
+        (var output, var rules) = RemapFilesystem.ParseSpecText(toml);
         Assert.Equal("out.iso", output);
         Assert.Equal(3, rules.Count);
         Assert.Equal("src/**", rules[0].HostGlob);
@@ -218,18 +218,18 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void ParseSpecText_IgnoresCommentsAndEmptyLines()
     {
-        string toml = """
-                      # comment
-                      [metadata]
-                      # another
-                      output = "a.iso"
+        const string toml = """
+                            # comment
+                            [metadata]
+                            # another
+                            output = "a.iso"
 
-                      [map_rules]
-                      ; semicolon comment
-                      "a/**" = "b/{1}"
+                            [map_rules]
+                            ; semicolon comment
+                            "a/**" = "b/{1}"
 
-                      """;
-        (string? output, List<RemapRule> rules) = RemapFilesystem.ParseSpecText(toml);
+                            """;
+        (var output, var rules) = RemapFilesystem.ParseSpecText(toml);
         Assert.Equal("a.iso", output);
         Assert.Single(rules);
     }
@@ -237,17 +237,17 @@ public class RemapFilesystemTests : IDisposable
     [Fact]
     public void ParseSpecFile_ReadsFromFile()
     {
-        string toml = """
-                      [metadata]
-                      output = "fromfile.iso"
-                      [map_rules]
-                      "**" = "{0}"
-                      """;
+        const string toml = """
+                            [metadata]
+                            output = "fromfile.iso"
+                            [map_rules]
+                            "**" = "{0}"
+                            """;
         var tmp = Path.Combine(Path.GetTempPath(), $"xiso_spec_{Guid.NewGuid():N}.toml");
         File.WriteAllText(tmp, toml, Encoding.UTF8);
         _tempFiles.Add(tmp);
 
-        (string? output, List<RemapRule> rules) = RemapFilesystem.ParseSpecFile(tmp);
+        (var output, var rules) = RemapFilesystem.ParseSpecFile(tmp);
         Assert.Equal("fromfile.iso", output);
         Assert.Single(rules);
         Assert.Equal("**", rules[0].HostGlob);
@@ -268,12 +268,12 @@ public class RemapFilesystemTests : IDisposable
             new() { HostGlob = "src/**", ImagePath = "dest/{1}", IsExclusion = false },
             new() { HostGlob = "skip/**", ImagePath = "", IsExclusion = true },
         };
-        string toml = RemapFilesystem.GenerateSpecText(rules, "out.iso");
+        var toml = RemapFilesystem.GenerateSpecText(rules, "out.iso");
         Assert.Contains("output = \"out.iso\"", toml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("src/**", toml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("!skip/**", toml, StringComparison.OrdinalIgnoreCase);
 
-        (string? output, List<RemapRule> parsed) = RemapFilesystem.ParseSpecText(toml);
+        (var output, var parsed) = RemapFilesystem.ParseSpecText(toml);
         Assert.Equal("out.iso", output);
         Assert.Equal(2, parsed.Count);
         Assert.Equal(rules[0].HostGlob, parsed[0].HostGlob);
@@ -286,7 +286,7 @@ public class RemapFilesystemTests : IDisposable
     public void GenerateSpecText_WithoutOutput_OmitsMetadata()
     {
         var rules = new List<RemapRule> { new() { HostGlob = "**", ImagePath = "{0}" } };
-        string toml = RemapFilesystem.GenerateSpecText(rules, null);
+        var toml = RemapFilesystem.GenerateSpecText(rules, null);
         Assert.DoesNotContain("[metadata]", toml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("[map_rules]", toml, StringComparison.OrdinalIgnoreCase);
     }
@@ -444,13 +444,13 @@ public class RemapFilesystemTests : IDisposable
         var outDir = CreateTempDir();
         var isoPath = Path.Combine(outDir, "remap.iso");
 
-        int res = RemapFilesystem.BuildImage(src, isoPath, new List<RemapRule> { rule! });
+        var res = RemapFilesystem.BuildImage(src, isoPath, new List<RemapRule> { rule! });
         Assert.Equal(0, res);
         Assert.True(File.Exists(isoPath));
 
         // Extract and verify structure
         var extract = CreateTempDir();
-        int ext = XisoReader.Extract(isoPath, extract, false);
+        var ext = XisoReader.Extract(isoPath, extract, false);
         Assert.Equal(0, ext);
         Assert.True(File.Exists(Path.Combine(extract, "new", "a.txt")));
         Assert.True(File.Exists(Path.Combine(extract, "new", "sub", "b.txt")));
@@ -473,7 +473,7 @@ public class RemapFilesystemTests : IDisposable
         var outDir = CreateTempDir();
         var isoPath = Path.Combine(outDir, "remap_excl.iso");
 
-        int res = RemapFilesystem.BuildImage(src, isoPath, new List<RemapRule> { all!, excl! });
+        var res = RemapFilesystem.BuildImage(src, isoPath, new List<RemapRule> { all!, excl! });
         Assert.Equal(0, res);
         var extract = CreateTempDir();
         XisoReader.Extract(isoPath, extract, false);
@@ -490,7 +490,7 @@ public class RemapFilesystemTests : IDisposable
         CreateFile(src, "a.txt", "a");
         var outDir = CreateTempDir();
         var isoPath = Path.Combine(outDir, "no_rules.iso");
-        int res = RemapFilesystem.BuildImage(src, isoPath, new List<RemapRule>());
+        var res = RemapFilesystem.BuildImage(src, isoPath, new List<RemapRule>());
         Assert.Equal(1, res);
     }
 
@@ -501,7 +501,7 @@ public class RemapFilesystemTests : IDisposable
         var outDir = CreateTempDir();
         var isoPath = Path.Combine(outDir, "missing.iso");
         Assert.True(RemapRule.TryParse("**:{0}", out var r, out _));
-        int res = RemapFilesystem.BuildImage(missing, isoPath, new List<RemapRule> { r! });
+        var res = RemapFilesystem.BuildImage(missing, isoPath, new List<RemapRule> { r! });
         Assert.Equal(1, res);
     }
 }

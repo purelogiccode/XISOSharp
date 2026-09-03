@@ -9,15 +9,21 @@ namespace XISOSharp;
 public class XisoFormatException : IOException
 {
     /// <summary>Creates a new <see cref="XisoFormatException"/>.</summary>
-    public XisoFormatException() { }
+    public XisoFormatException()
+    {
+    }
 
     /// <summary>Creates a new <see cref="XisoFormatException"/> with a message.</summary>
     /// <param name="message">Description of the format error.</param>
-    public XisoFormatException(string message) : base(message) { }
+    public XisoFormatException(string message) : base(message)
+    {
+    }
 
     /// <summary>Creates a new <see cref="XisoFormatException"/> with a message and inner exception.</summary>
     /// <param name="message">Description of the format error.</param>
     /// <param name="innerException">The underlying cause.</param>
-    public XisoFormatException(string message, Exception innerException) : base(message, innerException) { }
+    public XisoFormatException(string message, Exception innerException) : base(message, innerException)
+    {
+    }
 }
 #pragma warning restore RCS1194

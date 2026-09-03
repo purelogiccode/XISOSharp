@@ -42,7 +42,10 @@ public class XisoReaderTests : IDisposable
 
         if (!string.IsNullOrEmpty(_tempDir) && Directory.Exists(_tempDir))
         {
-            try { Directory.Delete(_tempDir, true); }
+            try
+            {
+                Directory.Delete(_tempDir, true);
+            }
             catch
             {
                 /* cleanup best-effort */
@@ -59,7 +62,7 @@ public class XisoReaderTests : IDisposable
         using var fs = new FileStream(TestIsoPath,
             new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
 
-        (uint rootDirSector, uint rootDirSize, long discLseek) = XisoReader.VerifyXiso(fs, "source.iso");
+        (var rootDirSector, var rootDirSize, var discLseek) = XisoReader.VerifyXiso(fs, "source.iso");
 
         Assert.True(rootDirSector > 0);
         Assert.True(rootDirSize > 0);
@@ -187,10 +190,7 @@ public class XisoReaderTests : IDisposable
             new Random(42).NextBytes(data);
             File.WriteAllBytes(invalidPath, data);
 
-            Assert.Throws<IOException>(() =>
-            {
-                XisoReader.DecodeXiso(invalidPath, null, ExtractMode.List, out _, true);
-            });
+            Assert.Throws<IOException>(() => XisoReader.DecodeXiso(invalidPath, null, ExtractMode.List, out _, true));
         }
         finally
         {
@@ -205,10 +205,7 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void DecodeXiso_SmallFile_Throws()
     {
-        Assert.Throws<IOException>(() =>
-        {
-            XisoReader.DecodeXiso(InvalidFilePath, null, ExtractMode.List, out _, true);
-        });
+        Assert.Throws<IOException>(() => XisoReader.DecodeXiso(InvalidFilePath, null, ExtractMode.List, out _, true));
     }
 
     /// <summary>
@@ -218,9 +215,7 @@ public class XisoReaderTests : IDisposable
     public void DecodeXiso_NonExistentFile_Throws()
     {
         Assert.Throws<FileNotFoundException>(() =>
-        {
-            XisoReader.DecodeXiso(NonExistentPath, null, ExtractMode.List, out _, true);
-        });
+            XisoReader.DecodeXiso(NonExistentPath, null, ExtractMode.List, out _, true));
     }
 
     /// <summary>

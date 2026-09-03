@@ -24,7 +24,10 @@ public class XisoRangesTests : IDisposable
 
             if (File.Exists(dir))
             {
-                try { File.Delete(dir); }
+                try
+                {
+                    File.Delete(dir);
+                }
                 catch
                 {
                     // ignored
@@ -77,11 +80,11 @@ public class XisoRangesTests : IDisposable
         var src = CreateSourceDir(PopulateSimple);
         var iso = CreateIso(src);
 
-        (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> _) = XisoRanges.GetXisoRanges(iso);
+        (var sys, _) = XisoRanges.GetXisoRanges(iso);
 
         Assert.NotEmpty(sys);
         // Sys ranges should be sorted and non-overlapping
-        for (int i = 1; i < sys.Count; i++)
+        for (var i = 1; i < sys.Count; i++)
         {
             Assert.True(sys[i].Start > sys[i - 1].End,
                 $"Sys ranges should be sorted and non-overlapping: {sys[i - 1]} then {sys[i]}");
@@ -99,7 +102,7 @@ public class XisoRangesTests : IDisposable
         var src = CreateSourceDir(PopulateSimple);
         var iso = CreateIso(src);
 
-        (List<(uint Start, uint End)> _, List<(uint Start, uint End)> files) = XisoRanges.GetXisoRanges(iso);
+        (_, var files) = XisoRanges.GetXisoRanges(iso);
 
         Assert.NotEmpty(files);
         Assert.All(files, r => Assert.True(r.End >= r.Start));
@@ -111,7 +114,7 @@ public class XisoRangesTests : IDisposable
         var src = CreateSourceDir(_ => { });
         var iso = CreateIso(src);
 
-        (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> files) = XisoRanges.GetXisoRanges(iso);
+        (var sys, var files) = XisoRanges.GetXisoRanges(iso);
 
         Assert.NotEmpty(sys);
         // Empty source yields no file extents (or at most zero)
@@ -124,10 +127,10 @@ public class XisoRangesTests : IDisposable
         var src = CreateSourceDir(PopulateSimple);
         var iso = CreateIso(src);
 
-        (List<(uint Start, uint End)> sysPath, List<(uint Start, uint End)> filesPath) = XisoRanges.GetXisoRanges(iso);
+        (var sysPath, var filesPath) = XisoRanges.GetXisoRanges(iso);
 
         using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        (List<(uint Start, uint End)> sysStream, List<(uint Start, uint End)> filesStream) =
+        (var sysStream, var filesStream) =
             XisoRanges.GetXisoRanges(fs, 0, true);
 
         Assert.Equal(sysPath, sysStream);
@@ -141,11 +144,11 @@ public class XisoRangesTests : IDisposable
         var normalIso = CreateIso(src);
         var prependedIso = CreateIso(src, prependSectors: 64);
 
-        (List<(uint Start, uint End)> _, List<(uint Start, uint End)> filesNormal) =
+        (_, var filesNormal) =
             XisoRanges.GetXisoRanges(normalIso);
         // For prepended, we must pass the byte offset of the XISO partition
-        long offset = 64L * Constants.SectorSize;
-        (List<(uint Start, uint End)> sysPrepend, List<(uint Start, uint End)> filesPrepend) =
+        const long offset = 64L * Constants.SectorSize;
+        (var sysPrepend, var filesPrepend) =
             XisoRanges.GetXisoRanges(prependedIso, offset, true);
 
         // The logical file ranges relative to partition should match; but sys ranges are offset-dependent.
@@ -250,7 +253,7 @@ public class XisoRangesTests : IDisposable
 
         Assert.Equal(3, entries.Count);
         // Sorted by offset ascending
-        for (int i = 1; i < entries.Count; i++)
+        for (var i = 1; i < entries.Count; i++)
         {
             Assert.True(entries[i].Offset >= entries[i - 1].Offset,
                 $"Entries not sorted by offset: {entries[i - 1].Offset} > {entries[i].Offset}");
@@ -299,8 +302,8 @@ public class XisoRangesTests : IDisposable
         Assert.Contains(entries, e => string.Equals(e.Path, "a/b/level2.txt", StringComparison.Ordinal) && e.Size == 2);
         Assert.Contains(entries, e => string.Equals(e.Path, "a/b/c/deep.txt", StringComparison.Ordinal) && e.Size == 4);
         // Ensure sorted
-        var offsets = entries.Select(e => e.Offset).ToList();
-        Assert.Equal(offsets.OrderBy(x => x).ToList(), offsets);
+        var offsets = entries.ConvertAll(e => e.Offset);
+        Assert.Equal(offsets.Order().ToList(), offsets);
     }
 
     [Fact]
@@ -316,18 +319,18 @@ public class XisoRangesTests : IDisposable
         using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
 
         // Read header to get rootOffset/rootSize like GetXisoRanges does
-        long headerOffset = Constants.HeaderOffset;
+        const long headerOffset = Constants.HeaderOffset;
         fs.Seek(headerOffset + 20, SeekOrigin.Begin);
         Span<byte> buf = stackalloc byte[4];
         fs.ReadExactly(buf);
-        uint rootOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(buf);
+        var rootOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(buf);
         fs.ReadExactly(buf);
-        uint rootSize = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(buf);
+        var rootSize = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(buf);
 
         var sysSectors = new List<uint>();
         var fileSectors = new List<uint>();
-        long isoOffset = 0;
-        long headerOffsetSector = headerOffset / Constants.SectorSize;
+        const long isoOffset = 0;
+        const long headerOffsetSector = headerOffset / Constants.SectorSize;
         sysSectors.Add((uint)headerOffsetSector);
         // Call GetValidSectors directly
         XisoRanges.GetValidSectors(fs, isoOffset, sysSectors, fileSectors, rootOffset * Constants.SectorSize, rootSize,

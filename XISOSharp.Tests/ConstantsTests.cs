@@ -28,7 +28,7 @@ public class ConstantsTests
         Assert.Equal(1u, Constants.NumSectors(1));
         Assert.Equal(1u, Constants.NumSectors(Constants.SectorSize - 1));
         Assert.Equal(2u, Constants.NumSectors(Constants.SectorSize + 1));
-        Assert.Equal(3u, Constants.NumSectors(Constants.SectorSize * 2 + 1));
+        Assert.Equal(3u, Constants.NumSectors((Constants.SectorSize * 2) + 1));
     }
 
     /// <summary>

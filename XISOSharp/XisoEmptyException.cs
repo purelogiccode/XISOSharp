@@ -8,11 +8,15 @@ namespace XISOSharp;
 public class XisoEmptyException : ExtractErrorException
 {
     /// <summary>Creates a new <see cref="XisoEmptyException"/>.</summary>
-    public XisoEmptyException() : base(ExtractError.ErrIsoNoFiles, "XISO image contains no files.") { }
+    public XisoEmptyException() : base(ExtractError.ErrIsoNoFiles, "XISO image contains no files.")
+    {
+    }
 
     /// <summary>Creates a new <see cref="XisoEmptyException"/> with a message.</summary>
     /// <param name="message">Description of the empty-ISO condition.</param>
-    public XisoEmptyException(string message) : base(ExtractError.ErrIsoNoFiles, message) { }
+    public XisoEmptyException(string message) : base(ExtractError.ErrIsoNoFiles, message)
+    {
+    }
 
     /// <summary>Creates a new <see cref="XisoEmptyException"/> with a message and inner exception.</summary>
     /// <param name="message">Description of the empty-ISO condition.</param>

@@ -31,8 +31,10 @@ public static class HashUtil
     public static bool IsAllZero(byte[] a)
     {
         foreach (var b in a)
+        {
             if (b != 0)
                 return false;
+        }
 
         return true;
     }

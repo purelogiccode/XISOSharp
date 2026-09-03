@@ -57,11 +57,11 @@ public class BoyerMoore
             _bcTable[_pattern[i]] = _patLen - i - 1;
         }
 
-        _gsTable = new int[2 * (_patLen + 1) + 2];
+        _gsTable = new int[(2 * (_patLen + 1)) + 2];
 
         for (i = 1; i <= _patLen; i++)
         {
-            _gsTable[i] = 2 * _patLen - i;
+            _gsTable[i] = (2 * _patLen) - i;
         }
 
         i = _patLen;
@@ -85,10 +85,12 @@ public class BoyerMoore
         }
 
         for (i = 1; i <= j; i++)
+        {
             if (_gsTable[i] > _patLen + j - i)
             {
                 _gsTable[i] = _patLen + j - i;
             }
+        }
 
         var k = _gsTable[_patLen + 1 + j];
 

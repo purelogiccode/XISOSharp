@@ -120,7 +120,7 @@ public class IntegrationTests : IDisposable
         Assert.NotNull(isoPath);
 
         using var fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        (uint rootDirSector, uint rootDirSize, _) = XisoReader.VerifyXiso(fs, "test.iso");
+        (var rootDirSector, var rootDirSize, _) = XisoReader.VerifyXiso(fs, "test.iso");
 
         Assert.True(rootDirSector > 0, "Root directory sector should be non-zero");
         Assert.True(rootDirSize > 0, "Root directory size should be non-zero");
@@ -179,7 +179,7 @@ public class IntegrationTests : IDisposable
     {
         var outputDir = CreateTempDir();
 
-        (int result, string? outPath) = await XisoWriter.CreateXisoAsync(
+        (var result, var outPath) = await XisoWriter.CreateXisoAsync(
             SourceDir, outputDir, null, null, null, null);
 
         Assert.Equal(0, result);
@@ -193,12 +193,12 @@ public class IntegrationTests : IDisposable
         var outputDir = CreateTempDir();
         var extractDir = CreateTempDir();
 
-        (int createResult, string? isoPath) = await XisoWriter.CreateXisoAsync(
+        (var createResult, var isoPath) = await XisoWriter.CreateXisoAsync(
             SourceDir, outputDir, null, null, null, null);
         Assert.Equal(0, createResult);
         Assert.NotNull(isoPath);
 
-        (int extractResult, _) = await XisoReader.DecodeXisoAsync(
+        (var extractResult, _) = await XisoReader.DecodeXisoAsync(
             isoPath, extractDir, ExtractMode.Extract);
         Assert.Equal(0, extractResult);
         Assert.True(File.Exists(Path.Combine(extractDir, "file1.txt")));
@@ -443,11 +443,11 @@ public class IntegrationTests : IDisposable
 
         var subdir = entries.First(static e => string.Equals(e.Name, "subdir", StringComparison.Ordinal));
         Assert.True(subdir.IsDirectory);
-        Assert.True((subdir.Attributes & Constants.AttributeDir) != 0);
+        Assert.NotEqual(0, subdir.Attributes & Constants.AttributeDir);
 
         var file = entries.First(static e => string.Equals(e.Name, "file1.txt", StringComparison.Ordinal));
         Assert.False(file.IsDirectory);
-        Assert.True((file.Attributes & Constants.AttributeArc) != 0);
+        Assert.NotEqual(0, file.Attributes & Constants.AttributeArc);
     }
 
     [Fact]

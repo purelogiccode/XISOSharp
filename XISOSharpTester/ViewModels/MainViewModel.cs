@@ -6,11 +6,8 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Input;
-
 using Microsoft.Win32;
-
 using Serilog;
-
 using XISOSharpTester.Models;
 using XISOSharpTester.Services;
 using XISOSharpTester.Views;
@@ -27,7 +24,7 @@ internal class MainViewModel : INotifyPropertyChanged
         AddFilesCommand = new RelayCommand(_ => AddFiles());
         AddFolderCommand = new RelayCommand(_ => AddFolder());
         RemoveFileCommand = new RelayCommand(RemoveFile);
-        RunTestsCommand = new RelayCommand(o => { _ = RunTestsAsync(); }, _ => CanRunTests);
+        RunTestsCommand = new RelayCommand(o => o = RunTestsAsync(), _ => CanRunTests);
         ExportPdfCommand = new RelayCommand(_ => ExportPdf(), _ => HasResults);
         CopyLogCommand = new RelayCommand(_ => CopyLog());
         CopyResultsCommand = new RelayCommand(_ => CopyResults(), _ => HasResults);

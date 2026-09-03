@@ -60,7 +60,7 @@ public static class XisoValidator
         }
 
         // Check for missing files (in source but not in output)
-        foreach ((string path, FileTreeEntry entry) in sourceDict)
+        foreach ((var path, FileTreeEntry entry) in sourceDict)
         {
             if (!outputDict.ContainsKey(path))
             {
@@ -75,7 +75,7 @@ public static class XisoValidator
         }
 
         // Check for extra files (in output but not in source)
-        foreach ((string path, FileTreeEntry entry) in outputDict)
+        foreach ((var path, FileTreeEntry entry) in outputDict)
         {
             if (!sourceDict.ContainsKey(path))
             {
@@ -90,7 +90,7 @@ public static class XisoValidator
         }
 
         // Check file sizes and optionally checksums for files present in both
-        foreach ((string path, FileTreeEntry srcEntry) in sourceDict)
+        foreach ((var path, FileTreeEntry srcEntry) in sourceDict)
         {
             if (!outputDict.TryGetValue(path, out var outEntry))
                 continue;
@@ -188,10 +188,14 @@ public static class XisoValidator
 
         // File count
         if (result.SourceFileCount == result.OutputFileCount)
+        {
             Logger.Log("[VALIDATE] File count: MATCH\n");
+        }
         else
+        {
             Logger.Log(
                 $"[VALIDATE] File count: MISMATCH — source: {result.SourceFileCount}, output: {result.OutputFileCount}\n");
+        }
 
         // File paths
         var pathIssues = result.Issues.Where(static i =>
@@ -211,10 +215,14 @@ public static class XisoValidator
         // Checksums
         var checksumIssues = result.Issues.Where(static i => i.Type == ValidationIssueType.ChecksumMismatch).ToList();
         if (checksumIssues.Count > 0)
+        {
             Logger.Log($"[VALIDATE] Checksums: FAIL — {checksumIssues.Count} checksum difference(s) (SHA-256)\n");
+        }
         else if (result.Issues.Any(static i => i.Type == ValidationIssueType.ChecksumMismatch) ||
                  result.SourceFileCount == 0)
+        {
             Logger.Log("[VALIDATE] Checksums: SKIPPED\n");
+        }
 
         // Detailed issues
         foreach (var issue in result.Issues)
@@ -299,8 +307,7 @@ public static class XisoValidator
 #pragma warning disable IL2026 // JSON serialization is acceptable for CLI tool output
 #pragma warning disable IL3050
         var json = JsonSerializer.Serialize(report, options);
-#pragma warning restore IL3050
-#pragma warning restore IL2026
+#pragma warning restore IL3050, IL2026
         File.WriteAllText(reportPath, json, Encoding.UTF8);
     }
 }

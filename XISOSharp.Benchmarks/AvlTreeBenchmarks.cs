@@ -1,5 +1,4 @@
 using BenchmarkDotNet.Attributes;
-
 using XISOSharp.DataStructures;
 
 namespace XISOSharp.Benchmarks;
@@ -64,7 +63,7 @@ public class AvlTreeBenchmarks
     }
 
     [Benchmark]
-    public void CompareKeys()
+    public static void CompareKeys()
     {
         for (var i = 0; i < 1000; i++)
         {

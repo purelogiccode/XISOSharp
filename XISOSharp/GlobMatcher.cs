@@ -138,7 +138,7 @@ public sealed class GlobMatcher
 
         // A trailing slash means "the directory and everything below it", unless the
         // pattern already ends with a '**' segment (e.g. "a/**/" behaves like "a/**").
-        string normalized = glob;
+        var normalized = glob;
         if (glob.EndsWith('/'))
         {
             var trimmed = glob.TrimEnd('/');

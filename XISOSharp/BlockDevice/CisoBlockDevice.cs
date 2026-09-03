@@ -36,8 +36,8 @@ public sealed class CisoBlockDevice : IBlockDevice
         Span<byte> hdr = stackalloc byte[24];
         csoFs.Seek(0, SeekOrigin.Begin);
         ReadExact(csoFs, hdr);
-        uint magic = BinaryPrimitives.ReadUInt32LittleEndian(hdr[..4]);
-        uint hsize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
+        var magic = BinaryPrimitives.ReadUInt32LittleEndian(hdr[..4]);
+        var hsize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
         Length = (long)BinaryPrimitives.ReadUInt64LittleEndian(hdr[8..16]);
         _blockSize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[16..20]);
         _version = hdr[20];
@@ -49,8 +49,8 @@ public sealed class CisoBlockDevice : IBlockDevice
             throw new InvalidDataException($"Unsupported CISO version {_version}");
         if (_blockSize != 2048) throw new InvalidDataException($"Unsupported CISO block size {_blockSize}");
 
-        long totalBlocks = (Length + _blockSize - 1) / _blockSize;
-        long indexLen = totalBlocks + 1;
+        var totalBlocks = (Length + _blockSize - 1) / _blockSize;
+        var indexLen = totalBlocks + 1;
         _index = new uint[indexLen];
         Span<byte> leBuf = stackalloc byte[4];
         for (long i = 0; i < indexLen; i++)
@@ -66,18 +66,18 @@ public sealed class CisoBlockDevice : IBlockDevice
     /// <inheritdoc/>
     public int Read(long offset, Span<byte> buffer)
     {
-        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
         if (offset >= Length) return 0;
-        long toRead = Math.Min(buffer.Length, Length - offset);
-        long sector = offset / _blockSize;
-        long sectorOff = offset % _blockSize;
-        int bufPos = 0;
-        int remaining = (int)toRead;
+        var toRead = Math.Min(buffer.Length, Length - offset);
+        var sector = offset / _blockSize;
+        var sectorOff = offset % _blockSize;
+        var bufPos = 0;
+        var remaining = (int)toRead;
 
         while (remaining > 0)
         {
-            byte[] sectorData = GetSector(sector);
-            int copy = (int)Math.Min(remaining, _blockSize - sectorOff);
+            var sectorData = GetSector(sector);
+            var copy = (int)Math.Min(remaining, _blockSize - sectorOff);
             sectorData.AsSpan((int)sectorOff, copy).CopyTo(buffer.Slice(bufPos, copy));
             bufPos += copy;
             remaining -= copy;
@@ -104,25 +104,25 @@ public sealed class CisoBlockDevice : IBlockDevice
     {
         if (_cachedSector == sector && _cachedData != null) return _cachedData;
 
-        uint rawEntry = _index[sector];
-        uint rawNext = _index[sector + 1];
-        bool isPlain = _version == CisoWriter.VersionDeflate
+        var rawEntry = _index[sector];
+        var rawNext = _index[sector + 1];
+        var isPlain = _version == CisoWriter.VersionDeflate
             ? (rawEntry & 0x80000000u) != 0
             : (rawEntry & 0x80000000u) == 0;
 
-        ulong off = (rawEntry & 0x7FFFFFFFu) * (ulong)(1u << _align);
-        ulong nextOff = (rawNext & 0x7FFFFFFFu) * (ulong)(1u << _align);
-        long dataLen = (long)(nextOff - off);
+        var off = (rawEntry & 0x7FFFFFFFu) * (ulong)(1u << _align);
+        var nextOff = (rawNext & 0x7FFFFFFFu) * (ulong)(1u << _align);
+        var dataLen = (long)(nextOff - off);
 
         byte[] data;
         if (isPlain)
         {
             data = new byte[_blockSize];
             _csoFs.Seek((long)off, SeekOrigin.Begin);
-            int n = 0;
+            var n = 0;
             while (n < _blockSize)
             {
-                int r = _csoFs.Read(data, n, (int)_blockSize - n);
+                var r = _csoFs.Read(data, n, (int)_blockSize - n);
                 if (r == 0) throw new EndOfStreamException($"Unexpected EOF at plain sector {sector}");
                 n += r;
             }
@@ -132,10 +132,10 @@ public sealed class CisoBlockDevice : IBlockDevice
             if (dataLen <= 0) throw new InvalidDataException($"Zero-length compressed sector {sector}");
             var compBuf = new byte[dataLen];
             _csoFs.Seek((long)off, SeekOrigin.Begin);
-            int n = 0;
+            var n = 0;
             while (n < dataLen)
             {
-                int r = _csoFs.Read(compBuf, n, (int)(dataLen - n));
+                var r = _csoFs.Read(compBuf, n, (int)(dataLen - n));
                 if (r == 0) throw new EndOfStreamException($"Unexpected EOF at compressed sector {sector}");
                 n += r;
             }
@@ -164,24 +164,26 @@ public sealed class CisoBlockDevice : IBlockDevice
 
     private static byte[] DecompressWithTrim(byte[] compBuf, byte align, byte version)
     {
-        int maxTrim = align == 0 ? 0 : (1 << align) - 1;
+        var maxTrim = align == 0 ? 0 : (1 << align) - 1;
         maxTrim = Math.Max(maxTrim, 3);
-        for (int trim = 0; trim <= maxTrim && trim <= compBuf.Length; trim++)
+        for (var trim = 0; trim <= maxTrim && trim <= compBuf.Length; trim++)
         {
-            int tryLen = compBuf.Length - trim;
+            var tryLen = compBuf.Length - trim;
             if (tryLen <= 0) continue;
-            bool tailZero = true;
-            for (int z = tryLen; z < compBuf.Length; z++)
+            var tailZero = true;
+            for (var z = tryLen; z < compBuf.Length; z++)
+            {
                 if (compBuf[z] != 0)
                 {
                     tailZero = false;
                     break;
                 }
+            }
 
             if (!tailZero && trim != 0) continue;
             try
             {
-                byte[] dec = version == CisoWriter.VersionDeflate
+                var dec = version == CisoWriter.VersionDeflate
                     ? CisoReaderDeflate(compBuf.AsSpan(0, tryLen))
                     : CisoReaderLz4(compBuf.AsSpan(0, tryLen));
                 if (dec.Length == 2048) return dec;
@@ -228,8 +230,8 @@ public sealed class CisoBlockDevice : IBlockDevice
         int srcPos = 0, dstPos = 0;
         while (srcPos < src.Length && dstPos < expectedSize)
         {
-            byte token = src[srcPos++];
-            int litLen = token >> 4;
+            var token = src[srcPos++];
+            var litLen = token >> 4;
             if (litLen == 15)
             {
                 byte len;
@@ -247,9 +249,9 @@ public sealed class CisoBlockDevice : IBlockDevice
             dstPos += litLen;
             if (dstPos >= expectedSize || srcPos >= src.Length) break;
             if (srcPos + 2 > src.Length) throw new InvalidDataException("LZ4 offset missing");
-            int offset = src[srcPos++] | (src[srcPos++] << 8);
+            var offset = src[srcPos++] | (src[srcPos++] << 8);
             if (offset == 0) throw new InvalidDataException("LZ4 offset zero");
-            int mLen = token & 0x0F;
+            var mLen = token & 0x0F;
             if (mLen == 15)
             {
                 byte len;
@@ -263,7 +265,7 @@ public sealed class CisoBlockDevice : IBlockDevice
 
             mLen += 4;
             if (mLen > expectedSize - dstPos) mLen = expectedSize - dstPos;
-            for (int i = 0; i < mLen; i++) dst[dstPos + i] = dst[dstPos - offset + i];
+            for (var i = 0; i < mLen; i++) dst[dstPos + i] = dst[dstPos - offset + i];
             dstPos += mLen;
         }
 
@@ -273,10 +275,10 @@ public sealed class CisoBlockDevice : IBlockDevice
 
     private static void ReadExact(FileStream fs, Span<byte> buf)
     {
-        int off = 0;
+        var off = 0;
         while (off < buf.Length)
         {
-            int n = fs.Read(buf[off..]);
+            var n = fs.Read(buf[off..]);
             if (n == 0) throw new EndOfStreamException();
             off += n;
         }

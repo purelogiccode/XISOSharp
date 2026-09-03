@@ -12,7 +12,7 @@ public class XisoExceptionTests
     public void XisoFormatException_IsIOException()
     {
         var ex = new XisoFormatException("bad format");
-        Assert.IsAssignableFrom<IOException>(ex);
+        Assert.IsType<IOException>(ex, exactMatch: false);
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public class XisoExceptionTests
     public void XisoEmptyException_IsExtractErrorException()
     {
         var ex = new XisoEmptyException();
-        Assert.IsAssignableFrom<ExtractErrorException>(ex);
+        Assert.IsType<ExtractErrorException>(ex, exactMatch: false);
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public class XisoExceptionTests
     public void XisoFileTooLargeException_IsIOException()
     {
         var ex = new XisoFileTooLargeException("big.bin", 5_000_000_000L);
-        Assert.IsAssignableFrom<IOException>(ex);
+        Assert.IsType<IOException>(ex, exactMatch: false);
     }
 
     [Fact]
@@ -212,7 +212,7 @@ public class XisoExceptionTests
 
         foreach (var ex in exceptions)
         {
-            Assert.IsAssignableFrom<Exception>(ex);
+            Assert.IsType<Exception>(ex, exactMatch: false);
             Assert.NotNull(ex.Message);
         }
     }

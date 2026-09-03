@@ -11,13 +11,13 @@ public static class XisoSkeleton
 
     private static bool WriteBytes(FileStream inFs, FileStream outFs, long offset, long length)
     {
-        byte[] buf = new byte[64 * SectorSize];
+        var buf = new byte[64 * SectorSize];
         long copied = 0;
         if (offset >= 0) inFs.Seek(offset, SeekOrigin.Begin);
         while (copied < length)
         {
-            int toRead = (int)Math.Min(buf.Length, length - copied);
-            int n = inFs.Read(buf, 0, toRead);
+            var toRead = (int)Math.Min(buf.Length, length - copied);
+            var n = inFs.Read(buf, 0, toRead);
             if (n == 0) break;
             outFs.Write(buf, 0, n);
             copied += n;
@@ -28,12 +28,12 @@ public static class XisoSkeleton
 
     private static void WriteZeroes(FileStream outFs, long offset, long length)
     {
-        byte[] buf = new byte[64 * SectorSize];
+        var buf = new byte[64 * SectorSize];
         long written = 0;
         if (offset >= 0) outFs.Seek(offset, SeekOrigin.Begin);
         while (written < length)
         {
-            int toWrite = (int)Math.Min(buf.Length, length - written);
+            var toWrite = (int)Math.Min(buf.Length, length - written);
             outFs.Write(buf, 0, toWrite);
             written += toWrite;
         }
@@ -53,15 +53,15 @@ public static class XisoSkeleton
     {
         ct.ThrowIfCancellationRequested();
 
-        string skel = skeletonPath ?? DeriveSkeletonPath(inputPath);
-        string hash = hashPath ?? DeriveHashPath(inputPath);
+        var skel = skeletonPath ?? DeriveSkeletonPath(inputPath);
+        var hash = hashPath ?? DeriveHashPath(inputPath);
 
         using var isoFs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        long isoLen = isoFs.Length;
-        long xisoLength = isoLen - isoOffset;
+        var isoLen = isoFs.Length;
+        var xisoLength = isoLen - isoOffset;
         if (xisoLength <= 0) return false;
 
-        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+        (var bones, var fileRanges) =
             XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
         var ranges = XisoRanges.MergeRanges(bones, fileRanges);
         var fileEntries = XisoRanges.GetFileEntries(isoFs, isoOffset);
@@ -76,17 +76,17 @@ public static class XisoSkeleton
         // Hash and skeleton in one pass similar to XDVDFS.ProcessXISO
         // For correctness, we first hash all files in offset-sorted order, then create skeleton by sector walking
         // Hashing phase: stream each file once.
-        foreach ((string path, long off, uint size) in fileEntries)
+        foreach ((var path, var off, var size) in fileEntries)
         {
             ct.ThrowIfCancellationRequested();
             using var sha1 = SHA1.Create();
-            byte[] hashBuf = new byte[64 * SectorSize];
+            var hashBuf = new byte[64 * SectorSize];
             long remaining = size;
             isoFs.Seek(off, SeekOrigin.Begin);
             while (remaining > 0)
             {
-                int toRead = (int)Math.Min(hashBuf.Length, remaining);
-                int n = isoFs.Read(hashBuf, 0, toRead);
+                var toRead = (int)Math.Min(hashBuf.Length, remaining);
+                var n = isoFs.Read(hashBuf, 0, toRead);
                 if (n == 0) break;
                 sha1.TransformBlock(hashBuf, 0, n, null, 0);
                 remaining -= n;
@@ -110,11 +110,11 @@ public static class XisoSkeleton
         while (numBytes < xisoLength)
         {
             ct.ThrowIfCancellationRequested();
-            long currentByte = isoOffset + numBytes;
-            long currentSector = (currentByte + SectorSize - 1) / SectorSize;
+            var currentByte = isoOffset + numBytes;
+            var currentSector = (currentByte + SectorSize - 1) / SectorSize;
             long bytesUntilEndOfExtent = 0;
             long bytesToWipe = 0;
-            bool isBone = false;
+            var isBone = false;
 
             if (ranges.Count > 0 && currentSector > ranges[^1].End)
             {
@@ -122,36 +122,40 @@ public static class XisoSkeleton
             }
             else
             {
-                for (int i = 0; i < ranges.Count; i++)
+                for (var i = 0; i < ranges.Count; i++)
                 {
                     if (currentSector >= ranges[i].Start && currentSector <= ranges[i].End)
                     {
-                        bytesUntilEndOfExtent = (ranges[i].End + 1) * SectorSize - currentByte;
+                        bytesUntilEndOfExtent = ((ranges[i].End + 1) * SectorSize) - currentByte;
                         // Check bone
-                        for (int b = 0; b < bones.Count; b++)
+                        for (var b = 0; b < bones.Count; b++)
+                        {
                             if (currentSector >= bones[b].Start && currentSector <= bones[b].End)
                             {
                                 isBone = true;
                                 break;
                             }
+                        }
 
                         // bones include this sector => bytesUntil uses bone extent if present
                         if (isBone)
                         {
                             // find bone extent that contains currentSector
-                            for (int b = 0; b < bones.Count; b++)
+                            for (var b = 0; b < bones.Count; b++)
+                            {
                                 if (currentSector >= bones[b].Start && currentSector <= bones[b].End)
                                 {
-                                    bytesUntilEndOfExtent = (bones[b].End + 1) * SectorSize - currentByte;
+                                    bytesUntilEndOfExtent = ((bones[b].End + 1) * SectorSize) - currentByte;
                                     break;
                                 }
+                            }
                         }
 
                         break;
                     }
                     else if (currentSector < ranges[i].Start && (i == 0 || currentSector > ranges[i - 1].End))
                     {
-                        bytesToWipe = ranges[i].Start * SectorSize - currentByte;
+                        bytesToWipe = (ranges[i].Start * SectorSize) - currentByte;
                         break;
                     }
                 }
@@ -169,7 +173,7 @@ public static class XisoSkeleton
             }
             else
             {
-                long bytesToRead = bytesUntilEndOfExtent > 0 ? bytesUntilEndOfExtent : xisoLength - numBytes;
+                var bytesToRead = bytesUntilEndOfExtent > 0 ? bytesUntilEndOfExtent : xisoLength - numBytes;
                 if (isBone)
                 {
                     if (!WriteBytes(isoFs, skelFs, -1, bytesToRead)) return false;
@@ -189,8 +193,8 @@ public static class XisoSkeleton
 
     private static string DeriveSkeletonPath(string input)
     {
-        string dir = Path.GetDirectoryName(input) ?? "";
-        string full = Path.GetFileName(input) ?? "skeleton";
+        var dir = Path.GetDirectoryName(input) ?? "";
+        var full = Path.GetFileName(input) ?? "skeleton";
         // Strip compound extensions
         if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".redump.iso".Length];
         else if (full.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".video.iso".Length];
@@ -201,8 +205,8 @@ public static class XisoSkeleton
 
     private static string DeriveHashPath(string input)
     {
-        string dir = Path.GetDirectoryName(input) ?? "";
-        string full = Path.GetFileName(input) ?? "hash";
+        var dir = Path.GetDirectoryName(input) ?? "";
+        var full = Path.GetFileName(input) ?? "hash";
         if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".redump.iso".Length];
         else if (full.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".video.iso".Length];
         else if (full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".iso".Length];

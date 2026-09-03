@@ -28,11 +28,11 @@ public static class FileTimeHelper
     public static void WriteFileTimeNow(Span<byte> destination)
     {
         double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var tmp = (now + (369.0 * 365.25 * 24.0 * 60.0 * 60.0 - (3.0 * 24.0 * 60.0 * 60.0 + 6.0 * 60.0 * 60.0))) *
+        var tmp = (now + ((369.0 * 365.25 * 24.0 * 60.0 * 60.0) - ((3.0 * 24.0 * 60.0 * 60.0) + (6.0 * 60.0 * 60.0)))) *
                   1.0e7;
 
         var h = (uint)(tmp * (1.0 / (4.0 * (1L << 30))));
-        var l = (uint)(tmp - h * 4.0 * (1L << 30));
+        var l = (uint)(tmp - (h * 4.0 * (1L << 30)));
 
         BinaryPrimitives.WriteUInt32LittleEndian(destination, l);
         BinaryPrimitives.WriteUInt32LittleEndian(destination[4..], h);
@@ -82,7 +82,7 @@ public static class FileTimeHelper
             return 0UL;
         try
         {
-            long ft = utc.ToFileTimeUtc();
+            var ft = utc.ToFileTimeUtc();
             return (ulong)ft;
         }
         catch (ArgumentOutOfRangeException)
@@ -117,13 +117,13 @@ public static class FileTimeHelper
         // Manual fallback for values > long.MaxValue (year > ~30828) — return MaxValue.
         try
         {
-            long ticks1601 = FileTimeEpoch.Ticks;
+            var ticks1601 = FileTimeEpoch.Ticks;
             // FILETIME ticks are 100ns; DateTime ticks are same.
             // Guard overflow: fileTime > (DateTime.MaxValue.Ticks - ticks1601) => MaxValue.
-            long maxFileTime = DateTime.MaxValue.Ticks - ticks1601;
+            var maxFileTime = DateTime.MaxValue.Ticks - ticks1601;
             if (fileTime > (ulong)maxFileTime)
                 return DateTimeOffset.MaxValue;
-            long ticks = ticks1601 + (long)fileTime;
+            var ticks = ticks1601 + (long)fileTime;
             return new DateTimeOffset(new DateTime(ticks, DateTimeKind.Utc));
         }
         catch
@@ -163,7 +163,7 @@ public static class FileTimeHelper
         // Hex raw: 0x...
         if (input.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
         {
-            string hex = input[2..];
+            var hex = input[2..];
             if (ulong.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out fileTime))
             {
                 dateTime = FromFileTimeRaw(fileTime);
@@ -174,7 +174,7 @@ public static class FileTimeHelper
         }
 
         // Decimal raw (all digits)
-        bool allDigits = input.Length > 0 && input.All(static c => char.IsDigit(c));
+        var allDigits = input.Length > 0 && input.All(static c => char.IsDigit(c));
         if (allDigits && ulong.TryParse(input, NumberStyles.None, CultureInfo.InvariantCulture, out fileTime))
         {
             dateTime = FromFileTimeRaw(fileTime);

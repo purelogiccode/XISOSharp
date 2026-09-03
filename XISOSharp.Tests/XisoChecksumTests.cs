@@ -24,7 +24,10 @@ public class XisoChecksumTests : IDisposable
 
             if (File.Exists(dir))
             {
-                try { File.Delete(dir); }
+                try
+                {
+                    File.Delete(dir);
+                }
                 catch
                 {
                     // ignored

@@ -62,7 +62,7 @@ public class AvlTreeTests
     {
         Assert.True(AvlTree.AvlCompareKey("abc", "ab") > 0);
         Assert.True(AvlTree.AvlCompareKey("ab", "abc") < 0);
-        Assert.True(AvlTree.AvlCompareKey("ABC", "abc") == 0);
+        Assert.Equal(0, AvlTree.AvlCompareKey("ABC", "abc"));
     }
 
     /// <summary>
@@ -219,6 +219,8 @@ public class AvlTreeTests
         Assert.Contains("e", visited, StringComparer.OrdinalIgnoreCase);
     }
 
+    private static readonly string[] Expected = new[] { "a", "b", "m", "q", "z" };
+
     /// <summary>
     /// Verifies that infix (in-order) traversal visits nodes
     /// in case-insensitive sorted alphabetical order.
@@ -239,7 +241,7 @@ public class AvlTreeTests
             return 0;
         }, visited, AvlTraversalMethod.Infix, 0);
 
-        Assert.Equal(new[] { "a", "b", "m", "q", "z" }, visited, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(Expected, visited, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>

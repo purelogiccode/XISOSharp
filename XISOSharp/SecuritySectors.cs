@@ -28,15 +28,15 @@ public static class SecuritySectors
 
         var securitySectors = new List<int>();
         using var sr = new StreamReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read));
-        int lineCount = 0;
-        long maxStart = redumpLength / Constants.SectorSize - 4096;
+        var lineCount = 0;
+        var maxStart = (redumpLength / Constants.SectorSize) - 4096;
         while (sr.ReadLine() is { } line)
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
-            string[] range = line.Split('-');
+            var range = line.Split('-');
             if (range.Length == 2 && int.TryParse(range[0].Trim(), System.Globalization.CultureInfo.InvariantCulture,
-                    out int startSector) &&
-                int.TryParse(range[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out int endSector))
+                    out var startSector) &&
+                int.TryParse(range[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var endSector))
             {
                 if (startSector < 0 || startSector > maxStart || endSector - startSector != 4095)
                 {
@@ -79,16 +79,16 @@ public static class SecuritySectors
     public static int[]? ParseLines(IEnumerable<string> lines, long redumpLength, int xgdType, bool quiet = false)
     {
         var securitySectors = new List<int>();
-        long maxStart = redumpLength / Constants.SectorSize - 4096;
-        int lineCount = 0;
+        var maxStart = (redumpLength / Constants.SectorSize) - 4096;
+        var lineCount = 0;
         foreach (var raw in lines)
         {
             var line = raw.Trim();
             if (line.Length == 0) continue;
-            string[] range = line.Split('-');
+            var range = line.Split('-');
             if (range.Length == 2 &&
-                int.TryParse(range[0].Trim(), System.Globalization.CultureInfo.InvariantCulture, out int s) &&
-                int.TryParse(range[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out int e))
+                int.TryParse(range[0].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var s) &&
+                int.TryParse(range[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var e))
             {
                 if (s < 0 || s > maxStart || e - s != 4095)
                 {

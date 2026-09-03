@@ -47,7 +47,7 @@ public class ExtractErrorExceptionTests
     public void Exception_IsException()
     {
         var ex = new ExtractErrorException(ExtractError.ErrIsoNoFiles);
-        Assert.IsAssignableFrom<Exception>(ex);
+        Assert.IsType<Exception>(ex, exactMatch: false);
     }
 
     /// <summary>

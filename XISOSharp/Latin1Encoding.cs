@@ -31,9 +31,11 @@ internal static class Latin1Encoding
             {
                 var c = chars[charIndex + i];
                 if (c > 0xFF)
+                {
                     throw new ArgumentException(
                         $"Character U+{(int)c:X4} at position {charIndex + i} is outside the Latin-1 range (0x00–0xFF).",
                         nameof(chars));
+                }
 
                 bytes[byteIndex + i] = (byte)c;
             }

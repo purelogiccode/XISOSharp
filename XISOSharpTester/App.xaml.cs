@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.IO;
 using System.Windows;
-
 using Serilog;
 
 namespace XISOSharpTester;
@@ -27,9 +26,10 @@ public partial class App
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Debug(formatProvider: CultureInfo.InvariantCulture)
-            .WriteTo.File(logPath, rollingInterval: RollingInterval.Day,
+            .WriteTo.File(logPath,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
-                formatProvider: CultureInfo.InvariantCulture)
+                formatProvider: CultureInfo.InvariantCulture,
+                rollingInterval: RollingInterval.Day)
             .CreateLogger();
 
         Log.Information("XISOSharpTester started");

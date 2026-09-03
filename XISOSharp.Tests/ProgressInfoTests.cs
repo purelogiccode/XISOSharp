@@ -238,7 +238,7 @@ public class ProgressInfoTests : IDisposable
         var outputDir = CreateTempDir();
         var progress = new CollectingProgress();
 
-        (int result, _) = await XisoWriter.CreateXisoAsync(
+        (var result, _) = await XisoWriter.CreateXisoAsync(
             src, outputDir, null, null, null, null, progress: progress);
         Assert.Equal(0, result);
 

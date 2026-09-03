@@ -468,7 +468,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
     {
         var src = CreateSourceDir(PopulateSimple);
         var iso = CreateIso(src, prependSectors: 16);
-        long offset = 16L * Constants.SectorSize;
+        const long offset = 16L * Constants.SectorSize;
         var outDir = CreateTempDir();
         var skel = Path.Combine(outDir, "prepend.skeleton.xiso");
         var hash = Path.Combine(outDir, "prepend.hash");
@@ -585,7 +585,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
     {
         var src = CreateSourceDir(PopulateSimple);
         var iso = CreateIso(src, prependSectors: 16);
-        long offset = 16L * Constants.SectorSize;
+        const long offset = 16L * Constants.SectorSize;
         var outDir = CreateTempDir();
         var zar = Path.Combine(outDir, "prepend.zar");
 

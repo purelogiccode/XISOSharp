@@ -10,16 +10,22 @@ public class ExtractErrorException : Exception
     public ExtractError ErrorCode { get; }
 
     /// <summary>Creates a new <see cref="ExtractErrorException"/> with no error code.</summary>
-    public ExtractErrorException() { }
+    public ExtractErrorException()
+    {
+    }
 
     /// <summary>Creates a new <see cref="ExtractErrorException"/> with a message.</summary>
     /// <param name="message">The error message.</param>
-    public ExtractErrorException(string message) : base(message) { }
+    public ExtractErrorException(string message) : base(message)
+    {
+    }
 
     /// <summary>Creates a new <see cref="ExtractErrorException"/> with a message and inner exception.</summary>
     /// <param name="message">The error message.</param>
     /// <param name="innerException">The inner exception.</param>
-    public ExtractErrorException(string message, Exception innerException) : base(message, innerException) { }
+    public ExtractErrorException(string message, Exception innerException) : base(message, innerException)
+    {
+    }
 
     /// <summary>
     /// Creates a new <see cref="ExtractErrorException"/> with the given error code.
