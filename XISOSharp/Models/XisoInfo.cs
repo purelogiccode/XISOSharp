@@ -1,5 +1,3 @@
-using XISOSharp;
-
 namespace XISOSharp.Models;
 
 #pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally

@@ -56,7 +56,7 @@
 
     <!-- Source Link + versioning -->
     <ItemGroup>
-        <PackageReference Include="Meziantou.Analyzer" Version="3.0.201">
+        <PackageReference Include="Meziantou.Analyzer" Version="3.0.203">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>

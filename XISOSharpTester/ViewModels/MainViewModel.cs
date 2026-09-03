@@ -10,7 +10,6 @@ using Microsoft.Win32;
 using Serilog;
 using XISOSharpTester.Services;
 using XISOSharpTester.Views;
-using XISOSharp.Models;
 using XISOSharpTester.Models;
 
 namespace XISOSharpTester.ViewModels;
