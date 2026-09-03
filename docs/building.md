@@ -38,7 +38,7 @@ The solution contains:
 | Project | Target(s) | Output |
 |---|---|---|
 | `XISOSharp.Core` | net8.0, net9.0, net10.0 | `XISOSharp.dll` + NuGet package |
-| `XISOSharp.Cli` | net10.0 | `extract-xiso` executable |
+| `XISOSharp.Cli` | net10.0 | `XISOSharp.Cli` executable |
 | `XISOSharp.Tests` | net10.0 | xUnit test assembly |
 | `XISOSharp.Benchmarks` | net10.0 | BenchmarkDotNet harness |
 | `XISOSharpTester` | net10.0-windows | WPF regression-test GUI |
@@ -87,7 +87,7 @@ Supported runtime identifiers (`XISOSharp.Cli.csproj`):
 `win-x64; linux-x64; osx-x64; osx-arm64`.
 
 Output lands in `XISOSharp.Cli/bin/Release/net10.0/<rid>/publish/` as a single
-`extract-xiso` (or `extract-xiso.exe`) binary.
+`XISOSharp.Cli` (or `XISOSharp.Cli.exe`) binary.
 
 ## NuGet packaging
 

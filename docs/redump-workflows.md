@@ -60,7 +60,7 @@ always sit at exactly `0x0FD90000`.
 ## Skip sectors (reading offset images)
 
 ```bash
-extract-xiso --skip-sectors <N> -d ./out image.iso
+XISOSharp.Cli --skip-sectors <N> -d ./out image.iso
 ```
 
 `N` is the number of 2048-byte sectors to skip from the start of the file before the
@@ -80,7 +80,7 @@ XISO filesystem begins. The header must then be at `N × 2048 + 0x10000`.
 ## Prepend sectors (writing offset images)
 
 ```bash
-extract-xiso -c ./game_files redump.iso --prepend-sectors <N>
+XISOSharp.Cli -c ./game_files redump.iso --prepend-sectors <N>
 ```
 
 Writes the image with `N` zero-filled sectors **before** the XISO filesystem, reserving
@@ -100,13 +100,13 @@ layout of a real dump and is readable by other Xbox tools.
 
 ```bash
 # 1. Extract the game partition from a Redump dump
-extract-xiso --skip-sectors 129824 -d ./extracted game.redump.iso
+XISOSharp.Cli --skip-sectors 129824 -d ./extracted game.redump.iso
 
 # 2. Rebuild a Redump-style image at the same offset
-extract-xiso -c ./extracted rebuilt.iso --prepend-sectors 129824
+XISOSharp.Cli -c ./extracted rebuilt.iso --prepend-sectors 129824
 
 # 3. Prove the conversion is lossless
-extract-xiso validate game.redump.iso rebuilt.iso --validate-checksums
+XISOSharp.Cli validate game.redump.iso rebuilt.iso --validate-checksums
 ```
 
 ### Optimize an offset image in place
@@ -114,13 +114,13 @@ extract-xiso validate game.redump.iso rebuilt.iso --validate-checksums
 ```bash
 # Reads at the skip offset, writes a bare optimized XISO
 # (validation flags cannot be combined with --skip-sectors)
-extract-xiso -r --skip-sectors 129824 game.redump.iso
+XISOSharp.Cli -r --skip-sectors 129824 game.redump.iso
 ```
 
 ### Offset images with exclusion and media patching
 
 ```bash
-extract-xiso -s -X "**/*.tmp" -c ./files custom.iso --prepend-sectors 16640   # XGD3 offset
+XISOSharp.Cli -s -X "**/*.tmp" -c ./files custom.iso --prepend-sectors 16640   # XGD3 offset
 ```
 
 ## Advanced: archival pipeline (video / filler / seed / wipe / trim / petrify / update / ZAR)
@@ -134,9 +134,10 @@ see **[Archival Workflows](archival.md)**.
 Quick taste:
 
 ```bash
-extract-xiso --all game.redump.iso                  # video+filler+seed+trim+update+wipe in one pass
-extract-xiso rebuild game.xiso video.iso filler.bin su20076000_00000000 -o game.redump.iso --security-sectors sectors.txt
-extract-xiso --zar game.iso -o game.zar
+XISOSharp.Cli --all game.redump.iso                  # video+filler+seed+trim+update+wipe in one pass
+XISOSharp.Cli rebuild game.xiso video.iso filler.bin su20076000_00000000 -o game.redump.iso --security-sectors sectors.txt
+XISOSharp.Cli rebuild game.zar video.iso filler.bin su20076000_00000000 -o game.redump.iso   # .zar sidecar as <xiso>
+XISOSharp.Cli --zar game.iso -o game.zar
 ```
 
 ## Sector math reference

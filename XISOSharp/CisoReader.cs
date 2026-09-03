@@ -511,7 +511,12 @@ public static class CisoReader
         }
     }
 
-    private static string DeriveDefaultIsoPath(string csoPath)
+    /// <summary>
+    /// Derives the default <c>.iso</c> output path for <paramref name="csoPath"/>
+    /// (same rule <see cref="DecompressToIso"/> uses when no explicit output is given):
+    /// the <c>.cso</c>/<c>.1.cso</c> suffix is replaced with <c>.iso</c>.
+    /// </summary>
+    public static string DeriveDefaultIsoPath(string csoPath)
     {
         var dir = Path.GetDirectoryName(csoPath) ?? "";
         var file = Path.GetFileName(csoPath);

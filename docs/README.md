@@ -73,13 +73,13 @@ The site is rendered with **Docsify** — a fixed **left sidebar** is provided b
 
 ```bash
 # Extract an ISO to a directory
-extract-xiso -d output_dir game.iso
+XISOSharp.Cli -d output_dir game.iso
 
 # Create an ISO from a directory
-extract-xiso -c source_dir
+XISOSharp.Cli -c source_dir
 
 # List contents
-extract-xiso -l game.iso
+XISOSharp.Cli -l game.iso
 ```
 
 ```csharp
@@ -98,7 +98,7 @@ See [Getting Started](getting-started.md) for details.
 | Project | Description |
 |---|---|
 | `XISOSharp.Core` | Class library (NuGet package `XISOSharp`) — complete read/write engine |
-| `XISOSharp.Cli` | Command-line tool `extract-xiso` (byte-compatible with the original) |
+| `XISOSharp.Cli` | Command-line tool `XISOSharp` (extract-xiso-compatible flags) |
 | `XISOSharp.Tests` | xUnit test suite |
 | `XISOSharp.Benchmarks` | BenchmarkDotNet benchmarks (AVL tree, Boyer–Moore, sector math) |
 | `XISOSharpTester` | WPF GUI for batch regression testing against the reference C tool |

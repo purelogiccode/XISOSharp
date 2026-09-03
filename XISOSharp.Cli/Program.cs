@@ -6,7 +6,7 @@ using XISOSharp.Models;
 namespace XISOSharp.Cli;
 
 /// <summary>
-/// Command-line entry point for extract-xiso.
+/// Command-line entry point for the XISOSharp CLI (extract-xiso-compatible).
 /// Parses arguments and dispatches to <see cref="XisoReader"/> for extraction/listing/rewriting
 /// or <see cref="XisoWriter"/> for image creation.
 /// </summary>
@@ -42,6 +42,8 @@ internal static class Program
         string? hashAlgo = null;
         var xSeen = false;
         var deleteOld = false;
+        var assumeYes = false;
+        var assumeNo = false;
         string? path = null;
         string? outputName = null;
         var createList = new List<(string Dir, string? Name)>();
@@ -309,6 +311,14 @@ internal static class Program
                     case "-s": Logger.RemoveSystemUpdate = true; break;
                     case "-D": deleteOld = true; break;
                     case "-m": Logger.MediaEnable = false; break;
+                    case "-y":
+                    case "--yes":
+                        assumeYes = true;
+                        break;
+                    case "-n":
+                    case "--no":
+                        assumeNo = true;
+                        break;
                     case "-d":
                         if (i + 1 < args.Length)
                         {
@@ -846,6 +856,12 @@ internal static class Program
             return 1;
         }
 
+        if (assumeYes && assumeNo)
+        {
+            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
+            return 1;
+        }
+
         Logger.Log(Constants.Banner);
 
         // Dispatch XboxKit redump modes (batch) — after expansion so --batch handling is uniform,
@@ -853,7 +869,7 @@ internal static class Program
         if (videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode || zarMode)
         {
             return RunRedumpBatch(isoFiles, videoMode, randomMode, seedMode, wipeMode, trimMode, petrifyMode,
-                updateMode, zarMode, securitySectorsPath, outputName);
+                updateMode, zarMode, securitySectorsPath, outputName, assumeYes, assumeNo);
         }
 
         if (createList.Count > 0)
@@ -1249,24 +1265,8 @@ internal static class Program
 
             try
             {
-                using var tagFs = new FileStream(xisoPath,
-                    new FileStreamOptions
-                    {
-                        Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
-                    });
-
-                tagFs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
-                var tagBuf = new byte[Constants.OptimizedTagLength];
-                var tagRead = tagFs.Read(tagBuf);
-                if (tagRead == Constants.OptimizedTagLength)
-                {
-                    var tag = Encoding.ASCII.GetString(tagBuf);
-                    if (tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin],
-                            StringComparison.Ordinal))
-                    {
-                        optimized = true;
-                    }
-                }
+                // Probed through the decompressed view so .cso input is detected too.
+                optimized = XisoReader.IsOptimizedImage(xisoPath);
             }
             catch
             {
@@ -1287,6 +1287,15 @@ internal static class Program
                 if (File.Exists(oldPath))
                 {
                     Logger.LogErr($"{oldPath} already exists, cannot rewrite {xisoPath}\n");
+                    continue;
+                }
+
+                // An explicit -o target may already exist (default output is the
+                // just-moved-away input path, which is always free). Confirm first:
+                // after the move below there is no going back.
+                if (outputName != null && !OverwritePrompt.ConfirmOverwrite(outputName, assumeYes, assumeNo))
+                {
+                    err = 1;
                     continue;
                 }
 
@@ -1431,6 +1440,8 @@ internal static class Program
     {
         var outRebuild = outputName;
         var secPath = securitySectorsPath;
+        var assumeYes = false;
+        var assumeNo = false;
         var positionals = new List<string>();
         for (var i = optind; i < args.Length; i++)
         {
@@ -1465,14 +1476,24 @@ internal static class Program
             {
                 Logger.Quiet = Logger.RealQuiet = true;
             }
+            else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
+                      string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeYes = true;
+            }
+            else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
+                      string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeNo = true;
+            }
             else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+                      string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
             {
                 PrintUsage();
                 return 0;
             }
             else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+                      string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
             {
                 Console.Write(Constants.Banner);
                 return 0;
@@ -1491,8 +1512,14 @@ internal static class Program
 
         if (positionals.Count == 0)
         {
-            Logger.LogErr("Error: rebuild requires at least <xiso> [video.iso] [filler|seed] [su...]\n");
+            Logger.LogErr("Error: rebuild requires at least <xiso|game.zar> [video.iso] [filler|seed] [su...]\n");
             PrintUsage();
+            return 1;
+        }
+
+        if (assumeYes && assumeNo)
+        {
+            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
             return 1;
         }
 
@@ -1504,7 +1531,7 @@ internal static class Program
         if (positionals.Count > 4)
         {
             Logger.LogErr(
-                "Error: rebuild takes at most 4 positional files: <xiso> [video.iso] [filler|seed] [update]\n");
+                "Error: rebuild takes at most 4 positional files: <xiso|game.zar> [video.iso] [filler|seed] [update]\n");
             return 1;
         }
 
@@ -1530,6 +1557,9 @@ internal static class Program
         }
 
         var outRedump = outRebuild ?? DeriveRedumpPath(xisoPath);
+
+        if (!OverwritePrompt.ConfirmOverwrite(outRedump, assumeYes, assumeNo))
+            return 1;
 
         try
         {
@@ -1914,6 +1944,8 @@ internal static class Program
         // writes a single .cso.
         long? splitBytes = CisoWriter.DefaultSplitPoint;
         var version = CisoWriter.VersionLz4;
+        var assumeYes = false;
+        var assumeNo = false;
         var positionals = new List<string>();
 
         for (var i = optind; i < args.Length; i++)
@@ -1976,6 +2008,16 @@ internal static class Program
                 splitBytes = sb == 0 ? null : sb;
                 i++;
             }
+            else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
+                      string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeYes = true;
+            }
+            else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
+                      string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeNo = true;
+            }
             else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
             {
                 Logger.Quiet = true;
@@ -1985,13 +2027,13 @@ internal static class Program
                 Logger.Quiet = Logger.RealQuiet = true;
             }
             else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+                      string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
             {
                 PrintUsage();
                 return 0;
             }
             else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+                      string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
             {
                 Console.Write(Constants.Banner);
                 return 0;
@@ -2015,8 +2057,22 @@ internal static class Program
             return 1;
         }
 
+        if (assumeYes && assumeNo)
+        {
+            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
+            return 1;
+        }
+
         var source = positionals[0];
         var outCso = positionals.Count == 2 ? positionals[1] : output;
+
+        // Resolve the path CompressToCso will write (first split part when splitting)
+        // so an existing output triggers the -y/-n prompt instead of silent overwrite.
+        var probeCso = outCso ?? CisoWriter.DeriveDefaultCsoPath(source, Directory.Exists(source));
+        if (splitBytes.HasValue)
+            probeCso = Path.ChangeExtension(probeCso, "1.cso"); // CisoSplitFile.PartPath(_, 0) parity
+        if (!OverwritePrompt.ConfirmOverwrite(probeCso, assumeYes, assumeNo))
+            return 1;
 
         try
         {
@@ -2034,6 +2090,8 @@ internal static class Program
     private static int RunDecompressMode(string[] args, int optind)
     {
         string? output = null;
+        var assumeYes = false;
+        var assumeNo = false;
         var positionals = new List<string>();
 
         for (var i = optind; i < args.Length; i++)
@@ -2050,6 +2108,16 @@ internal static class Program
 
                 output = args[++i];
             }
+            else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
+                      string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeYes = true;
+            }
+            else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
+                      string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeNo = true;
+            }
             else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
             {
                 Logger.Quiet = true;
@@ -2059,13 +2127,13 @@ internal static class Program
                 Logger.Quiet = Logger.RealQuiet = true;
             }
             else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+                      string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
             {
                 PrintUsage();
                 return 0;
             }
             else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+                      string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
             {
                 Console.Write(Constants.Banner);
                 return 0;
@@ -2089,8 +2157,20 @@ internal static class Program
             return 1;
         }
 
+        if (assumeYes && assumeNo)
+        {
+            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
+            return 1;
+        }
+
         var source = positionals[0];
         var outIso = positionals.Count == 2 ? positionals[1] : output;
+
+        // Resolve the path DecompressToIso will write so an existing output
+        // triggers the -y/-n prompt instead of silent overwrite.
+        if (!OverwritePrompt.ConfirmOverwrite(outIso ?? CisoReader.DeriveDefaultIsoPath(source), assumeYes,
+                assumeNo))
+            return 1;
 
         try
         {
@@ -2185,12 +2265,14 @@ internal static class Program
         var full = Path.GetFileName(xisoPath) ?? "redump";
         var baseName = full;
         if (full.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase)) baseName = full[..^5];
+        else if (full.EndsWith(".zar", StringComparison.OrdinalIgnoreCase)) baseName = full[..^4];
         else if (full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) baseName = full[..^4];
         return Path.Combine(dir, baseName + ".redump.iso");
     }
 
     private static int RunRedumpBatch(List<string> isoFiles, bool video, bool random, bool seed, bool wipe, bool trim,
-        bool petrify, bool update, bool zar, string? securitySectorsPath, string? outputName)
+        bool petrify, bool update, bool zar, string? securitySectorsPath, string? outputName,
+        bool assumeYes, bool assumeNo)
     {
         _ = securitySectorsPath;
         // Single-output guard
@@ -2202,6 +2284,21 @@ internal static class Program
         }
 
         var exit = 0;
+
+        // -y/--yes/-n/--no gate for every file this batch writes (XboxKit ConfirmOverwrite
+        // parity). A declined output skips just that operation; a -n refusal also fails
+        // the file (the [ERROR] line is printed by the helper itself).
+        bool ConfirmOutput(string outPath, string what)
+        {
+            if (OverwritePrompt.ConfirmOverwrite(outPath, assumeYes, assumeNo))
+                return true;
+            if (assumeNo)
+                exit = 1;
+            else
+                Logger.Log($"[INFO] Skipping {what}: output exists\n");
+            return false;
+        }
+
         foreach (var iso in isoFiles)
         {
             long size = 0;
@@ -2275,7 +2372,11 @@ internal static class Program
                     var outVideo = (outputName != null && singleModeCount)
                         ? outputName
                         : Path.Combine(dir, baseName + ".video.iso");
-                    if (!XisoRedump.TryExtractVideo(iso, outVideo, out var outPath, Logger.Quiet))
+                    if (!ConfirmOutput(outVideo, $"--video for {iso}"))
+                    {
+                        // Skipped by user choice (-n refusal already failed this file above).
+                    }
+                    else if (!XisoRedump.TryExtractVideo(iso, outVideo, out var outPath, Logger.Quiet))
                     {
                         Logger.LogErr($"[ERROR] Failed extracting video from {iso}\n");
                         exit = 1;
@@ -2294,7 +2395,11 @@ internal static class Program
                     var outUpd = (outputName != null && singleModeCount)
                         ? outputName
                         : Path.Combine(dir, "su20076000_00000000");
-                    if (!XisoRedump.TryExtractUpdate(iso, outUpd, wipe: true, quiet: Logger.Quiet))
+                    if (!ConfirmOutput(outUpd, $"--update for {iso}"))
+                    {
+                        // Skipped by user choice (-n refusal already failed this file above).
+                    }
+                    else if (!XisoRedump.TryExtractUpdate(iso, outUpd, wipe: true, quiet: Logger.Quiet))
                     {
                         Logger.LogErr($"[ERROR] Failed extracting update from video {iso}\n");
                         exit = 1;
@@ -2326,7 +2431,11 @@ internal static class Program
                         var outUpd = (outputName != null && singleModeCount)
                             ? outputName
                             : Path.Combine(dir, "su20076000_00000000");
-                        if (!XisoRedump.TryExtractUpdate(videoPath, outUpd, wipe: true, quiet: Logger.Quiet))
+                        if (!ConfirmOutput(outUpd, $"--update for {iso}"))
+                        {
+                            // Skipped by user choice (-n refusal already failed this file above).
+                        }
+                        else if (!XisoRedump.TryExtractUpdate(videoPath, outUpd, wipe: true, quiet: Logger.Quiet))
                         {
                             Logger.LogErr($"[ERROR] Failed extracting update from {videoPath}\n");
                             exit = 1;
@@ -2357,17 +2466,17 @@ internal static class Program
                 var outFiller = (outputName != null && singleModeCount)
                     ? outputName
                     : Path.Combine(dir, baseName + ".filler");
-                bool ok;
-                if (isRedump)
-                    ok = XisoOperations.ExtractFiller(iso, outFiller, isoOffset, xisoLen, Logger.Quiet);
-                else
-                    ok = XisoOperations.ExtractFiller(iso, outFiller, 0, null, Logger.Quiet);
+                // A declined output counts as handled (skipped) so later ops still run.
+                var fillerConfirmed = ConfirmOutput(outFiller, $"--random for {iso}");
+                bool ok = !fillerConfirmed || (isRedump
+                    ? XisoOperations.ExtractFiller(iso, outFiller, isoOffset, xisoLen, Logger.Quiet)
+                    : XisoOperations.ExtractFiller(iso, outFiller, 0, null, Logger.Quiet));
                 if (!ok)
                 {
                     Logger.LogErr($"[ERROR] Failed extracting filler from {iso}\n");
                     exit = 1;
                 }
-                else
+                else if (fillerConfirmed)
                 {
                     Logger.Log($"Filler extracted to {outFiller} ({new FileInfo(outFiller).Length} bytes)\n");
                 }
@@ -2378,7 +2487,11 @@ internal static class Program
                 var outSeed = (outputName != null && singleModeCount)
                     ? outputName
                     : Path.Combine(dir, baseName + ".seed");
-                var ok = XisoOperations.TryExtractSeed(iso, outSeed, isRedump ? isoOffset : 0, Logger.Quiet);
+                // A declined output counts as handled (skipped) so later ops still run;
+                // the failure cleanup below must not touch a file we refused to overwrite.
+                var seedConfirmed = ConfirmOutput(outSeed, $"--seed for {iso}");
+                var ok = !seedConfirmed ||
+                    XisoOperations.TryExtractSeed(iso, outSeed, isRedump ? isoOffset : 0, Logger.Quiet);
                 if (!ok)
                 {
                     if (singleModeCount)
@@ -2399,34 +2512,32 @@ internal static class Program
                         }
                     }
                 }
-                else
+                else if (seedConfirmed)
                 {
                     Logger.Log($"Seed extracted to {outSeed}\n");
                 }
             }
+
+            var wipeDeclined = false;
 
             if (wipe)
             {
                 var outWiped = (outputName != null && singleModeCount)
                     ? outputName
                     : Path.Combine(dir, baseName + ".wiped.xiso");
-                bool ok;
-                if (isRedump)
-                {
-                    // Produce wiped game partition from Redump
-                    ok = XisoOperations.WipeFiller(iso, outWiped, isoOffset, Logger.Quiet);
-                }
-                else
-                {
-                    ok = XisoOperations.WipeFiller(iso, outWiped, 0, Logger.Quiet);
-                }
+                // A declined output counts as handled (skipped) so later ops still run.
+                var wipeConfirmed = ConfirmOutput(outWiped, $"--wipe for {iso}");
+                wipeDeclined = !wipeConfirmed;
+                bool ok = !wipeConfirmed || (isRedump
+                    ? XisoOperations.WipeFiller(iso, outWiped, isoOffset, Logger.Quiet)
+                    : XisoOperations.WipeFiller(iso, outWiped, 0, Logger.Quiet));
 
                 if (!ok)
                 {
                     Logger.LogErr($"[ERROR] Failed wiping {iso}\n");
                     exit = 1;
                 }
-                else
+                else if (wipeConfirmed)
                 {
                     Logger.Log($"Wiped XISO written to {outWiped}\n");
                 }
@@ -2447,11 +2558,17 @@ internal static class Program
                         : Path.Combine(dir, baseName + ".trim.wiped.xiso");
                     // The wiped file from previous step is at .wiped.xiso; we could do WipeAndTrim directly from original
                     var wipedPath = Path.Combine(dir, baseName + ".wiped.xiso");
-                    // If we already produced wiped, trim it; else do combined
-                    if (File.Exists(wipedPath) && !singleModeCount)
+                    // If we already produced wiped, trim it; else do combined.
+                    // A declined --wipe must not be consumed+deleted here: fall through to
+                    // the combined op (which confirms its own output) instead.
+                    if (File.Exists(wipedPath) && !singleModeCount && !wipeDeclined)
                     {
                         // Trim the already-wiped file
-                        if (!XisoOperations.TrimXiso(wipedPath, outTrimWiped, 0, Logger.Quiet))
+                        if (!ConfirmOutput(outTrimWiped, $"--trim for {iso}"))
+                        {
+                            // Skipped by user choice (-n refusal already failed this file above).
+                        }
+                        else if (!XisoOperations.TrimXiso(wipedPath, outTrimWiped, 0, Logger.Quiet))
                         {
                             Logger.LogErr($"[ERROR] Failed trimming {wipedPath}\n");
                             exit = 1;
@@ -2475,14 +2592,17 @@ internal static class Program
                         var outPath2 = (outputName != null && singleModeCount)
                             ? outputName
                             : Path.Combine(dir, baseName + ".wiped.xiso");
-                        // Do combined directly
-                        var ok = XisoOperations.WipeAndTrim(iso, outPath2, isRedump ? isoOffset : 0, Logger.Quiet);
+                        // Do combined directly. A declined output counts as handled
+                        // (skipped) but the structural continue below still applies.
+                        var trimConfirmed = ConfirmOutput(outPath2, $"--trim for {iso}");
+                        var ok = !trimConfirmed ||
+                            XisoOperations.WipeAndTrim(iso, outPath2, isRedump ? isoOffset : 0, Logger.Quiet);
                         if (!ok)
                         {
                             Logger.LogErr($"[ERROR] Failed wiping+trimming {iso}\n");
                             exit = 1;
                         }
-                        else
+                        else if (trimConfirmed)
                         {
                             Logger.Log($"Wiped+trimmed XISO written to {outPath2}\n");
                         }
@@ -2496,13 +2616,16 @@ internal static class Program
                     var outTrim = (outputName != null && singleModeCount)
                         ? outputName
                         : Path.Combine(dir, baseName + ".trim.xiso");
-                    var ok = XisoOperations.TrimXiso(iso, outTrim, isRedump ? isoOffset : 0, Logger.Quiet);
+                    // A declined output counts as handled (skipped) so later ops still run.
+                    var trimConfirmed = ConfirmOutput(outTrim, $"--trim for {iso}");
+                    var ok = !trimConfirmed ||
+                        XisoOperations.TrimXiso(iso, outTrim, isRedump ? isoOffset : 0, Logger.Quiet);
                     if (!ok)
                     {
                         Logger.LogErr($"[ERROR] Failed trimming {iso}\n");
                         exit = 1;
                     }
-                    else
+                    else if (trimConfirmed)
                     {
                         Logger.Log($"Trimmed XISO written to {outTrim}\n");
                     }
@@ -2516,8 +2639,12 @@ internal static class Program
                     : Path.Combine(dir, baseName + ".skeleton.xiso");
                 var outHash = Path.Combine(dir, baseName + ".hash");
                 // petrify already derives hash path internally if null, but we pass explicit
-                var ok = XisoSkeleton.Petrify(iso, outSkel, outHash, isRedump ? isoOffset : 0, Logger.Quiet);
-                if (!ok)
+                if (!ConfirmOutput(outSkel, $"--petrify for {iso}") ||
+                    !ConfirmOutput(outHash, $"--petrify hash for {iso}"))
+                {
+                    // Skipped by user choice (-n refusal already failed this file above).
+                }
+                else if (!XisoSkeleton.Petrify(iso, outSkel, outHash, isRedump ? isoOffset : 0, Logger.Quiet))
                 {
                     Logger.LogErr($"[ERROR] Failed petrifying {iso}\n");
                     exit = 1;
@@ -2533,8 +2660,11 @@ internal static class Program
                 var outZar = (outputName != null && singleModeCount)
                     ? outputName
                     : Path.Combine(dir, baseName + ".zar");
-                var ok = XisoZarchive.CreateZar(iso, outZar, isRedump ? isoOffset : 0, Logger.Quiet);
-                if (!ok)
+                if (!ConfirmOutput(outZar, $"--zar for {iso}"))
+                {
+                    // Skipped by user choice (-n refusal already failed this file above).
+                }
+                else if (!XisoZarchive.CreateZar(iso, outZar, isRedump ? isoOffset : 0, Logger.Quiet))
                 {
                     Logger.LogErr($"[ERROR] Failed creating ZAR for {iso}\n");
                     exit = 1;
@@ -2794,8 +2924,8 @@ internal static class Program
                                                  Usage:
                                                  Usage:
 
-                                                   extract-xiso [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
-                                                   extract-xiso [options] -c <dir> [name] [-c <dir> [name]] ...
+                                                    XISOSharp.Cli [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
+                                                    XISOSharp.Cli [options] -c <dir> [name] [-c <dir> [name]] ...
 
                                                    Mutually exclusive modes:
 
@@ -2834,9 +2964,11 @@ internal static class Program
 
                                                      Redump / XboxKit modes (lossless archival):
 
-                                                     rebuild <xiso> [video.iso] [filler|seed] [su...] -o <redump.iso>
-                                                                           Rebuild a Redump ISO from its components.
-                                                                           Auto-detects XGD type by size; video type via
+                                                      rebuild <xiso|game.zar> [video.iso] [filler|seed] [su...] -o <redump.iso>
+                                                                            Rebuild a Redump ISO from its components.
+                                                                            <xiso> may be a .zar sidecar (single embedded
+                                                                            XISO used verbatim, else tree repacked).
+                                                                            Auto-detects XGD type by size; video type via
                                                                            PVD at 0x832D. Supports filler file or 4-byte
                                                                            seed (XGD1 PRNG) plus optional sectors.txt for
                                                                            security sectors (--security-sectors).
@@ -2889,6 +3021,10 @@ internal static class Program
                                                                         In rewrite mode, rewrite xiso in <directory>.
                                                     -D                  In rewrite mode, delete old xiso after processing.
                                                     -h                  Print this help text and exit.
+                                                    -n, --no            Never overwrite: refuse when an output file
+                                                                          exists (rebuild, rewrite -o, compress,
+                                                                          decompress, redump batch outputs).
+                                                    -y, --yes           Always overwrite without prompting.
                                                     -m                  In create or rewrite mode, disable automatic .xbe
                                                                           media enable patching (not recommended).
                                                     -o <filename>       In rewrite mode, set custom output filename

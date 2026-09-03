@@ -1,0 +1,11 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="XISOSharp.Gui.App"
+             RequestedThemeVariant="Dark">
+             <!-- Dark-only UI: the variant is pinned, never follows the OS theme. -->
+
+    <Application.Styles>
+        <!-- No Mode attribute: FluentTheme follows RequestedThemeVariant="Dark" above. -->
+        <FluentTheme />
+    </Application.Styles>
+</Application>

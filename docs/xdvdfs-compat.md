@@ -16,8 +16,8 @@ Modern xdvdfs is a `no_std`-capable filesystem library (`xdvdfs-core` traits + `
 **CLI:**
 
 ```
-extract-xiso build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run]
-extract-xiso build-image --dry-run -m "bin:/" -m "assets/**:/assets/{1}" ./src
+XISOSharp.Cli build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run]
+XISOSharp.Cli build-image --dry-run -m "bin:/" -m "assets/**:/assets/{1}" ./src
 ```
 
 **xdvdfs ref:** `xdvdfs-cli/src/cmd_build_image.rs` + `xdvdfs-core/src/write/fs.rs:RemapOverlayFilesystem` — ordered `wax` globs `host/** : image/{0|1}` with `!negation` + `{n}` captures + `--dry-run` + `xdvdfs.toml` `[map_rules]` (`README.md:72`).
@@ -46,7 +46,7 @@ Manual TOML subset parser (no `Tomlyn` dep) reads `[map_rules]` preserve-order, 
 
 ## Image-Spec
 
-**CLI:** `extract-xiso image-spec from -O <out> -m "host:image" ... [specPath]` (stdout when `specPath` omitted, file when given).
+**CLI:** `XISOSharp.Cli image-spec from -O <out> -m "host:image" ... [specPath]` (stdout when `specPath` omitted, file when given).
 
 **xdvdfs ref:** `image-spec from -O dist/image.iso -m "bin:/" -m "assets:/{0}" xdvdfs.toml` (`README.md:154`).
 
@@ -61,8 +61,8 @@ Round-trip: `GenerateSpecText` → `ParseSpecFile` → `BuildImage` yields ident
 **CLI:**
 
 ```
-extract-xiso checksum <image> [images...] [--silent]
-extract-xiso --checksum <image> [--silent]            # flag form, multiple ISOs
+XISOSharp.Cli checksum <image> [images...] [--silent]
+XISOSharp.Cli --checksum <image> [--silent]            # flag form, multiple ISOs
 ```
 
 Output: `hex tab path` (silent → hex only). Exit `0` on all, deterministic hex for `a.iso`/`b.iso` identical trees → `31e10d…`.

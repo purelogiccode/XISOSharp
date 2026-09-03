@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
+using XISOSharp.BlockDevice;
 using XISOSharp.DataStructures;
 using XISOSharp.Interfaces;
 using XISOSharp.Models;
@@ -21,11 +22,62 @@ public static class XisoReader
     private static readonly byte[] HeaderDataBytes = Encoding.ASCII.GetBytes(Constants.HeaderData);
 
     /// <summary>
+    /// True when <paramref name="path"/> has a <c>.cso</c> extension; covers split
+    /// <c>*.1.cso</c> part sets (mirroring <c>xdvdfs-cli/src/img.rs::open_image</c>).
+    /// </summary>
+    internal static bool IsCsoPath(string path)
+        => Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Opens an image for reading: <c>.cso</c> paths (single or split parts) are routed
+    /// through <see cref="CisoBlockDevice"/> wrapped in a <see cref="BlockDeviceStream"/>,
+    /// everything else opens as a plain <see cref="FileStream"/>. Detection is by extension
+    /// (mirroring <c>xdvdfs-cli/src/img.rs::open_image</c>) with a <c>CISO</c> magic sniff
+    /// fallback, so renamed containers — notably the CLI rewrite flow, which appends
+    /// <c>.old</c> — still resolve to the decompressed view.
+    /// </summary>
+    internal static Stream OpenImageStream(string path)
+    {
+        if (IsCsoPath(path) || CisoReader.IsCso(path))
+            return new BlockDeviceStream(new CisoBlockDevice(path), leaveOpen: false);
+        return new FileStream(
+            path,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
+            });
+    }
+
+    /// <summary>
+    /// Strips a <c>.cso</c> (or split <c>.1.cso</c>) image suffix for output naming:
+    /// <c>game.cso</c> → <c>game</c>, <c>game.1.cso</c> → <c>game</c>.
+    /// </summary>
+    private static string StripCsoSuffix(string name)
+    {
+        var stem = name[..^".cso".Length];
+        if (stem.EndsWith(".1", StringComparison.Ordinal))
+            stem = stem[..^2];
+        return stem;
+    }
+
+    /// <summary>
+    /// Strips the rewrite backup suffix (legacy: last 4 chars, i.e. <c>.old</c>) plus any
+    /// <c>.cso</c> image suffix, so a rewrite names its output after the game, not the container.
+    /// </summary>
+    private static string StripRewriteSuffix(string filename)
+    {
+        filename = filename.EndsWith(".old", StringComparison.OrdinalIgnoreCase)
+            ? filename[..^".old".Length]
+            : filename[..^4];
+        return IsCsoPath(filename) && filename.Length > 4 ? StripCsoSuffix(filename) : filename;
+    }
+
+    /// <summary>
     /// Verifies that the given stream is a valid XISO image by checking the header
     /// magic at all known disc offsets. Returns root directory metadata and the
     /// disc lseek offset used.
     /// </summary>
-    /// <param name="fs">Open file stream positioned anywhere.</param>
+    /// <param name="fs">Open image stream positioned anywhere (plain file or CISO-backed).</param>
     /// <param name="isoName">Display name of the ISO (used in error messages).</param>
     /// <param name="skipSectors">
     /// Optional number of 2048-byte sectors to skip from the start of the file before
@@ -52,7 +104,7 @@ public static class XisoReader
     /// Thrown when the root directory sector and size are both zero (empty ISO).
     /// </exception>
     public static (uint rootDirSector, uint rootDirSize, long discLseek) VerifyXiso(
-        FileStream fs, string isoName, int? skipSectors = null)
+        Stream fs, string isoName, int? skipSectors = null)
     {
         Span<byte> buffer = stackalloc byte[Constants.HeaderDataLength];
         long discLseek = 0;
@@ -298,7 +350,7 @@ public static class XisoReader
     /// Recursively traverses the on-disk directory tree of an XISO image,
     /// building an AVL index and optionally extracting files or listing entries.
     /// </summary>
-    /// <param name="fs">File stream positioned at the start of the directory sector.</param>
+    /// <param name="fs">Image stream positioned at the start of the directory sector.</param>
     /// <param name="inDirNode">Pre-allocated directory entry node, or <c>null</c> to create one.</param>
     /// <param name="dirStart">Byte offset of the current directory sector.</param>
     /// <param name="path">Path prefix for logging and extraction.</param>
@@ -307,7 +359,7 @@ public static class XisoReader
     /// <param name="llCompat">If <c>true</c>, uses backwards-compatible right-offset calculation.</param>
     /// <param name="discLseek">Disc lseek offset for sector address calculation.</param>
     internal static void TraverseXiso(
-        FileStream fs,
+        Stream fs,
         DirEntry? inDirNode,
         long dirStart,
         string? path,
@@ -583,7 +635,7 @@ public static class XisoReader
     /// <param name="discLseek">Disc lseek offset for sector address calculation.</param>
     /// <exception cref="IOException">Thrown on read or write errors.</exception>
     internal static void ExtractFile(
-        FileStream fs,
+        Stream fs,
         string filename,
         uint startSector,
         uint fileSize,
@@ -651,7 +703,7 @@ public static class XisoReader
     /// and a new optimized ISO is created in its place.
     /// Always uses <c>llCompat=true</c> to handle linked-list-style directory entries.
     /// </summary>
-    /// <param name="xisoPath">Path to the XISO file to rewrite.</param>
+    /// <param name="xisoPath">Path to the XISO file to rewrite, or a <c>.cso</c> image (auto-detected).</param>
     /// <param name="outputPath">Output directory for the rewritten ISO, or <c>null</c> for the current directory.</param>
     /// <param name="outIsoPath">Receives the path to the output ISO file.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
@@ -688,7 +740,7 @@ public static class XisoReader
     /// <summary>
     /// Extracts files from an XISO image to a directory.
     /// </summary>
-    /// <param name="xisoPath">Path to the XISO file.</param>
+    /// <param name="xisoPath">Path to the XISO file, or a <c>.cso</c> image (auto-detected).</param>
     /// <param name="outputPath">Output directory, or <c>null</c> to extract to an ISO-named subdirectory.</param>
     /// <param name="llCompat">
     /// If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.
@@ -716,7 +768,7 @@ public static class XisoReader
     /// The optimized-tag marker is probed automatically, so callers do not need to know
     /// the image layout (unlike <see cref="Extract"/>, which takes <c>llCompat</c>).
     /// </summary>
-    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="isoPath">Path to the XISO file, or a <c>.cso</c> image (auto-detected).</param>
     /// <param name="outputPath">
     /// Destination directory. When <c>null</c>, a directory named after the ISO file
     /// (without the <c>.iso</c> extension) is created in the current directory.
@@ -753,16 +805,12 @@ public static class XisoReader
     /// <summary>
     /// Returns <c>true</c> when the image carries the extract-xiso optimized tag
     /// at byte offset 31337 (shifted by the skip offset when reading offset images),
-    /// meaning it uses the optimized directory layout.
+    /// meaning it uses the optimized directory layout. <c>.cso</c> paths are probed
+    /// through the decompressed view.
     /// </summary>
-    private static bool IsOptimized(string isoPath, int? skipSectors = null)
+    public static bool IsOptimizedImage(string isoPath, int? skipSectors = null)
     {
-        using var fs = new FileStream(
-            isoPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
-            });
+        using var fs = OpenImageStream(isoPath);
 
         fs.Seek(((long)(skipSectors ?? 0) * Constants.SectorSize) + Constants.OptimizedTagOffset, SeekOrigin.Begin);
         Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];
@@ -776,9 +824,17 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Returns <c>true</c> when the image carries the extract-xiso optimized tag
+    /// at byte offset 31337 (shifted by the skip offset when reading offset images),
+    /// meaning it uses the optimized directory layout.
+    /// </summary>
+    private static bool IsOptimized(string isoPath, int? skipSectors = null)
+        => IsOptimizedImage(isoPath, skipSectors);
+
+    /// <summary>
     /// Lists files in an XISO image without extracting.
     /// </summary>
-    /// <param name="xisoPath">Path to the XISO file.</param>
+    /// <param name="xisoPath">Path to the XISO file, or a <c>.cso</c> image (auto-detected).</param>
     /// <param name="llCompat">
     /// If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.
     /// Pass <c>false</c> for already-optimized ISOs.
@@ -803,7 +859,7 @@ public static class XisoReader
     /// Recursively lists all files in an XISO image in a tree format,
     /// showing full paths and sizes for each entry.
     /// </summary>
-    /// <param name="xisoPath">Path to the XISO file.</param>
+    /// <param name="xisoPath">Path to the XISO file, or a <c>.cso</c> image (auto-detected).</param>
     /// <param name="llCompat">
     /// If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.
     /// Pass <c>false</c> for already-optimized ISOs.
@@ -830,7 +886,8 @@ public static class XisoReader
     /// Prefer using <see cref="Rewrite"/>, <see cref="Extract"/>, or <see cref="List"/>
     /// for mode-specific operations.
     /// </summary>
-    /// <param name="xisoPath">Path to the XISO file (or <c>.old</c> file for rewrite mode).</param>
+    /// <param name="xisoPath">Path to the XISO file (or <c>.old</c> file for rewrite mode),
+    /// or a <c>.cso</c> image (auto-detected).</param>
     /// <param name="outputPath">
     /// Output directory for extraction or rewrite output.
     /// When <c>null</c> in extract mode, a directory named after the ISO is created.
@@ -889,7 +946,7 @@ public static class XisoReader
 
         if (mode == ExtractMode.Rewrite)
         {
-            filename = filename[..^4];
+            filename = StripRewriteSuffix(filename);
             repair = true;
         }
 
@@ -908,14 +965,13 @@ public static class XisoReader
                 return 1;
         }
 
+        // A .cso input names its outputs after the game, not the container.
+        if (shortName == null && len > 4 && IsCsoPath(name))
+            shortName = StripCsoSuffix(name);
+
         string? cwd = null;
 
-        using var fs = new FileStream(
-            xisoPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
-            });
+        using Stream fs = OpenImageStream(xisoPath);
 
         (var rootDirSect, var rootDirSize, var discLseek) = VerifyXiso(fs, name, skipSectors);
 
@@ -1022,7 +1078,8 @@ public static class XisoReader
     /// Asynchronously processes an XISO image. Verifies the image, then
     /// performs extraction, listing, or rewriting based on the specified mode.
     /// </summary>
-    /// <param name="xisoPath">Path to the XISO file (or <c>.old</c> file for rewrite mode).</param>
+    /// <param name="xisoPath">Path to the XISO file (or <c>.old</c> file for rewrite mode),
+    /// or a <c>.cso</c> image (auto-detected).</param>
     /// <param name="outputPath">Output directory for extraction or rewrite output. When <c>null</c> in extract mode, a directory named after the ISO is created.</param>
     /// <param name="mode">Operating mode: extract, list, or rewrite.</param>
     /// <param name="llCompat">If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.</param>
@@ -2158,7 +2215,7 @@ public static class XisoReader
     /// <exception cref="IOException">
     /// Thrown when EOF is reached before the buffer is fully populated.
     /// </exception>
-    private static void ReadExact(FileStream fs, Span<byte> buffer)
+    private static void ReadExact(Stream fs, Span<byte> buffer)
     {
         var offset = 0;
         while (offset < buffer.Length)

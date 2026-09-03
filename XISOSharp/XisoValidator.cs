@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using XISOSharp.Models;
 
 namespace XISOSharp;
@@ -14,6 +15,57 @@ namespace XISOSharp;
 /// <param name="Size">File size in bytes (0 for directories).</param>
 /// <param name="IsDirectory">Whether this entry is a directory.</param>
 internal record FileTreeEntry(string Path, long Size, bool IsDirectory);
+
+/// <summary>
+/// JSON report side (source/output) for <see cref="XisoValidator.WriteReport"/>.
+/// Members serialize camelCase via the report serializer context options.
+/// </summary>
+/// <param name="Path">Image path.</param>
+/// <param name="FileCount">Total files in the image.</param>
+/// <param name="DirCount">Total directories in the image.</param>
+/// <param name="TotalBytes">Total file data bytes in the image.</param>
+internal sealed record ValidationReportSide(string Path, int FileCount, int DirCount, long TotalBytes);
+
+/// <summary>
+/// JSON report issue entry for <see cref="XisoValidator.WriteReport"/>.
+/// </summary>
+/// <param name="Type">Issue type name (e.g. "MissingInOutput").</param>
+/// <param name="Path">The file path (XISO internal path with forward slashes).</param>
+/// <param name="SourceSize">Size in the source ISO (0 if missing in source).</param>
+/// <param name="OutputSize">Size in the output ISO (0 if missing in output).</param>
+/// <param name="SourceHash">Lowercase hex SHA-256 in the source (null if not computed).</param>
+/// <param name="OutputHash">Lowercase hex SHA-256 in the output (null if not computed).</param>
+internal sealed record ValidationReportIssue(
+    string Type,
+    string Path,
+    long SourceSize,
+    long OutputSize,
+    string? SourceHash,
+    string? OutputHash);
+
+/// <summary>
+/// JSON validation report for <see cref="XisoValidator.WriteReport"/>.
+/// Named DTOs (instead of anonymous types) so System.Text.Json source generation
+/// keeps working in trimmed single-file publishes, where reflection-based
+/// serialization is disabled.
+/// </summary>
+/// <param name="Source">Source image summary.</param>
+/// <param name="Output">Output image summary.</param>
+/// <param name="Passed">Whether validation passed with no issues.</param>
+/// <param name="IssueCount">Number of issues found.</param>
+/// <param name="Issues">Issue details.</param>
+internal sealed record ValidationReport(
+    ValidationReportSide Source,
+    ValidationReportSide Output,
+    bool Passed,
+    int IssueCount,
+    List<ValidationReportIssue> Issues);
+
+/// <summary>
+/// Trim-safe System.Text.Json source-generation context for <see cref="ValidationReport"/>.
+/// </summary>
+[JsonSerializable(typeof(ValidationReport))]
+internal sealed partial class ValidationReportJsonContext : JsonSerializerContext;
 
 /// <summary>
 /// Provides post-conversion validation comparing source and output XISO images.
@@ -273,42 +325,28 @@ public static class XisoValidator
         string outputPath,
         string reportPath)
     {
-        var report = new
-        {
-            source =
-                new
-                {
-                    path = sourcePath,
-                    fileCount = result.SourceFileCount,
-                    dirCount = result.SourceDirCount,
-                    totalBytes = result.SourceTotalBytes
-                },
-            output =
-                new
-                {
-                    path = outputPath,
-                    fileCount = result.OutputFileCount,
-                    dirCount = result.OutputDirCount,
-                    totalBytes = result.OutputTotalBytes
-                },
-            passed = result.Passed,
-            issueCount = result.Issues.Count,
-            issues = result.Issues.Select(static i => new
-            {
-                type = i.Type.ToString(),
-                path = i.Path,
-                sourceSize = i.SourceSize,
-                outputSize = i.OutputSize,
-                sourceHash = i.SourceHash != null ? Convert.ToHexString(i.SourceHash).ToLowerInvariant() : null,
-                outputHash = i.OutputHash != null ? Convert.ToHexString(i.OutputHash).ToLowerInvariant() : null
-            }).ToList()
-        };
+        static string? Hex(byte[]? hash) =>
+            hash != null ? Convert.ToHexString(hash).ToLowerInvariant() : null;
 
-        var options = new JsonSerializerOptions { WriteIndented = true };
-#pragma warning disable IL2026 // JSON serialization is acceptable for CLI tool output
-#pragma warning disable IL3050
-        var json = JsonSerializer.Serialize(report, options);
-#pragma warning restore IL3050, IL2026
+        var report = new ValidationReport(
+            new ValidationReportSide(sourcePath, result.SourceFileCount, result.SourceDirCount, result.SourceTotalBytes),
+            new ValidationReportSide(outputPath, result.OutputFileCount, result.OutputDirCount, result.OutputTotalBytes),
+            result.Passed,
+            result.Issues.Count,
+            result.Issues.Select(static i => new ValidationReportIssue(
+                i.Type.ToString(),
+                i.Path,
+                i.SourceSize,
+                i.OutputSize,
+                Hex(i.SourceHash),
+                Hex(i.OutputHash))).ToList());
+
+        var context = new ValidationReportJsonContext(new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        });
+        var json = JsonSerializer.Serialize(report, context.ValidationReport);
         File.WriteAllText(reportPath, json, Encoding.UTF8);
     }
 }

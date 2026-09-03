@@ -1,14 +1,14 @@
-# XISOSharp.Cli
+# XISOSharp CLI (`XISOSharp.Cli`)
 
-Command-line tool for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images.
+Command-line tool for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. Builds as `XISOSharp.Cli(.exe)`.
 
 This project is a direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) CLI tool (v2.7.1) from C to C#. It provides the same interface and produces byte-identical output for all operations.
 
 ## Usage
 
 ```
-extract-xiso [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
-extract-xiso [options] -c <dir> [name] [-c <dir> [name]] ...
+XISOSharp.Cli [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
+XISOSharp.Cli [options] -c <dir> [name] [-c <dir> [name]] ...
 ```
 
 ### Modes (mutually exclusive)

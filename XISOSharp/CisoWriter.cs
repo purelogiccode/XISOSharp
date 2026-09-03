@@ -364,7 +364,13 @@ public static class CisoWriter
             _ => CompressionLevel.Optimal
         };
 
-    private static string DeriveDefaultCsoPath(string sourcePath, bool isDir)
+    /// <summary>
+    /// Derives the default <c>.cso</c> output path for <paramref name="sourcePath"/>
+    /// (same rule <see cref="CompressToCso"/> uses when no explicit output is given):
+    /// a directory maps to <c>&lt;parent&gt;/&lt;name&gt;.cso</c>, a file maps to its
+    /// sibling with the extension replaced by <c>.cso</c>.
+    /// </summary>
+    public static string DeriveDefaultCsoPath(string sourcePath, bool isDir)
     {
         if (isDir)
         {

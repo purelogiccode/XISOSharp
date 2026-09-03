@@ -30,16 +30,17 @@ dotnet build XISOSharp.Cli -c Release
 
 # Or a self-contained single-file binary for your platform (no runtime needed)
 dotnet publish XISOSharp.Cli -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
-# Supported RIDs: win-x64, linux-x64, osx-x64, osx-arm64
+# Supported RIDs: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 (win-x86 also builds).
+# Or publish all six at once: ./publish-cli.ps1  (binaries land in publish/<rid>/)
 ```
 
-The executable is named **`extract-xiso`** (Windows: `extract-xiso.exe`) and lives in
+The executable is named **`XISOSharp.Cli`** (Windows: `XISOSharp.Cli.exe`) and lives in
 `XISOSharp.Cli/bin/Release/net10.0/`.
 
 ### First extraction
 
 ```bash
-extract-xiso -d ./extracted game.iso
+XISOSharp.Cli -d ./extracted game.iso
 ```
 
 - `-d ./extracted` — output directory (created if missing)
@@ -58,21 +59,21 @@ creating dir1\ (0 bytes) [OK]
 ### First creation
 
 ```bash
-extract-xiso -c ./game_files
+XISOSharp.Cli -c ./game_files
 ```
 
 Creates `game_files.iso` in the current directory from the contents of `./game_files`.
 Optionally pass an output name:
 
 ```bash
-extract-xiso -c ./game_files my_game.iso          # written to ./my_game.iso
-extract-xiso -c ./game_files ./out/my_game.iso     # name may include a directory
+XISOSharp.Cli -c ./game_files my_game.iso          # written to ./my_game.iso
+XISOSharp.Cli -c ./game_files ./out/my_game.iso     # name may include a directory
 ```
 
 ### First listing
 
 ```bash
-extract-xiso -l game.iso
+XISOSharp.Cli -l game.iso
 ```
 
 Lists the top-level entries. Use `-t` for a recursive listing with sizes, or see the
@@ -129,19 +130,19 @@ int result = XisoReader.List("game.iso", llCompat: false);
 
 ```bash
 # Video filler seed wipe trim petrify update zar — XboxKit parity
-extract-xiso --video game.redump.iso              # L0 head + L1 tail via XgdTables
-extract-xiso --random game.iso                    # filler gaps via GetXisoRanges/MergeRanges
-extract-xiso --seed game.iso                      # XGD1 PRNG brute-force (XboxPrng)
-extract-xiso --wipe game.iso -o wiped.iso
-extract-xiso --trim game.iso -o trimmed.iso
-extract-xiso --petrify game.iso                   # skeleton + .hash SHA-1
-extract-xiso --update game.redump.iso             # XGD3 su20076000_00000000
-extract-xiso --zar game.iso -o game.zar           # zstd
-extract-xiso --all game.redump.iso                # all of the above + --video/--wipe
+XISOSharp.Cli --video game.redump.iso              # L0 head + L1 tail via XgdTables
+XISOSharp.Cli --random game.iso                    # filler gaps via GetXisoRanges/MergeRanges
+XISOSharp.Cli --seed game.iso                      # XGD1 PRNG brute-force (XboxPrng)
+XISOSharp.Cli --wipe game.iso -o wiped.iso
+XISOSharp.Cli --trim game.iso -o trimmed.iso
+XISOSharp.Cli --petrify game.iso                   # skeleton + .hash SHA-1
+XISOSharp.Cli --update game.redump.iso             # XGD3 su20076000_00000000
+XISOSharp.Cli --zar game.iso -o game.zar           # zstd
+XISOSharp.Cli --all game.redump.iso                # all of the above + --video/--wipe
 
 # Lossless rebuild
-extract-xiso rebuild game.xiso video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso --security-sectors sectors.txt
-extract-xiso validate game.redump.iso rebuilt.redump.iso --validate-checksums
+XISOSharp.Cli rebuild game.xiso video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso --security-sectors sectors.txt
+XISOSharp.Cli validate game.redump.iso rebuilt.redump.iso --validate-checksums
 ```
 
 See [Archival Workflows](archival.md).
@@ -150,16 +151,16 @@ See [Archival Workflows](archival.md).
 
 ```bash
 # Ordered remapping with wax captures + negation + xdvdfs.toml
-extract-xiso build-image ./src -m "bin:/" -m "assets/**:/assets/{1}" -O out.iso
-extract-xiso build-image -D -m "!secret/**" -m "**:/{0}" ./src   # --dry-run
-extract-xiso image-spec from -O dist/image.iso -m "bin:/" xdvdfs.toml
+XISOSharp.Cli build-image ./src -m "bin:/" -m "assets/**:/assets/{1}" -O out.iso
+XISOSharp.Cli build-image -D -m "!secret/**" -m "**:/{0}" ./src   # --dry-run
+XISOSharp.Cli image-spec from -O dist/image.iso -m "bin:/" xdvdfs.toml
 
 # CISO compress/decompress (DEFLATE v1 + LZ4 v2, align 0/1/2)
-extract-xiso compress ./game_dir game.cso --ciso-level 9
-extract-xiso decompress game.cso game.iso
+XISOSharp.Cli compress ./game_dir game.cso --ciso-level 9
+XISOSharp.Cli decompress game.cso game.iso
 
 # Deterministic SHA3-256 image checksum (BTreeMap sorted, xdvdfs compat)
-extract-xiso checksum game.iso
+XISOSharp.Cli checksum game.iso
 ```
 
 See [Build-Image](xdvdfs-compat.md#build-image) · [Compression](compression.md) · [Checksums](xdvdfs-compat.md#checksum).

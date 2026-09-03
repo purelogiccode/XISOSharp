@@ -1,6 +1,8 @@
 bin/
 obj/
 /packages/
+/publish/
+/publish-gui/
 riderModule.iml
 /_ReSharper.Caches/
 /TestData/

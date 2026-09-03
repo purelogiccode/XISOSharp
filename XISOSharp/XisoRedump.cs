@@ -234,7 +234,9 @@ public static class XisoRedump
     /// <summary>
     /// Rebuilds a Redump ISO from its components. Mirrors <c>XGD.RebuildRedump</c>.
     /// </summary>
-    /// <param name="xisoPath">Game partition XISO.</param>
+    /// <param name="xisoPath">Game partition XISO, or a <c>.zar</c> sidecar standing in for it
+    /// (a single embedded XISO image is used verbatim; otherwise the archived file tree is
+    /// repacked into a temporary XISO — file data is exact, directory layout is regenerated).</param>
     /// <param name="videoPath">Video partition (from <see cref="TryExtractVideo"/>).</param>
     /// <param name="fillerOrSeedPath">Optional filler file or 4-byte seed file (XGD1 PRNG). Pass null if unavailable.</param>
     /// <param name="updatePath">Optional XGD3 system-update file (<c>su20076000_00000000</c>).</param>
@@ -251,6 +253,37 @@ public static class XisoRedump
         string? securitySectorsPath = null,
         bool quiet = false,
         CancellationToken cancellationToken = default)
+    {
+        // A .zar sidecar may stand in for the <xiso> component (XboxKit roadmap
+        // "ZArchive rebuild is coming soon!"): materialize it to a temp XISO first.
+        if (xisoPath.EndsWith(".zar", StringComparison.OrdinalIgnoreCase))
+        {
+            var materialized = MaterializeZarXiso(xisoPath, quiet, cancellationToken, out var scratchDir);
+            if (materialized == null) return false;
+            try
+            {
+                return RebuildRedumpCore(materialized, videoPath, fillerOrSeedPath, updatePath,
+                    outputRedumpPath, securitySectorsPath, quiet, cancellationToken);
+            }
+            finally
+            {
+                DeleteScratchDir(scratchDir, quiet);
+            }
+        }
+
+        return RebuildRedumpCore(xisoPath, videoPath, fillerOrSeedPath, updatePath,
+            outputRedumpPath, securitySectorsPath, quiet, cancellationToken);
+    }
+
+    private static bool RebuildRedumpCore(
+        string xisoPath,
+        string videoPath,
+        string? fillerOrSeedPath,
+        string? updatePath,
+        string outputRedumpPath,
+        string? securitySectorsPath,
+        bool quiet,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -553,11 +586,177 @@ public static class XisoRedump
         return WriteSplitL1(videoFs, redumpFs, l0Length, l1Length, updateFs);
     }
 
+    // -----------------------------------------------------------------------
+    // Rebuild from .zar sidecar — the archive stands in for the <xiso> component.
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Extracts a <c>.zar</c> sidecar to a scratch directory and returns a usable XISO path:
+    /// a single embedded XISO image is used verbatim, otherwise the archived file tree is
+    /// repacked via <c>XisoWriter.PackFromDirectory</c>. Returns null (already logged) when
+    /// the archive is invalid, empty, or cannot be repacked. Throws
+    /// <see cref="FileNotFoundException"/> for a missing path, like a missing XISO.
+    /// </summary>
+    /// <param name="zarPath">Path to the <c>.zar</c> sidecar.</param>
+    /// <param name="quiet">Suppress info output.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <param name="scratchDir">Scratch directory holding the materialized files; caller deletes it.</param>
+    private static string? MaterializeZarXiso(string zarPath, bool quiet, CancellationToken cancellationToken,
+        out string? scratchDir)
+    {
+        scratchDir = null;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!File.Exists(zarPath))
+            throw new FileNotFoundException($"XISO/ZAR input not found: {zarPath}", zarPath);
+
+        using var reader = ZARSharp.ZArchiveReader.TryOpen(zarPath);
+        if (reader == null)
+        {
+            if (!quiet) Logger.LogErr($"[ERROR] Not a valid ZArchive: {zarPath}\n");
+            return null;
+        }
+
+        scratchDir = Path.Combine(Path.GetTempPath(), $"XISOSharp_zar_{Guid.NewGuid():N}");
+        var filesDir = Path.Combine(scratchDir, "files");
+        Directory.CreateDirectory(filesDir);
+        try
+        {
+            var files = ExtractZarTree(reader, filesDir, cancellationToken);
+            if (files.Count == 0)
+            {
+                if (!quiet) Logger.LogErr($"[ERROR] ZArchive contains no files: {zarPath}\n");
+                return null;
+            }
+
+            // Single-file archives holding an XISO image are used verbatim,
+            // so a byte-identical rebuild stays possible.
+            if (files.Count == 1 && HasXisoMagic(Path.Combine(filesDir, files[0])))
+            {
+                if (!quiet) Logger.Log($"[INFO] Using XISO image '{files[0]}' from {zarPath}\n");
+                return Path.Combine(filesDir, files[0]);
+            }
+
+            if (!quiet)
+                Logger.Log($"[INFO] Repacking {files.Count} files from {zarPath} into a temporary XISO\n");
+            var tempXiso = Path.Combine(scratchDir, "game.xiso");
+            if (XisoWriter.PackFromDirectory(filesDir, tempXiso, cancellationToken: cancellationToken) != 0)
+            {
+                if (!quiet) Logger.LogErr($"[ERROR] Failed repacking ZArchive contents into an XISO: {zarPath}\n");
+                return null;
+            }
+
+            return tempXiso;
+        }
+        catch
+        {
+            DeleteScratchDir(scratchDir, quiet: true);
+            scratchDir = null;
+            throw;
+        }
+    }
+
+    private static List<string> ExtractZarTree(ZARSharp.ZArchiveReader reader, string outputDir,
+        CancellationToken cancellationToken)
+    {
+        var files = new List<string>();
+        ExtractZarDir(reader, string.Empty, outputDir, string.Empty, files, cancellationToken);
+        return files;
+    }
+
+    private static void ExtractZarDir(ZARSharp.ZArchiveReader reader, string srcPath, string outDir,
+        string relPath, List<string> files, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var dirHandle = reader.LookUp(srcPath);
+        if (dirHandle == ZARSharp.ZArchiveReader.InvalidNode || !reader.IsDirectory(dirHandle))
+            throw new InvalidOperationException($"Directory not found in archive: '{srcPath}'.");
+        Directory.CreateDirectory(outDir);
+
+        var count = reader.GetDirEntryCount(dirHandle);
+        for (uint i = 0; i < count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!reader.GetDirEntry(dirHandle, i, out var entry))
+                throw new InvalidOperationException("Directory contains invalid node.");
+            var childSrc = string.IsNullOrEmpty(srcPath) ? entry.Name : srcPath + "/" + entry.Name;
+            var childRel = string.IsNullOrEmpty(relPath) ? entry.Name : relPath + "/" + entry.Name;
+            var childOut = Path.Combine(outDir, entry.Name);
+            if (entry.IsDirectory)
+            {
+                ExtractZarDir(reader, childSrc, childOut, childRel, files, cancellationToken);
+            }
+            else
+            {
+                ExtractZarFile(reader, childSrc, childOut, cancellationToken);
+                files.Add(childRel);
+            }
+        }
+    }
+
+    private static void ExtractZarFile(ZARSharp.ZArchiveReader reader, string srcPath, string outputPath,
+        CancellationToken cancellationToken)
+    {
+        var handle = reader.LookUp(srcPath);
+        if (handle == ZARSharp.ZArchiveReader.InvalidNode || !reader.IsFile(handle))
+            throw new InvalidOperationException($"Unable to extract file: {srcPath}");
+        using var output = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+        var buffer = new byte[64 * 1024];
+        ulong offset = 0;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var read = reader.ReadFromFile(handle, offset, buffer);
+            if (read == 0) break;
+            output.Write(buffer, 0, (int)read);
+            offset += read;
+        }
+
+        if (offset != reader.GetFileSize(handle))
+            throw new InvalidOperationException($"Extraction failed: {srcPath}");
+    }
+
+    private static bool HasXisoMagic(string path)
+    {
+        try
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096);
+            if (fs.Length < Constants.HeaderOffset + Constants.HeaderDataLength) return false;
+            fs.Seek(Constants.HeaderOffset, SeekOrigin.Begin);
+            Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
+            var total = 0;
+            while (total < buf.Length)
+            {
+                var n = fs.Read(buf[total..]);
+                if (n == 0) break;
+                total += n;
+            }
+
+            return total == buf.Length && buf.SequenceEqual(Encoding.ASCII.GetBytes(Constants.HeaderData));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void DeleteScratchDir(string? scratchDir, bool quiet)
+    {
+        if (string.IsNullOrEmpty(scratchDir)) return;
+        try
+        {
+            if (Directory.Exists(scratchDir)) Directory.Delete(scratchDir, true);
+        }
+        catch (Exception ex)
+        {
+            if (!quiet) Logger.Log($"[INFO] Could not remove temp directory {scratchDir}: {ex.Message}\n");
+        }
+    }
+
     /// <summary>
     /// Tries to rebuild a Redump ISO by inferring video, filler, and update paths from additional files.
     /// </summary>
     /// <param name="additionalFiles">Candidate component files (video, filler, update).</param>
-    /// <param name="xisoPath">Game partition XISO path.</param>
+    /// <param name="xisoPath">Game partition XISO path, or a <c>.zar</c> sidecar (see <see cref="RebuildRedump"/>).</param>
     /// <param name="outputRedumpPath">Destination Redump ISO path.</param>
     /// <param name="quiet">When <c>true</c>, suppresses logging.</param>
     /// <returns><c>true</c> on success; otherwise <c>false</c>.</returns>

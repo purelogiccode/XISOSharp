@@ -44,6 +44,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
+        <ProjectReference Include="..\XISOSharp.Cli\XISOSharp.Cli.csproj" />
+        <ProjectReference Include="..\ZARSharp\ZARSharp.csproj" />
     </ItemGroup>
 
 </Project>

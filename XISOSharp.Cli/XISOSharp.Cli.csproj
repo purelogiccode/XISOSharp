@@ -3,13 +3,39 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
-        <AssemblyName>extract-xiso</AssemblyName>
+        <!-- AssemblyName matches the project identity: the XISOSharp CLI ships as
+             XISOSharp.Cli(.exe). A bare "XISOSharp" is impossible — the class
+             library already owns that assembly name, and two same-named
+             assemblies break solution restore ("Ambiguous project name"). -->
+        <AssemblyName>XISOSharp.Cli</AssemblyName>
         <ApplicationIcon>icon/icon.ico</ApplicationIcon>
-        <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+        <!-- XboxKit RID parity (win-x86 extra; primary six: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64) -->
+        <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+
+        <!-- Distribution defaults: every self-contained `dotnet publish -r` for a
+             listed RID yields a trimmed single-file binary with no runtime to install. -->
+        <PublishSingleFile>true</PublishSingleFile>
+        <PublishTrimmed>true</PublishTrimmed>
+        <TrimMode>partial</TrimMode>
+
+        <!-- Surface trim/single-file incompatibilities at build time, not just publish. -->
+        <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+        <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
+    </ItemGroup>
+
+    <!-- Version stamps (Version/InformationalVersion/FileVersion) derived from git tags, same as the library. -->
+    <ItemGroup>
+        <PackageReference Include="MinVer" PrivateAssets="all" Version="7.0.0">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="XISOSharp.Tests" />
     </ItemGroup>
 
     <ItemGroup>

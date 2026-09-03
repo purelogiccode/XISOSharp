@@ -76,10 +76,10 @@ extension marks split input).
 ## CLI
 
 ```
-extract-xiso compress <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
-extract-xiso cso <sourceDir|image.iso> [output.cso]       # alias
-extract-xiso decompress <cso|.1.cso> [output.iso]
-extract-xiso uncso|decso <cso|.1.cso> [output.iso]        # aliases
+XISOSharp.Cli compress <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
+XISOSharp.Cli cso <sourceDir|image.iso> [output.cso]       # alias
+XISOSharp.Cli decompress <cso|.1.cso> [output.iso]
+XISOSharp.Cli uncso|decso <cso|.1.cso> [output.iso]        # aliases
 ```
 
 | Flag | Effect |
@@ -92,18 +92,18 @@ Examples:
 
 ```bash
 # Directory → CISO (build ISO then compress in one pass); default v2 LZ4, split output
-extract-xiso compress ./game_dir game.cso --ciso-level 9
+XISOSharp.Cli compress ./game_dir game.cso --ciso-level 9
 #   → game.1.cso (+ game.2.cso, … for images > ~4 GiB)
 
 # ISO → single-file CISO (classic layout, escape hatch)
-extract-xiso cso game.iso game.cso --ciso-split 0
+XISOSharp.Cli cso game.iso game.cso --ciso-split 0
 
 # Classic DEFLATE CISO with a custom split point
-extract-xiso cso game.iso game.cso --ciso-version 1 --ciso-split 1073741824
+XISOSharp.Cli cso game.iso game.cso --ciso-version 1 --ciso-split 1073741824
 
 # Decompress (single or split input)
-extract-xiso decompress game.1.cso game.iso
-extract-xiso uncso game.cso
+XISOSharp.Cli decompress game.1.cso game.iso
+XISOSharp.Cli uncso game.cso
 ```
 
 Multi-file handling: `compress` accepts `sourceDir` or `image.iso`; when given a directory it first builds an ISO (via `XisoWriter.CreateXiso` pipeline) then wraps via `CisoWriter`.
@@ -143,17 +143,19 @@ Header detection: `IsCso` checks `CISO` magic + `headerSize==24` + `version 1/2`
 
 - On-demand sector decompress with **single-sector cache** (`_cachedSectorIndex` + `_cachedSectorData` 2048 bytes) — avoids realloc per read.
 - Accepts a path (single or split `*.1.cso` parts), a `FileStream`, or any seekable `Stream` (e.g. the composite split stream).
-- **Auto-detect**: `XisoChecksum.ComputeImageChecksum(string)` routes any `.cso`/`*.1.cso` path (extension check, `img.rs::open_image` parity) through `CisoBlockDevice`, so the `checksum` CLI verb and `--checksum` flag hash the decompressed view directly — result identical to the source ISO. An `IBlockDevice` overload (`ComputeImageChecksum(dev, name, ...)`) accepts any device (`File`/`Memory`/`Ciso`/`Offset`), mirroring xdvdfs `compute_checksum(blockdev)`.
-- Passed to `XisoReader.VerifyXiso(IBlockDevice)` so `checksum` operates directly on `.cso` without decompressing to a temp file (future auto-detect for `extract`/`list`).
+- **Auto-detect**: any `.cso`/`*.1.cso` path is routed through `CisoBlockDevice`, so `checksum`, `extract`, `unpack`, `list`/`tree`, `pack` (iso→rewrite) and `rewrite` all operate on the decompressed view directly — results identical to the source ISO. `XisoReader.DecodeXiso` opens inputs via `OpenImageStream` (plain `FileStream`, or `CisoBlockDevice` wrapped in `BlockDeviceStream`); detection is by extension (`img.rs::open_image` parity) with a `CISO` magic sniff fallback so renamed containers still resolve (the CLI rewrite flow appends `.old`: `game.cso` → `game.cso.old`). Rewrite/extract output names strip the container suffix (`game.cso` → `game.iso`, extract dir `game/`). An `IBlockDevice` overload (`ComputeImageChecksum(dev, name, ...)`) accepts any device (`File`/`Memory`/`Ciso`/`Offset`), mirroring xdvdfs `compute_checksum(blockdev)`.
+- `checksum`/`extract`/`list` operate directly on `.cso` without decompressing to a temp file.
 
 ```bash
-extract-xiso checksum game.iso      # plain ISO
-extract-xiso checksum game.1.cso    # CISO (single or split) — same hash as game.iso
+XISOSharp.Cli checksum game.iso      # plain ISO
+XISOSharp.Cli checksum game.1.cso    # CISO (single or split) — same hash as game.iso
 ```
 
 ```bash
-extract-xiso checksum game.iso      # plain ISO
-extract-xiso checksum game.1.cso    # CISO (single or split) — same hash as game.iso
+XISOSharp.Cli checksum game.iso      # plain ISO
+XISOSharp.Cli checksum game.1.cso    # CISO (single or split) — same hash as game.iso
+XISOSharp.Cli -d out -x game.cso     # extract from CISO — same files as game.iso
+XISOSharp.Cli rewrite game.cso       # rewrite from CISO — same bytes as rewriting game.iso
 ```
 
 Usage:
@@ -178,9 +180,9 @@ See [xdvdfs Compat — Block Device](xdvdfs-compat.md#block-device).
 Verified:
 
 ```bash
-extract-xiso compress sourceDir out.cso
-extract-xiso decompress out.1.cso rebuilt.iso
-extract-xiso checksum source.iso rebuilt.iso --silent  # hex match
+XISOSharp.Cli compress sourceDir out.cso
+XISOSharp.Cli decompress out.1.cso rebuilt.iso
+XISOSharp.Cli checksum source.iso rebuilt.iso --silent  # hex match
 # Also: decompress Rust-produced v2 CISO → same checksum
 ```
 

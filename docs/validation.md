@@ -17,7 +17,7 @@ The `validate` command compares two existing ISO images and must be the **first*
 token on the command line (it does not start with `-`):
 
 ```bash
-extract-xiso validate <source.iso> <output.iso> [--validate-checksums] [--validate-report <file>]
+XISOSharp.Cli validate <source.iso> <output.iso> [--validate-checksums] [--validate-report <file>]
 ```
 
 | Flag | Effect |
@@ -34,7 +34,7 @@ an ordinary XISO; the output is the image produced by a conversion.
 Combine with `-r` to validate every rewritten image:
 
 ```bash
-extract-xiso -r --validate [--validate-checksums] [--validate-strict] [--validate-report <file>] game.iso
+XISOSharp.Cli -r --validate [--validate-checksums] [--validate-strict] [--validate-report <file>] game.iso
 ```
 
 | Flag | Effect |
@@ -109,10 +109,10 @@ Each issue entry carries `type`, `path`, `sourceSize`, `outputSize`, `sourceHash
 
 ```bash
 # Compare a Redump source with a rebuilt XISO, including checksums
-extract-xiso validate game.redump.iso rebuilt.xiso --validate-checksums
+XISOSharp.Cli validate game.redump.iso rebuilt.xiso --validate-checksums
 
 # Rewrite and validate with a JSON report; fail the build on mismatch
-extract-xiso -r --validate --validate-strict --validate-report report.json game.iso
+XISOSharp.Cli -r --validate --validate-strict --validate-report report.json game.iso
 ```
 
 See also: [CLI Reference](cli.md) · [Redump & Disc Layouts](redump-workflows.md) ·

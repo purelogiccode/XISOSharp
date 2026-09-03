@@ -1,5 +1,14 @@
 # Resume Instructions — ZARSharp (ZArchive-0.1.2 → pure C# port)
 
+> STATUS 2026-09-03 (later same day): **IMPLEMENTED.** `ZARSharp/` library,
+> 22 tests in `XISOSharp.Tests/ZArchiveSharpTests.cs` (all green), both-way
+> interop with `zarchive.exe` verified, README + TODO2 updated. FOLLOW-UP DONE:
+> `rebuild` from `.zar` sidecar implemented in `XisoRedump` (+7 tests in
+> `XisoZarRebuildTests.cs`, CLI + docs wired). Only known issue: 17 pre-existing
+> `XisoChecksumTests` fail on machines without OS SHA3 support
+> (`PlatformNotSupportedException`, unrelated to ZARSharp).
+> Original research notes preserved below.
+>
 > Written at end of session: 2026-09-03. Only **research** was done — no ZARSharp code exists yet.
 > Next session: implement the plan below. Everything needed is captured here so no re-exploration is required.
 

@@ -36,7 +36,7 @@ partition sits at a nonstandard offset, auto-detection can fail. Find the offset
 use `--skip-sectors`:
 
 ```bash
-extract-xiso --skip-sectors 129824 -d ./out dump.iso    # XGD2-style offset
+XISOSharp.Cli --skip-sectors 129824 -d ./out dump.iso    # XGD2-style offset
 ```
 
 **Do I need `--skip-sectors` for every Redump image?**
@@ -55,7 +55,7 @@ pattern `**/$SystemUpdate/**` (matches entries named exactly `$SystemUpdate`); d
 Use the repeatable `-X` flag with glob patterns:
 
 ```bash
-extract-xiso -X "**/*.tmp" -X "**/node_modules/**" -c ./game_files
+XISOSharp.Cli -X "**/*.tmp" -X "**/node_modules/**" -c ./game_files
 ```
 
 Patterns without a `**/` prefix match only at the root. See

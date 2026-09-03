@@ -31,7 +31,7 @@ Redump: [ L0 (VIDEO_L0_LENGTH[wave]) | l0Padding | game partition (fileRanges + 
 ## Video
 
 ```bash
-extract-xiso --video <redump.iso> [video.iso]
+XISOSharp.Cli --video <redump.iso> [video.iso]
 ```
 
 `XisoRedump.TryExtractVideo(redumpPath, outputVideoPath, out outPath)` — head `VIDEO_L0_LENGTH[videoType]` at `0` + tail `VIDEO_L1_LENGTH[videoType]` at `isoSize-L1`, streamed `64*SectorSize` chunks via `Logger`. Gracefully fails (warning) when `GetVideoType == -1`. As sidecar of `--all`/`--best`/`--compress` (see aliases). XGD3 `su…` is **not** in video when `--update` also extracts it (zeroed in video for dedup).
@@ -39,7 +39,7 @@ extract-xiso --video <redump.iso> [video.iso]
 ## Random
 
 ```bash
-extract-xiso --random <input.iso> [filler.bin]
+XISOSharp.Cli --random <input.iso> [filler.bin]
 ```
 
 `XisoOperations.ExtractFiller(isoPath, isoOffset)` — bytes **not** in `SysRanges ∪ FileRanges` after `MergeRanges`, i.e. gaps. Validates `filler % SectorSize==0`. Mirrors `XDVDFS.GetValidSectors` → `ProcessXISO` filler path.
@@ -47,7 +47,7 @@ extract-xiso --random <input.iso> [filler.bin]
 ## Seed
 
 ```bash
-extract-xiso --seed <input.iso> [seed.bin]
+XISOSharp.Cli --seed <input.iso> [seed.bin]
 ```
 
 XGD1 only. `XisoOperations.TryExtractSeed` + `XboxPrng.BruteForceSeed(ReadOnlySpan<byte> fillerSample)` / `SimulateSectors` / `WriteSectors` — RC4-like PRNG (port of `XboxPRNG.cs`). Brute-forces 4-byte LE seed from first filler gap; gate `GetXisoType==0` (XGD1). Writes 4-byte LE seed to `*.seed`.
@@ -55,7 +55,7 @@ XGD1 only. `XisoOperations.TryExtractSeed` + `XboxPrng.BruteForceSeed(ReadOnlySp
 ## Wipe
 
 ```bash
-extract-xiso --wipe <input.iso> -o <wiped.xiso>
+XISOSharp.Cli --wipe <input.iso> -o <wiped.xiso>
 ```
 
 `XisoOperations.WipeFiller` → `ProcessWipe` — walks `currentByte < xisoLength`, writing zeroes for filler extents instead of original/PRNG bytes. Part of `--best` (`-twx`). Improves compression for emulator use.
@@ -63,7 +63,7 @@ extract-xiso --wipe <input.iso> -o <wiped.xiso>
 ## Trim
 
 ```bash
-extract-xiso --trim <input.iso> [trimmed.xiso]
+XISOSharp.Cli --trim <input.iso> [trimmed.xiso]
 ```
 
 `XisoOperations.TrimXiso` — truncate after last file extent (`ranges.Max(End)+1)*SectorSize`), already `FileModulus`-aligned collection via `MergeRanges`. `FileStream.SetLength(trimmedLen)`.
@@ -71,7 +71,7 @@ extract-xiso --trim <input.iso> [trimmed.xiso]
 ## Petrify
 
 ```bash
-extract-xiso --petrify <input.iso> [skeleton.xiso] [hashFile]
+XISOSharp.Cli --petrify <input.iso> [skeleton.xiso] [hashFile]
 ```
 
 `XisoSkeleton.Petrify` — XISO with file extents zeroed + SHA-1 hex per file (`CollectFileEntries` sorted by `Offset`, `SHA1` streaming `sector*SectorSize+isoOffset`, line `hex + " " + path`). Skeleton = copy XISO with `WriteZeroes` over `FileRanges`. Mirrors `ProcessXISO(skeleton:true, hashWriter)`.
@@ -79,7 +79,7 @@ extract-xiso --petrify <input.iso> [skeleton.xiso] [hashFile]
 ## Update
 
 ```bash
-extract-xiso --update <redump.iso> [updateFile]
+XISOSharp.Cli --update <redump.iso> [updateFile]
 ```
 
 `XisoRedump.TryExtractUpdate(redumpPath, outputUpdatePath, outputVideoPath)` — extracts `su20076000_00000000` from video `L1` tail and zeroes it in output `video.iso` for dedup (XGD3 only, `GetVideoType` 17/18). Heuristic `FindUpdateOffset` tail scan `ABCDABCD`, `l1Trimmed = L1 - suSize - SectorSize`. Warns no-op on XGD1/2.
@@ -87,16 +87,21 @@ extract-xiso --update <redump.iso> [updateFile]
 ## ZAR
 
 ```bash
-extract-xiso --zar <input.iso|redump.iso> [output.zar]
+XISOSharp.Cli --zar <input.iso|redump.iso> [output.zar]
+XISOSharp.Cli rebuild <game.zar> [video.iso] [filler|seed] [su...] -o <redump.iso>
 ```
 
-`XisoZarchive.CreateZar` — packs `CollectFileEntries` sorted streams into zstd frame with XboxKit header layout (uses `ZstdSharp.Port` pure-managed, no native, `IsTrimmable` kept). Choice of `skeleton+update+video` sidecars included when present.
+`XisoZarchive.CreateZar` — packs the XISO file tree with the XboxKit header layout using
+raw (uncompressed) blocks, valid per the ZArchive spec (no native deps, trimmable/AOT-safe).
+Full read/write/pack/extract support lives in the `ZARSharp` project: a pure-C# port of
+`References/ZArchive-0.1.2` with an in-repo RFC 8878 zstd decoder (zero packages), so
+reference `zarchive.exe` archives (zstd-compressed) open transparently.
 
 ## Security sectors
 
 ```bash
-extract-xiso --security-sectors <sectors.txt> <redump.iso> --video ...
-extract-xiso rebuild ... --security-sectors <sectors.txt> -o <redump.iso>
+XISOSharp.Cli --security-sectors <sectors.txt> <redump.iso> --video ...
+XISOSharp.Cli rebuild ... --security-sectors <sectors.txt> -o <redump.iso>
 ```
 
 `SecuritySectors.cs` parses `start-end` lines (`start-end` where `end-start==4095`, `4096`-sector ranges), sorted `int[]`. Overrides built-ins per XGD type, zeroes in Redump, skipped via `XboxPrng.SimulateSectors` in rebuild.
@@ -104,9 +109,9 @@ extract-xiso rebuild ... --security-sectors <sectors.txt> -o <redump.iso>
 ## Aliases
 
 ```bash
-extract-xiso --all <redump.iso>       # == --random --seed --trim --update --video --wipe (+ --xiso)
-extract-xiso --best <redump.iso>      # == --trim --wipe --xiso  (mirrors XboxKit -b / -twx)
-extract-xiso --compress <input.iso>   # == --petrify --update --video --zar (mirrors -c / -puvz)
+XISOSharp.Cli --all <redump.iso>       # == --random --seed --trim --update --video --wipe (+ --xiso)
+XISOSharp.Cli --best <redump.iso>      # == --trim --wipe --xiso  (mirrors XboxKit -b / -twx)
+XISOSharp.Cli --compress <input.iso>   # == --petrify --update --video --zar (mirrors -c / -puvz)
 ```
 
 `Program.cs:482` expands `allMode`/`bestMode`/`compressAlias` + `RunRedumpBatch:693` dispatches batch with `-o` single-file guard. Aliases match XboxKit `-a` (`-rstuvwx`) / `-b` / `-c`.
@@ -114,11 +119,18 @@ extract-xiso --compress <input.iso>   # == --petrify --update --video --zar (mir
 ## Rebuild
 
 ```bash
-extract-xiso rebuild <xiso> [video.iso] [filler|seed] [su20076000_00000000] -o <redump.iso>
-extract-xiso <input.xiso> [files...]   # XboxKit compat alias (no flags)
+XISOSharp.Cli rebuild <xiso|game.zar> [video.iso] [filler|seed] [su20076000_00000000] -o <redump.iso>
+XISOSharp.Cli <input.xiso> [files...]   # XboxKit compat alias (no flags)
 ```
 
 `XisoRedump.RebuildRedump(xisoPath, videoPath, fillerOrSeedPath, updatePath, outputRedumpPath, securitySectors, progress, ct)` — faithful `RebuildRedump` port: `GetXISORanges(xisoFS,0,quiet)` → `MergeRanges` → sector walk with `XboxPRNG` fallback. Validates `l0Padding = xisoOffset - L0 >=0`, `l1Padding = (redumpLen-L1)-(xisoOffset+xisoLength)`, last-sector split for XGD3 updates. Pads via `WriteZeroes`. Checks `currentByte==xisoLength`.
+
+A `.zar` sidecar may stand in for `<xiso>` (XboxKit roadmap "ZArchive rebuild is coming soon!",
+beyond parity): a single embedded XISO image is used verbatim (byte-identical rebuild stays
+possible), otherwise the archived file tree is extracted to a temp dir and repacked via
+`XisoWriter.PackFromDirectory` — file data is exact, directory layout is regenerated, so the
+rebuilt Redump matches only if no gaps depend on the original layout (filler still covers gaps).
+Temp files are deleted afterwards; corrupt archives fail with an error instead of rebuilding.
 
 Positional file mode (`rebuild <xiso> [files...]`) expands via `Program.cs:RunRebuildMode:1259` (files may appear before `-o`), matching XboxKit `xboxkit.exe <input.xiso> [files...]`.
 
@@ -126,16 +138,19 @@ Workflow:
 
 ```bash
 # Full archival export
-extract-xiso --all game.redump.iso
+XISOSharp.Cli --all game.redump.iso
 
 # Lossless rebuild (video + filler/seed + update)
-extract-xiso rebuild game.xiso game.video.iso game.filler su20076000_00000000 -o rebuilt.redump.iso
+XISOSharp.Cli rebuild game.xiso game.video.iso game.filler su20076000_00000000 -o rebuilt.redump.iso
 
 # XGD1 seed variant
-extract-xiso rebuild game.xiso game.video.iso seed.bin -o rebuilt.redump.iso
+XISOSharp.Cli rebuild game.xiso game.video.iso seed.bin -o rebuilt.redump.iso
+
+# From a .zar sidecar instead of the XISO
+XISOSharp.Cli rebuild game.zar game.video.iso game.filler su20076000_00000000 -o rebuilt.redump.iso
 
 # Validate
-extract-xiso validate game.redump.iso rebuilt.redump.iso --validate-checksums
+XISOSharp.Cli validate game.redump.iso rebuilt.redump.iso --validate-checksums
 ```
 
 ## API surface
@@ -156,18 +171,18 @@ extract-xiso validate game.redump.iso rebuilt.redump.iso --validate-checksums
 
 ```bash
 # Redump → components (one pass)
-extract-xiso --all H:\dumps\game.redump.iso
+XISOSharp.Cli --all H:\dumps\game.redump.iso
 
 # Components → Redump (with update extraction)
-extract-xiso --update game.redump.iso su.bin
-extract-xiso --video game.redump.iso game.video.iso
-extract-xiso --random game.xiso game.filler
-extract-xiso rebuild game.xiso game.video.iso game.filler su.bin -o rebuilt.redump.iso
-extract-xiso validate game.redump.iso rebuilt.redump.iso --validate-checksums
+XISOSharp.Cli --update game.redump.iso su.bin
+XISOSharp.Cli --video game.redump.iso game.video.iso
+XISOSharp.Cli --random game.xiso game.filler
+XISOSharp.Cli rebuild game.xiso game.video.iso game.filler su.bin -o rebuilt.redump.iso
+XISOSharp.Cli validate game.redump.iso rebuilt.redump.iso --validate-checksums
 
 # Trim for emulator
-extract-xiso --best game.iso          # trimmed + wiped
-extract-xiso --trim game.iso -o small.xiso
+XISOSharp.Cli --best game.iso          # trimmed + wiped
+XISOSharp.Cli --trim game.iso -o small.xiso
 ```
 
 See also: [CLI](cli.md) · [Redump & Disc Layouts](redump-workflows.md) · [Compression](compression.md) · [Library](library.md)

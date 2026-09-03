@@ -11,7 +11,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 | Project | Description |
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
-| [XISOSharp.Cli](XISOSharp.Cli/) | CLI `extract-xiso` (`net10.0`, `AssemblyName extract-xiso`) — byte-compatible + 20 extra modes |
+| [XISOSharp.Cli](XISOSharp.Cli/) | CLI `XISOSharp.Cli` (`net10.0`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 20 extra modes |
 | [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (675 tests) — golden fixtures + `MemoryBlockDevice` |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
@@ -53,114 +53,132 @@ cd XISOSharp
 
 # framework-dependent (needs .NET 10 SDK, pinned in global.json)
 dotnet build XISOSharp.Cli -c Release
-# bin: XISOSharp.Cli/bin/Release/net10.0/extract-xiso(.exe)
+# bin: XISOSharp.Cli/bin/Release/net10.0/XISOSharp.Cli(.exe)
 
-# self-contained single-file (no runtime)
-dotnet publish XISOSharp.Cli -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
-dotnet publish XISOSharp.Cli -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true
-dotnet publish XISOSharp.Cli -c Release -r osx-arm64 --self-contained -p:PublishSingleFile=true
+# self-contained trimmed single-file (no runtime needed) for all six RIDs
+./publish-cli.ps1
+# binaries land in publish/<rid>/XISOSharp.Cli(.exe), ~14 MB each
+
+# or one RID manually (single-file + trimmed come from the csproj defaults)
+dotnet publish XISOSharp.Cli -c Release -r linux-x64 --self-contained
+# RIDs: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 (win-x86 also builds)
 ```
+
+### GUI (desktop app, Avalonia, dark-only)
+
+```bash
+# self-contained single-file (no runtime needed) for all six RIDs
+./publish-gui.ps1
+# binaries land in publish-gui/<rid>/XISOSharp.Gui(.exe), ~80 MB each
+```
+
+`XISOSharp.Gui` is a dark-theme front-end that drives the `XISOSharp` CLI as a child
+process (extract/create/rewrite/rebuild/compress/decompress/validate/batch plus
+list/tree/info/unpack/copy-out/checksum, live log, cancel, overwrite `-y`/`-n`
+switch). It finds the CLI next to itself, on `PATH`, or via the Settings tab
+(persisted to `%AppData%/XISOSharp/gui-settings.json`). Headless helpers:
+`XISOSharp.Gui --probe-cli [path]` and `XISOSharp.Gui --self-test [cliPath]`.
 
 ## Using the CLI
 
-The CLI is `extract-xiso`-compatible (`-c`/`-x`/`-l`/`-r`/`-d`/`-D`/`-m`/`-q`/`-Q`/`-s`/`-X`/`-h`/`-v`) plus XboxKit + xdvdfs verbs. Flags must precede positionals; `-h`/`-v` exit 0.
+The CLI binary is `XISOSharp.Cli(.exe)`. It is `extract-xiso`-compatible (`-c`/`-x`/`-l`/`-r`/`-d`/`-D`/`-m`/`-q`/`-Q`/`-s`/`-X`/`-h`/`-v`) plus XboxKit + xdvdfs verbs. Flags must precede positionals; `-h`/`-v` exit 0. `-v` still prints the `extract-xiso v2.7.1` baseline banner for compatibility.
 
 ### Basics
 
 ```bash
 # Extract (auto-detects RAW/GLOBAL/XGD2/XGD3/Hybrid/XGD1)
-extract-xiso -d ./out game.iso
-extract-xiso --unpack game.iso              # auto-named ./game/
-extract-xiso --unpack game.iso ./out
+XISOSharp.Cli -d ./out game.iso
+XISOSharp.Cli --unpack game.iso              # auto-named ./game/
+XISOSharp.Cli --unpack game.iso ./out
 
 # List / tree / info / audit
-extract-xiso -l game.iso
-extract-xiso -t game.iso                     # recursive with sizes
-extract-xiso -i game.iso /                  # volume + dir entries
-extract-xiso --ls game.iso /media           # flat directory
-extract-xiso -V game.iso game2.iso         # deep audit (header/tag/cycles/bounds/0x48)
+XISOSharp.Cli -l game.iso
+XISOSharp.Cli -t game.iso                     # recursive with sizes
+XISOSharp.Cli -i game.iso /                  # volume + dir entries
+XISOSharp.Cli --ls game.iso /media           # flat directory
+XISOSharp.Cli -V game.iso game2.iso         # deep audit (header/tag/cycles/bounds/0x48)
 
 # Create / pack / rewrite
-extract-xiso -c ./game_files                # -> ./game_files.iso
-extract-xiso -c ./game_files custom.iso
-extract-xiso -c ./src ./out.iso -s -X "**/*.tmp" -X "**/node_modules/**"
-extract-xiso --pack ./game_files            # dir → create
-extract-xiso --pack game.iso                # iso → rewrite (keeps .old)
-extract-xiso -r game.iso                    # rewrite optimized (skips if already in!xiso)
-extract-xiso -r -D game.iso                 # + delete .old
+XISOSharp.Cli -c ./game_files                # -> ./game_files.iso
+XISOSharp.Cli -c ./game_files custom.iso
+XISOSharp.Cli -c ./src ./out.iso -s -X "**/*.tmp" -X "**/node_modules/**"
+XISOSharp.Cli --pack ./game_files            # dir → create
+XISOSharp.Cli --pack game.iso                # iso → rewrite (keeps .old)
+XISOSharp.Cli -r game.iso                    # rewrite optimized (skips if already in!xiso)
+XISOSharp.Cli -r -D game.iso                 # + delete .old
 
 # Copy-out / hash / XEX / batch
-extract-xiso --copy-out game.iso /media ./media_out
-extract-xiso --md5 game.iso                 # or --sha256
-extract-xiso --xex-info game360.iso /default.xex
-extract-xiso --batch ./isos -d ./out        # all *.iso sorted
-extract-xiso --batch ./isos --batch-recursive -r
+XISOSharp.Cli --copy-out game.iso /media ./media_out
+XISOSharp.Cli --md5 game.iso                 # or --sha256
+XISOSharp.Cli --xex-info game360.iso /default.xex
+XISOSharp.Cli --batch ./isos -d ./out        # all *.iso sorted
+XISOSharp.Cli --batch ./isos --batch-recursive -r
 ```
 
 ### Redump & disc offsets
 
 ```bash
 # Video partition precedes game partition — auto-probed, or explicit
-extract-xiso --skip-sectors 129824 -d ./out redump.iso     # GLOBAL/XGD2
-extract-xiso -c ./files redump.iso --prepend-sectors 16640 # XGD3
-extract-xiso -c ./files hybrid.iso --prepend-sectors 283392 # Hybrid 0x89D80000
-extract-xiso -r --skip-sectors 283392 game.iso             # rewrite offset image to bare
+XISOSharp.Cli --skip-sectors 129824 -d ./out redump.iso     # GLOBAL/XGD2
+XISOSharp.Cli -c ./files redump.iso --prepend-sectors 16640 # XGD3
+XISOSharp.Cli -c ./files hybrid.iso --prepend-sectors 283392 # Hybrid 0x89D80000
+XISOSharp.Cli -r --skip-sectors 283392 game.iso             # rewrite offset image to bare
 
 # Validate lossless round-trip
-extract-xiso validate game.redump.iso rebuilt.iso --validate-checksums
-extract-xiso -r --validate --validate-strict --validate-report report.json game.iso
+XISOSharp.Cli validate game.redump.iso rebuilt.iso --validate-checksums
+XISOSharp.Cli -r --validate --validate-strict --validate-report report.json game.iso
 ```
 
 ### Archival (Redump lossless, XboxKit parity)
 
 ```bash
 # Extract components
-extract-xiso --video game.redump.iso                  # -> game.video.iso (L0 head + L1 tail)
-extract-xiso --random game.iso                        # -> game.filler (gap bytes)
-extract-xiso --seed game.iso                          # -> game.seed (XGD1 PRNG brute-force, 4-byte LE)
-extract-xiso --wipe game.iso -o wiped.iso             # zero filler gaps
-extract-xiso --trim game.iso -o trimmed.iso           # truncate after last extent
-extract-xiso --petrify game.iso                       # -> skeleton.iso + .hash (SHA-1 per file)
-extract-xiso --update game.redump.iso                 # XGD3 -> su20076000_00000000 (+ zeroes it in video)
-extract-xiso --zar game.iso -o game.zar               # ZArchive/zstd
+XISOSharp.Cli --video game.redump.iso                  # -> game.video.iso (L0 head + L1 tail)
+XISOSharp.Cli --random game.iso                        # -> game.filler (gap bytes)
+XISOSharp.Cli --seed game.iso                          # -> game.seed (XGD1 PRNG brute-force, 4-byte LE)
+XISOSharp.Cli --wipe game.iso -o wiped.iso             # zero filler gaps
+XISOSharp.Cli --trim game.iso -o trimmed.iso           # truncate after last extent
+XISOSharp.Cli --petrify game.iso                       # -> skeleton.iso + .hash (SHA-1 per file)
+XISOSharp.Cli --update game.redump.iso                 # XGD3 -> su20076000_00000000 (+ zeroes it in video)
+XISOSharp.Cli --zar game.iso -o game.zar               # ZArchive/zstd
 
 # Aliases (mirrors xboxkit -a/-b/-c)
-extract-xiso --all game.redump.iso                    # --random --seed --trim --update --video --wipe
-extract-xiso --best game.redump.iso                   # --trim --wipe
-extract-xiso --compress game.iso                      # --petrify --update --video --zar
+XISOSharp.Cli --all game.redump.iso                    # --random --seed --trim --update --video --wipe
+XISOSharp.Cli --best game.redump.iso                   # --trim --wipe
+XISOSharp.Cli --compress game.iso                      # --petrify --update --video --zar
 
 # Security sectors (4096-sector ranges)
-extract-xiso --video --security-sectors sectors.txt game.redump.iso
-extract-xiso rebuild --security-sectors sectors.txt -o rebuilt.iso # or:
+XISOSharp.Cli --video --security-sectors sectors.txt game.redump.iso
+XISOSharp.Cli rebuild --security-sectors sectors.txt -o rebuilt.iso # or:
 
 # Rebuild lossless Redump from components
-extract-xiso rebuild game.xiso video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso
-extract-xiso rebuild game.xiso video.iso seed.bin -o rebuilt.redump.iso          # XGD1 seed variant
-extract-xiso rebuild game.xiso video.iso --security-sectors sectors.txt -o rebuilt.redump.iso
+XISOSharp.Cli rebuild game.xiso video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso
+XISOSharp.Cli rebuild game.xiso video.iso seed.bin -o rebuilt.redump.iso          # XGD1 seed variant
+XISOSharp.Cli rebuild game.xiso video.iso --security-sectors sectors.txt -o rebuilt.redump.iso
 ```
 
 ### Packing & compression (xdvdfs parity)
 
 ```bash
 # Ordered remapping (wax captures, ! negation, xdvdfs.toml, --dry-run)
-extract-xiso build-image ./src -m "bin:/" -m "assets/**:/assets/{1}" -O out.iso
-extract-xiso build-image -D -m "!secret/**" -m "**:/{0}" ./src      # dry-run
-extract-xiso build-image -f xdvdfs.toml ./src -O out.iso
+XISOSharp.Cli build-image ./src -m "bin:/" -m "assets/**:/assets/{1}" -O out.iso
+XISOSharp.Cli build-image -D -m "!secret/**" -m "**:/{0}" ./src      # dry-run
+XISOSharp.Cli build-image -f xdvdfs.toml ./src -O out.iso
 
 # TOML generation
-extract-xiso image-spec from -O dist/image.iso -m "bin:/" -m "assets:/{0}" xdvdfs.toml
+XISOSharp.Cli image-spec from -O dist/image.iso -m "bin:/" -m "assets:/{0}" xdvdfs.toml
 # -> stdout if specPath omitted
 
 # CISO (v2 LZ4 default, byte-identical to modern xdvdfs compress; v1 DEFLATE via --ciso-version 1)
-extract-xiso compress ./game_dir game.cso --ciso-level 9       # 0=store; 1..9 = LZ4 acceleration 10-level
-extract-xiso cso game.iso game.cso --ciso-split 0              # single .cso (default splits at ~4 GiB)
-extract-xiso decompress game.1.cso game.iso                    # also reads split .1.cso/.2.cso parts
-extract-xiso uncso game.cso                                    # decso alias
+XISOSharp.Cli compress ./game_dir game.cso --ciso-level 9       # 0=store; 1..9 = LZ4 acceleration 10-level
+XISOSharp.Cli cso game.iso game.cso --ciso-split 0              # single .cso (default splits at ~4 GiB)
+XISOSharp.Cli decompress game.1.cso game.iso                    # also reads split .1.cso/.2.cso parts
+XISOSharp.Cli uncso game.cso                                    # decso alias
 
 # Deterministic image checksum (SHA3-256 over sorted BTreeMap, xdvdfs compat)
-extract-xiso checksum game.iso
-extract-xiso checksum --silent game1.iso game2.iso            # hex only, multiple images
-extract-xiso --checksum game.iso --silent                     # flag form
+XISOSharp.Cli checksum game.iso
+XISOSharp.Cli checksum --silent game1.iso game2.iso            # hex only, multiple images
+XISOSharp.Cli --checksum game.iso --silent                     # flag form
 ```
 
 Exit codes: `0` success/`-v`/`-h`/`validate` pass, `1` usage/I/O, `2` validation failure (`--validate-strict`).
@@ -351,6 +369,7 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | ECMA-119 descriptors `0x8000` | ✅ | ✅ | ❌ | 🟡 sector 32 |
 | Optimized tag `in!xiso` at 31337 | ✅ | ✅ | ❌ | ❌ |
 | CISO decompress (DEFLATE v1 + LZ4 v2, single + split parts) | ✅ | ❌ | ❌ | ✅ |
+| `.cso`/`.1.cso` input auto-detect in all verbs (`img.rs` parity) | ✅ | ❌ | ❌ | ✅ |
 | BlockDevice random-access (File/Memory/Offset/Ciso) | ✅ | ❌ | ❌ | ✅ |
 | Track/TOC parsing | ✅* | — | — | 🟡 |
 | **Writing** | | | | |
@@ -369,6 +388,8 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | `--petrify` skeleton + SHA-1 per file | ✅ | ❌ | ✅ | ❌ |
 | `--update` tail `su20076000_00000000` (XGD3) | ✅ | ❌ | ✅ | ❌ |
 | `--zar` ZArchive/zstd | ✅ | ❌ | ✅ | ❌ |
+| ZArchive read/write/pack/extract library (`ZARSharp`, pure C#, zero packages, incl. RFC 8878 zstd decoder) | ✅ | ❌ | ❌ | ❌ |
+| `rebuild` from `.zar` sidecar (XboxKit roadmap "coming soon") | ✅ | ❌ | ❌ | ❌ |
 | `rebuild` lossless (L0/`l0Padding`+game+`l1Padding`+L1) | ✅ | ❌ | ✅ | ❌ |
 | `--security-sectors` `4096`-aligned `sectors.txt` | ✅ | ❌ | 🟡 `sectors.txt` sidecar | ❌ |
 | Aliases `--all`/`--best`/`--compress` | ✅ | ❌ | ✅ | ❌ |
@@ -410,9 +431,9 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | Strong-name signing (`snk`) | ✅ | — | ❌ | — |
 | Trimmable + AOT (`IsTrimmable`/`IsAotCompatible`) | ✅ | — | ❌ | ✅ native/`no_std` |
 | Native dependencies | **none** | none | none (managed NuGet `GrindCore`/`SabreTools`) | `bincode`/`serde`/`clap`/`wax`/`ciso`/`md-5`/`sha3` |
-| Distribution | NuGet + `extract-xiso` bin | `cmake` bin | `dotnet` publish + NuGet `LibXGD` | `cargo` crate |
+| Distribution | NuGet + `XISOSharp` bin | `cmake` bin | `dotnet` publish + NuGet `LibXGD` | `cargo` crate |
 
-<sub>*XISOSharp `Track/TOC` = `GetVolumeInfo`/`ListDirectory`/`GetXisoRanges` sector map; 🟡 = partial/opt-in/different pad or trimmed-only semantics. xdvdfs CISO = `ciso` crate 0.2 — LZ4 v2 with fixed `align 2`; DEFLATE v1 neither written nor read (`ciso` reader rejects `version != 2`), and no `decompress` verb (`.cso` read via `CSOBlockDevice` only). extract-xiso `-p` is parsed but unhandled (dead); `FORCE_ASCII` is a dead macro.</sub>
+<sub>*XISOSharp `Track/TOC` = `GetVolumeInfo`/`ListDirectory`/`GetXisoRanges` sector map; 🟡 = partial/opt-in/different pad or trimmed-only semantics. xdvdfs CISO = `ciso` crate 0.2 — LZ4 v2 with fixed `align 2`; DEFLATE v1 neither written nor read (`ciso` reader rejects `version != 2`), and no `decompress` verb (`.cso` read via `CSOBlockDevice` only). The original extract-xiso `-p` is parsed but unhandled (dead); `FORCE_ASCII` is a dead macro.</sub>
 
 ## Build
 
@@ -421,10 +442,10 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
-dotnet test -c Release                       # 675 tests
+dotnet test -c Release                       # 724 tests
 ```
 
-Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF). CI builds on `ubuntu`/`windows`/`macos`.
+Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF); `ZARSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library). CI builds on `ubuntu`/`windows`/`macos`.
 
 ## Requirements
 

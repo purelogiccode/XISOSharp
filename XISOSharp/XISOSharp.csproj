@@ -54,6 +54,10 @@
         <None Include="icon\icon.png" Pack="true" PackagePath="\" />
     </ItemGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\ZARSharp\ZARSharp.csproj" />
+    </ItemGroup>
+
     <!-- Source Link + versioning -->
     <ItemGroup>
         <PackageReference Include="Meziantou.Analyzer" Version="3.0.203">
