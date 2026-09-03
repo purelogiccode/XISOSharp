@@ -1,6 +1,8 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
+using XISOSharp.BlockDevice;
+using XISOSharp.Interfaces;
 
 namespace XISOSharp;
 
@@ -18,24 +20,47 @@ public static class XisoChecksum
     /// using their UTF-8 path bytes (leading <c>/</c>, e.g. <c>/DIR/FILE.TXT</c>) and,
     /// for regular files, the file data. This matches <c>xdvdfs checksum</c>.
     /// </summary>
-    /// <param name="isoPath">Path to the XISO file (or Redump partition; use <paramref name="skipSectors"/> for video offset).</param>
+    /// <param name="isoPath">Path to the XISO file (or Redump partition; use <paramref name="skipSectors"/> for video offset).
+    /// A <c>.cso</c> path — single file or split <c>*.1.cso</c> parts — is auto-detected by extension and
+    /// routed through <see cref="CisoBlockDevice"/> (mirroring <c>xdvdfs-cli/src/img.rs::open_image</c>).</param>
     /// <param name="skipSectors">Optional skip sectors for Redump game partition.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>32-byte SHA3-256 digest.</returns>
     public static byte[] ComputeImageChecksum(string isoPath, int? skipSectors = null, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        return ComputeImageChecksum(fs, Path.GetFileName(isoPath), skipSectors, ct);
+        if (IsCsoPath(isoPath))
+        {
+            using var dev = new CisoBlockDevice(isoPath);
+            return ComputeImageChecksum(dev, Path.GetFileName(isoPath), skipSectors, ct);
+        }
+
+        using var fsDev = new FileBlockDevice(isoPath, FileMode.Open, FileAccess.Read);
+        return ComputeImageChecksum(fsDev, Path.GetFileName(isoPath), skipSectors, ct);
     }
+
+    /// <summary>True when <paramref name="path"/> has a <c>.cso</c> extension (covers split <c>*.1.cso</c>).</summary>
+    private static bool IsCsoPath(string path)
+        => Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Computes checksum from an open stream with known disc name (for error reporting).</summary>
     public static byte[] ComputeImageChecksum(FileStream fs, string isoName, int? skipSectors = null,
         CancellationToken ct = default)
     {
+        using var dev = new FileBlockDevice(fs, leaveOpen: true);
+        return ComputeImageChecksum(dev, isoName, skipSectors, ct);
+    }
+
+    /// <summary>
+    /// Computes the checksum over any <see cref="IBlockDevice"/> (file, memory, CISO or
+    /// offset-wrapped), mirroring <c>xdvdfs checksum</c> operating on <c>Box&lt;dyn BlockDeviceRead&gt;</c>.
+    /// </summary>
+    public static byte[] ComputeImageChecksum(IBlockDevice dev, string isoName, int? skipSectors = null,
+        CancellationToken ct = default)
+    {
         ct.ThrowIfCancellationRequested();
         // Detect discLseek / root table via VerifyXiso probe (supports skipSectors override)
-        (var rootSector, var rootSize, var discLseek) = XisoReader.VerifyXiso(fs, isoName, skipSectors);
+        (var rootSector, var rootSize, var discLseek) = XisoReader.VerifyXiso(dev, isoName, skipSectors);
 
         var dirStart = ((long)rootSector * Constants.SectorSize) + discLseek;
 
@@ -43,7 +68,7 @@ public static class XisoChecksum
         // where path = parent + "/" + name, including both files and directories.
         var map = new SortedDictionary<string, (bool IsDir, long Offset, uint Size)>(StringComparer.Ordinal);
 
-        CollectFileTree(fs, dirStart, rootSize, discLseek, "", map, ct);
+        CollectFileTree(dev, dirStart, rootSize, discLseek, "", map, ct);
 
         // SHA3-256 over sorted map
         using IncrementalHash hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA3_256);
@@ -62,15 +87,16 @@ public static class XisoChecksum
             {
                 // Stream file data without loading all at once (avoid read_data_all)
                 var fileOffset = entry.Offset;
+                long consumed = 0;
                 long remaining = entry.Size;
-                fs.Seek(fileOffset, SeekOrigin.Begin);
                 var buf = new byte[Constants.ReadWriteBufferSize];
                 while (remaining > 0)
                 {
                     var toRead = (int)Math.Min(buf.Length, remaining);
-                    var n = fs.Read(buf, 0, toRead);
+                    var n = dev.Read(fileOffset + consumed, buf.AsSpan(0, toRead));
                     if (n == 0) break;
                     hasher.AppendData(buf, 0, n);
+                    consumed += n;
                     remaining -= n;
                 }
 
@@ -94,12 +120,12 @@ public static class XisoChecksum
     // File-tree collection — mirrors xdvdfs read.rs file_tree + walk_dirent_tree
     // -----------------------------------------------------------------------
 
-    private static void CollectFileTree(FileStream fs, long dirStart, uint dirSize, long discLseek,
+    private static void CollectFileTree(IBlockDevice dev, long dirStart, uint dirSize, long discLseek,
         string parent, SortedDictionary<string, (bool IsDir, long Offset, uint Size)> map, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         // Gather immediate children of this directory table
-        var children = WalkDirentTree(fs, dirStart, dirSize);
+        var children = WalkDirentTree(dev, dirStart, dirSize);
 
         // For each child, insert into map and recurse if directory
         foreach (var child in children)
@@ -116,7 +142,7 @@ public static class XisoChecksum
             {
                 var subDirStart = fileOffset;
                 var subDirSize = child.Size;
-                CollectFileTree(fs, subDirStart, subDirSize, discLseek, path, map, ct);
+                CollectFileTree(dev, subDirStart, subDirSize, discLseek, path, map, ct);
             }
         }
     }
@@ -129,7 +155,7 @@ public static class XisoChecksum
         public bool IsDirectory;
     }
 
-    private static List<DirEnt> WalkDirentTree(FileStream fs, long dirStart, uint dirSize)
+    private static List<DirEnt> WalkDirentTree(IBlockDevice dev, long dirStart, uint dirSize)
     {
         var result = new List<DirEnt>();
         if (dirSize == 0) return result;
@@ -145,7 +171,7 @@ public static class XisoChecksum
             // Bounds check: ensure we don't read beyond dir table
             if (top >= dirSize) continue;
 
-            var opt = ReadDirent(fs, offset);
+            var opt = ReadDirent(dev, offset);
             if (opt == null) continue; // empty directory sentinel
 
             var node = opt;
@@ -181,12 +207,10 @@ public static class XisoChecksum
         public bool IsDirectory => (Attributes & Constants.AttributeDir) != 0;
     }
 
-    private static DirentNodeRaw? ReadDirent(FileStream fs, long offset)
+    private static DirentNodeRaw? ReadDirent(IBlockDevice dev, long offset)
     {
         Span<byte> hdr = stackalloc byte[14];
-        fs.Seek(offset, SeekOrigin.Begin);
-        var n = fs.Read(hdr);
-        if (n != 14) return null;
+        if (dev.Read(offset, hdr) != hdr.Length) return null;
 
         // Check empty directory sentinel (14 bytes all 0xFF or all 0x00)
         bool allFf = true, allZero = true;
@@ -209,13 +233,7 @@ public static class XisoChecksum
         if (nameLen == 0) return null; // shouldn't happen, but treat as empty
 
         var nameBuf = new byte[nameLen];
-        var rn = 0;
-        while (rn < nameLen)
-        {
-            var r = fs.Read(nameBuf, rn, nameLen - rn);
-            if (r == 0) return null;
-            rn += r;
-        }
+        if (dev.Read(offset + 14, nameBuf) != nameLen) return null;
 
         // Xbox uses Windows-1252; xdvdfs uses encoding_rs WINDOWS_1252.
         // Latin1Encoding covers the same range for test vectors (ASCII).

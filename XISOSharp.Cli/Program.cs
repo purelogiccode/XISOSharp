@@ -1909,7 +1909,11 @@ internal static class Program
     {
         string? output = null;
         var level = 9;
-        long? splitBytes = null;
+        // xdvdfs compress always writes through ciso::split::SplitOutput (split point 0xffbf6000,
+        // ~4 GiB). Match that by default; --ciso-split overrides the point, --ciso-split 0
+        // writes a single .cso.
+        long? splitBytes = CisoWriter.DefaultSplitPoint;
+        var version = CisoWriter.VersionLz4;
         var positionals = new List<string>();
 
         for (var i = optind; i < args.Length; i++)
@@ -1939,17 +1943,37 @@ internal static class Program
 
                 i++;
             }
+            else if (string.Equals(a, "--ciso-version", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: --ciso-version requires 1, 2 or auto\n");
+                    return 1;
+                }
+
+                var v = args[++i];
+                if (string.Equals(v, "1", StringComparison.OrdinalIgnoreCase))
+                    version = CisoWriter.VersionDeflate;
+                else if (string.Equals(v, "2", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(v, "auto", StringComparison.OrdinalIgnoreCase))
+                    version = CisoWriter.VersionLz4;
+                else
+                {
+                    Logger.LogErr("Error: --ciso-version requires 1, 2 or auto\n");
+                    return 1;
+                }
+            }
             else if (string.Equals(a, "--ciso-split", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(a, "--split", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length || !long.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var sb) ||
-                    sb <= 0)
+                    sb < 0)
                 {
-                    Logger.LogErr("Error: --ciso-split requires a positive integer (bytes)\n");
+                    Logger.LogErr("Error: --ciso-split requires a non-negative integer (bytes)\n");
                     return 1;
                 }
 
-                splitBytes = sb;
+                splitBytes = sb == 0 ? null : sb;
                 i++;
             }
             else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
@@ -1997,7 +2021,7 @@ internal static class Program
         try
         {
             Logger.Log(Constants.Banner);
-            var rc = CisoWriter.CompressToCso(source, outCso, level, splitBytes);
+            var rc = CisoWriter.CompressToCso(source, outCso, level, splitBytes, version);
             return rc;
         }
         catch (Exception ex)
@@ -2831,12 +2855,16 @@ internal static class Program
 
                                                       CISO / Compression modes:
 
-                                                      compress <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-split bytes]
+                                                      compress <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
                                                                             Pack and compress to CISO (CSO). Source may be a directory (packed then compressed)
                                                                             or an existing ISO. Level 0=store, 1=fastest … 9=smallest. Default 9.
-                                                                            Deflate per 2048-byte sector (version 1, BCL) with LZ4 read compat.
-                                                                            Alias: cso. Split threshold is reserved (single-file now).
-                                                      decompress <cso> [output.iso]    Decompress CISO/CSO to ISO (handles DEFLATE v1 and LZ4 v2).
+                                                                            Version 2 (default) writes LZ4 sectors with fixed align 2 — byte-compatible
+                                                                            with modern `xdvdfs compress`; version 1 writes classic DEFLATE sectors.
+                                                                            Like xdvdfs, output is split at 0xffbf6000 (~4 GiB) into .1.cso/.2.cso parts;
+                                                                            --ciso-split bytes overrides the split point, --ciso-split 0 writes a single .cso.
+                                                                            Alias: cso.
+                                                      decompress <cso|.1.cso> [output.iso]    Decompress CISO/CSO to ISO (DEFLATE v1 and LZ4 v2,
+                                                                            single files and split .1.cso/.2.cso… parts).
                                                                             Aliases: uncso, decso.
                                                        checksum <image> [images...] [--silent]  Compute SHA3-256 image checksum (xdvdfs-compatible:
                                                                              SHA3-256 over sorted path bytes + file data). Output: hex tab path.

@@ -239,6 +239,100 @@ public class XisoChecksumTests : IDisposable
     }
 
     [Fact]
+    public void ComputeImageChecksum_CisoV2SingleFile_MatchesIsoChecksum()
+    {
+        var src = CreateSourceDir(d =>
+        {
+            File.WriteAllText(Path.Combine(d, "file.txt"), "ciso checksum single");
+            Directory.CreateDirectory(Path.Combine(d, "sub"));
+            File.WriteAllText(Path.Combine(d, "sub", "nested.bin"), new string('n', 5000));
+        });
+        var iso = CreateIso(src);
+
+        Assert.Equal(0, CisoWriter.CompressToCso(iso, Path.ChangeExtension(iso, ".cso"), level: 9,
+            splitBytes: null, version: CisoWriter.VersionLz4));
+        var cso = Path.ChangeExtension(iso, ".cso");
+        Assert.True(File.Exists(cso));
+
+        // The .cso path is auto-detected and routed through CisoBlockDevice
+        Assert.Equal(XisoChecksum.ComputeImageChecksumHex(iso), XisoChecksum.ComputeImageChecksumHex(cso));
+    }
+
+    [Fact]
+    public void ComputeImageChecksum_CisoV1SingleFile_MatchesIsoChecksum()
+    {
+        var src = CreateSourceDir(d =>
+        {
+            File.WriteAllText(Path.Combine(d, "file.txt"), "ciso v1 checksum");
+            Directory.CreateDirectory(Path.Combine(d, "sub"));
+            File.WriteAllText(Path.Combine(d, "sub", "nested.bin"), new string('v', 5000));
+        });
+        var iso = CreateIso(src);
+
+        Assert.Equal(0, CisoWriter.CompressToCso(iso, Path.ChangeExtension(iso, ".cso"), level: 6,
+            splitBytes: null, version: CisoWriter.VersionDeflate));
+        var cso = Path.ChangeExtension(iso, ".cso");
+
+        Assert.Equal(XisoChecksum.ComputeImageChecksumHex(iso), XisoChecksum.ComputeImageChecksumHex(cso));
+    }
+
+    [Fact]
+    public void ComputeImageChecksum_CisoV2SplitParts_MatchesIsoChecksum()
+    {
+        var src = CreateSourceDir(d =>
+        {
+            File.WriteAllText(Path.Combine(d, "file.txt"), "ciso checksum split");
+            Directory.CreateDirectory(Path.Combine(d, "sub"));
+            File.WriteAllText(Path.Combine(d, "sub", "nested.bin"), new string('s', 20000));
+        });
+        var iso = CreateIso(src);
+
+        // Tiny split point forces multiple .N.cso parts
+        Assert.Equal(0, CisoWriter.CompressToCso(iso, Path.ChangeExtension(iso, ".cso"), level: 9,
+            splitBytes: 4096, version: CisoWriter.VersionLz4));
+        var firstPart = Path.ChangeExtension(iso, ".1.cso");
+        Assert.True(File.Exists(firstPart));
+        Assert.True(File.Exists(Path.ChangeExtension(iso, ".2.cso")), "expected at least two split parts");
+
+        // Checksum over the .1.cso split path must equal the uncompressed ISO checksum
+        Assert.Equal(XisoChecksum.ComputeImageChecksumHex(iso), XisoChecksum.ComputeImageChecksumHex(firstPart));
+    }
+
+    [Fact]
+    public void ComputeImageChecksum_CisoV1SplitParts_MatchesIsoChecksum()
+    {
+        var src = CreateSourceDir(d =>
+        {
+            File.WriteAllText(Path.Combine(d, "file.txt"), "ciso v1 checksum split");
+            Directory.CreateDirectory(Path.Combine(d, "sub"));
+            File.WriteAllText(Path.Combine(d, "sub", "nested.bin"), new string('w', 20000));
+        });
+        var iso = CreateIso(src);
+
+        Assert.Equal(0, CisoWriter.CompressToCso(iso, Path.ChangeExtension(iso, ".cso"), level: 6,
+            splitBytes: 4096, version: CisoWriter.VersionDeflate));
+        var firstPart = Path.ChangeExtension(iso, ".1.cso");
+        Assert.True(File.Exists(firstPart));
+
+        Assert.Equal(XisoChecksum.ComputeImageChecksumHex(iso), XisoChecksum.ComputeImageChecksumHex(firstPart));
+    }
+
+    [Fact]
+    public void ComputeImageChecksum_IBlockDeviceOverload_CisoDeviceMatchesIsoChecksum()
+    {
+        var src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "block device checksum"));
+        var iso = CreateIso(src);
+
+        Assert.Equal(0, CisoWriter.CompressToCso(iso, Path.ChangeExtension(iso, ".cso"), level: 9,
+            splitBytes: null, version: CisoWriter.VersionLz4));
+
+        using var dev = new BlockDevice.CisoBlockDevice(Path.ChangeExtension(iso, ".cso"));
+        var viaDevice = Convert.ToHexString(XisoChecksum.ComputeImageChecksum(dev, "game.cso")).ToLowerInvariant();
+
+        Assert.Equal(XisoChecksum.ComputeImageChecksumHex(iso), viaDevice);
+    }
+
+    [Fact]
     public void ComputeImageChecksum_NestedDirectoryVsFlat_DifferentChecksum()
     {
         var srcFlat = CreateSourceDir(d =>

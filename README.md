@@ -151,10 +151,10 @@ extract-xiso build-image -f xdvdfs.toml ./src -O out.iso
 extract-xiso image-spec from -O dist/image.iso -m "bin:/" -m "assets:/{0}" xdvdfs.toml
 # -> stdout if specPath omitted
 
-# CISO (DEFLATE v1 0x80000000 + LZ4 v2, align 0/1/2)
-extract-xiso compress ./game_dir game.cso --ciso-level 9       # 0=NoComp,1-3=Fastest,4-6=Optimal,7-9=Smallest
-extract-xiso cso game.iso game.cso                             # alias
-extract-xiso decompress game.cso game.iso
+# CISO (v2 LZ4 default, byte-identical to modern xdvdfs compress; v1 DEFLATE via --ciso-version 1)
+extract-xiso compress ./game_dir game.cso --ciso-level 9       # 0=store; 1..9 = LZ4 acceleration 10-level
+extract-xiso cso game.iso game.cso --ciso-split 0              # single .cso (default splits at ~4 GiB)
+extract-xiso decompress game.1.cso game.iso                    # also reads split .1.cso/.2.cso parts
 extract-xiso uncso game.cso                                    # decso alias
 
 # Deterministic image checksum (SHA3-256 over sorted BTreeMap, xdvdfs compat)
@@ -288,9 +288,9 @@ string toml = RemapFilesystem.GenerateSpecText(rules, "dist/out.iso");
 RemapFilesystem.WriteSpec("xdvdfs.toml", rules, "dist/out.iso");
 var loaded = RemapFilesystem.ParseSpecFile("xdvdfs.toml"); // preserve-order [map_rules]
 
-// CISO (pure-managed: DEFLATE v1 0x80000000 + LZ4 v2, align 0/1/2, threshold +12)
-int cso = CisoWriter.CompressToCso("game.iso", "game.cso", level: 9, splitBytes: null);
-int iso = CisoReader.DecompressToIso("game.cso", "rebuilt.iso");
+// CISO (pure-managed: v2 LZ4 default byte-identical to xdvdfs (lz4_flex port), v1 DEFLATE, threshold +12)
+int cso = CisoWriter.CompressToCso("game.iso", "game.cso", level: 9, splitBytes: CisoWriter.DefaultSplitPoint);
+int iso = CisoReader.DecompressToIso("game.1.cso", "rebuilt.iso"); // split .N.cso input supported
 bool isCso = CisoReader.IsCso("game.cso"); // magic CISO + blockSize 2048 + ver 1/2
 
 // BlockDevice — in-memory golden fixtures without temp files (no_std parity)
@@ -350,7 +350,7 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | Encoding Latin-1 / WINDOWS_1252 | ✅ | 🟡 raw bytes (`FORCE_ASCII` dead) | 🟡 ASCII | ✅ |
 | ECMA-119 descriptors `0x8000` | ✅ | ✅ | ❌ | 🟡 sector 32 |
 | Optimized tag `in!xiso` at 31337 | ✅ | ✅ | ❌ | ❌ |
-| CISO decompress (DEFLATE v1 + LZ4 v2) | ✅ | ❌ | ❌ | 🟡 v2 LZ4 read (no verb) |
+| CISO decompress (DEFLATE v1 + LZ4 v2, single + split parts) | ✅ | ❌ | ❌ | ✅ |
 | BlockDevice random-access (File/Memory/Offset/Ciso) | ✅ | ❌ | ❌ | ✅ |
 | Track/TOC parsing | ✅* | — | — | 🟡 |
 | **Writing** | | | | |
@@ -377,8 +377,9 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | **Packing / xdvdfs** | | | | |
 | `build-image` ordered `host/**:image/{n}` + `!` + `{0}` | ✅ | ❌ | ❌ | ✅ |
 | `image-spec from` TOML preserve-order | ✅ | ❌ | ❌ | ✅ |
-| CISO compress DEFLATE `align` 0/1/2 threshold `+12` | ✅ | ❌ | ❌ | 🟡 LZ4 v2, fixed `align 2` |
-| `--ciso-level` 0..9 / `--ciso-split` shim | ✅ | ❌ | ❌ | 🟡 |
+| CISO compress v2 LZ4 (byte-identical `lz4_flex` port, fixed `align 2`) + v1 DEFLATE `align` 0/1/2, threshold `+12` | ✅ | ❌ | ❌ | ✅ |
+| `--ciso-level` 0..9 / `--ciso-version 1\|2\|auto` / `--ciso-split` (default split `0xffbf6000`) | ✅ | ❌ | ❌ | ✅ |
+| Split CSO output `.1.cso`/`.2.cso`… + split input (`ciso::split` parity) | ✅ | ❌ | ❌ | ✅ |
 | `wax` glob `*`/`**`/`?`/`[]`/`{a,b}` | ✅ | ❌ | ❌ | ✅ |
 | `xdvdfs.toml` `[map_rules]` | ✅ | ❌ | ❌ | ✅ |
 | `--dry-run` preview | ✅ | ❌ | ❌ | ✅ |

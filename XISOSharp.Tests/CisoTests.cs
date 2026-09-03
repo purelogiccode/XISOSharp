@@ -415,4 +415,373 @@ public class CisoTests : IDisposable
         using var dst = new MemoryStream();
         Assert.Throws<InvalidDataException>(() => CisoReader.DecompressStream(src, dst));
     }
+
+    // ---- LZ4 codec (lz4_flex byte-exact port) ----
+
+    private static byte[] Filled(byte value, int len)
+    {
+        var data = new byte[len];
+        data.AsSpan().Fill(value);
+        return data;
+    }
+
+    private static string CompressToHex(byte[] input)
+    {
+        var dst = new byte[Lz4.MaxCompressedOutputSize(input.Length)];
+        var n = Lz4.Compress(input, dst);
+        Assert.True(n > 0);
+        return Convert.ToHexString(dst.AsSpan(0, n));
+    }
+
+    [Fact]
+    public void Lz4_Compress_MatchesLz4Flex_GoldenVectors()
+    {
+        // Hand-traced lz4_flex 0.11.3 outputs (the compressor behind ciso 0.2 / xdvdfs compress):
+        // 13 x 'a': seed at 0, match at offset 1 (total length 4+2, clipped by END_OFFSET=6), 6 last literals.
+        Assert.Equal("1261010060616161616161", CompressToHex(Filled(0x61, 13)));
+
+        // 12 bytes < LZ4_MIN_LENGTH (13): literals only, token 0xC0.
+        Assert.Equal("C0616161616161616161616161", CompressToHex(Filled(0x61, 12)));
+
+        // 2048 zero bytes: match at offset 1, duplicate length 2037 (>= 0xF -> token 0x1F),
+        // extended integer 2037-15=2022 = 7x0xFF + 0xED, 6 trailing literals.
+        Assert.Equal("1F000100FFFFFFFFFFFFFFED60000000000000", CompressToHex(Filled(0x00, 2048)));
+    }
+
+    [Fact]
+    public void Lz4_Compress_Decompress_RoundTrips_RandomAndStructuredData()
+    {
+        var rng = new Random(1234);
+
+        for (var t = 0; t < 100; t++)
+        {
+            var len = rng.Next(1, 4096);
+            var data = new byte[len];
+            rng.NextBytes(data);
+            RoundTripLz4(data);
+        }
+
+        // Low-entropy runs exercise match extension and overlapping copies.
+        for (var t = 0; t < 100; t++)
+        {
+            var len = rng.Next(1, 4096);
+            var data = new byte[len];
+            var pos = 0;
+            while (pos < len)
+            {
+                var run = Math.Min(rng.Next(1, 40), len - pos);
+                data.AsSpan(pos, run).Fill((byte)rng.Next(0, 4));
+                pos += run;
+            }
+
+            RoundTripLz4(data);
+        }
+    }
+
+    private static void RoundTripLz4(byte[] data)
+    {
+        var dst = new byte[Lz4.MaxCompressedOutputSize(data.Length)];
+        var n = Lz4.Compress(data, dst);
+        var back = new byte[data.Length];
+        var m = Lz4.Decompress(dst.AsSpan(0, n), back);
+        Assert.True(m == data.Length, $"decompressed {m} != {data.Length}");
+        Assert.True(back.AsSpan().SequenceEqual(data));
+    }
+
+    [Fact]
+    public void Lz4_Decompress_RejectsMalformedBlocks()
+    {
+        // Zero match offset is invalid.
+        var bad = new byte[] { 0x10, 0x41, 0x00, 0x00 }; // literal 'A', offset 0
+        Assert.Throws<InvalidDataException>(() => Lz4.Decompress(bad, new byte[64]));
+
+        // Literal length overruns the source.
+        var truncated = new byte[] { 0xF0, 0xFF, 0x00 };
+        Assert.Throws<InvalidDataException>(() => Lz4.Decompress(truncated, new byte[64]));
+
+        // Match overruns the destination.
+        var overrun = new byte[] { 0x1F, 0x41, 0x01, 0x00, 0xFF, 0xFF, 0x00 }; // lit 'A', offset 1, match len 529
+        Assert.Throws<InvalidDataException>(() => Lz4.Decompress(overrun, new byte[8]));
+    }
+
+    // ---- CISO v2 (LZ4) writer ----
+
+    private static (byte version, byte align, uint[] index) ParseCsoHeader(string path)
+    {
+        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        Span<byte> header = stackalloc byte[24];
+        fs.ReadExactly(header);
+        var magic = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(header[..4]);
+        Assert.Equal(CisoReader.Magic, magic);
+        var uncompressedSize = System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(header[8..16]);
+        var totalBlocks = (long)((uncompressedSize + CisoWriter.BlockSize - 1) / CisoWriter.BlockSize);
+        var index = new uint[totalBlocks + 1];
+        Span<byte> le = stackalloc byte[4];
+        for (var i = 0; i < index.Length; i++)
+        {
+            fs.ReadExactly(le);
+            index[i] = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(le);
+        }
+
+        return (header[20], header[21], index);
+    }
+
+    [Fact]
+    public void CompressToCso_DefaultVersion_WritesV2HeaderWithAlign2()
+    {
+        var isoPath = CreateTempIso();
+        var csoDir = CreateTempDir();
+        var csoPath = Path.Combine(csoDir, "v2.cso");
+
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 9);
+        Assert.Equal(0, rc);
+        Assert.True(CisoReader.IsCso(csoPath));
+
+        var (version, align, _) = ParseCsoHeader(csoPath);
+        Assert.Equal(CisoWriter.VersionLz4, version);
+        Assert.Equal(2, align); // ciso 0.2 fixed alignment
+    }
+
+    [Fact]
+    public void CompressToCso_Version2_RoundTrip_PreservesSha256()
+    {
+        var isoPath = CreateTempIso();
+        var origHash = ComputeSha256(isoPath);
+
+        foreach (var level in new[] { 0, 1, 9 })
+        {
+            var csoDir = CreateTempDir();
+            var csoPath = Path.Combine(csoDir, $"v2l{level}.cso");
+            var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: level, version: CisoWriter.VersionLz4);
+            Assert.Equal(0, rc);
+            Assert.True(CisoReader.IsCso(csoPath));
+
+            var decDir = CreateTempDir();
+            var decPath = Path.Combine(decDir, $"v2l{level}.iso");
+            Assert.Equal(0, CisoReader.DecompressToIso(csoPath, decPath));
+            Assert.Equal(origHash, ComputeSha256(decPath));
+        }
+    }
+
+    [Fact]
+    public void CompressToCso_Version2_Level0_AllSectorsPlain()
+    {
+        var isoPath = CreateTempIso();
+        var csoDir = CreateTempDir();
+        var csoPath = Path.Combine(csoDir, "v2store.cso");
+
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 0, version: CisoWriter.VersionLz4);
+        Assert.Equal(0, rc);
+
+        var (_, _, index) = ParseCsoHeader(csoPath);
+        // v2: high bit set = compressed; level 0 must flag every sector plain.
+        for (var i = 0; i < index.Length - 1; i++)
+            Assert.Equal(0u, index[i] & 0x80000000u);
+    }
+
+    [Fact]
+    public void CompressToCso_Version2_Level9_CompressesSectors()
+    {
+        var isoPath = CreateTempIso();
+        var csoDir = CreateTempDir();
+        var csoPath = Path.Combine(csoDir, "v2best.cso");
+
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 9, version: CisoWriter.VersionLz4);
+        Assert.Equal(0, rc);
+
+        var (_, _, index) = ParseCsoHeader(csoPath);
+        // The XISO has large 0xFF gap regions; at least one sector must store compressed.
+        var compressed = index.Take(index.Length - 1).Count(e => (e & 0x80000000u) != 0);
+        Assert.True(compressed > 0, "expected at least one compressed sector");
+    }
+
+    [Fact]
+    public void CompressStream_Version2_DecompressStream_RoundTrip()
+    {
+        var isoPath = CreateTempIso();
+        var isoBytes = File.ReadAllBytes(isoPath);
+
+        using var src = new MemoryStream(isoBytes, writable: false);
+        using var compressed = new MemoryStream();
+        CisoWriter.CompressStream(src, compressed, level: 9, version: CisoWriter.VersionLz4);
+
+        compressed.Seek(0, SeekOrigin.Begin);
+        using var decompressed = new MemoryStream();
+        CisoReader.DecompressStream(compressed, decompressed);
+
+        Assert.Equal(isoBytes.Length, decompressed.Length);
+        Assert.Equal(ComputeSha256Bytes(isoBytes), ComputeSha256Bytes(decompressed.ToArray()));
+    }
+
+    [Fact]
+    public void DecompressStream_HandCraftedV2RawBlockFrame()
+    {
+        // Craft a v2 CSO whose single sector is stored as an in-frame uncompressed block:
+        // payload = [u32 LE 0x80000800 (raw block, 2048 bytes)][2048 raw bytes].
+        var pattern = new byte[2048];
+        for (var i = 0; i < pattern.Length; i++) pattern[i] = (byte)(i * 7);
+
+        var dataStart = 24 + 4 * 2; // header + 2 index entries
+        var cso = new MemoryStream();
+        var header = new byte[24];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(0, 4), CisoReader.Magic);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(4, 4), CisoReader.HeaderSize);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(header.AsSpan(8, 8), 2048ul);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(16, 4), 2048u);
+        header[20] = CisoWriter.VersionLz4;
+        header[21] = 2;
+        cso.Write(header);
+
+        // Index: compressed-flagged entry pointing at the payload, final entry after it.
+        var index = new byte[8];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(
+            index.AsSpan(0, 4), (uint)(dataStart >> 2) | 0x80000000u);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(
+            index.AsSpan(4, 4), (uint)((dataStart + 4 + 2048) >> 2));
+        cso.Write(index);
+
+        var payload = new byte[4 + 2048];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(0, 4), 0x80000000u | 2048u);
+        pattern.CopyTo(payload.AsSpan(4));
+        cso.Write(payload);
+
+        cso.Seek(0, SeekOrigin.Begin);
+        using var dest = new MemoryStream();
+        CisoReader.DecompressStream(cso, dest);
+
+        Assert.Equal(pattern, dest.ToArray());
+    }
+
+    [Fact]
+    public void CompressToCso_InvalidVersion_ThrowsArgumentOutOfRange()
+    {
+        var isoPath = CreateTempIso();
+        var csoDir = CreateTempDir();
+        var csoPath = Path.Combine(csoDir, "bad.cso");
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CisoWriter.CompressToCso(isoPath, csoPath, level: 6, version: 3));
+    }
+
+    // ---- Split CSO output / input (ciso::split parity) ----
+
+    private (string isoPath, string csoPath, string csoDir) CreateSplitCso(string? outputName = null,
+        long splitBytes = 16384, int level = 9, byte version = CisoWriter.VersionLz4)
+    {
+        var isoPath = CreateTempIso();
+        var csoDir = CreateTempDir();
+        var csoPath = Path.Combine(csoDir, outputName ?? "split.cso");
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: level, splitBytes: splitBytes, version: version);
+        Assert.Equal(0, rc);
+        return (isoPath, csoPath, csoDir);
+    }
+
+    private static List<string> SplitParts(string csoPath)
+    {
+        var parts = new List<string>();
+        var baseName = csoPath[..^4]; // strip ".cso"
+        for (var i = 1; ; i++)
+        {
+            var part = $"{baseName}.{i}.cso";
+            if (!File.Exists(part)) break;
+            parts.Add(part);
+        }
+
+        return parts;
+    }
+
+    [Fact]
+    public void CompressToCso_WithSplit_WritesNumberedPartsAndRoundTrips()
+    {
+        var (isoPath, csoPath, _) = CreateSplitCso(splitBytes: 16384);
+        var parts = SplitParts(csoPath);
+        Assert.True(parts.Count >= 2, $"expected at least 2 parts, got {parts.Count}");
+
+        // Part names are <base>.1.cso, <base>.2.cso, …
+        Assert.EndsWith(".1.cso", parts[0], StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith(".2.cso", parts[1], StringComparison.OrdinalIgnoreCase);
+        Assert.True(CisoReader.IsCso(parts[0]));
+
+        var origHash = ComputeSha256(isoPath);
+        var decDir = CreateTempDir();
+        var decPath = Path.Combine(decDir, "split.iso");
+        Assert.Equal(0, CisoReader.DecompressToIso(parts[0], decPath));
+        Assert.Equal(origHash, ComputeSha256(decPath));
+    }
+
+    [Fact]
+    public void CompressToCso_WithSplit_LargerThanImage_ProducesSinglePart()
+    {
+        var (_, csoPath, _) = CreateSplitCso(splitBytes: 1 << 30);
+        var parts = SplitParts(csoPath);
+        var singlePart = Assert.Single(parts);
+        Assert.EndsWith(".1.cso", singlePart, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CompressToCso_WithSplit_OutputWithoutExtension_StillNumbered()
+    {
+        var (_, _, csoDir) = CreateSplitCso(outputName: "noext", splitBytes: 16384);
+        Assert.True(File.Exists(Path.Combine(csoDir, "noext.1.cso")));
+    }
+
+    [Fact]
+    public void ReadFromCso_SplitInput_RandomAccessAcrossParts()
+    {
+        var (isoPath, csoPath, _) = CreateSplitCso(splitBytes: 8192);
+        var isoBytes = File.ReadAllBytes(isoPath);
+        var parts = SplitParts(csoPath);
+        Assert.True(parts.Count >= 2);
+
+        // Read the first 512 bytes and a window crossing the split boundary.
+        Span<byte> buf = stackalloc byte[512];
+        CisoReader.ReadFromCso(parts[0], 0, buf);
+        Assert.True(buf.SequenceEqual(isoBytes.AsSpan(0, 512)));
+
+        var boundary = new FileInfo(parts[0]).Length;
+        if (boundary + 512 < isoBytes.Length)
+        {
+            var cross = new byte[1024];
+            CisoReader.ReadFromCso(parts[0], boundary - 512, cross);
+            Assert.True(cross.AsSpan().SequenceEqual(isoBytes.AsSpan((int)boundary - 512, 1024)));
+        }
+    }
+
+    [Fact]
+    public void CisoBlockDevice_SplitInput_MatchesOriginalIso()
+    {
+        var (isoPath, csoPath, _) = CreateSplitCso(splitBytes: 8192);
+        var isoBytes = File.ReadAllBytes(isoPath);
+        var parts = SplitParts(csoPath);
+        Assert.True(parts.Count >= 2);
+
+        using var dev = new XISOSharp.BlockDevice.CisoBlockDevice(parts[0]);
+        Assert.Equal(isoBytes.Length, dev.Length);
+
+        var buf = new byte[4096];
+        for (var offset = 0; offset < isoBytes.Length; offset += buf.Length)
+        {
+            var n = dev.Read(offset, buf);
+            var expected = Math.Min(buf.Length, isoBytes.Length - offset);
+            Assert.Equal(expected, n);
+            Assert.True(buf.AsSpan(0, expected).SequenceEqual(isoBytes.AsSpan(offset, expected)),
+                $"block device mismatch at offset {offset}");
+        }
+    }
+
+    [Fact]
+    public void CompressToCso_SplitVersion1_RoundTrips()
+    {
+        var (isoPath, csoPath, _) = CreateSplitCso(splitBytes: 16384, level: 6, version: CisoWriter.VersionDeflate);
+        var parts = SplitParts(csoPath);
+        Assert.True(parts.Count >= 2);
+
+        var (version, _, _) = ParseCsoHeader(parts[0]);
+        Assert.Equal(CisoWriter.VersionDeflate, version);
+
+        var origHash = ComputeSha256(isoPath);
+        var decDir = CreateTempDir();
+        var decPath = Path.Combine(decDir, "splitv1.iso");
+        Assert.Equal(0, CisoReader.DecompressToIso(parts[0], decPath));
+        Assert.Equal(origHash, ComputeSha256(decPath));
+    }
 }

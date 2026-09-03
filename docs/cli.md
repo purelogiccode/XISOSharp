@@ -25,8 +25,8 @@ extract-xiso validate <source.iso> <output.iso> [options]
 extract-xiso rebuild <xiso> [video.iso] [filler|seed] [su20076000_00000000] -o <redump.iso>
 extract-xiso build-image [sourceDir] [output.iso] -m "host:image" [-f <toml>] [-O output] [-D|--dry-run]
 extract-xiso image-spec from -O <out> -m "host:image" ... [specPath]
-extract-xiso compress|cso <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-split N]
-extract-xiso decompress|uncso|decso <cso> [output.iso]
+extract-xiso compress|cso <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
+extract-xiso decompress|uncso|decso <cso|.1.cso> [output.iso]
 extract-xiso checksum [--silent] <image> [images...]
 extract-xiso --checksum <image> [--silent]            # flag form
 ```
@@ -75,9 +75,9 @@ Modes are mutually exclusive unless noted as aliases. If no mode is given, **ext
 | `rebuild <xiso> [video.iso] [filler|seed] [su…] -o <redump.iso>` | **Rebuild** Redump ISO (`XisoRedump.RebuildRedump`): `L0`+`l0Padding`+game partition scan (filler/PRNG + security-sector zero-skip) + `l1Padding`+`L1` (optionally `l1Trimmed+updateFS+lastSector`). Positional alias `extract-xiso <input.xiso> [files...]` also accepted. See [Archival](archival.md#rebuild). |
 | `build-image [sourceDir] [output.iso] -m "host:image" [-f <toml>] [-O output] [-D\|--dry-run]` | **xdvdfs parity:** ordered `wax` remapping (`RemapFilesystem`, `WaxGlob` `*`/`**`/`?`/`[]`/`{a,b}` + `{0}` whole + `{n}` groups, `!negation` first-wins, suffix re-add), `xdvdfs.toml` `[map_rules]`, `--dry-run` via `DryRunRemap` → `CreateFromRemapTree` (`IsRemap` skips CWD). See [xdvdfs Compat](xdvdfs-compat.md#build-image). |
 | `image-spec from -O <out> -m "host:image" ... [specPath]` | **xdvdfs parity:** TOML generation (`GenerateSpecText` preserve-order `[metadata] output` + `[map_rules]`), stdout when `specPath` omitted. See [xdvdfs Compat](xdvdfs-compat.md#image-spec). |
-| `compress\|cso <src> [out.cso] [--ciso-level 0..9] [--ciso-split N]` | **CISO** compress: `CisoWriter.CompressToCso` pure-managed BCL DEFLATE v1 `0x80000000` + LZ4 v2, `align` 0 (<2 GB)/1 (<4 GB)/2 (else), `threshold +12`, reader `CisoBlockDevice`. Use on `sourceDir` or `image.iso`. `--ciso-split` warns-ignored (compat). See [Compression](compression.md). |
-| `decompress\|uncso\|decso <cso> [out.iso]` | **CISO** decompress: `CisoReader.DecompressToIso` handle both versions + random-access. |
-| `checksum [--silent] <image> [images...]` / `--checksum <image> [--silent]` | **SHA3-256** image checksum (`XisoChecksum.ComputeImageChecksum`, `SortedDictionary Ordinal` `/path` UTF-8 + streamed data, `xdvdfs` compat). Prints `hex tab path` (silent → hex only). Also `flag` form `--checksum` supports multiple ISOs. See [xdvdfs Compat](xdvdfs-compat.md#checksum). |
+| `compress\|cso <src> [out.cso] [--ciso-level 0..9] [--ciso-version 1\|2\|auto] [--ciso-split bytes]` | **CISO** compress: `CisoWriter.CompressToCso` — v2 (default) LZ4 sectors with fixed `align 2`, byte-identical to modern `xdvdfs compress` (pure-managed `lz4_flex` port); v1 BCL DEFLATE `0x80000000` with dynamic `align` 0/1/2; threshold `+12`. Use on `sourceDir` or `image.iso`. Output splits at `0xffbf6000` (~4 GiB) into `.1.cso`/`.2.cso`… parts (xdvdfs `SplitOutput` parity); `--ciso-split 0` writes a single `.cso`. See [Compression](compression.md). |
+| `decompress\|uncso\|decso <cso\|.1.cso> [out.iso]` | **CISO** decompress: `CisoReader.DecompressToIso` handles both versions, single files and split `.N.cso` parts. |
+| `checksum [--silent] <image> [images...]` / `--checksum <image> [--silent]` | **SHA3-256** image checksum (`XisoChecksum.ComputeImageChecksum`, `SortedDictionary Ordinal` `/path` UTF-8 + streamed data, `xdvdfs` compat). `.cso` / split `.1.cso` inputs are auto-detected by extension and read through `CisoBlockDevice` (`img.rs::open_image` parity), hashing the decompressed view — result identical to the source ISO. Prints `hex tab path` (silent → hex only). Also `flag` form `--checksum` supports multiple ISOs. See [xdvdfs Compat](xdvdfs-compat.md#checksum). |
 
 ## Options
 
@@ -93,8 +93,9 @@ Modes are mutually exclusive unless noted as aliases. If no mode is given, **ext
 | `-X <glob_pattern>` | **Create mode only.** Exclude files/directories matching the glob pattern. Repeatable. See [Exclude patterns](#exclude-patterns). `WaxGlob` engine also supports `{0}`/`{n}` captures for `build-image`. |
 | `--skip-sectors N` | Treat the image as if the XISO filesystem starts `N` sectors (2048 bytes each) into the file — for Redump images with a video partition. Valid in extract, list, tree, rewrite, unpack, video, audit where noted. See [Redump & Disc Layouts](redump-workflows.md). |
 | `--prepend-sectors N` | Write the output image with `N` empty sectors before the XISO filesystem, reserving room for a video partition. Valid in create (`-c`) and rewrite (`-r`) modes. See [Redump & Disc Layouts](redump-workflows.md). |
-| `--ciso-level 0..9` | CISO compression level (`compress`/`cso`): `0` NoCompression, `1..3` Fastest, `4..6` Optimal, `7..9` SmallestSize (default `9`). Maps to `CompressionLevel` for BCL DEFLATE. |
-| `--ciso-split <bytes>` | Compatibility shim for xdvdfs `SplitOutput`; warns and is ignored (C# writes single `.cso`). |
+| `--ciso-level 0..9` | CISO compression level (`compress`/`cso`, default `9`). v1: maps to `CompressionLevel` for BCL DEFLATE (`0` NoCompression, `1..3` Fastest, `4..6` Optimal, `7..9` SmallestSize). v2: `0` = store all plain, `1..9` = LZ4 acceleration `10 - level` (level 9 byte-identical to xdvdfs). |
+| `--ciso-version 1\|2\|auto` | CISO payload codec (`compress`/`cso`). Default `2` (LZ4, `align 2` — modern xdvdfs parity); `1` = classic DEFLATE. |
+| `--ciso-split <bytes>` | Split point for `.1.cso`/`.2.cso`… output (`compress`/`cso`). Default `0xffbf6000` (~4 GiB, xdvdfs `SplitOutput`); `0` = single `.cso`. |
 | `-p` | (Hidden) Print usage and exit 1. |
 
 ### Exclude patterns

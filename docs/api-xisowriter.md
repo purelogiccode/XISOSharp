@@ -194,7 +194,7 @@ public static int CompressToCso(string sourcePath, string outputCsoPath, int lev
 public static int DecompressToIso(string csoPath, string outputIsoPath, IProgress<ProgressInfo>? progress = null, CancellationToken ct = default);
 ```
 
-Pure-managed BCL `DeflateStream` v1 (`0x80000000` plain bit, `align` 0/1/2 per size, threshold `+12`) + LZ4 v2 read via `CisoBlockDevice` single-sector cache + `IBlockDevice` stack (`File`/`Memory`/`Offset`/`Ciso`). CLI `compress|cso` / `decompress|uncso|decso` (`Program.cs:RunCompressMode`/`RunDecompressMode`). See [Compression](compression.md).
+Pure-managed v2 LZ4 (byte-exact `lz4_flex 0.11.3` port, fixed `align 2` — byte-identical to modern `xdvdfs compress`) + BCL `DeflateStream` v1 (`0x80000000` plain bit, dynamic `align` 0/1/2 per size, threshold `+12`), split output `.N.cso` via `CisoSplitOutput` (`ciso::split::SplitOutput` parity) + LZ4 v2 read via `CisoBlockDevice` single-sector cache + `IBlockDevice` stack (`File`/`Memory`/`Offset`/`Ciso`). CLI `compress|cso` / `decompress|uncso|decso` (`Program.cs:RunCompressMode`/`RunDecompressMode`). See [Compression](compression.md).
 
 See also: [Library Overview](library.md) · [XisoReader API](api-xisoreader.md) ·
 [Utilities & Types](api-utilities.md) · [xdvdfs Compat](xdvdfs-compat.md) · [Compression](compression.md)

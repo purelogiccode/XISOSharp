@@ -89,7 +89,7 @@ Output: `hex tab path` (silent → hex only). Exit `0` on all, deterministic hex
 | `FileBlockDevice` | wraps `FileStream` (BCL `FileStream` chunk `64*SectorSize`) |
 | `MemoryBlockDevice` | in-memory `byte[]` — golden `.iso` blobs without temp files (mirrors `no_std` usage) |
 | `OffsetBlockDevice` | `OffsetWrapper` parity — probes `[0, Global, Xgd3, Hybrid, Xgd1]` skip-sectors + CISO wrapper |
-| `CisoBlockDevice` | CISO random-access (single-sector cache, `index[totalBlocks+1]` LE u32 offsets, DEFLATE/LZ4 on-demand decompress) |
+| `CisoBlockDevice` | CISO random-access (single-sector cache, `index[totalBlocks+1]` LE u32 offsets, DEFLATE/LZ4 on-demand decompress, single + split `*.N.cso` input) |
 
 **Overloads:**
 

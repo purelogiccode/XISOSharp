@@ -7,7 +7,8 @@ namespace XISOSharp;
 /// <summary>
 /// CISO / CSO decompression and random-access reader.
 /// Handles version 1 (DEFLATE, plain=high bit) and version 2 (LZ4, compressed=high bit)
-/// for interoperability with <c>ciso 0.2.1</c> / <c>xdvdfs</c> and classic tools.
+/// for interoperability with <c>ciso 0.2.1</c> / <c>xdvdfs</c> and classic tools, including
+/// split <c>.1.cso</c>/<c>.2.cso</c>… part files (<c>ciso::split::SplitFileReader</c> parity).
 /// </summary>
 public static class CisoReader
 {
@@ -22,6 +23,7 @@ public static class CisoReader
 
     /// <summary>
     /// Returns true if <paramref name="path"/> is a CISO/CSO file (checks magic + header size).
+    /// Accepts single files and the first part of a split image (<c>*.1.cso</c>).
     /// </summary>
     public static bool IsCso(string path)
     {
@@ -45,7 +47,8 @@ public static class CisoReader
     }
 
     /// <summary>
-    /// Decompresses a CISO/CSO file to an ISO file. Returns 0 on success, 1 on error.
+    /// Decompresses a CISO/CSO file to an ISO file. Accepts split input
+    /// (<c>image.1.cso</c>, with <c>image.2.cso</c>, … resolved alongside). Returns 0 on success, 1 on error.
     /// </summary>
     public static int DecompressToIso(string csoPath, string? outputIsoPath = null,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
@@ -57,7 +60,7 @@ public static class CisoReader
         if (string.Equals(Path.GetFullPath(csoPath), Path.GetFullPath(output), StringComparison.OrdinalIgnoreCase))
             throw new IOException("Source and destination paths are the same");
 
-        using var src = new FileStream(csoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        using var src = OpenReadStream(csoPath);
         using var dst = new FileStream(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
         DecompressStream(src, dst, progress, ct);
         Logger.Log($"Decompressed {csoPath} -> {output} ({new FileInfo(output).Length} bytes)\n");
@@ -68,7 +71,7 @@ public static class CisoReader
     /// Asynchronous variant of <see cref="DecompressToIso"/>.
     /// Decompresses a CISO/CSO file to an ISO file on a thread-pool thread.
     /// </summary>
-    /// <param name="csoPath">Source CISO/CSO path.</param>
+    /// <param name="csoPath">Source CISO/CSO path (single file or split <c>*.1.cso</c> parts).</param>
     /// <param name="outputIsoPath">Destination ISO path; if <c>null</c>, derived from <paramref name="csoPath"/> (<c>.iso</c>).</param>
     /// <param name="progress">Optional progress channel.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -79,8 +82,10 @@ public static class CisoReader
 
     /// <summary>
     /// Decompresses a CISO stream to an output stream. Both must be seekable.
-    /// Supports both DEFLATE (v1) and LZ4 (v2) payloads; LZ4 blocks are decoded via
-    /// a minimal pure-managed fallback that handles raw blocks produced by <c>ciso 0.2.1</c>.
+    /// Supports both DEFLATE (v1) and LZ4 (v2) payloads. Version 2 payloads are the per-sector
+    /// LZ4 frame with the 7-byte frame header and 4-byte end mark stripped
+    /// (<c>[u32 LE block info][block data]</c>, block-info high bit = uncompressed block),
+    /// as produced by <c>ciso 0.2.1</c> / <c>xdvdfs compress</c>.
     /// </summary>
     public static void DecompressStream(Stream source, Stream dest,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
@@ -120,7 +125,6 @@ public static class CisoReader
             indexEntries[i] = BinaryPrimitives.ReadUInt32LittleEndian(leBuf);
         }
 
-        // Verify last index roughly matches data size (allow alignment slack)
         // Decompress each sector
         var blockBuf = new byte[BlockSize];
         long written = 0;
@@ -158,6 +162,15 @@ public static class CisoReader
 
             source.Seek((long)offset, SeekOrigin.Begin);
 
+            // The final index entry stores position >> align, rounding down, so the last
+            // compressed block's gap can be up to (1 << align) - 1 bytes short of the true
+            // payload. The real bytes are present in the file — extend the read for the
+            // last sector (ciso read.rs instead pads with zeros, which corrupts payloads
+            // whose tail is non-zero).
+            var readLen = dataLen;
+            if (!isPlain && sector == totalBlocks - 1)
+                readLen = Math.Min(dataLen + (1L << align) - 1, source.Length - (long)offset);
+
             if (isPlain)
             {
                 // Plain block: read BlockSize bytes directly (ignore dataLen which may include alignment pad)
@@ -180,128 +193,28 @@ public static class CisoReader
             }
             else
             {
-                // Compressed: dataLen bytes at offset.
-                // For align>0, dataLen may include up to (1<<align)-1 pad bytes after compressed data.
-                // We trim trailing zeros up to align window when decompressing.
-                // Allocate buffer for compressed data
-                if (dataLen == 0)
+                // Compressed: payload at offset; may include trailing alignment pad for
+                // non-final sectors, and the final sector's gap may round down (see above).
+                if (readLen <= 0)
                     throw new InvalidDataException($"Zero-length compressed sector {sector}");
 
-                // For last block, dataLen may be truncated; but we still handle.
-                var compBuf = new byte[dataLen];
+                var compBuf = new byte[readLen];
                 var compRead = 0;
-                while (compRead < dataLen)
+                while (compRead < readLen)
                 {
-                    var n = source.Read(compBuf, compRead, (int)(dataLen - compRead));
-                    if (n == 0) throw new EndOfStreamException($"Unexpected EOF at compressed sector {sector}");
+                    var n = source.Read(compBuf, compRead, (int)(readLen - compRead));
+                    if (n == 0) break;
                     compRead += n;
                 }
 
-                // Try decompress, trimming trailing zeros if needed (alignment pad)
-                var decompressed = false;
-                var maxTrim = align == 0 ? 0 : (1 << align) - 1;
-                // Also allow trimming up to 3 extra for safety
-                maxTrim = Math.Max(maxTrim, 3);
+                if (compRead < readLen)
+                    Array.Resize(ref compBuf, compRead);
 
-                for (var trim = 0; trim <= maxTrim && trim <= compBuf.Length; trim++)
-                {
-                    var tryLen = compBuf.Length - trim;
-                    if (tryLen <= 0) continue;
-                    // Quick check: trailing bytes we trim should be zeros (pad)
-                    var tailZero = true;
-                    for (var z = tryLen; z < compBuf.Length; z++)
-                    {
-                        if (compBuf[z] != 0)
-                        {
-                            tailZero = false;
-                            break;
-                        }
-                    }
+                var expected = (int)Math.Min(BlockSize, (long)uncompressedSize - written);
+                var sectorData = DecompressSector(version, align, compBuf, expected);
 
-                    if (!tailZero && trim != 0) continue;
-
-                    try
-                    {
-                        byte[] decompressedBytes;
-                        if (version == CisoWriter.VersionDeflate)
-                        {
-                            decompressedBytes = DeflateDecompress(compBuf.AsSpan(0, tryLen));
-                        }
-                        else
-                        {
-                            decompressedBytes = Lz4Decompress(compBuf.AsSpan(0, tryLen));
-                        }
-
-                        if (decompressedBytes.Length == 0) continue;
-                        // For non-last blocks, expect BlockSize; for last, may be remainder
-                        long expected = BlockSize;
-                        if (written + expected > (long)uncompressedSize)
-                            expected = (long)uncompressedSize - written;
-
-                        if (decompressedBytes.Length != expected)
-                        {
-                            // If decompressed length mismatches, maybe we trimmed wrong; try next trim
-                            // But allow if expected is BlockSize and we got less? No, must match.
-                            if (decompressedBytes.Length < expected && trim == maxTrim)
-                            {
-                                // Last attempt: accept partial?
-                                // fall through to failure
-                            }
-                            else if (decompressedBytes.Length != expected)
-                            {
-                                continue;
-                            }
-                        }
-
-                        dest.Write(decompressedBytes, 0, decompressedBytes.Length);
-                        written += decompressedBytes.Length;
-                        decompressed = true;
-                        break;
-                    }
-                    catch
-                    {
-                        // Try next trim
-                        continue;
-                    }
-                }
-
-                if (!decompressed)
-                {
-                    // Fallback: try raw deflate without trimming, with more permissive
-                    try
-                    {
-                        var decompressedBytes = version == CisoWriter.VersionDeflate
-                            ? DeflateDecompress(compBuf)
-                            : Lz4Decompress(compBuf);
-                        long expected = BlockSize;
-                        if (written + expected > (long)uncompressedSize)
-                            expected = (long)uncompressedSize - written;
-                        // If still mismatched, truncate/pad
-                        if (decompressedBytes.Length != expected)
-                        {
-                            if (decompressedBytes.Length > expected)
-                            {
-                                Array.Resize(ref decompressedBytes, (int)expected);
-                            }
-                            else if (decompressedBytes.Length < expected)
-                            {
-                                // Pad with zeros
-                                var tmp = new byte[expected];
-                                Array.Copy(decompressedBytes, tmp, decompressedBytes.Length);
-                                decompressedBytes = tmp;
-                            }
-                        }
-
-                        dest.Write(decompressedBytes, 0, decompressedBytes.Length);
-                        written += decompressedBytes.Length;
-                        decompressed = true;
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new InvalidDataException(
-                            $"Failed to decompress sector {sector} (version {version}, dataLen {dataLen})", ex);
-                    }
-                }
+                dest.Write(sectorData, 0, expected);
+                written += expected;
             }
 
             progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded, Path: $"/sector/{sector}", Sector: sector,
@@ -333,13 +246,13 @@ public static class CisoReader
     }
 
     /// <summary>
-    /// Random-access read from a CISO file (decompresses the sector(s) containing the requested range).
-    /// Provided for BlockDevice parity.
+    /// Random-access read from a CISO file, single or split (<c>*.1.cso</c> parts), decompressing
+    /// the sector(s) containing the requested range.
     /// </summary>
     public static void ReadFromCso(string csoPath, long offset, Span<byte> buffer)
     {
-        using var fs = new FileStream(csoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        ReadFromCso(fs, offset, buffer);
+        using var fs = OpenReadStream(csoPath);
+        ReadFromCsoCore(fs, offset, buffer);
     }
 
     /// <summary>
@@ -349,6 +262,9 @@ public static class CisoReader
     /// <param name="offset">Byte offset in the uncompressed image.</param>
     /// <param name="buffer">Destination buffer to fill.</param>
     public static void ReadFromCso(FileStream csoFs, long offset, Span<byte> buffer)
+        => ReadFromCsoCore(csoFs, offset, buffer);
+
+    private static void ReadFromCsoCore(Stream csoFs, long offset, Span<byte> buffer)
     {
         // Minimal random-access: decompress whole needed sectors
         Span<byte> header = stackalloc byte[24];
@@ -408,24 +324,27 @@ public static class CisoReader
             }
             else
             {
-                var compBuf = new byte[dataLen];
+                if (dataLen <= 0) throw new InvalidDataException($"Zero-length compressed sector {sector}");
+
+                // The last sector's index gap can round down (final entry stores
+                // position >> align); extend the read to recover the true payload.
+                var readLen = dataLen;
+                if (sector == totalBlocks - 1)
+                    readLen = Math.Min(dataLen + (1L << align) - 1, csoFs.Length - (long)off);
+
+                var compBuf = new byte[readLen];
                 var n = 0;
-                while (n < dataLen)
+                while (n < readLen)
                 {
-                    var r = csoFs.Read(compBuf, n, (int)(dataLen - n));
-                    if (r == 0) throw new EndOfStreamException();
+                    var r = csoFs.Read(compBuf, n, (int)(readLen - n));
+                    if (r == 0) break;
                     n += r;
                 }
 
-                // Trim pad if needed
-                byte[] dec;
-                if (version == CisoWriter.VersionDeflate)
-                    dec = TryDecompressWithTrim(compBuf, align);
-                else
-                    dec = Lz4DecompressWithTrim(compBuf, align);
-                if (dec.Length != BlockSize)
-                    throw new InvalidDataException($"Decompressed size mismatch at sector {sector}");
-                sectorData = dec;
+                if (n < readLen)
+                    Array.Resize(ref compBuf, n);
+
+                sectorData = DecompressSector(version, align, compBuf, BlockSize);
             }
 
             var toCopy = Math.Min(remaining, BlockSize - sectorOffset);
@@ -436,18 +355,47 @@ public static class CisoReader
         }
     }
 
-    private static byte[] TryDecompressWithTrim(byte[] compBuf, byte align)
+    /// <summary>
+    /// Opens a CISO source for reading: a plain <c>.cso</c> file or, for a split path
+    /// (<c>*.1.cso</c>), a composite stream over all <c>*.N.cso</c> parts.
+    /// </summary>
+    private static Stream OpenReadStream(string path)
     {
-        var maxTrim = align == 0 ? 0 : (1 << align) - 1;
-        maxTrim = Math.Max(maxTrim, 3);
-        for (var trim = 0; trim <= maxTrim && trim <= compBuf.Length; trim++)
+        if (CisoSplitFile.IsSplitPath(path))
         {
-            var tryLen = compBuf.Length - trim;
+            var parts = CisoSplitFile.OpenParts(path);
+            if (parts.Count == 0) throw new FileNotFoundException($"CSO not found: {path}");
+            return parts.Count == 1 ? parts[0] : new CisoSplitInputStream(parts);
+        }
+
+        return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+    }
+
+    /// <summary>
+    /// Decodes one CISO sector payload to exactly <paramref name="expected"/> bytes.
+    /// Version 2 first tries the strict <c>[u32 LE block info][block data]</c> framing;
+    /// both versions then fall back to alignment-trim + codec attempts for robustness
+    /// against non-conforming writers.
+    /// </summary>
+    internal static byte[] DecompressSector(byte version, byte align, byte[] payload, int expected)
+    {
+        if (version == CisoWriter.VersionLz4)
+        {
+            var strict = TryDecodeV2Payload(payload, expected);
+            if (strict != null) return strict;
+        }
+
+        // Lenient fallbacks: trailing zero bytes may be alignment padding, so try
+        // trimming them before decoding.
+        var maxTrim = Math.Max(align == 0 ? 0 : (1 << align) - 1, 3);
+        for (var trim = 0; trim <= maxTrim && trim <= payload.Length; trim++)
+        {
+            var tryLen = payload.Length - trim;
             if (tryLen <= 0) continue;
             var tailZero = true;
-            for (var z = tryLen; z < compBuf.Length; z++)
+            for (var z = tryLen; z < payload.Length; z++)
             {
-                if (compBuf[z] != 0)
+                if (payload[z] != 0)
                 {
                     tailZero = false;
                     break;
@@ -455,175 +403,101 @@ public static class CisoReader
             }
 
             if (!tailZero && trim != 0) continue;
-            try
-            {
-                var dec = DeflateDecompress(compBuf.AsSpan(0, tryLen));
-                if (dec.Length == BlockSize) return dec;
-            }
-            catch
-            {
-                // ignored
-            }
+
+            var decoded = TryDecodeAny(version, payload.AsSpan(0, tryLen), expected);
+            if (decoded != null) return decoded;
         }
 
-        return DeflateDecompress(compBuf);
+        var full = TryDecodeAny(version, payload, expected);
+        if (full != null) return full;
+
+        throw new InvalidDataException(
+            $"Failed to decompress CISO sector ({payload.Length}-byte payload, version {version}, expected {expected} bytes)");
     }
 
-    private static byte[] Lz4DecompressWithTrim(byte[] compBuf, byte align)
+    /// <summary>
+    /// Strict CISO v2 payload decode: the payload is the sector's LZ4 frame with the 7-byte
+    /// frame header and 4-byte end mark stripped — <c>[u32 LE block info][block data]</c> where
+    /// the block-info high bit marks an uncompressed (raw) block. This mirrors
+    /// <c>ciso read.rs</c>, which re-adds the <c>LZ4_HEADER</c> before handing the data to the
+    /// frame decoder.
+    /// </summary>
+    private static byte[]? TryDecodeV2Payload(byte[] payload, int expected)
     {
-        var maxTrim = align == 0 ? 0 : (1 << align) - 1;
-        maxTrim = Math.Max(maxTrim, 3);
-        for (var trim = 0; trim <= maxTrim && trim <= compBuf.Length; trim++)
-        {
-            var tryLen = compBuf.Length - trim;
-            if (tryLen <= 0) continue;
-            var tailZero = true;
-            for (var z = tryLen; z < compBuf.Length; z++)
-            {
-                if (compBuf[z] != 0)
-                {
-                    tailZero = false;
-                    break;
-                }
-            }
+        if (payload.Length < 4) return null;
+        var sizeField = BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, 4));
+        var blockLen = (int)(sizeField & 0x7FFFFFFFu);
+        if (blockLen <= 0 || blockLen > payload.Length - 4) return null;
 
-            if (!tailZero && trim != 0) continue;
-            try
-            {
-                var dec = Lz4Decompress(compBuf.AsSpan(0, tryLen));
-                if (dec.Length == BlockSize) return dec;
-            }
-            catch
-            {
-                // ignored
-            }
+        var body = payload.AsSpan(4, blockLen);
+        if ((sizeField & 0x80000000u) != 0)
+        {
+            // The frame stored the sector uncompressed.
+            return body.Length >= expected ? body.Slice(0, expected).ToArray() : null;
         }
 
-        return Lz4Decompress(compBuf);
+        var dst = new byte[BlockSize];
+        try
+        {
+            var n = Lz4.Decompress(body, dst);
+            // Accept an exact remainder or a full (zero-padded) last block.
+            if (n == expected || (n == BlockSize && expected < BlockSize))
+                return dst[..expected];
+        }
+        catch
+        {
+            // fall through to lenient paths
+        }
+
+        return null;
     }
 
-    private static byte[] DeflateDecompress(ReadOnlySpan<byte> data)
+    private enum SectorCodec
+    {
+        Lz4,
+        Deflate
+    }
+
+    private static byte[]? TryDecodeAny(byte version, ReadOnlySpan<byte> data, int expected)
+    {
+        // Declared codec first, then the cross-codec fallback (e.g. DEFLATE bytes under a v2 header).
+        var primary = version == CisoWriter.VersionLz4 ? SectorCodec.Lz4 : SectorCodec.Deflate;
+        var secondary = primary == SectorCodec.Lz4 ? SectorCodec.Deflate : SectorCodec.Lz4;
+        return TryDecode(primary, data, expected) ?? TryDecode(secondary, data, expected);
+    }
+
+    private static byte[]? TryDecode(SectorCodec codec, ReadOnlySpan<byte> data, int expected)
+    {
+        byte[] decoded;
+        try
+        {
+            decoded = codec == SectorCodec.Lz4 ? DecodeLz4(data) : DecodeDeflate(data);
+        }
+        catch
+        {
+            return null;
+        }
+
+        // Accept an exact match, or a full zero-padded last block truncated to the remainder.
+        if (decoded.Length == expected) return decoded;
+        if (decoded.Length == BlockSize && expected < BlockSize) return decoded[..expected];
+        return null;
+    }
+
+    private static byte[] DecodeLz4(ReadOnlySpan<byte> data)
+    {
+        var dst = new byte[BlockSize];
+        var n = Lz4.Decompress(data, dst);
+        return dst[..n];
+    }
+
+    private static byte[] DecodeDeflate(ReadOnlySpan<byte> data)
     {
         using var ms = new MemoryStream(data.ToArray());
         using var ds = new DeflateStream(ms, CompressionMode.Decompress);
         using var outMs = new MemoryStream();
         ds.CopyTo(outMs);
         return outMs.ToArray();
-    }
-
-    // Minimal LZ4 raw block decompressor for ciso 0.2.1 payloads.
-    // ciso stores raw LZ4 block (stripped of 7-byte header + 4-byte footer) as produced by lz4_flex legacy frame.
-    // We attempt to decode using a tiny managed LZ4 block decoder. If K4os or native not available,
-    // we fallback to interpreting the data as DEFLATE (for compatibility when writer used DEFLATE but header says v2).
-    private static byte[] Lz4Decompress(ReadOnlySpan<byte> data)
-    {
-        // Attempt pure-managed LZ4 block decompress
-        // lz4_flex legacy frame stripped block is a single LZ4 block (max 64KB) compressed with block size 64KB,
-        // We can try to decompress as raw LZ4 block using simple algorithm if available.
-        // Since we don't have a managed LZ4 library in BCL, we try DEFLATE first as fallback
-        // (covers case where v2 file was actually written with DEFLATE by mistake).
-        // Then attempt simple LZ4 decode implemented below.
-
-        // Try DEFLATE fallback (if data was actually DEFLATE)
-        try
-        {
-            var def = DeflateDecompress(data);
-            if (def.Length == BlockSize) return def;
-        }
-        catch
-        {
-            // ignored
-        }
-
-        // Try managed LZ4 block decode
-        try
-        {
-            return Lz4BlockDecompress(data, BlockSize);
-        }
-        catch (Exception ex)
-        {
-            // As last resort, try DEFLATE again without length check
-            try
-            {
-                return DeflateDecompress(data);
-            }
-            catch
-            {
-                // ignored
-            }
-
-            throw new InvalidDataException("LZ4 decompress failed", ex);
-        }
-    }
-
-    // Very small LZ4 block decoder (raw block, no frame). Based on LZ4 spec: https://github.com/lz4/lz4/blob/dev/doc/lz4_Block_format.md
-    // This decoder assumes the block is not using checksums and is a single block (legacy).
-    // It decodes to exactly BlockSize bytes.
-    private static byte[] Lz4BlockDecompress(ReadOnlySpan<byte> src, int expectedSize)
-    {
-        var dst = new byte[expectedSize];
-        var srcPos = 0;
-        var dstPos = 0;
-
-        while (srcPos < src.Length && dstPos < expectedSize)
-        {
-            var token = src[srcPos++];
-            var literalLen = token >> 4;
-            if (literalLen == 15)
-            {
-                byte len;
-                do
-                {
-                    if (srcPos >= src.Length) break;
-                    len = src[srcPos++];
-                    literalLen += len;
-                } while (len == 255);
-            }
-
-            if (srcPos + literalLen > src.Length) throw new InvalidDataException("LZ4 literal overrun");
-            if (dstPos + literalLen > expectedSize) throw new InvalidDataException("LZ4 dst overrun literals");
-            src.Slice(srcPos, literalLen).CopyTo(dst.AsSpan(dstPos, literalLen));
-            srcPos += literalLen;
-            dstPos += literalLen;
-
-            if (dstPos >= expectedSize || srcPos >= src.Length) break;
-
-            if (srcPos + 2 > src.Length) throw new InvalidDataException("LZ4 offset missing");
-            var offset = src[srcPos++] | (src[srcPos++] << 8);
-            if (offset == 0) throw new InvalidDataException("LZ4 offset zero");
-
-            var matchLen = token & 0x0F;
-            if (matchLen == 15)
-            {
-                byte len;
-                do
-                {
-                    if (srcPos >= src.Length) break;
-                    len = src[srcPos++];
-                    matchLen += len;
-                } while (len == 255);
-            }
-
-            matchLen += 4;
-
-            if (dstPos < offset) throw new InvalidDataException("LZ4 offset out of range");
-            if (dstPos + matchLen > expectedSize) matchLen = expectedSize - dstPos; // clamp for last block
-
-            // Overlap-safe copy
-            for (var i = 0; i < matchLen; i++)
-                dst[dstPos + i] = dst[dstPos - offset + i];
-            dstPos += matchLen;
-        }
-
-        if (dstPos != expectedSize)
-        {
-            // If we didn't fill expected, it may be because src ended early but dst was supposed to be fully decoded
-            // For CISO, each block should decompress to exactly 2048. If we got less, pad? But error.
-            if (dstPos < expectedSize)
-                throw new InvalidDataException($"LZ4 decompressed {dstPos} != {expectedSize}");
-        }
-
-        return dst;
     }
 
     private static void ReadExact(Stream s, Span<byte> buf)

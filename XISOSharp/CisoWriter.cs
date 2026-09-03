@@ -5,12 +5,14 @@ using XISOSharp.Models;
 namespace XISOSharp;
 
 /// <summary>
-/// CISO / CSO compressed ISO writer, ported from <c>ciso 0.2.1</c> (<c>layout.rs</c> + <c>write.rs</c>)
+/// CISO / CSO compressed ISO writer, ported from <c>ciso 0.2.1</c> (<c>layout.rs</c> + <c>write.rs</c> + <c>split.rs</c>)
 /// and <c>References/xdvdfs-0.8.3/xdvdfs-cli/src/cmd_compress.rs</c>.
-/// Uses raw DEFLATE per 2048-byte sector (BCL <see cref="DeflateStream"/>, no native),
-/// keeping <c>IsTrimmable</c>/<c>IsAotCompatible</c> true. Reader handles both
-/// version 1 (DEFLATE, plain=0x80000000) and version 2 (LZ4, compressed=0x80000000)
-/// for interop with <c>xdvdfs</c> (<c>lz4_flex</c>) and classic tools.
+/// Version 1 emits raw DEFLATE per 2048-byte sector (BCL <see cref="DeflateStream"/>, no native);
+/// version 2 emits LZ4 sector payloads (via <see cref="Lz4"/>, byte-identical to the <c>lz4_flex</c>
+/// encoder used by <c>ciso 0.2</c>) with the fixed <c>align 2</c> the reference writes — matching what
+/// modern <c>xdvdfs compress</c> produces. Output can be split into <c>.1.cso</c>/<c>.2.cso</c> parts
+/// through <see cref="CisoSplitOutput"/> (<c>ciso::split::SplitOutput</c> parity). Both versions keep
+/// <c>IsTrimmable</c>/<c>IsAotCompatible</c> true; the reader handles both.
 /// </summary>
 public static class CisoWriter
 {
@@ -29,6 +31,12 @@ public static class CisoWriter
     /// <summary>CISO version 2 — xdvdfs / ciso 0.2 LZ4 payload where high bit means compressed.</summary>
     public const byte VersionLz4 = 2; // xdvdfs / ciso 0.2 (LZ4)
 
+    /// <summary>
+    /// Default split point for split output (<c>ciso::split::FILE_SPLIT_POINT</c>, ~4 GiB) —
+    /// the threshold modern <c>xdvdfs compress</c> always writes through.
+    /// </summary>
+    public const long DefaultSplitPoint = 0xffbf6000;
+
     // Threshold mirroring ciso write.rs: only store compressed if it saves >12 bytes (7 header +4 footer +1)
     private const int CompressionSavingThreshold = 12;
 
@@ -37,13 +45,22 @@ public static class CisoWriter
     /// </summary>
     /// <param name="sourcePath">Source directory or ISO file.</param>
     /// <param name="outputCsoPath">Destination CSO path; if null, derived from source (<c>.cso</c>).</param>
-    /// <param name="level">Compression level 0..9 (0=store, 1=fastest … 9=smallestSize). Default 6.</param>
-    /// <param name="splitBytes">Optional split threshold; when set, output is split into <c>.1.cso</c> parts (not yet implemented — reserved).</param>
+    /// <param name="level">Compression level 0..9 (0=store, 1=fastest … 9=smallestSize). Default 6.
+    /// For version 2 the level maps inversely to the LZ4 acceleration parameter
+    /// (<c>acceleration = 10 - level</c>; level 9 is byte-identical to <c>xdvdfs compress</c>).</param>
+    /// <param name="splitBytes">
+    /// Optional split threshold. When set, output is written as <c>&lt;name&gt;.1.cso</c>,
+    /// <c>&lt;name&gt;.2.cso</c>, … parts (ciso <c>SplitOutput</c> semantics; see
+    /// <see cref="DefaultSplitPoint"/> for the value xdvdfs uses). When null, a single
+    /// <c>.cso</c> file is written.
+    /// </param>
+    /// <param name="version">CISO version: <see cref="VersionLz4"/> (default, matches modern xdvdfs)
+    /// or <see cref="VersionDeflate"/> (classic).</param>
     /// <param name="progress">Optional progress channel.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>0 on success, 1 on error.</returns>
     public static int CompressToCso(string sourcePath, string? outputCsoPath = null, int level = 6,
-        long? splitBytes = null,
+        long? splitBytes = null, byte version = VersionLz4,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -54,9 +71,8 @@ public static class CisoWriter
         if (splitBytes is <= 0)
             throw new ArgumentOutOfRangeException(nameof(splitBytes));
 
-        // Split not yet implemented — validate but ignore for now; future work will use ciso::split semantics
-        if (splitBytes.HasValue)
-            Logger.LogErr("warning: --ciso-split is reserved and currently ignored (single-file output)\n");
+        if (version != VersionDeflate && version != VersionLz4)
+            throw new ArgumentOutOfRangeException(nameof(version), "CISO version must be 1 (DEFLATE) or 2 (LZ4)");
 
         var isDir = Directory.Exists(sourcePath);
         var isFile = File.Exists(sourcePath);
@@ -88,11 +104,21 @@ public static class CisoWriter
         try
         {
             using var src = new FileStream(sourceFile, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-            using var dst = new FileStream(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
-            CompressStream(src, dst, level, progress, ct);
+            if (splitBytes.HasValue)
+            {
+                using var split = new CisoSplitOutput(output, splitBytes.Value);
+                CompressStream(src, split, level, version, progress, ct);
+                foreach (var part in split.PartPaths)
+                    Logger.Log($"  part {part} ({new FileInfo(part).Length} bytes)\n");
+                Logger.Log($"Compressed {sourcePath} -> {output} ({split.PartPaths.Count} part(s))\n");
+            }
+            else
+            {
+                using var dst = new FileStream(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+                CompressStream(src, dst, level, version, progress, ct);
+                Logger.Log($"Compressed {sourcePath} -> {output} ({new FileInfo(output).Length} bytes)\n");
+            }
 
-            // Ensure split handling future: close dst before returning
-            Logger.Log($"Compressed {sourcePath} -> {output} ({new FileInfo(output).Length} bytes)\n");
             return 0;
         }
         finally
@@ -113,18 +139,26 @@ public static class CisoWriter
 
     /// <summary>Asynchronous variant of <see cref="CompressToCso"/>.</summary>
     public static async Task<int> CompressToCsoAsync(string sourcePath, string? outputCsoPath = null, int level = 6,
-        long? splitBytes = null, IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
-        => await Task.Run(() => CompressToCso(sourcePath, outputCsoPath, level, splitBytes, progress, ct), ct)
+        long? splitBytes = null, byte version = VersionLz4,
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
+        => await Task.Run(() => CompressToCso(sourcePath, outputCsoPath, level, splitBytes, version, progress, ct), ct)
             .ConfigureAwait(false);
 
     /// <summary>
     /// Compresses a seekable source stream (uncompressed ISO) to a seekable destination stream (CISO).
-    /// Source is read sector-wise (2048 bytes) and written as CISO header + index + deflated blocks.
+    /// Source is read sector-wise (2048 bytes) and written as CISO header + index + per-sector payloads.
+    /// Version 2 writes LZ4 payloads (LZ4 frame per sector with the 7-byte header and 4-byte end mark
+    /// stripped, as <c>ciso 0.2</c> does); version 1 writes DEFLATE payloads. Split output applies when
+    /// the destination is a <see cref="CisoSplitOutput"/>.
     /// </summary>
-    public static void CompressStream(Stream source, Stream dest, int level = 6,
+    public static void CompressStream(Stream source, Stream dest, int level = 6, byte version = VersionLz4,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
+        if (level < 0 || level > 9)
+            throw new ArgumentOutOfRangeException(nameof(level), "CISO level must be 0..9");
+        if (version != VersionDeflate && version != VersionLz4)
+            throw new ArgumentOutOfRangeException(nameof(version), "CISO version must be 1 (DEFLATE) or 2 (LZ4)");
         if (!source.CanSeek) throw new ArgumentException("Source must be seekable", nameof(source));
         if (!dest.CanSeek) throw new ArgumentException("Destination must be seekable", nameof(dest));
 
@@ -137,15 +171,13 @@ public static class CisoWriter
         var totalBlocks = (int)((uncompressedSize + BlockSize - 1) / BlockSize);
         var indexLen = totalBlocks + 1;
 
-        // Dynamic alignment: mirror Python logic and rust's fixed 2 for large images.
-        // Keep align=0 for <2GB to avoid padding overhead; align=1 for <4GB; align=2 for >=4GB.
-        int align;
-        if (uncompressedSize < 0x80000000L) align = 0;
+        // ciso 0.2 (v2) fixes alignment at 2; classic v1 keeps dynamic alignment:
+        // align=0 for <2GB to avoid padding overhead; align=1 for <4GB; align=2 for >=4GB.
+        byte align;
+        if (version == VersionLz4) align = 2;
+        else if (uncompressedSize < 0x80000000L) align = 0;
         else if (uncompressedSize < 0x100000000L) align = 1;
         else align = 2;
-
-        const byte version = VersionDeflate;
-        // If we ever switch to LZ4, version = VersionLz4 and align = 2 (rust default).
 
         var header = new byte[HeaderSize];
         BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(0, 4), Magic);
@@ -153,7 +185,7 @@ public static class CisoWriter
         BinaryPrimitives.WriteUInt64LittleEndian(header.AsSpan(8, 8), (ulong)uncompressedSize);
         BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(16, 4), BlockSize);
         header[20] = version;
-        header[21] = (byte)align;
+        header[21] = align;
         header[22] = 0;
         header[23] = 0;
 
@@ -174,6 +206,15 @@ public static class CisoWriter
         progress?.Report(new ProgressInfo(ProgressInfoType.FileCount, Count: totalBlocks));
 
         CompressionLevel compLevel = MapLevel(level);
+
+        // Scratch for the v2 payload: [u32 LE block info][LZ4 block data] — the LZ4 frame with
+        // its 7-byte header and 4-byte end mark stripped (ciso write.rs).
+        byte[]? lz4Scratch = null;
+        if (version == VersionLz4 && level > 0)
+            lz4Scratch = new byte[4 + Lz4.MaxCompressedOutputSize(BlockSize)];
+
+        // --ciso-level maps inversely to LZ4 acceleration (level 9 = acceleration 1 = lz4_flex parity).
+        var acceleration = Math.Max(1, 10 - level);
 
         for (var sector = 0; sector < totalBlocks; sector++)
         {
@@ -206,41 +247,74 @@ public static class CisoWriter
             if (read < BlockSize)
                 Array.Clear(blockBuf, read, BlockSize - read);
 
-            // Compress
-            byte[] compressed;
-            if (level == 0)
+            ReadOnlySpan<byte> dataToWrite;
+            uint flagBit;
+
+            if (version == VersionLz4)
             {
-                compressed = Array.Empty<byte>();
+                // v2: index high bit set = compressed, clear = plain.
+                if (level == 0)
+                {
+                    dataToWrite = blockBuf;
+                    flagBit = 0;
+                }
+                else
+                {
+                    var blockLen = Lz4.Compress(blockBuf, lz4Scratch.AsSpan(4), acceleration);
+                    // When the block does not compress, the frame stores it raw
+                    // (block info carries the 0x80000000 uncompressed bit, as in lz4_flex).
+                    var sizeField = blockLen < BlockSize ? (uint)blockLen : 0x80000000u | (uint)BlockSize;
+                    BinaryPrimitives.WriteUInt32LittleEndian(lz4Scratch, sizeField);
+                    var payloadLen = 4 + Math.Min(blockLen, BlockSize);
+
+                    if (payloadLen + CompressionSavingThreshold >= BlockSize)
+                    {
+                        dataToWrite = blockBuf;
+                        flagBit = 0;
+                    }
+                    else
+                    {
+                        dataToWrite = lz4Scratch.AsSpan(0, payloadLen);
+                        flagBit = 0x80000000u;
+                    }
+                }
             }
             else
             {
-                compressed = DeflateCompress(blockBuf, compLevel);
+                // v1 classic DEFLATE: index high bit set = plain.
+                byte[] compressed;
+                if (level == 0)
+                {
+                    compressed = Array.Empty<byte>();
+                }
+                else
+                {
+                    compressed = DeflateCompress(blockBuf, compLevel);
+                }
+
+                var usePlain = level == 0 || compressed.Length == 0 ||
+                               compressed.Length + CompressionSavingThreshold >= BlockSize;
+                if (usePlain)
+                {
+                    dataToWrite = blockBuf;
+                    flagBit = 0x80000000u;
+                }
+                else
+                {
+                    dataToWrite = compressed;
+                    flagBit = 0;
+                }
             }
 
-            bool usePlain;
-            byte[] dataToWrite;
-            if (level == 0 || compressed.Length == 0 || compressed.Length + CompressionSavingThreshold >= BlockSize)
-            {
-                // Store plain (no saving)
-                usePlain = true;
-                dataToWrite = blockBuf;
-            }
-            else
-            {
-                usePlain = false;
-                dataToWrite = compressed;
-            }
+            var posShifted = position >> align;
+            if (posShifted > 0x7FFFFFFFL)
+                throw new IOException("CISO index overflow: image too large for the CISO format");
 
-            var posShifted = (uint)(position >> align);
-            var entry = posShifted & 0x7FFFFFFFu;
-            if (usePlain)
-                entry |= 0x80000000u; // classic: high bit = plain
-            // For version 2 LZ4, this would be opposite: entry |= isCompressed ? 0x80000000 : 0
-
+            var entry = (uint)posShifted | flagBit;
             indexEntries[sector] = entry;
 
             dest.Seek(position, SeekOrigin.Begin);
-            dest.Write(dataToWrite, 0, dataToWrite.Length);
+            dest.Write(dataToWrite);
             position += dataToWrite.Length;
 
             // Progress: report file added? Use Sector
@@ -248,9 +322,8 @@ public static class CisoWriter
                 Size: dataToWrite.Length));
         }
 
-        // Final index entry (end of file) — never plain
+        // Final index entry (end of file) — never flagged
         {
-            // Align final position? No need to align final, but store as is (no pad after last block)
             var posShifted = (uint)(position >> align);
             indexEntries[indexLen - 1] = posShifted & 0x7FFFFFFFu;
         }
