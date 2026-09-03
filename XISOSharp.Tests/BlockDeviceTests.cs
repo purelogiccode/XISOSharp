@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using XISOSharp.BlockDevice;
+using XISOSharp.Interfaces;
 
 namespace XISOSharp.Tests;
 

@@ -1,7 +1,9 @@
-﻿using System.Buffers.Binary;
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using XISOSharp.DataStructures;
+using XISOSharp.Interfaces;
+using XISOSharp.Models;
 
 namespace XISOSharp;
 
@@ -194,7 +196,7 @@ public static class XisoReader
     /// <param name="skipSectors">Optional skip override (in 2048-byte sectors).</param>
     /// <returns>Root sector/size and disc lseek (including skip offset when provided).</returns>
     public static (uint rootDirSector, uint rootDirSize, long discLseek) VerifyXiso(
-        BlockDevice.IBlockDevice dev, string isoName, int? skipSectors = null)
+        IBlockDevice dev, string isoName, int? skipSectors = null)
     {
         Span<byte> buffer = stackalloc byte[Constants.HeaderDataLength];
         Span<byte> intBuf = stackalloc byte[4];
@@ -272,7 +274,7 @@ public static class XisoReader
     /// <summary>
     /// Audits a block-device image (memory, CISO, or offset-wrapped).
     /// </summary>
-    public static AuditResult AuditXiso(BlockDevice.IBlockDevice dev, string isoName = "memory")
+    public static AuditResult AuditXiso(IBlockDevice dev, string isoName = "memory")
     {
         // Implement via temp file fallback by reading via block device -> use GetVolumeInfo path
         // For simplicity, validate via VerifyXiso then walk via reading directory sectors through dev
@@ -1205,7 +1207,7 @@ public static class XisoReader
     /// <param name="isoName">Display name for error messages.</param>
     /// <param name="skipSectors">Optional skip sectors.</param>
     /// <returns>Raw FILETIME.</returns>
-    public static ulong GetFileTimeRaw(BlockDevice.IBlockDevice dev, string isoName = "memory", int? skipSectors = null)
+    public static ulong GetFileTimeRaw(IBlockDevice dev, string isoName = "memory", int? skipSectors = null)
     {
         var discLseek = FindDiscLseekForFileTime(dev, isoName, skipSectors);
         Span<byte> buf = stackalloc byte[8];
@@ -1218,7 +1220,7 @@ public static class XisoReader
     /// <summary>
     /// Block-device overload of <see cref="GetFileTime(string,int?)"/>.
     /// </summary>
-    public static DateTimeOffset GetFileTime(BlockDevice.IBlockDevice dev, string isoName = "memory",
+    public static DateTimeOffset GetFileTime(IBlockDevice dev, string isoName = "memory",
         int? skipSectors = null)
     {
         return FileTimeHelper.FromFileTimeRaw(GetFileTimeRaw(dev, isoName, skipSectors));
@@ -1308,7 +1310,7 @@ public static class XisoReader
         throw new XisoFormatException($"Invalid XISO: {isoName}");
     }
 
-    private static long FindDiscLseekForFileTime(BlockDevice.IBlockDevice dev, string isoName, int? skipSectors)
+    private static long FindDiscLseekForFileTime(IBlockDevice dev, string isoName, int? skipSectors)
     {
         Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
         if (skipSectors.HasValue)
@@ -1407,7 +1409,8 @@ public static class XisoReader
 
         var visited = new HashSet<long>();
 
-        AuditWalk(fs, rootDirStart, "/", fileLength, discLseek, issues, visited, ref filesChecked, ref dirsChecked);
+        AuditWalk(fs, rootDirStart, rootDirStart, "/", fileLength, discLseek, issues, visited, ref filesChecked,
+            ref dirsChecked);
 
         return new AuditResult(issues.Count == 0, filesChecked, dirsChecked, issues);
     }
@@ -1415,6 +1418,7 @@ public static class XisoReader
     private static void AuditWalk(
         FileStream fs,
         long dirStart,
+        long tableStart,
         string path,
         long fileLength,
         long discLseek,
@@ -1448,12 +1452,15 @@ public static class XisoReader
             ReadExact(fs, shortBuf);
             var lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
 
-            if (lOffset == Constants.PadShort)
+            // xdvdfs semantics (mirrors GetFileEntries): 0xFFFF and the all-zero 0x0000
+            // sentinel mark an empty directory table only at the table start. Deeper nodes
+            // use them as "no left child" markers and must still be processed.
+            if (lOffset == Constants.PadShort && dirStart == tableStart)
             {
                 return;
             }
 
-            if (lOffset == Constants.EmptyDirectorySentinel)
+            if (lOffset == Constants.EmptyDirectorySentinel && dirStart == tableStart)
             {
                 var peekPos = fs.Position;
                 var isAllZeros = false;
@@ -1478,9 +1485,9 @@ public static class XisoReader
                 }
             }
 
-            if (lOffset != 0)
+            if (lOffset != 0 && lOffset != Constants.PadShort)
             {
-                var leftSeek = dirStart + ((long)lOffset * Constants.DwordSize);
+                var leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
                 if (leftSeek >= fileLength)
                 {
                     issues.Add($"Left child offset {lOffset} (seek {leftSeek}) exceeds file length in {path}.");
@@ -1488,7 +1495,8 @@ public static class XisoReader
                 else
                 {
                     var childVisited = new HashSet<long>(visited);
-                    AuditWalk(fs, leftSeek, path, fileLength, discLseek, issues, childVisited, ref filesChecked,
+                    AuditWalk(fs, leftSeek, tableStart, path, fileLength, discLseek, issues, childVisited,
+                        ref filesChecked,
                         ref dirsChecked);
                 }
             }
@@ -1546,7 +1554,7 @@ public static class XisoReader
                             $"Directory '{path}{filename}' size {fileSize} (ends at {endOffset}) exceeds file length {fileLength}.");
                     }
 
-                    AuditWalk(fs, sectorOffset, path + filename + "/", fileLength, discLseek, issues,
+                    AuditWalk(fs, sectorOffset, sectorOffset, path + filename + "/", fileLength, discLseek, issues,
                         new HashSet<long>(), ref filesChecked, ref dirsChecked);
                 }
             }
@@ -1555,9 +1563,9 @@ public static class XisoReader
                 filesChecked++;
             }
 
-            if (rOffset != 0)
+            if (rOffset != 0 && rOffset != Constants.PadShort)
             {
-                var rightSeek = dirStart + ((long)rOffset * Constants.DwordSize);
+                var rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
                 if (rightSeek >= fileLength)
                 {
                     issues.Add($"Right child offset {rOffset} (seek {rightSeek}) exceeds file length in {path}.");

@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using XISOSharp.Interfaces;
 
 namespace XISOSharp.BlockDevice;
 

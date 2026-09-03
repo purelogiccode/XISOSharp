@@ -3,6 +3,8 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using XISOSharp.BlockDevice;
+using XISOSharp.BattleTests.Models;
+using XISOSharp.Models;
 
 namespace XISOSharp.BattleTests;
 

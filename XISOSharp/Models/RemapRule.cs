@@ -1,4 +1,6 @@
-namespace XISOSharp;
+using XISOSharp;
+
+namespace XISOSharp.Models;
 
 /// <summary>
 /// Represents a host-to-image path mapping rule for <c>build-image</c>.

@@ -1,4 +1,4 @@
-namespace XISOSharp.BattleTests;
+namespace XISOSharp.BattleTests.Models;
 
 /// <summary>Single battle sub-test result.</summary>
 internal sealed class SubBattleResult

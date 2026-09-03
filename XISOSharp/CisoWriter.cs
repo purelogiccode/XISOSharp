@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.IO.Compression;
+using XISOSharp.Models;
 
 namespace XISOSharp;
 

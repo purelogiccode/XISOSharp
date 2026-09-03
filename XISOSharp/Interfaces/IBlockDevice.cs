@@ -1,4 +1,4 @@
-namespace XISOSharp.BlockDevice;
+namespace XISOSharp.Interfaces;
 
 /// <summary>
 /// Abstraction over a random-access block device, mirroring <c>xdvdfs-core/src/blockdev.rs</c>

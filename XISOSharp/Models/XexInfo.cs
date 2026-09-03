@@ -1,4 +1,4 @@
-namespace XISOSharp;
+namespace XISOSharp.Models;
 
 /// <summary>
 /// Metadata parsed from the header of an Xbox 360 executable (XEX2 format).

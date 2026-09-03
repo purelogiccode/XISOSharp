@@ -1,6 +1,7 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using XISOSharp.Models;
 
 namespace XISOSharp.Cli;
 

@@ -1,70 +1,10 @@
 using System.Runtime.InteropServices;
 using XISOSharp.DataStructures;
+using XISOSharp.Models;
 
 #pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
 
 namespace XISOSharp;
-
-/// <summary>Result codes returned by AVL tree insertion.</summary>
-public enum AvlResult
-{
-    /// <summary>Operation completed successfully without requiring rebalancing.</summary>
-    NoErr,
-
-    /// <summary>An error occurred during the operation.</summary>
-    AvlError,
-
-    /// <summary>Operation completed and the tree was rebalanced.</summary>
-    AvlBalanced
-}
-
-/// <summary>Traversal order when walking an AVL tree.</summary>
-public enum AvlTraversalMethod
-{
-    /// <summary>Visit the current node before its children (pre-order traversal).</summary>
-    Prefix,
-
-    /// <summary>Visit the left child, then the current node, then the right child (in-order traversal).</summary>
-    Infix,
-
-    /// <summary>Visit children before the current node (post-order traversal).</summary>
-    Postfix
-}
-
-/// <summary>Operating mode for XISO image processing.</summary>
-public enum ExtractMode
-{
-    /// <summary>Build the AVL tree directory structure without writing an output file.</summary>
-    GenerateAvl,
-
-    /// <summary>Extract files from the XISO image to disk.</summary>
-    Extract,
-
-    /// <summary>List the contents of the XISO image.</summary>
-    List,
-
-    /// <summary>Rewrite the XISO image with an optimized AVL directory structure.</summary>
-    Rewrite,
-
-    /// <summary>Recursively list all files with sizes in a tree format.</summary>
-    Tree,
-
-    /// <summary>Deep-audit the XISO image: validate header, walk tree, check sector bounds, detect cycles.</summary>
-    Verify
-}
-
-/// <summary>Error codes for non-fatal extraction failures.</summary>
-public enum ExtractError
-{
-    /// <summary>XISO image references no files in its directory table.</summary>
-    ErrIsoNoFiles = -5003,
-
-    /// <summary>XISO image has already been rewritten (optimized format detected).</summary>
-    ErrIsoRewritten = -5002,
-
-    /// <summary>Unexpected end of sector while reading a directory entry chain.</summary>
-    ErrEndOfSector = -5001
-}
 
 /// <summary>
 /// Callback invoked during extraction/creation to report progress.
@@ -74,45 +14,6 @@ public enum ExtractError
 public delegate void ProgressCallback(long currentValue, long finalValue);
 
 /// <summary>
-/// Type of a structured progress event emitted during write operations
-/// (create/rewrite). See <see cref="ProgressInfo"/> for the payload semantics.
-/// </summary>
-public enum ProgressInfoType
-{
-    /// <summary>Total number of files in the image, emitted once before writing starts.</summary>
-    FileCount,
-
-    /// <summary>Total number of directories in the image, emitted once before writing starts.</summary>
-    DirCount,
-
-    /// <summary>A directory has been written. Payload: <see cref="ProgressInfo.Path"/> (internal path), <see cref="ProgressInfo.Sector"/>.</summary>
-    DirAdded,
-
-    /// <summary>A file has been written. Payload: <see cref="ProgressInfo.Path"/>, <see cref="ProgressInfo.Sector"/>, <see cref="ProgressInfo.Size"/>.</summary>
-    FileAdded,
-
-    /// <summary>All data has been written; the image is complete. Emitted once, last.</summary>
-    FinishedPacking
-}
-
-/// <summary>
-/// A structured progress event emitted during <see cref="XisoWriter.CreateXiso"/>
-/// operations. Delivered through <see cref="IProgress{T}"/> so consumers can drive
-/// progress bars, tree views, and logging from a single channel.
-/// </summary>
-/// <param name="Type">The kind of event; determines which payload fields are populated.</param>
-/// <param name="Count">Total count for <see cref="ProgressInfoType.FileCount"/> and <see cref="ProgressInfoType.DirCount"/>; 0 otherwise.</param>
-/// <param name="Path">Internal path with forward slashes for <see cref="ProgressInfoType.DirAdded"/> (e.g. <c>"/"</c>, <c>"/subdir"</c>) and <see cref="ProgressInfoType.FileAdded"/> (e.g. <c>"/subdir/file.bin"</c>); <c>null</c> otherwise.</param>
-/// <param name="Sector">Start sector (partition-relative) for <see cref="ProgressInfoType.DirAdded"/> and <see cref="ProgressInfoType.FileAdded"/>; 0 otherwise.</param>
-/// <param name="Size">Byte size written for <see cref="ProgressInfoType.FileAdded"/>; 0 otherwise.</param>
-public readonly record struct ProgressInfo(
-    ProgressInfoType Type,
-    long Count = 0,
-    string? Path = null,
-    long Sector = 0,
-    long Size = 0);
-
-/// <summary>
 /// Callback invoked for each node during an AVL tree traversal.
 /// </summary>
 /// <param name="node">The current tree node being visited.</param>
@@ -120,25 +21,6 @@ public readonly record struct ProgressInfo(
 /// <param name="depth">Current depth within the tree (0 = root).</param>
 /// <returns>0 to continue traversal; any non-zero value stops the traversal.</returns>
 public delegate int TraversalCallback(AvlNode node, object? context, int depth);
-
-/// <summary>
-/// Describes a source directory and optional output name for creating an XISO image.
-/// Entries can be chained via <see cref="Next"/> for batch creation.
-/// </summary>
-public class CreateList
-{
-    /// <summary>Source directory path whose contents will be packed into the XISO.</summary>
-    public string Path { get; set; } = "";
-
-    /// <summary>
-    /// Optional output filename or path for the resulting ISO.
-    /// When <c>null</c> the directory name is used.
-    /// </summary>
-    public string? Name { get; set; }
-
-    /// <summary>Next entry in a linked list of creation tasks, or <c>null</c>.</summary>
-    public CreateList? Next { get; set; }
-}
 
 /// <summary>
 /// Represents a Windows FILETIME value as two 32-bit unsigned integers.

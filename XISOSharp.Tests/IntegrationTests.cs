@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
 

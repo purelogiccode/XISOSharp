@@ -1,4 +1,4 @@
-namespace XISOSharp.DataStructures;
+namespace XISOSharp.Models;
 
 /// <summary>Skew direction of an AVL tree node, used during balancing.</summary>
 public enum AvlSkew

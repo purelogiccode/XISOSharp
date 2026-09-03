@@ -1,4 +1,4 @@
-namespace XISOSharpTester.Services;
+namespace XISOSharpTester.Models;
 
 /// <summary>
 /// Reports the current progress of a test session, including

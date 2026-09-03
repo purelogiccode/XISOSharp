@@ -1,4 +1,4 @@
-namespace XISOSharp.BattleTests;
+namespace XISOSharp.BattleTests.Models;
 
 /// <summary>Single battle check status.</summary>
 internal enum BattleStatus

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using XISOSharp.BattleTests.Models;
 
 namespace XISOSharp.BattleTests;
 

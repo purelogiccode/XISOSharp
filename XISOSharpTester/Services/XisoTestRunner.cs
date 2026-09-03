@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Serilog;
 using XISOSharp;
+using XISOSharp.Models;
 using XISOSharpTester.Models;
 
 namespace XISOSharpTester.Services;

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
 

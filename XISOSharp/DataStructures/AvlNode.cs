@@ -1,4 +1,6 @@
-﻿namespace XISOSharp.DataStructures;
+using XISOSharp.Models;
+
+namespace XISOSharp.DataStructures;
 
 /// <summary>
 /// Node in an AVL (Adelson-Velsky/Landis) balanced binary search tree.

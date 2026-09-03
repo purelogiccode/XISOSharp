@@ -1,4 +1,5 @@
 using XISOSharp.DataStructures;
+using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
 

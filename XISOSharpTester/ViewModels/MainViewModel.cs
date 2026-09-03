@@ -8,9 +8,10 @@ using System.Windows;
 using System.Windows.Input;
 using Microsoft.Win32;
 using Serilog;
-using XISOSharpTester.Models;
 using XISOSharpTester.Services;
 using XISOSharpTester.Views;
+using XISOSharp.Models;
+using XISOSharpTester.Models;
 
 namespace XISOSharpTester.ViewModels;
 

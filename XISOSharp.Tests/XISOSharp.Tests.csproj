@@ -39,6 +39,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="..\XISOSharp.TestDataGenerator\TestDataWriter.cs" Link="TestDataGenerator\TestDataWriter.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
     </ItemGroup>
 

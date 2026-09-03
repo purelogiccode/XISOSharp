@@ -1,4 +1,4 @@
-namespace XISOSharp.BattleTests;
+namespace XISOSharp.BattleTests.Models;
 
 /// <summary>Per-file battle result.</summary>
 internal sealed class PerFileBattleResult

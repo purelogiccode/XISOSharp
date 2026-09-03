@@ -1,3 +1,5 @@
+using XISOSharp.Interfaces;
+
 namespace XISOSharp.BlockDevice;
 
 /// <summary>

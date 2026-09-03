@@ -1,5 +1,6 @@
 using BenchmarkDotNet.Attributes;
 using XISOSharp.DataStructures;
+using XISOSharp.Models;
 
 namespace XISOSharp.Benchmarks;
 

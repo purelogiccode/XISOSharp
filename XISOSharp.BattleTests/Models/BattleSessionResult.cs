@@ -1,4 +1,4 @@
-namespace XISOSharp.BattleTests;
+namespace XISOSharp.BattleTests.Models;
 
 /// <summary>Session aggregate.</summary>
 internal sealed class BattleSessionResult
