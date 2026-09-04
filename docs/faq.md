@@ -150,9 +150,12 @@ No — split-file images are out of scope. XISOSharp works with single-file imag
 
 Only additively: new CLI flags (`-t`, `-i`, `-V`, `-o`, `--copy-out`, `--md5`,
 `--sha256`, `-X`, `--skip-sectors`, `--prepend-sectors`, `--skip-existing`,
-`validate`/`--validate*`), the input==output safety guard, unpack resume
-(`UnpackOptions`), GUI drag-and-drop, async APIs, progress callbacks, and a public
-library surface. Core algorithms are unchanged.
+`validate`/`--validate*`), the input==output safety guard, misplaced-flag
+diagnostics, `-d` tolerance for batch-script artifacts (trailing separators,
+UNC paths, spaces), unpack resume (`UnpackOptions`), GUI drag-and-drop, async
+APIs, progress callbacks, a public stream-based read API (`OpenImageStream` +
+`Stream` overloads of `Extract`/`UnpackImage`/`List`/`Tree`/`DecodeXiso`), and a
+public library surface. Core algorithms are unchanged.
 
 **Where can I report bugs or request features?**
 

@@ -144,11 +144,10 @@ public static class XisoWriter
 
         outputDirectory ??= cwd;
 
-        var outLen = outputDirectory.Length;
-        if (outLen > 0 && outputDirectory[outLen - 1] == Constants.PathChar)
-        {
-            outputDirectory = outputDirectory[..--outLen];
-        }
+        // Never trim into a filesystem root: `-d C:\` (batch scripts love
+        // trailing backslashes, upstream #61) must stay `C:\`, not become the
+        // drive-relative `C:` that Path.Combine would then mis-resolve.
+        outputDirectory = XisoPaths.TrimTrailingSeparators(outputDirectory);
 
         if (string.IsNullOrEmpty(isoName))
         {

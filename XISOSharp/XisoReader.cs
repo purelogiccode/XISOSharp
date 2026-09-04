@@ -35,8 +35,9 @@ public static class XisoReader
     /// (mirroring <c>xdvdfs-cli/src/img.rs::open_image</c>) with a <c>CISO</c> magic sniff
     /// fallback, so renamed containers — notably the CLI rewrite flow, which appends
     /// <c>.old</c> — still resolve to the decompressed view.
+    /// The caller owns the returned stream.
     /// </summary>
-    internal static Stream OpenImageStream(string path)
+    public static Stream OpenImageStream(string path)
     {
         if (IsCsoPath(path) || CisoReader.IsCso(path))
             return new BlockDeviceStream(new CisoBlockDevice(path), leaveOpen: false);
@@ -811,9 +812,37 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Stream-based <c>Extract</c>: extracts an already-open image
+    /// without taking the input path. The stream must be readable + seekable
+    /// and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name for output naming and messages.</param>
+    /// <param name="outputPath">Destination directory (<c>null</c> = derive from <paramref name="imageName"/>).</param>
+    /// <param name="llCompat">Backwards-compatible right-offset calculation.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="skipSectors">Optional skip before the XISO filesystem begins.</param>
+    /// <param name="options">Optional resume options (<see cref="UnpackOptions.SkipExisting"/>).</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    public static int Extract(
+        Stream imageStream,
+        string imageName,
+        string? outputPath,
+        bool llCompat,
+        CancellationToken cancellationToken = default,
+        int? skipSectors = null,
+        UnpackOptions? options = null,
+        IProgress<ProgressInfo>? progress = null)
+    {
+        return DecodeXiso(imageStream, imageName, outputPath, ExtractMode.Extract, out _, llCompat,
+            cancellationToken, skipSectors: skipSectors, progress: progress, unpackOptions: options);
+    }
+
+    /// <summary>
     /// Unpacks an entire XISO image to a directory.
     /// The optimized-tag marker is probed automatically, so callers do not need to know
-    /// the image layout (unlike <see cref="Extract"/>, which takes <c>llCompat</c>).
+    /// the image layout (unlike <c>Extract</c>, which takes <c>llCompat</c>).
     /// </summary>
     /// <param name="isoPath">Path to the XISO file, or a <c>.cso</c> image (auto-detected).</param>
     /// <param name="outputPath">
@@ -862,6 +891,38 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Stream-based <see cref="UnpackImage(string, string?, CancellationToken, int?, UnpackOptions?, IProgress{ProgressInfo}?)"/>:
+    /// unpacks an already-open image, probing the optimized tag from the stream.
+    /// The stream must be readable + seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name for output naming and messages.</param>
+    /// <param name="outputPath">Destination directory (<c>null</c> = derive from <paramref name="imageName"/>).</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="skipSectors">Optional skip before the XISO filesystem begins.</param>
+    /// <param name="options">Optional resume options (<see cref="UnpackOptions.SkipExisting"/>).</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    public static int UnpackImage(
+        Stream imageStream,
+        string imageName,
+        string? outputPath = null,
+        CancellationToken cancellationToken = default,
+        int? skipSectors = null,
+        UnpackOptions? options = null,
+        IProgress<ProgressInfo>? progress = null)
+    {
+        if (skipSectors < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value,
+                "Skip sectors must be non-negative.");
+        }
+
+        return Extract(imageStream, imageName, outputPath, !IsOptimizedImage(imageStream, skipSectors),
+            cancellationToken, skipSectors, options, progress);
+    }
+
+    /// <summary>
     /// Returns <c>true</c> when the image carries the extract-xiso optimized tag
     /// at byte offset 31337 (shifted by the skip offset when reading offset images),
     /// meaning it uses the optimized directory layout. <c>.cso</c> paths are probed
@@ -870,16 +931,45 @@ public static class XisoReader
     public static bool IsOptimizedImage(string isoPath, int? skipSectors = null)
     {
         using var fs = OpenImageStream(isoPath);
+        return IsOptimizedImage(fs, skipSectors);
+    }
 
-        fs.Seek(((long)(skipSectors ?? 0) * Constants.SectorSize) + Constants.OptimizedTagOffset, SeekOrigin.Begin);
-        Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];
-        if (fs.Read(tagBuf) != Constants.OptimizedTagLength)
+    /// <summary>
+    /// Stream-based <see cref="IsOptimizedImage(string, int?)"/>: probes the
+    /// optimized tag on an already-open stream and restores its position.
+    /// </summary>
+    /// <param name="imageStream">Open image stream; must be readable and seekable.</param>
+    /// <param name="skipSectors">Optional skip applied before the tag offset.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="imageStream"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="imageStream"/> is not readable + seekable.
+    /// </exception>
+    public static bool IsOptimizedImage(Stream imageStream, int? skipSectors = null)
+    {
+        if (imageStream == null)
+            throw new ArgumentNullException(nameof(imageStream));
+        if (!imageStream.CanRead || !imageStream.CanSeek)
+            throw new ArgumentException("Image stream must be readable and seekable.", nameof(imageStream));
+
+        var pos = imageStream.Position;
+        try
         {
-            return false;
-        }
+            imageStream.Seek(((long)(skipSectors ?? 0) * Constants.SectorSize) + Constants.OptimizedTagOffset,
+                SeekOrigin.Begin);
+            Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];
+            if (imageStream.Read(tagBuf) != Constants.OptimizedTagLength)
+            {
+                return false;
+            }
 
-        var tag = Encoding.ASCII.GetString(tagBuf);
-        return tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin], StringComparison.Ordinal);
+            var tag = Encoding.ASCII.GetString(tagBuf);
+            return tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin],
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            imageStream.Seek(pos, SeekOrigin.Begin);
+        }
     }
 
     /// <summary>
@@ -915,6 +1005,21 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Stream-based <c>List</c>: lists files of an already-open image.
+    /// The stream must be readable + seekable and is left open.
+    /// </summary>
+    public static int List(
+        Stream imageStream,
+        string imageName,
+        bool llCompat,
+        CancellationToken cancellationToken = default,
+        int? skipSectors = null)
+    {
+        return DecodeXiso(imageStream, imageName, null, ExtractMode.List, out _, llCompat,
+            cancellationToken, skipSectors: skipSectors);
+    }
+
+    /// <summary>
     /// Recursively lists all files in an XISO image in a tree format,
     /// showing full paths and sizes for each entry.
     /// </summary>
@@ -940,9 +1045,24 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Stream-based <c>Tree</c>: tree-lists an already-open image.
+    /// The stream must be readable + seekable and is left open.
+    /// </summary>
+    public static int Tree(
+        Stream imageStream,
+        string imageName,
+        bool llCompat,
+        CancellationToken cancellationToken = default,
+        int? skipSectors = null)
+    {
+        return DecodeXiso(imageStream, imageName, null, ExtractMode.Tree, out _, llCompat,
+            cancellationToken, skipSectors: skipSectors);
+    }
+
+    /// <summary>
     /// Main entry point for processing an XISO image. Verifies the image, then
     /// performs extraction, listing, or rewriting based on the specified mode.
-    /// Prefer using <see cref="Rewrite"/>, <see cref="Extract"/>, or <see cref="List"/>
+    /// Prefer using <see cref="Rewrite"/>, <c>Extract</c>, or <c>List</c>
     /// for mode-specific operations.
     /// </summary>
     /// <param name="xisoPath">Path to the XISO file (or <c>.old</c> file for rewrite mode),
@@ -1005,10 +1125,117 @@ public static class XisoReader
         UnpackOptions? unpackOptions = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using Stream fs = OpenImageStream(xisoPath);
+        return DecodeXisoCore(fs, xisoPath, outputPath, mode, out outIsoPath, llCompat,
+            cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions);
+    }
+
+    /// <summary>
+    /// Stream-based <c>DecodeXiso</c>: processes an already-open image
+    /// (file, memory, or any readable + seekable stream) without taking the
+    /// input path. The caller's stream is left open and positioned wherever
+    /// the read phase ends. Rewrite mode is intentionally unavailable here —
+    /// it is file-identity based (the <c>.old</c> dance).
+    /// </summary>
+    /// <param name="imageStream">Open image stream; must be readable and seekable.</param>
+    /// <param name="imageName">
+    /// Display name for output naming and messages (typically the file name,
+    /// e.g. <c>game.iso</c>); extract-to-default-directory derives from it.
+    /// </param>
+    /// <param name="outputPath">
+    /// Output directory for extraction.
+    /// When <c>null</c> in extract mode, a directory named after
+    /// <paramref name="imageName"/> is created.
+    /// </param>
+    /// <param name="mode">Operating mode: extract or list (rewrite is refused).</param>
+    /// <param name="outIsoPath">Always <c>null</c> (rewrite is refused).</param>
+    /// <param name="llCompat">
+    /// If <c>true</c>, use backwards-compatible (non-optimized) right-offset calculation.
+    /// </param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="outputName">Ignored (rewrite is refused).</param>
+    /// <param name="skipSectors">
+    /// Optional number of 2048-byte sectors to skip in the stream before the XISO
+    /// filesystem begins.
+    /// </param>
+    /// <param name="prependSectors">Ignored (rewrite is refused).</param>
+    /// <param name="progress">
+    /// Optional structured progress channel; receives <see cref="ProgressInfoType.FileAdded"/>
+    /// for each file actually written in extract mode. Ignored in list/tree modes.
+    /// </param>
+    /// <param name="unpackOptions">
+    /// Optional resume options for extract mode; when <see cref="UnpackOptions.SkipExisting"/>
+    /// is set, files already on disk with the same size are skipped (TODO #13, xdvdfs #190).
+    /// Ignored in non-extract modes.
+    /// </param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="imageStream"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="imageStream"/> is not readable + seekable,
+    /// when <paramref name="mode"/> is rewrite, or when <paramref name="outputPath"/> is empty.
+    /// </exception>
+    /// <exception cref="XisoFormatException">
+    /// Thrown when the stream is not a valid XISO image.
+    /// </exception>
+    /// <exception cref="XisoEmptyException">
+    /// Thrown when the XISO image contains no files.
+    /// </exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static int DecodeXiso(
+        Stream imageStream,
+        string imageName,
+        string? outputPath,
+        ExtractMode mode,
+        out string? outIsoPath,
+        bool llCompat,
+        CancellationToken cancellationToken = default,
+        string? outputName = null,
+        int? skipSectors = null,
+        int? prependSectors = null,
+        IProgress<ProgressInfo>? progress = null,
+        UnpackOptions? unpackOptions = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (imageStream == null)
+            throw new ArgumentNullException(nameof(imageStream));
+        if (!imageStream.CanRead || !imageStream.CanSeek)
+            throw new ArgumentException("Image stream must be readable and seekable.", nameof(imageStream));
+        if (mode == ExtractMode.Rewrite)
+            throw new ArgumentException("Rewrite mode requires a file path; use DecodeXiso(string, ...).",
+                nameof(mode));
+
+        return DecodeXisoCore(imageStream, imageName, outputPath, mode, out outIsoPath, llCompat,
+            cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions);
+    }
+
+    /// <summary>
+    /// Shared engine behind both <c>DecodeXiso</c> overloads. The path overload
+    /// opens (and owns) the stream; the public stream overload validates it.
+    /// </summary>
+    private static int DecodeXisoCore(
+        Stream imageStream,
+        string imageName,
+        string? outputPath,
+        ExtractMode mode,
+        out string? outIsoPath,
+        bool llCompat,
+        CancellationToken cancellationToken = default,
+        string? outputName = null,
+        int? skipSectors = null,
+        int? prependSectors = null,
+        IProgress<ProgressInfo>? progress = null,
+        UnpackOptions? unpackOptions = null)
+    {
         outIsoPath = null;
         var repair = false;
 
-        var filename = xisoPath;
+        // Batch scripts can pass an empty -d (`-d "%UNSET_VAR%"`): fail fast
+        // with a named error instead of an IndexOutOfRangeException deep in
+        // path-prefix building or a BCL ArgumentException from CreateDirectory.
+        if (outputPath != null && outputPath.Length == 0)
+            throw new ArgumentException("Output path must not be empty.", nameof(outputPath));
+
+        var filename = imageName;
 
         if (mode == ExtractMode.Rewrite)
         {
@@ -1027,7 +1254,7 @@ public static class XisoReader
                 shortName = name[..^4];
                 break;
             case 0:
-                Logger.LogErr($"invalid xiso image name: {xisoPath}\n");
+                Logger.LogErr($"invalid xiso image name: {imageName}\n");
                 return 1;
         }
 
@@ -1037,7 +1264,9 @@ public static class XisoReader
 
         string? cwd = null;
 
-        using Stream fs = OpenImageStream(xisoPath);
+        // The caller's stream stays open: extraction reads through it under the
+        // destination-directory chdir below, and ownership never transfers.
+        var fs = imageStream;
 
         (var rootDirSect, var rootDirSize, var discLseek) = VerifyXiso(fs, name, skipSectors);
 
@@ -1199,6 +1428,33 @@ public static class XisoReader
         {
             var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken,
                 outputName, skipSectors, prependSectors, progress, unpackOptions);
+            return (result, outPath);
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Stream-based <c>DecodeXisoAsync</c>: runs the stream
+    /// <see cref="DecodeXiso(Stream, string, string?, ExtractMode, out string?, bool, CancellationToken, string?, int?, int?, IProgress{ProgressInfo}?, UnpackOptions?)"/>
+    /// overload on a thread-pool thread. The stream must be readable +
+    /// seekable and is left open. Rewrite mode is refused.
+    /// </summary>
+    public static async Task<(int Result, string? OutIsoPath)> DecodeXisoAsync(
+        Stream imageStream,
+        string imageName,
+        string? outputPath,
+        ExtractMode mode,
+        bool llCompat = false,
+        CancellationToken cancellationToken = default,
+        string? outputName = null,
+        int? skipSectors = null,
+        int? prependSectors = null,
+        IProgress<ProgressInfo>? progress = null,
+        UnpackOptions? unpackOptions = null)
+    {
+        return await Task.Run(() =>
+        {
+            var result = DecodeXiso(imageStream, imageName, outputPath, mode, out var outPath, llCompat,
+                cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
     }

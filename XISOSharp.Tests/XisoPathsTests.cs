@@ -137,4 +137,83 @@ public sealed class XisoPathsTests : IDisposable
         var dir = CreateTempDir();
         Assert.False(XisoPaths.IsWithinDirectory(Path.GetDirectoryName(dir), dir));
     }
+
+    [Fact]
+    public void TrimTrailingSeparators_RootSlash_Survives()
+    {
+        Assert.Equal("/", XisoPaths.TrimTrailingSeparators("/"));
+    }
+
+    [Fact]
+    public void TrimTrailingSeparators_Empty_StaysEmpty()
+    {
+        Assert.Equal("", XisoPaths.TrimTrailingSeparators(""));
+    }
+
+    [Theory]
+    [InlineData("out/", "out")]
+    [InlineData("out//", "out")]
+    public void TrimTrailingSeparators_Relative_Strips(string input, string expected)
+    {
+        Assert.Equal(expected, XisoPaths.TrimTrailingSeparators(input));
+    }
+
+    [Fact]
+    public void TrimTrailingSeparators_DriveRoot_Survives()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        Assert.Equal(@"C:\", XisoPaths.TrimTrailingSeparators(@"C:\"));
+    }
+
+    [Theory]
+    [InlineData(@"C:\out\", @"C:\out")]
+    [InlineData(@"C:\out\\", @"C:\out")]
+    [InlineData(@"C:\out\/", @"C:\out")]
+    public void TrimTrailingSeparators_DriveSubdir_Strips(string input, string expected)
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        Assert.Equal(expected, XisoPaths.TrimTrailingSeparators(input));
+    }
+
+    [Fact]
+    public void TrimTrailingSeparators_UncRoot_Survives()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        Assert.Equal(@"\\server\share\", XisoPaths.TrimTrailingSeparators(@"\\server\share\"));
+    }
+
+    [Fact]
+    public void TrimTrailingSeparators_UncSubdir_Strips()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        Assert.Equal(@"\\server\share\dir",
+            XisoPaths.TrimTrailingSeparators(@"\\server\share\dir\"));
+    }
+
+    [Fact]
+    public void AreSamePath_Unc_TrailingSeparator_Match()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        Assert.True(XisoPaths.AreSamePath(@"\\server\share\dir", @"\\server\share\dir\"));
+    }
+
+    [Fact]
+    public void IsWithinDirectory_Unc_TrailingSeparator_Matches()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        Assert.True(XisoPaths.IsWithinDirectory(
+            @"\\server\share\dir\out.iso", @"\\server\share\dir\"));
+    }
 }

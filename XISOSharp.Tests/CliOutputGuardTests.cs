@@ -88,4 +88,30 @@ public sealed class CliOutputGuardTests
     {
         Assert.Null(CliOutputGuard.CheckImageOutput("game.iso", "game.cso"));
     }
+
+    [Theory]
+    [InlineData("-d")]
+    [InlineData("-o")]
+    [InlineData("-x")]
+    [InlineData("--skip-existing")]
+    [InlineData("--batch")]
+    public void CheckMisplacedFlag_KnownFlag_ReportsMustComeFirst(string token)
+    {
+        var refusal = CliOutputGuard.CheckMisplacedFlag(token);
+        Assert.NotNull(refusal);
+        Assert.Contains(token, refusal, StringComparison.Ordinal);
+        Assert.Contains("must come before", refusal, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("game.iso")]
+    [InlineData("./new/")]
+    [InlineData("-Z")]
+    [InlineData("-")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void CheckMisplacedFlag_NotAFlag_Allows(string? token)
+    {
+        Assert.Null(CliOutputGuard.CheckMisplacedFlag(token));
+    }
 }

@@ -58,13 +58,43 @@ public static class XisoPaths
     {
         try
         {
-            return Path.GetFullPath(path)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return TrimTrailingSeparators(Path.GetFullPath(path));
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException
                                        or UnauthorizedAccessException)
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Strips trailing directory separators without cutting into a filesystem
+    /// root: <c>C:\</c>, <c>\\server\share\</c> and <c>/</c> are returned
+    /// unchanged (naive <c>TrimEnd</c> would corrupt them into <c>C:</c>,
+    /// <c>\\server\share</c> and the empty string). Batch-script <c>-d</c>
+    /// values routinely carry trailing backslashes (upstream #61).
+    /// </summary>
+    public static string TrimTrailingSeparators(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return path;
+
+        var trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (trimmed.Length == 0)
+            return path;
+
+        string? root;
+        try
+        {
+            root = Path.GetPathRoot(path);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+        {
+            return trimmed;
+        }
+
+        var rootContentLength = (root ?? string.Empty)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Length;
+        return trimmed.Length <= rootContentLength ? path : trimmed;
     }
 }

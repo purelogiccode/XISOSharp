@@ -108,6 +108,10 @@ int resumed = XisoReader.UnpackImage("game.iso", "./out",
 // List
 XisoReader.List("game.iso", llCompat: false);
 
+// Stream input (memory, network, embedded resource — readable + seekable, stays open)
+using var image = new MemoryStream(File.ReadAllBytes("game.iso"));
+XisoReader.UnpackImage(image, "game.iso", "./out");
+
 // Create with exclusions (WaxGlob {0}/{n} also works for build-image)
 XisoWriter.CreateXiso(
     "source_dir", "./out", null, null, out var isoPath, "game.iso", null,

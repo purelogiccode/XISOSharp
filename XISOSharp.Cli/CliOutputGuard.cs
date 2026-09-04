@@ -13,6 +13,40 @@ namespace XISOSharp.Cli;
 internal static class CliOutputGuard
 {
     /// <summary>
+    /// Flags the upstream #61 confusion: a known option spelling sitting in a
+    /// positional slot (the main parser stops at the first non-flag token, so
+    /// <c>game.iso -d ./new/</c> would otherwise be probed as a file named
+    /// <c>-d</c>). Returns the error line, or <c>null</c> for anything that is
+    /// not an exact known-flag spelling. Callers still let a token through
+    /// when it exists on disk, so a file literally named like a flag keeps
+    /// working.
+    /// </summary>
+    public static string? CheckMisplacedFlag(string? token)
+    {
+        if (string.IsNullOrEmpty(token) || !MisplacedFlags.Contains(token))
+            return null;
+
+        return $"Error: {token} must come before ISO filenames" +
+               $" (e.g. -x {token} <value> game.iso);" +
+               " a flag after the first filename is read as a filename\n";
+    }
+
+    private static readonly HashSet<string> MisplacedFlags = new(StringComparer.Ordinal)
+    {
+        "-v", "-h", "-c", "-x", "--unpack", "-X", "-l", "-t", "-i",
+        "--ls", "--xex-info", "--md5", "--sha256", "-V", "validate",
+        "--validate", "--validate-checksums", "--validate-strict",
+        "--validate-report", "--copy-out", "-r", "-q", "-Q", "-s", "-D",
+        "-m", "-y", "--yes", "-n", "--no", "-d", "-o", "-O", "--output",
+        "-p", "--skip-sectors", "--prepend-sectors", "--batch",
+        "--batch-recursive", "--skip-existing", "--pack", "--video",
+        "--random", "--seed", "--wipe", "--trim", "--petrify", "--update",
+        "--zar", "--all", "--best", "--compress", "--security-sectors",
+        "--sectors", "--checksum", "--filetime", "--get-filetime",
+        "--set-filetime", "--silent", "--dry-run",
+    };
+
+    /// <summary>
     /// Rewrite (<c>-r</c>) runs <c>input → input.old</c> before writing, so an
     /// <c>-o</c> pointing at the input itself (or at the backup about to hold
     /// it) is refused: the former is just the default, the latter destroys data.

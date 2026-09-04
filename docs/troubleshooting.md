@@ -46,8 +46,23 @@ image. This is a safety check inherited from the reference tool.
 ### `open error: <file> No such file or directory`
 
 The file does not exist, is locked, or the path was mistyped. Remember that flags must
-come **before** filenames; an unknown flag is treated as a filename and produces this
-error.
+come **before** filenames; an *unknown* flag is treated as a filename and produces this
+error, while a *known* flag in a filename slot fails fast with
+`Error: <flag> must come before ISO filenames` (see below).
+
+### `Error: <flag> must come before ISO filenames`
+
+You put a flag after an ISO filename (e.g. `game.iso -d ./new/` — upstream #61):
+option parsing stops at the first filename, so the flag would otherwise be opened
+as an image. Move the flag before the filename (`-x -d ./new/ game.iso`). The check
+is skipped when the token exists on disk, so a file literally named like a flag
+still works. See [CLI Reference](cli.md#misplaced-flags-upstream-61).
+
+### `Output path must not be empty`
+
+An empty `-d` value (typically `-d "%UNSET_VAR%"` in a batch script). Quote-check
+the variable or omit `-d` to extract next to the ISO. See
+[CLI Reference](cli.md#destination-directory-edge-cases--d).
 
 ### `... is already optimized, skipping...`
 

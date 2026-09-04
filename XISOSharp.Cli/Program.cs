@@ -15,10 +15,11 @@ internal static class Program
     /// <summary>
     /// Entry point. Parses command-line flags and positional arguments,
     /// then invokes the appropriate XISO operation.
+    /// Internal (not private) so the test suite can drive end-to-end CLI runs.
     /// </summary>
     /// <param name="args">Command-line arguments.</param>
     /// <returns>0 on success, 1 on error.</returns>
-    private static int Main(string[] args)
+    internal static int Main(string[] args)
     {
         if (args.Length < 1)
         {
@@ -600,6 +601,20 @@ internal static class Program
         }
 
         parse_done:
+
+        // Upstream #61: `game.iso -d ./new/` silently probed `-d` as an image
+        // ("open error: -d"). Flags must precede filenames, so name the mistake
+        // instead — unless the token exists on disk, in which case it really is
+        // a (bizarrely named) file and keeps working as before.
+        for (var i = optind; i < args.Length; i++)
+        {
+            var misplaced = CliOutputGuard.CheckMisplacedFlag(args[i]);
+            if (misplaced != null && !File.Exists(args[i]) && !Directory.Exists(args[i]))
+            {
+                Logger.LogErr(misplaced);
+                return 1;
+            }
+        }
 
         // --pack translates to create mode (directory input) or rewrite mode (ISO input),
         // reusing the existing create/rewrite machinery.

@@ -33,7 +33,7 @@ XISOSharp.Cli --checksum <image> [--silent]            # flag form
 
 - Flags must precede positional arguments; the first non-flag token ends option parsing (except verbs above which are detected as first token).
 - Flags are matched exactly — combined shorts such as `-lr` are **not** supported.
-- An unknown flag is treated as a filename (it will then fail with an "open error").
+- An unknown flag is treated as a filename (it will then fail with an "open error"); a *known* flag in a filename slot fails fast with `must come before ISO filenames` (see [Misplaced flags](#misplaced-flags-upstream-61)).
 - `-h` prints help; `-v` prints the banner (`extract-xiso v2.7.1 (01.11.14)`); both exit 0.
 - With no arguments at all, usage is printed and the tool exits 1.
 
@@ -85,7 +85,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 
 | Flag | Description |
 |---|---|
-| `-d <directory>` | Extract mode: output directory (created if missing). Rewrite mode: directory for the rewritten ISO. Ignored by list/tree. |
+| `-d <directory>` | Extract mode: output directory (created if missing). Rewrite mode: directory for the rewritten ISO. Ignored by list/tree. Tolerant of batch-script artifacts: trailing separators, UNC paths, spaces — see [Destination directory edge cases](#destination-directory-edge-cases--d). |
 | `-D` | Rewrite mode: delete the `.old` source file after a successful rewrite. |
 | `-m` | Disable automatic `.xbe` media-enable patching during create/rewrite (not recommended). |
 | `-o <filename>` | Rewrite/rebuild/compress output filename (default: original name with `.iso`/`.cso` extension). For `rebuild` must be `-o <redump.iso>`; for `compress` optional positional. |
@@ -154,6 +154,37 @@ Notes:
 - Cancellation is honored per entry, so Ctrl+C stops promptly; the working directory
   is always restored.
 - `--skip-existing` is rejected outside extract / `--unpack` / `--copy-out` (exit 1).
+
+### Destination directory edge cases (`-d`)
+
+Batch scripts build `-d` values by concatenation, so the usual artifacts are
+tolerated (upstream #61):
+
+- Trailing separators (`-d .\new\game\`, doubled, or mixed `/\`) are stripped —
+  including the filesystem-root case (`-d C:\` stays `C:\`, never the
+  drive-relative `C:` that `Path.Combine` would mis-resolve).
+- UNC destinations (`-d \\server\share\dir`), `\\?\`-prefixed paths, and
+  directories with spaces all work; an unreachable host fails fast with an
+  `IOException` instead of hanging.
+- An empty `-d` (`-d "%UNSET_VAR%"`) is rejected with
+  `Output path must not be empty` (exit 1).
+- A `-d` pointing at an existing *file* fails with an `IOException`; the
+  process working directory is restored either way.
+
+### Misplaced flags (upstream #61)
+
+`extract-xiso game.iso -d ./new/` never worked upstream: `getopt` stops at
+the first filename, so `-d` was opened as an image (`open error: -d`). This
+CLI keeps the flags-first contract, but a known flag spelling in a filename
+slot now fails fast with a named error instead of a bogus open attempt:
+
+```bash
+XISOSharp.Cli game.iso -d ./new/
+# Error: -d must come before ISO filenames (e.g. -x -d <value> game.iso); a flag after the first filename is read as a filename
+```
+
+The check is skipped when the token exists on disk, so a file literally
+named like a flag keeps working.
 
 ### Exclude patterns
 

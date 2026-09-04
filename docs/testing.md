@@ -39,7 +39,9 @@ Highlights:
 | Exclude patterns | `ExcludePatternsTests.cs` |
 | Skip/prepend sectors | `SkipPrependSectorsTests.cs` |
 | Unpack resume (`UnpackOptions.SkipExisting`, cancel+resume, copy-out) | `UnpackResumeTests.cs` |
-| Input==output safety guards (library + CLI) | `XisoOutputGuardTests.cs`, `CliOutputGuardTests.cs` |
+| Input==output safety guards (library + CLI) and misplaced-flag errors | `XisoOutputGuardTests.cs`, `CliOutputGuardTests.cs` |
+| Extract destination edge cases: trailing separators, UNC, spaces, empty, CLI end-to-end | `CliDestinationDirTests.cs` |
+| Public stream API (`OpenImageStream`, `Stream` overloads, seekability guards) | `XisoStreamApiTests.cs` |
 | CISO compress/decompress, split parts, `.cso` auto-detect | `CisoTests.cs`, `CisoAutoDetectTests.cs` |
 | Golden interop vs reference `xdvdfs-cli 0.8.3` (both directions, split layout) | `CisoSplitInteropTests.cs` |
 | Logging, constants, types, exceptions | `LoggerTests.cs`, `ConstantsTests.cs`, `TypesTests.cs`, `XisoExceptionTests.cs`, … |

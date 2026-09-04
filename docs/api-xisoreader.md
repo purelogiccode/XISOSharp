@@ -29,6 +29,8 @@ directory listing, auditing, hashing, and copy-out.
 | `Rewrite` | Rewrite an image into the optimized layout |
 | `DecodeXiso` | Main entry point (all modes) |
 | `DecodeXisoAsync` | Async wrapper of `DecodeXiso` |
+| `OpenImageStream` | Open an image for reading (`.cso`-aware); caller owns the stream |
+| `IsOptimizedImage` | Probe the optimized tag (path or stream overload) |
 | `GetVolumeInfo` | Volume descriptor metadata without throwing |
 | `ListDirectory` | Metadata of entries in a directory |
 | `ListDirectoryFlat` | Entry **names** of a directory (non-recursive convenience) |
@@ -43,7 +45,7 @@ directory listing, auditing, hashing, and copy-out.
 
 ```csharp
 public static (uint rootDirSector, uint rootDirSize, long discLseek) VerifyXiso(
-    FileStream fs, string isoName, int? skipSectors = null)
+    Stream fs, string isoName, int? skipSectors = null)
 ```
 
 Verifies the header magic at all known disc offsets (or at the `skipSectors` offset
@@ -51,7 +53,7 @@ when given) and returns the root directory table location and the detected disc 
 
 | Parameter | Meaning |
 |---|---|
-| `fs` | Open, readable `FileStream` positioned anywhere |
+| `fs` | Open, readable stream positioned anywhere (file, memory, block-device backed) |
 | `isoName` | Display name used in error messages |
 | `skipSectors` | Treat the XISO as starting `N` sectors into the file (Redump). Negative → `ArgumentOutOfRangeException` |
 
@@ -103,6 +105,24 @@ to pick `llCompat` automatically and defaults the output directory to the ISO na
 
 All return 0 on success.
 
+### Stream-based overloads
+
+`Extract`, `UnpackImage`, `List`, `Tree`, `DecodeXiso`, and `DecodeXisoAsync`
+each have a `Stream` overload taking `(Stream imageStream, string imageName, ...)`
+in place of the input path — for memory, network, or embedded-resource images.
+The stream must be readable and seekable (`ArgumentException` otherwise) and is
+left open; `imageName` (typically the file name) drives output naming and
+messages. `IsOptimizedImage` has a matching `Stream` overload (position
+restored), and `OpenImageStream` — the `.cso`-aware opener the path APIs use
+internally — is public too. Rewrite stays path-only (it is file-identity based,
+the `.old` dance), so the stream `DecodeXiso` refuses `ExtractMode.Rewrite`
+with `ArgumentException`.
+
+```csharp
+using var image = new MemoryStream(File.ReadAllBytes("game.iso"));
+int rc = XisoReader.UnpackImage(image, "game.iso", "./out"); // stream stays open
+```
+
 ## Resume interrupted unpacks
 
 ```csharp
@@ -141,6 +161,7 @@ public static int DecodeXiso(
 
 The generic entry point used by the wrappers above. `mode` is one of `ExtractMode`:
 `Extract`, `List`, `Tree`, `Rewrite`, `GenerateAvl` (internal use), or `Verify`.
+The `Stream` overload is covered under [Stream-based overloads](#stream-based-overloads).
 
 ## DecodeXisoAsync
 

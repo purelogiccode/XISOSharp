@@ -144,18 +144,29 @@ public static async Task<(int Result, string? OutIsoPath)> DecodeXisoAsync(
 
 **Returns**: A tuple containing `Result` (0 on success) and `OutIsoPath` (the output ISO path in rewrite mode).
 
+`Extract`, `UnpackImage`, `List`, `Tree`, `DecodeXiso`, and `DecodeXisoAsync`
+each have a `Stream` overload taking `(Stream imageStream, string imageName, ...)`
+in place of the input path — for memory, network, or embedded-resource images.
+The stream must be readable and seekable and is left open; `imageName` (typically
+the file name) drives output naming and messages. Rewrite stays path-only.
+
+```csharp
+using var image = new MemoryStream(File.ReadAllBytes("game.iso"));
+int rc = XisoReader.UnpackImage(image, "game.iso", "./out"); // stream stays open
+```
+
 #### `VerifyXiso`
 
 Low-level method that validates the XISO header and returns root directory metadata. Most users should use `DecodeXiso` instead.
 
 ```csharp
 public static (uint rootDirSector, uint rootDirSize, long discLseek) VerifyXiso(
-    FileStream fs, string isoName, int? skipSectors = null)
+    Stream fs, string isoName, int? skipSectors = null)
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `fs` | `FileStream` | Open file stream positioned anywhere. |
+| `fs` | `Stream` | Open stream positioned anywhere. |
 | `isoName` | `string` | Display name for error messages. |
 | `skipSectors` | `int?` | Optional number of 2048-byte sectors to skip from the start of the file before the XISO filesystem begins. When set, the header magic is verified at `skipSectors * SectorSize + HeaderOffset` and offset probing is skipped. Negative values throw `ArgumentOutOfRangeException`. |
 
