@@ -359,7 +359,11 @@ public static class XisoReader
     /// <param name="avlRoot">Reference to the AVL root being built.</param>
     /// <param name="llCompat">If <c>true</c>, uses backwards-compatible right-offset calculation.</param>
     /// <param name="discLseek">Disc lseek offset for sector address calculation.</param>
-    /// <param name="unpackOptions">Optional resume options for extract mode (skip-existing).</param>
+    /// <param name="unpackOptions">
+    /// Optional resume options for extract mode (skip-existing), and the
+    /// <c>ContinueOnError</c> collector: per-file I/O failures are recorded
+    /// and skipped instead of aborting (TODO #9, xdvdfs #187).
+    /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <param name="progress">Optional channel receiving <c>FileAdded</c> per written file in extract mode.</param>
     internal static void TraverseXiso(
@@ -538,46 +542,65 @@ public static class XisoReader
 
                 if (!Logger.RemoveSystemUpdate || !filename.Contains("$SystemUpdate", StringComparison.Ordinal))
                 {
+                    // Under continue-on-error an uncreatable directory records a
+                    // named failure and skips its whole subtree (xdvdfs #187);
+                    // otherwise the error aborts the run as before.
+                    var dirOk = true;
                     if (mode == ExtractMode.Extract)
                     {
-                        Directory.CreateDirectory(filename);
-                        Directory.SetCurrentDirectory(filename);
-                    }
-
-                    if (mode != ExtractMode.GenerateAvl)
-                    {
-                        Logger.Log(
-                            $"{mode switch { ExtractMode.Extract => "creating ", _ => "" }}{path}{filename}{Constants.PathCharStr} (0 bytes){mode switch { ExtractMode.Extract => " [OK]", _ => "" }}\n");
-                        Logger.Flush();
-                    }
-
-                    if (fileSize > 0)
-                    {
-                        var subdir = new DirEntry
+                        try
                         {
-                            Left = dir.Left,
-                            Parent = null,
-                            AvlNode = dir.AvlNode,
-                            Filename = dir.Filename,
-                            ROffset = dir.ROffset,
-                            Attributes = dir.Attributes,
-                            FilenameLength = dir.FilenameLength,
-                            FileSize = dir.FileSize,
-                            StartSector = dir.StartSector
-                        };
-
-                        var subAvlRoot = mode == ExtractMode.GenerateAvl ? dir.AvlNode?.Subdirectory : null;
-                        TraverseXiso(
-                            fs, subdir,
-                            ((long)startSector * Constants.SectorSize) + discLseek,
-                            subPath, mode,
-                            ref mode == ExtractMode.GenerateAvl ? ref dir.AvlNode!.Subdirectory : ref subAvlRoot,
-                            llCompat, discLseek, unpackOptions, cancellationToken, progress);
+                            Directory.CreateDirectory(filename);
+                            Directory.SetCurrentDirectory(filename);
+                        }
+                        catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
+                                                   ex is not OperationCanceledException)
+                        {
+                            var failure = ex as ExtractFileException
+                                ?? ExtractFileException.ForDirectory(string.Concat(path, filename), filename, ex);
+                            unpackOptions.RecordFailure(failure);
+                            Logger.LogErr($"Error: {failure.Message}\n");
+                            dirOk = false;
+                        }
                     }
 
-                    if (mode == ExtractMode.Extract)
+                    if (dirOk)
                     {
-                        Directory.SetCurrentDirectory("..");
+                        if (mode != ExtractMode.GenerateAvl)
+                        {
+                            Logger.Log(
+                                $"{mode switch { ExtractMode.Extract => "creating ", _ => "" }}{path}{filename}{Constants.PathCharStr} (0 bytes){mode switch { ExtractMode.Extract => " [OK]", _ => "" }}\n");
+                            Logger.Flush();
+                        }
+
+                        if (fileSize > 0)
+                        {
+                            var subdir = new DirEntry
+                            {
+                                Left = dir.Left,
+                                Parent = null,
+                                AvlNode = dir.AvlNode,
+                                Filename = dir.Filename,
+                                ROffset = dir.ROffset,
+                                Attributes = dir.Attributes,
+                                FilenameLength = dir.FilenameLength,
+                                FileSize = dir.FileSize,
+                                StartSector = dir.StartSector
+                            };
+
+                            var subAvlRoot = mode == ExtractMode.GenerateAvl ? dir.AvlNode?.Subdirectory : null;
+                            TraverseXiso(
+                                fs, subdir,
+                                ((long)startSector * Constants.SectorSize) + discLseek,
+                                subPath, mode,
+                                ref mode == ExtractMode.GenerateAvl ? ref dir.AvlNode!.Subdirectory : ref subAvlRoot,
+                                llCompat, discLseek, unpackOptions, cancellationToken, progress);
+                        }
+
+                        if (mode == ExtractMode.Extract)
+                        {
+                            Directory.SetCurrentDirectory("..");
+                        }
                     }
                 }
             }
@@ -585,10 +608,31 @@ public static class XisoReader
             {
                 if (!Logger.RemoveSystemUpdate || !(path?.Contains("$SystemUpdate", StringComparison.Ordinal) ?? false))
                 {
+                    // A failed file still advances the sibling chain: every entry
+                    // seeks explicitly (ExtractFile seeks to its sector, siblings
+                    // seek from the saved position), so recording and carrying on
+                    // is position-safe. Failed files are excluded from the totals.
+                    var fileOk = true;
                     if (mode == ExtractMode.Extract)
                     {
-                        var written = ExtractFile(fs, filename, startSector, fileSize, path, discLseek,
-                            unpackOptions, cancellationToken);
+                        bool written;
+                        try
+                        {
+                            written = ExtractFile(fs, filename, startSector, fileSize, path, discLseek,
+                                unpackOptions, cancellationToken);
+                        }
+                        catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
+                                                   ex is not OperationCanceledException)
+                        {
+                            var failure = ex as ExtractFileException
+                                ?? ExtractFileException.ForWrite(string.Concat(path, filename), filename,
+                                    startSector, fileSize, -1, ex);
+                            unpackOptions.RecordFailure(failure);
+                            Logger.LogErr($"Error: {failure.Message}\n");
+                            written = false;
+                            fileOk = false;
+                        }
+
                         if (written)
                         {
                             progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded,
@@ -602,10 +646,13 @@ public static class XisoReader
                         Logger.Flush();
                     }
 
-                    Logger.TotalFiles++;
-                    Logger.TotalFilesAllIsos++;
-                    Logger.TotalBytes += fileSize;
-                    Logger.TotalBytesAllIsos += fileSize;
+                    if (fileOk)
+                    {
+                        Logger.TotalFiles++;
+                        Logger.TotalFilesAllIsos++;
+                        Logger.TotalBytes += fileSize;
+                        Logger.TotalBytesAllIsos += fileSize;
+                    }
                 }
             }
 
@@ -660,7 +707,12 @@ public static class XisoReader
     /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><c>true</c> when the file was written, <c>false</c> when it was skipped or excluded.</returns>
-    /// <exception cref="IOException">Thrown on read or write errors.</exception>
+    /// <exception cref="ExtractFileException">
+    /// Thrown naming the entry, its sector, and expected vs actual bytes when the
+    /// destination cannot be created, the image data ends early (TODO #9, xdvdfs #187),
+    /// or a write fails — replacing the old truncate-and-warn path, which also
+    /// spun forever on a 0-byte read at end of image.
+    /// </exception>
     internal static bool ExtractFile(
         Stream fs,
         string filename,
@@ -685,51 +737,100 @@ public static class XisoReader
             return false;
         }
 
-        using var outFile = new FileStream(
-            filename,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
-            });
+        var internalPath = string.Concat(path, filename);
 
-        fs.Seek(((long)startSector * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
-
-        if (fileSize == 0)
+        // Integrity pre-check: the entry's data range must lie inside the image.
+        // Catches torn images and entries pointing past the end before an empty
+        // destination file is created for them. A length that cannot be resolved
+        // (write-only view) skips the pre-check; the copy loop still validates.
+        if (fileSize > 0 && fs.CanSeek)
         {
-            Logger.Log(
-                $"extracting {path}{filename} (0 bytes) [100%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
-            Logger.Flush();
-        }
-        else
-        {
-            uint totalSize = 0;
-            var size = Math.Min(fileSize, Constants.ReadWriteBufferSize);
-
-            do
+            try
             {
-                var readSize = fs.Read(CopyBuffer, 0, (int)size);
-                if (readSize < 0)
-                    throw new IOException("Read error in extract_file");
-
-                if (readSize != 0)
-                {
-                    outFile.Write(CopyBuffer, 0, readSize);
-                }
-
-                totalSize += (uint)readSize;
-                var percent = (uint)(totalSize * 100.0 / fileSize);
-                Logger.Log(
-                    $"extracting {path}{filename} ({fileSize} bytes) [{percent}%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
-                Logger.Flush();
-
-                size = Math.Min(fileSize - totalSize, Constants.ReadWriteBufferSize);
-            } while (totalSize < fileSize && size > 0);
-
-            if (totalSize < fileSize)
-            {
-                Logger.Log(
-                    $"\nWARNING: File {filename} is truncated. Reported size: {fileSize} bytes, read size: {totalSize} bytes!\n");
+                var imageLength = fs.Length;
+                var dataEnd = ((long)startSector * Constants.SectorSize) + discLseek + fileSize;
+                if (dataEnd > imageLength)
+                    throw ExtractFileException.ForTruncated(internalPath, filename, startSector, fileSize,
+                        Math.Max(0, imageLength - (((long)startSector * Constants.SectorSize) + discLseek)));
             }
+            catch (ExtractFileException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is NotSupportedException or IOException or ObjectDisposedException)
+            {
+                // Length unresolvable: fall through to the copy-loop check below.
+            }
+        }
+
+        FileStream outFile;
+        try
+        {
+            outFile = new FileStream(
+                filename,
+                new FileStreamOptions
+                {
+                    Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
+                });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw ExtractFileException.ForCreate(internalPath, filename, startSector, fileSize, ex);
+        }
+
+        uint totalSize = 0;
+        try
+        {
+            using (outFile)
+            {
+                fs.Seek(((long)startSector * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
+
+                if (fileSize == 0)
+                {
+                    Logger.Log(
+                        $"extracting {path}{filename} (0 bytes) [100%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
+                    Logger.Flush();
+                }
+                else
+                {
+                    var size = Math.Min(fileSize, Constants.ReadWriteBufferSize);
+
+                    do
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var readSize = fs.Read(CopyBuffer, 0, (int)size);
+                        if (readSize == 0)
+                            break;
+
+                        outFile.Write(CopyBuffer, 0, readSize);
+
+                        totalSize += (uint)readSize;
+                        var percent = (uint)(totalSize * 100.0 / fileSize);
+                        Logger.Log(
+                            $"extracting {path}{filename} ({fileSize} bytes) [{percent}%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
+                        Logger.Flush();
+
+                        size = Math.Min(fileSize - totalSize, Constants.ReadWriteBufferSize);
+                    } while (totalSize < fileSize && size > 0);
+
+                    if (totalSize < fileSize)
+                        throw ExtractFileException.ForTruncated(internalPath, filename, startSector, fileSize,
+                            totalSize);
+                }
+            }
+
+            // Post-write integrity: the bytes on disk must equal the reported size.
+            // Catches torn writes and anything that truncated the file behind us.
+            if (new FileInfo(filename).Length != fileSize)
+                throw ExtractFileException.ForTruncated(internalPath, filename, startSector, fileSize, totalSize);
+        }
+        catch (ExtractFileException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw ExtractFileException.ForWrite(internalPath, filename, startSector, fileSize, totalSize, ex);
         }
 
         Logger.Log("\n");
@@ -1360,6 +1461,12 @@ public static class XisoReader
                     TraverseXiso(fs, null, ((long)rootDirSect * Constants.SectorSize) + discLseek,
                         buf, mode, ref avlRoot, llCompat, discLseek,
                         unpackOptions, cancellationToken, progress);
+
+                    // A continued run that hit per-file failures still fails the
+                    // run: the summary names every file (xdvdfs "Failed to unpack
+                    // image"), so callers and the CLI exit code see it.
+                    if (mode == ExtractMode.Extract)
+                        unpackOptions?.ThrowIfFailed(name);
                 }
             }
 
@@ -2093,7 +2200,14 @@ public static class XisoReader
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <exception cref="FileNotFoundException">Thrown when the ISO file does not exist.</exception>
     /// <exception cref="InvalidDataException">Thrown when the internal path does not exist.</exception>
-    /// <exception cref="IOException">Thrown on read or write errors.</exception>
+    /// <exception cref="ExtractFileException">
+    /// Thrown naming the entry, its sector, and expected vs actual bytes on
+    /// destination or data failures (TODO #9, xdvdfs #187); under
+    /// <see cref="UnpackOptions.ContinueOnError"/> a directory copy collects
+    /// per-file failures and throws the <see cref="ExtractError.ErrExtractFailed"/>
+    /// summary instead.
+    /// </exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
     public static void CopyOut(string isoPath, string internalPath, string destPath,
         UnpackOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -2116,15 +2230,16 @@ public static class XisoReader
         if (entry.IsDirectory)
         {
             CopyOutDirectory(fs, isoPath, internalPath, destPath, volInfo, options, cancellationToken);
+            options?.ThrowIfFailed(isoPath);
         }
         else
         {
-            CopyOutFile(fs, entry, destPath, volInfo, options, cancellationToken);
+            CopyOutFile(fs, entry, internalPath, destPath, volInfo, options, cancellationToken);
         }
     }
 
-    private static void CopyOutFile(FileStream fs, EntryInfo entry, string destPath, VolumeInfo volInfo,
-        UnpackOptions? options = null, CancellationToken cancellationToken = default)
+    private static void CopyOutFile(FileStream fs, EntryInfo entry, string internalPath, string destPath,
+        VolumeInfo volInfo, UnpackOptions? options = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (options?.ShouldSkip(destPath, entry.FileSize) == true)
@@ -2138,27 +2253,57 @@ public static class XisoReader
         if (!string.IsNullOrEmpty(destDir))
             Directory.CreateDirectory(destDir);
 
-        using var outFile = new FileStream(
-            destPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
-            });
-
-        fs.Seek(((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek, SeekOrigin.Begin);
-
-        var remaining = entry.FileSize;
-        var buffer = new byte[Constants.ReadWriteBufferSize];
-
-        while (remaining > 0)
+        FileStream outFile;
+        try
         {
-            var toRead = (int)Math.Min(remaining, Constants.ReadWriteBufferSize);
-            var read = fs.Read(buffer, 0, toRead);
-            if (read <= 0)
-                throw new IOException($"Unexpected end of file data for {entry.Name}");
+            outFile = new FileStream(
+                destPath,
+                new FileStreamOptions
+                {
+                    Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
+                });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw ExtractFileException.ForCreate(internalPath, destPath, entry.StartSector, entry.FileSize, ex);
+        }
 
-            outFile.Write(buffer, 0, read);
-            remaining -= (uint)read;
+        try
+        {
+            using (outFile)
+            {
+                fs.Seek(((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek, SeekOrigin.Begin);
+
+                var remaining = entry.FileSize;
+                var totalRead = 0L;
+                var buffer = new byte[Constants.ReadWriteBufferSize];
+
+                while (remaining > 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var toRead = (int)Math.Min(remaining, Constants.ReadWriteBufferSize);
+                    var read = fs.Read(buffer, 0, toRead);
+                    if (read <= 0)
+                        throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
+                            entry.FileSize, totalRead);
+
+                    outFile.Write(buffer, 0, read);
+                    remaining -= (uint)read;
+                    totalRead += read;
+                }
+            }
+
+            if (new FileInfo(destPath).Length != (long)entry.FileSize)
+                throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
+                    entry.FileSize, new FileInfo(destPath).Length);
+        }
+        catch (ExtractFileException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw ExtractFileException.ForWrite(internalPath, destPath, entry.StartSector, entry.FileSize, -1, ex);
         }
     }
 
@@ -2176,13 +2321,25 @@ public static class XisoReader
             var entryDestPath = Path.Combine(destPath, entry.Name);
             var entryInternalPath = internalPath.TrimEnd('/') + "/" + entry.Name;
 
-            if (entry.IsDirectory)
+            try
             {
-                CopyOutDirectory(fs, isoPath, entryInternalPath, entryDestPath, volInfo, options, cancellationToken);
+                if (entry.IsDirectory)
+                {
+                    CopyOutDirectory(fs, isoPath, entryInternalPath, entryDestPath, volInfo, options,
+                        cancellationToken);
+                }
+                else
+                {
+                    CopyOutFile(fs, entry, entryInternalPath, entryDestPath, volInfo, options, cancellationToken);
+                }
             }
-            else
+            catch (Exception ex) when (options?.ContinueOnError == true && ex is not OperationCanceledException)
             {
-                CopyOutFile(fs, entry, entryDestPath, volInfo, options, cancellationToken);
+                var failure = ex as ExtractFileException
+                    ?? ExtractFileException.ForWrite(entryInternalPath, entryDestPath, entry.StartSector,
+                        entry.FileSize, -1, ex);
+                options.RecordFailure(failure);
+                Logger.LogErr($"Error: {failure.Message}\n");
             }
         }
     }

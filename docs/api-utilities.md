@@ -195,12 +195,13 @@ writes the current Windows FILETIME (8 bytes, little-endian) into the header are
 
 ## Unpack & path safety
 
-`public sealed class UnpackOptions` — resume options for extract/unpack/copy-out
+`public sealed class UnpackOptions` — resume + robustness options for extract/unpack/copy-out
 (see [XisoReader API](api-xisoreader.md#resume-interrupted-unpacks)):
 
 | Member | Description |
 |---|---|
 | `bool SkipExisting { get; set; }` | Skip destinations already holding a same-size file (`skip: <path>`) |
+| `bool ContinueOnError { get; set; }` | Record per-file failures and continue; the run ends with the `ErrExtractFailed` summary |
 | `bool ShouldSkip(string destPath, long fileSize)` | The size-match predicate (never skips unresolvable paths) |
 
 `public static class XisoPaths` — full-path comparison behind the input==output

@@ -129,6 +129,7 @@ int rc = XisoReader.UnpackImage(image, "game.iso", "./out"); // stream stays ope
 public sealed class UnpackOptions
 {
     public bool SkipExisting { get; set; }
+    public bool ContinueOnError { get; set; }
     public bool ShouldSkip(string destPath, long fileSize);
 }
 ```
@@ -141,6 +142,35 @@ per-file timestamps, so **size is the identity signal**: a same-size file is ass
 to be a complete earlier write, while a missing or short file (a torn write) is
 rewritten. Cancellation is honored per entry (`OperationCanceledException`), and the
 process working directory is restored even when the run aborts.
+
+When `ContinueOnError` is set, a per-file failure (uncreatable destination,
+truncated data, failed write) is recorded and skipped instead of aborting;
+an uncreatable directory skips its subtree. The run still throws at the end —
+an `ExtractErrorException` with code `ErrExtractFailed` listing every failure
+(the xdvdfs `Failed to unpack image` wrapper) — so the failure is visible to
+callers. Structural table corruption still aborts immediately (TODO #16).
+
+## Extraction errors
+
+```csharp
+public sealed class ExtractFileException : ExtractErrorException
+{
+    public string InternalPath { get; }  // entry inside the image
+    public string DestPath { get; }      // destination being written
+    public uint StartSector { get; }     // partition-relative data sector
+    public long FileSize { get; }        // reported size in bytes
+    public long BytesRead { get; }       // bytes read before a short read (-1 otherwise)
+}
+```
+
+Every per-file extraction failure carries this context (TODO #9, xdvdfs #187):
+`Message` reads `Failed to extract "<entry>" (sector N, M bytes) ->
+"<dest>": <reason>`, with the OS error as `InnerException`. New
+`ExtractError` codes: `ErrFileTruncated` (-5004, image data ends early),
+`ErrFileWrite` (-5005, destination create/write failed), `ErrExtractFailed`
+(-5006, end-of-run summary under `ContinueOnError`). Extracted files are
+integrity-checked: out-of-image data ranges are refused before the destination
+is created, and the on-disk length is re-statted after the copy.
 
 ## DecodeXiso (main entry)
 

@@ -12,7 +12,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI `XISOSharp.Cli` (`net10.0`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 20 extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (823 tests) — golden fixtures + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + unpack-resume/output-guard/`-d`-edge-case/stream-API coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (833 tests) — golden fixtures + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/robustness coverage |
 | [ZARSharp.Tests](ZARSharp.Tests/) | xUnit suite (1238 tests) — pure-C# ZArchive/zstd port (encoder, decoder, fuzz, corruption, `zarchive.exe` interop) |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
@@ -470,7 +470,7 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
-dotnet test -c Release                       # 2061 tests (823 XISOSharp + 1238 ZARSharp)
+dotnet test -c Release                       # 2071 tests (833 XISOSharp + 1238 ZARSharp)
 ```
 
 Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF); `ZARSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library); `ZARSharp.Tests` (`net10.0`). CI builds on `ubuntu`/`windows`/`macos`.

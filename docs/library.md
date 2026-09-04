@@ -105,6 +105,21 @@ int result = XisoReader.Extract("game.iso", "./out", llCompat: false);
 int resumed = XisoReader.UnpackImage("game.iso", "./out",
     options: new UnpackOptions { SkipExisting = true });
 
+// Keep going past bad files; the run still throws a summary at the end
+try
+{
+    XisoReader.UnpackImage("game.iso", "./out",
+        options: new UnpackOptions { ContinueOnError = true });
+}
+catch (ExtractFileException ex)  // one file: entry, sector, expected/actual
+{
+    Console.Error.WriteLine(ex.Message);
+}
+catch (ExtractErrorException ex)  // summary: every failure listed
+{
+    Console.Error.WriteLine(ex.Message);
+}
+
 // List
 XisoReader.List("game.iso", llCompat: false);
 

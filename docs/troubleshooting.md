@@ -64,6 +64,24 @@ An empty `-d` value (typically `-d "%UNSET_VAR%"` in a batch script). Quote-chec
 the variable or omit `-d` to extract next to the ISO. See
 [CLI Reference](cli.md#destination-directory-edge-cases--d).
 
+### `Failed to extract "<entry>" (sector N, M bytes) -> "<dest>": ...`
+
+A per-file extraction failure with full context (xdvdfs #187): the entry, its
+data sector, expected size, and the underlying OS cause. Common reasons: the
+destination name is illegal on the filesystem, permission was denied, the drive
+vanished, or the image data ends early (truncated download — the detail then
+reads `image data ends before the reported file size` with read-vs-expected
+counts). Add `--continue-on-error` to log-and-skip failed files while the rest
+still extracts. See [CLI Reference](cli.md#extraction-robustness).
+
+### `Failed to unpack image "<name>": N file(s) failed: ...`
+
+The end-of-run summary of a `--continue-on-error` run: at least one file
+failed (each listed with the detail above), so the exit code is non-zero even
+though the healthy files extracted. Fix the causes (names, permissions, image
+damage), then re-run — with `--skip-existing` to skip what's already done. See
+[CLI Reference](cli.md#extraction-robustness).
+
 ### `... is already optimized, skipping...`
 
 The image carries the optimized tag; rewrite mode has nothing to do. Extract/list
@@ -95,10 +113,15 @@ file and only writes the missing ones. See
 The output path is not writable or its directory does not exist. Check permissions and
 create the target directory (`-d` creates it for you in extract mode).
 
-### `WARNING: File <name> is truncated. Reported size: X bytes, read size: Y bytes!`
+### `Failed to extract ... image data ends before the reported file size ...`
 
-The image's directory entry claims more bytes than the file actually contains — the
-ISO is truncated or corrupt. Extraction continues but the file is incomplete.
+The image's directory entry claims more bytes than the image actually contains —
+a truncated download or corrupt/torn image. The file fails with
+`ErrFileTruncated` (expected vs actual byte counts are in the message) instead
+of being left short on disk; add `--continue-on-error` to salvage the rest.
+(Retired warning text from older builds:
+`WARNING: File <name> is truncated. Reported size: X bytes, read size: Y bytes!`.)
+See [CLI Reference](cli.md#extraction-robustness).
 
 ## Permission and file-system issues
 

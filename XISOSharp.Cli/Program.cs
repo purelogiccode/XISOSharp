@@ -62,6 +62,7 @@ internal static class Program
         string? batchDir = null;
         var batchRecursive = false;
         var skipExisting = false;
+        var continueOnError = false;
         string? packInput = null;
         string? packName = null;
         string? packIsoFile = null;
@@ -397,6 +398,9 @@ internal static class Program
                     case "--skip-existing":
                         skipExisting = true;
                         break;
+                    case "--continue-on-error":
+                        continueOnError = true;
+                        break;
                     case "--pack":
                         if (packInput != null || xSeen || rewrite || createList.Count > 0)
                         {
@@ -695,6 +699,14 @@ internal static class Program
         {
             Logger.LogErr(
                 "Error: --skip-existing is only supported in extract (-x), --unpack, and --copy-out modes\n");
+            return 1;
+        }
+
+        // #9 (xdvdfs #187): per-file robustness only makes sense where files are unpacked.
+        if (continueOnError && !((extract && !rewrite && createList.Count == 0) || unpackMode || copyOut))
+        {
+            Logger.LogErr(
+                "Error: --continue-on-error is only supported in extract (-x), --unpack, and --copy-out modes\n");
             return 1;
         }
 
@@ -1113,11 +1125,15 @@ internal static class Program
         // #13 (xdvdfs #190): resume an interrupted unpack by skipping files already
         // on disk with matching sizes. Pairs with --batch: each image in the bulk
         // run resumes instead of redoing completed files.
-        UnpackOptions? unpackOptions = skipExisting ? new UnpackOptions { SkipExisting = true } : null;
+        // #9 (xdvdfs #187): with --continue-on-error, per-file failures are logged
+        // and skipped instead of aborting the run; the summary still fails the exit code.
+        UnpackOptions? unpackOptions = skipExisting || continueOnError
+            ? new UnpackOptions { SkipExisting = skipExisting, ContinueOnError = continueOnError }
+            : null;
 
         if (unpackMode)
         {
-            return RunUnpackMode(args, optind, path, skipSectors, skipExisting);
+            return RunUnpackMode(args, optind, path, skipSectors, skipExisting, continueOnError);
         }
 
         if (hashMode)
@@ -1210,7 +1226,8 @@ internal static class Program
                 XisoReader.CopyOut(xisoPath, internalPath, destPath, unpackOptions);
                 Logger.Log($"Copied {internalPath} to {destPath}\n");
             }
-            catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException
+                or ExtractErrorException)
             {
                 Logger.LogErr($"Error: {ex.Message}\n");
                 return 1;
@@ -1445,7 +1462,8 @@ internal static class Program
     /// Executes the <c>--unpack</c> mode: unpack one ISO to a destination directory
     /// (defaulting to the ISO name). Returns the process exit code.
     /// </summary>
-    private static int RunUnpackMode(string[] args, int optind, string? path, int? skipSectors, bool skipExisting)
+    private static int RunUnpackMode(string[] args, int optind, string? path, int? skipSectors, bool skipExisting,
+        bool continueOnError)
     {
         if (optind >= args.Length)
         {
@@ -1464,7 +1482,9 @@ internal static class Program
 
         try
         {
-            UnpackOptions? unpackOptions = skipExisting ? new UnpackOptions { SkipExisting = true } : null;
+            UnpackOptions? unpackOptions = skipExisting || continueOnError
+                ? new UnpackOptions { SkipExisting = skipExisting, ContinueOnError = continueOnError }
+                : null;
             var result = XisoReader.UnpackImage(xisoPath, destPath, skipSectors: skipSectors,
                 options: unpackOptions);
             return result == 0 ? 0 : 1;
@@ -3144,6 +3164,14 @@ internal static class Program
                                                                           unpack to resume it. Pairs with --batch so
                                                                           an interrupted bulk run resumes instead of
                                                                           redoing completed files.
+                                                     --continue-on-error  In extract, --unpack, and --copy-out modes,
+                                                                          log per-file failures (uncreatable output,
+                                                                          truncated data) as "Error: Failed to
+                                                                          extract ..." and continue with the next
+                                                                          entry instead of aborting. An uncreatable
+                                                                          directory skips its subtree. The run still
+                                                                          ends with a "Failed to unpack image"
+                                                                          summary and a non-zero exit code.
                                                     -q                  Run quiet (suppress all non-error output).
                                                     -Q                  Run silent (suppress all output).
                                                     -s                  Skip $SystemUpdate folder.

@@ -576,6 +576,9 @@ Error codes for non-fatal extraction failures.
 | `ErrEndOfSector` | `-5001` | Unexpected end of sector while reading a directory entry chain. |
 | `ErrIsoRewritten` | `-5002` | XISO image has already been rewritten (optimized format detected). |
 | `ErrIsoNoFiles` | `-5003` | XISO image references no files in its directory table. |
+| `ErrFileTruncated` | `-5004` | File data ends before the reported size (truncated image or entry pointing past end of image). |
+| `ErrFileWrite` | `-5005` | Destination file or directory could not be created or written. |
+| `ErrExtractFailed` | `-5006` | End-of-run summary of a `ContinueOnError` run: one or more files failed (message lists each). |
 
 #### `AvlResult`
 
@@ -742,6 +745,25 @@ public class ExtractErrorException : Exception
 | Member | Type | Description |
 |--------|------|-------------|
 | `ErrorCode` | `ExtractError` | The specific error code that caused this exception. |
+
+#### `ExtractFileException`
+
+Per-file extraction failure carrying the full error context: which entry failed,
+where it lives in the image, where it was going on disk, and the underlying
+cause as `InnerException`. `Message` reads
+`Failed to extract "<entry>" (sector N, M bytes) -> "<dest>": <reason>`.
+Collected across a `ContinueOnError` run and summarized as `ErrExtractFailed`.
+
+```csharp
+public sealed class ExtractFileException : ExtractErrorException
+{
+    public string InternalPath { get; }
+    public string DestPath { get; }
+    public uint StartSector { get; }
+    public long FileSize { get; }
+    public long BytesRead { get; }
+}
+```
 
 #### `XisoFormatException`
 
@@ -997,6 +1019,7 @@ The library uses a combination of return codes and exceptions:
 |-----------|-------|
 | **Return code** (`int`) | `0` = success, non-zero = failure. Returned by `DecodeXiso` and `CreateXiso`. |
 | `ExtractErrorException` | Thrown for non-fatal extraction errors. Check `ErrorCode` for the specific error. |
+| `ExtractFileException` | Per-file extraction failure (entry, sector, expected/actual bytes, OS cause as inner). |
 | `XisoFormatException` | Thrown when an XISO image has an invalid format (corrupt header, truncated, bad sector pointers). |
 | `XisoEmptyException` | Thrown when an XISO image contains no files. |
 | `XisoFileTooLargeException` | Thrown when a file exceeds the 4 GB XISO format limit. |

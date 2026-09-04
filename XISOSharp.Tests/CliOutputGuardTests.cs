@@ -94,6 +94,7 @@ public sealed class CliOutputGuardTests
     [InlineData("-o")]
     [InlineData("-x")]
     [InlineData("--skip-existing")]
+    [InlineData("--continue-on-error")]
     [InlineData("--batch")]
     public void CheckMisplacedFlag_KnownFlag_ReportsMustComeFirst(string token)
     {

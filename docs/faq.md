@@ -152,7 +152,9 @@ Only additively: new CLI flags (`-t`, `-i`, `-V`, `-o`, `--copy-out`, `--md5`,
 `--sha256`, `-X`, `--skip-sectors`, `--prepend-sectors`, `--skip-existing`,
 `validate`/`--validate*`), the input==output safety guard, misplaced-flag
 diagnostics, `-d` tolerance for batch-script artifacts (trailing separators,
-UNC paths, spaces), unpack resume (`UnpackOptions`), GUI drag-and-drop, async
+UNC paths, spaces), unpack resume (`UnpackOptions`), per-file extraction
+errors with entry/sector/size context plus `--continue-on-error`
+(`ExtractFileException`), GUI drag-and-drop, async
 APIs, progress callbacks, a public stream-based read API (`OpenImageStream` +
 `Stream` overloads of `Extract`/`UnpackImage`/`List`/`Tree`/`DecodeXiso`), and a
 public library surface. Core algorithms are unchanged.

@@ -39,7 +39,7 @@ internal static class CliOutputGuard
         "--validate-report", "--copy-out", "-r", "-q", "-Q", "-s", "-D",
         "-m", "-y", "--yes", "-n", "--no", "-d", "-o", "-O", "--output",
         "-p", "--skip-sectors", "--prepend-sectors", "--batch",
-        "--batch-recursive", "--skip-existing", "--pack", "--video",
+        "--batch-recursive", "--skip-existing", "--continue-on-error", "--pack", "--video",
         "--random", "--seed", "--wipe", "--trim", "--petrify", "--update",
         "--zar", "--all", "--best", "--compress", "--security-sectors",
         "--sectors", "--checksum", "--filetime", "--get-filetime",

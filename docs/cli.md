@@ -98,6 +98,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--skip-sectors N` | Treat the image as if the XISO filesystem starts `N` sectors (2048 bytes each) into the file — for Redump images with a video partition. Valid in extract, list, tree, rewrite, unpack, video, audit where noted. See [Redump & Disc Layouts](redump-workflows.md). |
 | `--prepend-sectors N` | Write the output image with `N` empty sectors before the XISO filesystem, reserving room for a video partition. Valid in create (`-c`) and rewrite (`-r`) modes. See [Redump & Disc Layouts](redump-workflows.md). |
 | `--skip-existing` | In extract, `--unpack`, and `--copy-out` modes, skip files already on disk with matching sizes (logged as `skip: <path>`) instead of overwriting them. Re-run an interrupted unpack to resume it; pairs with `--batch`. See [Resume interrupted unpacks](#resume-interrupted-unpacks). |
+| `--continue-on-error` | In extract, `--unpack`, and `--copy-out` modes, log per-file failures (`Error: Failed to extract ...`) and continue with the next entry instead of aborting. An uncreatable directory skips its subtree. The run still ends with a `Failed to unpack image` summary and a non-zero exit code. See [Extraction robustness](#extraction-robustness). |
 | `--ciso-level 0..9` | CISO compression level (`compress`/`cso`, default `9`). v1: maps to `CompressionLevel` for BCL DEFLATE (`0` NoCompression, `1..3` Fastest, `4..6` Optimal, `7..9` SmallestSize). v2: `0` = store all plain, `1..9` = LZ4 acceleration `10 - level` (level 9 byte-identical to xdvdfs). |
 | `--ciso-version 1\|2\|auto` | CISO payload codec (`compress`/`cso`). Default `2` (LZ4, `align 2` — modern xdvdfs parity); `1` = classic DEFLATE. |
 | `--ciso-split <bytes>` | Split point for `.1.cso`/`.2.cso`… output (`compress`/`cso`). Default `0xffbf6000` (~4 GiB, xdvdfs `SplitOutput`); `0` = single `.cso`. |
@@ -154,6 +155,46 @@ Notes:
 - Cancellation is honored per entry, so Ctrl+C stops promptly; the working directory
   is always restored.
 - `--skip-existing` is rejected outside extract / `--unpack` / `--copy-out` (exit 1).
+
+### Extraction robustness
+
+A damaged image or a hostile destination no longer dies with a bare OS error
+(upstream xdvdfs #187: the web unpacker could only report `Failed to create
+file X`). Every per-file failure throws `ExtractFileException`, which names the
+entry, its sector, and expected vs actual bytes, with the OS error as the inner
+exception:
+
+```bash
+XISOSharp.Cli -x -d ./out game.iso
+# Error: Failed to extract "./out/videos/intro.wmv" (sector 1234, 20000 bytes) -> "intro.wmv": could not create output file: ...
+```
+
+Extracted files are integrity-checked two ways: an entry whose data range lies
+past the end of the image is refused before its destination is created, and the
+bytes on disk are re-statted after the copy — a short image (truncated
+download, torn file, entry pointing past the end) fails the file with
+`ErrFileTruncated` instead of leaving a short file behind. (The old code merely
+warned — and spun forever on a 0-byte read at end of image.)
+
+With `--continue-on-error`, a failed file is logged and skipped while the rest
+of the image still extracts; an uncreatable directory skips its whole subtree.
+The run still ends with a summary naming every failure, and a non-zero exit:
+
+```bash
+XISOSharp.Cli --continue-on-error --unpack game.iso ./out
+# Error: Failed to extract ... (logged per file as it happens)
+# Failed to unpack image "game.iso": 2 file(s) failed:
+#   Failed to extract ...
+```
+
+Notes:
+
+- Structural corruption (an unreadable directory table) still aborts immediately:
+  after a mid-table failure the stream position is unknowable, so continuing
+  siblings would be unsound. Table hardening is TODO #16.
+- Failed files are excluded from the file/byte totals and `FileAdded` progress.
+- `--continue-on-error` is rejected outside extract / `--unpack` / `--copy-out`
+  (exit 1), and pairs with `--skip-existing` and `--batch`.
 
 ### Destination directory edge cases (`-d`)
 
@@ -230,6 +271,7 @@ Enforced at parse time; violations print an error and exit 1:
 | `--skip-sectors`/`--prepend-sectors` with `-i`, hash, `--copy-out`, `-V`, `validate`, or `--validate*` | Error |
 | `-X` without `-c` | Error |
 | `--skip-existing` without extract/`--unpack`/`--copy-out` (e.g. with `-l`, `-t`, `-r`, `-c`, redump verbs) | Error |
+| `--continue-on-error` without extract/`--unpack`/`--copy-out` | Error |
 | `-c` with extra positional arguments | Usage error |
 | `-y` with `-n` | Error (`[ERROR] Cannot use both --no (-n) and --yes (-y)`) |
 | No positional arguments in a non-create/non-verb mode | Usage error |
