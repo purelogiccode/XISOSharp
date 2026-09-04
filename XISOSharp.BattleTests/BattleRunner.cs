@@ -11,7 +11,13 @@ namespace XISOSharp.BattleTests;
 /// <summary>Orchestrates all battle comparisons between C# and native extract-xiso.</summary>
 internal static class BattleRunner
 {
-    /// <summary>Runs the full battle suite against the supplied ISO files.</summary>
+    /// <summary>
+    /// Runs the full battle suite against the supplied ISO files.
+    /// </summary>
+    /// <param name="isoFiles">ISO paths to compare between C# and native implementations.</param>
+    /// <param name="exePath">Path to the native extract-xiso executable; C#-only checks run when missing.</param>
+    /// <param name="createDirs">Optional source directories for create-parity battles.</param>
+    /// <returns>The aggregated session result with per-file and advanced-check outcomes.</returns>
     public static async Task<BattleSessionResult> RunAsync(IList<string> isoFiles, string exePath,
         string[]? createDirs = null)
     {
@@ -100,10 +106,13 @@ internal static class BattleRunner
         return session;
     }
 
-    private static string Symbol(BattleStatus s) => s switch
+    private static string Symbol(BattleStatus s)
     {
-        BattleStatus.Passed => "\u2713", BattleStatus.Failed => "\u2717", BattleStatus.Skipped => "-", _ => "?"
-    };
+        return s switch
+        {
+            BattleStatus.Passed => "\u2713", BattleStatus.Failed => "\u2717", BattleStatus.Skipped => "-", _ => "?"
+        };
+    }
 
     private static PerFileBattleResult TestSingleFile(string path, ExtractXisoWrapper? wrapper)
     {
@@ -1246,6 +1255,9 @@ internal static class BattleRunner
         }
     }
 
+    /// <summary>
+    /// Glob patterns exercised by the <c>Glob</c> advanced self-check.
+    /// </summary>
     internal static readonly string[] Patterns = new[] { "**/*.iso" };
 
     private static SubBattleResult CheckGlobMatcher()
@@ -1342,7 +1354,7 @@ internal static class BattleRunner
         var csDict = cs.ToDictionary(e => e.Path, StringComparer.OrdinalIgnoreCase);
         var exeDict = exe.ToDictionary(e => e.Path, StringComparer.OrdinalIgnoreCase);
         int match = 0, mis = 0;
-        foreach ((var p, ListEntry ce) in csDict)
+        foreach ((var p, var ce) in csDict)
         {
             if (exeDict.TryGetValue(p, out var ee))
             {
@@ -1386,7 +1398,7 @@ internal static class BattleRunner
         var exeFiles = Directory.GetFiles(exeDir, "*", SearchOption.AllDirectories)
             .Select(f => (Full: f, Rel: Path.GetRelativePath(exeDir, f)))
             .ToDictionary(x => x.Rel, StringComparer.OrdinalIgnoreCase);
-        foreach ((var rel, (string Full, string Rel) cs) in csFiles)
+        foreach ((var rel, var cs) in csFiles)
         {
             if (exeFiles.TryGetValue(rel, out var exe))
             {

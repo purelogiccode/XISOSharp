@@ -11,7 +11,10 @@ public sealed class MemoryBlockDevice : IBlockDevice
     private byte[] _data;
 
     /// <summary>Creates an empty device.</summary>
-    public MemoryBlockDevice() => _data = [];
+    public MemoryBlockDevice()
+    {
+        _data = [];
+    }
 
     /// <summary>Creates a device initialized with <paramref name="data"/> (copied).</summary>
     public MemoryBlockDevice(ReadOnlySpan<byte> data)
@@ -71,7 +74,10 @@ public sealed class MemoryBlockDevice : IBlockDevice
     }
 
     /// <summary>Returns a span over the written bytes (read-only).</summary>
-    public ReadOnlySpan<byte> AsSpan() => _data.AsSpan(0, (int)Length);
+    public ReadOnlySpan<byte> AsSpan()
+    {
+        return _data.AsSpan(0, (int)Length);
+    }
 
     /// <inheritdoc/>
     public void Dispose()

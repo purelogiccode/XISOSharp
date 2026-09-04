@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Serilog;
 using XISOSharp;
 using XISOSharp.Models;
+using XISOSharpTester.Logging;
 using XISOSharpTester.Models;
 
 namespace XISOSharpTester.Services;
@@ -41,33 +42,54 @@ public static class XisoTestRunner
         string xisoSharpExePath,
         IProgress<TestProgress>? progress = null)
     {
-        var session = new TestSessionResult();
-        var exeAvailable = File.Exists(xisoSharpExePath);
-
-        using var wrapper = exeAvailable ? new XisoSharpWrapper(xisoSharpExePath) : null;
-
-        if (wrapper != null)
+        try
         {
-            XisoSharpVersion = wrapper.GetVersion();
-        }
+            ArgumentNullException.ThrowIfNull(files);
+            Log.Information("Test session starting for {Count} file(s)", files.Count);
+            var session = new TestSessionResult();
+            var exeAvailable = File.Exists(xisoSharpExePath);
 
-        for (var i = 0; i < files.Count; i++)
+            using var wrapper = exeAvailable ? new XisoSharpWrapper(xisoSharpExePath) : null;
+
+            if (wrapper != null)
+            {
+                try
+                {
+                    XisoSharpVersion = wrapper.GetVersion();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "GetVersion failed");
+                    BugReporter.ReportException(ex, "GetVersion failed");
+                }
+            }
+
+            for (var i = 0; i < files.Count; i++)
+            {
+                var file = files[i];
+                var fileIndex = i;
+                var currentWrapper = wrapper;
+                progress?.Report(new TestProgress(file.FileName, fileIndex + 1, files.Count,
+                    "Starting", $"Testing {file.FileName}..."));
+
+                var result = await Task.Run(() => TestSingleFile(file, currentWrapper, progress, fileIndex, files.Count))
+                    .ConfigureAwait(false);
+                session.FileResults.Add(result);
+            }
+
+            progress?.Report(new TestProgress("Done", files.Count, files.Count,
+                "Complete", "All tests finished.", true));
+
+            Log.Information("Test session finished: {Passed} passed, {Failed} failed, {Skipped} skipped",
+                session.PassedFiles, session.FailedFiles, session.SkippedFiles);
+            return session;
+        }
+        catch (Exception ex)
         {
-            var file = files[i];
-            var fileIndex = i;
-            var currentWrapper = wrapper;
-            progress?.Report(new TestProgress(file.FileName, fileIndex + 1, files.Count,
-                "Starting", $"Testing {file.FileName}..."));
-
-            var result = await Task.Run(() => TestSingleFile(file, currentWrapper, progress, fileIndex, files.Count))
-                .ConfigureAwait(false);
-            session.FileResults.Add(result);
+            Log.Error(ex, "Test session failed");
+            BugReporter.ReportException(ex, "Test session failed");
+            throw;
         }
-
-        progress?.Report(new TestProgress("Done", files.Count, files.Count,
-            "Complete", "All tests finished.", true));
-
-        return session;
     }
 
     private static PerFileResult TestSingleFile(
@@ -83,35 +105,56 @@ public static class XisoTestRunner
             FileName = entry.FileName, FilePath = entry.FilePath, FileSize = entry.FileSize
         };
 
-        var path = entry.FilePath;
-
-        if (!File.Exists(path))
+        try
         {
+            ArgumentNullException.ThrowIfNull(entry);
+            var path = entry.FilePath;
+
+            if (!File.Exists(path))
+            {
+                Log.Warning("Test skipped (file not found): {Path}", path);
+                result.SubTests.Add(new SubTestResult
+                {
+                    TestName = "All Tests", Status = TestStatus.Skipped, Detail = "File not found on disk."
+                });
+                result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+                return result;
+            }
+
+            // Test 1: Verify XISO header
+            RunVerifyTest(entry, wrapper, progress, fileIndex, totalFiles, result);
+
+            // Test 2: List files comparison
+            RunListTest(entry, wrapper, progress, fileIndex, totalFiles, result);
+
+            // Test 3: Extract all files & hash comparison
+            RunExtractTest(entry, wrapper, progress, fileIndex, totalFiles, result);
+
+            // Test 4: Rewrite comparison
+            RunRewriteTest(entry, wrapper, progress, fileIndex, totalFiles, result);
+
+            result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+            Log.Information("[{Status}] {File} ({Time:N1}s)",
+                result.AllPassed ? "PASS" : "FAIL", entry.FileName, result.ElapsedSeconds);
+            if (!result.AllPassed)
+                BugReporter.ReportWarning($"Test failures for {entry.FileName}");
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "TestSingleFile failed for {File}", entry.FileName);
+            BugReporter.ReportException(ex, $"TestSingleFile failed for {entry.FileName}");
             result.SubTests.Add(new SubTestResult
             {
-                TestName = "All Tests", Status = TestStatus.Skipped, Detail = "File not found on disk."
+                TestName = "All Tests",
+                Status = TestStatus.Failed,
+                Detail = $"Harness error: {ex.Message}",
+                ElapsedSeconds = sw.Elapsed.TotalSeconds
             });
             result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
             return result;
         }
-
-        // Test 1: Verify XISO header
-        RunVerifyTest(entry, wrapper, progress, fileIndex, totalFiles, result);
-
-        // Test 2: List files comparison
-        RunListTest(entry, wrapper, progress, fileIndex, totalFiles, result);
-
-        // Test 3: Extract all files & hash comparison
-        RunExtractTest(entry, wrapper, progress, fileIndex, totalFiles, result);
-
-        // Test 4: Rewrite comparison
-        RunRewriteTest(entry, wrapper, progress, fileIndex, totalFiles, result);
-
-        result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
-        Log.Information("[{Status}] {File} ({Time:N1}s)",
-            result.AllPassed ? "PASS" : "FAIL", entry.FileName, result.ElapsedSeconds);
-
-        return result;
     }
 
     private static void RunVerifyTest(
@@ -173,6 +216,8 @@ public static class XisoTestRunner
         catch (Exception ex)
         {
             tSw.Stop();
+            Log.Error(ex, "Verify test failed for {File}", entry.FileName);
+            BugReporter.ReportException(ex, $"Verify test failed for {entry.FileName}");
             result.SubTests.Add(new SubTestResult
             {
                 TestName = "Verify XISO",
@@ -256,6 +301,8 @@ public static class XisoTestRunner
         catch (Exception ex)
         {
             tSw.Stop();
+            Log.Error(ex, "List test failed for {File}", entry.FileName);
+            BugReporter.ReportException(ex, $"List test failed for {entry.FileName}");
             result.SubTests.Add(new SubTestResult
             {
                 TestName = "List Files",
@@ -360,6 +407,8 @@ public static class XisoTestRunner
         catch (Exception ex)
         {
             tSw.Stop();
+            Log.Error(ex, "Extract test failed for {File}", entry.FileName);
+            BugReporter.ReportException(ex, $"Extract test failed for {entry.FileName}");
             result.SubTests.Add(new SubTestResult
             {
                 TestName = "Extract & Hash Compare",
@@ -515,6 +564,8 @@ public static class XisoTestRunner
         catch (Exception ex)
         {
             tSw.Stop();
+            Log.Error(ex, "Rewrite test failed for {File}", entry.FileName);
+            BugReporter.ReportException(ex, $"Rewrite test failed for {entry.FileName}");
             result.SubTests.Add(new SubTestResult
             {
                 TestName = "Rewrite Compare",
@@ -547,10 +598,23 @@ public static class XisoTestRunner
         {
             return string.Empty;
         }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "CaptureCSharpListOutput failed for {Iso}", isoPath);
+            BugReporter.ReportException(ex, $"CaptureCSharpListOutput failed for {isoPath}");
+            return string.Empty;
+        }
         finally
         {
             Logger.Quiet = saveQuiet;
-            Console.SetOut(originalOut);
+            try
+            {
+                Console.SetOut(originalOut);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Restoring console output failed");
+            }
         }
     }
 
@@ -562,7 +626,10 @@ public static class XisoTestRunner
 
     private static List<ListEntry> ParseListOutput(string output)
     {
-        var entries = new List<ListEntry>();
+        try
+        {
+            ArgumentNullException.ThrowIfNull(output);
+            var entries = new List<ListEntry>();
 
         // Matches: " - Path: filename                        Size: N bytes,  StartSector: S"
         // or with nesting: " - filename                        Size: N bytes,  StartSector: S"
@@ -589,6 +656,13 @@ public static class XisoTestRunner
 
         entries.Sort(static (a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
         return entries;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ParseListOutput failed");
+            BugReporter.ReportException(ex, "ParseListOutput failed");
+            return [];
+        }
     }
 
     private sealed record ListComparison(bool AllMatch, string Detail);
@@ -608,7 +682,7 @@ public static class XisoTestRunner
         var matchCount = 0;
         var mismatchCount = 0;
 
-        foreach ((var path, ListEntry csEntry) in csByPath)
+        foreach ((var path, var csEntry) in csByPath)
         {
             if (exeByPath.TryGetValue(path, out var exeEntry))
             {
@@ -663,7 +737,7 @@ public static class XisoTestRunner
             .Select(f => (FullPath: f, Relative: Path.GetRelativePath(exeDir, f)))
             .ToDictionary(static x => x.Relative, StringComparer.OrdinalIgnoreCase);
 
-        foreach ((var relative, (string FullPath, string Relative) csPath) in csFiles)
+        foreach ((var relative, var csPath) in csFiles)
         {
             if (exeFiles.TryGetValue(relative, out var exePath))
             {
@@ -723,8 +797,9 @@ public static class XisoTestRunner
         {
             return Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Length;
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Warning(ex, "CountFiles failed for {Dir}", dir);
             return 0;
         }
     }
@@ -735,18 +810,28 @@ public static class XisoTestRunner
         {
             if (Directory.Exists(path)) Directory.Delete(path, true);
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Warning(ex, "DeleteDirectorySafe failed for {Path}", path);
             /* best effort */
         }
     }
 
     private static string CreateTempSubDir(string name)
     {
-        var dir = Path.Combine(Path.GetTempPath(), "XISOSharpTester",
-            Guid.NewGuid().ToString("N").Substring(0, 8), name);
-        Directory.CreateDirectory(dir);
-        return dir;
+        try
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "XISOSharpTester",
+                Guid.NewGuid().ToString("N").Substring(0, 8), name);
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "CreateTempSubDir failed");
+            BugReporter.ReportException(ex, "CreateTempSubDir failed");
+            throw;
+        }
     }
 
     private static void Report(IProgress<TestProgress>? progress, string file, int index, int total,

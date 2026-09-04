@@ -37,7 +37,7 @@ public static class ZArchiveCommon
     /// </summary>
     public static bool GetNextPathNode(ref ReadOnlySpan<char> path, out ReadOnlySpan<char> node)
     {
-        int i = 0;
+        var i = 0;
         while (i < path.Length && (path[i] == '/' || path[i] == '\\'))
         {
             i++;
@@ -50,7 +50,7 @@ public static class ZArchiveCommon
             return false;
         }
 
-        int end = 0;
+        var end = 0;
         while (end < path.Length && path[end] != '/' && path[end] != '\\')
         {
             end++;
@@ -64,8 +64,8 @@ public static class ZArchiveCommon
     /// <summary>String-based overload used by the writer/tool layers.</summary>
     public static bool GetNextPathNode(ref string path, out string node)
     {
-        ReadOnlySpan<char> span = path.AsSpan();
-        bool ok = GetNextPathNode(ref span, out ReadOnlySpan<char> n);
+        var span = path.AsSpan();
+        var ok = GetNextPathNode(ref span, out var n);
         path = span.ToString();
         node = n.ToString();
         return ok;
@@ -84,7 +84,7 @@ public static class ZArchiveCommon
             return;
         }
 
-        int index = path.Length - 1;
+        var index = path.Length - 1;
         while (true)
         {
             if (path[index] == '/' || path[index] == '\\')
@@ -108,8 +108,8 @@ public static class ZArchiveCommon
     /// <summary>String-based overload.</summary>
     public static void SplitFilenameFromPath(ref string path, out string filename)
     {
-        ReadOnlySpan<char> span = path.AsSpan();
-        SplitFilenameFromPath(ref span, out ReadOnlySpan<char> f);
+        var span = path.AsSpan();
+        SplitFilenameFromPath(ref span, out var f);
         path = span.ToString();
         filename = f.ToString();
     }
@@ -118,7 +118,10 @@ public static class ZArchiveCommon
     // Name comparison (case-insensitive, A-Z folding only)
     // ------------------------------------------------------------------
 
-    private static char FoldAscii(char c) => c >= 'A' && c <= 'Z' ? (char)(c + 32) : c;
+    private static char FoldAscii(char c)
+    {
+        return c >= 'A' && c <= 'Z' ? (char)(c + 32) : c;
+    }
 
     /// <summary>Case-insensitive equality (folds A-Z only).</summary>
     public static bool CompareNodeNameBool(ReadOnlySpan<char> n1, ReadOnlySpan<char> n2)
@@ -128,7 +131,7 @@ public static class ZArchiveCommon
             return false;
         }
 
-        for (int i = 0; i < n1.Length; i++)
+        for (var i = 0; i < n1.Length; i++)
         {
             if (FoldAscii(n1[i]) != FoldAscii(n2[i]))
             {
@@ -148,11 +151,11 @@ public static class ZArchiveCommon
     /// </summary>
     public static int CompareNodeName(ReadOnlySpan<char> n1, ReadOnlySpan<char> n2)
     {
-        int min = Math.Min(n1.Length, n2.Length);
-        for (int i = 0; i < min; i++)
+        var min = Math.Min(n1.Length, n2.Length);
+        for (var i = 0; i < min; i++)
         {
-            char c1 = FoldAscii(n1[i]);
-            char c2 = FoldAscii(n2[i]);
+            var c1 = FoldAscii(n1[i]);
+            var c2 = FoldAscii(n2[i]);
             if (c1 != c2)
             {
                 return (byte)c2 - (byte)c1;
@@ -178,11 +181,11 @@ public static class ZArchiveCommon
     /// </summary>
     public static int CompareNodeName(ReadOnlySpan<byte> n1, ReadOnlySpan<byte> n2)
     {
-        int min = Math.Min(n1.Length, n2.Length);
-        for (int i = 0; i < min; i++)
+        var min = Math.Min(n1.Length, n2.Length);
+        for (var i = 0; i < min; i++)
         {
-            byte c1 = n1[i];
-            byte c2 = n2[i];
+            var c1 = n1[i];
+            var c2 = n2[i];
             if (c1 >= (byte)'A' && c1 <= (byte)'Z')
             {
                 c1 += (byte)('a' - 'A');
@@ -220,10 +223,10 @@ public static class ZArchiveCommon
             return false;
         }
 
-        for (int i = 0; i < n1.Length; i++)
+        for (var i = 0; i < n1.Length; i++)
         {
-            byte c1 = n1[i];
-            byte c2 = n2[i];
+            var c1 = n1[i];
+            var c2 = n2[i];
             if (c1 >= (byte)'A' && c1 <= (byte)'Z')
             {
                 c1 += (byte)('a' - 'A');
@@ -264,10 +267,10 @@ public static class ZArchiveCommon
             return string.Empty;
         }
 
-        char[] chars = new char[bytes.Length];
-        for (int i = 0; i < bytes.Length; i++)
+        var chars = new char[bytes.Length];
+        for (var i = 0; i < bytes.Length; i++)
         {
-            byte b = bytes[i];
+            var b = bytes[i];
             chars[i] = b switch
             {
                 < 0x80 => (char)b,
@@ -290,8 +293,8 @@ public static class ZArchiveCommon
             return [];
         }
 
-        byte[] outBytes = new byte[text.Length];
-        for (int i = 0; i < text.Length; i++)
+        var outBytes = new byte[text.Length];
+        for (var i = 0; i < text.Length; i++)
         {
             outBytes[i] = EncodeChar1252(text[i]);
         }
@@ -311,7 +314,7 @@ public static class ZArchiveCommon
             return (byte)c;
         }
 
-        for (int i = 0; i < Cp1252High.Length; i++)
+        for (var i = 0; i < Cp1252High.Length; i++)
         {
             if (Cp1252High[i] == c)
             {
@@ -327,23 +330,38 @@ public static class ZArchiveCommon
     // ------------------------------------------------------------------
 
     /// <summary>Reads a big-endian UInt16.</summary>
-    public static ushort ReadU16BE(ReadOnlySpan<byte> src) => BinaryPrimitives.ReadUInt16BigEndian(src);
+    public static ushort ReadU16Be(ReadOnlySpan<byte> src)
+    {
+        return BinaryPrimitives.ReadUInt16BigEndian(src);
+    }
 
     /// <summary>Reads a big-endian UInt32.</summary>
-    public static uint ReadU32BE(ReadOnlySpan<byte> src) => BinaryPrimitives.ReadUInt32BigEndian(src);
+    public static uint ReadU32Be(ReadOnlySpan<byte> src)
+    {
+        return BinaryPrimitives.ReadUInt32BigEndian(src);
+    }
 
     /// <summary>Reads a big-endian UInt64.</summary>
-    public static ulong ReadU64BE(ReadOnlySpan<byte> src) => BinaryPrimitives.ReadUInt64BigEndian(src);
+    public static ulong ReadU64Be(ReadOnlySpan<byte> src)
+    {
+        return BinaryPrimitives.ReadUInt64BigEndian(src);
+    }
 
     /// <summary>Writes a big-endian UInt16.</summary>
-    public static void WriteU16BE(Span<byte> dst, ushort value) =>
+    public static void WriteU16Be(Span<byte> dst, ushort value)
+    {
         BinaryPrimitives.WriteUInt16BigEndian(dst, value);
+    }
 
     /// <summary>Writes a big-endian UInt32.</summary>
-    public static void WriteU32BE(Span<byte> dst, uint value) =>
+    public static void WriteU32Be(Span<byte> dst, uint value)
+    {
         BinaryPrimitives.WriteUInt32BigEndian(dst, value);
+    }
 
     /// <summary>Writes a big-endian UInt64.</summary>
-    public static void WriteU64BE(Span<byte> dst, ulong value) =>
+    public static void WriteU64Be(Span<byte> dst, ulong value)
+    {
         BinaryPrimitives.WriteUInt64BigEndian(dst, value);
+    }
 }

@@ -69,7 +69,8 @@ public sealed class XisoZarConvertTests : IDisposable
     private static void AssertSnapshotsEqual(
         Dictionary<string, byte[]> expected, Dictionary<string, byte[]> actual)
     {
-        Assert.Equal(expected.Keys.Order().ToArray(), actual.Keys.Order().ToArray());
+        Assert.Equal(expected.Keys.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
+            actual.Keys.Order(StringComparer.OrdinalIgnoreCase).ToArray());
         foreach (var (rel, data) in expected)
         {
             Assert.True(actual.TryGetValue(rel, out var got), $"missing {rel}");
@@ -92,9 +93,9 @@ public sealed class XisoZarConvertTests : IDisposable
 
     private static byte[] PatternBytes(int length, int seed)
     {
-        byte[] data = new byte[length];
-        uint state = (uint)((seed * 2654435761u) + 1);
-        for (int i = 0; i < length; i++)
+        var data = new byte[length];
+        var state = (uint)((seed * 2654435761u) + 1);
+        for (var i = 0; i < length; i++)
         {
             state = (state * 1664525) + 1013904223;
             data[i] = (byte)(state >> 24);
@@ -105,7 +106,7 @@ public sealed class XisoZarConvertTests : IDisposable
 
     private static string SolutionRoot()
     {
-        string? dir = AppContext.BaseDirectory;
+        var dir = AppContext.BaseDirectory;
         while (dir is not null)
         {
             if (File.Exists(Path.Combine(dir, "CSharp_XISOSharp.sln")))
@@ -142,7 +143,7 @@ public sealed class XisoZarConvertTests : IDisposable
         // zstd must come in well under it. This fails if the writer regresses
         // to raw-only storage.
         var src = CreateSourceDir(PopulateRich);
-        long rawTotal = Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories)
+        var rawTotal = Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories)
             .Sum(f => new FileInfo(f).Length);
         var iso = CreateIso(src);
         var work = CreateTempDir("xiso_zc_ratio");
@@ -150,7 +151,7 @@ public sealed class XisoZarConvertTests : IDisposable
 
         Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
 
-        long zarLen = new FileInfo(zar).Length;
+        var zarLen = new FileInfo(zar).Length;
         Assert.True(zarLen < rawTotal / 2,
             $"ZAR {zarLen} B not < half of raw input {rawTotal} B; compression not engaged?");
     }
@@ -170,7 +171,7 @@ public sealed class XisoZarConvertTests : IDisposable
         Assert.NotNull(reader);
         foreach (var (rel, data) in expected)
         {
-            uint h = reader!.LookUp(rel);
+            var h = reader.LookUp(rel);
             Assert.NotEqual(ZArchiveReader.InvalidNode, h);
             Assert.True(reader.IsFile(h));
             Assert.Equal((ulong)data.Length, reader.GetFileSize(h));
@@ -178,7 +179,7 @@ public sealed class XisoZarConvertTests : IDisposable
         }
 
         // Empty directory survives the conversion.
-        uint dir = reader!.LookUp("sub/emptydir");
+        var dir = reader.LookUp("sub/emptydir");
         Assert.NotEqual(ZArchiveReader.InvalidNode, dir);
         Assert.True(reader.IsDirectory(dir));
     }
@@ -254,8 +255,8 @@ public sealed class XisoZarConvertTests : IDisposable
         Assert.NotNull(reader);
         foreach (var file in Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories))
         {
-            string rel = Path.GetRelativePath(src, file).Replace('\\', '/');
-            uint h = reader!.LookUp(rel);
+            var rel = Path.GetRelativePath(src, file).Replace('\\', '/');
+            var h = reader.LookUp(rel);
             Assert.NotEqual(ZArchiveReader.InvalidNode, h);
             Assert.Equal(
                 SHA256.HashData(File.ReadAllBytes(file)),
@@ -266,7 +267,7 @@ public sealed class XisoZarConvertTests : IDisposable
     [Fact]
     public void Interop_ReferenceExeExtractsOurZar()
     {
-        string exe = Path.Combine(SolutionRoot(), "References", "ZArchive-0.1.2", "zarchive.exe");
+        var exe = Path.Combine(SolutionRoot(), "References", "ZArchive-0.1.2", "zarchive.exe");
         if (!File.Exists(exe))
         {
             return; // reference binary not present; covered by round-trip tests

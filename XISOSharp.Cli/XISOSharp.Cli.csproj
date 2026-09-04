@@ -25,6 +25,10 @@
 
     <ItemGroup>
         <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
+        <PackageReference Include="Serilog" Version="4.4.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+        <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
+        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     </ItemGroup>
 
     <!-- Version stamps (Version/InformationalVersion/FileVersion) derived from git tags, same as the library. -->

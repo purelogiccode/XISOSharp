@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 namespace ZARSharp;
 
 /// <summary>
@@ -9,7 +11,7 @@ namespace ZARSharp;
 public struct CompressionOffsetRecord
 {
     /// <summary>Size on disk in bytes.</summary>
-    public const int SizeOnDisk = 8 + 2 * ZArchiveCommon.EntriesPerOffsetRecord;
+    public const int SizeOnDisk = 8 + (2 * ZArchiveCommon.EntriesPerOffsetRecord);
 
     /// <summary>Base output offset of the first block in this record.</summary>
     public ulong BaseOffset;
@@ -30,12 +32,12 @@ public struct CompressionOffsetRecord
     {
         var rec = new CompressionOffsetRecord
         {
-            BaseOffset = ZArchiveCommon.ReadU64BE(src),
+            BaseOffset = ZArchiveCommon.ReadU64Be(src),
             Sizes = new ushort[ZArchiveCommon.EntriesPerOffsetRecord],
         };
-        for (int i = 0; i < ZArchiveCommon.EntriesPerOffsetRecord; i++)
+        for (var i = 0; i < ZArchiveCommon.EntriesPerOffsetRecord; i++)
         {
-            rec.Sizes[i] = ZArchiveCommon.ReadU16BE(src.Slice(8 + i * 2));
+            rec.Sizes[i] = ZArchiveCommon.ReadU16Be(src.Slice(8 + (i * 2)));
         }
 
         return rec;
@@ -44,10 +46,10 @@ public struct CompressionOffsetRecord
     /// <summary>Writes this record to <paramref name="dst"/> (40 bytes).</summary>
     public readonly void WriteTo(Span<byte> dst)
     {
-        ZArchiveCommon.WriteU64BE(dst, BaseOffset);
-        for (int i = 0; i < ZArchiveCommon.EntriesPerOffsetRecord; i++)
+        ZArchiveCommon.WriteU64Be(dst, BaseOffset);
+        for (var i = 0; i < ZArchiveCommon.EntriesPerOffsetRecord; i++)
         {
-            ZArchiveCommon.WriteU16BE(dst.Slice(8 + i * 2), Sizes[i]);
+            ZArchiveCommon.WriteU16Be(dst.Slice(8 + (i * 2)), Sizes[i]);
         }
     }
 }
@@ -135,21 +137,24 @@ public struct FileDirectoryEntry
     }
 
     /// <summary>Reads one entry from <paramref name="src"/> (16 bytes).</summary>
-    public static FileDirectoryEntry ReadFrom(ReadOnlySpan<byte> src) => new()
+    public static FileDirectoryEntry ReadFrom(ReadOnlySpan<byte> src)
     {
-        NameOffsetAndTypeFlag = ZArchiveCommon.ReadU32BE(src),
-        Field1 = ZArchiveCommon.ReadU32BE(src.Slice(4)),
-        Field2 = ZArchiveCommon.ReadU32BE(src.Slice(8)),
-        Field3 = ZArchiveCommon.ReadU32BE(src.Slice(12)),
-    };
+        return new FileDirectoryEntry
+        {
+            NameOffsetAndTypeFlag = ZArchiveCommon.ReadU32Be(src),
+            Field1 = ZArchiveCommon.ReadU32Be(src.Slice(4)),
+            Field2 = ZArchiveCommon.ReadU32Be(src.Slice(8)),
+            Field3 = ZArchiveCommon.ReadU32Be(src.Slice(12)),
+        };
+    }
 
     /// <summary>Writes this entry to <paramref name="dst"/> (16 bytes).</summary>
     public readonly void WriteTo(Span<byte> dst)
     {
-        ZArchiveCommon.WriteU32BE(dst, NameOffsetAndTypeFlag);
-        ZArchiveCommon.WriteU32BE(dst.Slice(4), Field1);
-        ZArchiveCommon.WriteU32BE(dst.Slice(8), Field2);
-        ZArchiveCommon.WriteU32BE(dst.Slice(12), Field3);
+        ZArchiveCommon.WriteU32Be(dst, NameOffsetAndTypeFlag);
+        ZArchiveCommon.WriteU32Be(dst.Slice(4), Field1);
+        ZArchiveCommon.WriteU32Be(dst.Slice(8), Field2);
+        ZArchiveCommon.WriteU32Be(dst.Slice(12), Field3);
     }
 }
 
@@ -227,7 +232,7 @@ public struct Footer
         {
             IntegrityHash = new byte[32],
         };
-        int o = 0;
+        var o = 0;
         f.SectionCompressedData = ReadInfo(src.Slice(o));
         o += 16;
         f.SectionOffsetRecords = ReadInfo(src.Slice(o));
@@ -242,24 +247,27 @@ public struct Footer
         o += 16;
         src.Slice(o, 32).CopyTo(f.IntegrityHash.AsSpan());
         o += 32;
-        f.TotalSize = ZArchiveCommon.ReadU64BE(src.Slice(o));
+        f.TotalSize = ZArchiveCommon.ReadU64Be(src.Slice(o));
         o += 8;
-        f.Version = ZArchiveCommon.ReadU32BE(src.Slice(o));
+        f.Version = ZArchiveCommon.ReadU32Be(src.Slice(o));
         o += 4;
-        f.Magic = ZArchiveCommon.ReadU32BE(src.Slice(o));
+        f.Magic = ZArchiveCommon.ReadU32Be(src.Slice(o));
         return f;
 
-        static OffsetInfo ReadInfo(ReadOnlySpan<byte> s) => new()
+        static OffsetInfo ReadInfo(ReadOnlySpan<byte> s)
         {
-            Offset = ZArchiveCommon.ReadU64BE(s),
-            Size = ZArchiveCommon.ReadU64BE(s.Slice(8)),
-        };
+            return new OffsetInfo
+            {
+                Offset = ZArchiveCommon.ReadU64Be(s),
+                Size = ZArchiveCommon.ReadU64Be(s.Slice(8)),
+            };
+        }
     }
 
     /// <summary>Writes this footer to <paramref name="dst"/> (144 bytes).</summary>
     public readonly void WriteTo(Span<byte> dst)
     {
-        int o = 0;
+        var o = 0;
         WriteInfo(dst.Slice(o), SectionCompressedData);
         o += 16;
         WriteInfo(dst.Slice(o), SectionOffsetRecords);
@@ -274,16 +282,17 @@ public struct Footer
         o += 16;
         IntegrityHash.AsSpan(0, 32).CopyTo(dst.Slice(o, 32));
         o += 32;
-        ZArchiveCommon.WriteU64BE(dst.Slice(o), TotalSize);
+        ZArchiveCommon.WriteU64Be(dst.Slice(o), TotalSize);
         o += 8;
-        ZArchiveCommon.WriteU32BE(dst.Slice(o), Version);
+        ZArchiveCommon.WriteU32Be(dst.Slice(o), Version);
         o += 4;
-        ZArchiveCommon.WriteU32BE(dst.Slice(o), Magic);
+        ZArchiveCommon.WriteU32Be(dst.Slice(o), Magic);
+        return;
 
         static void WriteInfo(Span<byte> d, OffsetInfo i)
         {
-            ZArchiveCommon.WriteU64BE(d, i.Offset);
-            ZArchiveCommon.WriteU64BE(d.Slice(8), i.Size);
+            ZArchiveCommon.WriteU64Be(d, i.Offset);
+            ZArchiveCommon.WriteU64Be(d.Slice(8), i.Size);
         }
     }
 }

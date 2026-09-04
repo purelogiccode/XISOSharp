@@ -1,5 +1,7 @@
 namespace ZARSharp.Zstd;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 /// <summary>
 /// LSB-first forward bit writer (inverse of <see cref="ForwardBitReader"/>).
 /// Used for FSE NCount headers (<c>FSE_writeNCount</c>), which have no end-mark:
@@ -12,7 +14,6 @@ internal sealed class ForwardBitWriter
     private readonly int _capacity;
     private int _pos;
     private uint _bitBuf;
-    private int _bitCount;
 
     /// <summary>Creates a writer over <c>buf[offset..offset+capacity)</c>.</summary>
     public ForwardBitWriter(byte[] buf, int offset, int capacity)
@@ -35,7 +36,7 @@ internal sealed class ForwardBitWriter
     public int BytesWritten => _pos - _start;
 
     /// <summary>Pending bits not yet flushed.</summary>
-    public int PendingBits => _bitCount;
+    public int PendingBits { get; private set; }
 
     /// <summary>Adds <paramref name="nbBits"/> low bits of <paramref name="value"/> LSB-first.</summary>
     public void AddBits(uint value, int nbBits)
@@ -57,16 +58,16 @@ internal sealed class ForwardBitWriter
             return;
         }
 
-        uint mask = nbBits == 32 ? uint.MaxValue : ((1u << nbBits) - 1);
-        _bitBuf |= (value & mask) << _bitCount;
-        _bitCount += nbBits;
+        var mask = nbBits == 32 ? uint.MaxValue : ((1u << nbBits) - 1);
+        _bitBuf |= (value & mask) << PendingBits;
+        PendingBits += nbBits;
         // Eager capacity check (including pending bits): never silently truncate.
-        if ((_pos - _start) + ((_bitCount + 7) / 8) > _capacity)
+        if ((_pos - _start) + ((PendingBits + 7) / 8) > _capacity)
         {
             throw new ZstdException("Bitstream overflow.");
         }
 
-        while (_bitCount >= 8)
+        while (PendingBits >= 8)
         {
             if (_pos - _start >= _capacity)
             {
@@ -75,14 +76,14 @@ internal sealed class ForwardBitWriter
 
             _buf[_pos++] = (byte)_bitBuf;
             _bitBuf >>= 8;
-            _bitCount -= 8;
+            PendingBits -= 8;
         }
     }
 
     /// <summary>Flushes pending bits, zero-padding the last byte. Returns total bytes.</summary>
     public int Flush()
     {
-        if (_bitCount > 0)
+        if (PendingBits > 0)
         {
             if (_pos - _start >= _capacity)
             {
@@ -91,7 +92,7 @@ internal sealed class ForwardBitWriter
 
             _buf[_pos++] = (byte)_bitBuf;
             _bitBuf = 0;
-            _bitCount = 0;
+            PendingBits = 0;
         }
 
         return BytesWritten;
@@ -116,7 +117,6 @@ internal sealed class CStreamWriter
     private readonly int _endPtr; // start + capacity - 8 (mirrors C endPtr)
     private int _ptr;
     private ulong _container;
-    private int _bitPos;
 
     /// <summary>Creates a writer over <c>dst[offset..offset+capacity)</c>.</summary>
     public CStreamWriter(byte[] dst, int offset, int capacity)
@@ -142,7 +142,7 @@ internal sealed class CStreamWriter
     }
 
     /// <summary>Bits currently held in the container.</summary>
-    public int BitPos => _bitPos;
+    public int BitPos { get; private set; }
 
     /// <summary>Bytes committed (excluding the in-register tail).</summary>
     public int FlushedBytes => _ptr - _start;
@@ -160,25 +160,25 @@ internal sealed class CStreamWriter
             return;
         }
 
-        if (_bitPos + nbBits >= 64)
+        if (BitPos + nbBits >= 64)
         {
             throw new ZstdException("Bit container overflow (FlushBits required).");
         }
 
-        ulong mask = nbBits == 64 ? ulong.MaxValue : ((1UL << nbBits) - 1);
-        _container |= (value & mask) << _bitPos;
-        _bitPos += nbBits;
+        var mask = nbBits == 64 ? ulong.MaxValue : ((1UL << nbBits) - 1);
+        _container |= (value & mask) << BitPos;
+        BitPos += nbBits;
     }
 
     /// <summary>Emits full bytes little-endian (safe version: clamps on overflow).</summary>
     public void FlushBits()
     {
-        int nbBytes = _bitPos >> 3;
+        var nbBytes = BitPos >> 3;
         if (_ptr <= _endPtr)
         {
             // C writes the whole 8-byte container (LEST) then advances by nbBytes;
             // the tail bytes beyond _ptr hold the remaining bits for Close().
-            for (int i = 0; i < 8; i++)
+            for (var i = 0; i < 8; i++)
             {
                 _dst[_ptr + i] = (byte)(_container >> (i * 8));
             }
@@ -190,7 +190,7 @@ internal sealed class CStreamWriter
             }
         }
 
-        _bitPos &= 7;
+        BitPos &= 7;
         _container >>= nbBytes * 8;
     }
 
@@ -207,7 +207,7 @@ internal sealed class CStreamWriter
             throw new ZstdException("Bitstream overflow.");
         }
 
-        if (_bitPos > 0)
+        if (BitPos > 0)
         {
             _dst[_ptr] = (byte)_container; // zero-padded tail byte
             return (_ptr - _start) + 1;

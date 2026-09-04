@@ -161,8 +161,11 @@ public static class CisoWriter
     public static async Task<int> CompressToCsoAsync(string sourcePath, string? outputCsoPath = null, int level = 6,
         long? splitBytes = null, byte version = VersionLz4,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
-        => await Task.Run(() => CompressToCso(sourcePath, outputCsoPath, level, splitBytes, version, progress, ct), ct)
+    {
+        return await Task.Run(() => CompressToCso(sourcePath, outputCsoPath, level, splitBytes, version, progress, ct),
+                ct)
             .ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Compresses a seekable source stream (uncompressed ISO) to a seekable destination stream (CISO).
@@ -225,7 +228,7 @@ public static class CisoWriter
         // For progress
         progress?.Report(new ProgressInfo(ProgressInfoType.FileCount, Count: totalBlocks));
 
-        CompressionLevel compLevel = MapLevel(level);
+        var compLevel = MapLevel(level);
 
         // Scratch for the v2 payload: [u32 LE block info][LZ4 block data] — the LZ4 frame with
         // its 7-byte header and 4-byte end mark stripped (ciso write.rs).
@@ -375,7 +378,8 @@ public static class CisoWriter
     }
 
     private static CompressionLevel MapLevel(int level)
-        => level switch
+    {
+        return level switch
         {
             0 => CompressionLevel.NoCompression,
             1 or 2 => CompressionLevel.Fastest,
@@ -383,6 +387,7 @@ public static class CisoWriter
             8 or 9 => CompressionLevel.SmallestSize,
             _ => CompressionLevel.Optimal
         };
+    }
 
     /// <summary>
     /// Derives the default <c>.cso</c> output path for <paramref name="sourcePath"/>
@@ -428,8 +433,20 @@ public static class CisoWriter
     }
 
     // Internal helper to avoid recursion with public CompressToCso calling PackFromDirectory which might call Compress again
+    /// <summary>
+    /// Internal packing helper for the CISO pipeline; packs a directory to an exact ISO path
+    /// without re-entering <see cref="CompressToCso"/>.
+    /// </summary>
     private static class XisoWriterInternal
     {
+        /// <summary>
+        /// Packs <paramref name="sourceDirectory"/> into <paramref name="outputIsoPath"/>,
+        /// creating the output directory first.
+        /// </summary>
+        /// <param name="sourceDirectory">Source directory whose contents are packed.</param>
+        /// <param name="outputIsoPath">Exact destination ISO path.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>0 on success, 1 on error.</returns>
         public static int PackFromDirectoryForCiso(string sourceDirectory, string outputIsoPath, CancellationToken ct)
         {
             // Use XisoWriter.CreateXiso directly with explicit output name to avoid extra .iso

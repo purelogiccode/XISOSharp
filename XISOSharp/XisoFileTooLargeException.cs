@@ -48,8 +48,13 @@ public class XisoFileTooLargeException : IOException
         FileSize = fileSize;
     }
 
+    /// <summary>Creates a new <see cref="XisoFileTooLargeException"/> with a message and HRESULT.</summary>
+    /// <param name="message">Description of the error.</param>
+    /// <param name="hresult">The HRESULT error code.</param>
     public XisoFileTooLargeException(string? message, int hresult) : base(message, hresult)
     {
+        FileName = "";
+        FileSize = 0;
     }
 }
 #pragma warning restore RCS1194

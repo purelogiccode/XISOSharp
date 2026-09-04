@@ -1,5 +1,7 @@
 using System.Numerics;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 namespace ZARSharp.Zstd;
 
 /// <summary>
@@ -27,16 +29,19 @@ public readonly record struct ZstdMatchParams(
     bool UseChain)
 {
     /// <summary>Parameters for <paramref name="level"/> (1..6).</summary>
-    public static ZstdMatchParams ForLevel(int level) => level switch
+    public static ZstdMatchParams ForLevel(int level)
     {
-        1 => new(17, 12, 13, 1, 6, 0, 0, UseChain: false), // fast
-        2 => new(17, 13, 15, 1, 5, 0, 0, UseChain: false), // fast (dfast mapped here)
-        3 => new(17, 15, 16, 2, 5, 0, 0, UseChain: true), // greedy = lazy depth 0
-        4 => new(17, 17, 17, 2, 4, 0, 1, UseChain: true), // lazy depth 1
-        5 => new(17, 16, 17, 3, 4, 2, 1, UseChain: true), // lazy depth 1
-        6 => new(17, 16, 17, 3, 4, 4, 1, UseChain: true), // lazy depth 1
-        _ => throw new ArgumentOutOfRangeException(nameof(level), "Level must be 1..6."),
-    };
+        return level switch
+        {
+            1 => new ZstdMatchParams(17, 12, 13, 1, 6, 0, 0, UseChain: false), // fast
+            2 => new ZstdMatchParams(17, 13, 15, 1, 5, 0, 0, UseChain: false), // fast (dfast mapped here)
+            3 => new ZstdMatchParams(17, 15, 16, 2, 5, 0, 0, UseChain: true), // greedy = lazy depth 0
+            4 => new ZstdMatchParams(17, 17, 17, 2, 4, 0, 1, UseChain: true), // lazy depth 1
+            5 => new ZstdMatchParams(17, 16, 17, 3, 4, 2, 1, UseChain: true), // lazy depth 1
+            6 => new ZstdMatchParams(17, 16, 17, 3, 4, 4, 1, UseChain: true), // lazy depth 1
+            _ => throw new ArgumentOutOfRangeException(nameof(level), "Level must be 1..6."),
+        };
+    }
 }
 
 /// <summary>
@@ -87,29 +92,26 @@ public sealed class ZstdMatchFinder
     private const int SearchStrength = 8; // kSearchStrength
     private const int StepIncrement = 1 << (SearchStrength - 1); // kStepIncr = 128
     private const int LazySkippingStep = 8; // kLazySkippingStep
-
-    private readonly ZstdMatchParams _params;
-    private readonly int _level;
     private readonly uint[] _hashTable;
     private readonly uint[] _chainTable; // Empty unless UseChain.
 
     /// <summary>Creates a finder for <paramref name="level"/> (1..6).</summary>
     public ZstdMatchFinder(int level)
     {
-        _params = ZstdMatchParams.ForLevel(level);
-        _level = level;
-        _hashTable = new uint[1 << _params.HashLog];
-        _chainTable = _params.UseChain ? new uint[1 << _params.ChainLog] : [];
+        Params = ZstdMatchParams.ForLevel(level);
+        Level = level;
+        _hashTable = new uint[1 << Params.HashLog];
+        _chainTable = Params.UseChain ? new uint[1 << Params.ChainLog] : [];
     }
 
     /// <summary>Compression level (1..6).</summary>
-    public int Level => _level;
+    public int Level { get; }
 
     /// <summary>Effective strategy (1→Fast, 2→DoubleFast-as-fast, 3→Greedy, 4–6→Lazy).</summary>
-    public ZstdStrategy Strategy => (ZstdStrategy)_level;
+    public ZstdStrategy Strategy => (ZstdStrategy)Level;
 
     /// <summary>Parameters in effect.</summary>
-    public ZstdMatchParams Params => _params;
+    public ZstdMatchParams Params { get; }
 
     /// <summary>
     /// Parses <paramref name="source"/> into <paramref name="store"/> (sequences
@@ -134,7 +136,7 @@ public sealed class ZstdMatchFinder
             Array.Clear(_chainTable);
         }
 
-        return _params.UseChain
+        return Params.UseChain
             ? FindLazy(source, store, repeatOffsets)
             : FindFast(source, store, repeatOffsets);
     }
@@ -149,7 +151,7 @@ public sealed class ZstdMatchFinder
     /// </summary>
     internal static uint HashPtr(ReadOnlySpan<byte> src, int pos, int hashLog, int minMatch)
     {
-        ulong value = Read64Padded(src, pos);
+        var value = Read64Padded(src, pos);
         if (minMatch <= 4)
         {
             return (uint)(((uint)value * Prime4Bytes) >> (32 - hashLog));
@@ -176,13 +178,13 @@ public sealed class ZstdMatchFinder
     private static ulong Read64Padded(ReadOnlySpan<byte> src, int pos)
     {
         ulong value = 0;
-        int available = src.Length - pos;
+        var available = src.Length - pos;
         if (available > 7)
         {
             available = 8;
         }
 
-        for (int i = 0; i < available; i++)
+        for (var i = 0; i < available; i++)
         {
             value |= (ulong)src[pos + i] << (8 * i);
         }
@@ -190,8 +192,10 @@ public sealed class ZstdMatchFinder
         return value;
     }
 
-    private static uint Read32(ReadOnlySpan<byte> src, int pos) =>
-        (uint)(src[pos] | (src[pos + 1] << 8) | (src[pos + 2] << 16) | (src[pos + 3] << 24));
+    private static uint Read32(ReadOnlySpan<byte> src, int pos)
+    {
+        return (uint)(src[pos] | (src[pos + 1] << 8) | (src[pos + 2] << 16) | (src[pos + 3] << 24));
+    }
 
     /// <summary>
     /// <c>ZSTD_count</c>: counts matching bytes of <c>src[ip..]</c> vs
@@ -200,7 +204,7 @@ public sealed class ZstdMatchFinder
     /// </summary>
     private static int CountMatches(ReadOnlySpan<byte> src, int ip, int match, int end)
     {
-        int start = ip;
+        var start = ip;
         while (ip < end && src[ip] == src[match])
         {
             ip++;
@@ -211,13 +215,19 @@ public sealed class ZstdMatchFinder
     }
 
     /// <summary><c>ZSTD_highbit32</c>: index of the highest set bit (input ≥ 1).</summary>
-    private static int Highbit32(uint value) => 31 - BitOperations.LeadingZeroCount(value);
+    private static int Highbit32(uint value)
+    {
+        return 31 - BitOperations.LeadingZeroCount(value);
+    }
 
-    private int WindowLow(int curr) => WindowLowFor(curr, _params.WindowLog);
+    private int WindowLow(int curr)
+    {
+        return WindowLowFor(curr, Params.WindowLog);
+    }
 
     private static int WindowLowFor(int curr, int windowLog)
     {
-        int window = 1 << windowLog;
+        var window = 1 << windowLog;
         return curr > window ? curr - window : 0;
     }
 
@@ -227,44 +237,44 @@ public sealed class ZstdMatchFinder
 
     private int FindFast(ReadOnlySpan<byte> src, ZstdSequenceStore store, uint[] rep)
     {
-        int n = src.Length;
+        var n = src.Length;
         if (n == 0)
         {
             store.SetTrailingLiterals([]);
             return 0;
         }
 
-        int hashLog = _params.HashLog;
-        int mls = _params.MinMatch;
-        int stepSize = _params.TargetLength + (_params.TargetLength == 0 ? 1 : 0) + 1; // min 2
+        var hashLog = Params.HashLog;
+        var mls = Params.MinMatch;
+        var stepSize = Params.TargetLength + (Params.TargetLength == 0 ? 1 : 0) + 1; // min 2
 
         // Decoder-synchronous repeat history: true values at all times,
         // evolved with UpdateRep after every stored sequence (see class remarks).
         uint[] history = [rep[0], rep[1], rep[2]];
-        uint offset1 = history[0];
-        uint offset2 = history[1];
+        var offset1 = history[0];
+        var offset2 = history[1];
 
-        int anchor = 0;
-        int ip = 1; // ip0 += (ip0 == prefixStart): position 0 has no history.
-        int ilimit = n - 8;
+        var anchor = 0;
+        var ip = 1; // ip0 += (ip0 == prefixStart): position 0 has no history.
+        var ilimit = n - 8;
 
-        int step = stepSize;
-        int nextStep = ip + StepIncrement;
+        var step = stepSize;
+        var nextStep = ip + StepIncrement;
 
         while (ip + 1 <= ilimit)
         {
-            bool matched = false;
-            for (int k = 0; k < 2 && !matched; k++)
+            var matched = false;
+            for (var k = 0; k < 2 && !matched; k++)
             {
-                int pos = ip + k;
+                var pos = ip + k;
 
                 // Repcode probe (guarded; upstream relies on the invariant).
                 if (offset1 > 0 && offset1 <= (uint)(pos - WindowLow(pos))
                                 && Read32(src, pos) == Read32(src, pos - (int)offset1))
                 {
-                    int start = pos;
-                    int match = pos - (int)offset1;
-                    int length = 4;
+                    var start = pos;
+                    var match = pos - (int)offset1;
+                    var length = 4;
                     while (start > anchor && match > WindowLow(start) && src[start - 1] == src[match - 1])
                     {
                         start--;
@@ -282,7 +292,7 @@ public sealed class ZstdMatchFinder
                     anchor = start + length;
                     ip = anchor;
                     PostMatchFill(src, _hashTable, hashLog, mls, n, ilimit, start, ip);
-                    ip = ImmediateRepLoop(src, store, history, n, ilimit, ip, _params.WindowLog, ref anchor);
+                    ip = ImmediateRepLoop(src, store, history, n, ilimit, ip, Params.WindowLog, ref anchor);
                     offset1 = history[0];
                     offset2 = history[1];
                     step = stepSize;
@@ -292,14 +302,14 @@ public sealed class ZstdMatchFinder
                 }
 
                 // Hash probe.
-                uint h = HashPtr(src, pos, hashLog, mls);
-                int index = (int)_hashTable[h];
+                var h = HashPtr(src, pos, hashLog, mls);
+                var index = (int)_hashTable[h];
                 _hashTable[h] = (uint)pos;
                 if (index < pos && index >= WindowLow(pos) && Read32(src, pos) == Read32(src, index))
                 {
-                    int start = pos;
-                    int match = index;
-                    int length = 4;
+                    var start = pos;
+                    var match = index;
+                    var length = 4;
                     while (start > anchor && match > WindowLow(start) && src[start - 1] == src[match - 1])
                     {
                         start--;
@@ -308,10 +318,10 @@ public sealed class ZstdMatchFinder
                     }
 
                     length += CountMatches(src, start + length, match + length, n);
-                    uint offset = (uint)(start - match);
+                    var offset = (uint)(start - match);
                     history[0] = offset1;
                     history[1] = offset2;
-                    uint offBase = ZstdSeq.OffsetToOffBase(offset);
+                    var offBase = ZstdSeq.OffsetToOffBase(offset);
                     store.StoreSequence(src.Slice(anchor, start - anchor), offBase, length);
                     ZstdSeq.UpdateRep(history, offBase, start == anchor ? 1u : 0u);
                     offset1 = history[0];
@@ -319,7 +329,7 @@ public sealed class ZstdMatchFinder
                     anchor = start + length;
                     ip = anchor;
                     PostMatchFill(src, _hashTable, hashLog, mls, n, ilimit, start, ip);
-                    ip = ImmediateRepLoop(src, store, history, n, ilimit, ip, _params.WindowLog, ref anchor);
+                    ip = ImmediateRepLoop(src, store, history, n, ilimit, ip, Params.WindowLog, ref anchor);
                     offset1 = history[0];
                     offset2 = history[1];
                     step = stepSize;
@@ -362,12 +372,12 @@ public sealed class ZstdMatchFinder
             hashTable[HashPtr(src, matchStart + 2, hashLog, mls)] = (uint)(matchStart + 2);
         }
 
-        if (matchEnd - 2 >= 0 && matchEnd - 2 <= ilimit && matchEnd - 2 < n)
+        if (matchEnd >= 2 && matchEnd - 2 <= ilimit && matchEnd - 2 < n)
         {
             hashTable[HashPtr(src, matchEnd - 2, hashLog, mls)] = (uint)(matchEnd - 2);
         }
 
-        if (matchEnd - 1 >= 0 && matchEnd - 1 <= ilimit && matchEnd - 1 < n)
+        if (matchEnd >= 1 && matchEnd - 1 <= ilimit && matchEnd - 1 < n)
         {
             hashTable[HashPtr(src, matchEnd - 1, hashLog, mls)] = (uint)(matchEnd - 1);
         }
@@ -390,7 +400,7 @@ public sealed class ZstdMatchFinder
         while (ip <= ilimit && history[1] > 0 && history[1] <= (uint)(ip - WindowLowFor(ip, windowLog))
                && Read32(src, ip) == Read32(src, ip - (int)history[1]))
         {
-            int length = 4 + CountMatches(src, ip + 4, ip + 4 - (int)history[1], n);
+            var length = 4 + CountMatches(src, ip + 4, ip + 4 - (int)history[1], n);
             store.StoreSequence([], ZstdSeq.Repcode1, length);
             ZstdSeq.UpdateRep(history, ZstdSeq.Repcode1, 1u);
             ip += length;
@@ -406,36 +416,36 @@ public sealed class ZstdMatchFinder
 
     private int FindLazy(ReadOnlySpan<byte> src, ZstdSequenceStore store, uint[] rep)
     {
-        int n = src.Length;
+        var n = src.Length;
         if (n == 0)
         {
             store.SetTrailingLiterals([]);
             return 0;
         }
 
-        int hashLog = _params.HashLog;
-        int mls = Math.Clamp(_params.MinMatch, 4, 6); // BOUNDED(4, minMatch, 6)
-        int searchLog = _params.SearchLog;
-        int depth = _params.Depth;
-        int chainSize = 1 << _params.ChainLog;
-        int chainMask = chainSize - 1;
+        var hashLog = Params.HashLog;
+        var mls = Math.Clamp(Params.MinMatch, 4, 6); // BOUNDED(4, minMatch, 6)
+        var searchLog = Params.SearchLog;
+        var depth = Params.Depth;
+        var chainSize = 1 << Params.ChainLog;
+        var chainMask = chainSize - 1;
 
         uint[] history = [rep[0], rep[1], rep[2]];
-        uint offset1 = history[0];
-        uint offset2 = history[1];
+        var offset1 = history[0];
+        var offset2 = history[1];
 
-        int anchor = 0;
-        int ip = 1; // ip += (dictAndPrefixLength == 0)
-        int ilimit = n - 8;
+        var anchor = 0;
+        var ip = 1; // ip += (dictAndPrefixLength == 0)
+        var ilimit = n - 8;
 
-        int nextToUpdate = 0;
-        bool lazySkipping = false;
+        var nextToUpdate = 0;
+        var lazySkipping = false;
 
         while (ip < ilimit)
         {
-            int matchLength = 0;
-            uint offBase = ZstdSeq.Repcode1;
-            int start = ip + 1;
+            var matchLength = 0;
+            var offBase = ZstdSeq.Repcode1;
+            var start = ip + 1;
 
             // Repcode probe at ip+1 (upstream checks rep at the next position).
             if (offset1 > 0 && offset1 <= (uint)(ip + 1 - WindowLow(ip + 1))
@@ -451,7 +461,7 @@ public sealed class ZstdMatchFinder
             // First search (depth 0).
             {
                 uint found = 999999999;
-                int ml2 = HcFindBestMatch(src, ip, n, ref found, hashLog, mls, searchLog, chainMask, chainSize,
+                var ml2 = HcFindBestMatch(src, ip, n, ref found, hashLog, mls, searchLog, chainMask, chainSize,
                     ref nextToUpdate, ref lazySkipping);
                 if (ml2 > matchLength)
                 {
@@ -464,7 +474,7 @@ public sealed class ZstdMatchFinder
             if (matchLength < 4)
             {
                 // Jump faster over incompressible sections.
-                int skip = ((ip - anchor) >> SearchStrength) + 1;
+                var skip = ((ip - anchor) >> SearchStrength) + 1;
                 ip += skip;
                 lazySkipping = skip > LazySkippingStep;
                 continue;
@@ -479,9 +489,9 @@ public sealed class ZstdMatchFinder
                     if (offBase != 0 && offset1 > 0 && offset1 <= (uint)(ip - WindowLow(ip))
                         && Read32(src, ip) == Read32(src, ip - (int)offset1))
                     {
-                        int mlRep = 4 + CountMatches(src, ip + 4, ip + 4 - (int)offset1, n);
-                        int gain2 = mlRep * 3;
-                        int gain1 = matchLength * 3 - Highbit32(offBase) + 1;
+                        var mlRep = 4 + CountMatches(src, ip + 4, ip + 4 - (int)offset1, n);
+                        var gain2 = mlRep * 3;
+                        var gain1 = (matchLength * 3) - Highbit32(offBase) + 1;
                         if (mlRep >= 4 && gain2 > gain1)
                         {
                             matchLength = mlRep;
@@ -492,10 +502,10 @@ public sealed class ZstdMatchFinder
 
                     {
                         uint candidate = 999999999;
-                        int ml2 = HcFindBestMatch(src, ip, n, ref candidate, hashLog, mls, searchLog, chainMask,
+                        var ml2 = HcFindBestMatch(src, ip, n, ref candidate, hashLog, mls, searchLog, chainMask,
                             chainSize, ref nextToUpdate, ref lazySkipping);
-                        int gain2 = (ml2 * 4) - Highbit32(candidate);
-                        int gain1 = (matchLength * 4) - Highbit32(offBase) + 4;
+                        var gain2 = (ml2 * 4) - Highbit32(candidate);
+                        var gain1 = (matchLength * 4) - Highbit32(offBase) + 4;
                         if (ml2 >= 4 && gain2 > gain1)
                         {
                             matchLength = ml2;
@@ -513,7 +523,7 @@ public sealed class ZstdMatchFinder
             // Catch up (offsets only; repcode matches need none).
             if (ZstdSeq.IsOffset(offBase))
             {
-                uint offset = ZstdSeq.ToOffset(offBase);
+                var offset = ZstdSeq.ToOffset(offBase);
                 while (start > anchor && start - (int)offset > WindowLow(start)
                                       && src[start - 1] == src[start - (int)offset - 1])
                 {
@@ -536,7 +546,7 @@ public sealed class ZstdMatchFinder
             while (ip <= ilimit && offset2 > 0 && offset2 <= (uint)(ip - WindowLow(ip))
                    && Read32(src, ip) == Read32(src, ip - (int)offset2))
             {
-                int repLength = 4 + CountMatches(src, ip + 4, ip + 4 - (int)offset2, n);
+                var repLength = 4 + CountMatches(src, ip + 4, ip + 4 - (int)offset2, n);
                 history[0] = offset1;
                 history[1] = offset2;
                 store.StoreSequence([], ZstdSeq.Repcode1, repLength);
@@ -569,12 +579,12 @@ public sealed class ZstdMatchFinder
         ref int nextToUpdate, ref bool lazySkipping)
     {
         // ZSTD_insertAndFindFirstIndex_internal (prefix only).
-        int idx = nextToUpdate;
+        var idx = nextToUpdate;
         if (!lazySkipping)
         {
             while (idx < ip)
             {
-                uint h = HashPtr(src, idx, hashLog, mls);
+                var h = HashPtr(src, idx, hashLog, mls);
                 _chainTable[idx & chainMask] = _hashTable[h];
                 _hashTable[h] = (uint)idx;
                 idx++;
@@ -585,7 +595,7 @@ public sealed class ZstdMatchFinder
             // Lazy-skipping mode: insert a single stale position (upstream).
             if (idx < ip)
             {
-                uint h = HashPtr(src, idx, hashLog, mls);
+                var h = HashPtr(src, idx, hashLog, mls);
                 _chainTable[idx & chainMask] = _hashTable[h];
                 _hashTable[h] = (uint)idx;
             }
@@ -593,15 +603,15 @@ public sealed class ZstdMatchFinder
 
         nextToUpdate = ip;
 
-        int lowLimit = WindowLow(ip);
-        int minChain = ip > chainSize ? ip - chainSize : 0;
-        int attempts = 1 << searchLog;
-        int best = 3; // ml = 4 - 1
-        int matchIndex = (int)_hashTable[HashPtr(src, ip, hashLog, mls)];
+        var lowLimit = WindowLow(ip);
+        var minChain = ip > chainSize ? ip - chainSize : 0;
+        var attempts = 1 << searchLog;
+        var best = 3; // ml = 4 - 1
+        var matchIndex = (int)_hashTable[HashPtr(src, ip, hashLog, mls)];
 
         while (matchIndex >= lowLimit && matchIndex < ip && attempts > 0)
         {
-            int current = 0;
+            var current = 0;
             // Prefilter: read the 4 bytes ending at the current best length.
             // Guarded so both reads stay in bounds (upstream over-reads here).
             if (matchIndex + best + 1 <= end && ip + best + 1 <= end

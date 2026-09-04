@@ -53,28 +53,56 @@ public sealed class ExtractFileException : ExtractErrorException
         BytesRead = bytesRead;
     }
 
-    public ExtractFileException() : base()
+    /// <summary>Creates a new <see cref="ExtractFileException"/> with a default message.</summary>
+    public ExtractFileException()
     {
+        InternalPath = string.Empty;
+        DestPath = string.Empty;
     }
 
+    /// <summary>Creates a new <see cref="ExtractFileException"/> with a message.</summary>
+    /// <param name="message">The error message.</param>
     public ExtractFileException(string message) : base(message)
     {
+        InternalPath = string.Empty;
+        DestPath = string.Empty;
     }
 
+    /// <summary>Creates a new <see cref="ExtractFileException"/> with a message and inner exception.</summary>
+    /// <param name="message">The error message.</param>
+    /// <param name="innerException">The underlying cause.</param>
     public ExtractFileException(string message, Exception innerException) : base(message, innerException)
     {
+        InternalPath = string.Empty;
+        DestPath = string.Empty;
     }
 
+    /// <summary>Creates a new <see cref="ExtractFileException"/> with the given error code.</summary>
+    /// <param name="code">The <see cref="ExtractError"/> value describing the failure.</param>
     public ExtractFileException(ExtractError code) : base(code)
     {
+        InternalPath = string.Empty;
+        DestPath = string.Empty;
     }
 
+    /// <summary>Creates a new <see cref="ExtractFileException"/> with an error code and message.</summary>
+    /// <param name="code">The <see cref="ExtractError"/> value describing the failure.</param>
+    /// <param name="message">The error message.</param>
     public ExtractFileException(ExtractError code, string message) : base(code, message)
     {
+        InternalPath = string.Empty;
+        DestPath = string.Empty;
     }
 
-    public ExtractFileException(ExtractError code, string message, Exception innerException) : base(code, message, innerException)
+    /// <summary>Creates a new <see cref="ExtractFileException"/> with an error code, message, and inner exception.</summary>
+    /// <param name="code">The <see cref="ExtractError"/> value describing the failure.</param>
+    /// <param name="message">The error message.</param>
+    /// <param name="innerException">The underlying cause.</param>
+    public ExtractFileException(ExtractError code, string message, Exception innerException) : base(code, message,
+        innerException)
     {
+        InternalPath = string.Empty;
+        DestPath = string.Empty;
     }
 
     private static string FormatMessage(string internalPath, string destPath, uint startSector, long fileSize,
@@ -89,19 +117,25 @@ public sealed class ExtractFileException : ExtractErrorException
     /// <summary>Destination create/open failed (the xdvdfs #187 shape: bad name, denied, missing drive).</summary>
     internal static ExtractFileException ForCreate(string internalPath, string destPath, uint startSector,
         long fileSize, Exception inner)
-        => new(ExtractError.ErrFileWrite, internalPath, destPath, startSector, fileSize,
+    {
+        return new ExtractFileException(ExtractError.ErrFileWrite, internalPath, destPath, startSector, fileSize,
             $"could not create output file: {inner.Message}", innerException: inner);
+    }
 
     /// <summary>Destination directory could not be created; the subtree is skipped under continue-on-error.</summary>
     internal static ExtractFileException ForDirectory(string internalPath, string destPath, Exception inner)
-        => new(ExtractError.ErrFileWrite, internalPath, destPath, 0, 0,
+    {
+        return new ExtractFileException(ExtractError.ErrFileWrite, internalPath, destPath, 0, 0,
             $"could not create output directory: {inner.Message}", innerException: inner);
+    }
 
     /// <summary>Write failed mid-copy (disk full, device removed).</summary>
     internal static ExtractFileException ForWrite(string internalPath, string destPath, uint startSector,
         long fileSize, long bytesRead, Exception inner)
-        => new(ExtractError.ErrFileWrite, internalPath, destPath, startSector, fileSize,
+    {
+        return new ExtractFileException(ExtractError.ErrFileWrite, internalPath, destPath, startSector, fileSize,
             $"write failed: {inner.Message}", bytesRead, inner);
+    }
 
     /// <summary>
     /// Image data ends before the reported size: truncated download, torn
@@ -109,7 +143,9 @@ public sealed class ExtractFileException : ExtractErrorException
     /// </summary>
     internal static ExtractFileException ForTruncated(string internalPath, string destPath, uint startSector,
         long fileSize, long bytesRead)
-        => new(ExtractError.ErrFileTruncated, internalPath, destPath, startSector, fileSize,
+    {
+        return new ExtractFileException(ExtractError.ErrFileTruncated, internalPath, destPath, startSector, fileSize,
             "image data ends before the reported file size", bytesRead);
+    }
 }
 #pragma warning restore RCS1194

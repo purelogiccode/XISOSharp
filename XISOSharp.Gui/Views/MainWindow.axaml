@@ -59,12 +59,12 @@
           <StackPanel Margin="4">
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Image (.iso/.cso/.zar)" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding ExImage}" Watermark="game.iso" />
+              <TextBox Grid.Column="1" Text="{Binding ExImage}" PlaceholderText="game.iso" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseExImage_Click" Margin="6,0,0,0" />
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Destination dir" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding ExDest}" Watermark="(same folder as image)" />
+              <TextBox Grid.Column="1" Text="{Binding ExDest}" PlaceholderText="(same folder as image)" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseExDest_Click" Margin="6,0,0,0" />
             </Grid>
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
@@ -76,17 +76,17 @@
             <TextBlock Classes="section" Text="Inspect" />
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="In-image path" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding ExInfoPath}" Watermark="/default.xbe (empty = volume info)" />
+              <TextBox Grid.Column="1" Text="{Binding ExInfoPath}" PlaceholderText="/default.xbe (empty = volume info)" />
               <Button Grid.Column="2" Content="Info" Command="{Binding RunInfoCommand}" IsEnabled="{Binding CanRun}" Margin="6,0,0,0" />
             </Grid>
             <TextBlock Classes="section" Text="Copy out" />
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="In-image path" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding ExCopyPath}" Watermark="/docs/readme.txt" />
+              <TextBox Grid.Column="1" Text="{Binding ExCopyPath}" PlaceholderText="/docs/readme.txt" />
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Destination file" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding ExCopyDest}" Watermark="readme.txt" />
+              <TextBox Grid.Column="1" Text="{Binding ExCopyDest}" PlaceholderText="readme.txt" />
               <Button Grid.Column="2" Content="Copy out" Command="{Binding RunCopyOutCommand}" IsEnabled="{Binding CanRun}" Margin="6,0,0,0" />
             </Grid>
           </StackPanel>
@@ -103,10 +103,10 @@
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Image name" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding CrName}" Watermark="(defaults to directory name)" />
+              <TextBox Grid.Column="1" Text="{Binding CrName}" PlaceholderText="(defaults to directory name)" />
             </Grid>
             <TextBlock Text="Exclude globs (-X, one per line)" Margin="0,6,0,2" />
-            <TextBox Text="{Binding CrExcludes}" AcceptsReturn="True" Height="70" Watermark="*.tmp&#x0a;screenshots/**" />
+            <TextBox Text="{Binding CrExcludes}" AcceptsReturn="True" Height="70" PlaceholderText="*.tmp&#x0a;screenshots/**" />
             <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
               <CheckBox Content="Skip $SystemUpdate (-s)" IsChecked="{Binding CrSkipSystemUpdate}" />
               <CheckBox Content="Disable .xbe media patch (-m)" IsChecked="{Binding CrDisableXbePatch}" />
@@ -120,11 +120,11 @@
         <ScrollViewer>
           <StackPanel Margin="4">
             <TextBlock Text="Images (one per line)" Margin="0,0,0,2" />
-            <TextBox Text="{Binding RwImages}" AcceptsReturn="True" Height="70" Watermark="game.iso" />
+            <TextBox Text="{Binding RwImages}" AcceptsReturn="True" Height="70" PlaceholderText="game.iso" />
             <Button Content="Add images…" Click="AddRwImages_Click" HorizontalAlignment="Left" Margin="0,4,0,0" />
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Custom output (-o)" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding RwOutput}" Watermark="(empty = rewrite in place rules)" />
+              <TextBox Grid.Column="1" Text="{Binding RwOutput}" PlaceholderText="(empty = rewrite in place rules)" />
               <Button Grid.Column="2" Content="Save as…" Click="BrowseRwOutput_Click" Margin="6,0,0,0" />
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
@@ -144,7 +144,7 @@
             </StackPanel>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="JSON report" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding RwReport}" Watermark="(optional) report.json" />
+              <TextBox Grid.Column="1" Text="{Binding RwReport}" PlaceholderText="(optional) report.json" />
               <Button Grid.Column="2" Content="Save as…" Click="BrowseRwReport_Click" Margin="6,0,0,0" />
             </Grid>
             <Button Content="Rewrite" Command="{Binding RunRewriteCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
@@ -156,7 +156,7 @@
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Output" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding WpOutput}" Watermark="(optional)" />
+              <TextBox Grid.Column="1" Text="{Binding WpOutput}" PlaceholderText="(optional)" />
             </Grid>
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
               <Button Content="Wipe filler" Command="{Binding RunWipeCommand}" IsEnabled="{Binding CanRun}" />
@@ -170,16 +170,16 @@
         <ScrollViewer>
           <StackPanel Margin="4">
             <TextBlock Text="Components, one per line: &lt;xiso|game.zar&gt; [video.iso] [filler|seed] [su…]" Margin="0,0,0,2" />
-            <TextBox Text="{Binding RbParts}" AcceptsReturn="True" Height="90" Watermark="game.xiso&#x0a;video.iso" />
+            <TextBox Text="{Binding RbParts}" AcceptsReturn="True" Height="90" PlaceholderText="game.xiso&#x0a;video.iso" />
             <Button Content="Add files…" Click="AddRbParts_Click" HorizontalAlignment="Left" Margin="0,4,0,0" />
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Output Redump ISO" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding RbOutput}" Watermark="redump.iso" />
+              <TextBox Grid.Column="1" Text="{Binding RbOutput}" PlaceholderText="redump.iso" />
               <Button Grid.Column="2" Content="Save as…" Click="BrowseRbOutput_Click" Margin="6,0,0,0" />
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Security sectors" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding RbSectors}" Watermark="(optional) sectors.txt" />
+              <TextBox Grid.Column="1" Text="{Binding RbSectors}" PlaceholderText="(optional) sectors.txt" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseRbSectors_Click" Margin="6,0,0,0" />
             </Grid>
             <Button Content="Rebuild" Command="{Binding RunRebuildCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
@@ -200,7 +200,7 @@
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Output .cso" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding CpOutput}" Watermark="(auto-derived)" />
+              <TextBox Grid.Column="1" Text="{Binding CpOutput}" PlaceholderText="(auto-derived)" />
               <Button Grid.Column="2" Content="Save as…" Click="BrowseCpOutput_Click" Margin="6,0,0,0" />
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
@@ -213,7 +213,7 @@
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Split bytes" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding CpSplit}" Watermark="(default ~4 GiB; 0 = single .cso)" />
+              <TextBox Grid.Column="1" Text="{Binding CpSplit}" PlaceholderText="(default ~4 GiB; 0 = single .cso)" />
             </Grid>
             <TextBlock Classes="hint" Text="Level 0 = store, 9 = smallest (default). Version 2 writes LZ4 sectors, version 1 classic DEFLATE." />
             <Button Content="Compress" Command="{Binding RunCompressCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
@@ -226,12 +226,12 @@
           <StackPanel Margin="4">
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="CSO file" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding DcCso}" Watermark="game.cso" />
+              <TextBox Grid.Column="1" Text="{Binding DcCso}" PlaceholderText="game.cso" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseDcCso_Click" Margin="6,0,0,0" />
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Output ISO" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding DcOutput}" Watermark="(auto-derived)" />
+              <TextBox Grid.Column="1" Text="{Binding DcOutput}" PlaceholderText="(auto-derived)" />
               <Button Grid.Column="2" Content="Save as…" Click="BrowseDcOutput_Click" Margin="6,0,0,0" />
             </Grid>
             <Button Content="Decompress" Command="{Binding RunDecompressCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
@@ -257,7 +257,7 @@
             </StackPanel>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="JSON report" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding VaReport}" Watermark="(optional) report.json" />
+              <TextBox Grid.Column="1" Text="{Binding VaReport}" PlaceholderText="(optional) report.json" />
               <Button Grid.Column="2" Content="Save as…" Click="BrowseVaReport_Click" Margin="6,0,0,0" />
             </Grid>
             <Button Content="Validate conversion" Command="{Binding RunValidateCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
@@ -290,7 +290,7 @@
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Destination (-d)" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding BaDest}" Watermark="(extract/rewrite outputs)" />
+              <TextBox Grid.Column="1" Text="{Binding BaDest}" PlaceholderText="(extract/rewrite outputs)" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseBaDest_Click" Margin="6,0,0,0" />
             </Grid>
             <TextBlock Classes="hint" Text="Processes every .iso in the directory (extract, list, tree, rewrite, audit)." />
@@ -305,7 +305,7 @@
             <TextBlock Classes="section" Text="XISOSharp CLI" />
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="CLI path" VerticalAlignment="Center" />
-              <TextBox Grid.Column="1" Text="{Binding CliPath}" Watermark="(auto-detect)" />
+              <TextBox Grid.Column="1" Text="{Binding CliPath}" PlaceholderText="(auto-detect)" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseCliPath_Click" Margin="6,0,0,0" />
             </Grid>
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">

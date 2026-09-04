@@ -30,7 +30,10 @@ public sealed class WaxGlob
     public string Pattern { get; }
 
     /// <summary>Returns true if <paramref name="candidate"/> matches the wax pattern.</summary>
-    public bool IsMatch(string candidate) => _regex.IsMatch(candidate);
+    public bool IsMatch(string candidate)
+    {
+        return _regex.IsMatch(candidate);
+    }
 
     /// <summary>
     /// Returns captures where index 0 is the whole match, 1..N are pattern captures.

@@ -1,5 +1,7 @@
 namespace ZARSharp.Zstd;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 /// <summary>
 /// zstd strategy selector. Upstream level 6 uses a binary-tree lazy strategy
 /// (<c>clevels.h</c>); this port maps levels 1–2 → fast/double-fast
@@ -63,18 +65,16 @@ public sealed class ZstdCompressor : IZarBlockCompressor
     private const int WindowLog = 17; // Covers 64 KiB blocks (window 128 KiB).
     private const int MaxChunk = 65536; // One independent block per 64 KiB.
 
-    private readonly ZstdCompressionOptions _options;
-
     /// <summary>Creates a compressor (default level 6).</summary>
     public ZstdCompressor(ZstdCompressionOptions? options = null)
     {
-        _options = options ?? new ZstdCompressionOptions();
-        ArgumentOutOfRangeException.ThrowIfLessThan(_options.Level, 1);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(_options.Level, 6);
+        Options = options ?? new ZstdCompressionOptions();
+        ArgumentOutOfRangeException.ThrowIfLessThan(Options.Level, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(Options.Level, 6);
     }
 
     /// <summary>Options in effect.</summary>
-    public ZstdCompressionOptions Options => _options;
+    public ZstdCompressionOptions Options { get; }
 
     /// <summary>
     /// Compresses <paramref name="source"/> as a single-shot frame into
@@ -84,7 +84,7 @@ public sealed class ZstdCompressor : IZarBlockCompressor
     /// </summary>
     public int Compress(ReadOnlySpan<byte> source, Span<byte> destination)
     {
-        byte[] frame = EncodeFrame(source, _options.Level, _options.ChecksumFlag);
+        var frame = EncodeFrame(source, Options.Level, Options.ChecksumFlag);
         if (frame.Length >= source.Length || frame.Length > destination.Length)
         {
             return -1;
@@ -100,7 +100,7 @@ public sealed class ZstdCompressor : IZarBlockCompressor
         ArgumentOutOfRangeException.ThrowIfNegative(sourceSize);
 
         // lib/zstd.h: ZSTD_COMPRESSBOUND(s) = s + (s>>8) + (s<128KB ? (128KB-s)>>11 : 0).
-        long bound = (long)sourceSize + (sourceSize >> 8);
+        var bound = (long)sourceSize + (sourceSize >> 8);
         if (sourceSize < 131072)
         {
             bound += (131072 - sourceSize) >> 11;
@@ -121,15 +121,17 @@ public sealed class ZstdCompressor : IZarBlockCompressor
     /// Decodable by <see cref="DecompressFrame"/>, the C# decoder, and native
     /// zstd.
     /// </summary>
-    public byte[] CompressBlock(ReadOnlySpan<byte> source) =>
-        EncodeFrame(source, _options.Level, _options.ChecksumFlag);
+    public byte[] CompressBlock(ReadOnlySpan<byte> source)
+    {
+        return EncodeFrame(source, Options.Level, Options.ChecksumFlag);
+    }
 
     /// <summary>Thin wrapper over the existing decoder ( Phase-0 harness convenience).</summary>
     public static byte[] DecompressFrame(ReadOnlySpan<byte> src, int maxSize)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maxSize);
-        byte[] copy = src.ToArray();
-        byte[] full = ZstdDecompressor.Decompress(copy);
+        var copy = src.ToArray();
+        var full = ZstdDecompressor.Decompress(copy);
         if (full.Length > maxSize)
         {
             throw new ZstdException("Decompressed size exceeds maximum.");
@@ -144,25 +146,25 @@ public sealed class ZstdCompressor : IZarBlockCompressor
 
     private static byte[] EncodeFrame(ReadOnlySpan<byte> src, int level, bool checksum)
     {
-        byte[] dst = new byte[GetCompressBound(src.Length)];
-        int pos = WriteFrameHeader(dst, 0, src.Length, checksum);
+        var dst = new byte[GetCompressBound(src.Length)];
+        var pos = WriteFrameHeader(dst, 0, src.Length, checksum);
 
         // Independent 64 KiB blocks (fresh tables each; repeat/treeless never
         // used, which is always legal). Repeat-offset history is frame-scoped
         // (RFC 8878 §4.1.1) and carried across blocks; resetting it per block
         // would corrupt repeat codes in later blocks. Empty input still emits
         // one empty last block — a frame with zero blocks would not decode.
-        uint[] rep = ZstdSeq.FreshRepeatOffsets();
-        int remaining = src.Length;
-        int inPos = 0;
+        var rep = ZstdSeq.FreshRepeatOffsets();
+        var remaining = src.Length;
+        var inPos = 0;
         do
         {
-            int chunk = Math.Min(remaining, MaxChunk);
-            bool last = chunk == remaining;
-            uint r0 = rep[0];
-            uint r1 = rep[1];
-            uint r2 = rep[2];
-            int blockSize = ZstdBlockEncoder.EncodeBlock(
+            var chunk = Math.Min(remaining, MaxChunk);
+            var last = chunk == remaining;
+            var r0 = rep[0];
+            var r1 = rep[1];
+            var r2 = rep[2];
+            var blockSize = ZstdBlockEncoder.EncodeBlock(
                 src.Slice(inPos, chunk), level, dst, pos, dst.Length - pos, last, rep);
             if (blockSize < 0 || blockSize >= chunk + 3)
             {
@@ -180,7 +182,7 @@ public sealed class ZstdCompressor : IZarBlockCompressor
                     throw new ZstdException("Frame destination too small.");
                 }
 
-                uint header = (last ? 1u : 0u) | ((uint)chunk << 3); // Type raw(0).
+                var header = (last ? 1u : 0u) | ((uint)chunk << 3); // Type raw(0).
                 dst[pos] = (byte)header;
                 dst[pos + 1] = (byte)(header >> 8);
                 dst[pos + 2] = (byte)(header >> 16);
@@ -195,7 +197,7 @@ public sealed class ZstdCompressor : IZarBlockCompressor
 
         if (checksum)
         {
-            uint csum = (uint)ZstdXxh64.Hash64(src.ToArray(), 0, src.Length);
+            var csum = (uint)ZstdXxh64.Hash64(src.ToArray(), 0, src.Length);
             if (pos + 4 > dst.Length)
             {
                 throw new ZstdException("Frame destination too small.");
@@ -222,17 +224,17 @@ public sealed class ZstdCompressor : IZarBlockCompressor
         // 2-byte FCS form holds size-256 in a u16 (max 65791); larger inputs
         // use the 4-byte form; sub-256-byte inputs omit FCS (still valid —
         // DecompressFrame does not need it).
-        int fcsFlag = contentSize < 256 ? 0 : contentSize <= 65791 ? 1 : 2;
+        var fcsFlag = contentSize < 256 ? 0 : contentSize <= 65791 ? 1 : 2;
         dst[offset] = (byte)(FrameMagic & 0xFF);
         dst[offset + 1] = (byte)((FrameMagic >> 8) & 0xFF);
         dst[offset + 2] = (byte)((FrameMagic >> 16) & 0xFF);
         dst[offset + 3] = (byte)((FrameMagic >> 24) & 0xFF);
         dst[offset + 4] = (byte)((fcsFlag << 6) | (checksum ? 0x04 : 0));
         dst[offset + 5] = (byte)((WindowLog - 10) << 3);
-        int pos = offset + 6;
+        var pos = offset + 6;
         if (fcsFlag == 1)
         {
-            int biased = contentSize - 256;
+            var biased = contentSize - 256;
             dst[pos] = (byte)biased;
             dst[pos + 1] = (byte)(biased >> 8);
             pos += 2;

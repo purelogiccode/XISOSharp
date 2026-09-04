@@ -1,5 +1,7 @@
 using System.Numerics;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 namespace ZARSharp.Zstd;
 
 /// <summary>
@@ -64,19 +66,25 @@ internal static class ZstdFseEncoder
             return NCountBound;
         }
 
-        return (((maxSymbolValue + 1) * tableLog + 4 + 2) / 8) + 1 + 2;
+        return ((((maxSymbolValue + 1) * tableLog) + 4 + 2) / 8) + 1 + 2;
     }
 
     /// <summary>
     /// Worst-case size of an <see cref="Encode"/>d symbol stream without its
     /// distribution header (<c>FSE_BLOCKBOUND</c>). Size encode buffers with this.
     /// </summary>
-    public static int BlockBound(int srcSize) => srcSize + (srcSize >> 7) + 4 + 8;
+    public static int BlockBound(int srcSize)
+    {
+        return srcSize + (srcSize >> 7) + 4 + 8;
+    }
 
     /// <summary>
     /// Worst-case size of header plus stream (<c>FSE_COMPRESSBOUND</c>).
     /// </summary>
-    public static int CompressBound(int srcSize) => NCountBound + BlockBound(srcSize);
+    public static int CompressBound(int srcSize)
+    {
+        return NCountBound + BlockBound(srcSize);
+    }
 
     /// <summary>
     /// Minimum table log that can represent <paramref name="srcSize"/> symbols
@@ -87,8 +95,8 @@ internal static class ZstdFseEncoder
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(srcSize, 1);
 
-        uint minBitsSrc = (uint)BitOperations.Log2((uint)srcSize) + 1;
-        uint minBitsSymbols = (uint)BitOperations.Log2((uint)maxSymbolValue) + 2;
+        var minBitsSrc = (uint)BitOperations.Log2((uint)srcSize) + 1;
+        var minBitsSymbols = (uint)BitOperations.Log2((uint)maxSymbolValue) + 2;
         return (int)Math.Min(minBitsSrc, minBitsSymbols);
     }
 
@@ -97,8 +105,10 @@ internal static class ZstdFseEncoder
     /// at most <paramref name="maxTableLog"/> (or <see cref="DefaultTableLog"/>
     /// when 0), reduced for small inputs, raised to <see cref="MinTableLogFor"/>).
     /// </summary>
-    public static int OptimalTableLog(int maxTableLog, int srcSize, int maxSymbolValue) =>
-        OptimalTableLog(maxTableLog, srcSize, maxSymbolValue, minus: 2);
+    public static int OptimalTableLog(int maxTableLog, int srcSize, int maxSymbolValue)
+    {
+        return OptimalTableLog(maxTableLog, srcSize, maxSymbolValue, minus: 2);
+    }
 
     /// <summary>
     /// Optimal table log with an explicit accuracy reduction
@@ -110,9 +120,9 @@ internal static class ZstdFseEncoder
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(srcSize, 1);
 
-        uint maxBitsSrc = unchecked((uint)(BitOperations.Log2((uint)(srcSize - 1)) - minus));
-        uint tableLog = maxTableLog == 0 ? DefaultTableLog : (uint)maxTableLog;
-        uint minBits = (uint)MinTableLogFor(srcSize, maxSymbolValue);
+        var maxBitsSrc = unchecked((uint)(BitOperations.Log2((uint)(srcSize - 1)) - minus));
+        var tableLog = maxTableLog == 0 ? DefaultTableLog : (uint)maxTableLog;
+        var minBits = (uint)MinTableLogFor(srcSize, maxSymbolValue);
         if (maxBitsSrc < tableLog)
         {
             tableLog = maxBitsSrc;
@@ -179,14 +189,14 @@ internal static class ZstdFseEncoder
             throw new ZstdException("FSE tableLog too small for distribution.");
         }
 
-        short lowProbCount = useLowProbCount ? (short)-1 : (short)1;
-        ulong scale = 62UL - (uint)tableLog;
-        ulong step = (1UL << 62) / (uint)total;
-        ulong vStep = 1UL << (int)(scale - 20);
-        int stillToDistribute = 1 << tableLog;
+        var lowProbCount = useLowProbCount ? (short)-1 : (short)1;
+        var scale = 62UL - (uint)tableLog;
+        var step = (1UL << 62) / (uint)total;
+        var vStep = 1UL << (int)(scale - 20);
+        var stillToDistribute = 1 << tableLog;
         uint largest = 0;
         short largestP = 0;
-        uint lowThreshold = (uint)total >> tableLog;
+        var lowThreshold = (uint)total >> tableLog;
 
         for (uint s = 0; s <= (uint)maxSymbolValue; s++)
         {
@@ -208,10 +218,10 @@ internal static class ZstdFseEncoder
             }
             else
             {
-                short proba = (short)((count[s] * step) >> (int)scale);
+                var proba = (short)((count[s] * step) >> (int)scale);
                 if (proba < 8)
                 {
-                    ulong restToBeat = vStep * RtbTable[proba];
+                    var restToBeat = vStep * RtbTable[proba];
                     if ((count[s] * step) - ((ulong)(uint)proba << (int)scale) > restToBeat)
                     {
                         proba++;
@@ -246,10 +256,10 @@ internal static class ZstdFseEncoder
         short[] norm, int tableLog, uint[] count, int total,
         int maxSymbolValue, short lowProbCount)
     {
-        const short NotYetAssigned = -2;
+        const short notYetAssigned = -2;
         uint distributed = 0;
-        uint lowThreshold = (uint)total >> tableLog;
-        uint lowOne = (uint)(((ulong)(uint)total * 3) >> (tableLog + 1));
+        var lowThreshold = (uint)total >> tableLog;
+        var lowOne = (uint)(((ulong)(uint)total * 3) >> (tableLog + 1));
 
         for (uint s = 0; s <= (uint)maxSymbolValue; s++)
         {
@@ -275,10 +285,10 @@ internal static class ZstdFseEncoder
                 continue;
             }
 
-            norm[s] = NotYetAssigned;
+            norm[s] = notYetAssigned;
         }
 
-        uint toDistribute = unchecked((uint)((1 << tableLog) - (int)distributed));
+        var toDistribute = unchecked((uint)((1 << tableLog) - (int)distributed));
         if (toDistribute == 0)
         {
             return;
@@ -289,7 +299,7 @@ internal static class ZstdFseEncoder
             lowOne = (uint)((ulong)(uint)total * 3 / (toDistribute * 2));
             for (uint s = 0; s <= (uint)maxSymbolValue; s++)
             {
-                if (norm[s] == NotYetAssigned && count[s] <= lowOne)
+                if (norm[s] == notYetAssigned && count[s] <= lowOne)
                 {
                     norm[s] = 1;
                     distributed++;
@@ -332,18 +342,18 @@ internal static class ZstdFseEncoder
             return;
         }
 
-        ulong vStepLog = 62UL - (uint)tableLog;
-        ulong mid = (1UL << (int)(vStepLog - 1)) - 1;
-        ulong rStep = ((1UL << (int)vStepLog) * toDistribute + mid) / (uint)total;
-        ulong tmpTotal = mid;
+        var vStepLog = 62UL - (uint)tableLog;
+        var mid = (1UL << (int)(vStepLog - 1)) - 1;
+        var rStep = (((1UL << (int)vStepLog) * toDistribute) + mid) / (uint)total;
+        var tmpTotal = mid;
         for (uint s = 0; s <= (uint)maxSymbolValue; s++)
         {
-            if (norm[s] == NotYetAssigned)
+            if (norm[s] == notYetAssigned)
             {
-                ulong end = tmpTotal + (count[s] * rStep);
-                uint sStart = (uint)(tmpTotal >> (int)vStepLog);
-                uint sEnd = (uint)(end >> (int)vStepLog);
-                uint weight = sEnd - sStart;
+                var end = tmpTotal + (count[s] * rStep);
+                var sStart = (uint)(tmpTotal >> (int)vStepLog);
+                var sEnd = (uint)(end >> (int)vStepLog);
+                var weight = sEnd - sStart;
                 if (weight < 1)
                 {
                     throw new ZstdException("FSE normalization failed.");
@@ -383,19 +393,19 @@ internal static class ZstdFseEncoder
         var writer = new ForwardBitWriter(dst, offset, capacity);
         writer.AddBits((uint)(tableLog - MinTableLog), 4);
 
-        int tableSize = 1 << tableLog;
-        int remaining = tableSize + 1; // +1 for extra accuracy
-        int threshold = tableSize;
-        int nbBits = tableLog + 1;
-        int alphabetSize = maxSymbolValue + 1;
-        int symbol = 0;
-        bool previousIs0 = false;
+        var tableSize = 1 << tableLog;
+        var remaining = tableSize + 1; // +1 for extra accuracy
+        var threshold = tableSize;
+        var nbBits = tableLog + 1;
+        var alphabetSize = maxSymbolValue + 1;
+        var symbol = 0;
+        var previousIs0 = false;
 
         while (symbol < alphabetSize && remaining > 1)
         {
             if (previousIs0)
             {
-                int start = symbol;
+                var start = symbol;
                 while (symbol < alphabetSize && norm[symbol] == 0)
                 {
                     symbol++;
@@ -422,7 +432,7 @@ internal static class ZstdFseEncoder
             }
 
             int count = norm[symbol++];
-            int max = (2 * threshold - 1) - remaining;
+            var max = (2 * threshold) - 1 - remaining;
             remaining -= count < 0 ? -count : count;
             count++; // +1 for extra accuracy
             if (count >= threshold)
@@ -467,14 +477,14 @@ internal static class ZstdFseEncoder
 
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(maxSymbolValue, norm.Length);
 
-        int tableSize = 1 << tableLog;
-        int tableMask = tableSize - 1;
-        int maxSV1 = maxSymbolValue + 1;
-        int step = (tableSize >> 1) + (tableSize >> 3) + 3;
+        var tableSize = 1 << tableLog;
+        var tableMask = tableSize - 1;
+        var maxSv1 = maxSymbolValue + 1;
+        var step = (tableSize >> 1) + (tableSize >> 3) + 3;
 
         // Sanity: probabilities must sum to exactly tableSize (-1 counts 1).
         long total = 0;
-        for (int s = 0; s <= maxSymbolValue; s++)
+        for (var s = 0; s <= maxSymbolValue; s++)
         {
             if (norm[s] < -1)
             {
@@ -489,12 +499,12 @@ internal static class ZstdFseEncoder
             throw new ZstdException("Bad FSE distribution.");
         }
 
-        int[] tableSymbol = new int[tableSize];
-        int[] cumul = new int[maxSV1 + 1];
-        int highThreshold = tableSize - 1;
+        var tableSymbol = new int[tableSize];
+        var cumul = new int[maxSv1 + 1];
+        var highThreshold = tableSize - 1;
 
         // Symbol start positions; low-probability symbols take cells from the top.
-        for (int u = 1; u <= maxSV1; u++)
+        for (var u = 1; u <= maxSv1; u++)
         {
             if (norm[u - 1] == -1)
             {
@@ -507,15 +517,15 @@ internal static class ZstdFseEncoder
             }
         }
 
-        cumul[maxSV1] = tableSize + 1;
+        cumul[maxSv1] = tableSize + 1;
 
         // Spread symbols (general path; identical result to the unrolled
         // no-lowprob fast path in C, which is only a speed optimization).
-        int position = 0;
-        for (int symbol = 0; symbol < maxSV1; symbol++)
+        var position = 0;
+        for (var symbol = 0; symbol < maxSv1; symbol++)
         {
             int freq = norm[symbol];
-            for (int i = 0; i < freq; i++)
+            for (var i = 0; i < freq; i++)
             {
                 tableSymbol[position] = symbol;
                 position = (position + step) & tableMask;
@@ -532,18 +542,18 @@ internal static class ZstdFseEncoder
         }
 
         // TableU16: next-state values sorted by symbol order.
-        int[] stateTable = new int[tableSize];
-        for (int u = 0; u < tableSize; u++)
+        var stateTable = new int[tableSize];
+        for (var u = 0; u < tableSize; u++)
         {
-            int s = tableSymbol[u];
+            var s = tableSymbol[u];
             stateTable[cumul[s]++] = tableSize + u;
         }
 
         // Symbol transformation table.
-        uint[] deltaNbBits = new uint[maxSV1];
-        int[] deltaFindState = new int[maxSV1];
+        var deltaNbBits = new uint[maxSv1];
+        var deltaFindState = new int[maxSv1];
         uint distributed = 0;
-        for (int s = 0; s <= maxSymbolValue; s++)
+        for (var s = 0; s <= maxSymbolValue; s++)
         {
             switch (norm[s])
             {
@@ -559,8 +569,8 @@ internal static class ZstdFseEncoder
                     break;
                 default:
                 {
-                    uint maxBitsOut = (uint)(tableLog - BitOperations.Log2((uint)norm[s] - 1));
-                    uint minStatePlus = (uint)norm[s] << (int)maxBitsOut;
+                    var maxBitsOut = (uint)(tableLog - BitOperations.Log2((uint)norm[s] - 1));
+                    var minStatePlus = (uint)norm[s] << (int)maxBitsOut;
                     deltaNbBits[s] = (maxBitsOut << 16) - minStatePlus;
                     deltaFindState[s] = (int)(distributed - (uint)norm[s]);
                     distributed += (uint)norm[s];
@@ -589,7 +599,7 @@ internal static class ZstdFseEncoder
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
 
         symbol = src[offset];
-        for (int i = 1; i < length; i++)
+        for (var i = 1; i < length; i++)
         {
             if (src[offset + i] != symbol)
             {
@@ -642,12 +652,12 @@ internal static class ZstdFseEncoder
             return -1; // Mirrors BIT_initCStream failure → compress returns 0.
         }
 
-        int tableLog = ct.TableLog;
-        long state1 = 1L << tableLog;
-        long state2 = 1L << tableLog;
+        var tableLog = ct.TableLog;
+        var state1 = 1L << tableLog;
+        var state2 = 1L << tableLog;
 
-        int ip = srcOffset + srcLength; // One past the end; moves backwards.
-        int istart = srcOffset;
+        var ip = srcOffset + srcLength; // One past the end; moves backwards.
+        var istart = srcOffset;
 
         if ((srcLength & 1) == 1)
         {
@@ -663,7 +673,7 @@ internal static class ZstdFseEncoder
         }
 
         // Join to mod 4 (64-bit container: 4 symbols per steady-state loop).
-        int srcSize = srcLength - 2;
+        var srcSize = srcLength - 2;
         if ((srcSize & 2) != 0)
         {
             state2 = EncodeSymbol(bitC, ct, state2, src[--ip]);
@@ -703,14 +713,17 @@ internal static class ZstdFseEncoder
     /// single-symbol alphabets, which still occupy a state slot in the shared
     /// sequence bitstream.
     /// </summary>
-    internal static FseCTable RleTable(int symbol) => new()
+    internal static FseCTable RleTable(int symbol)
     {
-        TableLog = 0,
-        MaxSymbolValue = symbol,
-        StateTable = [0],
-        DeltaNbBits = new uint[symbol + 1],
-        DeltaFindState = new int[symbol + 1],
-    };
+        return new FseCTable
+        {
+            TableLog = 0,
+            MaxSymbolValue = symbol,
+            StateTable = [0],
+            DeltaNbBits = new uint[symbol + 1],
+            DeltaFindState = new int[symbol + 1],
+        };
+    }
 
     /// <summary>
     /// Single-state initializer (<c>FSE_initCState2</c>) for encoders that share
@@ -769,9 +782,9 @@ internal static class ZstdFseEncoder
             throw new ZstdException("FSE symbol out of range.");
         }
 
-        uint deltaNbBits = ct.DeltaNbBits[symbol];
-        int nbBitsOut = (int)((deltaNbBits + (1 << 15)) >> 16);
-        long value = ((long)nbBitsOut << 16) - deltaNbBits;
+        var deltaNbBits = ct.DeltaNbBits[symbol];
+        var nbBitsOut = (int)((deltaNbBits + (1 << 15)) >> 16);
+        var value = ((long)nbBitsOut << 16) - deltaNbBits;
         return ct.StateTable[(int)((value >> nbBitsOut) + ct.DeltaFindState[symbol])];
     }
 
@@ -783,8 +796,8 @@ internal static class ZstdFseEncoder
             throw new ZstdException("FSE symbol out of range.");
         }
 
-        uint deltaNbBits = ct.DeltaNbBits[symbol];
-        int nbBitsOut = (int)((state + deltaNbBits) >> 16);
+        var deltaNbBits = ct.DeltaNbBits[symbol];
+        var nbBitsOut = (int)((state + deltaNbBits) >> 16);
         bitC.AddBits((ulong)state, nbBitsOut);
         return ct.StateTable[(int)((state >> nbBitsOut) + ct.DeltaFindState[symbol])];
     }

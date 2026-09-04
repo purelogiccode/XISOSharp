@@ -39,14 +39,18 @@ public sealed class ZArchiveReader : IDisposable
         }
     }
 
+    /// <summary>One cached decompressed 64 KiB block with its block index.</summary>
     private sealed class CacheBlock
     {
+        /// <summary>Decompressed block data (always 64 KiB).</summary>
         public readonly byte[] Data = new byte[ZArchiveCommon.CompressedBlockSize];
+
+        /// <summary>Cached block index, or <see cref="ulong.MaxValue"/> when empty.</summary>
         public ulong BlockIndex = ulong.MaxValue;
     }
 
 #if NET9_0_OR_GREATER
-    private readonly System.Threading.Lock _mutex = new();
+    private readonly Lock _mutex = new();
 #else
     private readonly object _mutex = new();
 #endif
@@ -80,7 +84,7 @@ public sealed class ZArchiveReader : IDisposable
         _blockCount = (ulong)offsetRecords.Length * (ulong)ZArchiveCommon.EntriesPerOffsetRecord;
 
         // 4 MiB LRU cache = 64 x 64 KiB blocks.
-        for (int i = 0; i < 64; i++)
+        for (var i = 0; i < 64; i++)
         {
             _lruChain.AddLast(new CacheBlock());
         }
@@ -115,24 +119,24 @@ public sealed class ZArchiveReader : IDisposable
     {
         try
         {
-            if (stream is null || !stream.CanRead || !stream.CanSeek)
+            if (stream?.CanRead != true || !stream.CanSeek)
             {
                 return null;
             }
 
-            ulong fileSize = (ulong)stream.Length;
+            var fileSize = (ulong)stream.Length;
             if (fileSize <= (ulong)Footer.SizeOnDisk)
             {
                 return null;
             }
 
-            byte[] footerBytes = new byte[Footer.SizeOnDisk];
+            var footerBytes = new byte[Footer.SizeOnDisk];
             if (!TryReadAt(stream, (long)(fileSize - (ulong)Footer.SizeOnDisk), footerBytes, 0, footerBytes.Length))
             {
                 return null;
             }
 
-            Footer footer = Footer.ReadFrom(footerBytes);
+            var footer = Footer.ReadFrom(footerBytes);
             if (footer.Magic != Footer.KMagic ||
                 footer.Version != Footer.KVersion1 ||
                 footer.TotalSize != fileSize)
@@ -163,7 +167,7 @@ public sealed class ZArchiveReader : IDisposable
                 return null;
             }
 
-            long numOffsetRecords =
+            var numOffsetRecords =
                 (long)(footer.SectionOffsetRecords.Size / (ulong)CompressionOffsetRecord.SizeOnDisk);
             if (numOffsetRecords == 0)
             {
@@ -175,7 +179,7 @@ public sealed class ZArchiveReader : IDisposable
                 return null;
             }
 
-            byte[] offsetBytes = new byte[(int)footer.SectionOffsetRecords.Size];
+            var offsetBytes = new byte[(int)footer.SectionOffsetRecords.Size];
             if (!TryReadAt(stream, (long)footer.SectionOffsetRecords.Offset, offsetBytes, 0, offsetBytes.Length))
             {
                 return null;
@@ -194,7 +198,7 @@ public sealed class ZArchiveReader : IDisposable
                 return null;
             }
 
-            byte[] nameTable = new byte[(int)footer.SectionNames.Size];
+            var nameTable = new byte[(int)footer.SectionNames.Size];
             if (nameTable.Length > 0 &&
                 !TryReadAt(stream, (long)footer.SectionNames.Offset, nameTable, 0, nameTable.Length))
             {
@@ -207,7 +211,7 @@ public sealed class ZArchiveReader : IDisposable
                 return null;
             }
 
-            long numEntries = (long)(footer.SectionFileTree.Size / (ulong)FileDirectoryEntry.SizeOnDisk);
+            var numEntries = (long)(footer.SectionFileTree.Size / (ulong)FileDirectoryEntry.SizeOnDisk);
             if (numEntries == 0 || numEntries > int.MaxValue)
             {
                 return null;
@@ -218,7 +222,7 @@ public sealed class ZArchiveReader : IDisposable
                 return null;
             }
 
-            byte[] treeBytes = new byte[(int)footer.SectionFileTree.Size];
+            var treeBytes = new byte[(int)footer.SectionFileTree.Size];
             if (!TryReadAt(stream, (long)footer.SectionFileTree.Offset, treeBytes, 0, treeBytes.Length))
             {
                 return null;
@@ -269,10 +273,10 @@ public sealed class ZArchiveReader : IDisposable
         try
         {
             stream.Seek(offset, SeekOrigin.Begin);
-            int total = 0;
+            var total = 0;
             while (total < count)
             {
-                int read = stream.Read(buffer, bufferOffset + total, count - total);
+                var read = stream.Read(buffer, bufferOffset + total, count - total);
                 if (read == 0)
                 {
                     return false;
@@ -308,8 +312,8 @@ public sealed class ZArchiveReader : IDisposable
             return string.Empty;
         }
 
-        int offset = (int)nameOffset;
-        int nameLength = nameTable[offset] & 0x7F;
+        var offset = (int)nameOffset;
+        var nameLength = nameTable[offset] & 0x7F;
         if ((nameTable[offset] & 0x80) != 0)
         {
             // Extended 2-byte length (with the upstream quirk).
@@ -323,7 +327,7 @@ public sealed class ZArchiveReader : IDisposable
         }
         else
         {
-            offset += 1;
+            offset++;
         }
 
         if (nameLength < 0 || offset + nameLength > nameTable.Length)
@@ -343,8 +347,8 @@ public sealed class ZArchiveReader : IDisposable
             return null;
         }
 
-        int offset = (int)nameOffset;
-        int nameLength = nameTable[offset] & 0x7F;
+        var offset = (int)nameOffset;
+        var nameLength = nameTable[offset] & 0x7F;
         if ((nameTable[offset] & 0x80) != 0)
         {
             if (offset + 1 >= nameTable.Length)
@@ -357,7 +361,7 @@ public sealed class ZArchiveReader : IDisposable
         }
         else
         {
-            offset += 1;
+            offset++;
         }
 
         if (nameLength < 0 || offset + nameLength > nameTable.Length)
@@ -393,8 +397,8 @@ public sealed class ZArchiveReader : IDisposable
 
         // Byte-faithful walk: encode the path as Windows-1252 (separators
         // are ASCII and survive the codec) and compare raw name bytes.
-        byte[] pathBytes = ZArchiveCommon.Encode1252(path.AsSpan());
-        int pos = 0;
+        var pathBytes = ZArchiveCommon.Encode1252(path.AsSpan());
+        var pos = 0;
         uint currentNode = 0;
         while (true)
         {
@@ -409,7 +413,7 @@ public sealed class ZArchiveReader : IDisposable
                 return currentNode; // end of path
             }
 
-            int nodeStart = pos;
+            var nodeStart = pos;
             while (pos < pathBytes.Length && pathBytes[pos] != (byte)'/' && pathBytes[pos] != (byte)'\\')
             {
                 pos++;
@@ -421,15 +425,15 @@ public sealed class ZArchiveReader : IDisposable
                 return InvalidNode;
             }
 
-            FileDirectoryEntry entry = _fileTree[currentNode];
+            var entry = _fileTree[currentNode];
             if (entry.IsFile)
             {
                 return InvalidNode; // trying to iterate a file
             }
 
-            uint index = entry.NodeStartIndex;
-            uint endIndex = entry.NodeStartIndex + entry.Count;
-            uint match = InvalidNode;
+            var index = entry.NodeStartIndex;
+            var endIndex = entry.NodeStartIndex + entry.Count;
+            var match = InvalidNode;
             while (index < endIndex)
             {
                 if (index >= (uint)_fileTree.Length)
@@ -437,8 +441,8 @@ public sealed class ZArchiveReader : IDisposable
                     return InvalidNode;
                 }
 
-                FileDirectoryEntry child = _fileTree[index];
-                byte[]? childName = GetNameRaw(_nameTable, child.NameOffset, out int childLen);
+                var child = _fileTree[index];
+                var childName = GetNameRaw(_nameTable, child.NameOffset, out var childLen);
                 if (childName is not null &&
                     ZArchiveCommon.CompareNodeNameBool(nodeName, childName.AsSpan(0, childLen)))
                 {
@@ -459,12 +463,16 @@ public sealed class ZArchiveReader : IDisposable
     }
 
     /// <summary>True when <paramref name="node"/> is a directory.</summary>
-    public bool IsDirectory(uint node) =>
-        node < (uint)_fileTree.Length && !_fileTree[node].IsFile;
+    public bool IsDirectory(uint node)
+    {
+        return node < (uint)_fileTree.Length && !_fileTree[node].IsFile;
+    }
 
     /// <summary>True when <paramref name="node"/> is a file.</summary>
-    public bool IsFile(uint node) =>
-        node < (uint)_fileTree.Length && _fileTree[node].IsFile;
+    public bool IsFile(uint node)
+    {
+        return node < (uint)_fileTree.Length && _fileTree[node].IsFile;
+    }
 
     /// <summary>Child count (0 for files and invalid handles).</summary>
     public uint GetDirEntryCount(uint node)
@@ -486,20 +494,20 @@ public sealed class ZArchiveReader : IDisposable
             return false;
         }
 
-        FileDirectoryEntry dir = _fileTree[node];
+        var dir = _fileTree[node];
         if (index >= dir.Count)
         {
             return false;
         }
 
-        uint childIndex = dir.NodeStartIndex + index;
+        var childIndex = dir.NodeStartIndex + index;
         if (childIndex >= (uint)_fileTree.Length)
         {
             return false;
         }
 
-        FileDirectoryEntry child = _fileTree[childIndex];
-        string name = GetName(_nameTable, child.NameOffset);
+        var child = _fileTree[childIndex];
+        var name = GetName(_nameTable, child.NameOffset);
         if (name.Length == 0)
         {
             return false; // bad name (also rejects the ≥0x80-char quirk names)
@@ -535,29 +543,29 @@ public sealed class ZArchiveReader : IDisposable
         lock (_mutex)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            FileDirectoryEntry file = _fileTree[node];
+            var file = _fileTree[node];
             if (!file.IsFile)
             {
                 return 0;
             }
 
-            ulong fileOffset = file.GetFileOffset();
-            ulong fileSize = file.GetFileSize();
+            var fileOffset = file.GetFileOffset();
+            var fileSize = file.GetFileSize();
             if (offset >= fileSize)
             {
                 return 0;
             }
 
-            ulong bytesToRead = Math.Min((ulong)buffer.Length, fileSize - offset);
-            ulong rawReadOffset = fileOffset + offset;
-            ulong remaining = bytesToRead;
-            int bufferPos = 0;
+            var bytesToRead = Math.Min((ulong)buffer.Length, fileSize - offset);
+            var rawReadOffset = fileOffset + offset;
+            var remaining = bytesToRead;
+            var bufferPos = 0;
             while (remaining > 0)
             {
-                ulong blockIndex = rawReadOffset / (ulong)ZArchiveCommon.CompressedBlockSize;
-                uint blockOffset = (uint)(rawReadOffset % (ulong)ZArchiveCommon.CompressedBlockSize);
-                uint step = (uint)Math.Min(remaining, (ulong)ZArchiveCommon.CompressedBlockSize - blockOffset);
-                CacheBlock? block = GetCachedBlock(blockIndex);
+                var blockIndex = rawReadOffset / (ulong)ZArchiveCommon.CompressedBlockSize;
+                var blockOffset = (uint)(rawReadOffset % (ulong)ZArchiveCommon.CompressedBlockSize);
+                var step = (uint)Math.Min(remaining, (ulong)ZArchiveCommon.CompressedBlockSize - blockOffset);
+                var block = GetCachedBlock(blockIndex);
                 if (block is null)
                 {
                     return 0;
@@ -576,14 +584,14 @@ public sealed class ZArchiveReader : IDisposable
     /// <summary>Reads a whole file into a new array (empty when invalid).</summary>
     public byte[] ReadFile(uint node)
     {
-        ulong size = GetFileSize(node);
+        var size = GetFileSize(node);
         if (size > int.MaxValue)
         {
             throw new InvalidOperationException("File too large to read into memory.");
         }
 
-        byte[] buffer = new byte[(int)size];
-        ulong read = ReadFromFile(node, 0, buffer);
+        var buffer = new byte[(int)size];
+        var read = ReadFromFile(node, 0, buffer);
         if (read != size)
         {
             throw new IOException("Failed to read file from archive.");
@@ -598,9 +606,9 @@ public sealed class ZArchiveReader : IDisposable
 
     private CacheBlock? GetCachedBlock(ulong blockIndex)
     {
-        if (_blockLookup.TryGetValue(blockIndex, out LinkedListNode<CacheBlock>? node))
+        if (_blockLookup.TryGetValue(blockIndex, out var node))
         {
-            MarkBlockAsMRU(node);
+            MarkBlockAsMru(node);
             return node.Value;
         }
 
@@ -609,11 +617,11 @@ public sealed class ZArchiveReader : IDisposable
             return null;
         }
 
-        LinkedListNode<CacheBlock> recycled = _lruChain.First!;
+        var recycled = _lruChain.First!;
         _blockLookup.Remove(recycled.Value.BlockIndex);
         recycled.Value.BlockIndex = blockIndex;
         _blockLookup[blockIndex] = recycled;
-        MarkBlockAsMRU(recycled);
+        MarkBlockAsMru(recycled);
         if (!LoadBlock(recycled.Value))
         {
             _blockLookup.Remove(blockIndex);
@@ -624,7 +632,7 @@ public sealed class ZArchiveReader : IDisposable
         return recycled.Value;
     }
 
-    private void MarkBlockAsMRU(LinkedListNode<CacheBlock> node)
+    private void MarkBlockAsMru(LinkedListNode<CacheBlock> node)
     {
         if (node.List is null || _lruChain.Last == node)
         {
@@ -637,27 +645,27 @@ public sealed class ZArchiveReader : IDisposable
 
     private bool LoadBlock(CacheBlock block)
     {
-        ulong recordIndex = block.BlockIndex / (ulong)ZArchiveCommon.EntriesPerOffsetRecord;
-        ulong recordSubIndex = block.BlockIndex % (ulong)ZArchiveCommon.EntriesPerOffsetRecord;
+        var recordIndex = block.BlockIndex / (ulong)ZArchiveCommon.EntriesPerOffsetRecord;
+        var recordSubIndex = block.BlockIndex % (ulong)ZArchiveCommon.EntriesPerOffsetRecord;
         if (recordIndex >= (ulong)_offsetRecords.Length)
         {
             return false;
         }
 
-        CompressionOffsetRecord record = _offsetRecords[recordIndex];
-        ulong offset = record.BaseOffset;
+        var record = _offsetRecords[recordIndex];
+        var offset = record.BaseOffset;
         for (ulong i = 0; i < recordSubIndex; i++)
         {
             offset += (ulong)record.Sizes[i] + 1;
         }
 
-        uint compressedSize = (uint)record.Sizes[recordSubIndex] + 1;
+        var compressedSize = (uint)record.Sizes[recordSubIndex] + 1;
         if (offset + compressedSize > _compressedDataSize)
         {
             return false;
         }
 
-        ulong fileOffset = _compressedDataOffset + offset;
+        var fileOffset = _compressedDataOffset + offset;
         if (compressedSize == (uint)ZArchiveCommon.CompressedBlockSize)
         {
             // Raw block: read directly.
@@ -671,7 +679,7 @@ public sealed class ZArchiveReader : IDisposable
 
         try
         {
-            byte[] src = new byte[compressedSize];
+            var src = new byte[compressedSize];
             Array.Copy(_blockDecompressionBuffer, src, (int)compressedSize);
             ZstdDecompressor.DecompressExact(src, 0, (int)compressedSize, block.Data, 0, block.Data.Length);
             return true;

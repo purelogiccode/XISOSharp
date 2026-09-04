@@ -61,9 +61,15 @@ public class CisoTests : IDisposable
         return outPath;
     }
 
-    private static byte[] ComputeSha256(string path) => SHA256.HashData(File.ReadAllBytes(path));
+    private static byte[] ComputeSha256(string path)
+    {
+        return SHA256.HashData(File.ReadAllBytes(path));
+    }
 
-    private static byte[] ComputeSha256Bytes(byte[] data) => SHA256.HashData(data);
+    private static byte[] ComputeSha256Bytes(byte[] data)
+    {
+        return SHA256.HashData(data);
+    }
 
     [Fact]
     public void CompressToCso_FromIsoFile_ProducesCsoAndIsCsoTrue()
@@ -754,7 +760,7 @@ public class CisoTests : IDisposable
         var parts = SplitParts(csoPath);
         Assert.True(parts.Count >= 2);
 
-        using var dev = new XISOSharp.BlockDevice.CisoBlockDevice(parts[0]);
+        using var dev = new BlockDevice.CisoBlockDevice(parts[0]);
         Assert.Equal(isoBytes.Length, dev.Length);
 
         var buf = new byte[4096];

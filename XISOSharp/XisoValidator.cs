@@ -113,7 +113,7 @@ public static class XisoValidator
         }
 
         // Check for missing files (in source but not in output)
-        foreach ((var path, FileTreeEntry entry) in sourceDict)
+        foreach ((var path, var entry) in sourceDict)
         {
             if (!outputDict.ContainsKey(path))
             {
@@ -128,7 +128,7 @@ public static class XisoValidator
         }
 
         // Check for extra files (in output but not in source)
-        foreach ((var path, FileTreeEntry entry) in outputDict)
+        foreach ((var path, var entry) in outputDict)
         {
             if (!sourceDict.ContainsKey(path))
             {
@@ -143,7 +143,7 @@ public static class XisoValidator
         }
 
         // Check file sizes and optionally checksums for files present in both
-        foreach ((var path, FileTreeEntry srcEntry) in sourceDict)
+        foreach ((var path, var srcEntry) in sourceDict)
         {
             if (!outputDict.TryGetValue(path, out var outEntry))
                 continue;
@@ -325,9 +325,6 @@ public static class XisoValidator
         string outputPath,
         string reportPath)
     {
-        static string? Hex(byte[]? hash) =>
-            hash != null ? Convert.ToHexString(hash).ToLowerInvariant() : null;
-
         var report = new ValidationReport(
             new ValidationReportSide(sourcePath, result.SourceFileCount, result.SourceDirCount,
                 result.SourceTotalBytes),
@@ -350,5 +347,11 @@ public static class XisoValidator
         });
         var json = JsonSerializer.Serialize(report, context.ValidationReport);
         File.WriteAllText(reportPath, json, Encoding.UTF8);
+        return;
+
+        static string? Hex(byte[]? hash)
+        {
+            return hash != null ? Convert.ToHexString(hash).ToLowerInvariant() : null;
+        }
     }
 }

@@ -1,6 +1,7 @@
-using XISOSharp;
-
 namespace XISOSharp.Cli;
+
+using Serilog;
+using Logging;
 
 /// <summary>
 /// Input==output refusal checks (TODO #15, xdvdfs #36). Each check returns the
@@ -23,12 +24,21 @@ internal static class CliOutputGuard
     /// </summary>
     public static string? CheckMisplacedFlag(string? token)
     {
-        if (string.IsNullOrEmpty(token) || !MisplacedFlags.Contains(token))
-            return null;
+        try
+        {
+            if (string.IsNullOrEmpty(token) || !MisplacedFlags.Contains(token))
+                return null;
 
-        return $"Error: {token} must come before ISO filenames" +
-               $" (e.g. -x {token} <value> game.iso);" +
-               " a flag after the first filename is read as a filename\n";
+            return $"Error: {token} must come before ISO filenames" +
+                   $" (e.g. -x {token} <value> game.iso);" +
+                   " a flag after the first filename is read as a filename\n";
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "CheckMisplacedFlag failed");
+            BugReporter.ReportException(ex, "CheckMisplacedFlag failed");
+            return null;
+        }
     }
 
     private static readonly HashSet<string> MisplacedFlags = new(StringComparer.Ordinal)
@@ -53,22 +63,31 @@ internal static class CliOutputGuard
     /// </summary>
     public static string? CheckRewriteOutput(string xisoPath, string? outputName)
     {
-        if (string.IsNullOrWhiteSpace(outputName))
+        try
+        {
+            if (string.IsNullOrWhiteSpace(outputName))
+                return null;
+
+            if (XisoPaths.AreSamePath(xisoPath, outputName))
+            {
+                return $"Error: rewrite output {outputName} is the same file as the input;" +
+                       " omit -o to rewrite in place\n";
+            }
+
+            if (XisoPaths.AreSamePath(xisoPath + ".old", outputName))
+            {
+                return $"Error: rewrite output {outputName} would overwrite the {xisoPath}.old backup;" +
+                       " choose another name\n";
+            }
+
             return null;
-
-        if (XisoPaths.AreSamePath(xisoPath, outputName))
-        {
-            return $"Error: rewrite output {outputName} is the same file as the input;" +
-                   " omit -o to rewrite in place\n";
         }
-
-        if (XisoPaths.AreSamePath(xisoPath + ".old", outputName))
+        catch (Exception ex)
         {
-            return $"Error: rewrite output {outputName} would overwrite the {xisoPath}.old backup;" +
-                   " choose another name\n";
+            Log.Error(ex, "CheckRewriteOutput failed for {Input}", xisoPath);
+            BugReporter.ReportException(ex, $"CheckRewriteOutput failed for {xisoPath}");
+            return null;
         }
-
-        return null;
     }
 
     /// <summary>
@@ -77,16 +96,25 @@ internal static class CliOutputGuard
     /// </summary>
     public static string? CheckSingleInputOutput(string input, string? outputName)
     {
-        if (string.IsNullOrWhiteSpace(outputName))
-            return null;
-
-        if (XisoPaths.AreSamePath(input, outputName))
+        try
         {
-            return $"Error: -o output {outputName} is the same file as the input {input};" +
-                   " choose another name\n";
-        }
+            if (string.IsNullOrWhiteSpace(outputName))
+                return null;
 
-        return null;
+            if (XisoPaths.AreSamePath(input, outputName))
+            {
+                return $"Error: -o output {outputName} is the same file as the input {input};" +
+                       " choose another name\n";
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "CheckSingleInputOutput failed for {Input}", input);
+            BugReporter.ReportException(ex, $"CheckSingleInputOutput failed for {input}");
+            return null;
+        }
     }
 
     /// <summary>
@@ -96,23 +124,32 @@ internal static class CliOutputGuard
     public static string? CheckRebuildOutput(string output, string? securitySectorsPath,
         params string?[] parts)
     {
-        foreach (var part in parts)
+        try
         {
-            if (!string.IsNullOrWhiteSpace(part) && XisoPaths.AreSamePath(part, output))
+            foreach (var part in parts)
             {
-                return $"Error: rebuild output {output} is the same file as input {part};" +
+                if (!string.IsNullOrWhiteSpace(part) && XisoPaths.AreSamePath(part, output))
+                {
+                    return $"Error: rebuild output {output} is the same file as input {part};" +
+                           " choose another name\n";
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(securitySectorsPath) &&
+                XisoPaths.AreSamePath(securitySectorsPath, output))
+            {
+                return $"Error: rebuild output {output} is the same file as the sectors file {securitySectorsPath};" +
                        " choose another name\n";
             }
-        }
 
-        if (!string.IsNullOrWhiteSpace(securitySectorsPath) &&
-            XisoPaths.AreSamePath(securitySectorsPath, output))
+            return null;
+        }
+        catch (Exception ex)
         {
-            return $"Error: rebuild output {output} is the same file as the sectors file {securitySectorsPath};" +
-                   " choose another name\n";
+            Log.Error(ex, "CheckRebuildOutput failed for {Output}", output);
+            BugReporter.ReportException(ex, $"CheckRebuildOutput failed for {output}");
+            return null;
         }
-
-        return null;
     }
 
     /// <summary>
@@ -122,12 +159,21 @@ internal static class CliOutputGuard
     /// </summary>
     public static string? CheckImageOutput(string source, string output)
     {
-        if (XisoPaths.AreSamePath(source, output))
+        try
         {
-            return $"Error: output {output} is the same file as the input {source};" +
-                   " choose another name\n";
-        }
+            if (XisoPaths.AreSamePath(source, output))
+            {
+                return $"Error: output {output} is the same file as the input {source};" +
+                       " choose another name\n";
+            }
 
-        return null;
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "CheckImageOutput failed for {Source}", source);
+            BugReporter.ReportException(ex, $"CheckImageOutput failed for {source}");
+            return null;
+        }
     }
 }

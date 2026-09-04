@@ -41,7 +41,10 @@ public sealed class UnpackOptions
     internal List<ExtractFileException> Failures { get; } = [];
 
     /// <summary>Records a per-file failure for the end-of-run summary.</summary>
-    internal void RecordFailure(ExtractFileException failure) => Failures.Add(failure);
+    internal void RecordFailure(ExtractFileException failure)
+    {
+        Failures.Add(failure);
+    }
 
     /// <summary>
     /// Throws an <see cref="ExtractErrorException"/> with code

@@ -667,7 +667,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         // Output must open in the real reader with all three files present.
         using var reader = ZARSharp.ZArchiveReader.TryOpen(zar);
         Assert.NotNull(reader);
-        Assert.Equal(10000UL, reader!.GetFileSize(reader.LookUp("a.txt")));
+        Assert.Equal(10000UL, reader.GetFileSize(reader.LookUp("a.txt")));
         Assert.Equal(70000UL, reader.GetFileSize(reader.LookUp("b.txt")));
         Assert.Equal(150000UL, reader.GetFileSize(reader.LookUp("sub/big.bin")));
     }

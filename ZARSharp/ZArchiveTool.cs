@@ -46,16 +46,16 @@ public static class ZArchiveTool
         {
             using var output = new FileStream(outputFile, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536);
             using var writer = new ZArchiveWriter(output, compressor);
-            byte[] buffer = new byte[ZArchiveCommon.CompressedBlockSize];
+            var buffer = new byte[ZArchiveCommon.CompressedBlockSize];
 
             // Deterministic order (the C++ iterator order is unspecified).
             var entries = Directory.EnumerateFileSystemEntries(inputDirectory, "*", SearchOption.AllDirectories)
                 .OrderBy(p => p, StringComparer.Ordinal)
                 .ToList();
 
-            foreach (string entry in entries)
+            foreach (var entry in entries)
             {
-                string relative = Path.GetRelativePath(inputDirectory, entry).Replace('\\', '/');
+                var relative = Path.GetRelativePath(inputDirectory, entry).Replace('\\', '/');
                 if (Directory.Exists(entry))
                 {
                     if (!writer.MakeDir(relative, recursive: false))
@@ -116,23 +116,23 @@ public static class ZArchiveTool
 
     private static void ExtractRecursive(ZArchiveReader reader, string srcPath, string outputDirectory)
     {
-        uint dirHandle = reader.LookUp(srcPath);
+        var dirHandle = reader.LookUp(srcPath);
         if (dirHandle == ZArchiveReader.InvalidNode || !reader.IsDirectory(dirHandle))
         {
             throw new InvalidOperationException($"Directory not found in archive: '{srcPath}'.");
         }
 
         Directory.CreateDirectory(outputDirectory);
-        uint count = reader.GetDirEntryCount(dirHandle);
+        var count = reader.GetDirEntryCount(dirHandle);
         for (uint i = 0; i < count; i++)
         {
-            if (!reader.GetDirEntry(dirHandle, i, out ZArchiveReader.DirEntry entry))
+            if (!reader.GetDirEntry(dirHandle, i, out var entry))
             {
                 throw new InvalidOperationException("Directory contains invalid node.");
             }
 
-            string childSrc = string.IsNullOrEmpty(srcPath) ? entry.Name : srcPath + "/" + entry.Name;
-            string childOut = Path.Combine(outputDirectory, entry.Name);
+            var childSrc = string.IsNullOrEmpty(srcPath) ? entry.Name : srcPath + "/" + entry.Name;
+            var childOut = Path.Combine(outputDirectory, entry.Name);
             if (entry.IsDirectory)
             {
                 ExtractRecursive(reader, childSrc, childOut);
@@ -146,18 +146,18 @@ public static class ZArchiveTool
 
     private static void ExtractFile(ZArchiveReader reader, string srcPath, string outputPath)
     {
-        uint handle = reader.LookUp(srcPath);
+        var handle = reader.LookUp(srcPath);
         if (handle == ZArchiveReader.InvalidNode || !reader.IsFile(handle))
         {
             throw new InvalidOperationException($"Unable to extract file: {srcPath}");
         }
 
         using var output = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
-        byte[] buffer = new byte[ZArchiveCommon.CompressedBlockSize];
+        var buffer = new byte[ZArchiveCommon.CompressedBlockSize];
         ulong offset = 0;
         while (true)
         {
-            ulong read = reader.ReadFromFile(handle, offset, buffer);
+            var read = reader.ReadFromFile(handle, offset, buffer);
             if (read == 0)
             {
                 break;

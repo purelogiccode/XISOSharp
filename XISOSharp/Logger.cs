@@ -58,6 +58,19 @@ public static class Logger
     public static long XboxDiscLseek { get; set; }
 
     /// <summary>
+    /// Optional Serilog bridge. Host apps (CLI/GUI/Tester) set these in their
+    /// logging bootstrap so every <see cref="Log"/>/<see cref="LogErr"/> write is
+    /// also routed through Serilog (file sinks + Warning+ bug-report forwarding).
+    /// Invocation is best-effort and never throws.
+    /// </summary>
+    public static Action<string>? ForwardInfo { get; set; }
+
+    /// <summary>
+    /// Optional Serilog bridge for error output. See <see cref="ForwardInfo"/>.
+    /// </summary>
+    public static Action<string>? ForwardError { get; set; }
+
+    /// <summary>
     /// Writes a formatted message to <see cref="Out"/> unless <see cref="Quiet"/> is <c>true</c>.
     /// </summary>
     /// <param name="message">Composite format string.</param>
@@ -65,6 +78,7 @@ public static class Logger
     public static void Log(string message, params object?[] args)
     {
         if (!Quiet) Out.Write(message, args);
+        Forward(ForwardInfo, message, args);
     }
 
     /// <summary>
@@ -93,5 +107,23 @@ public static class Logger
     public static void LogErr(string message, params object?[] args)
     {
         if (!RealQuiet) Error.Write(message, args);
+        Forward(ForwardError, message, args);
+    }
+
+    private static void Forward(Action<string>? target, string message, object?[] args)
+    {
+        if (target is null)
+            return;
+
+        try
+        {
+            var text = args.Length == 0 ? message : string.Format(message, args);
+            if (!string.IsNullOrEmpty(text))
+                target(text);
+        }
+        catch
+        {
+            // The Serilog bridge must never break library output.
+        }
     }
 }

@@ -1,9 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-
 namespace XISOSharp.Gui.Services;
+
+using Serilog;
+using Logging;
 
 /// <summary>
 /// Headless verification for <c>--self-test</c>: asserts every
@@ -15,33 +13,19 @@ namespace XISOSharp.Gui.Services;
 /// </summary>
 internal static class SelfTest
 {
-    internal static int Run(Action<string> log, string? e2eCliPath = null)
+    /// <summary>
+    /// Asserts every <see cref="CliCommands"/> builder emits the expected argv and,
+    /// with <paramref name="e2ECliPath"/>, runs the real CLI <c>-v</c> via <see cref="CliRunner"/>.
+    /// </summary>
+    /// <param name="log">Sink for PASS/FAIL lines.</param>
+    /// <param name="e2ECliPath">Optional CLI path for the end-to-end runner check.</param>
+    /// <returns>0 when all checks pass; otherwise 1.</returns>
+    internal static int Run(Action<string> log, string? e2ECliPath = null)
     {
         var failures = 0;
-
-        void Check(string name, string[] actual, string[] expected)
+        try
         {
-            var ok = actual.Length == expected.Length;
-            if (ok)
-            {
-                for (var i = 0; i < actual.Length; i++)
-                {
-                    if (!string.Equals(actual[i], expected[i], StringComparison.Ordinal))
-                    {
-                        ok = false;
-                        break;
-                    }
-                }
-            }
-
-            log($"{(ok ? "PASS" : "FAIL")} {name}");
-            if (!ok)
-            {
-                log($"  expected: {string.Join(" ", expected)}");
-                log($"  actual:   {string.Join(" ", actual)}");
-                failures++;
-            }
-        }
+            Log.Information("GUI self-test started");
 
         Check("extract", CliCommands.Extract(["a.iso"], "out", overwrite: false),
             ["-d", "out", "-x", "a.iso", "-n"]);
@@ -81,22 +65,84 @@ internal static class SelfTest
         log(failures == 0 ? "SELF-TEST: all passed" : $"SELF-TEST: {failures} failure(s)");
         if (failures != 0)
         {
+            Log.Warning("GUI self-test: {Failures} failure(s)", failures);
+            BugReporter.ReportWarning($"GUI self-test: {failures} failure(s)");
             return 1;
         }
 
-        if (!string.IsNullOrWhiteSpace(e2eCliPath))
+        if (!string.IsNullOrWhiteSpace(e2ECliPath))
         {
-            var lines = new List<string>();
-            var exit = CliRunner.RunAsync(e2eCliPath, ["-v"], lines.Add, CancellationToken.None)
-                .GetAwaiter().GetResult();
-            var ok = exit == 0 && lines.Count > 0;
-            log($"{(ok ? "PASS" : "FAIL")} runner-e2e (-v via CliRunner, exit {exit}, {lines.Count} line(s))");
-            if (!ok)
+            try
             {
+                var lines = new List<string>();
+                var exit = CliRunner.RunAsync(e2ECliPath, ["-v"], lines.Add, CancellationToken.None)
+                    .GetAwaiter().GetResult();
+                var ok = exit == 0 && lines.Count > 0;
+                log($"{(ok ? "PASS" : "FAIL")} runner-e2e (-v via CliRunner, exit {exit}, {lines.Count} line(s))");
+                if (!ok)
+                {
+                    Log.Warning("GUI self-test runner-e2e failed (exit {Exit})", exit);
+                    BugReporter.ReportWarning($"GUI self-test runner-e2e failed (exit {exit})");
+                    return 1;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "GUI self-test runner-e2e failed");
+                BugReporter.ReportException(ex, "GUI self-test runner-e2e failed");
+                log($"FAIL runner-e2e ({ex.Message})");
                 return 1;
             }
         }
 
+        Log.Information("GUI self-test passed");
         return 0;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "GUI self-test crashed");
+            BugReporter.ReportException(ex, "GUI self-test crashed");
+            try { log($"SELF-TEST: crashed ({ex.Message})"); }
+            catch
+            {
+                // ignored
+            }
+
+            return 1;
+        }
+
+        void Check(string name, string[] actual, string[] expected)
+        {
+            var ok = actual.Length == expected.Length;
+            if (ok)
+            {
+                for (var i = 0; i < actual.Length; i++)
+                {
+                    if (!string.Equals(actual[i], expected[i], StringComparison.Ordinal))
+                    {
+                        ok = false;
+                        break;
+                    }
+                }
+            }
+
+            log($"{(ok ? "PASS" : "FAIL")} {name}");
+            if (!ok)
+            {
+                log($"  expected: {string.Join(" ", expected)}");
+                log($"  actual:   {string.Join(" ", actual)}");
+                try
+                {
+                    Log.Warning("Self-test FAIL {Name}: expected [{Expected}] actual [{Actual}]",
+                        name, string.Join(" ", expected), string.Join(" ", actual));
+                }
+                catch
+                {
+                    // Logging must never break the self-test.
+                }
+
+                failures++;
+            }
+        }
     }
 }

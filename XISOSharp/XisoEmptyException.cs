@@ -28,15 +28,25 @@ public class XisoEmptyException : ExtractErrorException
     {
     }
 
+    /// <summary>Creates a new <see cref="XisoEmptyException"/> with the given error code.</summary>
+    /// <param name="code">The <see cref="ExtractError"/> value describing the failure.</param>
     public XisoEmptyException(ExtractError code) : base(code)
     {
     }
 
+    /// <summary>Creates a new <see cref="XisoEmptyException"/> with an error code and message.</summary>
+    /// <param name="code">The <see cref="ExtractError"/> value describing the failure.</param>
+    /// <param name="message">Description of the empty-ISO condition.</param>
     public XisoEmptyException(ExtractError code, string message) : base(code, message)
     {
     }
 
-    public XisoEmptyException(ExtractError code, string message, Exception innerException) : base(code, message, innerException)
+    /// <summary>Creates a new <see cref="XisoEmptyException"/> with an error code, message, and inner exception.</summary>
+    /// <param name="code">The <see cref="ExtractError"/> value describing the failure.</param>
+    /// <param name="message">Description of the empty-ISO condition.</param>
+    /// <param name="innerException">The underlying cause.</param>
+    public XisoEmptyException(ExtractError code, string message, Exception innerException) : base(code, message,
+        innerException)
     {
     }
 }

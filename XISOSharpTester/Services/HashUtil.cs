@@ -1,5 +1,7 @@
 using System.IO;
 using System.Security.Cryptography;
+using Serilog;
+using XISOSharpTester.Logging;
 
 namespace XISOSharpTester.Services;
 
@@ -47,10 +49,20 @@ public static class HashUtil
     /// <returns>The SHA-256 hash as a lowercase hex string.</returns>
     public static string ComputeSha256(string filePath)
     {
-        using var sha = SHA256.Create();
-        using var fs = File.OpenRead(filePath);
-        var hash = sha.ComputeHash(fs);
-        return ToHex(hash);
+        try
+        {
+            ArgumentException.ThrowIfNullOrEmpty(filePath);
+            using var sha = SHA256.Create();
+            using var fs = File.OpenRead(filePath);
+            var hash = sha.ComputeHash(fs);
+            return ToHex(hash);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ComputeSha256 failed for {Path}", filePath);
+            BugReporter.ReportException(ex, $"ComputeSha256 failed for {filePath}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -61,9 +73,19 @@ public static class HashUtil
     /// <returns>The MD5 hash as a lowercase hex string.</returns>
     public static string ComputeMd5(string filePath)
     {
-        using var md5 = MD5.Create();
-        using var fs = File.OpenRead(filePath);
-        var hash = md5.ComputeHash(fs);
-        return ToHex(hash);
+        try
+        {
+            ArgumentException.ThrowIfNullOrEmpty(filePath);
+            using var md5 = MD5.Create();
+            using var fs = File.OpenRead(filePath);
+            var hash = md5.ComputeHash(fs);
+            return ToHex(hash);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ComputeMd5 failed for {Path}", filePath);
+            BugReporter.ReportException(ex, $"ComputeMd5 failed for {filePath}");
+            throw;
+        }
     }
 }

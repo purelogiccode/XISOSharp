@@ -31,7 +31,10 @@ public static class Lz4
     /// Returns the minimum destination size <see cref="Compress"/> requires for
     /// <paramref name="inputLength"/> input bytes (<c>16 + 4 + inputLength * 110 / 100</c>).
     /// </summary>
-    public static int MaxCompressedOutputSize(int inputLength) => 16 + 4 + (inputLength * 110 / 100);
+    public static int MaxCompressedOutputSize(int inputLength)
+    {
+        return 16 + 4 + (inputLength * 110 / 100);
+    }
 
     /// <summary>
     /// Compresses <paramref name="input"/> into <paramref name="destination"/> as a raw LZ4 block.

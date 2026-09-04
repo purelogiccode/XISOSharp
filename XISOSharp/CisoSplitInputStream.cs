@@ -18,6 +18,13 @@ internal sealed class CisoSplitInputStream : Stream
     private readonly long[] _starts;
     private bool _disposed;
 
+    /// <summary>
+    /// Creates a read-only stream over the numbered split part files.
+    /// Part start offsets are derived from the previous part's file length and
+    /// <see cref="Length"/> is the last part's length (the global image size).
+    /// </summary>
+    /// <param name="parts">Open part streams in order; at least two are required.</param>
+    /// <exception cref="ArgumentException">Thrown when fewer than two parts are supplied.</exception>
     public CisoSplitInputStream(List<FileStream> parts)
     {
         if (parts is null || parts.Count < 2)
@@ -30,6 +37,11 @@ internal sealed class CisoSplitInputStream : Stream
         Length = _parts[^1].Length;
     }
 
+    /// <summary>Reads bytes at the current global <see cref="Position"/> across part boundaries.</summary>
+    /// <param name="buffer">Destination array.</param>
+    /// <param name="offset">Offset in <paramref name="buffer"/> to write at.</param>
+    /// <param name="count">Maximum number of bytes to read.</param>
+    /// <returns>Number of bytes read, or 0 at end of stream.</returns>
     public override int Read(byte[] buffer, int offset, int count)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
@@ -38,6 +50,9 @@ internal sealed class CisoSplitInputStream : Stream
         return Read(buffer.AsSpan(offset, count));
     }
 
+    /// <summary>Reads bytes at the current global <see cref="Position"/> across part boundaries.</summary>
+    /// <param name="buffer">Destination span.</param>
+    /// <returns>Number of bytes read, or 0 at end of stream.</returns>
     public override int Read(Span<byte> buffer)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -70,6 +85,11 @@ internal sealed class CisoSplitInputStream : Stream
         return total;
     }
 
+    /// <summary>Seeks to a global position within the composite split image.</summary>
+    /// <param name="offset">Offset relative to <paramref name="origin"/>.</param>
+    /// <param name="origin">Reference point: begin, current, or end.</param>
+    /// <returns>The new global position.</returns>
+    /// <exception cref="IOException">Thrown when seeking before the beginning of the stream.</exception>
     public override long Seek(long offset, SeekOrigin origin)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -84,22 +104,46 @@ internal sealed class CisoSplitInputStream : Stream
         return Position;
     }
 
+    /// <summary>Gets or sets the global read position across all parts.</summary>
     public override long Position { get; set; }
 
+    /// <summary>Gets the total length of the composite split image in bytes.</summary>
     public override long Length { get; }
 
-    public override void SetLength(long value) => throw new NotSupportedException();
+    /// <summary>Not supported; the split input stream is read-only.</summary>
+    /// <param name="value">Unused.</param>
+    /// <exception cref="NotSupportedException">Always thrown.</exception>
+    public override void SetLength(long value)
+    {
+        throw new NotSupportedException();
+    }
 
-    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    /// <summary>Not supported; the split input stream is read-only.</summary>
+    /// <param name="buffer">Unused.</param>
+    /// <param name="offset">Unused.</param>
+    /// <param name="count">Unused.</param>
+    /// <exception cref="NotSupportedException">Always thrown.</exception>
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
+    }
 
+    /// <summary>Gets a value indicating whether reading is supported (always <c>true</c>).</summary>
     public override bool CanRead => true;
+
+    /// <summary>Gets a value indicating whether seeking is supported (always <c>true</c>).</summary>
     public override bool CanSeek => true;
+
+    /// <summary>Gets a value indicating whether writing is supported (always <c>false</c>).</summary>
     public override bool CanWrite => false;
 
+    /// <summary>No-op; read state is never buffered.</summary>
     public override void Flush()
     {
     }
 
+    /// <summary>Disposes the underlying part streams.</summary>
+    /// <param name="disposing">Whether managed resources should be disposed.</param>
     protected override void Dispose(bool disposing)
     {
         if (_disposed) return;

@@ -1,7 +1,16 @@
 namespace XISOSharp.TestDataGenerator;
 
+/// <summary>
+/// Entry point for the TestData fixture generator. Parses an optional target root
+/// plus <c>--force</c>/<c>--help</c> and restores the deterministic source tree and ISO.
+/// </summary>
 internal static class Program
 {
+    /// <summary>
+    /// Restores the TestData fixture at the requested root and reports each action taken.
+    /// </summary>
+    /// <param name="args">Optional root path, <c>--force</c>/<c>-f</c>, and <c>--help</c>/<c>-h</c>.</param>
+    /// <returns>0 on success; 1 when fixture creation fails.</returns>
     private static int Main(string[] args)
     {
         string? root = null;
@@ -44,6 +53,9 @@ internal static class Program
         }
     }
 
+    /// <summary>
+    /// Prints generator usage, including the fixture layout and supported flags.
+    /// </summary>
     private static void PrintUsage()
     {
         Console.WriteLine("""

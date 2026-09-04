@@ -53,7 +53,7 @@ public class XisoFileTimeTests : IDisposable
     {
         var dto = new DateTimeOffset(2020, 6, 15, 12, 34, 56, TimeSpan.Zero);
         var raw = FileTimeHelper.ToFileTimeRaw(dto);
-        DateTimeOffset back = FileTimeHelper.FromFileTimeRaw(raw);
+        var back = FileTimeHelper.FromFileTimeRaw(raw);
         // BCL conversion is lossless for UTC times within range; allow 100ns tolerance (1 tick)
         Assert.Equal(dto.UtcDateTime, back.UtcDateTime);
         // Raw should be non-zero and reasonable (after 1601)
@@ -67,7 +67,7 @@ public class XisoFileTimeTests : IDisposable
     public void FileTimeHelper_Zero_MapsTo1601()
     {
         const ulong rawZero = 0UL;
-        DateTimeOffset epoch = FileTimeHelper.FromFileTimeRaw(rawZero);
+        var epoch = FileTimeHelper.FromFileTimeRaw(rawZero);
         Assert.Equal(new DateTimeOffset(1601, 1, 1, 0, 0, 0, TimeSpan.Zero), epoch);
         // Encoding the epoch should give 0
         var backRaw = FileTimeHelper.ToFileTimeRaw(epoch);
@@ -84,7 +84,7 @@ public class XisoFileTimeTests : IDisposable
     {
         // Max valid FILETIME is near DateTime.MaxValue; test that large values don't throw and clamp sanely.
         var maxRaw = (ulong)DateTime.MaxValue.ToFileTimeUtc();
-        DateTimeOffset dtoMax = FileTimeHelper.FromFileTimeRaw(maxRaw);
+        var dtoMax = FileTimeHelper.FromFileTimeRaw(maxRaw);
         // Should round-trip without exception; dtoMax should be close to MaxValue
         Assert.True(dtoMax.Year >= 9990);
 
@@ -117,7 +117,7 @@ public class XisoFileTimeTests : IDisposable
 
         // Initial filetime is non-zero (current time)
         var initialRaw = XisoReader.GetFileTimeRaw(isoPath);
-        DateTimeOffset initialDto = XisoReader.GetFileTime(isoPath);
+        var initialDto = XisoReader.GetFileTime(isoPath);
         Assert.Equal(initialDto, FileTimeHelper.FromFileTimeRaw(initialRaw));
 
         // Set to zero (xdvdfs deterministic) and verify
@@ -130,7 +130,7 @@ public class XisoFileTimeTests : IDisposable
         var targetDto = new DateTimeOffset(2021, 12, 31, 23, 59, 59, TimeSpan.Zero);
         XisoReader.SetFileTime(isoPath, targetDto);
         var afterRaw = XisoReader.GetFileTimeRaw(isoPath);
-        DateTimeOffset afterDto = XisoReader.GetFileTime(isoPath);
+        var afterDto = XisoReader.GetFileTime(isoPath);
         Assert.Equal(targetDto, afterDto);
         Assert.Equal(FileTimeHelper.ToFileTimeRaw(targetDto), afterRaw);
 
@@ -184,7 +184,7 @@ public class XisoFileTimeTests : IDisposable
 
             var afterRaw = XisoReader.GetFileTimeRaw(rewrittenIso);
             Assert.Equal(beforeRaw, afterRaw);
-            DateTimeOffset afterDto = XisoReader.GetFileTime(rewrittenIso);
+            var afterDto = XisoReader.GetFileTime(rewrittenIso);
             Assert.Equal(knownDto, afterDto);
         }
         finally

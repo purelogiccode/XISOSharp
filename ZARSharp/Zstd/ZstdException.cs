@@ -10,10 +10,14 @@ public sealed class ZstdException : Exception
     {
     }
 
-    public ZstdException() : base()
+    /// <summary>Creates a decoder error with a default message.</summary>
+    public ZstdException()
     {
     }
 
+    /// <summary>Creates a decoder error with an inner cause.</summary>
+    /// <param name="message">Reason.</param>
+    /// <param name="innerException">Inner cause.</param>
     public ZstdException(string? message, Exception? innerException) : base(message, innerException)
     {
     }

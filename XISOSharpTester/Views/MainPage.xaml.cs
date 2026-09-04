@@ -2,24 +2,50 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Windows.Controls;
 using System.Windows.Data;
+using Serilog;
+using XISOSharpTester.Logging;
 using XISOSharpTester.Models;
 using XISOSharpTester.ViewModels;
 
 namespace XISOSharpTester.Views;
 
+/// <summary>
+/// Main test page. Creates its <see cref="ViewModels.MainViewModel"/> and auto-scrolls the log view.
+/// </summary>
 internal partial class MainPage
 {
+    /// <summary>
+    /// Initializes the page and wires it to a new <see cref="ViewModels.MainViewModel"/>.
+    /// </summary>
     public MainPage()
     {
-        InitializeComponent();
-        DataContext = new MainViewModel();
+        try
+        {
+            InitializeComponent();
+            DataContext = new MainViewModel();
+            Log.Information("MainPage initialized");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "MainPage initialization failed");
+            BugReporter.ReportException(ex, "MainPage initialization failed");
+            throw;
+        }
     }
 
     private void LogTextBox_OnTextChanged(object sender, TextChangedEventArgs e)
     {
-        if (sender is TextBox tb)
+        try
         {
-            tb.ScrollToEnd();
+            if (sender is TextBox tb)
+            {
+                tb.ScrollToEnd();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Log auto-scroll failed");
+            BugReporter.ReportException(ex, "Log auto-scroll failed");
         }
     }
 }

@@ -26,7 +26,9 @@ public static class XisoReader
     /// <c>*.1.cso</c> part sets (mirroring <c>xdvdfs-cli/src/img.rs::open_image</c>).
     /// </summary>
     internal static bool IsCsoPath(string path)
-        => Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
+    {
+        return Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Opens an image for reading: <c>.cso</c> paths (single or split parts) are routed
@@ -1083,7 +1085,9 @@ public static class XisoReader
     /// meaning it uses the optimized directory layout.
     /// </summary>
     private static bool IsOptimized(string isoPath, int? skipSectors = null)
-        => IsOptimizedImage(isoPath, skipSectors);
+    {
+        return IsOptimizedImage(isoPath, skipSectors);
+    }
 
     /// <summary>
     /// Lists files in an XISO image without extracting.
@@ -1230,7 +1234,7 @@ public static class XisoReader
         UnpackOptions? unpackOptions = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using Stream fs = OpenImageStream(xisoPath);
+        using var fs = OpenImageStream(xisoPath);
         return DecodeXisoCore(fs, xisoPath, outputPath, mode, out outIsoPath, llCompat,
             cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions);
     }

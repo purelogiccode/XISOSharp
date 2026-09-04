@@ -367,7 +367,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
         var isoPath = CreateTestIso();
         var extractDir = CreateTempDir();
         var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
 
 #pragma warning disable MA0004
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>

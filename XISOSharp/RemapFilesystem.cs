@@ -10,10 +10,18 @@ namespace XISOSharp;
 /// </summary>
 public static class RemapFilesystem
 {
+    /// <summary>
+    /// Snapshot of a host filesystem entry collected during the remap directory walk.
+    /// </summary>
     private sealed class FileEntry
     {
+        /// <summary>File or directory name without any path prefix.</summary>
         public string Name = string.Empty;
+
+        /// <summary>Whether the entry is a directory.</summary>
         public bool IsDirectory;
+
+        /// <summary>File length in bytes; 0 for directories.</summary>
         public long Length;
     }
 
@@ -149,7 +157,10 @@ public static class RemapFilesystem
         return sb.ToString();
     }
 
-    private static string EscapeTomlString(string s) => s.Replace("\\", @"\\").Replace("\"", "\\\"");
+    private static string EscapeTomlString(string s)
+    {
+        return s.Replace("\\", @"\\").Replace("\"", "\\\"");
+    }
 
     /// <summary>
     /// Dry-run: returns ordered host→image mappings without building an image.
@@ -329,7 +340,7 @@ public static class RemapFilesystem
         // they iterate over trie which already deduplicates (first wins). For dry-run list we should mimic deduplicated output.
         var guestSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach ((var path, FileEntry entry, var prefix) in matches)
+        foreach ((var path, var entry, var prefix) in matches)
         {
             string? rewritten = null;
             // Iterate rules in order
@@ -474,7 +485,7 @@ public static class RemapFilesystem
                 {
                     Filename = fileName, FileSize = (uint)fi.Length, Subdirectory = null, HostPath = fi.FullName
                 };
-                AvlNode? tmp = parentNode.Subdirectory;
+                var tmp = parentNode.Subdirectory;
                 AvlTree.AvlInsert(ref tmp, fileNode);
                 parentNode.Subdirectory = tmp;
                 // If duplicate due to case-insensitive, we already checked, but insert may still fail if race.
@@ -546,7 +557,7 @@ public static class RemapFilesystem
 
             var newNode = new AvlNode { Filename = name, Subdirectory = null, FileSize = 0 };
             // Insert into parent
-            AvlNode? tmp = parentNode.Subdirectory;
+            var tmp = parentNode.Subdirectory;
             var res = AvlTree.AvlInsert(ref tmp, newNode);
             parentNode.Subdirectory = tmp;
             if (res == AvlResult.AvlError)
@@ -627,7 +638,7 @@ public static class RemapFilesystem
 
         var result = new List<(string hostRel, string guestRel, bool isDir)>();
         var guestSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach ((var path, FileEntry entry, var prefix) in matches)
+        foreach ((var path, var entry, var prefix) in matches)
         {
             string? rewritten = null;
             for (var idx = 0; idx < rules.Count; idx++)

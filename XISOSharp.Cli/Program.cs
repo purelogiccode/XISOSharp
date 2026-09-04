@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using Serilog;
+using XISOSharp.Cli.Logging;
 using XISOSharp.Models;
 
 namespace XISOSharp.Cli;
@@ -20,6 +22,34 @@ internal static class Program
     /// <param name="args">Command-line arguments.</param>
     /// <returns>0 on success, 1 on error.</returns>
     internal static int Main(string[] args)
+    {
+        AppLogging.Configure("XISOSharp.Cli");
+        try
+        {
+            return MainInner(args);
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                Log.Fatal(ex, "Unhandled CLI exception");
+                BugReporter.ReportException(ex, "Unhandled CLI exception");
+            }
+            catch
+            {
+                // Logging must never throw from the top-level handler.
+            }
+
+            Logger.LogErr($"Fatal error: {ex.Message}\n");
+            return 1;
+        }
+        finally
+        {
+            AppLogging.CloseAndFlush();
+        }
+    }
+
+    private static int MainInner(string[] args)
     {
         if (args.Length < 1)
         {
@@ -787,7 +817,7 @@ internal static class Program
             try
             {
                 var raw = XisoReader.GetFileTimeRaw(isoPath, skipSectors);
-                DateTimeOffset dto = FileTimeHelper.FromFileTimeRaw(raw);
+                var dto = FileTimeHelper.FromFileTimeRaw(raw);
                 var iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
                 Logger.Log($"FileTime: {iso8601} ({raw}) 0x{raw:X16}\n");
                 // Also emit raw only to stdout for scripting when quiet? Match xdvdfs raw behavior on --silent?
@@ -820,7 +850,7 @@ internal static class Program
 
             var isoPath = args[optind];
             var valueStr = args[optind + 1];
-            if (!FileTimeHelper.TryParseFileTime(valueStr, out var raw, out DateTimeOffset dto))
+            if (!FileTimeHelper.TryParseFileTime(valueStr, out var raw, out var dto))
             {
                 Logger.LogErr(
                     $"Error: invalid filetime value '{valueStr}' (expected ISO-8601, decimal, 0x hex, 'now', or '0')\n");
@@ -996,7 +1026,7 @@ internal static class Program
                 try
                 {
                     var raw = XisoReader.GetFileTimeRaw(xisoPath, skipSectors);
-                    DateTimeOffset dto = FileTimeHelper.FromFileTimeRaw(raw);
+                    var dto = FileTimeHelper.FromFileTimeRaw(raw);
                     var iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
                     Logger.Log($"  FileTime:       {iso8601} ({raw})\n");
                     Logger.Log($"  FileTime raw:   0x{raw:X16} ({raw})\n");
@@ -1127,7 +1157,7 @@ internal static class Program
         // run resumes instead of redoing completed files.
         // #9 (xdvdfs #187): with --continue-on-error, per-file failures are logged
         // and skipped instead of aborting the run; the summary still fails the exit code.
-        UnpackOptions? unpackOptions = skipExisting || continueOnError
+        var unpackOptions = skipExisting || continueOnError
             ? new UnpackOptions { SkipExisting = skipExisting, ContinueOnError = continueOnError }
             : null;
 
@@ -1488,7 +1518,7 @@ internal static class Program
 
         try
         {
-            UnpackOptions? unpackOptions = skipExisting || continueOnError
+            var unpackOptions = skipExisting || continueOnError
                 ? new UnpackOptions { SkipExisting = skipExisting, ContinueOnError = continueOnError }
                 : null;
             var result = XisoReader.UnpackImage(xisoPath, destPath, skipSectors: skipSectors,
@@ -2378,8 +2408,8 @@ internal static class Program
         var full = Path.GetFileName(xisoPath) ?? "redump";
         var baseName = full;
         if (full.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase)) baseName = full[..^5];
-        else if (full.EndsWith(".zar", StringComparison.OrdinalIgnoreCase)) baseName = full[..^4];
-        else if (full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) baseName = full[..^4];
+        else if (full.EndsWith(".zar", StringComparison.OrdinalIgnoreCase) ||
+                 full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) baseName = full[..^4];
         return Path.Combine(dir, baseName + ".redump.iso");
     }
 
@@ -2408,20 +2438,6 @@ internal static class Program
         }
 
         var exit = 0;
-
-        // -y/--yes/-n/--no gate for every file this batch writes (XboxKit ConfirmOverwrite
-        // parity). A declined output skips just that operation; a -n refusal also fails
-        // the file (the [ERROR] line is printed by the helper itself).
-        bool ConfirmOutput(string outPath, string what)
-        {
-            if (OverwritePrompt.ConfirmOverwrite(outPath, assumeYes, assumeNo))
-                return true;
-            if (assumeNo)
-                exit = 1;
-            else
-                Logger.Log($"[INFO] Skipping {what}: output exists\n");
-            return false;
-        }
 
         foreach (var iso in isoFiles)
         {
@@ -2592,7 +2608,7 @@ internal static class Program
                     : Path.Combine(dir, baseName + ".filler");
                 // A declined output counts as handled (skipped) so later ops still run.
                 var fillerConfirmed = ConfirmOutput(outFiller, $"--random for {iso}");
-                bool ok = !fillerConfirmed || (isRedump
+                var ok = !fillerConfirmed || (isRedump
                     ? XisoOperations.ExtractFiller(iso, outFiller, isoOffset, xisoLen, Logger.Quiet)
                     : XisoOperations.ExtractFiller(iso, outFiller, 0, null, Logger.Quiet));
                 if (!ok)
@@ -2652,7 +2668,7 @@ internal static class Program
                 // A declined output counts as handled (skipped) so later ops still run.
                 var wipeConfirmed = ConfirmOutput(outWiped, $"--wipe for {iso}");
                 wipeDeclined = !wipeConfirmed;
-                bool ok = !wipeConfirmed || (isRedump
+                var ok = !wipeConfirmed || (isRedump
                     ? XisoOperations.WipeFiller(iso, outWiped, isoOffset, Logger.Quiet)
                     : XisoOperations.WipeFiller(iso, outWiped, 0, Logger.Quiet));
 
@@ -2801,6 +2817,20 @@ internal static class Program
         }
 
         return exit;
+
+        // -y/--yes/-n/--no gate for every file this batch writes (XboxKit ConfirmOverwrite
+        // parity). A declined output skips just that operation; a -n refusal also fails
+        // the file (the [ERROR] line is printed by the helper itself).
+        bool ConfirmOutput(string outPath, string what)
+        {
+            if (OverwritePrompt.ConfirmOverwrite(outPath, assumeYes, assumeNo))
+                return true;
+            if (assumeNo)
+                exit = 1;
+            else
+                Logger.Log($"[INFO] Skipping {what}: output exists\n");
+            return false;
+        }
     }
 
     /// <summary>
@@ -3007,22 +3037,28 @@ internal static class Program
     }
 
     /// <summary>Formats the XEX encryption type as a name.</summary>
-    private static string FormatXexEncryption(ushort encryption) => encryption switch
+    private static string FormatXexEncryption(ushort encryption)
     {
-        0 => "None",
-        1 => "Normal",
-        _ => "Unknown"
-    };
+        return encryption switch
+        {
+            0 => "None",
+            1 => "Normal",
+            _ => "Unknown"
+        };
+    }
 
     /// <summary>Formats the XEX compression type as a name.</summary>
-    private static string FormatXexCompression(ushort compression) => compression switch
+    private static string FormatXexCompression(ushort compression)
     {
-        0 => "None",
-        1 => "Basic",
-        2 => "Normal",
-        3 => "Delta",
-        _ => "Unknown"
-    };
+        return compression switch
+        {
+            0 => "None",
+            1 => "Basic",
+            2 => "Normal",
+            3 => "Delta",
+            _ => "Unknown"
+        };
+    }
 
     /// <summary>
     /// Formats a directory entry attribute byte as a human-readable string.

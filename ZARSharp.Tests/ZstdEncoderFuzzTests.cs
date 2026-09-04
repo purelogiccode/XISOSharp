@@ -33,7 +33,7 @@ public sealed class ZstdEncoderFuzzTests
     {
         // Distinct stream per (kind, size, level) from the master seed.
         var rng = new Random(HashCode.Combine(Seed, kind, n, level));
-        byte[] buf = new byte[n];
+        var buf = new byte[n];
         switch (kind)
         {
             case "zeros":
@@ -45,8 +45,8 @@ public sealed class ZstdEncoderFuzzTests
             {
                 const string sample =
                     "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. ";
-                byte[] ascii = System.Text.Encoding.ASCII.GetBytes(sample);
-                for (int i = 0; i < n; i++)
+                var ascii = System.Text.Encoding.ASCII.GetBytes(sample);
+                for (var i = 0; i < n; i++)
                 {
                     buf[i] = ascii[(i + rng.Next(ascii.Length)) % ascii.Length];
                 }
@@ -55,7 +55,7 @@ public sealed class ZstdEncoderFuzzTests
             }
 
             case "sparse":
-                for (int i = 0; i < (n / 97) + 1 && i * 97 < n; i++)
+                for (var i = 0; i < (n / 97) + 1 && i * 97 < n; i++)
                 {
                     buf[rng.Next(n == 0 ? 1 : n)] = (byte)rng.Next(256);
                 }
@@ -63,9 +63,9 @@ public sealed class ZstdEncoderFuzzTests
                 break;
             case "pattern":
             {
-                byte[] period = new byte[rng.Next(1, 17)];
+                var period = new byte[rng.Next(1, 17)];
                 rng.NextBytes(period);
-                for (int i = 0; i < n; i++)
+                for (var i = 0; i < n; i++)
                 {
                     buf[i] = period[i % period.Length];
                 }
@@ -74,14 +74,14 @@ public sealed class ZstdEncoderFuzzTests
             }
 
             case "alternating":
-                for (int i = 0; i < n; i++)
+                for (var i = 0; i < n; i++)
                 {
                     buf[i] = (byte)(i % 2 == 0 ? 0x41 : 0xC3);
                 }
 
                 break;
             case "allbytes":
-                for (int i = 0; i < n; i++)
+                for (var i = 0; i < n; i++)
                 {
                     buf[i] = (byte)(((i * 31) + rng.Next(256)) % 256);
                 }
@@ -94,7 +94,10 @@ public sealed class ZstdEncoderFuzzTests
         return buf;
     }
 
-    private static string CaseName(string kind, int n, int level) => $"{kind}/{n}b/L{level}";
+    private static string CaseName(string kind, int n, int level)
+    {
+        return $"{kind}/{n}b/L{level}";
+    }
 
     // Boundary levels on the full matrix; mid levels on a representative subset.
     public static TheoryData<string, int, int> FuzzCases()
@@ -102,9 +105,9 @@ public sealed class ZstdEncoderFuzzTests
         var data = new TheoryData<string, int, int>();
         int[] sizes = [0, 1, 2, 3, 7, 255, 256, 1023, 1024, 4096, 16384, 32768, 65535, 65536, 65537, 66000];
         string[] kinds = ["zeros", "random", "text", "sparse", "pattern", "alternating", "allbytes"];
-        foreach (string kind in kinds)
+        foreach (var kind in kinds)
         {
-            foreach (int size in sizes)
+            foreach (var size in sizes)
             {
                 data.Add(kind, size, 1);
                 data.Add(kind, size, 6);
@@ -113,9 +116,9 @@ public sealed class ZstdEncoderFuzzTests
 
         int[] midSizes = [255, 4096, 65536];
         string[] midKinds = ["text", "random", "zeros", "sparse"];
-        foreach (string kind in midKinds)
+        foreach (var kind in midKinds)
         {
-            foreach (int size in midSizes)
+            foreach (var size in midSizes)
             {
                 data.Add(kind, size, 2);
                 data.Add(kind, size, 3);
@@ -131,9 +134,9 @@ public sealed class ZstdEncoderFuzzTests
     [MemberData(nameof(FuzzCases))]
     public void FuzzSelfRoundTrip(string kind, int size, int level)
     {
-        byte[] input = MakeInput(kind, size, level);
-        byte[] frame = new ZstdCompressor(ZstdCompressionOptions.FromLevel(level)).CompressBlock(input);
-        byte[] decoded = ZstdCompressor.DecompressFrame(frame, Math.Max(size, 1));
+        var input = MakeInput(kind, size, level);
+        var frame = new ZstdCompressor(ZstdCompressionOptions.FromLevel(level)).CompressBlock(input);
+        var decoded = ZstdCompressor.DecompressFrame(frame, Math.Max(size, 1));
         Assert.True(
             decoded.AsSpan().SequenceEqual(input),
             $"self round-trip failed for {CaseName(kind, size, level)}: frame {frame.Length} B");
@@ -142,7 +145,7 @@ public sealed class ZstdEncoderFuzzTests
     [Fact]
     public void FuzzNativeDecodesOurFramesBatched()
     {
-        string? python = FindPythonWithZstd();
+        var python = FindPythonWithZstd();
         if (python is null)
         {
             return; // toolchain-conditional, like ZstdEncoderTests
@@ -154,21 +157,21 @@ public sealed class ZstdEncoderFuzzTests
         int[] sizes = [0, 1, 255, 4096, 65536, 66000];
         int[] levels = [1, 6];
 
-        string work = Path.Combine(Path.GetTempPath(), "zar_fuzz_" + Guid.NewGuid().ToString("N"));
+        var work = Path.Combine(Path.GetTempPath(), "zar_fuzz_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         try
         {
             var manifest = new List<(string Name, string Frame, string Input)>();
-            foreach (string kind in kinds)
+            foreach (var kind in kinds)
             {
-                foreach (int size in sizes)
+                foreach (var size in sizes)
                 {
-                    foreach (int level in levels)
+                    foreach (var level in levels)
                     {
-                        byte[] input = MakeInput(kind, size, level);
-                        byte[] frame = new ZstdCompressor(ZstdCompressionOptions.FromLevel(level))
+                        var input = MakeInput(kind, size, level);
+                        var frame = new ZstdCompressor(ZstdCompressionOptions.FromLevel(level))
                             .CompressBlock(input);
-                        string name = $"{kind}_{size}_{level}";
+                        var name = $"{kind}_{size}_{level}";
                         File.WriteAllBytes(Path.Combine(work, name + ".zst"), frame);
                         File.WriteAllBytes(Path.Combine(work, name + ".bin"), input);
                         manifest.Add((name, name + ".zst", name + ".bin"));
@@ -212,9 +215,9 @@ public sealed class ZstdEncoderFuzzTests
                 UseShellExecute = false,
             };
             using var proc = Process.Start(psi)!;
-            string stdout = proc.StandardOutput.ReadToEnd();
-            string stderr = proc.StandardError.ReadToEnd();
-            bool exited = proc.WaitForExit(300_000);
+            var stdout = proc.StandardOutput.ReadToEnd();
+            var stderr = proc.StandardError.ReadToEnd();
+            var exited = proc.WaitForExit(300_000);
             Assert.True(exited, "native batch decode timed out.\n" + stderr);
             Assert.True(proc.ExitCode == 0, $"native batch decode failed.\n{stdout}\n{stderr}");
             Assert.True(
@@ -223,13 +226,13 @@ public sealed class ZstdEncoderFuzzTests
                 $"native batch count mismatch.\n{stdout}");
 
             // Phase 9 ratio gate: our text-64K L6 within 5% of native L6.
-            foreach (string line in stdout.Split('\n'))
+            foreach (var line in stdout.Split('\n'))
             {
                 if (line.StartsWith("NATIVE_L6", StringComparison.Ordinal))
                 {
-                    string[] parts = line.Split(' ');
-                    int native = int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
-                    int ours = int.Parse(parts[3], System.Globalization.CultureInfo.InvariantCulture);
+                    var parts = line.Split(' ');
+                    var native = int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
+                    var ours = int.Parse(parts[3], System.Globalization.CultureInfo.InvariantCulture);
                     Assert.True(
                         ours <= (long)(native * 1.05) + 64,
                         $"ratio regression: ours L6 {ours} B vs native L6 {native} B");
@@ -255,11 +258,11 @@ public sealed class ZstdEncoderFuzzTests
         // Always-on guards (no native oracle needed).
         var l6 = new ZstdCompressor(ZstdCompressionOptions.FromLevel(6));
 
-        byte[] zeros = new byte[65536];
+        var zeros = new byte[65536];
         Assert.True(l6.CompressBlock(zeros).Length < zeros.Length / 50, "zeros must collapse");
 
-        byte[] random = MakeInput("random", 5000, 6);
-        byte[] dest = new byte[ZstdCompressor.GetCompressBound(random.Length)];
+        var random = MakeInput("random", 5000, 6);
+        var dest = new byte[ZstdCompressor.GetCompressBound(random.Length)];
         Assert.Equal(-1, l6.Compress(random, dest)); // decline => writer stores raw
         Assert.True(
             l6.CompressBlock(random).Length <= random.Length + 64,
@@ -271,7 +274,7 @@ public sealed class ZstdEncoderFuzzTests
         string[] candidates = OperatingSystem.IsWindows()
             ? ["python", "python3"]
             : ["python3", "python"];
-        foreach (string candidate in candidates)
+        foreach (var candidate in candidates)
         {
             try
             {

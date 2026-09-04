@@ -26,6 +26,9 @@ public class XisoFormatException : IOException
     {
     }
 
+    /// <summary>Creates a new <see cref="XisoFormatException"/> with a message and HRESULT.</summary>
+    /// <param name="message">Description of the format error.</param>
+    /// <param name="hresult">The HRESULT error code.</param>
     public XisoFormatException(string? message, int hresult) : base(message, hresult)
     {
     }

@@ -37,7 +37,9 @@ public sealed class XboxPrng
 
     /// <summary>Write <paramref name="count"/> PRNG sectors to <paramref name="fs"/>.</summary>
     public void WriteSectors(FileStream fs, long count)
-        => WriteSectors((Stream)fs, count);
+    {
+        WriteSectors((Stream)fs, count);
+    }
 
     /// <summary>Writes <paramref name="count"/> PRNG sectors to <paramref name="output"/>.</summary>
     /// <param name="output">Destination stream to write filler sectors to.</param>

@@ -14,5 +14,8 @@ internal static class TestDataFixture
         Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData"));
 
     [ModuleInitializer]
-    internal static void EnsureTestData() => TestDataWriter.EnsureTestData(TestDataRoot);
+    internal static void EnsureTestData()
+    {
+        TestDataWriter.EnsureTestData(TestDataRoot);
+    }
 }

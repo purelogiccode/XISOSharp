@@ -41,7 +41,9 @@ public static class XisoChecksum
 
     /// <summary>True when <paramref name="path"/> has a <c>.cso</c> extension (covers split <c>*.1.cso</c>).</summary>
     private static bool IsCsoPath(string path)
-        => Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
+    {
+        return Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>Computes checksum from an open stream with known disc name (for error reporting).</summary>
     public static byte[] ComputeImageChecksum(FileStream fs, string isoName, int? skipSectors = null,
@@ -71,7 +73,7 @@ public static class XisoChecksum
         CollectFileTree(dev, dirStart, rootSize, discLseek, "", map, ct);
 
         // SHA3-256 over sorted map
-        using IncrementalHash hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA3_256);
+        using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA3_256);
         // For older runtimes fallback: SHA3_256.Create()
         // IncrementalHash works on net8+.
 
@@ -114,7 +116,9 @@ public static class XisoChecksum
     /// <summary>Returns the hex (lowercase) representation of the checksum.</summary>
     public static string ComputeImageChecksumHex(string isoPath, int? skipSectors = null,
         CancellationToken ct = default)
-        => Convert.ToHexString(ComputeImageChecksum(isoPath, skipSectors, ct)).ToLowerInvariant();
+    {
+        return Convert.ToHexString(ComputeImageChecksum(isoPath, skipSectors, ct)).ToLowerInvariant();
+    }
 
     // -----------------------------------------------------------------------
     // File-tree collection — mirrors xdvdfs read.rs file_tree + walk_dirent_tree
@@ -147,11 +151,21 @@ public static class XisoChecksum
         }
     }
 
+    /// <summary>
+    /// Simplified directory entry collected during the checksum file-tree walk.
+    /// </summary>
     private sealed class DirEnt
     {
+        /// <summary>File or directory name.</summary>
         public string Name = "";
+
+        /// <summary>Partition-relative start sector of the entry's data or subdirectory table.</summary>
         public uint StartSector;
+
+        /// <summary>File size or subdirectory table size in bytes.</summary>
         public uint Size;
+
+        /// <summary>Whether the entry is a directory.</summary>
         public bool IsDirectory;
     }
 
@@ -195,15 +209,33 @@ public static class XisoChecksum
         return result;
     }
 
+    /// <summary>
+    /// Raw on-disk directory entry parsed from a directory table during the checksum walk.
+    /// </summary>
     private sealed class DirentNodeRaw
     {
+        /// <summary>Left-child offset in DWORDs within the directory table (0 or 0xFFFF if none).</summary>
         public ushort LeftOffset;
+
+        /// <summary>Right-child offset in DWORDs within the directory table (0 or 0xFFFF if none).</summary>
         public ushort RightOffset;
+
+        /// <summary>Partition-relative start sector of the entry's data or subdirectory table.</summary>
         public uint StartSector;
+
+        /// <summary>File size or subdirectory table size in bytes.</summary>
         public uint Size;
+
+        /// <summary>Raw attribute byte with reserved bits masked out.</summary>
         public byte Attributes;
+
+        /// <summary>Filename length in bytes.</summary>
         public byte NameLength;
+
+        /// <summary>Decoded entry name.</summary>
         public string Name = "";
+
+        /// <summary>Whether the entry is a directory (derived from <see cref="Attributes"/>).</summary>
         public bool IsDirectory => (Attributes & Constants.AttributeDir) != 0;
     }
 
@@ -223,7 +255,7 @@ public static class XisoChecksum
 
         if (allFf || allZero) return null;
 
-        var left = BinaryPrimitives.ReadUInt16LittleEndian(hdr[0..2]);
+        var left = BinaryPrimitives.ReadUInt16LittleEndian(hdr[..2]);
         var right = BinaryPrimitives.ReadUInt16LittleEndian(hdr[2..4]);
         var sector = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
         var size = BinaryPrimitives.ReadUInt32LittleEndian(hdr[8..12]);

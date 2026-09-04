@@ -1,14 +1,14 @@
-using System.Globalization;
-using System.IO;
 using System.Windows;
 using Serilog;
+using XISOSharpTester.Logging;
 
 namespace XISOSharpTester;
 
 /// <summary>
 /// Application entry point for the XISOSharp Tester WPF application.
-/// Configures Serilog logging, writes the log to a rolling file
-/// in local app data, and logs startup and shutdown events.
+/// Configures Serilog logging (file/debug/console + Warning+ bug-report API),
+/// writes the log to a rolling file in local app data, and logs startup
+/// and shutdown events.
 /// </summary>
 public partial class App
 {
@@ -17,22 +17,26 @@ public partial class App
     /// </summary>
     protected override void OnStartup(StartupEventArgs e)
     {
-        base.OnStartup(e);
+        try
+        {
+            AppLogging.Configure("XISOSharpTester");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"AppLogging.Configure failed: {ex.Message}");
+        }
 
-        var logPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "XISOSharpTester", "logs", "extract-xiso-tester-.log");
-
-        Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Debug()
-            .WriteTo.Debug(formatProvider: CultureInfo.InvariantCulture)
-            .WriteTo.File(logPath,
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
-                formatProvider: CultureInfo.InvariantCulture,
-                rollingInterval: RollingInterval.Day)
-            .CreateLogger();
-
-        Log.Information("XISOSharpTester started");
+        try
+        {
+            base.OnStartup(e);
+            Log.Information("XISOSharpTester started");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Application startup failed");
+            BugReporter.ReportException(ex, "Application startup failed");
+            throw;
+        }
     }
 
     /// <summary>
@@ -41,8 +45,25 @@ public partial class App
     /// </summary>
     protected override void OnExit(ExitEventArgs e)
     {
-        Log.Information("XISOSharpTester exiting");
-        Log.CloseAndFlush();
-        base.OnExit(e);
+        try
+        {
+            Log.Information("XISOSharpTester exiting");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"OnExit logging failed: {ex.Message}");
+        }
+        finally
+        {
+            AppLogging.CloseAndFlush();
+            try
+            {
+                base.OnExit(e);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"OnExit failed: {ex.Message}");
+            }
+        }
     }
 }

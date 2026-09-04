@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using ZARSharp;
 using ZARSharp.Zstd;
 
 namespace ZARSharp.Tests;
@@ -13,7 +12,7 @@ public sealed class ZstdInteropVectorsTests
 {
     private static string SolutionRoot()
     {
-        string? dir = AppContext.BaseDirectory;
+        var dir = AppContext.BaseDirectory;
         while (dir is not null)
         {
             if (File.Exists(Path.Combine(dir, "CSharp_XISOSharp.sln")))
@@ -27,12 +26,14 @@ public sealed class ZstdInteropVectorsTests
         throw new InvalidOperationException("Solution root not found.");
     }
 
-    private static string ZArchiveExePath() =>
-        Path.Combine(SolutionRoot(), "References", "ZArchive-0.1.2", "zarchive.exe");
+    private static string ZArchiveExePath()
+    {
+        return Path.Combine(SolutionRoot(), "References", "ZArchive-0.1.2", "zarchive.exe");
+    }
 
     private static string NewTempDir(string prefix)
     {
-        string dir = Path.Combine(Path.GetTempPath(), "zarsharp", prefix + "_" + Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(Path.GetTempPath(), "zarsharp", prefix + "_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         return dir;
     }
@@ -52,9 +53,9 @@ public sealed class ZstdInteropVectorsTests
 
     private static byte[] Pattern(int n, int seed)
     {
-        byte[] data = new byte[n];
-        uint state = (uint)((seed * 2654435761u) + 1);
-        for (int i = 0; i < n; i++)
+        var data = new byte[n];
+        var state = (uint)((seed * 2654435761u) + 1);
+        for (var i = 0; i < n; i++)
         {
             state = (state * 1664525) + 1013904223;
             data[i] = (byte)(state >> 24);
@@ -74,12 +75,12 @@ public sealed class ZstdInteropVectorsTests
         else
         {
             frame.Add(0x60);
-            int v = content.Length - 256;
+            var v = content.Length - 256;
             frame.Add((byte)(v & 0xFF));
             frame.Add((byte)(v >> 8));
         }
 
-        uint header = (uint)((content.Length << 3) | (0 << 1) | 1);
+        var header = (uint)((content.Length << 3) | (0 << 1) | 1);
         frame.Add((byte)(header & 0xFF));
         frame.Add((byte)((header >> 8) & 0xFF));
         frame.Add((byte)((header >> 16) & 0xFF));
@@ -93,7 +94,7 @@ public sealed class ZstdInteropVectorsTests
     [InlineData(65536)]
     public void Decoder_GoldenRawFrames(int size)
     {
-        byte[] content = Pattern(size, size + 7);
+        var content = Pattern(size, size + 7);
         Assert.Equal(content, ZstdDecompressor.Decompress(RawBlockFrame(content)));
     }
 
@@ -113,10 +114,10 @@ public sealed class ZstdInteropVectorsTests
             return;
         }
 
-        string tmp = NewTempDir("boundary");
+        var tmp = NewTempDir("boundary");
         try
         {
-            string indir = Path.Combine(tmp, "in");
+            var indir = Path.Combine(tmp, "in");
             Directory.CreateDirectory(indir);
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal)
             {
@@ -127,7 +128,7 @@ public sealed class ZstdInteropVectorsTests
                 ["zeros.bin"] = new byte[70000],
             };
             var rnd = new Random(99);
-            byte[] incompressible = new byte[70000];
+            var incompressible = new byte[70000];
             rnd.NextBytes(incompressible);
             files["random.bin"] = incompressible;
 
@@ -137,7 +138,7 @@ public sealed class ZstdInteropVectorsTests
             }
 
             // exe -> ZARSharp.
-            string refZar = Path.Combine(tmp, "ref.zar");
+            var refZar = Path.Combine(tmp, "ref.zar");
             RunExe(indir, refZar);
             using (var reader = ZArchiveReader.TryOpen(refZar))
             {
@@ -146,18 +147,18 @@ public sealed class ZstdInteropVectorsTests
                 {
                     if (data.Length == 0)
                     {
-                        Assert.Equal(0ul, reader!.GetFileSize(reader.LookUp(rel)));
+                        Assert.Equal(0ul, reader.GetFileSize(reader.LookUp(rel)));
                         continue;
                     }
 
-                    Assert.Equal(data, reader!.ReadFile(reader.LookUp(rel)));
+                    Assert.Equal(data, reader.ReadFile(reader.LookUp(rel)));
                 }
             }
 
             // ZARSharp -> exe.
-            string ourZar = Path.Combine(tmp, "ours.zar");
+            var ourZar = Path.Combine(tmp, "ours.zar");
             ZArchiveTool.Pack(indir, ourZar);
-            string outdir = Path.Combine(tmp, "out");
+            var outdir = Path.Combine(tmp, "out");
             RunExe(ourZar, outdir);
             foreach (var (rel, data) in files)
             {
@@ -172,6 +173,7 @@ public sealed class ZstdInteropVectorsTests
             }
             catch
             {
+                // ignored
             }
         }
     }
@@ -184,28 +186,28 @@ public sealed class ZstdInteropVectorsTests
             return;
         }
 
-        string tmp = NewTempDir("trees");
+        var tmp = NewTempDir("trees");
         try
         {
-            string indir = Path.Combine(tmp, "in");
+            var indir = Path.Combine(tmp, "in");
             Directory.CreateDirectory(Path.Combine(indir, "docs", "sub"));
             File.WriteAllBytes(Path.Combine(indir, "docs", "readme.txt"), [1, 2, 3]);
             File.WriteAllBytes(Path.Combine(indir, "docs", "sub", "data.bin"), Pattern(1000, 3));
             File.WriteAllBytes(Path.Combine(indir, "caf\u00e9.txt"), [4, 5]); // é = 0xE9 in CP1252
             File.WriteAllBytes(Path.Combine(indir, "na\u00efve.bin"), Pattern(70000, 4)); // ï multi-block
 
-            string refZar = Path.Combine(tmp, "ref.zar");
+            var refZar = Path.Combine(tmp, "ref.zar");
             RunExe(indir, refZar);
             using (var reader = ZArchiveReader.TryOpen(refZar))
             {
                 Assert.NotNull(reader);
-                Assert.Equal([1, 2, 3], reader!.ReadFile(reader.LookUp("docs/readme.txt")));
+                Assert.Equal([1, 2, 3], reader.ReadFile(reader.LookUp("docs/readme.txt")));
                 Assert.Equal(Pattern(1000, 3), reader.ReadFile(reader.LookUp("docs/sub/data.bin")));
             }
 
-            string ourZar = Path.Combine(tmp, "ours.zar");
+            var ourZar = Path.Combine(tmp, "ours.zar");
             ZArchiveTool.Pack(indir, ourZar);
-            string outdir = Path.Combine(tmp, "out");
+            var outdir = Path.Combine(tmp, "out");
             RunExe(ourZar, outdir);
             Assert.Equal([1, 2, 3], File.ReadAllBytes(Path.Combine(outdir, "docs", "readme.txt")));
         }
@@ -217,6 +219,7 @@ public sealed class ZstdInteropVectorsTests
             }
             catch
             {
+                // ignored
             }
         }
     }

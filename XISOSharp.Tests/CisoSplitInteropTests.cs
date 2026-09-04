@@ -76,11 +76,15 @@ public class CisoSplitInteropTests : IDisposable
         throw new InvalidOperationException("Solution root not found.");
     }
 
-    private static string XdvdfsExePath() =>
-        Path.Combine(SolutionRoot(), "References", "xdvdfs-0.8.3", "xdvdfs.exe");
+    private static string XdvdfsExePath()
+    {
+        return Path.Combine(SolutionRoot(), "References", "xdvdfs-0.8.3", "xdvdfs.exe");
+    }
 
-    private static bool ReferenceAvailable() =>
-        OperatingSystem.IsWindows() && File.Exists(XdvdfsExePath());
+    private static bool ReferenceAvailable()
+    {
+        return OperatingSystem.IsWindows() && File.Exists(XdvdfsExePath());
+    }
 
     private static string RunXdvdfs(string arguments, string workDir)
     {
@@ -93,9 +97,9 @@ public class CisoSplitInteropTests : IDisposable
             CreateNoWindow = true,
         };
         using var proc = Process.Start(psi)!;
-        string stdout = proc.StandardOutput.ReadToEnd();
+        var stdout = proc.StandardOutput.ReadToEnd();
         Assert.True(proc.WaitForExit(120000), "xdvdfs.exe timed out.");
-        string stderr = proc.StandardError.ReadToEnd();
+        var stderr = proc.StandardError.ReadToEnd();
         Assert.True(proc.ExitCode == 0, $"xdvdfs.exe failed: {stderr}");
         return stdout;
     }
@@ -120,9 +124,15 @@ public class CisoSplitInteropTests : IDisposable
         return outPath;
     }
 
-    private static byte[] ComputeSha256(string path) => SHA256.HashData(File.ReadAllBytes(path));
+    private static byte[] ComputeSha256(string path)
+    {
+        return SHA256.HashData(File.ReadAllBytes(path));
+    }
 
-    private static string Md5Hex(byte[] data) => Convert.ToHexString(MD5.HashData(data)).ToLowerInvariant();
+    private static string Md5Hex(byte[] data)
+    {
+        return Convert.ToHexString(MD5.HashData(data)).ToLowerInvariant();
+    }
 
     private static Dictionary<string, string> ParseMd5Listing(string stdout)
     {
@@ -139,8 +149,10 @@ public class CisoSplitInteropTests : IDisposable
         return map;
     }
 
-    private static string StockMd5(string imagePath, string workDir) =>
-        RunXdvdfs($"md5 \"{imagePath}\"", workDir);
+    private static string StockMd5(string imagePath, string workDir)
+    {
+        return RunXdvdfs($"md5 \"{imagePath}\"", workDir);
+    }
 
     /// <summary>
     /// Keeps only entries that are files on disk: directory dirtab bytes are
@@ -152,7 +164,7 @@ public class CisoSplitInteropTests : IDisposable
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (path, hash) in listing)
         {
-            string local = path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+            var local = path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
             if (File.Exists(Path.Combine(sourceDir, local)))
             {
                 files[path] = hash;
@@ -170,18 +182,18 @@ public class CisoSplitInteropTests : IDisposable
             return; // reference binary not present; covered by self round-trip tests
         }
 
-        string isoPath = CreateTempIso();
-        string workDir = CreateTempDir();
+        var isoPath = CreateTempIso();
+        var workDir = CreateTempDir();
 
         // Note: the reference SplitOutput derives part names from the file name only
         // and creates them relative to the process working directory.
         RunXdvdfs($"compress \"{isoPath}\" \"{Path.Combine(workDir, "rust.cso")}\"", workDir);
 
-        string part1 = Path.Combine(workDir, "rust.1.cso");
+        var part1 = Path.Combine(workDir, "rust.1.cso");
         Assert.True(File.Exists(part1), "expected the reference writer to emit rust.1.cso");
         Assert.True(CisoReader.IsCso(part1));
 
-        string decPath = Path.Combine(CreateTempDir(), "rust.iso");
+        var decPath = Path.Combine(CreateTempDir(), "rust.iso");
         Assert.Equal(0, CisoReader.DecompressToIso(part1, decPath));
 
         // The reference repacks the image before compressing, so compare content
@@ -191,7 +203,7 @@ public class CisoSplitInteropTests : IDisposable
             FilesOnly(ParseMd5Listing(StockMd5(isoPath, workDir)), SourceDir),
             FilesOnly(ParseMd5Listing(StockMd5(decPath, workDir)), SourceDir));
 
-        using var dev = new XISOSharp.BlockDevice.CisoBlockDevice(part1);
+        using var dev = new BlockDevice.CisoBlockDevice(part1);
         Assert.Equal(new FileInfo(decPath).Length, dev.Length);
     }
 
@@ -203,19 +215,19 @@ public class CisoSplitInteropTests : IDisposable
             return; // reference binary not present; covered by self round-trip tests
         }
 
-        string srcDir = CreateTempDir();
+        var srcDir = CreateTempDir();
         Directory.CreateDirectory(Path.Combine(srcDir, "sub"));
-        byte[] blob = Enumerable.Range(0, 200000).Select(i => (byte)((i * 2654435761u) >> 16)).ToArray();
+        var blob = Enumerable.Range(0, 200000).Select(i => (byte)((i * 2654435761u) >> 16)).ToArray();
         File.WriteAllText(Path.Combine(srcDir, "hello.txt"), "hello rust golden world");
         File.WriteAllBytes(Path.Combine(srcDir, "sub", "blob.bin"), blob);
 
-        string workDir = CreateTempDir();
+        var workDir = CreateTempDir();
         RunXdvdfs($"compress \"{srcDir}\" \"{Path.Combine(workDir, "rustdir.cso")}\"", workDir);
 
-        string part1 = Path.Combine(workDir, "rustdir.1.cso");
+        var part1 = Path.Combine(workDir, "rustdir.1.cso");
         Assert.True(File.Exists(part1), "expected the reference writer to emit rustdir.1.cso");
 
-        string decPath = Path.Combine(CreateTempDir(), "rustdir.iso");
+        var decPath = Path.Combine(CreateTempDir(), "rustdir.iso");
         Assert.Equal(0, CisoReader.DecompressToIso(part1, decPath));
 
         var got = FilesOnly(ParseMd5Listing(StockMd5(decPath, workDir)), srcDir);
@@ -235,9 +247,9 @@ public class CisoSplitInteropTests : IDisposable
             return; // reference binary not present; covered by self round-trip tests
         }
 
-        string isoPath = CreateTempIso();
-        string workDir = CreateTempDir();
-        string csoPath = Path.Combine(workDir, "single.cso");
+        var isoPath = CreateTempIso();
+        var workDir = CreateTempDir();
+        var csoPath = Path.Combine(workDir, "single.cso");
         Assert.Equal(0, CisoWriter.CompressToCso(isoPath, csoPath, level: 9));
 
         Assert.Equal(
@@ -252,9 +264,9 @@ public class CisoSplitInteropTests : IDisposable
         // split.rs): part names, sparse global-offset writes, and the overshoot rule
         // (a write crossing the split point lands whole, so each part's data starts
         // exactly where the previous part's file ends). Needs no reference binary.
-        string isoPath = CreateTempIso();
-        string csoDir = CreateTempDir();
-        string csoPath = Path.Combine(csoDir, "ours.cso");
+        var isoPath = CreateTempIso();
+        var csoDir = CreateTempDir();
+        var csoPath = Path.Combine(csoDir, "ours.cso");
         const long splitBytes = 16384;
         Assert.Equal(0, CisoWriter.CompressToCso(isoPath, csoPath, level: 9, splitBytes: splitBytes));
 
@@ -271,7 +283,7 @@ public class CisoSplitInteropTests : IDisposable
         long previousLength = 0;
         foreach (var part in parts)
         {
-            byte[] data = File.ReadAllBytes(part);
+            var data = File.ReadAllBytes(part);
             var firstData = Array.FindIndex(data, b => b != 0);
             Assert.True(firstData >= 0, $"{part} has no data");
             // Data starts exactly where the previous part's file ends (sequential
@@ -285,7 +297,7 @@ public class CisoSplitInteropTests : IDisposable
 
         // Content round-trips through our tiling reader (SplitFileReader parity note
         // in the class doc: stock 0.8.3 itself cannot read sparse multi-part files).
-        string decPath = Path.Combine(CreateTempDir(), "ours.iso");
+        var decPath = Path.Combine(CreateTempDir(), "ours.iso");
         Assert.Equal(0, CisoReader.DecompressToIso(parts[0], decPath));
         Assert.True(ComputeSha256(isoPath).AsSpan().SequenceEqual(ComputeSha256(decPath)));
     }

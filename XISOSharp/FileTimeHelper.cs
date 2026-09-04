@@ -77,7 +77,7 @@ public static class FileTimeHelper
     {
         // DateTime.ToFileTimeUtc is precise integer arithmetic (BCL).
         // Clamp to valid FILETIME range: 0 .. DateTime.MaxValue.
-        DateTime utc = dateTime.UtcDateTime;
+        var utc = dateTime.UtcDateTime;
         if (utc < FileTimeEpoch.UtcDateTime)
             return 0UL;
         try
@@ -105,7 +105,7 @@ public static class FileTimeHelper
         {
             try
             {
-                DateTime utc = DateTime.FromFileTimeUtc((long)fileTime);
+                var utc = DateTime.FromFileTimeUtc((long)fileTime);
                 return new DateTimeOffset(utc, TimeSpan.Zero);
             }
             catch (ArgumentOutOfRangeException)
@@ -207,7 +207,7 @@ public static class FileTimeHelper
     /// <returns>Formatted string.</returns>
     public static string FormatFileTime(ulong fileTime)
     {
-        DateTimeOffset dto = FromFileTimeRaw(fileTime);
+        var dto = FromFileTimeRaw(fileTime);
         return $"{dto:O} ({fileTime})";
     }
 }

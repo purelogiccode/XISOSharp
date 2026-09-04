@@ -14,9 +14,9 @@ public sealed class ZstdEncoderTests
     private static byte[] Text(int n, int seed = 42)
     {
         const string sample = "The quick brown fox jumps over the lazy dog. ZArchive block 64 KiB. ";
-        byte[] ascii = System.Text.Encoding.ASCII.GetBytes(sample);
-        byte[] outBuf = new byte[n];
-        for (int i = 0; i < n; i++)
+        var ascii = System.Text.Encoding.ASCII.GetBytes(sample);
+        var outBuf = new byte[n];
+        for (var i = 0; i < n; i++)
         {
             outBuf[i] = ascii[(i + seed) % ascii.Length];
         }
@@ -26,7 +26,7 @@ public sealed class ZstdEncoderTests
 
     private static byte[] Random(int n, int seed)
     {
-        byte[] outBuf = new byte[n];
+        var outBuf = new byte[n];
         new Random(seed).NextBytes(outBuf);
         return outBuf;
     }
@@ -40,9 +40,9 @@ public sealed class ZstdEncoderTests
     [InlineData(6)]
     public void CompressBlock_Text64K_CompressesAndRoundTrips(int level)
     {
-        byte[] input = Text(65536);
+        var input = Text(65536);
         var compressor = new ZstdCompressor(ZstdCompressionOptions.FromLevel(level));
-        byte[] frame = compressor.CompressBlock(input);
+        var frame = compressor.CompressBlock(input);
         Assert.True(frame.Length < input.Length, $"L{level}: frame {frame.Length} not smaller than input.");
         Assert.Equal(input, ZstdDecompressor.Decompress(frame));
     }
@@ -62,7 +62,7 @@ public sealed class ZstdEncoderTests
             Random(1024, 9),
             [1, 2, 3, 4, 5, 6, 7, 8],
         ];
-        foreach (byte[] input in inputs)
+        foreach (var input in inputs)
         {
             Assert.Equal(input, ZstdDecompressor.Decompress(compressor.CompressBlock(input)));
         }
@@ -83,18 +83,18 @@ public sealed class ZstdEncoderTests
     [InlineData(100000)] // Multi-block frame.
     public void CompressBlock_Sizes_RoundTrip(int size)
     {
-        byte[] input = Text(size);
+        var input = Text(size);
         var compressor = new ZstdCompressor();
         Assert.Equal(input, ZstdDecompressor.Decompress(compressor.CompressBlock(input)));
 
-        byte[] random = Random(size, size + 1);
+        var random = Random(size, size + 1);
         Assert.Equal(random, ZstdDecompressor.Decompress(compressor.CompressBlock(random)));
     }
 
     [Fact]
     public void CompressBlock_Zeros_IsTiny()
     {
-        byte[] frame = new ZstdCompressor().CompressBlock(new byte[65536]);
+        var frame = new ZstdCompressor().CompressBlock(new byte[65536]);
         Assert.True(frame.Length < 64, $"Zeros frame is {frame.Length} bytes.");
         Assert.Equal(new byte[65536], ZstdDecompressor.Decompress(frame));
     }
@@ -102,7 +102,7 @@ public sealed class ZstdEncoderTests
     [Fact]
     public void CompressBlock_Empty_IsValidEmptyFrame()
     {
-        byte[] frame = new ZstdCompressor().CompressBlock([]);
+        var frame = new ZstdCompressor().CompressBlock([]);
         Assert.Equal([], ZstdDecompressor.Decompress(frame));
     }
 
@@ -110,11 +110,11 @@ public sealed class ZstdEncoderTests
     public void Compress_SpanApi_DeclinesIncompressible()
     {
         var compressor = new ZstdCompressor();
-        byte[] random = Random(65536, 1234);
-        byte[] dst = new byte[ZstdCompressor.GetCompressBound(random.Length)];
+        var random = Random(65536, 1234);
+        var dst = new byte[ZstdCompressor.GetCompressBound(random.Length)];
         Assert.Equal(-1, compressor.Compress(random, dst));
 
-        byte[] tiny = new byte[10];
+        var tiny = new byte[10];
         Assert.Equal(-1, compressor.Compress(tiny, new byte[128]));
         Assert.Equal(-1, compressor.Compress([], new byte[128]));
     }
@@ -123,9 +123,9 @@ public sealed class ZstdEncoderTests
     public void Compress_SpanApi_CompressibleFitsAndDecodes()
     {
         var compressor = new ZstdCompressor();
-        byte[] input = Text(65536);
-        byte[] dst = new byte[ZstdCompressor.GetCompressBound(input.Length)];
-        int size = compressor.Compress(input, dst);
+        var input = Text(65536);
+        var dst = new byte[ZstdCompressor.GetCompressBound(input.Length)];
+        var size = compressor.Compress(input, dst);
         Assert.True(size > 0 && size < input.Length);
         Assert.Equal(input, ZstdDecompressor.Decompress(dst[..size]));
 
@@ -136,11 +136,11 @@ public sealed class ZstdEncoderTests
     [Fact]
     public void CompressBlock_Checksum_RoundTripsAndDetectsCorruption()
     {
-        byte[] input = Text(8192);
+        var input = Text(8192);
         var plain = new ZstdCompressor();
         var checksummed = new ZstdCompressor(new ZstdCompressionOptions { Level = 6, ChecksumFlag = true });
-        byte[] framePlain = plain.CompressBlock(input);
-        byte[] frameSum = checksummed.CompressBlock(input);
+        var framePlain = plain.CompressBlock(input);
+        var frameSum = checksummed.CompressBlock(input);
         Assert.Equal(framePlain.Length + 4, frameSum.Length);
         Assert.Equal(input, ZstdDecompressor.Decompress(frameSum));
 
@@ -149,7 +149,7 @@ public sealed class ZstdEncoderTests
         Assert.Throws<ZstdException>(() => ZstdDecompressor.Decompress(frameSum));
 
         // Corrupt a payload byte → decoder rejects (or checksum catches it).
-        byte[] corrupt = (byte[])checksummed.CompressBlock(input).Clone();
+        var corrupt = (byte[])checksummed.CompressBlock(input).Clone();
         corrupt[corrupt.Length / 2] ^= 0x40;
         Assert.Throws<ZstdException>(() => ZstdDecompressor.Decompress(corrupt));
     }
@@ -158,8 +158,8 @@ public sealed class ZstdEncoderTests
     public void CompressBlock_Random_IsValidViaRawBlocks()
     {
         // Incompressible data still yields a valid frame (raw blocks inside).
-        byte[] random = Random(65536, 555);
-        byte[] frame = new ZstdCompressor().CompressBlock(random);
+        var random = Random(65536, 555);
+        var frame = new ZstdCompressor().CompressBlock(random);
         Assert.Equal(random, ZstdDecompressor.Decompress(frame));
     }
 
@@ -181,26 +181,26 @@ public sealed class ZstdEncoderTests
         // the stale {1,4,8} history (first diff at source byte 73470).
         // If the encoder ever compresses block 0 outright, this input no
         // longer covers the path — find a new trigger, do not delete this.
-        byte[] block0 = RawTriggerBlock();
-        byte[] block1 = Random(65536, 99);
+        var block0 = RawTriggerBlock();
+        var block1 = Random(65536, 99);
         Array.Copy(block1, 0, block1, 7912, 4096);
 
-        uint[] rep = ZstdSeq.FreshRepeatOffsets();
-        int blockSize = ZstdBlockEncoder.EncodeBlock(
+        var rep = ZstdSeq.FreshRepeatOffsets();
+        var blockSize = ZstdBlockEncoder.EncodeBlock(
             block0, level, new byte[70000], 0, 70000, lastBlock: false, rep);
         Assert.True(
             blockSize < 0 || blockSize >= block0.Length + 3,
             $"L{level}: trigger block no longer takes the raw path (size {blockSize}).");
 
-        byte[] src = new byte[block0.Length + block1.Length];
+        var src = new byte[block0.Length + block1.Length];
         Array.Copy(block0, src, block0.Length);
         Array.Copy(block1, 0, src, block0.Length, block1.Length);
 
         var compressor = new ZstdCompressor(ZstdCompressionOptions.FromLevel(level));
-        byte[] frame = compressor.CompressBlock(src);
+        var frame = compressor.CompressBlock(src);
         Assert.Equal(src, ZstdDecompressor.Decompress(frame));
 
-        string? python = FindPythonWithZstd();
+        var python = FindPythonWithZstd();
         if (python is not null)
         {
             Assert.Equal(src, DecodeWithNativePython(python, frame));
@@ -213,13 +213,13 @@ public sealed class ZstdEncoderTests
         // stores sequences (staging repeat history at L3+) while the frame
         // writer still falls back to raw for the block.
         var rng = new Random(1047);
-        byte[] chunk = new byte[65536];
+        var chunk = new byte[65536];
         rng.NextBytes(chunk);
-        byte[] pat = new byte[8];
+        var pat = new byte[8];
         rng.NextBytes(pat);
-        for (int k = 0; k < 2; k++)
+        for (var k = 0; k < 2; k++)
         {
-            int at = rng.Next(0, chunk.Length - 8);
+            var at = rng.Next(0, chunk.Length - 8);
             Array.Copy(pat, 0, chunk, at, 8);
         }
 
@@ -231,7 +231,7 @@ public sealed class ZstdEncoderTests
     [InlineData(6)]
     public void NativePython_DecodesOurFrames(int level)
     {
-        string? python = FindPythonWithZstd();
+        var python = FindPythonWithZstd();
         if (python is null)
         {
             // Toolchain-conditional (xunit v2 has no dynamic Skip): passes
@@ -241,10 +241,10 @@ public sealed class ZstdEncoderTests
 
         byte[][] inputs = [Text(65536), new byte[65536], Random(5000, 11), Text(0), Text(100000)];
         var compressor = new ZstdCompressor(ZstdCompressionOptions.FromLevel(level));
-        foreach (byte[] input in inputs)
+        foreach (var input in inputs)
         {
-            byte[] frame = compressor.CompressBlock(input);
-            Assert.Equal(input, DecodeWithNativePython(python!, frame));
+            var frame = compressor.CompressBlock(input);
+            Assert.Equal(input, DecodeWithNativePython(python, frame));
         }
     }
 
@@ -253,7 +253,7 @@ public sealed class ZstdEncoderTests
         string[] candidates = OperatingSystem.IsWindows()
             ? ["python", "python3"]
             : ["python3", "python"];
-        foreach (string candidate in candidates)
+        foreach (var candidate in candidates)
         {
             try
             {
@@ -286,7 +286,7 @@ public sealed class ZstdEncoderTests
 
     private static byte[] DecodeWithNativePython(string python, byte[] frame)
     {
-        string path = Path.Combine(Path.GetTempPath(), $"zarsharp-native-{Guid.NewGuid():N}.zst");
+        var path = Path.Combine(Path.GetTempPath(), $"zarsharp-native-{Guid.NewGuid():N}.zst");
         try
         {
             File.WriteAllBytes(path, frame);
@@ -320,6 +320,7 @@ public sealed class ZstdEncoderTests
             }
             catch
             {
+                // ignored
             }
         }
     }

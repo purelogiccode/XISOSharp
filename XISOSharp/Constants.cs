@@ -51,7 +51,9 @@ public static class Constants
     /// (<c>0xFFFF</c> or <c>0x0000</c>), matching xdvdfs behaviour.
     /// </summary>
     public static bool IsEmptyDirectorySentinel(ushort value)
-        => value == PadShort || value == EmptyDirectorySentinel;
+    {
+        return value == PadShort || value == EmptyDirectorySentinel;
+    }
 
     /// <summary>
     /// Returns true if the 14-byte directory entry header at <paramref name="header"/>
@@ -186,7 +188,10 @@ public static class Constants
     /// <summary>Masks out reserved attribute bits (3 and 6) from a raw attribute byte, matching xdvdfs behavior.</summary>
     /// <param name="attrs">Raw attribute byte read from disk.</param>
     /// <returns>Attribute byte with reserved bits cleared.</returns>
-    public static byte MaskAttributes(byte attrs) => (byte)(attrs & AttributeValidMask);
+    public static byte MaskAttributes(byte attrs)
+    {
+        return (byte)(attrs & AttributeValidMask);
+    }
 
     /// <summary>Version string reported by the tool and written into the optimized tag.</summary>
     public const string ExisoVersion = "2.7.1 (01.11.14)";

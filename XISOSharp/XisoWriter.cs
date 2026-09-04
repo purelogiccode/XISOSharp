@@ -683,7 +683,7 @@ public static class XisoWriter
         IReadOnlyList<string>? excludePatterns = null,
         string relativePath = "")
     {
-        GlobMatcher? matcher = excludePatterns is { Count: > 0 } ? new GlobMatcher(excludePatterns) : null;
+        var matcher = excludePatterns is { Count: > 0 } ? new GlobMatcher(excludePatterns) : null;
         return GenerateAvlTreeLocalCore(ref outRoot, ref ioN, ref filesSkipped, matcher, relativePath);
     }
 

@@ -1,6 +1,8 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 namespace ZARSharp.Zstd;
 
 /// <summary>
@@ -71,21 +73,27 @@ internal static class ZstdHuffmanEncoder
     /// Worst-case stream size without the table description
     /// (<c>HUF_BLOCKBOUND</c>).
     /// </summary>
-    public static int BlockBound(int srcSize) => srcSize + (srcSize >> 8) + 8;
+    public static int BlockBound(int srcSize)
+    {
+        return srcSize + (srcSize >> 8) + 8;
+    }
 
     /// <summary>
     /// Worst-case size of table description plus streams
     /// (<c>HUF_COMPRESSBOUND</c>). Size encode buffers with this.
     /// </summary>
-    public static int CompressBound(int srcSize) => CTableBound + BlockBound(srcSize);
+    public static int CompressBound(int srcSize)
+    {
+        return CTableBound + BlockBound(srcSize);
+    }
 
     /// <summary>
     /// Number of distinct symbols with nonzero count (<c>HUF_cardinality</c>).
     /// </summary>
     public static int Cardinality(uint[] count, int maxSymbolValue)
     {
-        int cardinality = 0;
-        for (int i = 0; i <= maxSymbolValue; i++)
+        var cardinality = 0;
+        for (var i = 0; i <= maxSymbolValue; i++)
         {
             if (count[i] != 0)
             {
@@ -100,8 +108,10 @@ internal static class ZstdHuffmanEncoder
     /// Minimum table log holding <paramref name="symbolCardinality"/> symbols
     /// (<c>HUF_minTableLog</c>).
     /// </summary>
-    public static int MinTableLog(int symbolCardinality) =>
-        BitOperations.Log2((uint)symbolCardinality) + 1;
+    public static int MinTableLog(int symbolCardinality)
+    {
+        return BitOperations.Log2((uint)symbolCardinality) + 1;
+    }
 
     /// <summary>
     /// Cheap table-log selection (<c>HUF_optimalTableLog</c> without the
@@ -112,7 +122,7 @@ internal static class ZstdHuffmanEncoder
     /// </summary>
     public static int OptimalTableLog(int srcSize, int maxSymbolValue, int maxTableLog = TableLogDefault)
     {
-        int tableLog = ZstdFseEncoder.OptimalTableLog(maxTableLog, srcSize, maxSymbolValue, minus: 1);
+        var tableLog = ZstdFseEncoder.OptimalTableLog(maxTableLog, srcSize, maxSymbolValue, minus: 1);
         return Math.Min(tableLog, TableLogDefault);
     }
 
@@ -126,7 +136,7 @@ internal static class ZstdHuffmanEncoder
         ArgumentNullException.ThrowIfNull(count);
 
         long nbBits = 0;
-        for (int s = 0; s <= maxSymbolValue; s++)
+        for (var s = 0; s <= maxSymbolValue; s++)
         {
             nbBits += (long)table.NbBits[s] * count[s];
         }
@@ -157,29 +167,29 @@ internal static class ZstdHuffmanEncoder
 
         // Sort symbols by decreasing count (HUF_sort); ties by ascending
         // symbol for determinism (the reference leaves ties unspecified).
-        int alphabetSize = maxSymbolValue + 1;
+        var alphabetSize = maxSymbolValue + 1;
         var order = new int[alphabetSize];
-        for (int i = 0; i < alphabetSize; i++)
+        for (var i = 0; i < alphabetSize; i++)
         {
             order[i] = i;
         }
 
         Array.Sort(order, (a, b) =>
         {
-            int c = count[b].CompareTo(count[a]);
+            var c = count[b].CompareTo(count[a]);
             return c != 0 ? c : a.CompareTo(b);
         });
 
         // huffNode array with 1-based indexing (huffNode == huffNode0 + 1):
         // leaves at t[1 + i], internal nodes at t[1 + n], barrier at t[0].
-        var t = new NodeElt[2 * (SymbolValueMax + 1) + 1];
-        for (int i = 0; i < alphabetSize; i++)
+        var t = new NodeElt[(2 * (SymbolValueMax + 1)) + 1];
+        for (var i = 0; i < alphabetSize; i++)
         {
             t[1 + i].Count = count[order[i]];
             t[1 + i].Symbol = (byte)order[i];
         }
 
-        int nonNullRank = maxSymbolValue;
+        var nonNullRank = maxSymbolValue;
         while (nonNullRank > 0 && t[1 + nonNullRank].Count == 0)
         {
             nonNullRank--;
@@ -192,7 +202,7 @@ internal static class ZstdHuffmanEncoder
 
         BuildTree(t, nonNullRank);
 
-        int maxNbBits = SetMaxHeight(t, nonNullRank, tableLog);
+        var maxNbBits = SetMaxHeight(t, nonNullRank, tableLog);
         if (maxNbBits > TableLogMax)
         {
             throw new ZstdException("Huffman tree too deep.");
@@ -214,16 +224,16 @@ internal static class ZstdHuffmanEncoder
     private static void BuildTree(NodeElt[] t, int nonNullRank)
     {
         const int startNode = SymbolValueMax + 1; // STARTNODE
-        int lowS = nonNullRank;
-        int lowN = startNode;
-        int nodeNb = startNode;
-        int nodeRoot = nodeNb + lowS - 1;
+        var lowS = nonNullRank;
+        var lowN = startNode;
+        var nodeNb = startNode;
+        var nodeRoot = nodeNb + lowS - 1;
 
         t[1 + nodeNb].Count = t[1 + lowS].Count + t[1 + lowS - 1].Count;
         t[1 + lowS].Parent = t[1 + lowS - 1].Parent = (ushort)nodeNb;
         nodeNb++;
         lowS -= 2;
-        for (int n = nodeNb; n <= nodeRoot; n++)
+        for (var n = nodeNb; n <= nodeRoot; n++)
         {
             t[1 + n].Count = 1u << 30;
         }
@@ -232,22 +242,22 @@ internal static class ZstdHuffmanEncoder
 
         while (nodeNb <= nodeRoot)
         {
-            uint countS = lowS >= 0 ? t[1 + lowS].Count : 0x80000000u;
-            int n1 = countS < t[1 + lowN].Count ? lowS-- : lowN++;
+            var countS = lowS >= 0 ? t[1 + lowS].Count : 0x80000000u;
+            var n1 = countS < t[1 + lowN].Count ? lowS-- : lowN++;
             countS = lowS >= 0 ? t[1 + lowS].Count : 0x80000000u;
-            int n2 = countS < t[1 + lowN].Count ? lowS-- : lowN++;
+            var n2 = countS < t[1 + lowN].Count ? lowS-- : lowN++;
             t[1 + nodeNb].Count = t[1 + n1].Count + t[1 + n2].Count;
             t[1 + n1].Parent = t[1 + n2].Parent = (ushort)nodeNb;
             nodeNb++;
         }
 
         t[1 + nodeRoot].NbBits = 0;
-        for (int n = nodeRoot - 1; n >= startNode; n--)
+        for (var n = nodeRoot - 1; n >= startNode; n--)
         {
             t[1 + n].NbBits = (byte)(t[1 + t[1 + n].Parent].NbBits + 1);
         }
 
-        for (int n = 0; n <= nonNullRank; n++)
+        for (var n = 0; n <= nonNullRank; n++)
         {
             t[1 + n].NbBits = (byte)(t[1 + t[1 + n].Parent].NbBits + 1);
         }
@@ -263,9 +273,9 @@ internal static class ZstdHuffmanEncoder
             return largestBits;
         }
 
-        int totalCost = 0;
-        int baseCost = 1 << (largestBits - targetNbBits);
-        int n = lastNonNull;
+        var totalCost = 0;
+        var baseCost = 1 << (largestBits - targetNbBits);
+        var n = lastNonNull;
 
         while (t[1 + n].NbBits > targetNbBits)
         {
@@ -283,13 +293,13 @@ internal static class ZstdHuffmanEncoder
 
         const uint noSymbol = 0xF0F0F0F0;
         var rankLast = new uint[TableLogMax + 2];
-        for (int i = 0; i < rankLast.Length; i++)
+        for (var i = 0; i < rankLast.Length; i++)
         {
             rankLast[i] = noSymbol;
         }
 
-        int currentNbBits = targetNbBits;
-        for (int pos = n; pos >= 0; pos--)
+        var currentNbBits = targetNbBits;
+        for (var pos = n; pos >= 0; pos--)
         {
             if (t[1 + pos].NbBits >= currentNbBits)
             {
@@ -302,11 +312,11 @@ internal static class ZstdHuffmanEncoder
 
         while (totalCost > 0)
         {
-            int nBitsToDecrease = BitOperations.Log2((uint)totalCost) + 1;
+            var nBitsToDecrease = BitOperations.Log2((uint)totalCost) + 1;
             for (; nBitsToDecrease > 1; nBitsToDecrease--)
             {
-                uint highPos = rankLast[nBitsToDecrease];
-                uint lowPos = rankLast[nBitsToDecrease - 1];
+                var highPos = rankLast[nBitsToDecrease];
+                var lowPos = rankLast[nBitsToDecrease - 1];
                 if (highPos == noSymbol)
                 {
                     continue;
@@ -317,8 +327,8 @@ internal static class ZstdHuffmanEncoder
                     break;
                 }
 
-                uint highTotal = t[1 + (int)highPos].Count;
-                uint lowTotal = 2 * t[1 + (int)lowPos].Count;
+                var highTotal = t[1 + (int)highPos].Count;
+                var lowTotal = 2 * t[1 + (int)lowPos].Count;
                 if (highTotal <= lowTotal)
                 {
                     break;
@@ -381,26 +391,26 @@ internal static class ZstdHuffmanEncoder
     {
         var nbPerRank = new int[TableLogMax + 1];
         var valPerRank = new int[TableLogMax + 1];
-        for (int i = 0; i <= nonNullRank; i++)
+        for (var i = 0; i <= nonNullRank; i++)
         {
             nbPerRank[t[1 + i].NbBits]++;
         }
 
-        int min = 0;
-        for (int i = maxNbBits; i > 0; i--)
+        var min = 0;
+        for (var i = maxNbBits; i > 0; i--)
         {
             valPerRank[i] = min;
             min += nbPerRank[i];
             min >>= 1;
         }
 
-        for (int i = 0; i <= nonNullRank; i++)
+        for (var i = 0; i <= nonNullRank; i++)
         {
             table.NbBits[t[1 + i].Symbol] = t[1 + i].NbBits;
         }
 
-        int alphabetSize = table.MaxSymbolValue + 1;
-        for (int i = 0; i < alphabetSize; i++)
+        var alphabetSize = table.MaxSymbolValue + 1;
+        for (var i = 0; i < alphabetSize; i++)
         {
             int nbBits = table.NbBits[i];
             if (nbBits > 0)
@@ -424,15 +434,15 @@ internal static class ZstdHuffmanEncoder
         ArgumentNullException.ThrowIfNull(dst);
         ArgumentNullException.ThrowIfNull(table);
 
-        int maxSymbolValue = table.MaxSymbolValue;
-        int huffLog = table.TableLog;
+        var maxSymbolValue = table.MaxSymbolValue;
+        var huffLog = table.TableLog;
         if (maxSymbolValue < 1 || maxSymbolValue > SymbolValueMax)
         {
             return 0;
         }
 
         var weights = new byte[maxSymbolValue];
-        for (int i = 0; i < maxSymbolValue; i++)
+        for (var i = 0; i < maxSymbolValue; i++)
         {
             int nbBits = table.NbBits[i];
             weights[i] = nbBits == 0 ? (byte)0 : (byte)(huffLog + 1 - nbBits);
@@ -443,7 +453,7 @@ internal static class ZstdHuffmanEncoder
             return 0;
         }
 
-        int hSize = CompressWeights(dst, offset + 1, capacity - 1, weights, maxSymbolValue);
+        var hSize = CompressWeights(dst, offset + 1, capacity - 1, weights, maxSymbolValue);
         if (hSize > 1 && hSize < maxSymbolValue / 2)
         {
             dst[offset] = (byte)hSize;
@@ -459,15 +469,15 @@ internal static class ZstdHuffmanEncoder
             return 0;
         }
 
-        if ((maxSymbolValue + 1) / 2 + 1 > capacity)
+        if (((maxSymbolValue + 1) / 2) + 1 > capacity)
         {
             return 0;
         }
 
         dst[offset] = (byte)(128 + (maxSymbolValue - 1));
-        for (int i = 0; i < maxSymbolValue; i += 2)
+        for (var i = 0; i < maxSymbolValue; i += 2)
         {
-            byte lo = i + 1 < maxSymbolValue ? weights[i + 1] : (byte)0;
+            var lo = i + 1 < maxSymbolValue ? weights[i + 1] : (byte)0;
             dst[offset + 1 + (i / 2)] = (byte)((weights[i] << 4) | lo);
         }
 
@@ -485,7 +495,7 @@ internal static class ZstdHuffmanEncoder
         }
 
         var count = new uint[TableLogMax + 1];
-        for (int i = 0; i < weightCount; i++)
+        for (var i = 0; i < weightCount; i++)
         {
             if (weights[i] > TableLogMax)
             {
@@ -495,14 +505,14 @@ internal static class ZstdHuffmanEncoder
             count[weights[i]]++;
         }
 
-        int wmax = TableLogMax;
+        var wmax = TableLogMax;
         while (wmax > 0 && count[wmax] == 0)
         {
             wmax--;
         }
 
         uint largest = 0;
-        for (int i = 0; i <= wmax; i++)
+        for (var i = 0; i <= wmax; i++)
         {
             largest = Math.Max(largest, count[i]);
         }
@@ -519,7 +529,7 @@ internal static class ZstdHuffmanEncoder
 
         try
         {
-            int tableLog = ZstdFseEncoder.OptimalTableLog(MaxFseTableLogForHuffHeader, weightCount, wmax);
+            var tableLog = ZstdFseEncoder.OptimalTableLog(MaxFseTableLogForHuffHeader, weightCount, wmax);
             var norm = new short[wmax + 1];
             var wcount = new uint[wmax + 1];
             Array.Copy(count, wcount, wmax + 1);
@@ -528,9 +538,9 @@ internal static class ZstdHuffmanEncoder
                 return 0;
             }
 
-            int hSize = ZstdFseEncoder.WriteNCount(dst, offset, capacity, norm, wmax, tableLog);
+            var hSize = ZstdFseEncoder.WriteNCount(dst, offset, capacity, norm, wmax, tableLog);
             var ct = ZstdFseEncoder.BuildCTable(norm, wmax, tableLog);
-            int cSize = ZstdFseEncoder.Encode(dst, offset + hSize, capacity - hSize, weights, 0, weightCount, ct);
+            var cSize = ZstdFseEncoder.Encode(dst, offset + hSize, capacity - hSize, weights, 0, weightCount, ct);
             if (cSize < 0)
             {
                 return 0;
@@ -564,9 +574,9 @@ internal static class ZstdHuffmanEncoder
         }
 
         var bitC = new HufCStream(dst, dstOffset, dstCapacity);
-        for (int i = srcLength - 1; i >= 0; i--)
+        for (var i = srcLength - 1; i >= 0; i--)
         {
-            byte symbol = src[srcOffset + i];
+            var symbol = src[srcOffset + i];
             int nbBits = table.NbBits[symbol];
             if (nbBits <= 0)
             {
@@ -602,41 +612,41 @@ internal static class ZstdHuffmanEncoder
             return 0;
         }
 
-        int segmentSize = (srcLength + 3) / 4;
-        int op = dstOffset + 6;
-        int capLeft = dstCapacity - 6;
+        var segmentSize = (srcLength + 3) / 4;
+        var op = dstOffset + 6;
+        var capLeft = dstCapacity - 6;
 
-        int c1 = Compress1X(dst, op, capLeft, src, srcOffset, segmentSize, table);
+        var c1 = Compress1X(dst, op, capLeft, src, srcOffset, segmentSize, table);
         if (c1 == 0 || c1 > 65535)
         {
             return 0;
         }
 
-        WriteU16LE(dst, dstOffset, (ushort)c1);
+        WriteU16Le(dst, dstOffset, (ushort)c1);
         op += c1;
         capLeft -= c1;
 
-        int c2 = Compress1X(dst, op, capLeft, src, srcOffset + segmentSize, segmentSize, table);
+        var c2 = Compress1X(dst, op, capLeft, src, srcOffset + segmentSize, segmentSize, table);
         if (c2 == 0 || c2 > 65535)
         {
             return 0;
         }
 
-        WriteU16LE(dst, dstOffset + 2, (ushort)c2);
+        WriteU16Le(dst, dstOffset + 2, (ushort)c2);
         op += c2;
         capLeft -= c2;
 
-        int c3 = Compress1X(dst, op, capLeft, src, srcOffset + (2 * segmentSize), segmentSize, table);
+        var c3 = Compress1X(dst, op, capLeft, src, srcOffset + (2 * segmentSize), segmentSize, table);
         if (c3 == 0 || c3 > 65535)
         {
             return 0;
         }
 
-        WriteU16LE(dst, dstOffset + 4, (ushort)c3);
+        WriteU16Le(dst, dstOffset + 4, (ushort)c3);
         op += c3;
 
-        int lastLength = srcLength - (3 * segmentSize);
-        int c4 = Compress1X(dst, op, dstCapacity - (op - dstOffset), src, srcOffset + (3 * segmentSize), lastLength,
+        var lastLength = srcLength - (3 * segmentSize);
+        var c4 = Compress1X(dst, op, dstCapacity - (op - dstOffset), src, srcOffset + (3 * segmentSize), lastLength,
             table);
         if (c4 == 0 || c4 > 65535)
         {
@@ -691,20 +701,20 @@ internal static class ZstdHuffmanEncoder
         huffLog = Math.Min(huffLog, TableLogDefault);
 
         var count = new uint[SymbolValueMax + 1];
-        int end = srcOffset + srcLength;
-        for (int i = srcOffset; i < end; i++)
+        var end = srcOffset + srcLength;
+        for (var i = srcOffset; i < end; i++)
         {
             count[src[i]]++;
         }
 
-        int maxSV = maxSymbolValue;
-        while (maxSV > 0 && count[maxSV] == 0)
+        var maxSv = maxSymbolValue;
+        while (maxSv > 0 && count[maxSv] == 0)
         {
-            maxSV--;
+            maxSv--;
         }
 
         uint largest = 0;
-        for (int i = 0; i <= maxSV; i++)
+        for (var i = 0; i <= maxSv; i++)
         {
             largest = Math.Max(largest, count[i]);
         }
@@ -720,11 +730,11 @@ internal static class ZstdHuffmanEncoder
             return 0;
         }
 
-        int tableLog = OptimalTableLog(srcLength, maxSV, huffLog);
-        var (table, maxBits) = BuildCTable(count, maxSV, tableLog);
+        var tableLog = OptimalTableLog(srcLength, maxSv, huffLog);
+        var (table, maxBits) = BuildCTable(count, maxSv, tableLog);
         huffLog = maxBits;
 
-        int hSize = WriteCTable(dst, dstOffset, dstCapacity, table);
+        var hSize = WriteCTable(dst, dstOffset, dstCapacity, table);
         if (hSize <= 0)
         {
             return 0;
@@ -735,7 +745,7 @@ internal static class ZstdHuffmanEncoder
             return 0;
         }
 
-        int cSize = srcLength < SingleStreamThreshold
+        var cSize = srcLength < SingleStreamThreshold
             ? Compress1X(dst, dstOffset + hSize, dstCapacity - hSize, src, srcOffset, srcLength, table)
             : Compress4X(dst, dstOffset + hSize, dstCapacity - hSize, src, srcOffset, srcLength, table);
         if (cSize == 0)
@@ -743,7 +753,7 @@ internal static class ZstdHuffmanEncoder
             return 0;
         }
 
-        int total = hSize + cSize;
+        var total = hSize + cSize;
         if (total >= srcLength - 1)
         {
             return 0;
@@ -752,22 +762,31 @@ internal static class ZstdHuffmanEncoder
         return total;
     }
 
-    private static void WriteU16LE(byte[] dst, int offset, ushort value)
+    private static void WriteU16Le(byte[] dst, int offset, ushort value)
     {
         dst[offset] = (byte)value;
         dst[offset + 1] = (byte)(value >> 8);
     }
 
+    /// <summary>Huffman tree-build node (count, parent link, symbol, and depth).</summary>
     // One Huffman tree node (nodeElt from lib/compress/huf_compress.c).
     [StructLayout(LayoutKind.Auto)]
     private struct NodeElt
     {
+        /// <summary>Subtree frequency.</summary>
         public uint Count;
+
+        /// <summary>Parent node index.</summary>
         public ushort Parent;
+
+        /// <summary>Symbol for leaf nodes.</summary>
         public byte Symbol;
+
+        /// <summary>Code length in bits.</summary>
         public byte NbBits;
     }
 
+    /// <summary>Single-container Huffman bit writer (top-anchored codes, 1-bit end mark).</summary>
     // Single-container HUF_CStream_t (lib/compress/huf_compress.c): the
     // second container only breaks data dependencies for speed, so one
     // container emits byte-identical output. New codes shift in from the top;
@@ -781,6 +800,10 @@ internal static class ZstdHuffmanEncoder
         private int _ptr;
         private bool _overflow;
 
+        /// <summary>Creates a writer over <paramref name="dst"/> at <paramref name="offset"/>.</summary>
+        /// <param name="dst">Destination buffer.</param>
+        /// <param name="offset">Start offset.</param>
+        /// <param name="capacity">Writable capacity from <paramref name="offset"/>.</param>
         public HufCStream(byte[] dst, int offset, int capacity)
         {
             _dst = dst;
@@ -789,8 +812,12 @@ internal static class ZstdHuffmanEncoder
             _ptr = offset;
         }
 
+        /// <summary>Bits currently held in the container.</summary>
         public int BitPos { get; private set; }
 
+        /// <summary>Shifts a Huffman code into the top of the container.</summary>
+        /// <param name="nbBits">Code length in bits.</param>
+        /// <param name="value">Canonical code value.</param>
         public void AddBits(int nbBits, uint value)
         {
             _container >>= nbBits;
@@ -798,18 +825,19 @@ internal static class ZstdHuffmanEncoder
             BitPos += nbBits;
         }
 
+        /// <summary>Emits whole bytes from the top of the container, little-endian.</summary>
         public void FlushBits()
         {
-            int bits = BitPos;
-            int nbBytes = bits >> 3;
-            ulong tmp = _container >> (64 - bits);
+            var bits = BitPos;
+            var nbBytes = bits >> 3;
+            var tmp = _container >> (64 - bits);
             if (_ptr + nbBytes > _start + _capacity)
             {
                 _overflow = true;
                 return;
             }
 
-            for (int i = 0; i < nbBytes; i++)
+            for (var i = 0; i < nbBytes; i++)
             {
                 _dst[_ptr++] = (byte)(tmp >> (8 * i));
             }
@@ -817,6 +845,8 @@ internal static class ZstdHuffmanEncoder
             BitPos &= 7;
         }
 
+        /// <summary>Appends the 1-bit end mark, flushes, and returns bytes written (0 on overflow).</summary>
+        /// <returns>Bytes written, or 0 when the stream did not fit.</returns>
         public int Close()
         {
             AddBits(1, 1); // End mark: a 1-bit value of 1.
@@ -826,7 +856,7 @@ internal static class ZstdHuffmanEncoder
                 return 0;
             }
 
-            int rest = BitPos;
+            var rest = BitPos;
             if (rest > 0)
             {
                 if (_ptr + 1 > _start + _capacity)

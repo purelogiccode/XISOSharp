@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 namespace ZARSharp.Zstd;
 
 /// <summary>
@@ -30,31 +32,46 @@ public static class ZstdSeq
     public const uint Repcode3 = 3;
 
     /// <summary>Initial repeat offsets at the start of a frame (<c>repStartValue = {1,4,8}</c>).</summary>
-    public static uint[] FreshRepeatOffsets() => [1, 4, 8];
+    public static uint[] FreshRepeatOffsets()
+    {
+        return [1, 4, 8];
+    }
 
     /// <summary><c>OFFSET_TO_OFFBASE(o)</c>: encodes a real offset (must be ≥ 1).</summary>
-    public static uint OffsetToOffBase(uint offset) =>
-        offset > 0
+    public static uint OffsetToOffBase(uint offset)
+    {
+        return offset > 0
             ? offset + RepNum
             : throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be >= 1.");
+    }
 
     /// <summary><c>OFFBASE_IS_OFFSET(o)</c>.</summary>
-    public static bool IsOffset(uint offBase) => offBase > RepNum;
+    public static bool IsOffset(uint offBase)
+    {
+        return offBase > RepNum;
+    }
 
     /// <summary><c>OFFBASE_IS_REPCODE(o)</c>.</summary>
-    public static bool IsRepcode(uint offBase) => offBase >= 1 && offBase <= RepNum;
+    public static bool IsRepcode(uint offBase)
+    {
+        return offBase >= 1 && offBase <= RepNum;
+    }
 
     /// <summary><c>OFFBASE_TO_OFFSET(o)</c>: decodes a real offset (must be an offset code).</summary>
-    public static uint ToOffset(uint offBase) =>
-        IsOffset(offBase)
+    public static uint ToOffset(uint offBase)
+    {
+        return IsOffset(offBase)
             ? offBase - RepNum
             : throw new ArgumentOutOfRangeException(nameof(offBase), "Not an offset code.");
+    }
 
     /// <summary><c>OFFBASE_TO_REPCODE(o)</c>: decodes a repeat code id 1..3.</summary>
-    public static uint ToRepcode(uint offBase) =>
-        IsRepcode(offBase)
+    public static uint ToRepcode(uint offBase)
+    {
+        return IsRepcode(offBase)
             ? offBase
             : throw new ArgumentOutOfRangeException(nameof(offBase), "Not a repeat code.");
+    }
 
     /// <summary>
     /// <c>ZSTD_updateRep</c>: updates the 3-entry repeat-offset history in place
@@ -79,10 +96,10 @@ public static class ZstdSeq
         else
         {
             // REPCODE_TO_OFFBASE values are 1..3; ToRepcode validates.
-            uint repCode = ToRepcode(offBase) - 1 + litLengthZero;
+            var repCode = ToRepcode(offBase) - 1 + litLengthZero;
             if (repCode > 0)
             {
-                uint currentOffset = repCode == RepNum
+                var currentOffset = repCode == RepNum
                     ? checked(rep[0] - 1)
                     : rep[repCode];
                 rep[2] = repCode >= 2 ? rep[1] : rep[2];
@@ -128,11 +145,8 @@ public sealed class ZstdSequenceStore
     private uint[] _offBases;
     private ushort[] _litLengths;
     private ushort[] _mlBases;
-    private int _count;
 
     private byte[] _literals;
-    private int _literalPos; // End of sequence literals; trailing literals follow.
-    private int _trailingLength;
     private bool _trailingSet;
 
     private int _longLengthType;
@@ -144,7 +158,7 @@ public sealed class ZstdSequenceStore
         ArgumentOutOfRangeException.ThrowIfNegative(maxSourceSize);
         // Every sequence consumes at least MinMatch... in practice ≥ 4 bytes
         // (both finders); bound generously and grow on demand regardless.
-        int seqCap = Math.Max(4, maxSourceSize / ZstdSeq.MinMatch + 2);
+        var seqCap = Math.Max(4, (maxSourceSize / ZstdSeq.MinMatch) + 2);
         _offBases = new uint[seqCap];
         _litLengths = new ushort[seqCap];
         _mlBases = new ushort[seqCap];
@@ -152,19 +166,19 @@ public sealed class ZstdSequenceStore
     }
 
     /// <summary>Number of stored sequences.</summary>
-    public int Count => _count;
+    public int Count { get; private set; }
 
     /// <summary>Total bytes of sequence literals (excludes trailing literals).</summary>
-    public int LiteralLength => _literalPos;
+    public int LiteralLength { get; private set; }
 
     /// <summary>Sequence literals.</summary>
-    public ReadOnlySpan<byte> Literals => new(_literals, 0, _literalPos);
+    public ReadOnlySpan<byte> Literals => new(_literals, 0, LiteralLength);
 
     /// <summary>Trailing literal count (0 until <see cref="SetTrailingLiterals"/>).</summary>
-    public int TrailingLength => _trailingLength;
+    public int TrailingLength { get; private set; }
 
     /// <summary>Trailing literals (final run after the last match).</summary>
-    public ReadOnlySpan<byte> TrailingLiterals => new(_literals, _literalPos, _trailingLength);
+    public ReadOnlySpan<byte> TrailingLiterals => new(_literals, LiteralLength, TrailingLength);
 
     /// <summary>
     /// Stores one sequence: copies <paramref name="literals"/> then appends
@@ -184,9 +198,9 @@ public sealed class ZstdSequenceStore
         }
 
         EnsureSequenceCapacity();
-        EnsureLiteralCapacity(_literalPos + literals.Length);
-        literals.CopyTo(new Span<byte>(_literals, _literalPos, literals.Length));
-        _literalPos += literals.Length;
+        EnsureLiteralCapacity(LiteralLength + literals.Length);
+        literals.CopyTo(new Span<byte>(_literals, LiteralLength, literals.Length));
+        LiteralLength += literals.Length;
 
         StoreSequenceOnly((uint)literals.Length, offBase, matchLength);
     }
@@ -204,9 +218,9 @@ public sealed class ZstdSequenceStore
         }
 
         _trailingSet = true;
-        EnsureLiteralCapacity(_literalPos + trailing.Length);
-        trailing.CopyTo(new Span<byte>(_literals, _literalPos, trailing.Length));
-        _trailingLength = trailing.Length;
+        EnsureLiteralCapacity(LiteralLength + trailing.Length);
+        trailing.CopyTo(new Span<byte>(_literals, LiteralLength, trailing.Length));
+        TrailingLength = trailing.Length;
     }
 
     /// <summary>
@@ -217,10 +231,10 @@ public sealed class ZstdSequenceStore
     public ZstdSequence Get(int index)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _count);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, Count);
 
         uint litLength = _litLengths[index];
-        uint matchLength = (uint)(_mlBases[index] + ZstdSeq.MinMatch);
+        var matchLength = (uint)(_mlBases[index] + ZstdSeq.MinMatch);
         if (index == _longLengthPos)
         {
             if (_longLengthType == LongLengthLiteral)
@@ -239,9 +253,9 @@ public sealed class ZstdSequenceStore
     /// <summary>Clears all sequences, literals, and long-length state for reuse.</summary>
     public void Reset()
     {
-        _count = 0;
-        _literalPos = 0;
-        _trailingLength = 0;
+        Count = 0;
+        LiteralLength = 0;
+        TrailingLength = 0;
         _trailingSet = false;
         _longLengthType = LongLengthNone;
         _longLengthPos = 0;
@@ -258,13 +272,13 @@ public sealed class ZstdSequenceStore
             }
 
             _longLengthType = LongLengthLiteral;
-            _longLengthPos = _count;
+            _longLengthPos = Count;
         }
 
-        _litLengths[_count] = (ushort)litLength;
-        _offBases[_count] = offBase;
+        _litLengths[Count] = (ushort)litLength;
+        _offBases[Count] = offBase;
 
-        long mlBase = (long)matchLength - ZstdSeq.MinMatch;
+        var mlBase = (long)matchLength - ZstdSeq.MinMatch;
         if (mlBase > 0xFFFF)
         {
             if (_longLengthType != LongLengthNone)
@@ -273,21 +287,21 @@ public sealed class ZstdSequenceStore
             }
 
             _longLengthType = LongLengthMatch;
-            _longLengthPos = _count;
+            _longLengthPos = Count;
         }
 
-        _mlBases[_count] = (ushort)mlBase;
-        _count++;
+        _mlBases[Count] = (ushort)mlBase;
+        Count++;
     }
 
     private void EnsureSequenceCapacity()
     {
-        if (_count < _offBases.Length)
+        if (Count < _offBases.Length)
         {
             return;
         }
 
-        int next = _offBases.Length * 2;
+        var next = _offBases.Length * 2;
         Array.Resize(ref _offBases, next);
         Array.Resize(ref _litLengths, next);
         Array.Resize(ref _mlBases, next);
@@ -300,7 +314,7 @@ public sealed class ZstdSequenceStore
             return;
         }
 
-        int next = Math.Max(needed, _literals.Length * 2);
+        var next = Math.Max(needed, _literals.Length * 2);
         Array.Resize(ref _literals, next);
     }
 }

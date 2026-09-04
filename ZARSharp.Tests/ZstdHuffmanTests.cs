@@ -14,7 +14,7 @@ public sealed class ZstdHuffmanTests
     public static TheoryData<int, string> CompressibleCases()
     {
         var data = new TheoryData<int, string>();
-        foreach (int size in new[] { 16, 64, 255, 256, 257, 1000, 4096, 16384 })
+        foreach (var size in new[] { 16, 64, 255, 256, 257, 1000, 4096, 16384 })
         {
             data.Add(size, "skewed");
             data.Add(size, "small-alpha");
@@ -28,9 +28,9 @@ public sealed class ZstdHuffmanTests
     [MemberData(nameof(CompressibleCases))]
     public void Huf_RoundTrip_CompressibleInputs(int size, string kind)
     {
-        byte[] src = MakeLiterals(kind, size, 0x485546u ^ (uint)size ^ (uint)kind.Length);
-        byte[] dst = new byte[ZstdHuffmanEncoder.CompressBound(size)];
-        int result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
+        var src = MakeLiterals(kind, size, 0x485546u ^ (uint)size ^ (uint)kind.Length);
+        var dst = new byte[ZstdHuffmanEncoder.CompressBound(size)];
+        var result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
 
         if (result == 0)
         {
@@ -61,9 +61,9 @@ public sealed class ZstdHuffmanTests
     public void Huf_TinyInputs_UseRawOrRle(int size)
     {
         var rng = new Random(0x71);
-        for (int trial = 0; trial < 20; trial++)
+        for (var trial = 0; trial < 20; trial++)
         {
-            byte[] src = new byte[size];
+            var src = new byte[size];
             // Mix of single-symbol, two-symbol, and random inputs.
             if (trial % 3 != 0)
             {
@@ -78,8 +78,8 @@ public sealed class ZstdHuffmanTests
                 Array.Fill(src, (byte)(0xA0 + trial));
             }
 
-            byte[] dst = new byte[Math.Max(16, ZstdHuffmanEncoder.CompressBound(size))];
-            int result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
+            var dst = new byte[Math.Max(16, ZstdHuffmanEncoder.CompressBound(size))];
+            var result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
             if (result == 1)
             {
                 Assert.All(src, b => Assert.Equal(dst[0], b));
@@ -98,9 +98,9 @@ public sealed class ZstdHuffmanTests
     [Fact]
     public void Huf_SingleSymbol_UsesRlePath()
     {
-        byte[] src = new byte[100];
+        var src = new byte[100];
         Array.Fill(src, (byte)0xAB);
-        byte[] dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
+        var dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
         Assert.Equal(1, ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length));
         Assert.Equal(0xAB, dst[0]);
     }
@@ -108,7 +108,7 @@ public sealed class ZstdHuffmanTests
     [Fact]
     public void Huf_EmptyInput_ReturnsZero()
     {
-        byte[] dst = new byte[16];
+        var dst = new byte[16];
         Assert.Equal(0, ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, [], 0, 0));
     }
 
@@ -117,9 +117,9 @@ public sealed class ZstdHuffmanTests
     {
         // Incompressible: the suspect heuristic must bail to raw, never expand.
         var rng = new Random(0x9A9D);
-        byte[] src = new byte[4096];
+        var src = new byte[4096];
         rng.NextBytes(src);
-        byte[] dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
+        var dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
         Assert.Equal(0, ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length));
     }
 
@@ -130,27 +130,27 @@ public sealed class ZstdHuffmanTests
         // represent this (header byte limit), so the FSE-compressed weights
         // form must be used.
         var rng = new Random(0xFF);
-        byte[] src = new byte[2048];
-        for (int i = 0; i < 255; i++)
+        var src = new byte[2048];
+        for (var i = 0; i < 255; i++)
         {
             src[i] = (byte)i;
         }
 
         // Skewed fill: hot symbols compress well, tail keeps all 255 present.
-        for (int i = 255; i < src.Length; i++)
+        for (var i = 255; i < src.Length; i++)
         {
             src[i] = rng.Next(10) < 7 ? (byte)rng.Next(4) : (byte)rng.Next(255);
         }
 
         // Shuffle the forced prefix so order is not sorted.
-        for (int i = src.Length - 1; i > 0; i--)
+        for (var i = src.Length - 1; i > 0; i--)
         {
-            int j = rng.Next(i + 1);
+            var j = rng.Next(i + 1);
             (src[i], src[j]) = (src[j], src[i]);
         }
 
-        byte[] dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
-        int result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
+        var dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
+        var result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
         Assert.InRange(result, 2, src.Length - 2);
         Assert.True(dst[0] < 128, "255 symbols must use the FSE-compressed weights form.");
         DecodeAndVerify(dst, 0, result, src, singleStream: false);
@@ -160,19 +160,19 @@ public sealed class ZstdHuffmanTests
     public void Huf_All256Symbols_RoundTrips()
     {
         var rng = new Random(0x100);
-        byte[] src = new byte[4096];
-        for (int i = 0; i < 256; i++)
+        var src = new byte[4096];
+        for (var i = 0; i < 256; i++)
         {
             src[i] = (byte)i;
         }
 
-        for (int i = 256; i < src.Length; i++)
+        for (var i = 256; i < src.Length; i++)
         {
             src[i] = rng.Next(10) < 7 ? (byte)rng.Next(4) : (byte)rng.Next(256);
         }
 
-        byte[] dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
-        int result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
+        var dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
+        var result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
         Assert.InRange(result, 2, src.Length - 2);
         DecodeAndVerify(dst, 0, result, src, singleStream: false);
     }
@@ -180,14 +180,14 @@ public sealed class ZstdHuffmanTests
     [Fact]
     public void Huf_TwoSymbols_RoundTrips()
     {
-        byte[] src = new byte[1000];
-        for (int i = 0; i < src.Length; i++)
+        var src = new byte[1000];
+        for (var i = 0; i < src.Length; i++)
         {
             src[i] = (i % 7 == 0) ? (byte)1 : (byte)0;
         }
 
-        byte[] dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
-        int result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
+        var dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
+        var result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
         Assert.InRange(result, 2, src.Length - 2);
         Assert.Equal(128, dst[0]); // Two weights, nibble-packed direct form.
         DecodeAndVerify(dst, 0, result, src, singleStream: false);
@@ -196,25 +196,25 @@ public sealed class ZstdHuffmanTests
     [Fact]
     public void Huf_FourStreamLayout_HasValidJumpTable()
     {
-        byte[] src = MakeLiterals("text-like", 1000, 0x4B);
-        byte[] dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
-        int result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
+        var src = MakeLiterals("text-like", 1000, 0x4B);
+        var dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
+        var result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
         Assert.InRange(result, 2, src.Length - 2);
 
-        int treeSize = ZstdHuffman.ReadStats(dst, 0, result, out _, out _, out _);
-        int streamsLength = result - treeSize;
+        var treeSize = ZstdHuffman.ReadStats(dst, 0, result, out _, out _, out _);
+        var streamsLength = result - treeSize;
         Assert.True(streamsLength >= 10, "4-stream payload needs a 6-byte jump table.");
 
-        int s1 = dst[treeSize] | (dst[treeSize + 1] << 8);
-        int s2 = dst[treeSize + 2] | (dst[treeSize + 3] << 8);
-        int s3 = dst[treeSize + 4] | (dst[treeSize + 5] << 8);
-        int s4 = streamsLength - 6 - s1 - s2 - s3;
+        var s1 = dst[treeSize] | (dst[treeSize + 1] << 8);
+        var s2 = dst[treeSize + 2] | (dst[treeSize + 3] << 8);
+        var s3 = dst[treeSize + 4] | (dst[treeSize + 5] << 8);
+        var s4 = streamsLength - 6 - s1 - s2 - s3;
         Assert.InRange(s1, 1, 65535);
         Assert.InRange(s2, 1, 65535);
         Assert.InRange(s3, 1, 65535);
         Assert.True(s4 > 0, "Fourth stream must be non-empty.");
 
-        int seg = (src.Length + 3) / 4;
+        var seg = (src.Length + 3) / 4;
         Assert.Equal(src.Length - (3 * seg), src.Length - (3 * seg)); // Sanity.
         Assert.True(seg * 3 <= src.Length + 3, "Segment split must match the decoder.");
     }
@@ -225,21 +225,21 @@ public sealed class ZstdHuffmanTests
         // Randomized compressible inputs must always select a table the
         // decoder accepts (codes ≤ 11 bits).
         var rng = new Random(0xCE11);
-        for (int trial = 0; trial < 60; trial++)
+        for (var trial = 0; trial < 60; trial++)
         {
-            int size = rng.Next(16, 5000);
-            int alpha = rng.Next(2, 256);
-            byte[] src = new byte[size];
-            for (int i = 0; i < size; i++)
+            var size = rng.Next(16, 5000);
+            var alpha = rng.Next(2, 256);
+            var src = new byte[size];
+            for (var i = 0; i < size; i++)
             {
                 src[i] = (byte)(rng.Next(4) == 0 ? rng.Next(alpha) : rng.Next(Math.Min(alpha, 8)));
             }
 
-            byte[] dst = new byte[ZstdHuffmanEncoder.CompressBound(size)];
-            int result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
+            var dst = new byte[ZstdHuffmanEncoder.CompressBound(size)];
+            var result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
             if (result > 1)
             {
-                ZstdHuffman.ReadStats(dst, 0, result, out _, out int tableLog, out _);
+                ZstdHuffman.ReadStats(dst, 0, result, out _, out var tableLog, out _);
                 Assert.InRange(tableLog, 1, 11);
                 DecodeAndVerify(dst, 0, result, src, singleStream: size < ZstdHuffmanEncoder.SingleStreamThreshold);
             }
@@ -249,15 +249,15 @@ public sealed class ZstdHuffmanTests
     [Fact]
     public void Huf_EncodeIntoOffset_Works()
     {
-        byte[] src = MakeLiterals("skewed", 500, 0x0FF);
-        byte[] dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length) + 64];
+        var src = MakeLiterals("skewed", 500, 0x0FF);
+        var dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length) + 64];
         Array.Fill(dst, (byte)0xCC);
-        int result = ZstdHuffmanEncoder.Compress(dst, 37, dst.Length - 37, src, 0, src.Length);
+        var result = ZstdHuffmanEncoder.Compress(dst, 37, dst.Length - 37, src, 0, src.Length);
         Assert.InRange(result, 2, src.Length - 2);
         Assert.Equal(0xCC, dst[36]);
         DecodeAndVerify(dst, 37, result, src, singleStream: false);
 
-        byte[] sub = new byte[result];
+        var sub = new byte[result];
         Array.Copy(dst, 37, sub, 0, result);
         DecodeAndVerify(sub, 0, result, src, singleStream: false);
     }
@@ -281,54 +281,54 @@ public sealed class ZstdHuffmanTests
         Assert.Equal(3, ZstdHuffmanEncoder.Cardinality(counts, 255));
 
         // Bound must cover real outputs, including the 4-stream jump table.
-        byte[] src = MakeLiterals("text-like", 4096, 0xB0);
-        byte[] dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
-        int result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
+        var src = MakeLiterals("text-like", 4096, 0xB0);
+        var dst = new byte[ZstdHuffmanEncoder.CompressBound(src.Length)];
+        var result = ZstdHuffmanEncoder.Compress(dst, 0, dst.Length, src, 0, src.Length);
         Assert.InRange(result, 2, dst.Length);
     }
 
     [Fact]
     public void Huf_Compress1X_TooSmallDestination_ReturnsZero()
     {
-        byte[] src = MakeLiterals("skewed", 500, 0x5A);
+        var src = MakeLiterals("skewed", 500, 0x5A);
         var counts = new uint[256];
-        foreach (byte b in src)
+        foreach (var b in src)
         {
             counts[b]++;
         }
 
-        int maxSV = 255;
-        while (counts[maxSV] == 0)
+        var maxSv = 255;
+        while (counts[maxSv] == 0)
         {
-            maxSV--;
+            maxSv--;
         }
 
-        var (table, _) = ZstdHuffmanEncoder.BuildCTable(counts, maxSV, 9);
-        byte[] tiny = new byte[8];
+        var (table, _) = ZstdHuffmanEncoder.BuildCTable(counts, maxSv, 9);
+        var tiny = new byte[8];
         Assert.Equal(0, ZstdHuffmanEncoder.Compress1X(tiny, 0, 4, src, 0, src.Length, table));
     }
 
     private static void DecodeAndVerify(byte[] dst, int offset, int length, byte[] expected, bool singleStream)
     {
-        int treeSize =
-            ZstdHuffman.ReadStats(dst, offset, length, out byte[] weights, out int tableLog, out int numSymbols);
+        var treeSize =
+            ZstdHuffman.ReadStats(dst, offset, length, out var weights, out var tableLog, out var numSymbols);
         Assert.InRange(tableLog, 1, 11);
         var table = ZstdHuffman.BuildTable(weights, numSymbols, tableLog);
 
-        byte[] got = new byte[expected.Length];
+        var got = new byte[expected.Length];
         if (singleStream)
         {
             ZstdHuffman.DecodeStream(dst, offset + treeSize, length - treeSize, table, got, 0, got.Length);
         }
         else
         {
-            int streamsLength = length - treeSize;
-            int s1 = dst[offset + treeSize] | (dst[offset + treeSize + 1] << 8);
-            int s2 = dst[offset + treeSize + 2] | (dst[offset + treeSize + 3] << 8);
-            int s3 = dst[offset + treeSize + 4] | (dst[offset + treeSize + 5] << 8);
-            int s4 = streamsLength - 6 - s1 - s2 - s3;
-            int seg = (expected.Length + 3) / 4;
-            int c1 = offset + treeSize + 6;
+            var streamsLength = length - treeSize;
+            var s1 = dst[offset + treeSize] | (dst[offset + treeSize + 1] << 8);
+            var s2 = dst[offset + treeSize + 2] | (dst[offset + treeSize + 3] << 8);
+            var s3 = dst[offset + treeSize + 4] | (dst[offset + treeSize + 5] << 8);
+            var s4 = streamsLength - 6 - s1 - s2 - s3;
+            var seg = (expected.Length + 3) / 4;
+            var c1 = offset + treeSize + 6;
             ZstdHuffman.DecodeStream(dst, c1, s1, table, got, 0, seg);
             ZstdHuffman.DecodeStream(dst, c1 + s1, s2, table, got, seg, seg);
             ZstdHuffman.DecodeStream(dst, c1 + s1 + s2, s3, table, got, 2 * seg, seg);
@@ -341,20 +341,20 @@ public sealed class ZstdHuffmanTests
     private static byte[] MakeLiterals(string kind, int size, uint seed)
     {
         var rng = new Random(unchecked((int)seed));
-        byte[] src = new byte[size];
+        var src = new byte[size];
         switch (kind)
         {
             case "skewed":
                 // Zipf-like over 32 symbols: highly compressible.
-                for (int i = 0; i < size; i++)
+                for (var i = 0; i < size; i++)
                 {
-                    int v = rng.Next(256);
+                    var v = rng.Next(256);
                     src[i] = (byte)(v < 128 ? rng.Next(4) : v < 224 ? rng.Next(32) : rng.Next(256));
                 }
 
                 break;
             case "small-alpha":
-                for (int i = 0; i < size; i++)
+                for (var i = 0; i < size; i++)
                 {
                     src[i] = (byte)rng.Next(6);
                 }
@@ -362,7 +362,7 @@ public sealed class ZstdHuffmanTests
                 break;
             default: // "text-like": word-ish bytes with spaces and repeats.
                 const string words = "the quick brown fox jumps over lazy dog 0123456789 ";
-                for (int i = 0; i < size; i++)
+                for (var i = 0; i < size; i++)
                 {
                     src[i] = (byte)words[rng.Next(words.Length)];
                 }
@@ -381,7 +381,7 @@ public sealed class ZstdHuffmanTests
             return true;
         }
 
-        int distinct = new HashSet<byte>(src).Count;
+        var distinct = new HashSet<byte>(src).Count;
         return distinct > size / 4;
     }
 }

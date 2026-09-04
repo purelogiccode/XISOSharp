@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Input;
 using Microsoft.Win32;
 using Serilog;
+using XISOSharpTester.Logging;
 using XISOSharpTester.Services;
 using XISOSharpTester.Views;
 using XISOSharpTester.Models;
@@ -16,8 +17,15 @@ namespace XISOSharpTester.ViewModels;
 
 #pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
 
+/// <summary>
+/// View-model for the Tester main page. Manages the extract-xiso path, selected ISO list,
+/// test execution via <see cref="Services.XisoTestRunner"/>, progress, log, and results export.
+/// </summary>
 internal class MainViewModel : INotifyPropertyChanged
 {
+    /// <summary>
+    /// Initializes commands and auto-detects a sibling extract-xiso.exe.
+    /// </summary>
     internal MainViewModel()
     {
         BrowseXisoSharpCommand = new RelayCommand(_ => BrowseXisoSharp());
@@ -36,15 +44,27 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private void AutoDetectXisoSharp()
     {
-        var candidate = Path.Combine(AppContext.BaseDirectory, "extract-xiso.exe");
-        if (File.Exists(candidate))
+        try
         {
-            XisoSharpPath = candidate;
+            var candidate = Path.Combine(AppContext.BaseDirectory, "extract-xiso.exe");
+            if (File.Exists(candidate))
+            {
+                XisoSharpPath = candidate;
+                Log.Information("Auto-detected extract-xiso: {Path}", candidate);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Auto-detect extract-xiso failed");
+            BugReporter.ReportException(ex, "Auto-detect extract-xiso failed");
         }
     }
 
     private string _xisoSharpPath = string.Empty;
 
+    /// <summary>
+    /// Gets or sets the full path to extract-xiso.exe used for comparison tests.
+    /// </summary>
     public string XisoSharpPath
     {
         get => _xisoSharpPath;
@@ -57,12 +77,21 @@ internal class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Gets whether <see cref="XisoSharpPath"/> points to an existing executable.
+    /// </summary>
     public bool IsXisoSharpValid => !string.IsNullOrEmpty(XisoSharpPath) && File.Exists(XisoSharpPath);
 
+    /// <summary>
+    /// Gets the selected XISO files to test.
+    /// </summary>
     public ObservableCollection<XisoFileEntry> Files { get; } = [];
 
     private string _filesSummary = "No files selected.";
 
+    /// <summary>
+    /// Gets or sets the human-readable file count/total-size summary.
+    /// </summary>
     public string FilesSummary
     {
         get => _filesSummary;
@@ -73,21 +102,46 @@ internal class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Gets the browse-for-extract-xiso command.</summary>
     public ICommand BrowseXisoSharpCommand { get; }
+
+    /// <summary>Gets the add-files command.</summary>
     public ICommand AddFilesCommand { get; }
+
+    /// <summary>Gets the add-folder (recursive ISO scan) command.</summary>
     public ICommand AddFolderCommand { get; }
+
+    /// <summary>Gets the remove-file command.</summary>
     public ICommand RemoveFileCommand { get; }
+
+    /// <summary>Gets the run-tests command.</summary>
     public ICommand RunTestsCommand { get; }
+
+    /// <summary>Gets the export-PDF command.</summary>
     public ICommand ExportPdfCommand { get; }
+
+    /// <summary>Gets the copy-log command.</summary>
     public ICommand CopyLogCommand { get; }
+
+    /// <summary>Gets the copy-results command.</summary>
     public ICommand CopyResultsCommand { get; }
+
+    /// <summary>Gets the show-about command.</summary>
     public ICommand AboutCommand { get; }
+
+    /// <summary>Gets the exit-application command.</summary>
     public ICommand ExitCommand { get; }
 
+    /// <summary>
+    /// Gets whether tests can start (files selected and no run in progress).
+    /// </summary>
     public bool CanRunTests => Files.Count > 0 && !IsRunning;
 
     private bool _isRunning;
 
+    /// <summary>
+    /// Gets or sets whether a test run is in progress.
+    /// </summary>
     public bool IsRunning
     {
         get => _isRunning;
@@ -101,12 +155,15 @@ internal class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Gets whether the progress bar should be shown.</summary>
     public bool ShowProgress => IsRunning;
 
+    /// <summary>Gets whether the results view should be shown.</summary>
     public bool ShowResults => !IsRunning && HasResults;
 
     private double _progressValue;
 
+    /// <summary>Gets or sets the 0-100 progress value.</summary>
     public double ProgressValue
     {
         get => _progressValue;
@@ -119,6 +176,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private string _statusText = "Ready.";
 
+    /// <summary>Gets or sets the status-bar text.</summary>
     public string StatusText
     {
         get => _statusText;
@@ -131,6 +189,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private string _progressText = "Ready.";
 
+    /// <summary>Gets or sets the progress detail text.</summary>
     public string ProgressText
     {
         get => _progressText;
@@ -143,6 +202,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private string _currentTest = string.Empty;
 
+    /// <summary>Gets or sets the current sub-test name (e.g. "Verify", "List").</summary>
     public string CurrentTest
     {
         get => _currentTest;
@@ -155,6 +215,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private string _fileProgress = string.Empty;
 
+    /// <summary>Gets or sets the "File i/N" progress text.</summary>
     public string FileProgress
     {
         get => _fileProgress;
@@ -167,6 +228,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private string _logText = string.Empty;
 
+    /// <summary>Gets or sets the full scrolling log text.</summary>
     public string LogText
     {
         get => _logText;
@@ -177,10 +239,14 @@ internal class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Gets the timestamped log entries bound to the log view.</summary>
     public ObservableCollection<LogEntry> LogEntries { get; } = [];
 
     private TestSessionResult? _sessionResult;
 
+    /// <summary>
+    /// Gets or sets the completed session result; setting it refreshes summary bindings.
+    /// </summary>
     public TestSessionResult? SessionResult
     {
         get => _sessionResult;
@@ -197,14 +263,19 @@ internal class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Gets whether a completed session with file results exists.</summary>
     public bool HasResults => SessionResult is { FileResults.Count: > 0 };
 
+    /// <summary>Gets the number of fully passing files in the session.</summary>
     public int SummaryPassed => SessionResult?.PassedFiles ?? 0;
 
+    /// <summary>Gets the number of failed files in the session.</summary>
     public int SummaryFailed => SessionResult?.FailedFiles ?? 0;
 
+    /// <summary>Gets the number of skipped files in the session.</summary>
     public int SummarySkipped => SessionResult?.SkippedFiles ?? 0;
 
+    /// <summary>Gets the one-line session summary (files, sub-test counts, elapsed).</summary>
     public string SummaryText => SessionResult != null
         ? $"{SessionResult.TotalFiles} files tested | " +
           $"{SessionResult.PassedSubTests} passed, {SessionResult.FailedSubTests} failed, {SessionResult.SkippedSubTests} skipped | " +
@@ -213,6 +284,7 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private string _summarySubText = string.Empty;
 
+    /// <summary>Gets or sets the sub-test breakdown line shown under the summary.</summary>
     public string SummarySubText
     {
         get => _summarySubText;
@@ -223,46 +295,79 @@ internal class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Gets the per-file results snapshot for binding.</summary>
     public ObservableCollection<PerFileResult> FileResults => SessionResult?.FileResults != null
         ? new ObservableCollection<PerFileResult>(SessionResult.FileResults)
         : [];
 
     private void BrowseXisoSharp()
     {
-        var dlg = new OpenFileDialog
+        try
         {
-            Title = "Select extract-xiso.exe",
-            Filter = "Executable files (*.exe)|*.exe|All files (*.*)|*.*",
-            FileName = "extract-xiso.exe"
-        };
-        if (dlg.ShowDialog() == true)
+            var dlg = new OpenFileDialog
+            {
+                Title = "Select extract-xiso.exe",
+                Filter = "Executable files (*.exe)|*.exe|All files (*.*)|*.*",
+                FileName = "extract-xiso.exe"
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                XisoSharpPath = dlg.FileName;
+                AddLog($"extract-xiso.exe set to: {XisoSharpPath}");
+                Log.Information("extract-xiso.exe set to {Path}", XisoSharpPath);
+            }
+        }
+        catch (Exception ex)
         {
-            XisoSharpPath = dlg.FileName;
-            AddLog($"extract-xiso.exe set to: {XisoSharpPath}");
+            Log.Error(ex, "Browse extract-xiso failed");
+            BugReporter.ReportException(ex, "Browse extract-xiso failed");
+            AddLog($"Error selecting extract-xiso.exe: {ex.Message}");
         }
     }
 
     private void AddFiles()
     {
-        var dlg = new OpenFileDialog
+        try
         {
-            Title = "Select XISO files", Filter = "ISO files (*.iso)|*.iso|All files (*.*)|*.*", Multiselect = true
-        };
-        if (dlg.ShowDialog() == true)
-        {
-            foreach (var path in dlg.FileNames)
+            var dlg = new OpenFileDialog
             {
-                AddFileIfNew(path);
-            }
+                Title = "Select XISO files", Filter = "ISO files (*.iso)|*.iso|All files (*.*)|*.*", Multiselect = true
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                foreach (var path in dlg.FileNames)
+                {
+                    AddFileIfNew(path);
+                }
 
-            UpdateFilesSummary();
-            AddLog($"Added {dlg.FileNames.Length} file(s). Total: {Files.Count}");
+                UpdateFilesSummary();
+                AddLog($"Added {dlg.FileNames.Length} file(s). Total: {Files.Count}");
+                Log.Information("Added {Count} file(s). Total: {Total}", dlg.FileNames.Length, Files.Count);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Add files failed");
+            BugReporter.ReportException(ex, "Add files failed");
+            AddLog($"Error adding files: {ex.Message}");
         }
     }
 
     private void AddFolder()
     {
-        var dlg = new OpenFolderDialog { Title = "Select folder with ISO files" };
+        OpenFolderDialog dlg;
+        try
+        {
+            dlg = new OpenFolderDialog { Title = "Select folder with ISO files" };
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Add folder dialog failed");
+            BugReporter.ReportException(ex, "Add folder dialog failed");
+            AddLog($"Error opening folder dialog: {ex.Message}");
+            return;
+        }
+
         if (dlg.ShowDialog() == true)
         {
             try
@@ -275,9 +380,12 @@ internal class MainViewModel : INotifyPropertyChanged
 
                 UpdateFilesSummary();
                 AddLog($"Added {isoFiles.Length} file(s) from folder. Total: {Files.Count}");
+                Log.Information("Added {Count} file(s) from folder. Total: {Total}", isoFiles.Length, Files.Count);
             }
             catch (Exception ex)
             {
+                Log.Error(ex, "Error scanning folder {Folder}", dlg.FolderName);
+                BugReporter.ReportException(ex, $"Error scanning folder {dlg.FolderName}");
                 AddLog($"Error scanning folder: {ex.Message}");
             }
         }
@@ -285,34 +393,72 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private void AddFileIfNew(string path)
     {
-        if (!Files.Any(f => string.Equals(f.FilePath, path, StringComparison.OrdinalIgnoreCase)))
+        try
         {
-            Files.Add(new XisoFileEntry { FilePath = path });
+            if (!Files.Any(f => string.Equals(f.FilePath, path, StringComparison.OrdinalIgnoreCase)))
+            {
+                Files.Add(new XisoFileEntry { FilePath = path });
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "AddFileIfNew failed for {Path}", path);
+            BugReporter.ReportException(ex, $"AddFileIfNew failed for {path}");
+            AddLog($"Error adding file: {ex.Message}");
         }
     }
 
     private void RemoveFile(object? param)
     {
-        if (param is XisoFileEntry entry)
+        try
         {
-            Files.Remove(entry);
-            UpdateFilesSummary();
-            AddLog($"Removed: {entry.FileName}. Total: {Files.Count}");
+            if (param is XisoFileEntry entry)
+            {
+                Files.Remove(entry);
+                UpdateFilesSummary();
+                AddLog($"Removed: {entry.FileName}. Total: {Files.Count}");
+                Log.Information("Removed {File}. Total: {Total}", entry.FileName, Files.Count);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Remove file failed");
+            BugReporter.ReportException(ex, "Remove file failed");
+            AddLog($"Error removing file: {ex.Message}");
         }
     }
 
     private void UpdateFilesSummary()
     {
-        var totalSize = Files.Sum(static f => new FileInfo(f.FilePath).Length);
-        var sizeStr = totalSize switch
+        try
         {
-            < 1024 => $"{totalSize} B",
-            < 1024 * 1024 => $"{totalSize / 1024.0:F1} KB",
-            < 1024L * 1024 * 1024 => $"{totalSize / (1024.0 * 1024):F1} MB",
-            _ => $"{totalSize / (1024.0 * 1024 * 1024):F2} GB"
-        };
-        FilesSummary = $"{Files.Count} file(s) \u2014 {sizeStr} total";
-        OnPropertyChanged(nameof(CanRunTests));
+            var totalSize = Files.Sum(static f =>
+            {
+                try
+                {
+                    return new FileInfo(f.FilePath).Length;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Could not stat {Path}", f.FilePath);
+                    return 0;
+                }
+            });
+            var sizeStr = totalSize switch
+            {
+                < 1024 => $"{totalSize} B",
+                < 1024 * 1024 => $"{totalSize / 1024.0:F1} KB",
+                < 1024L * 1024 * 1024 => $"{totalSize / (1024.0 * 1024):F1} MB",
+                _ => $"{totalSize / (1024.0 * 1024 * 1024):F2} GB"
+            };
+            FilesSummary = $"{Files.Count} file(s) \u2014 {sizeStr} total";
+            OnPropertyChanged(nameof(CanRunTests));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "UpdateFilesSummary failed");
+            BugReporter.ReportException(ex, "UpdateFilesSummary failed");
+        }
     }
 
     private async Task RunTestsAsync()
@@ -332,6 +478,12 @@ internal class MainViewModel : INotifyPropertyChanged
         if (!IsXisoSharpValid)
         {
             AddLog("WARNING: extract-xiso.exe not selected. Comparison tests will be skipped.");
+            Log.Warning("Test run without extract-xiso.exe; comparison tests will be skipped");
+            BugReporter.ReportWarning("Test run without extract-xiso.exe; comparison tests will be skipped");
+        }
+        else
+        {
+            Log.Information("Starting test run for {Count} file(s) with {Exe}", Files.Count, exePath);
         }
 
         var progress = new Progress<TestProgress>(p =>
@@ -368,6 +520,7 @@ internal class MainViewModel : INotifyPropertyChanged
         {
             AddLog($"FATAL ERROR: {ex.Message}");
             Log.Error(ex, "Test run failed");
+            BugReporter.ReportException(ex, "Test run failed");
             ProgressText = "Test run failed.";
             StatusText = "Error: Test run failed.";
         }
@@ -382,18 +535,31 @@ internal class MainViewModel : INotifyPropertyChanged
     {
         if (SessionResult == null) return;
 
-        var dlg = new SaveFileDialog
+        SaveFileDialog dlg;
+        try
         {
-            Title = "Export Results to PDF",
-            Filter = "PDF files (*.pdf)|*.pdf",
-            FileName = $"XISOSharpTester_Results_{DateTime.Now:yyyyMMdd_HHmmss}.pdf"
-        };
+            dlg = new SaveFileDialog
+            {
+                Title = "Export Results to PDF",
+                Filter = "PDF files (*.pdf)|*.pdf",
+                FileName = $"XISOSharpTester_Results_{DateTime.Now:yyyyMMdd_HHmmss}.pdf"
+            };
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "PDF save dialog failed");
+            BugReporter.ReportException(ex, "PDF save dialog failed");
+            AddLog($"PDF export failed: {ex.Message}");
+            return;
+        }
+
         if (dlg.ShowDialog() == true)
         {
             try
             {
                 PdfExporter.Export(SessionResult, XisoTestRunner.XisoSharpVersion, dlg.FileName);
                 AddLog($"PDF exported: {dlg.FileName}");
+                Log.Information("PDF exported to {Path}", dlg.FileName);
                 MessageBox.Show($"Results exported successfully to:\n{dlg.FileName}",
                     "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -401,6 +567,7 @@ internal class MainViewModel : INotifyPropertyChanged
             {
                 AddLog($"PDF export failed: {ex.Message}");
                 Log.Error(ex, "PDF export failed");
+                BugReporter.ReportException(ex, "PDF export failed");
                 MessageBox.Show($"Export failed: {ex.Message}", "Export Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -409,65 +576,125 @@ internal class MainViewModel : INotifyPropertyChanged
 
     private void CopyLog()
     {
-        if (!string.IsNullOrEmpty(LogText))
-            Clipboard.SetText(LogText);
+        try
+        {
+            if (!string.IsNullOrEmpty(LogText))
+            {
+                Clipboard.SetText(LogText);
+                Log.Debug("Log copied to clipboard ({Length} chars)", LogText.Length);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Copy log failed");
+            BugReporter.ReportException(ex, "Copy log failed");
+            AddLog($"Copy log failed: {ex.Message}");
+        }
     }
 
     private void CopyResults()
     {
         if (SessionResult == null) return;
 
-        var sb = new StringBuilder();
-        sb.AppendLine("=== XISOSharp Tester Results ===");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"Date: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"Summary: {SessionResult.TotalFiles} files | " +
-                                                    $"{SessionResult.PassedSubTests} passed, {SessionResult.FailedSubTests} failed, " +
-                                                    $"{SessionResult.SkippedSubTests} skipped | {SessionResult.TotalElapsedSeconds:N1}s");
-        sb.AppendLine();
-
-        foreach (var file in SessionResult.FileResults)
+        try
         {
-            var status = file.AllPassed ? "PASS" : file.Failed > 0 ? "FAIL" : "SKIP";
-            sb.AppendLine(CultureInfo.InvariantCulture,
-                $"--- {file.FileName} ({file.FileSize}) [{status}] {file.ElapsedSeconds:N2}s ---");
-            foreach (var t in file.SubTests)
+            var sb = new StringBuilder();
+            sb.AppendLine("=== XISOSharp Tester Results ===");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Date: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Summary: {SessionResult.TotalFiles} files | " +
+                                                         $"{SessionResult.PassedSubTests} passed, {SessionResult.FailedSubTests} failed, " +
+                                                         $"{SessionResult.SkippedSubTests} skipped | {SessionResult.TotalElapsedSeconds:N1}s");
+            sb.AppendLine();
+
+            foreach (var file in SessionResult.FileResults)
             {
-                var icon = t.Status switch
-                {
-                    TestStatus.Passed => "[PASS]",
-                    TestStatus.Failed => "[FAIL]",
-                    _ => "[SKIP]"
-                };
+                var status = file.AllPassed ? "PASS" : file.Failed > 0 ? "FAIL" : "SKIP";
                 sb.AppendLine(CultureInfo.InvariantCulture,
-                    $"  {icon} {t.TestName,-22} {t.ElapsedSeconds,6:N2}s  {t.Detail}");
+                    $"--- {file.FileName} ({file.FileSize}) [{status}] {file.ElapsedSeconds:N2}s ---");
+                foreach (var t in file.SubTests)
+                {
+                    var icon = t.Status switch
+                    {
+                        TestStatus.Passed => "[PASS]",
+                        TestStatus.Failed => "[FAIL]",
+                        _ => "[SKIP]"
+                    };
+                    sb.AppendLine(CultureInfo.InvariantCulture,
+                        $"  {icon} {t.TestName,-22} {t.ElapsedSeconds,6:N2}s  {t.Detail}");
+                }
+
+                sb.AppendLine();
             }
 
-            sb.AppendLine();
+            Clipboard.SetText(sb.ToString());
+            Log.Debug("Results copied to clipboard");
         }
-
-        Clipboard.SetText(sb.ToString());
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Copy results failed");
+            BugReporter.ReportException(ex, "Copy results failed");
+            AddLog($"Copy results failed: {ex.Message}");
+        }
     }
 
     private void AddLog(string message)
     {
-        var ts = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-        LogEntries.Add(new LogEntry { Message = message, Timestamp = ts });
-        LogText += $"[{ts}] {message}\n";
+        try
+        {
+            var ts = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            LogEntries.Add(new LogEntry { Message = message, Timestamp = ts });
+            LogText += $"[{ts}] {message}\n";
+            if (message.StartsWith("FATAL", StringComparison.OrdinalIgnoreCase) ||
+                message.StartsWith("Error", StringComparison.OrdinalIgnoreCase))
+                Log.Error("{TesterLog}", message);
+            else if (message.StartsWith("WARNING", StringComparison.OrdinalIgnoreCase))
+                Log.Warning("{TesterLog}", message);
+            else
+                Log.Information("{TesterLog}", message);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"AddLog failed: {ex.Message}");
+        }
     }
 
     private static void ShowAbout()
     {
-        var about = new AboutWindow { Owner = Application.Current.MainWindow };
-        about.ShowDialog();
+        try
+        {
+            var about = new AboutWindow { Owner = Application.Current.MainWindow };
+            about.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ShowAbout failed");
+            BugReporter.ReportException(ex, "ShowAbout failed");
+        }
     }
 
     private static void ExitApp()
     {
-        Application.Current.MainWindow?.Close();
+        try
+        {
+            Log.Information("Exit requested");
+            Application.Current.MainWindow?.Close();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Exit failed");
+            BugReporter.ReportException(ex, "Exit failed");
+        }
     }
 
+    /// <summary>
+    /// Occurs when a bound property value changes.
+    /// </summary>
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>
+    /// Raises <see cref="PropertyChanged"/> for the caller property.
+    /// </summary>
+    /// <param name="name">Property name; defaults to the caller member name.</param>
     protected void OnPropertyChanged([CallerMemberName] string? name = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

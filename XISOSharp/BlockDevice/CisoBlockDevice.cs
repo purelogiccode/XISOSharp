@@ -110,8 +110,10 @@ public sealed class CisoBlockDevice : IBlockDevice
     }
 
     /// <inheritdoc/>
-    public void Write(long offset, ReadOnlySpan<byte> buffer) =>
+    public void Write(long offset, ReadOnlySpan<byte> buffer)
+    {
         throw new NotSupportedException("CISO block device is read-only");
+    }
 
     /// <inheritdoc/>
     public void Dispose()

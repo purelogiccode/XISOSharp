@@ -47,16 +47,16 @@ internal static class ZstdHuffman
                 throw new ZstdException("Invalid Huffman direct weight count.");
             }
 
-            int packed = (transmittedCount + 1) / 2;
+            var packed = (transmittedCount + 1) / 2;
             if (packed + 1 > length)
             {
                 throw new ZstdException("Truncated Huffman weights.");
             }
 
             transmitted = new byte[transmittedCount];
-            for (int n = 0; n < transmittedCount; n += 2)
+            for (var n = 0; n < transmittedCount; n += 2)
             {
-                byte b = buf[offset + 1 + n / 2];
+                var b = buf[offset + 1 + (n / 2)];
                 transmitted[n] = (byte)(b >> 4);
                 if (n + 1 < transmittedCount)
                 {
@@ -69,15 +69,15 @@ internal static class ZstdHuffman
         else
         {
             // FSE-compressed weights (accuracy log ≤ 6, max 255 weights).
-            int fseSize = header;
+            var fseSize = header;
             if (fseSize + 1 > length)
             {
                 throw new ZstdException("Truncated Huffman weights.");
             }
 
-            int consumed = ZstdFse.ParseNormalizedCounts(
+            var consumed = ZstdFse.ParseNormalizedCounts(
                 buf, offset + 1, fseSize, 255,
-                out short[] norms, out int fseLog, out int fseMaxSymbol);
+                out var norms, out var fseLog, out var fseMaxSymbol);
             if (fseLog > 6)
             {
                 throw new ZstdException("Huffman weight tableLog too large.");
@@ -90,9 +90,9 @@ internal static class ZstdHuffman
         }
 
         // Validate and deduce the implied last weight (reference HUF_readStats).
-        int[] rankStats = new int[13];
+        var rankStats = new int[13];
         long weightTotal = 0;
-        for (int n = 0; n < transmittedCount; n++)
+        for (var n = 0; n < transmittedCount; n++)
         {
             int w = transmitted[n];
             if (w > 12)
@@ -109,7 +109,7 @@ internal static class ZstdHuffman
             throw new ZstdException("Invalid Huffman weights.");
         }
 
-        int maxBits = Highbit((uint)weightTotal) + 1;
+        var maxBits = Highbit((uint)weightTotal) + 1;
         if (maxBits > 12)
         {
             throw new ZstdException("Huffman tree too deep.");
@@ -117,13 +117,13 @@ internal static class ZstdHuffman
 
         // Note: HUF_TABLELOG_MAX is 12 here, but the format caps codes at 11
         // bits (RFC 8878 Section 4.2); enforce below after the last weight.
-        uint rest = (1u << maxBits) - (uint)weightTotal;
+        var rest = (1u << maxBits) - (uint)weightTotal;
         if (rest == 0 || (rest & (rest - 1)) != 0)
         {
             throw new ZstdException("Invalid Huffman weights.");
         }
 
-        int lastWeight = Highbit(rest) + 1;
+        var lastWeight = Highbit(rest) + 1;
         weights = new byte[transmittedCount + 1];
         Array.Copy(transmitted, weights, transmittedCount);
         weights[transmittedCount] = (byte)lastWeight;
@@ -140,7 +140,7 @@ internal static class ZstdHuffman
         }
 
         // Maximum code length is 11 bits (Max_Number_of_Bits ≤ 11).
-        for (int n = 0; n < numSymbols; n++)
+        for (var n = 0; n < numSymbols; n++)
         {
             if (weights[n] != 0 && maxBits + 1 - weights[n] > 11)
             {
@@ -173,19 +173,19 @@ internal static class ZstdHuffman
         byte[] buf, int offset, int length, ZstdFse.DecodeTable table, int maxOut)
     {
         var bitD = BackwardBitReader.ForHuffmanStream(buf, offset, length);
-        int log = table.TableLog;
+        var log = table.TableLog;
         if (bitD.RemainingBits < log)
         {
             throw new ZstdException("Truncated Huffman weights.");
         }
 
-        int state1 = (int)bitD.ReadBits(log);
+        var state1 = (int)bitD.ReadBits(log);
         if (bitD.RemainingBits < log)
         {
             throw new ZstdException("Truncated Huffman weights.");
         }
 
-        int state2 = (int)bitD.ReadBits(log);
+        var state2 = (int)bitD.ReadBits(log);
 
         var outWeights = new List<byte>(maxOut);
         while (true)
@@ -242,7 +242,7 @@ internal static class ZstdHuffman
             throw new ZstdException("Invalid Huffman table depth.");
         }
 
-        int tableSize = 1 << maxBits;
+        var tableSize = 1 << maxBits;
         var table = new HuffmanTable
         {
             MaxBits = maxBits,
@@ -251,21 +251,21 @@ internal static class ZstdHuffman
         };
 
         // Ascending weight (descending length), ascending symbol (RFC 4.2.1.3).
-        int code = 0;
-        for (int w = 1; w <= maxBits; w++)
+        var code = 0;
+        for (var w = 1; w <= maxBits; w++)
         {
-            int nbBits = maxBits + 1 - w;
-            for (int s = 0; s < numSymbols; s++)
+            var nbBits = maxBits + 1 - w;
+            for (var s = 0; s < numSymbols; s++)
             {
                 if (weights[s] == w)
                 {
-                    int reps = 1 << (maxBits - nbBits);
+                    var reps = 1 << (maxBits - nbBits);
                     if (code + reps > tableSize)
                     {
                         throw new ZstdException("Invalid Huffman tree.");
                     }
 
-                    for (int k = 0; k < reps; k++)
+                    for (var k = 0; k < reps; k++)
                     {
                         table.Symbols[code + k] = (byte)s;
                         table.NumBits[code + k] = (byte)nbBits;
@@ -293,15 +293,15 @@ internal static class ZstdHuffman
     /// </summary>
     private static uint PeekHuffman(BackwardBitReader bitD, byte[] buf, int streamOffset, int maxBits)
     {
-        long remaining = bitD.RemainingBits;
+        var remaining = bitD.RemainingBits;
         if (remaining >= maxBits)
         {
-            long baseBit = remaining - maxBits;
+            var baseBit = remaining - maxBits;
             uint value = 0;
-            for (int i = 0; i < maxBits; i++)
+            for (var i = 0; i < maxBits; i++)
             {
-                long p = baseBit + i;
-                int bit = (buf[streamOffset + (p >> 3)] >> (int)(p & 7)) & 1;
+                var p = baseBit + i;
+                var bit = (buf[streamOffset + (p >> 3)] >> (int)(p & 7)) & 1;
                 value |= (uint)(bit << i);
             }
 
@@ -309,9 +309,9 @@ internal static class ZstdHuffman
         }
 
         uint low = 0;
-        for (int i = 0; i < remaining; i++)
+        for (var i = 0; i < remaining; i++)
         {
-            int bit = (buf[streamOffset + (i >> 3)] >> (int)(i & 7)) & 1;
+            var bit = (buf[streamOffset + (i >> 3)] >> (int)(i & 7)) & 1;
             low |= (uint)(bit << i);
         }
 
@@ -327,13 +327,13 @@ internal static class ZstdHuffman
         HuffmanTable table, byte[] dst, int dstOffset, int dstLength)
     {
         var bitD = BackwardBitReader.ForHuffmanStream(buf, offset, length);
-        int maxBits = table.MaxBits;
-        int end = dstOffset + dstLength;
-        int p = dstOffset;
+        var maxBits = table.MaxBits;
+        var end = dstOffset + dstLength;
+        var p = dstOffset;
         while (p < end)
         {
-            uint index = PeekHuffman(bitD, buf, offset, maxBits);
-            byte sym = table.Symbols[index];
+            var index = PeekHuffman(bitD, buf, offset, maxBits);
+            var sym = table.Symbols[index];
             int len = table.NumBits[index];
             if (len > bitD.RemainingBits)
             {

@@ -1,8 +1,6 @@
-using System;
 using System.Diagnostics;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
+using Serilog;
+using XISOSharp.Gui.Logging;
 
 namespace XISOSharp.Gui.Services;
 
@@ -12,45 +10,69 @@ namespace XISOSharp.Gui.Services;
 /// </summary>
 internal static class CliLocator
 {
+    /// <summary>
+    /// Gets the CLI file name for the current OS.
+    /// </summary>
     internal static string CliFileName =>
         OperatingSystem.IsWindows() ? "XISOSharp.Cli.exe" : "XISOSharp.Cli";
 
+    /// <summary>
+    /// Resolves the CLI via explicit override, then a sibling of the GUI executable, then <c>PATH</c>.
+    /// </summary>
+    /// <param name="overridePath">User-configured CLI path; ignored when missing or blank.</param>
+    /// <returns>The resolved executable path, or <c>null</c> when not found.</returns>
     internal static string? Resolve(string? overridePath)
     {
-        if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
+        try
         {
-            return overridePath;
-        }
-
-        var sibling = Path.Combine(AppContext.BaseDirectory, CliFileName);
-        if (File.Exists(sibling))
-        {
-            return sibling;
-        }
-
-        var pathEnv = Environment.GetEnvironmentVariable("PATH");
-        if (!string.IsNullOrEmpty(pathEnv))
-        {
-            foreach (var dir in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
             {
-                try
+                return overridePath;
+            }
+
+            var sibling = Path.Combine(AppContext.BaseDirectory, CliFileName);
+            if (File.Exists(sibling))
+            {
+                return sibling;
+            }
+
+            var pathEnv = Environment.GetEnvironmentVariable("PATH");
+            if (!string.IsNullOrEmpty(pathEnv))
+            {
+                foreach (var dir in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    var candidate = Path.Combine(dir.Trim(), CliFileName);
-                    if (File.Exists(candidate))
+                    try
                     {
-                        return candidate;
+                        var candidate = Path.Combine(dir.Trim(), CliFileName);
+                        if (File.Exists(candidate))
+                        {
+                            return candidate;
+                        }
+                    }
+                    catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+                    {
+                        Log.Debug(ex, "Skipping malformed PATH entry");
+                        // Malformed PATH entry — skip it.
                     }
                 }
-                catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-                {
-                    // Malformed PATH entry — skip it.
-                }
             }
-        }
 
-        return null;
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "CliLocator.Resolve failed");
+            BugReporter.ReportException(ex, "CliLocator.Resolve failed");
+            return null;
+        }
     }
 
+    /// <summary>
+    /// Runs the CLI with <c>-v</c> and returns its first output line.
+    /// </summary>
+    /// <param name="cliPath">Resolved path to the CLI executable.</param>
+    /// <param name="ct">Cancellation token for the probe process.</param>
+    /// <returns>The version banner line, or <c>null</c> when the probe fails.</returns>
     internal static async Task<string?> ProbeVersionAsync(string cliPath, CancellationToken ct)
     {
         try
@@ -86,6 +108,13 @@ internal static class CliLocator
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
         {
+            Log.Warning(ex, "CLI version probe failed for {Cli}", cliPath);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "CLI version probe failed for {Cli}", cliPath);
+            BugReporter.ReportException(ex, $"CLI version probe failed for {cliPath}");
             return null;
         }
     }

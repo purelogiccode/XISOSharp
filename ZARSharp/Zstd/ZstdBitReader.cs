@@ -1,5 +1,7 @@
 namespace ZARSharp.Zstd;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 /// <summary>
 /// Backward (LIFO) little-endian bit reader (RFC 8878 Sections 4.1, 4.2.2).
 /// Bits are read from the end of the buffer toward the beginning;
@@ -11,20 +13,19 @@ internal sealed class BackwardBitReader
 {
     private readonly byte[] _buf;
     private readonly int _offset;
-    private long _pos; // exclusive top: next read takes bits below _pos
 
     private BackwardBitReader(byte[] buf, int offset, long useBits)
     {
         _buf = buf;
         _offset = offset;
-        _pos = useBits;
+        RemainingBits = useBits;
     }
 
     /// <summary>Useful bits not yet consumed.</summary>
-    public long RemainingBits => _pos;
+    public long RemainingBits { get; private set; }
 
     /// <summary>True when the stream is exactly consumed.</summary>
-    public bool IsAtEnd => _pos == 0;
+    public bool IsAtEnd => RemainingBits == 0;
 
     /// <summary>
     /// Initializes over a Huffman-coded stream: the highest set bit of the
@@ -37,13 +38,13 @@ internal sealed class BackwardBitReader
             throw new ZstdException("Empty Huffman stream.");
         }
 
-        byte last = buf[offset + length - 1];
+        var last = buf[offset + length - 1];
         if (last == 0)
         {
             throw new ZstdException("Huffman stream end mark missing.");
         }
 
-        return new BackwardBitReader(buf, offset, ((long)length - 1) * 8 + HighestBit(last));
+        return new BackwardBitReader(buf, offset, (((long)length - 1) * 8) + HighestBit(last));
     }
 
     /// <summary>
@@ -52,8 +53,8 @@ internal sealed class BackwardBitReader
     /// </summary>
     public static BackwardBitReader ForSequenceStream(byte[] buf, int offset, int length)
     {
-        long totalBits = (long)length * 8;
-        long p = totalBits;
+        var totalBits = (long)length * 8;
+        var p = totalBits;
         while (p > 0 && GetBit(buf, offset, p - 1) == 0)
         {
             p--;
@@ -74,7 +75,7 @@ internal sealed class BackwardBitReader
 
     private static int HighestBit(byte v)
     {
-        int h = 0;
+        var h = 0;
         while (v > 1)
         {
             v >>= 1;
@@ -97,18 +98,18 @@ internal sealed class BackwardBitReader
             throw new ZstdException("Invalid bit read size.");
         }
 
-        if (_pos < count)
+        if (RemainingBits < count)
         {
             throw new ZstdException("Truncated bitstream.");
         }
 
-        _pos -= count;
-        long baseBit = _pos;
+        RemainingBits -= count;
+        var baseBit = RemainingBits;
         uint value = 0;
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
-            long p = baseBit + i;
-            int bit = (_buf[_offset + (p >> 3)] >> (int)(p & 7)) & 1;
+            var p = baseBit + i;
+            var bit = (_buf[_offset + (p >> 3)] >> (int)(p & 7)) & 1;
             value |= (uint)(bit << i);
         }
 
@@ -138,7 +139,7 @@ internal sealed class ForwardBitReader
     }
 
     /// <summary>Bits consumed so far (relative to the stream start).</summary>
-    public long ConsumedBits => _bitPos - (long)_start * 8;
+    public long ConsumedBits => _bitPos - ((long)_start * 8);
 
     /// <summary>Peeks <paramref name="count"/> bits (0-32) without advancing.</summary>
     public uint PeekBits(int count)
@@ -149,10 +150,10 @@ internal sealed class ForwardBitReader
         }
 
         uint value = 0;
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
-            long p = _bitPos + i;
-            int bit = 0;
+            var p = _bitPos + i;
+            var bit = 0;
             if (p < (long)_end * 8 && p >= 0 && (p >> 3) < _buf.Length)
             {
                 bit = (_buf[p >> 3] >> (int)(p & 7)) & 1;
@@ -167,7 +168,7 @@ internal sealed class ForwardBitReader
     /// <summary>Reads <paramref name="count"/> bits (0-32) little-endian.</summary>
     public uint ReadBits(int count)
     {
-        uint value = PeekBits(count);
+        var value = PeekBits(count);
         _bitPos += count;
         return value;
     }

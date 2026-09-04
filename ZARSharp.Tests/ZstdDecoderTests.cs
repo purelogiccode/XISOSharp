@@ -14,9 +14,9 @@ public sealed class ZstdDecoderTests
     private static byte[] Text(int n)
     {
         const string sample = "The quick brown fox jumps over the lazy dog. Decoder gap test. ";
-        byte[] ascii = System.Text.Encoding.ASCII.GetBytes(sample);
-        byte[] outBuf = new byte[n];
-        for (int i = 0; i < n; i++)
+        var ascii = System.Text.Encoding.ASCII.GetBytes(sample);
+        var outBuf = new byte[n];
+        for (var i = 0; i < n; i++)
         {
             outBuf[i] = ascii[i % ascii.Length];
         }
@@ -27,33 +27,33 @@ public sealed class ZstdDecoderTests
     [Fact]
     public void ConcatenatedFramesDecodeToConcatenation()
     {
-        byte[] a = Text(1000);
-        byte[] b = Text(70000);
-        byte[] fa = new ZstdCompressor().CompressBlock(a);
-        byte[] fb = new ZstdCompressor().CompressBlock(b);
+        var a = Text(1000);
+        var b = Text(70000);
+        var fa = new ZstdCompressor().CompressBlock(a);
+        var fb = new ZstdCompressor().CompressBlock(b);
 
         byte[] both = [.. fa, .. fb];
-        byte[] decoded = ZstdDecompressor.Decompress(both);
+        var decoded = ZstdDecompressor.Decompress(both);
         Assert.Equal([.. a, .. b], decoded);
     }
 
     [Fact]
     public void SkippableFrameBetweenFramesIsSkipped()
     {
-        byte[] a = Text(5000);
-        byte[] fa = new ZstdCompressor().CompressBlock(a);
+        var a = Text(5000);
+        var fa = new ZstdCompressor().CompressBlock(a);
 
         // Skippable frame: magic 0x184D2A50 LE + u32 size + payload.
         byte[] skip = [0x50, 0x2A, 0x4D, 0x18, 0x04, 0x00, 0x00, 0x00, 0xDE, 0xAD, 0xBE, 0xEF];
         byte[] both = [.. fa, .. skip, .. fa];
-        byte[] decoded = ZstdDecompressor.Decompress(both);
+        var decoded = ZstdDecompressor.Decompress(both);
         Assert.Equal([.. a, .. a], decoded);
     }
 
     [Fact]
     public void TrailingGarbageStillThrows()
     {
-        byte[] fa = new ZstdCompressor().CompressBlock(Text(100));
+        var fa = new ZstdCompressor().CompressBlock(Text(100));
         Assert.Throws<ZstdException>(() => ZstdDecompressor.Decompress([.. fa, 0x00]));
     }
 
@@ -66,9 +66,9 @@ public sealed class ZstdDecoderTests
     [Fact]
     public void DecompressExactWithOptionsRoundTrips()
     {
-        byte[] input = Text(4096);
-        byte[] frame = new ZstdCompressor().CompressBlock(input);
-        byte[] dst = new byte[input.Length];
+        var input = Text(4096);
+        var frame = new ZstdCompressor().CompressBlock(input);
+        var dst = new byte[input.Length];
         ZstdDecompressor.DecompressExact(
             frame, 0, frame.Length, dst, 0, dst.Length, new ZstdDecoderOptions());
         Assert.Equal(input, dst);
@@ -86,8 +86,8 @@ public sealed class ZstdDecoderTests
         // to claim windowLog and verify content still decodes.
         // (Claiming a SMALLER window would invalidate real offsets, so the
         // sweep starts at the emitted windowLog 17.)
-        byte[] input = Text(65536);
-        byte[] frame = new ZstdCompressor().CompressBlock(input);
+        var input = Text(65536);
+        var frame = new ZstdCompressor().CompressBlock(input);
         Assert.Equal(0x38, frame[5]); // locks layout: explicit windowLog 17
         frame[5] = (byte)((windowLog - 10) << 3);
         Assert.Equal(input, ZstdDecompressor.Decompress(frame));
@@ -98,8 +98,8 @@ public sealed class ZstdDecoderTests
     [InlineData(31)] // 2 GiB window
     public void WindowAboveDefaultCapRejectedUnlessRaised(int windowLog)
     {
-        byte[] input = Text(65536);
-        byte[] frame = new ZstdCompressor().CompressBlock(input);
+        var input = Text(65536);
+        var frame = new ZstdCompressor().CompressBlock(input);
         frame[5] = (byte)((windowLog - 10) << 3);
 
         Assert.Throws<ZstdException>(() => ZstdDecompressor.Decompress(frame));
@@ -110,7 +110,7 @@ public sealed class ZstdDecoderTests
     [Fact]
     public void OptionsCapsRejectOversizedFrames()
     {
-        byte[] frame = new ZstdCompressor().CompressBlock(Text(65536)); // 128 KiB window
+        var frame = new ZstdCompressor().CompressBlock(Text(65536)); // 128 KiB window
         Assert.Throws<ZstdException>(() => ZstdDecompressor.Decompress(
             frame, new ZstdDecoderOptions { MaxWindowSize = 1024 }));
         Assert.Throws<ZstdException>(() => ZstdDecompressor.Decompress(

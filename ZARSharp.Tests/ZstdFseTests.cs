@@ -15,9 +15,9 @@ public sealed class ZstdFseTests
     public static TheoryData<int, int, bool> Contexts()
     {
         var data = new TheoryData<int, int, bool>();
-        foreach (int alphabet in new[] { 36, 53, 29 })
+        foreach (var alphabet in new[] { 36, 53, 29 })
         {
-            foreach (int tableLog in new[] { 6, 7, 8, 9 })
+            foreach (var tableLog in new[] { 6, 7, 8, 9 })
             {
                 data.Add(alphabet, tableLog, false);
                 data.Add(alphabet, tableLog, true);
@@ -32,9 +32,9 @@ public sealed class ZstdFseTests
     public void Fse_RoundTrip_AllDistributions(int alphabet, int tableLog, bool useLowProb)
     {
         string[] kinds = ["skewed", "uniform", "random"];
-        for (int d = 0; d < kinds.Length; d++)
+        for (var d = 0; d < kinds.Length; d++)
         {
-            byte[] symbols = MakeSymbols(kinds[d], alphabet, 3000, SeedFor(alphabet, tableLog, useLowProb, d));
+            var symbols = MakeSymbols(kinds[d], alphabet, 3000, SeedFor(alphabet, tableLog, useLowProb, d));
             RoundTripOnce(symbols, alphabet, tableLog, useLowProb, kinds[d]);
         }
     }
@@ -45,19 +45,19 @@ public sealed class ZstdFseTests
     [InlineData(29)]
     public void Fse_RleInput_UsesRlePath(int alphabet)
     {
-        byte[] zeros = new byte[64];
-        byte[] sevens = new byte[64];
+        var zeros = new byte[64];
+        var sevens = new byte[64];
         Array.Fill(sevens, (byte)7);
 
-        foreach (byte[] symbols in new[] { zeros, sevens })
+        foreach (var symbols in new[] { zeros, sevens })
         {
-            var (counts, maxSV) = Histogram(symbols, alphabet);
+            var (counts, maxSv) = Histogram(symbols, alphabet);
             var norms = new short[alphabet];
-            int total = symbols.Length;
-            int tableLog = ZstdFseEncoder.OptimalTableLog(9, total, maxSV);
-            Assert.Equal(-1, ZstdFseEncoder.NormalizeCounts(norms, counts, total, maxSV, tableLog, false));
+            var total = symbols.Length;
+            var tableLog = ZstdFseEncoder.OptimalTableLog(9, total, maxSv);
+            Assert.Equal(-1, ZstdFseEncoder.NormalizeCounts(norms, counts, total, maxSv, tableLog, false));
 
-            Assert.True(ZstdFseEncoder.IsSingleSymbol(symbols, 0, symbols.Length, out byte sym));
+            Assert.True(ZstdFseEncoder.IsSingleSymbol(symbols, 0, symbols.Length, out var sym));
             Assert.Equal(symbols[0], sym);
 
             var ct = ZstdFseEncoder.BuildCTable(new short[] { 63, 1 }, 1, 6);
@@ -79,37 +79,37 @@ public sealed class ZstdFseTests
     [InlineData(64)]
     public void Fse_RoundTrip_SmallStreams(int length)
     {
-        const int Alphabet = 8;
-        byte[] symbols = new byte[length];
-        for (int i = 0; i < length; i++)
+        const int alphabet = 8;
+        var symbols = new byte[length];
+        for (var i = 0; i < length; i++)
         {
-            symbols[i] = (byte)(((i * 3) + 1) % Alphabet); // Never single-symbol.
+            symbols[i] = (byte)(((i * 3) + 1) % alphabet); // Never single-symbol.
         }
 
-        RoundTripOnce(symbols, Alphabet, 6, false, $"small-{length}");
+        RoundTripOnce(symbols, alphabet, 6, false, $"small-{length}");
     }
 
     [Fact]
     public void Fse_Encode_TooSmallInput_ReturnsMinusOne()
     {
         var ct = ZstdFseEncoder.BuildCTable(new short[] { 32, 32 }, 1, 6);
-        byte[] dst = new byte[64];
+        var dst = new byte[64];
         Assert.Equal(-1, ZstdFseEncoder.Encode(dst, 0, dst.Length, new byte[] { 1 }, 0, 1, ct));
         Assert.Equal(-1, ZstdFseEncoder.Encode(dst, 0, dst.Length, new byte[] { 1, 2 }, 0, 2, ct));
         Assert.Equal(-1, ZstdFseEncoder.Encode(dst, 0, 4, new byte[] { 1, 2, 3 }, 0, 3, ct));
 
         // RLE-shaped input and RLE (tableLog 0) tables also decline.
-        byte[] rle = [9, 9, 9, 9, 9];
+        var rle = "\t\t\t\t\t"u8.ToArray();
         Assert.Equal(-1, ZstdFseEncoder.Encode(dst, 0, dst.Length, rle, 0, rle.Length, ct));
         var rleTable = new FseCTable { TableLog = 0, MaxSymbolValue = 9 };
         Assert.Equal(-1, ZstdFseEncoder.Encode(dst, 0, dst.Length, new byte[] { 1, 2, 3 }, 0, 3, rleTable));
 
         // Tiny destination that fits the container check but not the stream.
-        byte[] many = MakeSymbols("random", 8, 200, 0xF5E);
-        var (manyCounts, manyMaxSV) = Histogram(many, 8);
+        var many = MakeSymbols("random", 8, 200, 0xF5E);
+        var (manyCounts, manyMaxSv) = Histogram(many, 8);
         var manyNorms = new short[8];
-        Assert.Equal(6, ZstdFseEncoder.NormalizeCounts(manyNorms, manyCounts, many.Length, manyMaxSV, 6, false));
-        var manyTable = ZstdFseEncoder.BuildCTable(manyNorms, manyMaxSV, 6);
+        Assert.Equal(6, ZstdFseEncoder.NormalizeCounts(manyNorms, manyCounts, many.Length, manyMaxSv, 6, false));
+        var manyTable = ZstdFseEncoder.BuildCTable(manyNorms, manyMaxSv, 6);
         Assert.Equal(-1, ZstdFseEncoder.Encode(dst, 0, 16, many, 0, many.Length, manyTable));
 
         // Out-of-range symbols throw (caller bug, never a size decision).
@@ -128,13 +128,13 @@ public sealed class ZstdFseTests
         Assert.Equal(7, ZstdFseEncoder.OptimalTableLog(6, 3000, 35));
 
         // Below the minimum the distribution is not representable.
-        var (counts, maxSV) = Histogram(MakeSymbols("uniform", 36, 3000, 1), 36);
+        var (counts, maxSv) = Histogram(MakeSymbols("uniform", 36, 3000, 1), 36);
         Assert.Throws<ZstdException>(() =>
-            ZstdFseEncoder.NormalizeCounts(new short[36], counts, 3000, maxSV, 6, false));
+            ZstdFseEncoder.NormalizeCounts(new short[36], counts, 3000, maxSv, 6, false));
         Assert.Throws<ZstdException>(() =>
-            ZstdFseEncoder.NormalizeCounts(new short[36], counts, 3000, maxSV, 4, false));
+            ZstdFseEncoder.NormalizeCounts(new short[36], counts, 3000, maxSv, 4, false));
         Assert.Throws<ZstdException>(() =>
-            ZstdFseEncoder.NormalizeCounts(new short[36], counts, 3000, maxSV, 13, false));
+            ZstdFseEncoder.NormalizeCounts(new short[36], counts, 3000, maxSv, 13, false));
     }
 
     [Fact]
@@ -153,10 +153,10 @@ public sealed class ZstdFseTests
 
     private static void RoundTripOnce(byte[] symbols, int alphabet, int tableLog, bool useLowProb, string kind)
     {
-        var (counts, maxSV) = Histogram(symbols, alphabet);
-        int total = symbols.Length;
-        int nonzero = 0;
-        foreach (uint c in counts)
+        var (counts, maxSv) = Histogram(symbols, alphabet);
+        var total = symbols.Length;
+        var nonzero = 0;
+        foreach (var c in counts)
         {
             if (c > 0)
             {
@@ -165,15 +165,15 @@ public sealed class ZstdFseTests
         }
 
         var norms = new short[alphabet];
-        if (tableLog < ZstdFseEncoder.MinTableLogFor(total, maxSV))
+        if (tableLog < ZstdFseEncoder.MinTableLogFor(total, maxSv))
         {
             // Not representable at this accuracy (plan property, negative side).
             Assert.Throws<ZstdException>(() =>
-                ZstdFseEncoder.NormalizeCounts(norms, counts, total, maxSV, tableLog, useLowProb));
+                ZstdFseEncoder.NormalizeCounts(norms, counts, total, maxSv, tableLog, useLowProb));
             return;
         }
 
-        int got = ZstdFseEncoder.NormalizeCounts(norms, counts, total, maxSV, tableLog, useLowProb);
+        var got = ZstdFseEncoder.NormalizeCounts(norms, counts, total, maxSv, tableLog, useLowProb);
         Assert.NotEqual(-1, got); // Test distributions are never RLE.
         Assert.Equal(tableLog, got);
 
@@ -182,7 +182,7 @@ public sealed class ZstdFseTests
 
         // Present symbols keep a nonzero probability; the sum is exact.
         long sum = 0;
-        for (int s = 0; s < alphabet; s++)
+        for (var s = 0; s < alphabet; s++)
         {
             if (counts[s] > 0)
             {
@@ -195,32 +195,32 @@ public sealed class ZstdFseTests
         Assert.Equal(1 << tableLog, sum);
 
         // Header round-trip through the existing decoder.
-        byte[] header = new byte[ZstdFseEncoder.NCountWriteBound(maxSV, tableLog)];
-        int headerSize = ZstdFseEncoder.WriteNCount(header, 0, header.Length, norms, maxSV, tableLog);
+        var header = new byte[ZstdFseEncoder.NCountWriteBound(maxSv, tableLog)];
+        var headerSize = ZstdFseEncoder.WriteNCount(header, 0, header.Length, norms, maxSv, tableLog);
         Assert.True(headerSize > 0 && headerSize <= header.Length);
-        int consumed = ZstdFse.ParseNormalizedCounts(header, 0, headerSize, alphabet - 1,
-            out short[] parsed, out int parsedLog, out int parsedMaxSV);
+        var consumed = ZstdFse.ParseNormalizedCounts(header, 0, headerSize, alphabet - 1,
+            out var parsed, out var parsedLog, out var parsedMaxSv);
         Assert.Equal(headerSize, consumed);
         Assert.Equal(tableLog, parsedLog);
-        for (int s = 0; s < alphabet; s++)
+        for (var s = 0; s < alphabet; s++)
         {
-            short expected = s <= parsedMaxSV ? parsed[s] : (short)0;
+            var expected = s <= parsedMaxSv ? parsed[s] : (short)0;
             Assert.True(norms[s] == expected, $"{kind}: norm mismatch at {s}");
         }
 
-        for (int s = parsedMaxSV + 1; s < alphabet; s++)
+        for (var s = parsedMaxSv + 1; s < alphabet; s++)
         {
             Assert.Equal(0, norms[s]);
         }
 
         // Stream round-trip, decoded with the existing decoder tables.
-        var ct = ZstdFseEncoder.BuildCTable(norms, maxSV, tableLog);
-        byte[] dst = new byte[ZstdFseEncoder.BlockBound(total)];
-        int size = ZstdFseEncoder.Encode(dst, 0, dst.Length, symbols, 0, total, ct);
+        var ct = ZstdFseEncoder.BuildCTable(norms, maxSv, tableLog);
+        var dst = new byte[ZstdFseEncoder.BlockBound(total)];
+        var size = ZstdFseEncoder.Encode(dst, 0, dst.Length, symbols, 0, total, ct);
         Assert.True(size > 0, $"{kind}: encode failed");
 
-        var dtable = ZstdFse.BuildTable(parsed, parsedMaxSV, parsedLog);
-        byte[] decoded = DecodeStream(dst, size, dtable, total);
+        var dtable = ZstdFse.BuildTable(parsed, parsedMaxSv, parsedLog);
+        var decoded = DecodeStream(dst, size, dtable, total);
         Assert.Equal(symbols, decoded);
     }
 
@@ -234,11 +234,11 @@ public sealed class ZstdFseTests
     private static byte[] DecodeStream(byte[] buf, int size, ZstdFse.DecodeTable table, int symbolCount)
     {
         var bitD = BackwardBitReader.ForSequenceStream(buf, 0, size);
-        int log = table.TableLog;
-        int s1 = (int)bitD.ReadBits(log);
-        int s2 = (int)bitD.ReadBits(log);
-        byte[] output = new byte[symbolCount];
-        for (int i = 0; i < symbolCount; i++)
+        var log = table.TableLog;
+        var s1 = (int)bitD.ReadBits(log);
+        var s2 = (int)bitD.ReadBits(log);
+        var output = new byte[symbolCount];
+        for (var i = 0; i < symbolCount; i++)
         {
             if ((i & 1) == 0)
             {
@@ -264,61 +264,61 @@ public sealed class ZstdFseTests
 
     private static (uint[] Counts, int MaxSymbolValue) Histogram(byte[] symbols, int alphabet)
     {
-        uint[] counts = new uint[alphabet];
-        int maxSV = 0;
-        foreach (byte s in symbols)
+        var counts = new uint[alphabet];
+        var maxSv = 0;
+        foreach (var s in symbols)
         {
             counts[s]++;
-            if (s > maxSV)
+            if (s > maxSv)
             {
-                maxSV = s;
+                maxSv = s;
             }
         }
 
-        return (counts, maxSV);
+        return (counts, maxSv);
     }
 
     private static byte[] MakeSymbols(string kind, int alphabet, int count, int seed)
     {
         var rnd = new Random(seed);
-        byte[] symbols = new byte[count];
+        var symbols = new byte[count];
         switch (kind)
         {
             case "skewed": // One hot: 70% symbol 0, rest spread.
-                for (int i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                 {
                     symbols[i] = rnd.NextDouble() < 0.7 ? (byte)0 : (byte)rnd.Next(1, alphabet);
                 }
 
                 break;
             case "uniform":
-                for (int i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                 {
                     symbols[i] = (byte)rnd.Next(0, alphabet);
                 }
 
                 break;
             default: // "random": Dirichlet-ish random weights (varied skew).
-                double[] weights = new double[alphabet];
+                var weights = new double[alphabet];
                 double wsum = 0;
-                for (int s = 0; s < alphabet; s++)
+                for (var s = 0; s < alphabet; s++)
                 {
                     weights[s] = 0.05 + Math.Pow(rnd.NextDouble(), 3);
                     wsum += weights[s];
                 }
 
-                double[] cumul = new double[alphabet];
+                var cumul = new double[alphabet];
                 double acc = 0;
-                for (int s = 0; s < alphabet; s++)
+                for (var s = 0; s < alphabet; s++)
                 {
                     acc += weights[s] / wsum;
                     cumul[s] = acc;
                 }
 
-                for (int i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                 {
-                    double v = rnd.NextDouble();
-                    int s = 0;
+                    var v = rnd.NextDouble();
+                    var s = 0;
                     while (s < alphabet - 1 && cumul[s] < v)
                     {
                         s++;
@@ -333,8 +333,10 @@ public sealed class ZstdFseTests
         return symbols;
     }
 
-    private static int SeedFor(int alphabet, int tableLog, bool useLowProb, int dist) =>
-        (alphabet * 100003) + (tableLog * 1013) + (useLowProb ? 77 : 0) + (dist * 37) + 11;
+    private static int SeedFor(int alphabet, int tableLog, bool useLowProb, int dist)
+    {
+        return (alphabet * 100003) + (tableLog * 1013) + (useLowProb ? 77 : 0) + (dist * 37) + 11;
+    }
 
     private static int CeilLog2(int v)
     {

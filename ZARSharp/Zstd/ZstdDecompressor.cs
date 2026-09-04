@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 namespace ZARSharp.Zstd;
 
 /// <summary>
@@ -21,32 +23,30 @@ public static class ZstdDecompressor
     // Default decoder limits (documented; ZArchive needs only 64 KiB).
     // The window cap is a validity bound only: history is retained in full,
     // so raising it never changes allocation behavior beyond the frame cap.
-    private const ulong DefaultMaxWindowSize = 512UL * 1024 * 1024;
-    private const ulong DefaultMaxFrameContentSize = 512UL * 1024 * 1024;
 
     // ------------------------------------------------------------------
     // Sequence code tables (verified against the reference implementation)
     // ------------------------------------------------------------------
 
-    private const int MaxLL = 35;
-    private const int MaxML = 52;
+    private const int MaxLl = 35;
+    private const int MaxMl = 52;
     private const int MaxOff = 31;
 
-    private static readonly byte[] LLBits =
+    private static readonly byte[] LlBits =
     [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         1, 1, 1, 1, 2, 2, 3, 3, 4, 6, 7, 8, 9, 10, 11, 12,
         13, 14, 15, 16,
     ];
 
-    private static readonly uint[] LLBase =
+    private static readonly uint[] LlBase =
     [
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
         16, 18, 20, 22, 24, 28, 32, 40, 48, 64, 128, 256, 512, 1024, 2048, 4096,
         8192, 16384, 32768, 65536,
     ];
 
-    private static readonly byte[] MLBits =
+    private static readonly byte[] MlBits =
     [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -54,7 +54,7 @@ public static class ZstdDecompressor
         12, 13, 14, 15, 16,
     ];
 
-    private static readonly uint[] MLBase =
+    private static readonly uint[] MlBase =
     [
         3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
         19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
@@ -62,17 +62,24 @@ public static class ZstdDecompressor
         4099, 8195, 16387, 32771, 65539,
     ];
 
-    private static ulong OffsetBase(int code) =>
-        code == 0 ? 0UL : code == 1 ? 1UL : (1UL << code) - 3;
+    private static ulong OffsetBase(int code)
+    {
+        return code switch
+        {
+            0 => 0UL,
+            1 => 1UL,
+            _ => (1UL << code) - 3
+        };
+    }
 
-    private static readonly short[] LLDefaultNorm =
+    private static readonly short[] LlDefaultNorm =
     [
         4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1,
         2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 1, 1, 1, 1, 1,
         -1, -1, -1, -1,
     ];
 
-    private static readonly short[] MLDefaultNorm =
+    private static readonly short[] MlDefaultNorm =
     [
         1, 4, 3, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1,
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -80,30 +87,40 @@ public static class ZstdDecompressor
         -1, -1, -1, -1, -1,
     ];
 
-    private static readonly short[] OFDefaultNorm =
+    private static readonly short[] OfDefaultNorm =
     [
         1, 1, 1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1,
         1, 1, 1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1,
     ];
 
+    /// <summary>FSE decoding table for one sequence alphabet (literals, offsets, or matches).</summary>
     private sealed class SeqTable
     {
+        /// <summary>Accuracy log (table size is 1 &lt;&lt; TableLog).</summary>
         public int TableLog;
+
+        /// <summary>Baseline value per state.</summary>
         public uint[] Bases = [];
+
+        /// <summary>Extra bits to read per state.</summary>
         public byte[] ExtraBits = [];
+
+        /// <summary>State-transition bits to read per state.</summary>
         public byte[] NumBits = [];
+
+        /// <summary>Baseline for the next state per state.</summary>
         public int[] NewState = [];
     }
 
-    private static readonly SeqTable LLDefaultTable = BuildSeqTable(LLDefaultNorm, 35, 6, LLBase, LLBits);
-    private static readonly SeqTable MLDefaultTable = BuildSeqTable(MLDefaultNorm, 52, 6, MLBase, MLBits);
-    private static readonly SeqTable OFDefaultTable = BuildOFTable(OFDefaultNorm, 28, 5);
+    private static readonly SeqTable LlDefaultTable = BuildSeqTable(LlDefaultNorm, 35, 6, LlBase, LlBits);
+    private static readonly SeqTable MlDefaultTable = BuildSeqTable(MlDefaultNorm, 52, 6, MlBase, MlBits);
+    private static readonly SeqTable OfDefaultTable = BuildOfTable(OfDefaultNorm, 28, 5);
 
     private static SeqTable BuildSeqTable(
         short[] norms, int maxSymbol, int log, uint[] bases, byte[] extras)
     {
         var generic = ZstdFse.BuildTable(norms, maxSymbol, log);
-        int size = 1 << log;
+        var size = 1 << log;
         var table = new SeqTable
         {
             TableLog = log,
@@ -112,9 +129,9 @@ public static class ZstdDecompressor
             NumBits = new byte[size],
             NewState = new int[size],
         };
-        for (int i = 0; i < size; i++)
+        for (var i = 0; i < size; i++)
         {
-            int sym = generic.Symbols[i];
+            var sym = generic.Symbols[i];
             table.Bases[i] = bases[sym];
             table.ExtraBits[i] = extras[sym];
             table.NumBits[i] = generic.NumBits[i];
@@ -124,10 +141,10 @@ public static class ZstdDecompressor
         return table;
     }
 
-    private static SeqTable BuildOFTable(short[] norms, int maxSymbol, int log)
+    private static SeqTable BuildOfTable(short[] norms, int maxSymbol, int log)
     {
         var generic = ZstdFse.BuildTable(norms, maxSymbol, log);
-        int size = 1 << log;
+        var size = 1 << log;
         var table = new SeqTable
         {
             TableLog = log,
@@ -136,9 +153,9 @@ public static class ZstdDecompressor
             NumBits = new byte[size],
             NewState = new int[size],
         };
-        for (int i = 0; i < size; i++)
+        for (var i = 0; i < size; i++)
         {
-            int sym = generic.Symbols[i];
+            var sym = generic.Symbols[i];
             table.Bases[i] = (uint)OffsetBase(sym);
             table.ExtraBits[i] = (byte)sym;
             table.NumBits[i] = generic.NumBits[i];
@@ -148,14 +165,17 @@ public static class ZstdDecompressor
         return table;
     }
 
-    private static SeqTable BuildRleSeqTable(uint baseline, byte extraBits) => new()
+    private static SeqTable BuildRleSeqTable(uint baseline, byte extraBits)
     {
-        TableLog = 0,
-        Bases = [baseline],
-        ExtraBits = [extraBits],
-        NumBits = [0],
-        NewState = [0],
-    };
+        return new SeqTable
+        {
+            TableLog = 0,
+            Bases = [baseline],
+            ExtraBits = [extraBits],
+            NumBits = [0],
+            NewState = [0],
+        };
+    }
 
     // ------------------------------------------------------------------
     // Public API
@@ -165,8 +185,10 @@ public static class ZstdDecompressor
     /// Decompresses concatenated zstd frames, returning the output.
     /// </summary>
     /// <exception cref="ZstdException">On corrupt input or unsupported features.</exception>
-    public static byte[] Decompress(byte[] src, int offset, int length) =>
-        Decompress(src, offset, length, ZstdDecoderOptions.Default);
+    public static byte[] Decompress(byte[] src, int offset, int length)
+    {
+        return Decompress(src, offset, length, ZstdDecoderOptions.Default);
+    }
 
     /// <summary>
     /// Decompresses concatenated zstd frames, returning the output,
@@ -179,7 +201,7 @@ public static class ZstdDecompressor
         ArgumentNullException.ThrowIfNull(options);
 
         var output = new List<byte>();
-        int pos = DecompressFrames(src, offset, length, output, null, options);
+        var pos = DecompressFrames(src, offset, length, output, null, options);
         if (pos != offset + length)
         {
             throw new ZstdException("Trailing data after zstd frame.");
@@ -189,15 +211,19 @@ public static class ZstdDecompressor
     }
 
     /// <summary>Decompresses concatenated zstd frames, returning the output.</summary>
-    public static byte[] Decompress(byte[] src) =>
-        Decompress(src, 0, src is null ? 0 : src.Length);
+    public static byte[] Decompress(byte[] src)
+    {
+        return Decompress(src, 0, src?.Length ?? 0);
+    }
 
     /// <summary>
     /// Decompresses concatenated zstd frames, returning the output,
     /// enforcing the limits in <paramref name="options"/>.
     /// </summary>
-    public static byte[] Decompress(byte[] src, ZstdDecoderOptions options) =>
-        Decompress(src, 0, src is null ? 0 : src.Length, options);
+    public static byte[] Decompress(byte[] src, ZstdDecoderOptions options)
+    {
+        return Decompress(src, 0, src?.Length ?? 0, options);
+    }
 
     /// <summary>
     /// Decompresses exactly one frame region into <paramref name="dst"/>,
@@ -206,8 +232,10 @@ public static class ZstdDecompressor
     /// </summary>
     public static void DecompressExact(
         byte[] src, int srcOffset, int srcLength,
-        byte[] dst, int dstOffset, int dstLength) =>
+        byte[] dst, int dstOffset, int dstLength)
+    {
         DecompressExact(src, srcOffset, srcLength, dst, dstOffset, dstLength, ZstdDecoderOptions.Default);
+    }
 
     /// <summary>
     /// Decompresses exactly one frame region into <paramref name="dst"/>,
@@ -221,7 +249,7 @@ public static class ZstdDecompressor
     {
         ArgumentNullException.ThrowIfNull(options);
         var output = new List<byte>(dstLength);
-        int pos = DecompressFrame(src, srcOffset, srcLength, output, (ulong)dstLength, options);
+        var pos = DecompressFrame(src, srcOffset, srcLength, output, (ulong)dstLength, options);
         if (pos != srcOffset + srcLength)
         {
             throw new ZstdException("Trailing data after zstd frame.");
@@ -240,13 +268,25 @@ public static class ZstdDecompressor
     // Frames
     // ------------------------------------------------------------------
 
+    /// <summary>Per-frame decoder state carried across blocks in a frame.</summary>
     private sealed class FrameContext
     {
+        /// <summary>Window size for match-offset validation.</summary>
         public ulong WindowSize;
-        public SeqTable? LLTable;
-        public SeqTable? OFTable;
-        public SeqTable? MLTable;
+
+        /// <summary>Current literal-length sequence table.</summary>
+        public SeqTable? LlTable;
+
+        /// <summary>Current offset sequence table.</summary>
+        public SeqTable? OfTable;
+
+        /// <summary>Current match-length sequence table.</summary>
+        public SeqTable? MlTable;
+
+        /// <summary>Current Huffman table for treeless literals.</summary>
         public ZstdHuffman.HuffmanTable? HuffmanTable;
+
+        /// <summary>Three-entry repeat-offset history (starts at {1, 4, 8}).</summary>
         public readonly ulong[] RepeatOffsets = [1, 4, 8];
     }
 
@@ -254,9 +294,9 @@ public static class ZstdDecompressor
         byte[] src, int offset, int length, List<byte> output, ulong? exactSize,
         ZstdDecoderOptions options)
     {
-        int end = offset + length;
-        int pos = offset;
-        bool anyFrame = false;
+        var end = offset + length;
+        var pos = offset;
+        var anyFrame = false;
         while (pos < end)
         {
             if (end - pos < 4)
@@ -264,7 +304,7 @@ public static class ZstdDecompressor
                 throw new ZstdException("Truncated zstd frame magic.");
             }
 
-            uint magic = ReadU32LE(src, pos);
+            var magic = ReadU32Le(src, pos);
             if ((magic & SkippableMask) == SkippableBase)
             {
                 if (end - pos < 8)
@@ -272,7 +312,7 @@ public static class ZstdDecompressor
                     throw new ZstdException("Truncated skippable frame.");
                 }
 
-                uint skip = ReadU32LE(src, pos + 4);
+                var skip = ReadU32Le(src, pos + 4);
                 if (skip > (uint)(end - pos - 8))
                 {
                     throw new ZstdException("Truncated skippable frame.");
@@ -307,9 +347,9 @@ public static class ZstdDecompressor
         byte[] src, int offset, int length, List<byte> output, ulong? exactSize,
         ZstdDecoderOptions options)
     {
-        int end = offset + length;
-        int pos = offset + 4; // magic already validated by caller... (validated below for exact path)
-        if (ReadU32LE(src, offset) != ZstdMagic)
+        var end = offset + length;
+        var pos = offset + 4; // magic already validated by caller... (validated below for exact path)
+        if (ReadU32Le(src, offset) != ZstdMagic)
         {
             throw new ZstdException("Bad zstd magic.");
         }
@@ -319,16 +359,16 @@ public static class ZstdDecompressor
             throw new ZstdException("Truncated zstd frame header.");
         }
 
-        byte descriptor = src[pos++];
+        var descriptor = src[pos++];
         if ((descriptor & 0x08) != 0)
         {
             throw new ZstdException("Reserved frame flag set.");
         }
 
-        int fcsFlag = (descriptor >> 6) & 3;
-        bool singleSegment = (descriptor & 0x20) != 0;
-        bool checksumFlag = (descriptor & 0x04) != 0;
-        int dictFlag = descriptor & 3;
+        var fcsFlag = (descriptor >> 6) & 3;
+        var singleSegment = (descriptor & 0x20) != 0;
+        var checksumFlag = (descriptor & 0x04) != 0;
+        var dictFlag = descriptor & 3;
 
         var ctx = new FrameContext();
 
@@ -343,10 +383,10 @@ public static class ZstdDecompressor
                 throw new ZstdException("Truncated window descriptor.");
             }
 
-            byte wd = src[pos++];
-            uint windowLog = 10 + (uint)(wd >> 3);
-            ulong windowBase = 1UL << (int)windowLog;
-            ulong windowAdd = (windowBase / 8) * (uint)(wd & 7);
+            var wd = src[pos++];
+            var windowLog = 10 + (uint)(wd >> 3);
+            var windowBase = 1UL << (int)windowLog;
+            var windowAdd = (windowBase / 8) * (uint)(wd & 7);
             ctx.WindowSize = windowBase + windowAdd;
         }
 
@@ -355,7 +395,7 @@ public static class ZstdDecompressor
             throw new ZstdException("zstd dictionaries are not supported.");
         }
 
-        int fcsSize = fcsFlag switch
+        var fcsSize = fcsFlag switch
         {
             0 => singleSegment ? 1 : 0,
             1 => 2,
@@ -364,7 +404,7 @@ public static class ZstdDecompressor
         };
 
         ulong fcs = 0;
-        bool fcsKnown = fcsSize != 0;
+        var fcsKnown = fcsSize != 0;
         if (fcsKnown)
         {
             if (pos + fcsSize > end)
@@ -372,7 +412,7 @@ public static class ZstdDecompressor
                 throw new ZstdException("Truncated frame content size.");
             }
 
-            fcs = ReadUIntLE(src, pos, fcsSize);
+            fcs = ReadUIntLe(src, pos, fcsSize);
             if (fcsSize == 2)
             {
                 fcs += 256;
@@ -410,15 +450,15 @@ public static class ZstdDecompressor
                 $"zstd frame content size {fcs} != expected {exactSize.Value}.");
         }
 
-        ulong maxBlock = ctx.WindowSize;
+        var maxBlock = ctx.WindowSize;
         if (maxBlock > MaxBlockSizeLimit)
         {
             maxBlock = MaxBlockSizeLimit;
         }
 
-        int frameStart = output.Count;
-        ulong frameCap = fcsKnown ? fcs : options.MaxFrameContentSize;
-        bool lastBlock = false;
+        var frameStart = output.Count;
+        var frameCap = fcsKnown ? fcs : options.MaxFrameContentSize;
+        var lastBlock = false;
         while (!lastBlock)
         {
             if (pos + BlockHeaderSize > end)
@@ -426,11 +466,11 @@ public static class ZstdDecompressor
                 throw new ZstdException("Truncated block header.");
             }
 
-            uint header = (uint)(src[pos] | (src[pos + 1] << 8) | (src[pos + 2] << 16));
+            var header = (uint)(src[pos] | (src[pos + 1] << 8) | (src[pos + 2] << 16));
             pos += BlockHeaderSize;
             lastBlock = (header & 1) != 0;
-            int blockType = (int)((header >> 1) & 3);
-            int blockSize = (int)(header >> 3);
+            var blockType = (int)((header >> 1) & 3);
+            var blockSize = (int)(header >> 3);
             if ((ulong)blockSize > maxBlock && (blockType == 0 || blockType == 1))
             {
                 throw new ZstdException("zstd block too large.");
@@ -444,7 +484,7 @@ public static class ZstdDecompressor
                         throw new ZstdException("Truncated raw block.");
                     }
 
-                    for (int i = 0; i < blockSize; i++)
+                    for (var i = 0; i < blockSize; i++)
                     {
                         output.Add(src[pos + i]);
                     }
@@ -458,8 +498,8 @@ public static class ZstdDecompressor
                         throw new ZstdException("Truncated RLE block.");
                     }
 
-                    byte value = src[pos++];
-                    for (int i = 0; i < blockSize; i++)
+                    var value = src[pos++];
+                    for (var i = 0; i < blockSize; i++)
                     {
                         output.Add(value);
                     }
@@ -493,11 +533,11 @@ public static class ZstdDecompressor
                 throw new ZstdException("Truncated content checksum.");
             }
 
-            int contentStart = frameStart;
-            int contentLen = output.Count - contentStart;
-            byte[] flat = output.ToArray();
-            uint actual = (uint)ZstdXxh64.Hash64(flat, contentStart, contentLen);
-            uint expected = ReadU32LE(src, pos);
+            var contentStart = frameStart;
+            var contentLen = output.Count - contentStart;
+            var flat = output.ToArray();
+            var actual = (uint)ZstdXxh64.Hash64(flat, contentStart, contentLen);
+            var expected = ReadU32Le(src, pos);
             pos += 4;
             if (actual != expected)
             {
@@ -521,8 +561,8 @@ public static class ZstdDecompressor
         byte[] src, int offset, int length,
         List<byte> output, int frameStart, FrameContext ctx, ulong maxBlock)
     {
-        int end = offset + length;
-        int pos = offset;
+        var end = offset + length;
+        var pos = offset;
 
         // ---- Literals section ----
         if (pos >= end)
@@ -530,16 +570,16 @@ public static class ZstdDecompressor
             throw new ZstdException("Truncated literals header.");
         }
 
-        int litType = src[pos] & 3;
+        var litType = src[pos] & 3;
         byte[] literals;
         if (litType == 0 || litType == 1)
         {
-            int sizeFormat = (src[pos] >> 2) & 3;
+            var sizeFormat = (src[pos] >> 2) & 3;
             int regen;
             if (sizeFormat == 0 || sizeFormat == 2)
             {
                 regen = src[pos] >> 3;
-                pos += 1;
+                pos++;
             }
             else if (sizeFormat == 1)
             {
@@ -587,21 +627,21 @@ public static class ZstdDecompressor
 
                 literals = new byte[regen];
                 Array.Fill(literals, src[pos]);
-                pos += 1;
+                pos++;
             }
         }
         else
         {
-            bool isCompressed = litType == 2;
-            int sizeFormat = (src[pos] >> 2) & 3;
-            int headerSize = sizeFormat switch { 0 => 3, 1 => 3, 2 => 4, _ => 5 };
+            var isCompressed = litType == 2;
+            var sizeFormat = (src[pos] >> 2) & 3;
+            var headerSize = sizeFormat switch { 0 => 3, 1 => 3, 2 => 4, _ => 5 };
             if (pos + headerSize > end)
             {
                 throw new ZstdException("Truncated literals header.");
             }
 
             ulong bits = 0;
-            for (int i = 0; i < headerSize; i++)
+            for (var i = 0; i < headerSize; i++)
             {
                 bits |= (ulong)src[pos + i] << (i * 8);
             }
@@ -639,13 +679,13 @@ public static class ZstdDecompressor
             }
 
             ZstdHuffman.HuffmanTable huffman;
-            int streamsOffset = pos;
-            int streamsLength = compSize;
+            var streamsOffset = pos;
+            var streamsLength = compSize;
             if (isCompressed)
             {
-                int treeSize = ZstdHuffman.ReadStats(
+                var treeSize = ZstdHuffman.ReadStats(
                     src, pos, compSize,
-                    out byte[] weights, out int tableLog, out int numSymbols);
+                    out var weights, out var tableLog, out var numSymbols);
                 huffman = ZstdHuffman.BuildTable(weights, numSymbols, tableLog);
                 ctx.HuffmanTable = huffman;
                 streamsOffset += treeSize;
@@ -680,23 +720,23 @@ public static class ZstdDecompressor
                     throw new ZstdException("Truncated Huffman jump table.");
                 }
 
-                int s1 = ReadU16LE(src, streamsOffset);
-                int s2 = ReadU16LE(src, streamsOffset + 2);
-                int s3 = ReadU16LE(src, streamsOffset + 4);
-                int s4 = streamsLength - 6 - s1 - s2 - s3;
+                var s1 = ReadU16Le(src, streamsOffset);
+                var s2 = ReadU16Le(src, streamsOffset + 2);
+                var s3 = ReadU16Le(src, streamsOffset + 4);
+                var s4 = streamsLength - 6 - s1 - s2 - s3;
                 if (s4 < 0)
                 {
                     throw new ZstdException("Invalid Huffman jump table.");
                 }
 
-                int seg = (regen + 3) / 4;
+                var seg = (regen + 3) / 4;
                 if ((long)seg * 3 > regen)
                 {
                     throw new ZstdException("Invalid Huffman stream split.");
                 }
 
                 int d1 = 0, d2 = seg, d3 = 2 * seg, d4 = 3 * seg;
-                int l1 = seg, l2 = seg, l3 = seg, l4 = regen - 3 * seg;
+                int l1 = seg, l2 = seg, l3 = seg, l4 = regen - (3 * seg);
                 int c1 = streamsOffset + 6, c2 = c1 + s1, c3 = c2 + s2, c4 = c3 + s3;
                 ZstdHuffman.DecodeStream(src, c1, s1, huffman, literals, d1, l1);
                 ZstdHuffman.DecodeStream(src, c2, s2, huffman, literals, d2, l2);
@@ -708,14 +748,14 @@ public static class ZstdDecompressor
         }
 
         // ---- Sequences section ----
-        int seqSize = end - pos;
+        var seqSize = end - pos;
         if (seqSize <= 0)
         {
             throw new ZstdException("Missing sequences section.");
         }
 
-        int blockOutStart = output.Count;
-        int maxOut = blockOutStart + (int)maxBlock;
+        var blockOutStart = output.Count;
+        var maxOut = blockOutStart + (int)maxBlock;
 
         int numSeq = src[pos++];
         if (numSeq == 0)
@@ -736,7 +776,7 @@ public static class ZstdDecompressor
                         throw new ZstdException("Truncated sequence count.");
                     }
 
-                    numSeq = ReadU16LE(src, pos) + 0x7F00;
+                    numSeq = ReadU16Le(src, pos) + 0x7F00;
                     pos += 2;
                 }
                 else
@@ -755,21 +795,21 @@ public static class ZstdDecompressor
                 throw new ZstdException("Truncated sequence modes.");
             }
 
-            byte modes = src[pos++];
+            var modes = src[pos++];
             if ((modes & 3) != 0)
             {
                 throw new ZstdException("Reserved sequence mode bits set.");
             }
 
-            int llMode = (modes >> 6) & 3;
-            int ofMode = (modes >> 4) & 3;
-            int mlMode = (modes >> 2) & 3;
+            var llMode = (modes >> 6) & 3;
+            var ofMode = (modes >> 4) & 3;
+            var mlMode = (modes >> 2) & 3;
 
-            pos = BuildSeqTableForMode(src, pos, end, llMode, MaxLL, 9, LLBase, LLBits, LLDefaultTable,
-                ref ctx.LLTable);
-            pos = BuildOFTableForMode(src, pos, end, ofMode, ref ctx.OFTable);
-            pos = BuildSeqTableForMode(src, pos, end, mlMode, MaxML, 9, MLBase, MLBits, MLDefaultTable,
-                ref ctx.MLTable);
+            pos = BuildSeqTableForMode(src, pos, end, llMode, MaxLl, 9, LlBase, LlBits, LlDefaultTable,
+                ref ctx.LlTable);
+            pos = BuildOfTableForMode(src, pos, end, ofMode, ref ctx.OfTable);
+            pos = BuildSeqTableForMode(src, pos, end, mlMode, MaxMl, 9, MlBase, MlBits, MlDefaultTable,
+                ref ctx.MlTable);
 
             DecodeSequences(src, pos, end, numSeq, literals, output, maxOut, frameStart, ctx);
         }
@@ -817,9 +857,9 @@ public static class ZstdDecompressor
                 return pos;
             case 2: // FSE-compressed
             {
-                int consumed = ZstdFse.ParseNormalizedCounts(
+                var consumed = ZstdFse.ParseNormalizedCounts(
                     src, pos, end - pos, maxSymbol,
-                    out short[] norms, out int tableLog, out int maxSym);
+                    out var norms, out var tableLog, out var maxSym);
                 if (tableLog > maxLog)
                 {
                     throw new ZstdException("Sequence tableLog too large.");
@@ -841,13 +881,13 @@ public static class ZstdDecompressor
         }
     }
 
-    private static int BuildOFTableForMode(
+    private static int BuildOfTableForMode(
         byte[] src, int pos, int end, int mode, ref SeqTable? current)
     {
         switch (mode)
         {
             case 0:
-                current = OFDefaultTable;
+                current = OfDefaultTable;
                 return pos;
             case 1:
                 if (pos >= end)
@@ -865,15 +905,15 @@ public static class ZstdDecompressor
                 return pos;
             case 2:
             {
-                int consumed = ZstdFse.ParseNormalizedCounts(
+                var consumed = ZstdFse.ParseNormalizedCounts(
                     src, pos, end - pos, MaxOff,
-                    out short[] norms, out int tableLog, out int maxSym);
+                    out var norms, out var tableLog, out var maxSym);
                 if (tableLog > 8)
                 {
                     throw new ZstdException("Sequence tableLog too large.");
                 }
 
-                current = BuildOFTable(norms, maxSym, tableLog);
+                current = BuildOfTable(norms, maxSym, tableLog);
                 return pos + consumed;
             }
 
@@ -895,23 +935,23 @@ public static class ZstdDecompressor
     {
         var bitD = BackwardBitReader.ForSequenceStream(src, offset, end - offset);
 
-        SeqTable llTable = ctx.LLTable!;
-        SeqTable ofTable = ctx.OFTable!;
-        SeqTable mlTable = ctx.MLTable!;
+        var llTable = ctx.LlTable!;
+        var ofTable = ctx.OfTable!;
+        var mlTable = ctx.MlTable!;
 
-        int llState = (int)bitD.ReadBits(llTable.TableLog);
-        int ofState = (int)bitD.ReadBits(ofTable.TableLog);
-        int mlState = (int)bitD.ReadBits(mlTable.TableLog);
+        var llState = (int)bitD.ReadBits(llTable.TableLog);
+        var ofState = (int)bitD.ReadBits(ofTable.TableLog);
+        var mlState = (int)bitD.ReadBits(mlTable.TableLog);
 
-        ulong[] rep = ctx.RepeatOffsets;
-        int litPos = 0;
+        var rep = ctx.RepeatOffsets;
+        var litPos = 0;
 
-        for (int i = 0; i < numSeq; i++)
+        for (var i = 0; i < numSeq; i++)
         {
-            bool isLast = i == numSeq - 1;
-            SeqEntry ll = GetEntry(llTable, llState);
-            SeqEntry ml = GetEntry(mlTable, mlState);
-            SeqEntry of = GetEntry(ofTable, ofState);
+            var isLast = i == numSeq - 1;
+            var ll = GetEntry(llTable, llState);
+            var ml = GetEntry(mlTable, mlState);
+            var of = GetEntry(ofTable, ofState);
 
             // Offset first (reference order).
             ulong dist;
@@ -924,10 +964,10 @@ public static class ZstdDecompressor
             }
             else
             {
-                int ll0 = ll.Baseline == 0 ? 1 : 0;
+                var ll0 = ll.Baseline == 0 ? 1 : 0;
                 if (of.ExtraBits == 0)
                 {
-                    ulong temp = rep[ll0];
+                    var temp = rep[ll0];
                     rep[1] = rep[ll0 ^ 1];
                     rep[0] = temp;
                     dist = temp;
@@ -938,9 +978,9 @@ public static class ZstdDecompressor
                 }
                 else
                 {
-                    uint bit = bitD.ReadBits(1);
-                    ulong index = of.Baseline + (ulong)ll0 + bit; // 1..3
-                    ulong temp = index == 3
+                    var bit = bitD.ReadBits(1);
+                    var index = of.Baseline + (ulong)ll0 + bit; // 1..3
+                    var temp = index == 3
                         ? (rep[0] == 0 ? throw new ZstdException("Invalid repeat offset.") : rep[0] - 1)
                         : rep[index];
                     if (temp == 0)
@@ -959,8 +999,8 @@ public static class ZstdDecompressor
                 }
             }
 
-            uint matchLen = ml.Baseline + (ml.ExtraBits > 0 ? bitD.ReadBits(ml.ExtraBits) : 0);
-            uint litLen = ll.Baseline + (ll.ExtraBits > 0 ? bitD.ReadBits(ll.ExtraBits) : 0);
+            var matchLen = ml.Baseline + (ml.ExtraBits > 0 ? bitD.ReadBits(ml.ExtraBits) : 0);
+            var litLen = ll.Baseline + (ll.ExtraBits > 0 ? bitD.ReadBits(ll.ExtraBits) : 0);
 
             if (!isLast)
             {
@@ -978,7 +1018,7 @@ public static class ZstdDecompressor
         }
 
         // Trailing literals.
-        int remaining = literals.Length - litPos;
+        var remaining = literals.Length - litPos;
         if (remaining < 0)
         {
             throw new ZstdException("Literals over-consumed.");
@@ -989,20 +1029,33 @@ public static class ZstdDecompressor
             throw new ZstdException("Block output exceeds maximum.");
         }
 
-        for (int i = 0; i < remaining; i++)
+        for (var i = 0; i < remaining; i++)
         {
             output.Add(literals[litPos + i]);
         }
     }
 
+    /// <summary>Decoded snapshot of one sequence-table state entry.</summary>
     [StructLayout(LayoutKind.Auto)]
     private readonly struct SeqEntry
     {
+        /// <summary>Baseline literal, match, or offset value.</summary>
         public readonly uint Baseline;
+
+        /// <summary>Extra value bits to read.</summary>
         public readonly int ExtraBits;
+
+        /// <summary>State-transition bits to read.</summary>
         public readonly int NumBits;
+
+        /// <summary>Baseline for the next state.</summary>
         public readonly int NextState;
 
+        /// <summary>Creates a sequence-table entry snapshot.</summary>
+        /// <param name="baseline">Baseline value.</param>
+        /// <param name="extraBits">Extra value bits.</param>
+        /// <param name="numBits">State-transition bits.</param>
+        /// <param name="nextState">Next-state baseline.</param>
         public SeqEntry(uint baseline, int extraBits, int numBits, int nextState)
         {
             Baseline = baseline;
@@ -1012,10 +1065,14 @@ public static class ZstdDecompressor
         }
     }
 
-    private static SeqEntry GetEntry(SeqTable table, int state) => new(
-        table.Bases[state], table.ExtraBits[state], table.NumBits[state], table.NewState[state]);
+    private static SeqEntry GetEntry(SeqTable table, int state)
+    {
+        return new SeqEntry(
+            table.Bases[state], table.ExtraBits[state], table.NumBits[state], table.NewState[state]);
+    }
 
     private static void ExecuteSequence(
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         byte[] literals, ref int litPos, List<byte> output, int maxOut, int frameStart,
         ulong windowSize, uint litLen, uint matchLen, ulong dist)
     {
@@ -1036,13 +1093,13 @@ public static class ZstdDecompressor
 
         litPos += (int)litLen;
 
-        long frameOut = (long)output.Count - frameStart;
+        var frameOut = (long)output.Count - frameStart;
         if (dist == 0 || dist > (ulong)frameOut || dist > windowSize)
         {
             throw new ZstdException("Invalid match offset.");
         }
 
-        int matchPos = output.Count - (int)dist;
+        var matchPos = output.Count - (int)dist;
         for (uint i = 0; i < matchLen; i++)
         {
             output.Add(output[matchPos + (int)i]);
@@ -1053,16 +1110,20 @@ public static class ZstdDecompressor
     // Little-endian helpers
     // ------------------------------------------------------------------
 
-    private static uint ReadU32LE(byte[] buf, int offset) =>
-        (uint)(buf[offset] | (buf[offset + 1] << 8) | (buf[offset + 2] << 16) | (buf[offset + 3] << 24));
+    private static uint ReadU32Le(byte[] buf, int offset)
+    {
+        return (uint)(buf[offset] | (buf[offset + 1] << 8) | (buf[offset + 2] << 16) | (buf[offset + 3] << 24));
+    }
 
-    private static int ReadU16LE(byte[] buf, int offset) =>
-        buf[offset] | (buf[offset + 1] << 8);
+    private static int ReadU16Le(byte[] buf, int offset)
+    {
+        return buf[offset] | (buf[offset + 1] << 8);
+    }
 
-    private static ulong ReadUIntLE(byte[] buf, int offset, int size)
+    private static ulong ReadUIntLe(byte[] buf, int offset, int size)
     {
         ulong value = 0;
-        for (int i = 0; i < size; i++)
+        for (var i = 0; i < size; i++)
         {
             value |= (ulong)buf[offset + i] << (i * 8);
         }

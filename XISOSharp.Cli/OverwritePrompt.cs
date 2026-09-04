@@ -1,5 +1,8 @@
 namespace XISOSharp.Cli;
 
+using Serilog;
+using Logging;
+
 /// <summary>
 /// Interactive overwrite confirmation for CLI file outputs
 /// (<c>XboxKit/Helpers.cs::ConfirmOverwrite</c> parity).
@@ -21,23 +24,40 @@ internal static class OverwritePrompt
     internal static bool ConfirmOverwrite(string path, bool assumeYes, bool assumeNo,
         TextReader? input = null, TextWriter? output = null)
     {
-        if (assumeYes)
-            return true;
-        if (!File.Exists(path))
-            return true;
-
-        output ??= Console.Out;
-        if (assumeNo)
+        try
         {
-            output.WriteLine($"[ERROR] File already exists: {path}");
+            if (assumeYes)
+                return true;
+            if (!File.Exists(path))
+                return true;
+
+            output ??= Console.Out;
+            if (assumeNo)
+            {
+                output.WriteLine($"[ERROR] File already exists: {path}");
+                Log.Warning("Overwrite refused (assume-no): {Path}", path);
+                return false;
+            }
+
+            input ??= Console.In;
+            output.WriteLine($"[WARNING] File already exists: {path}");
+            output.WriteLine("Would you like to overwrite? (Y/N)");
+            var response = input.ReadLine()?.Trim();
+            return string.Equals(response, "Y", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(response, "YES", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Error(ex, "Overwrite prompt failed for {Path}", path);
+            BugReporter.ReportException(ex, $"Overwrite prompt failed for {path}");
+            output ??= Console.Out;
+            try { output.WriteLine($"[ERROR] Overwrite check failed: {path} ({ex.Message})"); }
+            catch
+            {
+                // ignored
+            }
+
             return false;
         }
-
-        input ??= Console.In;
-        output.WriteLine($"[WARNING] File already exists: {path}");
-        output.WriteLine("Would you like to overwrite? (Y/N)");
-        var response = input.ReadLine()?.Trim();
-        return string.Equals(response, "Y", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(response, "YES", StringComparison.OrdinalIgnoreCase);
     }
 }

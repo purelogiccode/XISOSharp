@@ -78,7 +78,9 @@ public static class CisoReader
     /// <returns>0 on success, 1 on error; throws on invalid arguments.</returns>
     public static async Task<int> DecompressToIsoAsync(string csoPath, string? outputIsoPath = null,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
-        => await Task.Run(() => DecompressToIso(csoPath, outputIsoPath, progress, ct), ct).ConfigureAwait(false);
+    {
+        return await Task.Run(() => DecompressToIso(csoPath, outputIsoPath, progress, ct), ct).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Decompresses a CISO stream to an output stream. Both must be seekable.
@@ -262,7 +264,9 @@ public static class CisoReader
     /// <param name="offset">Byte offset in the uncompressed image.</param>
     /// <param name="buffer">Destination buffer to fill.</param>
     public static void ReadFromCso(FileStream csoFs, long offset, Span<byte> buffer)
-        => ReadFromCsoCore(csoFs, offset, buffer);
+    {
+        ReadFromCsoCore(csoFs, offset, buffer);
+    }
 
     private static void ReadFromCsoCore(Stream csoFs, long offset, Span<byte> buffer)
     {
@@ -452,9 +456,16 @@ public static class CisoReader
         return null;
     }
 
+    /// <summary>
+    /// Sector payload codec tried during CISO decompression. The declared version is tried
+    /// first, then the other codec as a cross-compatibility fallback.
+    /// </summary>
     private enum SectorCodec
     {
+        /// <summary>LZ4 sector payload (CISO version 2).</summary>
         Lz4,
+
+        /// <summary>Raw DEFLATE sector payload (CISO version 1).</summary>
         Deflate
     }
 

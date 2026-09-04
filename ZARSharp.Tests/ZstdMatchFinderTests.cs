@@ -28,14 +28,14 @@ public sealed class ZstdMatchFinderTests
     {
         // Threads the repeat history across blocks when provided (chained
         // frames); otherwise starts from a fresh {1,4,8} like the decoder.
-        uint[] rep = history ?? ZstdSeq.FreshRepeatOffsets();
+        var rep = history ?? ZstdSeq.FreshRepeatOffsets();
         var output = new List<byte>(input.Length);
-        int litPos = 0;
-        byte[] literals = store.Literals.ToArray();
+        var litPos = 0;
+        var literals = store.Literals.ToArray();
 
-        for (int i = 0; i < store.Count; i++)
+        for (var i = 0; i < store.Count; i++)
         {
-            ZstdSequence seq = store.Get(i);
+            var seq = store.Get(i);
             Assert.True(litPos + (long)seq.LitLength <= literals.Length, $"Seq {i}: literal over-consumption.");
             for (uint k = 0; k < seq.LitLength; k++)
             {
@@ -55,9 +55,9 @@ public sealed class ZstdMatchFinderTests
             }
             else
             {
-                uint code = ZstdSeq.ToRepcode(seq.OffBase);
-                uint ll0 = seq.LitLength == 0 ? 1u : 0u;
-                uint repCode = code - 1 + ll0;
+                var code = ZstdSeq.ToRepcode(seq.OffBase);
+                var ll0 = seq.LitLength == 0 ? 1u : 0u;
+                var repCode = code - 1 + ll0;
                 Assert.True(repCode <= 3, $"Seq {i}: bad repeat code.");
                 if (repCode == 0)
                 {
@@ -80,7 +80,7 @@ public sealed class ZstdMatchFinderTests
             Assert.True(dist >= 1 && dist <= (ulong)output.Count,
                 $"Seq {i}: invalid offset {dist} at pos {output.Count}.");
 
-            int matchPos = output.Count - (int)dist;
+            var matchPos = output.Count - (int)dist;
             for (uint k = 0; k < seq.MatchLength; k++)
             {
                 output.Add(output[matchPos + (int)k]);
@@ -88,7 +88,7 @@ public sealed class ZstdMatchFinderTests
         }
 
         Assert.Equal(literals.Length, litPos);
-        foreach (byte b in store.TrailingLiterals)
+        foreach (var b in store.TrailingLiterals)
         {
             output.Add(b);
         }
@@ -103,13 +103,13 @@ public sealed class ZstdMatchFinderTests
     {
         var store = new ZstdSequenceStore(input.Length);
         var finder = new ZstdMatchFinder(level);
-        uint[] rep = ZstdSeq.FreshRepeatOffsets();
-        int trailing = finder.FindMatches(input, store, rep);
+        var rep = ZstdSeq.FreshRepeatOffsets();
+        var trailing = finder.FindMatches(input, store, rep);
         Assert.Equal(store.TrailingLength, trailing);
         Replay(input, store);
 
         // Every stored match meets the finder minimum (4 for all strategies).
-        for (int i = 0; i < store.Count; i++)
+        for (var i = 0; i < store.Count; i++)
         {
             Assert.True(store.Get(i).MatchLength >= 4, $"Level {level}: match < 4 bytes.");
         }
@@ -124,7 +124,7 @@ public sealed class ZstdMatchFinderTests
     internal static byte[] MakeInput(string kind, int size, int seed)
     {
         var rng = new Random(seed);
-        byte[] data = new byte[size];
+        var data = new byte[size];
         switch (kind)
         {
             case "zeros":
@@ -133,14 +133,14 @@ public sealed class ZstdMatchFinderTests
                 Array.Fill(data, (byte)0xAB);
                 break;
             case "period2":
-                for (int i = 0; i < size; i++)
+                for (var i = 0; i < size; i++)
                 {
                     data[i] = (byte)(0x10 + (i & 1));
                 }
 
                 break;
             case "period3":
-                for (int i = 0; i < size; i++)
+                for (var i = 0; i < size; i++)
                 {
                     data[i] = (byte)(0x30 + (i % 3));
                 }
@@ -157,11 +157,11 @@ public sealed class ZstdMatchFinderTests
                     "vexingly", "daft", "zebras", "sphinx", "black", "quartz",
                     "judge", "vow", "0123456789",
                 ];
-                int at = 0;
+                var at = 0;
                 while (at < size)
                 {
-                    string word = words[rng.Next(words.Length)];
-                    foreach (char c in word)
+                    var word = words[rng.Next(words.Length)];
+                    foreach (var c in word)
                     {
                         if (at >= size)
                         {
@@ -179,9 +179,9 @@ public sealed class ZstdMatchFinderTests
 
                 break;
             case "mixed-reps": // Designed to churn repeat offsets 1, 4, 8.
-                for (int i = 0; i < size; i++)
+                for (var i = 0; i < size; i++)
                 {
-                    int m = i % 64;
+                    var m = i % 64;
                     data[i] = m < 16 ? (byte)0xCC : m < 32 ? (byte)(i & 7) : (byte)rng.Next(256);
                 }
 
@@ -199,11 +199,11 @@ public sealed class ZstdMatchFinderTests
         var data = new TheoryData<int, string, int>();
         string[] kinds = ["zeros", "period1", "period2", "period3", "text", "mixed-reps", "random"];
         int[] sizes = [0, 1, 2, 3, 4, 5, 7, 8, 9, 12, 16, 31, 64, 100, 1000, 8192, 65536];
-        foreach (int level in new[] { 1, 2, 3, 4, 5, 6 })
+        foreach (var level in new[] { 1, 2, 3, 4, 5, 6 })
         {
-            foreach (string kind in kinds)
+            foreach (var kind in kinds)
             {
-                foreach (int size in sizes)
+                foreach (var size in sizes)
                 {
                     data.Add(level, kind, size);
                 }
@@ -217,7 +217,7 @@ public sealed class ZstdMatchFinderTests
     [MemberData(nameof(Corpus))]
     public void Finder_SequencesReplayToInput(int level, string kind, int size)
     {
-        byte[] input = MakeInput(kind, size, 0xF1 ^ (level * 7919) ^ size);
+        var input = MakeInput(kind, size, 0xF1 ^ (level * 7919) ^ size);
         ParseAndReplay(input, level);
     }
 
@@ -225,12 +225,12 @@ public sealed class ZstdMatchFinderTests
     public void Finder_RandomData_FindsNoSequences()
     {
         // Incompressible input: no matches, everything trailing.
-        byte[] input = MakeInput("random", 4096, 42);
-        for (int level = 1; level <= 6; level++)
+        var input = MakeInput("random", 4096, 42);
+        for (var level = 1; level <= 6; level++)
         {
             var store = new ZstdSequenceStore(input.Length);
             var finder = new ZstdMatchFinder(level);
-            int trailing = finder.FindMatches(input, store, ZstdSeq.FreshRepeatOffsets());
+            var trailing = finder.FindMatches(input, store, ZstdSeq.FreshRepeatOffsets());
             Assert.Equal(0, store.Count);
             Assert.Equal(input.Length, trailing);
             Assert.Equal(input, store.TrailingLiterals.ToArray());
@@ -243,18 +243,18 @@ public sealed class ZstdMatchFinderTests
         // 100 zero bytes must compress to (nearly) one sequence with offset 1.
         // This is the "offset 1 with empty history" trap: at block start the
         // history is {1,4,8}, so offset 1 is valid from position 1 on.
-        byte[] input = new byte[100];
-        for (int level = 1; level <= 6; level++)
+        var input = new byte[100];
+        for (var level = 1; level <= 6; level++)
         {
-            ZstdSequenceStore store = ParseAndReplay(input, level);
+            var store = ParseAndReplay(input, level);
             Assert.True(store.Count >= 1, $"Level {level}: expected matches for zeros.");
-            ZstdSequence first = store.Get(0);
+            var first = store.Get(0);
             // Offset 1, either as a full offset or as repeat code 1 with a
             // non-empty literal run (the rep probe fires first and resolves
             // rep[0] = 1 from the fresh {1,4,8} history).
-            bool isOffsetOne = ZstdSeq.IsOffset(first.OffBase) && ZstdSeq.ToOffset(first.OffBase) == 1;
-            bool isRepOne = ZstdSeq.IsRepcode(first.OffBase) && ZstdSeq.ToRepcode(first.OffBase) == 1
-                                                             && first.LitLength >= 1;
+            var isOffsetOne = ZstdSeq.IsOffset(first.OffBase) && ZstdSeq.ToOffset(first.OffBase) == 1;
+            var isRepOne = ZstdSeq.IsRepcode(first.OffBase) && ZstdSeq.ToRepcode(first.OffBase) == 1
+                                                            && first.LitLength >= 1;
             Assert.True(isOffsetOne || isRepOne, $"Level {level}: first seq {first} does not use offset 1.");
         }
     }
@@ -262,15 +262,15 @@ public sealed class ZstdMatchFinderTests
     [Fact]
     public void Finder_Deterministic()
     {
-        byte[] input = MakeInput("mixed-reps", 20000, 7);
-        for (int level = 1; level <= 6; level++)
+        var input = MakeInput("mixed-reps", 20000, 7);
+        for (var level = 1; level <= 6; level++)
         {
-            ZstdSequenceStore a = ParseAndReplay(input, level);
-            ZstdSequenceStore b = ParseAndReplay(input, level);
+            var a = ParseAndReplay(input, level);
+            var b = ParseAndReplay(input, level);
             Assert.Equal(a.Count, b.Count);
             Assert.Equal(a.LiteralLength, b.LiteralLength);
             Assert.Equal(a.TrailingLength, b.TrailingLength);
-            for (int i = 0; i < a.Count; i++)
+            for (var i = 0; i < a.Count; i++)
             {
                 Assert.Equal(a.Get(i), b.Get(i));
             }
@@ -282,14 +282,14 @@ public sealed class ZstdMatchFinderTests
     {
         // Positions are span-relative, so encoding a slice must equal encoding
         // the same bytes standalone (no hidden absolute-position dependence).
-        byte[] big = MakeInput("text", 10000, 99);
-        byte[] slice = new byte[3000];
+        var big = MakeInput("text", 10000, 99);
+        var slice = new byte[3000];
         Array.Copy(big, 1234, slice, 0, slice.Length);
-        for (int level = 1; level <= 6; level++)
+        for (var level = 1; level <= 6; level++)
         {
-            ZstdSequenceStore fromSlice =
+            var fromSlice =
                 ParseAndReplay(new ReadOnlySpan<byte>(big, 1234, slice.Length).ToArray(), level);
-            ZstdSequenceStore standalone = ParseAndReplay(slice, level);
+            var standalone = ParseAndReplay(slice, level);
             Assert.Equal(standalone.Count, fromSlice.Count);
         }
     }
@@ -301,14 +301,14 @@ public sealed class ZstdMatchFinderTests
         // the validator threads the same history (encoder and decoder evolve
         // it identically). Zeros guarantee immediate offset-1 matches in the
         // second block; text exercises chaining on realistic data.
-        foreach (string kind in new[] { "zeros", "text" })
+        foreach (var kind in new[] { "zeros", "text" })
         {
-            byte[] block = MakeInput(kind, 4096, 5);
-            for (int level = 1; level <= 6; level++)
+            var block = MakeInput(kind, 4096, 5);
+            for (var level = 1; level <= 6; level++)
             {
                 var finder = new ZstdMatchFinder(level);
-                uint[] encRep = ZstdSeq.FreshRepeatOffsets();
-                uint[] decRep = ZstdSeq.FreshRepeatOffsets();
+                var encRep = ZstdSeq.FreshRepeatOffsets();
+                var decRep = ZstdSeq.FreshRepeatOffsets();
                 var s1 = new ZstdSequenceStore(block.Length);
                 finder.FindMatches(block, s1, encRep);
                 Replay(block, s1, decRep);
@@ -327,10 +327,10 @@ public sealed class ZstdMatchFinderTests
     public void Finder_AllLevels_AgreeOnTrivialBoundaries()
     {
         // Sizes around HASH_READ_SIZE / ilimit edges must not throw or corrupt.
-        for (int size = 0; size <= 20; size++)
+        for (var size = 0; size <= 20; size++)
         {
-            byte[] input = MakeInput("period2", size, 1);
-            for (int level = 1; level <= 6; level++)
+            var input = MakeInput("period2", size, 1);
+            for (var level = 1; level <= 6; level++)
             {
                 ParseAndReplay(input, level);
             }
@@ -343,23 +343,24 @@ public sealed class ZstdMatchFinderTests
         // Sanity: lazy (L6) must find at least as much match coverage as
         // fast (L1) on repetitive text (validity is proven by replay; this
         // guards against a silently degenerate lazy path).
-        byte[] input = MakeInput("text", 32768, 1234);
+        var input = MakeInput("text", 32768, 1234);
 
-        long MatchedBytes(ZstdSequenceStore s)
+        var fast = MatchedBytes(ParseAndReplay(input, 1));
+        var lazy = MatchedBytes(ParseAndReplay(input, 6));
+        Assert.True(lazy >= fast, $"L6 matched {lazy} < L1 matched {fast}.");
+        Assert.True(lazy > input.Length / 2, "Text should be mostly matches.");
+        return;
+
+        static long MatchedBytes(ZstdSequenceStore s)
         {
             long total = 0;
-            for (int i = 0; i < s.Count; i++)
+            for (var i = 0; i < s.Count; i++)
             {
                 total += s.Get(i).MatchLength;
             }
 
             return total;
         }
-
-        long fast = MatchedBytes(ParseAndReplay(input, 1));
-        long lazy = MatchedBytes(ParseAndReplay(input, 6));
-        Assert.True(lazy >= fast, $"L6 matched {lazy} < L1 matched {fast}.");
-        Assert.True(lazy > input.Length / 2, "Text should be mostly matches.");
     }
 
     // ------------------------------------------------------------------
@@ -372,24 +373,24 @@ public sealed class ZstdMatchFinderTests
         // Independent transcription of the formulas (primes as literals):
         // hash4(u,h) = (u * 2654435761) >> (32-h), u = LE32.
         byte[] src = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
-        uint u = 0x04030201u;
-        uint expected4 = unchecked((u * 2654435761u) >> (32 - 10)); // U32 wraps, like the C.
+        const uint u = 0x04030201u;
+        const uint expected4 = unchecked((u * 2654435761u) >> (32 - 10)); // U32 wraps, like the C.
         Assert.Equal(expected4, ZstdMatchFinder.HashPtr(src, 0, 10, 4));
 
         // hash8(u,h) = (u * 0xCF1BBCDCB7A56463) >> (64-h), u = LE64.
-        ulong w = 0x0807060504030201UL;
-        ulong expected8 = unchecked((w * 0xCF1BBCDCB7A56463UL) >> (64 - 17));
+        const ulong w = 0x0807060504030201UL;
+        const ulong expected8 = unchecked((w * 0xCF1BBCDCB7A56463UL) >> (64 - 17));
         Assert.Equal((uint)expected8, ZstdMatchFinder.HashPtr(src, 0, 17, 8));
 
         // Tables bounds: every hash fits its table.
         var rng = new Random(3);
-        byte[] random = new byte[64];
+        var random = new byte[64];
         rng.NextBytes(random);
-        foreach (int mls in new[] { 4, 5, 6, 7, 8 })
+        foreach (var mls in new[] { 4, 5, 6, 7, 8 })
         {
-            foreach (int hlog in new[] { 12, 13, 15, 16, 17 })
+            foreach (var hlog in new[] { 12, 13, 15, 16, 17 })
             {
-                uint h = ZstdMatchFinder.HashPtr(random, 9, hlog, mls);
+                var h = ZstdMatchFinder.HashPtr(random, 9, hlog, mls);
                 Assert.True(h < (1u << hlog), $"hash out of range (mls={mls}, hlog={hlog}).");
             }
         }
@@ -443,13 +444,13 @@ public sealed class ZstdMatchFinderTests
         var store = new ZstdSequenceStore(64);
         store.StoreSequence(new byte[] { 1, 2, 3 }, ZstdSeq.OffsetToOffBase(5), 10);
         store.StoreSequence([], ZstdSeq.Repcode1, 4);
-        store.SetTrailingLiterals(new byte[] { 9, 9 });
+        store.SetTrailingLiterals("\t\t"u8);
 
         Assert.Equal(2, store.Count);
         Assert.Equal(new ZstdSequence(3, ZstdSeq.OffsetToOffBase(5), 10), store.Get(0));
         Assert.Equal(new ZstdSequence(0, ZstdSeq.Repcode1, 4), store.Get(1));
         Assert.Equal(new byte[] { 1, 2, 3 }, store.Literals.ToArray());
-        Assert.Equal(new byte[] { 9, 9 }, store.TrailingLiterals.ToArray());
+        Assert.Equal("\t\t"u8.ToArray(), store.TrailingLiterals.ToArray());
 
         store.Reset();
         Assert.Equal(0, store.Count);

@@ -12,7 +12,10 @@ internal sealed class ExtractXisoWrapper : IDisposable
     public bool Available => File.Exists(_exePath);
 
     /// <summary>Initializes wrapper with path to extract-xiso.exe.</summary>
-    public ExtractXisoWrapper(string exePath) => _exePath = Path.GetFullPath(exePath);
+    public ExtractXisoWrapper(string exePath)
+    {
+        _exePath = Path.GetFullPath(exePath);
+    }
 
     /// <summary>Runs the exe with args, returns exit code and stdout/stderr.</summary>
     public (int ExitCode, string StdOut, string StdErr) Run(params string[] args)
@@ -44,15 +47,22 @@ internal sealed class ExtractXisoWrapper : IDisposable
     }
 
     /// <summary>Lists files via <c>-l</c>.</summary>
-    public (int ExitCode, string StdOut, string StdErr) ListFiles(string isoPath) => Run("-l", isoPath);
+    public (int ExitCode, string StdOut, string StdErr) ListFiles(string isoPath)
+    {
+        return Run("-l", isoPath);
+    }
 
     /// <summary>Extracts via <c>-x -d &lt;out&gt;</c>.</summary>
-    public (int ExitCode, string StdOut, string StdErr) ExtractFiles(string isoPath, string outDir) =>
-        Run("-x", "-d", outDir, isoPath);
+    public (int ExitCode, string StdOut, string StdErr) ExtractFiles(string isoPath, string outDir)
+    {
+        return Run("-x", "-d", outDir, isoPath);
+    }
 
     /// <summary>Rewrites via <c>-r -d &lt;out&gt;</c>.</summary>
-    public (int ExitCode, string StdOut, string StdErr) Rewrite(string isoPath, string outDir) =>
-        Run("-r", "-d", outDir, isoPath);
+    public (int ExitCode, string StdOut, string StdErr) Rewrite(string isoPath, string outDir)
+    {
+        return Run("-r", "-d", outDir, isoPath);
+    }
 
     /// <summary>Creates via <c>-c &lt;dir&gt; [name]</c>.</summary>
     public (int ExitCode, string StdOut, string StdErr) Create(string dir, string? outName = null)

@@ -33,10 +33,10 @@ public sealed class ZstdCorruptionTests
     private static byte[] MakeText(int n, int seed)
     {
         const string sample = "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. ";
-        byte[] ascii = System.Text.Encoding.ASCII.GetBytes(sample);
+        var ascii = System.Text.Encoding.ASCII.GetBytes(sample);
         var rng = new Random(seed);
-        byte[] buf = new byte[n];
-        for (int i = 0; i < n; i++)
+        var buf = new byte[n];
+        for (var i = 0; i < n; i++)
         {
             buf[i] = ascii[(i + rng.Next(ascii.Length)) % ascii.Length];
         }
@@ -80,14 +80,14 @@ public sealed class ZstdCorruptionTests
                 captured = ex;
             }
         });
-        bool finished = task.Wait(TimeSpan.FromSeconds(10));
+        var finished = task.Wait(TimeSpan.FromSeconds(10));
         Assert.True(finished, $"decode hung on {data.Length} B corrupted input");
         return (captured is not null || output is null, output);
     }
 
     private static void AssertThrowOrIdentical(byte[] corrupted, byte[] original, string where)
     {
-        (bool threw, byte[]? output) = GuardedDecode(corrupted);
+        (var threw, var output) = GuardedDecode(corrupted);
         if (!threw)
         {
             Assert.True(
@@ -98,13 +98,13 @@ public sealed class ZstdCorruptionTests
 
     private static void AssertThrows(byte[] corrupted, string where)
     {
-        (bool threw, _) = GuardedDecode(corrupted);
+        (var threw, _) = GuardedDecode(corrupted);
         Assert.True(threw, $"corruption at {where} decoded without error");
     }
 
     private static byte[] Flipped(byte[] frame, int pos)
     {
-        byte[] corrupted = (byte[])frame.Clone();
+        var corrupted = (byte[])frame.Clone();
         corrupted[pos] ^= 0xFF;
         return corrupted;
     }
@@ -121,7 +121,7 @@ public sealed class ZstdCorruptionTests
     [Fact]
     public void ChecksumFrameSweepThrowOrIdentical()
     {
-        for (int pos = 0; pos < ChecksumFrame.Length; pos++)
+        for (var pos = 0; pos < ChecksumFrame.Length; pos++)
         {
             AssertThrowOrIdentical(Flipped(ChecksumFrame, pos), SmallInput, $"checksum frame byte {pos}");
         }
@@ -131,13 +131,13 @@ public sealed class ZstdCorruptionTests
     public void ChecksumFrameHeaderAndChecksumBytesStrictlyThrow()
     {
         // Magic (0-3), descriptor (4), window (5), FCS (6-7): always load-bearing.
-        for (int pos = 0; pos <= 7; pos++)
+        for (var pos = 0; pos <= 7; pos++)
         {
             AssertThrows(Flipped(ChecksumFrame, pos), $"checksum frame header byte {pos}");
         }
 
         // Content checksum tail: any flip breaks the integrity check.
-        for (int pos = ChecksumFrame.Length - 4; pos < ChecksumFrame.Length; pos++)
+        for (var pos = ChecksumFrame.Length - 4; pos < ChecksumFrame.Length; pos++)
         {
             AssertThrows(Flipped(ChecksumFrame, pos), $"checksum byte {pos}");
         }
@@ -152,7 +152,7 @@ public sealed class ZstdCorruptionTests
         // through silently — that is the checksum's job. (The same sweep on a
         // checksunless frame would be unsound: payload flips legitimately
         // decode to different content with no integrity protection.)
-        for (int pos = 0; pos < BigChecksumFrame.Length; pos += 16)
+        for (var pos = 0; pos < BigChecksumFrame.Length; pos += 16)
         {
             AssertThrowOrIdentical(Flipped(BigChecksumFrame, pos), TextInput, $"big checksum frame byte {pos}");
         }
@@ -164,7 +164,7 @@ public sealed class ZstdCorruptionTests
         // Magic flips can never parse; window flip (0x38^0xFF) blows the cap;
         // FCS flips break the content-size check. (Descriptor excluded: an
         // fcsFlag change can still decode identically — redundant field.)
-        foreach (int pos in new[] { 0, 1, 2, 3, 5, 6, 7 })
+        foreach (var pos in new[] { 0, 1, 2, 3, 5, 6, 7 })
         {
             AssertThrows(Flipped(TextFrame, pos), $"text frame header byte {pos}");
         }
@@ -189,7 +189,7 @@ public sealed class ZstdCorruptionTests
     [Fact]
     public void TruncatedTailsAlwaysThrow()
     {
-        foreach (int length in new[] { TextFrame.Length - 5, TextFrame.Length - 1 })
+        foreach (var length in new[] { TextFrame.Length - 5, TextFrame.Length - 1 })
         {
             AssertThrows(TextFrame[..length], $"tail truncation to {length} B");
         }
@@ -198,7 +198,7 @@ public sealed class ZstdCorruptionTests
     [Fact]
     public void TruncatedMultiBlockFrameThrows()
     {
-        foreach (int length in new[] { 7, 1000, BigFrame.Length / 2, BigFrame.Length - 1 })
+        foreach (var length in new[] { 7, 1000, BigFrame.Length / 2, BigFrame.Length - 1 })
         {
             AssertThrows(BigFrame[..length], $"multi-block truncation to {length} B");
         }
@@ -216,7 +216,7 @@ public sealed class ZstdCorruptionTests
     [Fact]
     public void EmptyFrameCorruptionThrows()
     {
-        byte[] empty = new ZstdCompressor().CompressBlock([]);
+        var empty = new ZstdCompressor().CompressBlock([]);
         Assert.Empty(ZstdDecompressor.Decompress(empty));
         AssertThrows(Flipped(empty, 0), "empty-frame magic");
     }

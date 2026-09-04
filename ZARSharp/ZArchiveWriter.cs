@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using ZARSharp.Zstd;
 
+#pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
+
 namespace ZARSharp;
 
 /// <summary>
@@ -18,7 +20,10 @@ public interface IZarBlockCompressor
 public sealed class ZarRawCompressor : IZarBlockCompressor
 {
     /// <inheritdoc/>
-    public int Compress(ReadOnlySpan<byte> source, Span<byte> destination) => -1;
+    public int Compress(ReadOnlySpan<byte> source, Span<byte> destination)
+    {
+        return -1;
+    }
 }
 
 /// <summary>
@@ -28,13 +33,25 @@ public sealed class ZarRawCompressor : IZarBlockCompressor
 /// </summary>
 public sealed class ZArchiveWriter : IDisposable
 {
+    /// <summary>In-memory directory-tree node used while building the archive.</summary>
     private sealed class PathNode
     {
+        /// <summary>True for file nodes, false for directories.</summary>
         public bool IsFile;
+
+        /// <summary>Index into the deduplicated name list.</summary>
         public int NameIndex = -1;
+
+        /// <summary>Child nodes (directories only).</summary>
         public readonly List<PathNode> Subnodes = [];
+
+        /// <summary>Uncompressed input offset where the file starts.</summary>
         public ulong FileOffset;
+
+        /// <summary>Uncompressed file size.</summary>
         public ulong FileSize;
+
+        /// <summary>First child index in the serialized file tree.</summary>
         public uint NodeStartIndex;
     }
 
@@ -93,12 +110,12 @@ public sealed class ZArchiveWriter : IDisposable
 
     private PathNode? GetNodeByPath(string path)
     {
-        PathNode current = _rootNode;
-        ReadOnlySpan<char> parser = path.AsSpan();
-        while (ZArchiveCommon.GetNextPathNode(ref parser, out ReadOnlySpan<char> nodeName))
+        var current = _rootNode;
+        var parser = path.AsSpan();
+        while (ZArchiveCommon.GetNextPathNode(ref parser, out var nodeName))
         {
-            PathNode? next = FindSubnodeByName(current, nodeName);
-            if (next is null || next.IsFile)
+            var next = FindSubnodeByName(current, nodeName);
+            if (next?.IsFile != false)
             {
                 return null;
             }
@@ -111,7 +128,7 @@ public sealed class ZArchiveWriter : IDisposable
 
     private PathNode? FindSubnodeByName(PathNode parent, ReadOnlySpan<char> nodeName)
     {
-        foreach (PathNode child in parent.Subnodes)
+        foreach (var child in parent.Subnodes)
         {
             if (ZArchiveCommon.CompareNodeNameBool(_nodeNames[child.NameIndex].AsSpan(), nodeName))
             {
@@ -124,13 +141,13 @@ public sealed class ZArchiveWriter : IDisposable
 
     private uint CreateNameEntry(ReadOnlySpan<char> name)
     {
-        string key = name.ToString();
-        if (_nodeNameLookup.TryGetValue(key, out uint existing))
+        var key = name.ToString();
+        if (_nodeNameLookup.TryGetValue(key, out var existing))
         {
             return existing;
         }
 
-        uint index = (uint)_nodeNames.Count;
+        var index = (uint)_nodeNames.Count;
         _nodeNames.Add(key);
         _nodeNameLookup.Add(key, index);
         return index;
@@ -148,9 +165,9 @@ public sealed class ZArchiveWriter : IDisposable
     public bool StartNewFile(string path)
     {
         _currentFileNode = null;
-        ReadOnlySpan<char> parser = path.AsSpan();
-        ZArchiveCommon.SplitFilenameFromPath(ref parser, out ReadOnlySpan<char> filename);
-        PathNode? dir = GetNodeByPath(parser.ToString());
+        var parser = path.AsSpan();
+        ZArchiveCommon.SplitFilenameFromPath(ref parser, out var filename);
+        var dir = GetNodeByPath(parser.ToString());
         if (dir is null)
         {
             return false;
@@ -179,12 +196,12 @@ public sealed class ZArchiveWriter : IDisposable
     /// </summary>
     public bool MakeDir(string path, bool recursive = false)
     {
-        string trimmed = path.TrimEnd('/', '\\');
+        var trimmed = path.TrimEnd('/', '\\');
         if (!recursive)
         {
-            ReadOnlySpan<char> parser = trimmed.AsSpan();
-            ZArchiveCommon.SplitFilenameFromPath(ref parser, out ReadOnlySpan<char> dirName);
-            PathNode? dir = GetNodeByPath(parser.ToString());
+            var parser = trimmed.AsSpan();
+            ZArchiveCommon.SplitFilenameFromPath(ref parser, out var dirName);
+            var dir = GetNodeByPath(parser.ToString());
             if (dir is null)
             {
                 return false;
@@ -199,12 +216,12 @@ public sealed class ZArchiveWriter : IDisposable
             return true;
         }
 
-        PathNode current = _rootNode;
-        ReadOnlySpan<char> walk = trimmed.AsSpan();
-        while (ZArchiveCommon.GetNextPathNode(ref walk, out ReadOnlySpan<char> nodeName))
+        var current = _rootNode;
+        var walk = trimmed.AsSpan();
+        while (ZArchiveCommon.GetNextPathNode(ref walk, out var nodeName))
         {
-            PathNode? next = FindSubnodeByName(current, nodeName);
-            if (next is not null && next.IsFile)
+            var next = FindSubnodeByName(current, nodeName);
+            if (next?.IsFile == true)
             {
                 return false;
             }
@@ -230,12 +247,12 @@ public sealed class ZArchiveWriter : IDisposable
             throw new InvalidOperationException("Archive already finalized.");
         }
 
-        int dataSize = data.Length;
-        int offset = 0;
-        int remaining = dataSize;
+        var dataSize = data.Length;
+        var offset = 0;
+        var remaining = dataSize;
         while (remaining > 0)
         {
-            int bytesToCopy = ZArchiveCommon.CompressedBlockSize - _bufferedBytes;
+            var bytesToCopy = ZArchiveCommon.CompressedBlockSize - _bufferedBytes;
             if (bytesToCopy > remaining)
             {
                 bytesToCopy = remaining;
@@ -270,8 +287,10 @@ public sealed class ZArchiveWriter : IDisposable
     }
 
     /// <summary>Appends data to the currently active file.</summary>
-    public void AppendData(byte[] data, int offset, int count) =>
+    public void AppendData(byte[] data, int offset, int count)
+    {
         AppendData(data.AsSpan(offset, count));
+    }
 
     // ------------------------------------------------------------------
     // Internals
@@ -284,18 +303,21 @@ public sealed class ZArchiveWriter : IDisposable
             return;
         }
 
-        byte[] copy = data.ToArray();
+        var copy = data.ToArray();
         _writeOutputData(copy, 0, copy.Length);
         _currentCompressedWriteIndex += (ulong)copy.Length;
         _sha?.AppendData(copy);
     }
 
-    private ulong GetCurrentOutputOffset() => _currentCompressedWriteIndex;
+    private ulong GetCurrentOutputOffset()
+    {
+        return _currentCompressedWriteIndex;
+    }
 
     private void StoreBlock(ReadOnlySpan<byte> uncompressedData)
     {
-        ulong writeOffset = GetCurrentOutputOffset();
-        int outputSize = _compressor.Compress(uncompressedData, _compressionBuffer.AsSpan());
+        var writeOffset = GetCurrentOutputOffset();
+        var outputSize = _compressor.Compress(uncompressedData, _compressionBuffer.AsSpan());
         if (outputSize < 0 || outputSize >= ZArchiveCommon.CompressedBlockSize)
         {
             // Store raw when incompressible (or when the compressor declines).
@@ -312,7 +334,7 @@ public sealed class ZArchiveWriter : IDisposable
             _offsetRecords.Add(new CompressionOffsetRecord(writeOffset));
         }
 
-        CompressionOffsetRecord rec = _offsetRecords[^1];
+        var rec = _offsetRecords[^1];
         rec.Sizes[_numWrittenOffsetRecords % (ulong)ZArchiveCommon.EntriesPerOffsetRecord] =
             (ushort)(outputSize - 1);
         _offsetRecords[^1] = rec;
@@ -340,7 +362,7 @@ public sealed class ZArchiveWriter : IDisposable
         _currentFileNode = null; // padding must not grow the active file
         if (_bufferedBytes != 0)
         {
-            int pad = ZArchiveCommon.CompressedBlockSize - _bufferedBytes;
+            var pad = ZArchiveCommon.CompressedBlockSize - _bufferedBytes;
             AppendData(new byte[pad]);
             _bufferedBytes = 0;
         }
@@ -362,9 +384,9 @@ public sealed class ZArchiveWriter : IDisposable
 
     private void WriteOffsetRecords()
     {
-        ulong start = GetCurrentOutputOffset();
+        var start = GetCurrentOutputOffset();
         Span<byte> buf = stackalloc byte[CompressionOffsetRecord.SizeOnDisk];
-        foreach (CompressionOffsetRecord rec in _offsetRecords)
+        foreach (var rec in _offsetRecords)
         {
             rec.WriteTo(buf);
             OutputData(buf);
@@ -379,14 +401,14 @@ public sealed class ZArchiveWriter : IDisposable
 
     private void WriteNameTable()
     {
-        ulong start = GetCurrentOutputOffset();
+        var start = GetCurrentOutputOffset();
         _nodeNameOffsets = new uint[_nodeNames.Count];
         uint tableOffset = 0;
         Span<byte> header = stackalloc byte[2];
-        for (int i = 0; i < _nodeNames.Count; i++)
+        for (var i = 0; i < _nodeNames.Count; i++)
         {
             _nodeNameOffsets[i] = tableOffset;
-            byte[] nameBytes = ZArchiveCommon.Encode1252(_nodeNames[i].AsSpan());
+            var nameBytes = ZArchiveCommon.Encode1252(_nodeNames[i].AsSpan());
             if (nameBytes.Length > ZArchiveCommon.MaxNameLength)
             {
                 Array.Resize(ref nameBytes, ZArchiveCommon.MaxNameLength);
@@ -403,7 +425,7 @@ public sealed class ZArchiveWriter : IDisposable
             {
                 header[0] = (byte)(nameBytes.Length & 0x7F);
                 OutputData(header.Slice(0, 1));
-                tableOffset += 1;
+                tableOffset++;
             }
 
             OutputData(nameBytes);
@@ -425,7 +447,7 @@ public sealed class ZArchiveWriter : IDisposable
         uint currentIndex = 1; // root node is at index 0
         while (queue.Count > 0)
         {
-            PathNode node = queue.Dequeue();
+            var node = queue.Dequeue();
             if (node.IsFile)
             {
                 node.NodeStartIndex = 0xFFFFFFFF;
@@ -440,20 +462,20 @@ public sealed class ZArchiveWriter : IDisposable
                     _nodeNames[b.NameIndex].AsSpan()));
             node.NodeStartIndex = currentIndex;
             currentIndex += (uint)node.Subnodes.Count;
-            foreach (PathNode child in node.Subnodes)
+            foreach (var child in node.Subnodes)
             {
                 queue.Enqueue(child);
             }
         }
 
         // Second pass: serialize BFS.
-        ulong start = GetCurrentOutputOffset();
+        var start = GetCurrentOutputOffset();
         Span<byte> buf = stackalloc byte[FileDirectoryEntry.SizeOnDisk];
         var writeQueue = new Queue<PathNode>();
         writeQueue.Enqueue(_rootNode);
         while (writeQueue.Count > 0)
         {
-            PathNode node = writeQueue.Dequeue();
+            var node = writeQueue.Dequeue();
             var tmp = new FileDirectoryEntry();
             if (ReferenceEquals(node, _rootNode))
             {
@@ -478,7 +500,7 @@ public sealed class ZArchiveWriter : IDisposable
 
             tmp.WriteTo(buf);
             OutputData(buf);
-            foreach (PathNode child in node.Subnodes)
+            foreach (var child in node.Subnodes)
             {
                 writeQueue.Enqueue(child);
             }
@@ -493,7 +515,7 @@ public sealed class ZArchiveWriter : IDisposable
 
     private void WriteMetaData()
     {
-        ulong now = GetCurrentOutputOffset();
+        var now = GetCurrentOutputOffset();
         _footer.SectionMetaDirectory = new OffsetInfo { Offset = now, Size = 0 };
         _footer.SectionMetaData = new OffsetInfo { Offset = now, Size = 0 };
     }
@@ -511,7 +533,7 @@ public sealed class ZArchiveWriter : IDisposable
         Span<byte> tmp = stackalloc byte[Footer.SizeOnDisk];
         _footer.WriteTo(tmp);
         _sha!.AppendData(tmp.ToArray());
-        byte[] digest = _sha.GetHashAndReset();
+        var digest = _sha.GetHashAndReset();
         _sha.Dispose();
         _sha = null;
 
@@ -519,7 +541,7 @@ public sealed class ZArchiveWriter : IDisposable
         _footer.WriteTo(tmp);
 
         // Raw write without hashing (ctx is null in C++ at this point).
-        byte[] finalFooter = tmp.ToArray();
+        var finalFooter = tmp.ToArray();
         _writeOutputData(finalFooter, 0, finalFooter.Length);
         _currentCompressedWriteIndex += (ulong)finalFooter.Length;
     }

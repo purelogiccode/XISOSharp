@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using Serilog;
+using XISOSharpTester.Logging;
 
 #pragma warning disable MA0048 // File name must match type name — class name intentionally differs from file name
 
@@ -52,24 +54,38 @@ public class XisoSharpWrapper : IDisposable
     /// <returns>A <see cref="Result"/> containing exit code and output.</returns>
     public Result Run(params string[] args)
     {
-        var psi = new ProcessStartInfo
+        try
         {
-            FileName = _exePath,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
-        };
-        foreach (var a in args)
-            psi.ArgumentList.Add(a);
+            ArgumentNullException.ThrowIfNull(args);
+            var psi = new ProcessStartInfo
+            {
+                FileName = _exePath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+            foreach (var a in args)
+                psi.ArgumentList.Add(a);
 
-        using var p = Process.Start(psi)!;
-        var tOut = p.StandardOutput.ReadToEndAsync();
-        var tErr = p.StandardError.ReadToEndAsync();
-        p.WaitForExit();
-        return new Result { ExitCode = p.ExitCode, StdOut = tOut.Result, StdErr = tErr.Result };
+            Log.Debug("Running extract-xiso: {Args}", string.Join(" ", args));
+            using var p = Process.Start(psi)!;
+            var tOut = p.StandardOutput.ReadToEndAsync();
+            var tErr = p.StandardError.ReadToEndAsync();
+            p.WaitForExit();
+            var result = new Result { ExitCode = p.ExitCode, StdOut = tOut.Result, StdErr = tErr.Result };
+            if (result.ExitCode != 0)
+                Log.Warning("extract-xiso exited with code {Exit}: {Args}", result.ExitCode, string.Join(" ", args));
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "extract-xiso run failed");
+            BugReporter.ReportException(ex, "extract-xiso run failed");
+            throw;
+        }
     }
 
     /// <summary>
@@ -125,17 +141,26 @@ public class XisoSharpWrapper : IDisposable
     /// <returns>The version string, or <c>null</c> if unavailable.</returns>
     public string? GetVersion()
     {
-        var r = Run("-v");
-        if (r.ExitCode != 0 && r.ExitCode != 255) return null;
-
-        var stdout = r.StdOut.Trim();
-        if (string.IsNullOrEmpty(stdout))
+        try
         {
-            stdout = r.All.Trim();
-        }
+            var r = Run("-v");
+            if (r.ExitCode != 0 && r.ExitCode != 255) return null;
 
-        var lines = stdout.Split('\n');
-        return lines.FirstOrDefault()?.Trim();
+            var stdout = r.StdOut.Trim();
+            if (string.IsNullOrEmpty(stdout))
+            {
+                stdout = r.All.Trim();
+            }
+
+            var lines = stdout.Split('\n');
+            return lines.FirstOrDefault()?.Trim();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "GetVersion failed");
+            BugReporter.ReportException(ex, "GetVersion failed");
+            return null;
+        }
     }
 
     /// <summary>

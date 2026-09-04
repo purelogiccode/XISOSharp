@@ -45,8 +45,10 @@ public class XisoZarRebuildTests : IDisposable
         File.WriteAllText(Path.Combine(dir, "sub", "c.txt"), "nested");
     }
 
-    private static string[] ZarScratchDirs() =>
-        Directory.GetDirectories(Path.GetTempPath(), "XISOSharp_zar_*");
+    private static string[] ZarScratchDirs()
+    {
+        return Directory.GetDirectories(Path.GetTempPath(), "XISOSharp_zar_*");
+    }
 
     private sealed class LogCapture : IDisposable
     {

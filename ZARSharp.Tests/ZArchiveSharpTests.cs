@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
-using ZARSharp;
 using ZARSharp.Zstd;
 
 namespace ZARSharp.Tests;
@@ -14,7 +13,7 @@ public sealed class ZArchiveSharpTests
 {
     private static string SolutionRoot()
     {
-        string? dir = AppContext.BaseDirectory;
+        var dir = AppContext.BaseDirectory;
         while (dir is not null)
         {
             if (File.Exists(Path.Combine(dir, "CSharp_XISOSharp.sln")))
@@ -28,21 +27,23 @@ public sealed class ZArchiveSharpTests
         throw new InvalidOperationException("Solution root not found.");
     }
 
-    private static string ZArchiveExePath() =>
-        Path.Combine(SolutionRoot(), "References", "ZArchive-0.1.2", "zarchive.exe");
+    private static string ZArchiveExePath()
+    {
+        return Path.Combine(SolutionRoot(), "References", "ZArchive-0.1.2", "zarchive.exe");
+    }
 
     private static string NewTempDir(string prefix)
     {
-        string dir = Path.Combine(Path.GetTempPath(), "zarsharp", prefix + "_" + Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(Path.GetTempPath(), "zarsharp", prefix + "_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         return dir;
     }
 
     private static byte[] PatternBytes(int length, int seed = 0)
     {
-        byte[] data = new byte[length];
-        uint state = (uint)((seed * 2654435761u) + 1);
-        for (int i = 0; i < length; i++)
+        var data = new byte[length];
+        var state = (uint)((seed * 2654435761u) + 1);
+        for (var i = 0; i < length; i++)
         {
             state = (state * 1664525) + 1013904223;
             data[i] = (byte)(state >> 24);
@@ -70,8 +71,8 @@ public sealed class ZArchiveSharpTests
     [Fact]
     public void RoundTrip_SingleSmallFile()
     {
-        byte[] content = System.Text.Encoding.ASCII.GetBytes("Hello, ZArchive!");
-        byte[] zar = BuildArchive(w =>
+        var content = "Hello, ZArchive!"u8.ToArray();
+        var zar = BuildArchive(w =>
         {
             Assert.True(w.StartNewFile("hello.txt"));
             w.AppendData(content);
@@ -79,7 +80,7 @@ public sealed class ZArchiveSharpTests
 
         using var reader = ZArchiveReader.TryOpen(zar);
         Assert.NotNull(reader);
-        uint node = reader!.LookUp("hello.txt");
+        var node = reader.LookUp("hello.txt");
         Assert.NotEqual(ZArchiveReader.InvalidNode, node);
         Assert.True(reader.IsFile(node));
         Assert.Equal((ulong)content.Length, reader.GetFileSize(node));
@@ -91,13 +92,13 @@ public sealed class ZArchiveSharpTests
     {
         int[] sizes = [0, 1, 100, 65535, 65536, 65537, 131072, 200000];
         var contents = sizes.Select((s, i) => (Name: $"f{i}.bin", Data: PatternBytes(s, i))).ToList();
-        byte[] zar = BuildArchive(w =>
+        var zar = BuildArchive(w =>
         {
             foreach (var (name, data) in contents)
             {
                 Assert.True(w.StartNewFile(name));
                 // Split appends to exercise the staging buffer.
-                for (int off = 0; off < data.Length; off += 7777)
+                for (var off = 0; off < data.Length; off += 7777)
                 {
                     w.AppendData(data.AsSpan(off, Math.Min(7777, data.Length - off)));
                 }
@@ -108,7 +109,7 @@ public sealed class ZArchiveSharpTests
         Assert.NotNull(reader);
         foreach (var (name, data) in contents)
         {
-            uint node = reader!.LookUp(name);
+            var node = reader.LookUp(name);
             Assert.NotEqual(ZArchiveReader.InvalidNode, node);
             Assert.Equal((ulong)data.Length, reader.GetFileSize(node));
             Assert.Equal(data, reader.ReadFile(node));
@@ -118,7 +119,7 @@ public sealed class ZArchiveSharpTests
     [Fact]
     public void RoundTrip_NestedDirsAndCaseInsensitiveLookup()
     {
-        byte[] zar = BuildArchive(w =>
+        var zar = BuildArchive(w =>
         {
             Assert.True(w.MakeDir("Docs"));
             Assert.True(w.MakeDir("Docs/Sub", recursive: true));
@@ -131,9 +132,9 @@ public sealed class ZArchiveSharpTests
         using var reader = ZArchiveReader.TryOpen(zar);
         Assert.NotNull(reader);
         // Case-insensitive, both separators.
-        Assert.NotEqual(ZArchiveReader.InvalidNode, reader!.LookUp("DOCS\\readme.txt"));
+        Assert.NotEqual(ZArchiveReader.InvalidNode, reader.LookUp("DOCS\\readme.txt"));
         Assert.NotEqual(ZArchiveReader.InvalidNode, reader.LookUp("/docs/SUB/DATA.BIN"));
-        uint dir = reader.LookUp("docs/sub");
+        var dir = reader.LookUp("docs/sub");
         Assert.True(reader.IsDirectory(dir));
         Assert.Equal(1u, reader.GetDirEntryCount(dir));
         Assert.True(reader.GetDirEntry(dir, 0, out var entry));
@@ -161,7 +162,7 @@ public sealed class ZArchiveSharpTests
     {
         Assert.Null(ZArchiveReader.TryOpen([]));
         Assert.Null(ZArchiveReader.TryOpen(new byte[144])); // size <= footer
-        byte[] zeros = new byte[1024];
+        var zeros = new byte[1024];
         Assert.Null(ZArchiveReader.TryOpen(zeros)); // bad magic
         Assert.Null(ZArchiveReader.TryOpen((string)"nonexistent_xyz.zar"));
     }
@@ -169,22 +170,22 @@ public sealed class ZArchiveSharpTests
     [Fact]
     public void Reader_ReadClampsAndCrossesBlocks()
     {
-        byte[] data = PatternBytes(200000, 42);
-        byte[] zar = BuildArchive(w =>
+        var data = PatternBytes(200000, 42);
+        var zar = BuildArchive(w =>
         {
             Assert.True(w.StartNewFile("big.bin"));
             w.AppendData(data);
         });
 
         using var reader = ZArchiveReader.TryOpen(zar)!;
-        uint node = reader!.LookUp("big.bin");
-        byte[] span = new byte[70000];
+        var node = reader.LookUp("big.bin");
+        var span = new byte[70000];
         // Unaligned read crossing a block boundary.
-        ulong read = reader.ReadFromFile(node, 60000, span);
+        var read = reader.ReadFromFile(node, 60000, span);
         Assert.Equal(70000ul, read);
         Assert.Equal(data.AsSpan(60000, 70000).ToArray(), span);
         // Clamp at EOF.
-        byte[] tail = new byte[100];
+        var tail = new byte[100];
         Assert.Equal(5ul, reader.ReadFromFile(node, (ulong)data.Length - 5, tail));
         Assert.Equal(data.AsSpan(data.Length - 5).ToArray(), tail.AsSpan(0, 5).ToArray());
         // Offset past EOF.
@@ -198,19 +199,19 @@ public sealed class ZArchiveSharpTests
     [Fact]
     public void Format_FooterIsBigEndianWithMagicAtEnd()
     {
-        byte[] zar = BuildArchive(w =>
+        var zar = BuildArchive(w =>
         {
             Assert.True(w.StartNewFile("a"));
             w.AppendData([9]);
         });
 
         Assert.True(zar.Length > 144);
-        byte[] footer = zar[^144..];
+        var footer = zar[^144..];
         // totalSize (BE u64 at offset 128) == file size.
-        ulong total = ((ulong)footer[128] << 56) | ((ulong)footer[129] << 48) |
-                      ((ulong)footer[130] << 40) | ((ulong)footer[131] << 32) |
-                      ((ulong)footer[132] << 24) | ((ulong)footer[133] << 16) |
-                      ((ulong)footer[134] << 8) | footer[135];
+        var total = ((ulong)footer[128] << 56) | ((ulong)footer[129] << 48) |
+                    ((ulong)footer[130] << 40) | ((ulong)footer[131] << 32) |
+                    ((ulong)footer[132] << 24) | ((ulong)footer[133] << 16) |
+                    ((ulong)footer[134] << 8) | footer[135];
         Assert.Equal((ulong)zar.Length, total);
         // version then magic at the very end.
         Assert.Equal(new byte[] { 0x61, 0xBF, 0x3A, 0x01 }, footer[136..140]);
@@ -220,16 +221,16 @@ public sealed class ZArchiveSharpTests
     [Fact]
     public void Format_IntegrityHashCoversOutput()
     {
-        byte[] zar = BuildArchive(w =>
+        var zar = BuildArchive(w =>
         {
             Assert.True(w.StartNewFile("a"));
             w.AppendData(PatternBytes(1000, 7));
         });
 
-        byte[] footer = zar[^144..];
-        byte[] stored = footer[96..128];
+        var footer = zar[^144..];
+        var stored = footer[96..128];
         // Recompute: SHA-256 over everything before the footer + zeroed footer.
-        byte[] zeroed = (byte[])footer.Clone();
+        var zeroed = (byte[])footer.Clone();
         Array.Clear(zeroed, 96, 32);
         using var sha = SHA256.Create();
         sha.TransformBlock(zar, 0, zar.Length - 144, null, 0);
@@ -241,8 +242,8 @@ public sealed class ZArchiveSharpTests
     public void Format_LongNameQuirk()
     {
         // Writer truncates names at 0x7FFF chars.
-        string longName = new string('n', 0x8005) + ".txt";
-        byte[] zar = BuildArchive(w =>
+        var longName = new string('n', 0x8005) + ".txt";
+        var zar = BuildArchive(w =>
         {
             Assert.True(w.StartNewFile(longName));
             w.AppendData([1]);
@@ -251,13 +252,13 @@ public sealed class ZArchiveSharpTests
         using var reader = ZArchiveReader.TryOpen(zar)!;
         // The stored (>= 0x80 char) name hits the 0.1.2 extended-length reader
         // quirk and is not resolvable -- byte parity with the C++ reader.
-        Assert.Equal(ZArchiveReader.InvalidNode, reader!.LookUp(longName));
+        Assert.Equal(ZArchiveReader.InvalidNode, reader.LookUp(longName));
     }
 
     [Fact]
     public void Common_PathHelpersMatchCpp()
     {
-        ReadOnlySpan<char> p = "//a\\b/c".AsSpan();
+        var p = "//a\\b/c".AsSpan();
         Assert.True(ZArchiveCommon.GetNextPathNode(ref p, out var n1));
         Assert.Equal("a", n1.ToString());
         Assert.True(ZArchiveCommon.GetNextPathNode(ref p, out var n2));
@@ -266,7 +267,7 @@ public sealed class ZArchiveSharpTests
         Assert.Equal("c", n3.ToString());
         Assert.False(ZArchiveCommon.GetNextPathNode(ref p, out _));
 
-        ReadOnlySpan<char> dir = "a/b/file.txt".AsSpan();
+        var dir = "a/b/file.txt".AsSpan();
         ZArchiveCommon.SplitFilenameFromPath(ref dir, out var file);
         Assert.Equal("file.txt", file.ToString());
         Assert.Equal("a/b/", dir.ToString());
@@ -294,13 +295,13 @@ public sealed class ZArchiveSharpTests
         else
         {
             frame.Add(0x60); // FCS flag 1, single-segment
-            int v = content.Length - 256;
+            var v = content.Length - 256;
             Assert.True(v <= 0xFFFF);
             frame.Add((byte)(v & 0xFF));
             frame.Add((byte)(v >> 8));
         }
 
-        uint header = (uint)((content.Length << 3) | (0 << 1) | 1);
+        var header = (uint)((content.Length << 3) | (0 << 1) | 1);
         frame.Add((byte)(header & 0xFF));
         frame.Add((byte)((header >> 8) & 0xFF));
         frame.Add((byte)((header >> 16) & 0xFF));
@@ -311,8 +312,8 @@ public sealed class ZArchiveSharpTests
     [Fact]
     public void Zstd_RawBlockFrame()
     {
-        byte[] content = PatternBytes(1000, 3);
-        byte[] decoded = ZstdDecompressor.Decompress(RawBlockFrame(content));
+        var content = PatternBytes(1000, 3);
+        var decoded = ZstdDecompressor.Decompress(RawBlockFrame(content));
         Assert.Equal(content, decoded);
     }
 
@@ -326,7 +327,7 @@ public sealed class ZArchiveSharpTests
         frame.Add((byte)((header >> 8) & 0xFF));
         frame.Add((byte)((header >> 16) & 0xFF));
         frame.Add(0x41);
-        byte[] decoded = ZstdDecompressor.Decompress([.. frame]);
+        var decoded = ZstdDecompressor.Decompress([.. frame]);
         Assert.Equal(500, decoded.Length);
         Assert.All(decoded, b => Assert.Equal(0x41, b));
 
@@ -350,9 +351,9 @@ public sealed class ZArchiveSharpTests
     {
         // Frame with content checksum over "abc": verified against the
         // decoder (checksum mismatch must throw; covered below).
-        byte[] content = [0x61, 0x62, 0x63];
+        var content = "abc"u8.ToArray();
         var frame = new List<byte> { 0x28, 0xB5, 0x2F, 0xFD, 0x24, 0x03 };
-        uint header = (uint)((content.Length << 3) | (0 << 1) | 1);
+        var header = (uint)((content.Length << 3) | (0 << 1) | 1);
         frame.Add((byte)(header & 0xFF));
         frame.Add((byte)((header >> 8) & 0xFF));
         frame.Add((byte)((header >> 16) & 0xFF));
@@ -373,7 +374,7 @@ public sealed class ZArchiveSharpTests
 
     private static void RunExe(string input, string output)
     {
-        string exe = ZArchiveExePath();
+        var exe = ZArchiveExePath();
         var psi = new ProcessStartInfo(exe, $"\"{input}\" \"{output}\"")
         {
             RedirectStandardOutput = true,
@@ -393,10 +394,10 @@ public sealed class ZArchiveSharpTests
             return; // reference binary not present; covered by round-trip tests
         }
 
-        string tmp = NewTempDir("exe2sharp");
+        var tmp = NewTempDir("exe2sharp");
         try
         {
-            string indir = Path.Combine(tmp, "in");
+            var indir = Path.Combine(tmp, "in");
             Directory.CreateDirectory(indir);
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal)
             {
@@ -410,31 +411,31 @@ public sealed class ZArchiveSharpTests
             };
             foreach (var (rel, data) in files)
             {
-                string full = Path.Combine(indir, rel);
+                var full = Path.Combine(indir, rel);
                 Directory.CreateDirectory(Path.GetDirectoryName(full)!);
                 File.WriteAllBytes(full, data);
             }
 
             // Note: the reference packs empty dirs only via MakeDir for real dirs;
             // empty files ARE packed (0-size, no blocks). Verify each file.
-            string zar = Path.Combine(tmp, "ref.zar");
+            var zar = Path.Combine(tmp, "ref.zar");
             RunExe(indir, zar);
 
             using var reader = ZArchiveReader.TryOpen(zar);
             Assert.NotNull(reader);
             foreach (var (rel, data) in files)
             {
-                string zpath = rel.Replace('\\', '/');
+                var zpath = rel.Replace('\\', '/');
                 if (data.Length == 0)
                 {
                     // Empty files still get directory entries.
-                    uint n = reader!.LookUp(zpath);
+                    var n = reader.LookUp(zpath);
                     Assert.NotEqual(ZArchiveReader.InvalidNode, n);
                     Assert.Equal(0ul, reader.GetFileSize(n));
                     continue;
                 }
 
-                uint node = reader!.LookUp(zpath);
+                var node = reader.LookUp(zpath);
                 Assert.NotEqual(ZArchiveReader.InvalidNode, node);
                 Assert.Equal(data, reader.ReadFile(node));
             }
@@ -447,6 +448,7 @@ public sealed class ZArchiveSharpTests
             }
             catch
             {
+                // ignored
             }
         }
     }
@@ -459,27 +461,27 @@ public sealed class ZArchiveSharpTests
             return;
         }
 
-        string tmp = NewTempDir("sharp2exe");
+        var tmp = NewTempDir("sharp2exe");
         try
         {
-            string indir = Path.Combine(tmp, "in");
+            var indir = Path.Combine(tmp, "in");
             Directory.CreateDirectory(indir);
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal)
             {
-                ["a.txt"] = System.Text.Encoding.ASCII.GetBytes("sharp packs, exe unpacks"),
+                ["a.txt"] = "sharp packs, exe unpacks"u8.ToArray(),
                 ["big.bin"] = PatternBytes(200000, 5),
-                [Path.Combine("d1", "d2", "deep.txt")] = System.Text.Encoding.ASCII.GetBytes("deep"),
+                [Path.Combine("d1", "d2", "deep.txt")] = "deep"u8.ToArray(),
             };
             foreach (var (rel, data) in files)
             {
-                string full = Path.Combine(indir, rel);
+                var full = Path.Combine(indir, rel);
                 Directory.CreateDirectory(Path.GetDirectoryName(full)!);
                 File.WriteAllBytes(full, data);
             }
 
-            string zar = Path.Combine(tmp, "ours.zar");
+            var zar = Path.Combine(tmp, "ours.zar");
             ZArchiveTool.Pack(indir, zar);
-            string outdir = Path.Combine(tmp, "out");
+            var outdir = Path.Combine(tmp, "out");
             RunExe(zar, outdir);
 
             foreach (var (rel, data) in files)
@@ -495,6 +497,7 @@ public sealed class ZArchiveSharpTests
             }
             catch
             {
+                // ignored
             }
         }
     }
@@ -507,24 +510,24 @@ public sealed class ZArchiveSharpTests
     public void Stress_MultiRecordAndLruEviction()
     {
         // 5 MiB file = 80 blocks > 64-block cache + > 16 blocks/record.
-        byte[] data = PatternBytes(5 * 1024 * 1024, 1234);
-        byte[] zar = BuildArchive(w =>
+        var data = PatternBytes(5 * 1024 * 1024, 1234);
+        var zar = BuildArchive(w =>
         {
             Assert.True(w.StartNewFile("big.bin"));
             w.AppendData(data);
         });
 
         using var reader = ZArchiveReader.TryOpen(zar)!;
-        uint node = reader!.LookUp("big.bin");
+        var node = reader.LookUp("big.bin");
         Assert.NotEqual(ZArchiveReader.InvalidNode, node);
         // Read tail first (fills cache with late blocks), then head (evicted reload).
-        byte[] tail = new byte[100000];
+        var tail = new byte[100000];
         Assert.Equal(100000ul, reader.ReadFromFile(node, (ulong)data.Length - 100000, tail));
         Assert.Equal(data.AsSpan(data.Length - 100000).ToArray(), tail);
         Assert.Equal(data, reader.ReadFile(node));
         // Strided reads across every block.
-        byte[] one = new byte[1];
-        for (int b = 0; b < 80; b++)
+        var one = new byte[1];
+        for (var b = 0; b < 80; b++)
         {
             Assert.Equal(1ul, reader.ReadFromFile(node, (ulong)((b * 65536) + b), one));
             Assert.Equal(data[(b * 65536) + b], one[0]);
@@ -534,22 +537,23 @@ public sealed class ZArchiveSharpTests
     [Fact]
     public async Task Stress_ConcurrentReads()
     {
-        byte[] data = PatternBytes(300000, 77);
-        byte[] zar = BuildArchive(w =>
+        var data = PatternBytes(300000, 77);
+        var zar = BuildArchive(w =>
         {
             Assert.True(w.StartNewFile("c.bin"));
             w.AppendData(data);
         });
 
         using var reader = ZArchiveReader.TryOpen(zar)!;
-        uint node = reader!.LookUp("c.bin");
+        var node = reader.LookUp("c.bin");
         var tasks = Enumerable.Range(0, 8).Select(t => Task.Run(() =>
         {
             var rnd = new Random(t);
-            byte[] buf = new byte[5000];
-            for (int i = 0; i < 25; i++)
+            var buf = new byte[5000];
+            for (var i = 0; i < 25; i++)
             {
-                int off = rnd.Next(0, data.Length - 5000);
+                var off = rnd.Next(0, data.Length - 5000);
+                // ReSharper disable once AccessToDisposedClosure
                 Assert.Equal(5000ul, reader.ReadFromFile(node, (ulong)off, buf));
                 Assert.Equal(data.AsSpan(off, 5000).ToArray(), buf);
             }
@@ -560,7 +564,7 @@ public sealed class ZArchiveSharpTests
     [Fact]
     public void Edge_LookupAndDirEntrySemantics()
     {
-        byte[] zar = BuildArchive(w =>
+        var zar = BuildArchive(w =>
         {
             Assert.True(w.MakeDir("empty"));
             Assert.True(w.StartNewFile("empty/")); // empty filename entry (C++ allows it)
@@ -569,12 +573,12 @@ public sealed class ZArchiveSharpTests
         });
 
         using var reader = ZArchiveReader.TryOpen(zar)!;
-        Assert.Equal(0u, reader!.LookUp(string.Empty)); // root
+        Assert.Equal(0u, reader.LookUp(string.Empty)); // root
         Assert.Equal(0u, reader.LookUp("/"));
         Assert.Equal(0u, reader.LookUp("///"));
         Assert.Equal(ZArchiveReader.InvalidNode, reader.LookUp("missing"));
         Assert.Equal(ZArchiveReader.InvalidNode, reader.LookUp("top.txt/deeper")); // iterate a file
-        uint top = reader.LookUp("top.txt");
+        var top = reader.LookUp("top.txt");
         Assert.Equal(0u, reader.GetDirEntryCount(top)); // file has no children
         Assert.False(reader.GetDirEntry(top, 0, out _));
         Assert.False(reader.GetDirEntry(0, 9999, out _));
@@ -586,21 +590,21 @@ public sealed class ZArchiveSharpTests
     [Fact]
     public void Edge_CorruptedArchivesReturnNull()
     {
-        byte[] zar = BuildArchive(w =>
+        var zar = BuildArchive(w =>
         {
             Assert.True(w.StartNewFile("a"));
             w.AppendData(PatternBytes(100, 1));
         });
 
-        byte[] badMagic = (byte[])zar.Clone();
+        var badMagic = (byte[])zar.Clone();
         badMagic[^1] ^= 0xFF;
         Assert.Null(ZArchiveReader.TryOpen(badMagic));
 
-        byte[] badTotal = (byte[])zar.Clone();
+        var badTotal = (byte[])zar.Clone();
         badTotal[badTotal.Length - 144 + 130] ^= 0xFF; // totalSize byte
         Assert.Null(ZArchiveReader.TryOpen(badTotal));
 
-        byte[] truncated = zar[..^10];
+        var truncated = zar[..^10];
         Assert.Null(ZArchiveReader.TryOpen(truncated));
     }
 
@@ -612,10 +616,10 @@ public sealed class ZArchiveSharpTests
             return;
         }
 
-        string tmp = NewTempDir("incompress");
+        var tmp = NewTempDir("incompress");
         try
         {
-            string indir = Path.Combine(tmp, "in");
+            var indir = Path.Combine(tmp, "in");
             Directory.CreateDirectory(indir);
             var rnd = new Random(20260903);
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal)
@@ -634,21 +638,21 @@ public sealed class ZArchiveSharpTests
             }
 
             // exe -> ZARSharp (incompressible => raw ZArchive blocks).
-            string refZar = Path.Combine(tmp, "ref.zar");
+            var refZar = Path.Combine(tmp, "ref.zar");
             RunExe(indir, refZar);
             using (var reader = ZArchiveReader.TryOpen(refZar))
             {
                 Assert.NotNull(reader);
                 foreach (var (rel, data) in files)
                 {
-                    Assert.Equal(data, reader!.ReadFile(reader.LookUp(rel)));
+                    Assert.Equal(data, reader.ReadFile(reader.LookUp(rel)));
                 }
             }
 
             // ZARSharp -> exe.
-            string ourZar = Path.Combine(tmp, "ours.zar");
+            var ourZar = Path.Combine(tmp, "ours.zar");
             ZArchiveTool.Pack(indir, ourZar);
-            string outdir = Path.Combine(tmp, "out");
+            var outdir = Path.Combine(tmp, "out");
             RunExe(ourZar, outdir);
             foreach (var (rel, data) in files)
             {
@@ -663,6 +667,7 @@ public sealed class ZArchiveSharpTests
             }
             catch
             {
+                // ignored
             }
         }
     }
@@ -670,16 +675,16 @@ public sealed class ZArchiveSharpTests
     [Fact]
     public void Tool_PackExtractRoundTrip()
     {
-        string tmp = NewTempDir("toolrt");
+        var tmp = NewTempDir("toolrt");
         try
         {
-            string indir = Path.Combine(tmp, "in");
+            var indir = Path.Combine(tmp, "in");
             Directory.CreateDirectory(Path.Combine(indir, "sub"));
             File.WriteAllBytes(Path.Combine(indir, "x.txt"), [1, 2, 3]);
             File.WriteAllBytes(Path.Combine(indir, "sub", "y.bin"), PatternBytes(70000, 1));
-            string zar = Path.Combine(tmp, "t.zar");
+            var zar = Path.Combine(tmp, "t.zar");
             ZArchiveTool.Pack(indir, zar);
-            string outdir = Path.Combine(tmp, "out");
+            var outdir = Path.Combine(tmp, "out");
             ZArchiveTool.Extract(zar, outdir);
             Assert.Equal([1, 2, 3], File.ReadAllBytes(Path.Combine(outdir, "x.txt")));
             Assert.Equal(PatternBytes(70000, 1), File.ReadAllBytes(Path.Combine(outdir, "sub", "y.bin")));
@@ -694,6 +699,7 @@ public sealed class ZArchiveSharpTests
             }
             catch
             {
+                // ignored
             }
         }
     }

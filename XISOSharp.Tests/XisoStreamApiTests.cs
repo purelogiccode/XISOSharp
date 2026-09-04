@@ -92,7 +92,8 @@ public class XisoStreamApiTests : IDisposable
 
     private sealed class NonSeekableStream(Stream inner) : Stream
     {
-        public override bool CanRead => inner.CanRead;
+        private readonly Stream _inner = inner;
+        public override bool CanRead => _inner.CanRead;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
         public override long Length => throw new NotSupportedException();
@@ -103,11 +104,30 @@ public class XisoStreamApiTests : IDisposable
             set => throw new NotSupportedException();
         }
 
-        public override void Flush() => inner.Flush();
-        public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Flush()
+        {
+            _inner.Flush();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            return _inner.Read(buffer, offset, count);
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     [Fact]
@@ -169,7 +189,7 @@ public class XisoStreamApiTests : IDisposable
     public async Task DecodeXisoAsync_FromStream_Extracts()
     {
         var isoPath = CreateIso();
-        await using var ms = new MemoryStream(File.ReadAllBytes(isoPath), writable: false);
+        await using var ms = new MemoryStream(await File.ReadAllBytesAsync(isoPath), writable: false);
         var dest = CreateTempDir("xiso_stream_dest3");
 
         var (result, outIso) = await XisoReader.DecodeXisoAsync(

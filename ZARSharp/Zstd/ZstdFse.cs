@@ -45,7 +45,7 @@ internal static class ZstdFse
         out short[] norms, out int tableLog, out int maxSymbolValue)
     {
         var reader = new ForwardBitReader(buf, offset, length);
-        uint first = reader.ReadBits(4);
+        var first = reader.ReadBits(4);
         tableLog = (int)first + 5;
         if (tableLog > 15)
         {
@@ -53,28 +53,28 @@ internal static class ZstdFse
         }
 
         norms = new short[maxSymbol + 1];
-        int remaining = (1 << tableLog) + 1;
-        int threshold = 1 << tableLog;
-        int nbBits = tableLog + 1;
-        int charnum = 0;
-        int maxSV1 = maxSymbol + 1;
-        bool previous0 = false;
+        var remaining = (1 << tableLog) + 1;
+        var threshold = 1 << tableLog;
+        var nbBits = tableLog + 1;
+        var charnum = 0;
+        var maxSv1 = maxSymbol + 1;
+        var previous0 = false;
 
         for (;;)
         {
             if (previous0)
             {
                 // Count zero repeats: each 0b11 continues.
-                int repeats = 0;
+                var repeats = 0;
                 while (reader.PeekBits(2) == 3)
                 {
                     reader.ReadBits(2);
                     repeats++;
                 }
 
-                uint last = reader.ReadBits(2);
-                charnum += repeats * 3 + (int)last;
-                if (charnum >= maxSV1)
+                var last = reader.ReadBits(2);
+                charnum += (repeats * 3) + (int)last;
+                if (charnum >= maxSv1)
                 {
                     break;
                 }
@@ -83,7 +83,7 @@ internal static class ZstdFse
                 continue;
             }
 
-            int max = (2 * threshold - 1) - remaining;
+            var max = (2 * threshold) - 1 - remaining;
             int count;
             if ((int)reader.PeekBits(nbBits - 1) < max)
             {
@@ -105,7 +105,7 @@ internal static class ZstdFse
             }
             else
             {
-                remaining -= 1; // -1 counts as 1 point (reference: remaining += count)
+                remaining--; // -1 counts as 1 point (reference: remaining += count)
             }
 
             norms[charnum++] = (short)count;
@@ -122,7 +122,7 @@ internal static class ZstdFse
                 threshold = 1 << (nbBits - 1);
             }
 
-            if (charnum >= maxSV1)
+            if (charnum >= maxSv1)
             {
                 break;
             }
@@ -133,13 +133,13 @@ internal static class ZstdFse
             throw new ZstdException("Corrupt FSE distribution.");
         }
 
-        if (charnum > maxSV1)
+        if (charnum > maxSv1)
         {
             throw new ZstdException("FSE symbol value too large.");
         }
 
         maxSymbolValue = charnum - 1;
-        int consumedBytes = (int)((reader.ConsumedBits + 7) >> 3);
+        var consumedBytes = (int)((reader.ConsumedBits + 7) >> 3);
         if (consumedBytes > length)
         {
             throw new ZstdException("Truncated FSE table description.");
@@ -156,13 +156,13 @@ internal static class ZstdFse
             throw new ZstdException("Invalid FSE tableLog.");
         }
 
-        int tableSize = 1 << tableLog;
-        int tableMask = tableSize - 1;
-        int step = (tableSize >> 1) + (tableSize >> 3) + 3;
+        var tableSize = 1 << tableLog;
+        var tableMask = tableSize - 1;
+        var step = (tableSize >> 1) + (tableSize >> 3) + 3;
 
         // Sanity: probabilities must sum to exactly tableSize (-1 counts 1).
         long total = 0;
-        for (int s = 0; s <= maxSymbolValue; s++)
+        for (var s = 0; s <= maxSymbolValue; s++)
         {
             total += norms[s] == -1 ? 1 : norms[s];
             if (norms[s] < -1)
@@ -176,12 +176,12 @@ internal static class ZstdFse
             throw new ZstdException("Corrupt FSE distribution.");
         }
 
-        int[] tableSymbol = new int[tableSize];
-        int[] symbolNext = new int[maxSymbolValue + 1];
-        int highThreshold = tableSize - 1;
+        var tableSymbol = new int[tableSize];
+        var symbolNext = new int[maxSymbolValue + 1];
+        var highThreshold = tableSize - 1;
 
         // Low-probability ("less than 1") symbols get single cells from the top.
-        for (int s = 0; s <= maxSymbolValue; s++)
+        for (var s = 0; s <= maxSymbolValue; s++)
         {
             if (norms[s] == -1)
             {
@@ -195,11 +195,11 @@ internal static class ZstdFse
         }
 
         // Spread remaining symbols.
-        int position = 0;
-        for (int s = 0; s <= maxSymbolValue; s++)
+        var position = 0;
+        for (var s = 0; s <= maxSymbolValue; s++)
         {
             int n = norms[s];
-            for (int i = 0; i < n; i++)
+            for (var i = 0; i < n; i++)
             {
                 tableSymbol[position] = s;
                 position = (position + step) & tableMask;
@@ -223,11 +223,11 @@ internal static class ZstdFse
             NewState = new int[tableSize],
         };
 
-        for (int u = 0; u < tableSize; u++)
+        for (var u = 0; u < tableSize; u++)
         {
-            int symbol = tableSymbol[u];
-            int nextState = symbolNext[symbol]++;
-            int nbBits = tableLog - Highbit((uint)nextState);
+            var symbol = tableSymbol[u];
+            var nextState = symbolNext[symbol]++;
+            var nbBits = tableLog - Highbit((uint)nextState);
             table.Symbols[u] = symbol;
             table.NumBits[u] = (byte)nbBits;
             table.NewState[u] = (nextState << nbBits) - tableSize;

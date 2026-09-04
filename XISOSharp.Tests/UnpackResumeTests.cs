@@ -40,7 +40,10 @@ public class UnpackResumeTests : IDisposable
         return dir;
     }
 
-    private static UnpackOptions Skip() => new() { SkipExisting = true };
+    private static UnpackOptions Skip()
+    {
+        return new UnpackOptions { SkipExisting = true };
+    }
 
     private static readonly DateTime PinnedTime = new(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
@@ -94,9 +97,15 @@ public class UnpackResumeTests : IDisposable
     {
         private readonly Action<ProgressInfo> _onReport;
 
-        public SyncProgress(Action<ProgressInfo> onReport) => _onReport = onReport;
+        public SyncProgress(Action<ProgressInfo> onReport)
+        {
+            _onReport = onReport;
+        }
 
-        public void Report(ProgressInfo value) => _onReport(value);
+        public void Report(ProgressInfo value)
+        {
+            _onReport(value);
+        }
     }
 
     [Fact]
@@ -164,18 +173,26 @@ public class UnpackResumeTests : IDisposable
         var isoPath = CreateIso(src, "game.iso");
         var dest = CreateTempDir("xiso_resume_dest");
 
-        using var cts = new CancellationTokenSource();
-        var written = 0;
-        var progress = new SyncProgress(info =>
-        {
-            if (info.Type == ProgressInfoType.FileAdded && ++written == 2)
-                cts.Cancel();
-        });
-
         var originalCwd = Directory.GetCurrentDirectory();
-        var ex = Record.Exception(() => XisoReader.DecodeXiso(isoPath, dest, ExtractMode.Extract,
-            out _, llCompat: false, cancellationToken: cts.Token,
-            progress: progress, unpackOptions: new UnpackOptions()));
+        Exception? ex;
+        // Keep the progress callback (which captures cts) inside the CTS lifetime
+        // so it cannot fire after disposal.
+        using (var cts = new CancellationTokenSource())
+        {
+            var written = 0;
+            var progress = new SyncProgress(info =>
+            {
+                if (info.Type == ProgressInfoType.FileAdded && ++written == 2)
+                    // ReSharper disable once AccessToDisposedClosure
+                    cts.Cancel();
+            });
+
+            ex = Record.Exception(() => XisoReader.DecodeXiso(isoPath, dest, ExtractMode.Extract,
+                // ReSharper disable once AccessToDisposedClosure
+                out _, llCompat: false, cancellationToken: cts.Token,
+                progress: progress, unpackOptions: new UnpackOptions()));
+        }
+
         Assert.IsType<OperationCanceledException>(ex);
 
         // The interrupted run must not leak its destination chdir ...

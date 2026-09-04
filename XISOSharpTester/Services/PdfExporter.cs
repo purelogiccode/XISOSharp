@@ -2,6 +2,8 @@ using QuestPDF;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Serilog;
+using XISOSharpTester.Logging;
 using XISOSharpTester.Models;
 
 namespace XISOSharpTester.Services;
@@ -30,7 +32,12 @@ public static class PdfExporter
     /// <param name="outputPath">Full file path where the PDF will be written.</param>
     public static void Export(TestSessionResult session, string? xisoSharpVersion, string outputPath)
     {
-        Document.Create(container =>
+        try
+        {
+            ArgumentNullException.ThrowIfNull(session);
+            ArgumentException.ThrowIfNullOrEmpty(outputPath);
+            Log.Information("Exporting PDF report to {Path}", outputPath);
+            Document.Create(container =>
         {
             container.Page(page =>
             {
@@ -126,6 +133,14 @@ public static class PdfExporter
                     .FontColor(Colors.Grey.Medium);
             });
         }).GeneratePdf(outputPath);
+            Log.Information("PDF report written to {Path}", outputPath);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "PDF export failed for {Path}", outputPath);
+            BugReporter.ReportException(ex, $"PDF export failed for {outputPath}");
+            throw;
+        }
     }
 
     private static string FormatSubTests(PerFileResult file)

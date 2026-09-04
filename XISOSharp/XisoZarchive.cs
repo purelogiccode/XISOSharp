@@ -15,12 +15,24 @@ namespace XISOSharp;
 /// </summary>
 public static class XisoZarchive
 {
+    /// <summary>
+    /// ZAR name-table tree node built from the XISO directory walk before streaming file data.
+    /// </summary>
     private sealed class PathNode
     {
+        /// <summary>Child nodes sorted case-insensitively by name.</summary>
         public readonly List<PathNode> Subnodes = [];
+
+        /// <summary>Whether this node is a file (<c>false</c> for directories).</summary>
         public bool IsFile;
+
+        /// <summary>Index into the shared ZAR name table.</summary>
         public int NameIndex;
+
+        /// <summary>Partition-relative byte offset of the file data within the image.</summary>
         public long SourceOffset;
+
+        /// <summary>File size in bytes.</summary>
         public ulong FileSize;
     }
 
