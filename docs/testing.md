@@ -38,6 +38,10 @@ Highlights:
 | Glob matching | `GlobMatcherTests.cs` |
 | Exclude patterns | `ExcludePatternsTests.cs` |
 | Skip/prepend sectors | `SkipPrependSectorsTests.cs` |
+| Unpack resume (`UnpackOptions.SkipExisting`, cancel+resume, copy-out) | `UnpackResumeTests.cs` |
+| Input==output safety guards (library + CLI) | `XisoOutputGuardTests.cs`, `CliOutputGuardTests.cs` |
+| CISO compress/decompress, split parts, `.cso` auto-detect | `CisoTests.cs`, `CisoAutoDetectTests.cs` |
+| Golden interop vs reference `xdvdfs-cli 0.8.3` (both directions, split layout) | `CisoSplitInteropTests.cs` |
 | Logging, constants, types, exceptions | `LoggerTests.cs`, `ConstantsTests.cs`, `TypesTests.cs`, `XisoExceptionTests.cs`, … |
 
 Conventions:
@@ -92,6 +96,25 @@ Parameters (all optional):
 > The script defaults point at the sibling repo layout
 > (`C:\Sincronizar\source\repos\CSharp_ExtractXiso`). Pass explicit paths if your
 > checkout differs.
+
+## Reference-binary interop tests
+
+`XISOSharp.Tests/CisoSplitInteropTests.cs` (split-CSO golden vectors vs the
+reference `xdvdfs-cli 0.8.3`) and `ZARSharp.Tests/ZArchiveSharpTests.cs`
+(`zarchive.exe` both-directions interop) shell out to reference binaries that live
+in the gitignored `References/` folder (`References/xdvdfs-0.8.3/xdvdfs.exe`,
+`References/ZArchive-0.1.2/zarchive.exe`). The convention, mirroring the
+`zarchive.exe` pattern:
+
+- Tests silently pass (early `return`) when the binary is absent, so CI and clean
+  checkouts stay green without the binaries.
+- `xdvdfs` parts land relative to the child working directory (the reference
+  `SplitOutput` derives part names from the file name only), so tests set
+  `ProcessStartInfo.WorkingDirectory` to a temp dir.
+- The content oracle is `xdvdfs md5` (`open_image`-aware): `unpack`/`copy-out`
+  take raw ISOs only, and stock 0.8.3 itself cannot read sparse multi-part files,
+  so multi-part assertions check writer-layout parity plus our-reader round-trips.
+  See [Compression](compression.md#round-trip--interop).
 
 ## Media-patch integration verification
 

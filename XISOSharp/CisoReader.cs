@@ -57,7 +57,7 @@ public static class CisoReader
         if (!File.Exists(csoPath)) throw new FileNotFoundException($"CSO not found: {csoPath}");
 
         var output = outputIsoPath ?? DeriveDefaultIsoPath(csoPath);
-        if (string.Equals(Path.GetFullPath(csoPath), Path.GetFullPath(output), StringComparison.OrdinalIgnoreCase))
+        if (XisoPaths.AreSamePath(csoPath, output))
             throw new IOException("Source and destination paths are the same");
 
         using var src = OpenReadStream(csoPath);

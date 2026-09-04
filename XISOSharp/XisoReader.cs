@@ -358,6 +358,9 @@ public static class XisoReader
     /// <param name="avlRoot">Reference to the AVL root being built.</param>
     /// <param name="llCompat">If <c>true</c>, uses backwards-compatible right-offset calculation.</param>
     /// <param name="discLseek">Disc lseek offset for sector address calculation.</param>
+    /// <param name="unpackOptions">Optional resume options for extract mode (skip-existing).</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="progress">Optional channel receiving <c>FileAdded</c> per written file in extract mode.</param>
     internal static void TraverseXiso(
         Stream fs,
         DirEntry? inDirNode,
@@ -366,8 +369,12 @@ public static class XisoReader
         ExtractMode mode,
         ref AvlNode? avlRoot,
         bool llCompat,
-        long discLseek)
+        long discLseek,
+        UnpackOptions? unpackOptions = null,
+        CancellationToken cancellationToken = default,
+        IProgress<ProgressInfo>? progress = null)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Span<byte> intBuf = stackalloc byte[4];
         Span<byte> shortBuf = stackalloc byte[2];
         Span<byte> byteBuf = stackalloc byte[1];
@@ -385,6 +392,10 @@ public static class XisoReader
 
         while (true)
         {
+            // Right-sibling iteration re-enters here via `continue`, bypassing the
+            // method entry, so every entry — file, directory, or sibling — observes
+            // cancellation (TODO #13: an interrupted unpack must stop promptly).
+            cancellationToken.ThrowIfCancellationRequested();
             ReadExact(fs, shortBuf);
             var tmp = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
 
@@ -508,7 +519,8 @@ public static class XisoReader
                 fs.Seek(leftSeek, SeekOrigin.Begin);
 
                 var savedDir = dir.Left!;
-                TraverseXiso(fs, savedDir, dirStart, path, mode, ref avlRoot, llCompat, discLseek);
+                TraverseXiso(fs, savedDir, dirStart, path, mode, ref avlRoot, llCompat, discLseek,
+                    unpackOptions, cancellationToken, progress);
             }
 
             dir.Left = null;
@@ -559,7 +571,7 @@ public static class XisoReader
                             ((long)startSector * Constants.SectorSize) + discLseek,
                             subPath, mode,
                             ref mode == ExtractMode.GenerateAvl ? ref dir.AvlNode!.Subdirectory : ref subAvlRoot,
-                            llCompat, discLseek);
+                            llCompat, discLseek, unpackOptions, cancellationToken, progress);
                     }
 
                     if (mode == ExtractMode.Extract)
@@ -574,7 +586,14 @@ public static class XisoReader
                 {
                     if (mode == ExtractMode.Extract)
                     {
-                        ExtractFile(fs, filename, startSector, fileSize, path, discLseek);
+                        var written = ExtractFile(fs, filename, startSector, fileSize, path, discLseek,
+                            unpackOptions, cancellationToken);
+                        if (written)
+                        {
+                            progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded,
+                                Path: string.Concat(path, filename).Replace('\\', '/'),
+                                Sector: startSector, Size: fileSize));
+                        }
                     }
                     else
                     {
@@ -633,19 +652,36 @@ public static class XisoReader
     /// <param name="fileSize">Reported size of the file in bytes.</param>
     /// <param name="path">Path prefix for progress logging.</param>
     /// <param name="discLseek">Disc lseek offset for sector address calculation.</param>
+    /// <param name="unpackOptions">
+    /// Optional resume options; when <see cref="UnpackOptions.SkipExisting"/> is set and
+    /// the file already exists with the same size, it is left untouched and logged as
+    /// <c>skip: &lt;path&gt;</c> (TODO #13, xdvdfs #190).
+    /// </param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><c>true</c> when the file was written, <c>false</c> when it was skipped or excluded.</returns>
     /// <exception cref="IOException">Thrown on read or write errors.</exception>
-    internal static void ExtractFile(
+    internal static bool ExtractFile(
         Stream fs,
         string filename,
         uint startSector,
         uint fileSize,
         string? path,
-        long discLseek)
+        long discLseek,
+        UnpackOptions? unpackOptions = null,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (Logger.RemoveSystemUpdate && path?.Contains("$SystemUpdate", StringComparison.Ordinal) == true)
         {
             fs.Seek(((long)startSector * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
-            return;
+            return false;
+        }
+
+        if (unpackOptions?.ShouldSkip(filename, fileSize) == true)
+        {
+            Logger.Log($"skip: {path}{filename} ({fileSize} bytes)\n");
+            Logger.Flush();
+            return false;
         }
 
         using var outFile = new FileStream(
@@ -696,6 +732,7 @@ public static class XisoReader
         }
 
         Logger.Log("\n");
+        return true;
     }
 
     /// <summary>
@@ -751,16 +788,26 @@ public static class XisoReader
     /// Optional number of 2048-byte sectors to skip in the source file before the XISO
     /// filesystem begins (for Redump-style images with a video partition).
     /// </param>
+    /// <param name="options">
+    /// Optional resume options; when <see cref="UnpackOptions.SkipExisting"/> is set,
+    /// files already on disk with the same size are skipped (TODO #13, xdvdfs #190).
+    /// </param>
+    /// <param name="progress">
+    /// Optional structured progress channel; receives a <see cref="ProgressInfoType.FileAdded"/>
+    /// event for each file actually written.
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     public static int Extract(
         string xisoPath,
         string? outputPath,
         bool llCompat,
         CancellationToken cancellationToken = default,
-        int? skipSectors = null)
+        int? skipSectors = null,
+        UnpackOptions? options = null,
+        IProgress<ProgressInfo>? progress = null)
     {
         return DecodeXiso(xisoPath, outputPath, ExtractMode.Extract, out _, llCompat, cancellationToken,
-            skipSectors: skipSectors);
+            skipSectors: skipSectors, progress: progress, unpackOptions: options);
     }
 
     /// <summary>
@@ -778,6 +825,15 @@ public static class XisoReader
     /// Optional number of 2048-byte sectors to skip in the source file before the XISO
     /// filesystem begins (for Redump-style images with a video partition).
     /// </param>
+    /// <param name="options">
+    /// Optional resume options; when <see cref="UnpackOptions.SkipExisting"/> is set,
+    /// files already on disk with the same size are skipped, so an interrupted unpack
+    /// resumes instead of redoing completed files (TODO #13, xdvdfs #190).
+    /// </param>
+    /// <param name="progress">
+    /// Optional structured progress channel; receives a <see cref="ProgressInfoType.FileAdded"/>
+    /// event for each file actually written.
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     /// <exception cref="XisoFormatException">
     /// Thrown when the file is not a valid XISO image.
@@ -791,7 +847,9 @@ public static class XisoReader
         string isoPath,
         string? outputPath = null,
         CancellationToken cancellationToken = default,
-        int? skipSectors = null)
+        int? skipSectors = null,
+        UnpackOptions? options = null,
+        IProgress<ProgressInfo>? progress = null)
     {
         if (skipSectors < 0)
         {
@@ -799,7 +857,8 @@ public static class XisoReader
                 "Skip sectors must be non-negative.");
         }
 
-        return Extract(isoPath, outputPath, !IsOptimized(isoPath, skipSectors), cancellationToken, skipSectors);
+        return Extract(isoPath, outputPath, !IsOptimized(isoPath, skipSectors), cancellationToken, skipSectors,
+            options, progress);
     }
 
     /// <summary>
@@ -915,7 +974,13 @@ public static class XisoReader
     /// </param>
     /// <param name="progress">
     /// Optional structured progress channel; receives <see cref="ProgressInfo"/> events
-    /// during the rewrite write phase. Ignored in non-rewrite modes.
+    /// during the rewrite write phase, and <see cref="ProgressInfoType.FileAdded"/> for
+    /// each file actually written in extract mode. Ignored in list/tree modes.
+    /// </param>
+    /// <param name="unpackOptions">
+    /// Optional resume options for extract mode; when <see cref="UnpackOptions.SkipExisting"/>
+    /// is set, files already on disk with the same size are skipped (TODO #13, xdvdfs #190).
+    /// Ignored in non-extract modes.
     /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     /// <exception cref="XisoFormatException">
@@ -936,7 +1001,8 @@ public static class XisoReader
         string? outputName = null,
         int? skipSectors = null,
         int? prependSectors = null,
-        IProgress<ProgressInfo>? progress = null)
+        IProgress<ProgressInfo>? progress = null,
+        UnpackOptions? unpackOptions = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
@@ -1001,77 +1067,90 @@ public static class XisoReader
 
         var isoName = shortName ?? name;
 
-        if (mode != ExtractMode.Rewrite)
+        // Everything below may change the process working directory (extract chdirs
+        // into the destination), so it runs under try/finally: an interrupted run
+        // (cancellation, disk error) must still restore the caller's directory.
+        try
         {
-            Logger.Log($"{(mode == ExtractMode.Extract ? "extracting" : "listing")} {name}:\n\n");
-
-            if (mode == ExtractMode.Extract && outputPath == null)
+            if (mode != ExtractMode.Rewrite)
             {
-                try
+                Logger.Log($"{(mode == ExtractMode.Extract ? "extracting" : "listing")} {name}:\n\n");
+
+                if (mode == ExtractMode.Extract && outputPath == null)
                 {
-                    Directory.CreateDirectory(isoName);
-                    Directory.SetCurrentDirectory(isoName);
+                    try
+                    {
+                        Directory.CreateDirectory(isoName);
+                        // Capture the caller's directory so the finally below restores it:
+                        // without this, multi-image runs (e.g. --batch) would resolve
+                        // every later image relative to this ISO's subdirectory.
+                        cwd ??= Directory.GetCurrentDirectory();
+                        Directory.SetCurrentDirectory(isoName);
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        Logger.LogErr($"Error: permission denied: {isoName}\n");
+                        throw new IOException($"Permission denied: {isoName}", ex);
+                    }
+                    catch (IOException ex)
+                    {
+                        Logger.LogErr($"Error: cannot create output directory: {isoName}: {ex.Message}\n");
+                        throw;
+                    }
                 }
-                catch (UnauthorizedAccessException ex)
+            }
+
+            if (rootDirSect != 0 && rootDirSize != 0)
+            {
+                var addSlash = 0;
+                if (outputPath != null && outputPath[^1] != Constants.PathChar)
                 {
-                    Logger.LogErr($"Error: permission denied: {isoName}\n");
-                    throw new IOException($"Permission denied: {isoName}", ex);
+                    addSlash = 1;
                 }
-                catch (IOException ex)
+
+                var buf = string.Concat(
+                    outputPath ?? "",
+                    addSlash != 0 && outputPath == null ? Constants.PathCharStr : "",
+                    mode != ExtractMode.List && outputPath == null ? isoName : "",
+                    Constants.PathCharStr);
+
+                if (mode == ExtractMode.Rewrite)
                 {
-                    Logger.LogErr($"Error: cannot create output directory: {isoName}: {ex.Message}\n");
-                    throw;
+                    fs.Seek(((long)rootDirSect * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
+                    AvlNode? avlRoot = null;
+                    TraverseXiso(fs, null, ((long)rootDirSect * Constants.SectorSize) + discLseek,
+                        buf, ExtractMode.GenerateAvl, ref avlRoot, llCompat, discLseek);
+
+                    XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null,
+                        prependSectors: prependSectors, progress: progress);
+                }
+                else
+                {
+                    fs.Seek(((long)rootDirSect * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
+                    AvlNode? avlRoot = null;
+                    TraverseXiso(fs, null, ((long)rootDirSect * Constants.SectorSize) + discLseek,
+                        buf, mode, ref avlRoot, llCompat, discLseek,
+                        unpackOptions, cancellationToken, progress);
                 }
             }
-        }
 
-        if (rootDirSect != 0 && rootDirSize != 0)
-        {
-            var addSlash = 0;
-            if (outputPath != null && outputPath[^1] != Constants.PathChar)
+            if (shortName != null)
             {
-                addSlash = 1;
             }
 
-            var buf = string.Concat(
-                outputPath ?? "",
-                addSlash != 0 && outputPath == null ? Constants.PathCharStr : "",
-                mode != ExtractMode.List && outputPath == null ? isoName : "",
-                Constants.PathCharStr);
-
-            if (mode == ExtractMode.Rewrite)
+            if (repair)
             {
-                fs.Seek(((long)rootDirSect * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
-                AvlNode? avlRoot = null;
-                TraverseXiso(fs, null, ((long)rootDirSect * Constants.SectorSize) + discLseek,
-                    buf, ExtractMode.GenerateAvl, ref avlRoot, llCompat, discLseek);
-
-                XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null,
-                    prependSectors: prependSectors, progress: progress);
             }
-            else
+
+            return 0;
+        }
+        finally
+        {
+            if (cwd != null)
             {
-                fs.Seek(((long)rootDirSect * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
-                AvlNode? avlRoot = null;
-                TraverseXiso(fs, null, ((long)rootDirSect * Constants.SectorSize) + discLseek,
-                    buf, mode, ref avlRoot, llCompat, discLseek);
+                Directory.SetCurrentDirectory(cwd);
             }
         }
-
-        if (shortName != null)
-        {
-        }
-
-        if (cwd != null)
-        {
-            Directory.SetCurrentDirectory(cwd);
-        }
-
-        if (repair)
-        {
-        }
-
-        return 0;
     }
 
     /// <summary>
@@ -1096,7 +1175,12 @@ public static class XisoReader
     /// </param>
     /// <param name="progress">
     /// Optional structured progress channel; receives <see cref="ProgressInfo"/> events
-    /// during the rewrite write phase.
+    /// during the rewrite write phase, and <see cref="ProgressInfoType.FileAdded"/> for
+    /// each file actually written in extract mode.
+    /// </param>
+    /// <param name="unpackOptions">
+    /// Optional resume options for extract mode (TODO #13, xdvdfs #190).
+    /// Ignored in non-extract modes.
     /// </param>
     /// <returns>A task that completes with the result code (0 on success, non-zero on error) and the output ISO path when in rewrite mode.</returns>
     public static async Task<(int Result, string? OutIsoPath)> DecodeXisoAsync(
@@ -1108,12 +1192,13 @@ public static class XisoReader
         string? outputName = null,
         int? skipSectors = null,
         int? prependSectors = null,
-        IProgress<ProgressInfo>? progress = null)
+        IProgress<ProgressInfo>? progress = null,
+        UnpackOptions? unpackOptions = null)
     {
         return await Task.Run(() =>
         {
             var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken,
-                outputName, skipSectors, prependSectors, progress);
+                outputName, skipSectors, prependSectors, progress, unpackOptions);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
     }
@@ -1744,11 +1829,19 @@ public static class XisoReader
     /// <param name="isoPath">Path to the XISO file.</param>
     /// <param name="internalPath">Path within the ISO (e.g. <c>"/subdir/file.xbe"</c>).</param>
     /// <param name="destPath">Destination path on the local filesystem.</param>
+    /// <param name="options">
+    /// Optional resume options; when <see cref="UnpackOptions.SkipExisting"/> is set,
+    /// destinations already holding a same-size file are left untouched and logged as
+    /// <c>skip: &lt;path&gt;</c> (TODO #13, xdvdfs #190).
+    /// </param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <exception cref="FileNotFoundException">Thrown when the ISO file does not exist.</exception>
     /// <exception cref="InvalidDataException">Thrown when the internal path does not exist.</exception>
     /// <exception cref="IOException">Thrown on read or write errors.</exception>
-    public static void CopyOut(string isoPath, string internalPath, string destPath)
+    public static void CopyOut(string isoPath, string internalPath, string destPath,
+        UnpackOptions? options = null, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var entry = GetEntryInfo(isoPath, internalPath);
         if (entry == null)
             throw new InvalidDataException($"Path not found in XISO: {internalPath}");
@@ -1766,16 +1859,25 @@ public static class XisoReader
 
         if (entry.IsDirectory)
         {
-            CopyOutDirectory(fs, isoPath, internalPath, destPath, volInfo);
+            CopyOutDirectory(fs, isoPath, internalPath, destPath, volInfo, options, cancellationToken);
         }
         else
         {
-            CopyOutFile(fs, entry, destPath, volInfo);
+            CopyOutFile(fs, entry, destPath, volInfo, options, cancellationToken);
         }
     }
 
-    private static void CopyOutFile(FileStream fs, EntryInfo entry, string destPath, VolumeInfo volInfo)
+    private static void CopyOutFile(FileStream fs, EntryInfo entry, string destPath, VolumeInfo volInfo,
+        UnpackOptions? options = null, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (options?.ShouldSkip(destPath, entry.FileSize) == true)
+        {
+            Logger.Log($"skip: {destPath} ({entry.FileSize} bytes)\n");
+            Logger.Flush();
+            return;
+        }
+
         var destDir = Path.GetDirectoryName(destPath);
         if (!string.IsNullOrEmpty(destDir))
             Directory.CreateDirectory(destDir);
@@ -1805,24 +1907,26 @@ public static class XisoReader
     }
 
     private static void CopyOutDirectory(FileStream fs, string isoPath, string internalPath, string destPath,
-        VolumeInfo volInfo)
+        VolumeInfo volInfo, UnpackOptions? options = null, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Directory.CreateDirectory(destPath);
 
         var entries = ListDirectory(isoPath, internalPath);
 
         foreach (var entry in entries)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var entryDestPath = Path.Combine(destPath, entry.Name);
             var entryInternalPath = internalPath.TrimEnd('/') + "/" + entry.Name;
 
             if (entry.IsDirectory)
             {
-                CopyOutDirectory(fs, isoPath, entryInternalPath, entryDestPath, volInfo);
+                CopyOutDirectory(fs, isoPath, entryInternalPath, entryDestPath, volInfo, options, cancellationToken);
             }
             else
             {
-                CopyOutFile(fs, entry, entryDestPath, volInfo);
+                CopyOutFile(fs, entry, entryDestPath, volInfo, options, cancellationToken);
             }
         }
     }

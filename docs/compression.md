@@ -177,6 +177,10 @@ See [xdvdfs Compat — Block Device](xdvdfs-compat.md#block-device).
 - **Saving threshold**: sectors where `payloadLen + 12 >= 2048` left plain, matching `ciso` crate `threshold`.
 - **v2 byte parity**: the LZ4 encoder is a byte-exact `lz4_flex 0.11.3` port (golden vectors hand-traced from the reference algorithm in `XisoTests`); v2 images decompress correctly with xdvdfs and vice versa.
 - **Split parity**: `compress` output (`.1.cso`, `.2.cso`, …) matches `ciso::split` semantics (absolute-position sparse parts, overshoot writes included) and round-trips through `decompress`/`ReadFromCso`/`CisoBlockDevice`.
+- **Split golden vectors vs Rust**: `XISOSharp.Tests/CisoSplitInteropTests.cs` runs both directions against the reference `xdvdfs-cli 0.8.3` binary (gitignored `References/xdvdfs-0.8.3`, tests skip if absent).
+  Rust-compressed ISO/dir → our `DecompressToIso` → stock `md5` content-identical; our single `.cso` → stock `md5` content-identical.
+  Multi-part Rust output verified locally: 4.5 GB random dir → genuine `big.1.cso` (4.29 GB, overshoot 1176 B past `0xffbf6000`) + `big.2.cso` → our decompress → per-file MD5 match.
+  Caveat: stock 0.8.3 itself cannot read sparse multi-part files (its `SplitFileReader` maps parts at cumulative sizes while data sits at global offsets — panics on its own output too); `CisoSplitInputStream` tiles by previous part length and reads them correctly. Stock `unpack`/`copy-out` take raw ISOs only — `md5`/`ls`/`tree`/`info`/`checksum` are the cso-aware oracles.
 - **Index random-access**: `BlockDeviceRead` over `.cso` via `index` random-access, not streaming — `CopyOut`/`ComputeFileHash` can seek arbitrarily.
 
 Verified:

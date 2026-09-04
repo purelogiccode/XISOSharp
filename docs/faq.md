@@ -67,6 +67,26 @@ The image carries the optimized tag (`in!xiso!2.7.1 (01.11.14)` at offset 31337)
 which means it was already rewritten by an extract-xiso-family tool. Rewrite mode skips
 such images because there is nothing left to optimize.
 
+**How do I resume an interrupted extraction?**
+
+Re-run the same command with `--skip-existing` (extract, `--unpack`, or
+`--copy-out`; pairs with `--batch`):
+
+```bash
+XISOSharp.Cli --skip-existing --unpack game.iso ./out
+```
+
+Files already on disk with matching sizes are skipped (`skip: <path>`); missing or
+short files are written. XISO stores no per-file timestamps, so size is the match
+signal. See [CLI Reference](cli.md#resume-interrupted-unpacks).
+
+**Why does rewrite/compress refuse with "is the same file as the input"?**
+
+An output pointing back at its own input is refused (exit 1) to prevent silent data
+loss — e.g. `-r -o game.iso game.iso`, or a `rebuild -o` naming a component. Omit
+`-o` to rewrite in place, or choose another name. See
+[CLI Reference](cli.md#inputoutput-safety-guard).
+
 **What is the 4 GB limit?**
 
 The on-disk file-size field is a 32-bit unsigned integer, so individual files cannot
@@ -129,9 +149,10 @@ No — split-file images are out of scope. XISOSharp works with single-file imag
 **Where is the C# code different from the C original?**
 
 Only additively: new CLI flags (`-t`, `-i`, `-V`, `-o`, `--copy-out`, `--md5`,
-`--sha256`, `-X`, `--skip-sectors`, `--prepend-sectors`, `validate`/`--validate*`),
-async APIs, progress callbacks, and a public library surface. Core algorithms are
-unchanged.
+`--sha256`, `-X`, `--skip-sectors`, `--prepend-sectors`, `--skip-existing`,
+`validate`/`--validate*`), the input==output safety guard, unpack resume
+(`UnpackOptions`), GUI drag-and-drop, async APIs, progress callbacks, and a public
+library surface. Core algorithms are unchanged.
 
 **Where can I report bugs or request features?**
 

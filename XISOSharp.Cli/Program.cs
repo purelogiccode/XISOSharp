@@ -60,6 +60,7 @@ internal static class Program
         var excludePatterns = new List<string>();
         string? batchDir = null;
         var batchRecursive = false;
+        var skipExisting = false;
         string? packInput = null;
         string? packName = null;
         string? packIsoFile = null;
@@ -392,6 +393,9 @@ internal static class Program
                     case "--batch-recursive":
                         batchRecursive = true;
                         break;
+                    case "--skip-existing":
+                        skipExisting = true;
+                        break;
                     case "--pack":
                         if (packInput != null || xSeen || rewrite || createList.Count > 0)
                         {
@@ -667,6 +671,15 @@ internal static class Program
         {
             Logger.LogErr(
                 "Error: --batch is only supported in extract, list, tree, rewrite (-r), and audit (-V) modes\n");
+            return 1;
+        }
+
+        // #13 (xdvdfs #190): resume only makes sense where files are unpacked.
+        // `extract` is still true for rewrite (-r) and create (-c), so exclude those.
+        if (skipExisting && !((extract && !rewrite && createList.Count == 0) || unpackMode || copyOut))
+        {
+            Logger.LogErr(
+                "Error: --skip-existing is only supported in extract (-x), --unpack, and --copy-out modes\n");
             return 1;
         }
 
@@ -1082,9 +1095,14 @@ internal static class Program
             return 0;
         }
 
+        // #13 (xdvdfs #190): resume an interrupted unpack by skipping files already
+        // on disk with matching sizes. Pairs with --batch: each image in the bulk
+        // run resumes instead of redoing completed files.
+        UnpackOptions? unpackOptions = skipExisting ? new UnpackOptions { SkipExisting = true } : null;
+
         if (unpackMode)
         {
-            return RunUnpackMode(args, optind, path, skipSectors);
+            return RunUnpackMode(args, optind, path, skipSectors, skipExisting);
         }
 
         if (hashMode)
@@ -1166,7 +1184,15 @@ internal static class Program
                     return 1;
                 }
 
-                XisoReader.CopyOut(xisoPath, internalPath, destPath);
+                // #13 (xdvdfs #190): with --skip-existing, an up-to-date destination
+                // is reported as skipped instead of being recopied.
+                if (!entry.IsDirectory && unpackOptions?.ShouldSkip(destPath, entry.FileSize) == true)
+                {
+                    Logger.Log($"skip: {destPath} ({entry.FileSize} bytes)\n");
+                    return 0;
+                }
+
+                XisoReader.CopyOut(xisoPath, internalPath, destPath, unpackOptions);
                 Logger.Log($"Copied {internalPath} to {destPath}\n");
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
@@ -1277,6 +1303,16 @@ internal static class Program
 
             if (rewrite)
             {
+                // #15 (xdvdfs #36): refuse an -o that points at the input or its
+                // backup before anything else (even an "already optimized" skip).
+                var rewriteRefusal = CliOutputGuard.CheckRewriteOutput(xisoPath, outputName);
+                if (rewriteRefusal != null)
+                {
+                    Logger.LogErr(rewriteRefusal);
+                    err = 1;
+                    continue;
+                }
+
                 if (optimized)
                 {
                     Logger.Log($"{xisoPath} is already optimized, skipping...\n");
@@ -1343,7 +1379,8 @@ internal static class Program
                 try
                 {
                     if (extract)
-                        XisoReader.Extract(xisoPath, path, !optimized, skipSectors: skipSectors);
+                        XisoReader.Extract(xisoPath, path, !optimized, skipSectors: skipSectors,
+                            options: unpackOptions);
                     else if (tree)
                         XisoReader.Tree(xisoPath, !optimized, skipSectors: skipSectors);
                     else
@@ -1393,7 +1430,7 @@ internal static class Program
     /// Executes the <c>--unpack</c> mode: unpack one ISO to a destination directory
     /// (defaulting to the ISO name). Returns the process exit code.
     /// </summary>
-    private static int RunUnpackMode(string[] args, int optind, string? path, int? skipSectors)
+    private static int RunUnpackMode(string[] args, int optind, string? path, int? skipSectors, bool skipExisting)
     {
         if (optind >= args.Length)
         {
@@ -1412,7 +1449,9 @@ internal static class Program
 
         try
         {
-            var result = XisoReader.UnpackImage(xisoPath, destPath, skipSectors: skipSectors);
+            UnpackOptions? unpackOptions = skipExisting ? new UnpackOptions { SkipExisting = true } : null;
+            var result = XisoReader.UnpackImage(xisoPath, destPath, skipSectors: skipSectors,
+                options: unpackOptions);
             return result == 0 ? 0 : 1;
         }
         catch (ExtractErrorException ex) when (ex.ErrorCode == ExtractError.ErrIsoNoFiles)
@@ -1557,6 +1596,15 @@ internal static class Program
         }
 
         var outRedump = outRebuild ?? DeriveRedumpPath(xisoPath);
+
+        // #15 (xdvdfs #36): the output is written while the parts are read.
+        var rebuildRefusal = CliOutputGuard.CheckRebuildOutput(outRedump, secPath,
+            xisoPath, videoPath, fillerOrSeed, updatePath);
+        if (rebuildRefusal != null)
+        {
+            Logger.LogErr(rebuildRefusal);
+            return 1;
+        }
 
         if (!OverwritePrompt.ConfirmOverwrite(outRedump, assumeYes, assumeNo))
             return 1;
@@ -2070,9 +2118,18 @@ internal static class Program
         var source = positionals[0];
         var outCso = positionals.Count == 2 ? positionals[1] : output;
 
+        // #15 (xdvdfs #36): refuse before the -y/-n prompt, not after it.
+        var probeCsoBase = outCso ?? CisoWriter.DeriveDefaultCsoPath(source, Directory.Exists(source));
+        var compressRefusal = CliOutputGuard.CheckImageOutput(source, probeCsoBase);
+        if (compressRefusal != null)
+        {
+            Logger.LogErr(compressRefusal);
+            return 1;
+        }
+
         // Resolve the path CompressToCso will write (first split part when splitting)
         // so an existing output triggers the -y/-n prompt instead of silent overwrite.
-        var probeCso = outCso ?? CisoWriter.DeriveDefaultCsoPath(source, Directory.Exists(source));
+        var probeCso = probeCsoBase;
         if (splitBytes.HasValue)
             probeCso = Path.ChangeExtension(probeCso, "1.cso"); // CisoSplitFile.PartPath(_, 0) parity
         if (!OverwritePrompt.ConfirmOverwrite(probeCso, assumeYes, assumeNo))
@@ -2170,9 +2227,18 @@ internal static class Program
         var source = positionals[0];
         var outIso = positionals.Count == 2 ? positionals[1] : output;
 
+        // #15 (xdvdfs #36): refuse before the -y/-n prompt, not after it.
+        var probeIso = outIso ?? CisoReader.DeriveDefaultIsoPath(source);
+        var decompressRefusal = CliOutputGuard.CheckImageOutput(source, probeIso);
+        if (decompressRefusal != null)
+        {
+            Logger.LogErr(decompressRefusal);
+            return 1;
+        }
+
         // Resolve the path DecompressToIso will write so an existing output
         // triggers the -y/-n prompt instead of silent overwrite.
-        if (!OverwritePrompt.ConfirmOverwrite(outIso ?? CisoReader.DeriveDefaultIsoPath(source), assumeYes,
+        if (!OverwritePrompt.ConfirmOverwrite(probeIso, assumeYes,
                 assumeNo))
         {
             return 1;
@@ -2287,6 +2353,17 @@ internal static class Program
         {
             Logger.LogErr("Error: -o <output> can only be used with a single input file\n");
             return 1;
+        }
+
+        // #15 (xdvdfs #36): a single-input -o must not point back at the input.
+        if (outputName != null && singleModeCount && isoFiles.Count == 1)
+        {
+            var batchRefusal = CliOutputGuard.CheckSingleInputOutput(isoFiles[0], outputName);
+            if (batchRefusal != null)
+            {
+                Logger.LogErr(batchRefusal);
+                return 1;
+            }
         }
 
         var exit = 0;
@@ -3045,6 +3122,13 @@ internal static class Program
                                                                           a video partition. Valid in create (-c) and
                                                                           rewrite (-r) mode. Combine with --skip-sectors
                                                                           for round-trip Redump-style reconstruction.
+                                                     --skip-existing      In extract, --unpack, and --copy-out modes,
+                                                                          skip files already on disk with matching
+                                                                          sizes (logged as "skip: <path>") instead of
+                                                                          overwriting them. Re-run an interrupted
+                                                                          unpack to resume it. Pairs with --batch so
+                                                                          an interrupted bulk run resumes instead of
+                                                                          redoing completed files.
                                                     -q                  Run quiet (suppress all non-error output).
                                                     -Q                  Run silent (suppress all output).
                                                     -s                  Skip $SystemUpdate folder.

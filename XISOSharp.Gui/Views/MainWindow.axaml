@@ -4,7 +4,8 @@
         x:Class="XISOSharp.Gui.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="XISOSharp"
-        Width="1020" Height="780" MinWidth="760" MinHeight="600">
+        Width="1020" Height="780" MinWidth="760" MinHeight="600"
+        DragDrop.AllowDrop="True">
 
   <Window.Styles>
     <Style Selector="TextBlock.section">
@@ -27,6 +28,8 @@
     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
       <TextBlock Text="XISOSharp" FontSize="20" FontWeight="Bold" VerticalAlignment="Center" />
       <TextBlock Text="desktop front-end for the XISOSharp CLI" VerticalAlignment="Center" Opacity="0.65" />
+      <TextBlock Text="Tip: drop .iso/.cso/.zar files or folders anywhere — the matching tab fills in."
+                 VerticalAlignment="Center" Opacity="0.65" FontSize="12" />
     </StackPanel>
 
     <!-- Status bar -->
@@ -50,7 +53,7 @@
     </StackPanel>
 
     <!-- Operation tabs -->
-    <TabControl Margin="0,0,0,6">
+    <TabControl Name="OpTabs" Margin="0,0,0,6">
       <TabItem Header="Extract">
         <ScrollViewer>
           <StackPanel Margin="4">

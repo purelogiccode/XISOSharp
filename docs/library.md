@@ -101,6 +101,10 @@ using XISOSharp;
 // Extract
 int result = XisoReader.Extract("game.iso", "./out", llCompat: false);
 
+// Resume an interrupted unpack (skip same-size files already on disk)
+int resumed = XisoReader.UnpackImage("game.iso", "./out",
+    options: new UnpackOptions { SkipExisting = true });
+
 // List
 XisoReader.List("game.iso", llCompat: false);
 
@@ -155,6 +159,12 @@ using var cts = new CancellationTokenSource();
 ```
 
 Async variants: `XisoReader.DecodeXisoAsync`, `XisoWriter.CreateXisoAsync`.
+
+Cancellation is honored per entry during extraction (an interrupted unpack throws
+`OperationCanceledException` and still restores the working directory), and extract
+mode reports `ProgressInfoType.FileAdded` per written file. Outputs that collide
+with their inputs throw `IOException` before writing (input==output guard); path
+comparison lives in `XisoPaths`, resume options in `UnpackOptions`.
 
 See also: [XisoReader API](api-xisoreader.md) · [XisoWriter API](api-xisowriter.md) ·
 [Utilities & Types](api-utilities.md) · [Building](building.md)

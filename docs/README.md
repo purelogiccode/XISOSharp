@@ -58,15 +58,15 @@ The site is rendered with **Docsify** — a fixed **left sidebar** is provided b
 ## Feature highlights
 
 - **Create** XISO images from a directory, with glob-based exclusion (`-X` via `GlobMatcher`/`WaxGlob`)
-- **Extract** full images, or single files/directories with `--copy-out` / `--unpack` (auto `llCompat`)
+- **Extract** full images, or single files/directories with `--copy-out` / `--unpack` (auto `llCompat`); resume interrupted runs with `--skip-existing` (`skip: <path>`)
 - **List** (`-l`), recursive **tree** (`-t`), volume **info** (`-i`), **hash** (`--md5` / `--sha256`), per-image **SHA3-256** `checksum`
-- **Rewrite** images into an optimized AVL layout (`-r`) + **validate** (`validate` / `--validate*`)
+- **Rewrite** images into an optimized AVL layout (`-r`) + **validate** (`validate` / `--validate*`); outputs colliding with their inputs are refused (input==output guard)
 - **Audit** (`-V`) deep integrity: header (5 offsets), tag `31337`, tree cycles, sector bounds, reserved `0x48`, empty `0x0000`
 - **Disc coverage** — RAW `0x0`, **GLOBAL/XGD2** `0x0FD90000`, **XGD3** `0x02080000`, **Hybrid** `0x89D80000`, **XGD1** `0x18300000` (native) + arbitrary `--skip-sectors`/`--prepend-sectors`
 - **Redump archival (XboxKit parity):** `--video`, `--random` (filler), `--seed` (XGD1 PRNG brute-force), `--wipe`, `--trim`, `--petrify` (skeleton + SHA-1), `--update` (XGD3 `su…`), `--zar` (ZArchive/zstd), `--security-sectors <sectors.txt>`, aliases `--all`/`--best`/`--compress`, verb `rebuild` for lossless Redump ↔ XISO
 - **xdvdfs parity:** `build-image` ordered `host/**:image/{0|1}` (`!` + `{n}` captures, `xdvdfs.toml`, `--dry-run`), `image-spec from`, **CISO** `compress`/`decompress` (DEFLATE v1 `0x80000000` + LZ4 v2, `align` 0/1/2) with `CisoBlockDevice` random-access, `IBlockDevice` (`File`/`Memory`/`Offset`/`Ciso`)
 - Automatic `.xbe` **media-enable patching** (Boyer–Moore `E8 CA FD FF FF 85 C0 7D → EB`)
-- Async APIs, `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FinishedPacking`), `CancellationToken` throughout
+- Async APIs, `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FinishedPacking`, with `FileAdded` also per written file in extract mode), `CancellationToken` throughout
 - Multi-targets **.NET 8, .NET 9, and .NET 10**; strong-named; trim/AOT compatible; **left sidebar** on Pages & Wiki
 
 ## Quick start

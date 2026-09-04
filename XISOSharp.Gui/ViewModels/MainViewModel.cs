@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using XISOSharp;
 using XISOSharp.Gui.Services;
 
 namespace XISOSharp.Gui.ViewModels;
@@ -166,6 +167,9 @@ internal sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ClearLog() => LogText = string.Empty;
 
+    /// <summary>Logs a GUI-originated message (e.g. drag-and-drop routing).</summary>
+    internal void LogMessage(string line) => AppendLog(line);
+
     [RelayCommand]
     private void CancelRun()
     {
@@ -217,24 +221,38 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunRewriteAsync() => GuardedAsync(() =>
     {
         var images = RequireLines(RwImages, "image");
+        ThrowIfSameOutput(NullIfEmpty(RwOutput),
+            images.Concat(images.Select(i => i + ".old")), "Rewrite output");
         return RunJobAsync("rewrite", CliCommands.Rewrite(images, NullIfEmpty(RwOutput), NullIfEmpty(RwWorkDir),
             RwDeleteOld, RwDisableXbePatch, RwValidate, RwChecksums, RwStrict, NullIfEmpty(RwReport),
             OverwriteExisting));
     });
 
     [RelayCommand]
-    private Task RunWipeAsync() => GuardedAsync(() => RunJobAsync("wipe",
-        CliCommands.Wipe(RequireValue(WpImage, "image"), NullIfEmpty(WpOutput), OverwriteExisting)));
+    private Task RunWipeAsync() => GuardedAsync(() =>
+    {
+        var image = RequireValue(WpImage, "image");
+        ThrowIfSameOutput(NullIfEmpty(WpOutput), [image], "Wipe output");
+        return RunJobAsync("wipe",
+            CliCommands.Wipe(image, NullIfEmpty(WpOutput), OverwriteExisting));
+    });
 
     [RelayCommand]
-    private Task RunTrimAsync() => GuardedAsync(() => RunJobAsync("trim",
-        CliCommands.Trim(RequireValue(WpImage, "image"), NullIfEmpty(WpOutput), OverwriteExisting)));
+    private Task RunTrimAsync() => GuardedAsync(() =>
+    {
+        var image = RequireValue(WpImage, "image");
+        ThrowIfSameOutput(NullIfEmpty(WpOutput), [image], "Trim output");
+        return RunJobAsync("trim",
+            CliCommands.Trim(image, NullIfEmpty(WpOutput), OverwriteExisting));
+    });
 
     [RelayCommand]
     private Task RunRebuildAsync() => GuardedAsync(() =>
     {
         var parts = RequireLines(RbParts, "component");
         var output = RequireValue(RbOutput, "output Redump ISO");
+        ThrowIfSameOutput(output, string.IsNullOrWhiteSpace(RbSectors) ? parts : [.. parts, RbSectors.Trim()],
+            "Rebuild output");
         return RunJobAsync("rebuild", CliCommands.Rebuild(parts, output, NullIfEmpty(RbSectors), OverwriteExisting));
     });
 
@@ -242,14 +260,20 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunCompressAsync() => GuardedAsync(() =>
     {
         var source = RequireValue(CpSource, "source directory or image");
+        ThrowIfSameOutput(NullIfEmpty(CpOutput), [source], "Compress output");
         return RunJobAsync("compress", CliCommands.Compress(source, NullIfEmpty(CpOutput),
             Math.Clamp(CpLevel, 0, 9), string.Equals(CpVersion, "1", StringComparison.Ordinal) ? 1 : 2,
             NullIfEmpty(CpSplit), OverwriteExisting));
     });
 
     [RelayCommand]
-    private Task RunDecompressAsync() => GuardedAsync(() => RunJobAsync("decompress",
-        CliCommands.Decompress(RequireValue(DcCso, "CSO file"), NullIfEmpty(DcOutput), OverwriteExisting)));
+    private Task RunDecompressAsync() => GuardedAsync(() =>
+    {
+        var cso = RequireValue(DcCso, "CSO file");
+        ThrowIfSameOutput(NullIfEmpty(DcOutput), [cso], "Decompress output");
+        return RunJobAsync("decompress",
+            CliCommands.Decompress(cso, NullIfEmpty(DcOutput), OverwriteExisting));
+    });
 
     [RelayCommand]
     private Task RunValidateAsync() => GuardedAsync(() =>
@@ -291,6 +315,27 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (InvalidOperationException ex)
         {
             AppendLog($"[GUI] {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Warn-before-run mirror of the CLI input==output guards (#15): refuses to
+    /// start a job whose output would overwrite one of its inputs. Thrown before
+    /// any CLI process spawns; <see cref="GuardedAsync"/> logs the message.
+    /// A <c>null</c> output means "derive/default", which never collides.
+    /// </summary>
+    private static void ThrowIfSameOutput(string? output, IEnumerable<string> inputs, string what)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+            return;
+
+        foreach (var input in inputs)
+        {
+            if (XisoPaths.AreSamePath(output, input))
+            {
+                throw new InvalidOperationException(
+                    $"{what} is the same file as the input ({input}); choose another output.");
+            }
         }
     }
 

@@ -254,6 +254,14 @@ public static class XisoRedump
         bool quiet = false,
         CancellationToken cancellationToken = default)
     {
+        // The output is written while the inputs are still being read: refuse
+        // to clobber any of them (xdvdfs #36).
+        foreach (var input in new[] { xisoPath, videoPath, fillerOrSeedPath, updatePath, securitySectorsPath })
+        {
+            if (!string.IsNullOrWhiteSpace(input) && XisoPaths.AreSamePath(input, outputRedumpPath))
+                throw new IOException($"Output '{outputRedumpPath}' must not overwrite its input '{input}'");
+        }
+
         // A .zar sidecar may stand in for the <xiso> component (XboxKit roadmap
         // "ZArchive rebuild is coming soon!"): materialize it to a temp XISO first.
         if (xisoPath.EndsWith(".zar", StringComparison.OrdinalIgnoreCase))

@@ -182,6 +182,8 @@ public static class XisoOperations
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (XisoPaths.AreSamePath(inputPath, outputPath))
+            throw new IOException($"Output '{outputPath}' must not overwrite its input '{inputPath}'");
         using var isoFs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
         var isoSize = isoFs.Length;
         var xisoLength = isoSize - isoOffset;
@@ -316,6 +318,8 @@ public static class XisoOperations
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
+        if (XisoPaths.AreSamePath(inputPath, outputPath))
+            throw new IOException($"Output '{outputPath}' must not overwrite its input '{inputPath}'");
         using var isoFs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
         (var bones, var fileRanges) =
             XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);

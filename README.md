@@ -12,7 +12,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI `XISOSharp.Cli` (`net10.0`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 20 extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (735 tests) — golden fixtures + `MemoryBlockDevice` |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (779 tests) — golden fixtures + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + unpack-resume/output-guard coverage |
 | [ZARSharp.Tests](ZARSharp.Tests/) | xUnit suite (1238 tests) — pure-C# ZArchive/zstd port (encoder, decoder, fuzz, corruption, `zarchive.exe` interop) |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
@@ -76,7 +76,10 @@ dotnet publish XISOSharp.Cli -c Release -r linux-x64 --self-contained
 `XISOSharp.Gui` is a dark-theme front-end that drives the `XISOSharp` CLI as a child
 process (extract/create/rewrite/rebuild/compress/decompress/validate/batch plus
 list/tree/info/unpack/copy-out/checksum, live log, cancel, overwrite `-y`/`-n`
-switch). It finds the CLI next to itself, on `PATH`, or via the Settings tab
+switch). Files and folders can be **dragged onto the window**: a single image queues
+Extract, a single `.cso` queues Decompress, multiple images queue Rewrite, and a folder
+queues Batch (when it contains `*.iso`) or Create. Input==output mistakes are refused
+before the CLI runs. It finds the CLI next to itself, on `PATH`, or via the Settings tab
 (persisted to `%AppData%/XISOSharp/gui-settings.json`). Headless helpers:
 `XISOSharp.Gui --probe-cli [path]` and `XISOSharp.Gui --self-test [cliPath]`.
 
@@ -114,6 +117,14 @@ XISOSharp.Cli --md5 game.iso                 # or --sha256
 XISOSharp.Cli --xex-info game360.iso /default.xex
 XISOSharp.Cli --batch ./isos -d ./out        # all *.iso sorted
 XISOSharp.Cli --batch ./isos --batch-recursive -r
+
+# Resume an interrupted unpack (skip files already on disk, logged as "skip: <path>")
+XISOSharp.Cli --skip-existing --unpack game.iso ./out
+XISOSharp.Cli --skip-existing --batch ./isos -d ./out   # bulk runs resume too
+XISOSharp.Cli --skip-existing --copy-out game.iso /media ./media_out
+
+# Safety: an -o that points back at the input (or its .old backup) is refused (exit 1)
+XISOSharp.Cli -r -o game.iso game.iso        # Error: ... is the same file as the input
 ```
 
 ### Redump & disc offsets
@@ -186,7 +197,7 @@ Exit codes: `0` success/`-v`/`-h`/`validate` pass, `1` usage/I/O, `2` validation
 
 ## Using the Library
 
-All in `XISOSharp` namespace (`XISOSharp.Core`). Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
+All in `XISOSharp` namespace (`XISOSharp.Core`). Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), safety types (`UnpackOptions`, `XisoPaths`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
 
 ### Extract / list / info
 
@@ -197,6 +208,18 @@ using XISOSharp.DataStructures; // AvlNode, etc.
 // Extract (llCompat auto via tag; pass false for optimized, true for legacy)
 int rc = XisoReader.Extract("game.iso", "./out", llCompat: false);
 int rc2 = XisoReader.UnpackImage("game.iso", "./out"); // auto IsOptimized, skipSectors aware
+
+// Resume an interrupted unpack: files already on disk with matching sizes are
+// skipped (logged as "skip: <path>") instead of rewritten (xdvdfs #190)
+var resume = new UnpackOptions { SkipExisting = true };
+int rc3 = XisoReader.UnpackImage("game.iso", "./out", options: resume);
+XisoReader.CopyOut("game.iso", "/media", "./media_out", resume);
+
+// Cancellation is honored per entry; extract also reports FileAdded per written file
+using var cts = new CancellationTokenSource();
+var progress = new Progress<ProgressInfo>(info => { /* ... */ }); // needs using XISOSharp.Models
+int rc4 = XisoReader.Extract("game.iso", "./out", llCompat: false,
+    cancellationToken: cts.Token, progress: progress);
 
 // List / tree / directory
 XisoReader.List("game.iso", llCompat: false);
@@ -239,8 +262,10 @@ int rc2 = XisoWriter.CreateXiso(
     excludePatterns: ["**/$SystemUpdate/**"],
     cancellationToken: ct);
 
-// Rewrite optimized (AVL) — or PackFromDirectory for iso input
-int rw = XisoReader.Rewrite("game.iso", outputDirectory: "./out", deleteOriginal: false, outputName: "game.opt.iso");
+// Rewrite optimized (AVL) — in place by default; an explicit -o-equivalent
+// outputName pointing at the input (or its .old backup) throws IOException
+int rw = XisoReader.Rewrite("game.iso", outputPath: "./out", out string? rewritten,
+    outputName: "game.opt.iso");
 var (res, outPath) = await XisoWriter.CreateXisoAsync("source_dir", "./out", null, null, "game.iso", null, ct);
 var (res2, out2) = await XisoReader.DecodeXisoAsync("game.iso", "./out", ExtractMode.Rewrite, llCompat: false, ct);
 ```
@@ -360,6 +385,7 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | Per-file MD5 / SHA-256 | ✅ | ❌ | ❌ | 🟡 MD5 |
 | SHA3-256 image checksum (`checksum`) | ✅ | ❌ | ❌ | ✅ |
 | `copy-out` single file/dir | ✅ | ❌ | ❌ | ✅ |
+| Resume interrupted unpack (`--skip-existing` / `UnpackOptions.SkipExisting`) | ✅ | ❌ | ❌ | ❌ (open #190) |
 | Deep audit `-V` (header/tag/cycles/bounds/0x48/0x0000) | ✅ | ❌ | ❌ | ❌ |
 | `validate` + `--validate*` JSON report | ✅ | ❌ | ❌ | ❌ |
 | Disc probe RAW/GLOBAL/XGD3/Hybrid/XGD1 (5) | ✅ | 🟡 4 | ✅ +tables | 🟡 4 (`XDVD_OFFSETS`, no Hybrid) |
@@ -401,7 +427,7 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | `image-spec from` TOML preserve-order | ✅ | ❌ | ❌ | ✅ |
 | CISO compress v2 LZ4 (byte-identical `lz4_flex` port, fixed `align 2`) + v1 DEFLATE `align` 0/1/2, threshold `+12` | ✅ | ❌ | ❌ | ✅ |
 | `--ciso-level` 0..9 / `--ciso-version 1\|2\|auto` / `--ciso-split` (default split `0xffbf6000`) | ✅ | ❌ | ❌ | ✅ |
-| Split CSO output `.1.cso`/`.2.cso`… + split input (`ciso::split` parity) | ✅ | ❌ | ❌ | ✅ |
+| Split CSO output `.1.cso`/`.2.cso`… + split input (`ciso::split` parity, golden-tested vs `xdvdfs-cli 0.8.3` incl. multi-part) | ✅ | ❌ | ❌ | ✅ |
 | `wax` glob `*`/`**`/`?`/`[]`/`{a,b}` | ✅ | ❌ | ❌ | ✅ |
 | `xdvdfs.toml` `[map_rules]` | ✅ | ❌ | ❌ | ✅ |
 | `--dry-run` preview | ✅ | ❌ | ❌ | ✅ |
@@ -421,6 +447,7 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | `-c` repeatable + `-X` excludes + `-s` | ✅ | 🟡 no `-X` | — | ✅ `pack` |
 | `--pack` dir→create / iso→rewrite | ✅ | ❌ | — | ✅ |
 | Batch `--batch` sorted + `--batch-recursive` | ✅ | 🟡 explicit args only | ❌ | 🟡 `checksum` multi |
+| Input==output safety guard (refuse `-o` onto input/`.old`/split part) | ✅ | — (no `-o` flag) | ❌ | ❌ (open #36) |
 | Quiet `-q` / silent `-Q` | ✅ | ✅ | 🟡 | ❌ |
 | Help `-h` / banner `-v` `2.7.1 (01.11.14)` | ✅ | ✅ | 🟡 `-h` only | 🟡 `clap` |
 | Exit `0`/`1` + `2` for `validate --strict` | ✅ | 🟡 `0`/`1` only | ❌ | ❌ |
@@ -443,7 +470,7 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
-dotnet test -c Release                       # 724 tests
+dotnet test -c Release                       # 2017 tests (779 XISOSharp + 1238 ZARSharp)
 ```
 
 Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF); `ZARSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library); `ZARSharp.Tests` (`net10.0`). CI builds on `ubuntu`/`windows`/`macos`.

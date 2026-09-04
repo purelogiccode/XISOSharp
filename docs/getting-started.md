@@ -56,6 +56,14 @@ creating dir1\ (0 bytes) [OK]
 2 files in game.iso total 5012 bytes
 ```
 
+If the run is interrupted (Ctrl+C, power loss), re-run it with `--skip-existing`
+to resume instead of starting over — files already on disk with matching sizes are
+skipped (`skip: <path>`), only the missing ones are written:
+
+```bash
+XISOSharp.Cli --skip-existing -d ./extracted game.iso
+```
+
 ### First creation
 
 ```bash
@@ -99,6 +107,10 @@ using XISOSharp;
 int result = XisoReader.Extract("game.iso", "output_directory", llCompat: false);
 if (result == 0)
     Console.WriteLine("Extraction succeeded");
+
+// Resume an interrupted run: skip files already on disk with matching sizes
+int resumed = XisoReader.UnpackImage("game.iso", "output_directory",
+    options: new UnpackOptions { SkipExisting = true });
 ```
 
 ### Create

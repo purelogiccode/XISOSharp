@@ -10,6 +10,7 @@ helpers, format constants, records, enums, delegates, and exceptions.
 - [FileTimeHelper](#filetimehelper)
 - [Constants](#constants)
 - [XisoValidator](#xisovalidator)
+- [Unpack & path safety](#unpack--path-safety)
 - [Records](#records)
 - [Enums](#enums)
 - [Delegates](#delegates)
@@ -192,6 +193,32 @@ writes the current Windows FILETIME (8 bytes, little-endian) into the header are
 | `void LogResult(ValidationResult result, string sourcePath, string outputPath)` | Print the `[VALIDATE]` summary |
 | `void WriteReport(ValidationResult result, string sourcePath, string outputPath, string reportPath)` | Write a JSON report |
 
+## Unpack & path safety
+
+`public sealed class UnpackOptions` — resume options for extract/unpack/copy-out
+(see [XisoReader API](api-xisoreader.md#resume-interrupted-unpacks)):
+
+| Member | Description |
+|---|---|
+| `bool SkipExisting { get; set; }` | Skip destinations already holding a same-size file (`skip: <path>`) |
+| `bool ShouldSkip(string destPath, long fileSize)` | The size-match predicate (never skips unresolvable paths) |
+
+`public static class XisoPaths` — full-path comparison behind the input==output
+guards (an output must never silently overwrite one of its inputs). Case sensitivity
+follows the OS: insensitive on Windows/macOS, sensitive on Unix.
+
+| Member | Description |
+|---|---|
+| `bool AreSamePath(string? a, string? b)` | `true` when both paths resolve to the same file system entry |
+| `bool IsWithinDirectory(string? path, string? directory)` | `true` when `path` lies inside `directory` (sibling-prefix safe, e.g. `C:\src2\x` is not inside `C:\src`) |
+
+The library throws `IOException` before writing when an output collides with an
+input (`CompressToCso` / `DecompressToIso`, split `.N.cso` parts onto the source,
+`WipeFiller` / `WipeAndTrim`, `RebuildRedump` onto any component); the CLI refuses
+even earlier — before any prompt, move, or write — and additionally covers rewrite
+`-o` onto the input or its `.old` backup. The only same-path write allowed is the
+explicit in-place one: `TrimXiso(input, input)` (safe `SetLength` truncation).
+
 ## Records
 
 | Record | Members |
@@ -201,7 +228,7 @@ writes the current Windows FILETIME (8 bytes, little-endian) into the header are
 | `AuditResult` | `IsValid`, `FilesChecked`, `DirsChecked`, `Issues` (incl. `Reserved attribute bits set: 0x…`) |
 | `ValidationIssue` | `Type`, `Path`, `SourceSize`, `OutputSize`, `SourceHash`, `OutputHash` |
 | `ValidationResult` | `Passed`, `SourceFileCount`, `OutputFileCount`, `SourceDirCount`, `OutputDirCount`, `SourceTotalBytes`, `OutputTotalBytes`, `Issues` |
-| `ProgressInfo` | `Type` (`ProgressInfoType`), `Count`, `Path`, `Sector`, `Size` — structured write-progress event (see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo)) |
+| `ProgressInfo` | `Type` (`ProgressInfoType`), `Count`, `Path`, `Sector`, `Size` — structured progress event for writes and extraction (see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo)) |
 | `XexInfo` | `ModuleFlags`, `HeaderSize`, `EntryPoint`, `ImageBaseAddress`, `ImageSize`, `LoadAddress`, `Region`, `AllowedMediaTypes`, `MediaId`, `TitleId`, `Version`, `Platform`, `DiscNumber`, `DiscCount`, `EncryptionType`, `CompressionType` — Xbox 360 XEX2 header (see [XisoReader API](api-xisoreader.md#getxexinfo)) |
 | `RemapRule` | `HostGlob`, `ImagePath`, `IsExclusion` — ordered remap rule (`!` prefix) |
 | `GlobMatchResult` | `IsMatch`, `Groups` (`Groups[0]` whole + per-`*/**` captures) |
@@ -216,7 +243,7 @@ writes the current Windows FILETIME (8 bytes, little-endian) into the header are
 | `AvlResult` | `NoErr`, `AvlError`, `AvlBalanced` |
 | `AvlTraversalMethod` | `Prefix`, `Infix`, `Postfix` |
 | `ValidationIssueType` | `MissingInOutput`, `ExtraInOutput`, `SizeMismatch`, `ChecksumMismatch` |
-| `ProgressInfoType` | `FileCount`, `DirCount`, `DirAdded`, `FileAdded`, `FinishedPacking` — write-progress event kinds |
+| `ProgressInfoType` | `FileCount`, `DirCount`, `DirAdded`, `FileAdded`, `FinishedPacking` — progress event kinds (`FileAdded` also fires per written file in extract mode) |
 
 ## Delegates
 

@@ -80,8 +80,10 @@ public static class CisoWriter
             throw new FileNotFoundException($"Source not found: {sourcePath}");
 
         var output = outputCsoPath ?? DeriveDefaultCsoPath(sourcePath, isDir);
-        if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(output), StringComparison.OrdinalIgnoreCase))
+        if (XisoPaths.AreSamePath(sourcePath, output))
             throw new IOException("Source and destination paths are the same");
+        if (splitBytes.HasValue && !isDir)
+            GuardSplitParts(sourcePath, output, splitBytes.Value);
 
         string? tempIso = null;
         string sourceFile;
@@ -134,6 +136,24 @@ public static class CisoWriter
                     // ignored
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Refuses a split compress whose part files would overwrite the source:
+    /// part <c>n</c> holds the global range <c>[(n-1)·split, n·split)</c>, so a
+    /// source literally named like one of its own parts (e.g. compressing
+    /// <c>game.1.cso</c> to split base <c>game.cso</c>) would be truncated
+    /// mid-read. Only parts that can exist for this source size are checked.
+    /// </summary>
+    private static void GuardSplitParts(string sourcePath, string output, long splitBytes)
+    {
+        var maxPart = new FileInfo(sourcePath).Length / splitBytes + 2;
+        for (var i = 0L; i < maxPart; i++)
+        {
+            var part = CisoSplitFile.PartPath(output, i);
+            if (XisoPaths.AreSamePath(sourcePath, part))
+                throw new IOException($"Source and split output part paths are the same: {part}");
         }
     }
 

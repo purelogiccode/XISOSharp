@@ -59,6 +59,22 @@ still work normally.
 Rewrite mode renames the source to `<name>.iso.old` first. Delete the stale `.old`
 file (or use `-D` next time to remove it automatically after rewriting).
 
+### `Error: ... is the same file as the input ...` / `... would overwrite the ... backup ...`
+
+The input==output safety guard refused an `-o` that points back at its own input
+(rewrite `-o` onto the input or its `.old` backup, wipe/trim/compress/decompress
+output onto the input, `rebuild -o` onto a component, split parts onto the source).
+Pick a different output name — or omit `-o` to use the mode's explicit in-place
+behavior (rewrite via `.old`, `TrimXiso(input, input)`). See
+[CLI Reference](cli.md#inputoutput-safety-guard).
+
+### `skip: <path>` lines during extract/unpack/copy-out
+
+Not an error: `--skip-existing` left a file already on disk with a matching size
+untouched. Re-running an interrupted unpack prints one `skip:` line per completed
+file and only writes the missing ones. See
+[CLI Reference](cli.md#resume-interrupted-unpacks).
+
 ### `Error: cannot write to <path>: ...`
 
 The output path is not writable or its directory does not exist. Check permissions and

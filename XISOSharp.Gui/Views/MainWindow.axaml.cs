@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using XISOSharp.Gui.ViewModels;
 
@@ -25,9 +27,22 @@ public partial class MainWindow : Window
         Patterns = ["*.iso", "*.xiso"],
     };
 
+    private static readonly string[] ImageExtensions = [".iso", ".xiso", ".img", ".zar"];
+
+    private static readonly string[] CsoExtensions = [".cso"];
+
+    // TabControl order in MainWindow.axaml.
+    private const int ExtractTab = 0;
+    private const int CreateTab = 1;
+    private const int RewriteTab = 2;
+    private const int DecompressTab = 5;
+    private const int BatchTab = 7;
+
     public MainWindow()
     {
         InitializeComponent();
+        AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(DragDrop.DropEvent, OnDrop);
     }
 
     private MainViewModel Vm => (MainViewModel)DataContext!;
@@ -94,6 +109,132 @@ public partial class MainWindow : Window
             SuggestedFileName = suggestedName,
         }).ConfigureAwait(false);
         return picked?.Path.LocalPath;
+    }
+
+    private void OnDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = !Vm.IsRunning && e.DataTransfer?.TryGetFiles()?.Length > 0
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+    }
+
+    private void OnDrop(object? sender, DragEventArgs e)
+    {
+        if (Vm.IsRunning)
+        {
+            Vm.LogMessage("[GUI] Drop ignored — a run is already in progress.");
+            return;
+        }
+
+        var paths = e.DataTransfer.TryGetFiles()
+            ?.Select(f =>
+            {
+                try
+                {
+                    return f.Path.LocalPath;
+                }
+                catch (InvalidOperationException)
+                {
+                    return null;
+                }
+            })
+            .Where(p => p is not null)
+            .Cast<string>()
+            .ToList() ?? [];
+
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        var images = paths.Where(p => File.Exists(p) && IsImage(p)).ToList();
+        var dirs = paths.Where(Directory.Exists).ToList();
+        foreach (var skipped in paths.Except(images, StringComparer.OrdinalIgnoreCase)
+                     .Except(dirs, StringComparer.OrdinalIgnoreCase))
+        {
+            Vm.LogMessage($"[GUI] Drop skipped (not an image or folder): {skipped}");
+        }
+
+        if (images.Count == 1 && dirs.Count == 0)
+        {
+            DropSingleImage(images[0]);
+        }
+        else
+        {
+            if (images.Count > 0)
+            {
+                Vm.RwImages = AppendDistinctLines(Vm.RwImages, images);
+                OpTabs.SelectedIndex = RewriteTab;
+                Vm.LogMessage($"[GUI] Drop: {images.Count} image(s) added to the Rewrite tab.");
+            }
+
+            foreach (var dir in dirs)
+            {
+                DropDirectory(dir);
+            }
+        }
+    }
+
+    private void DropSingleImage(string image)
+    {
+        if (IsCso(image))
+        {
+            Vm.DcCso = image;
+            OpTabs.SelectedIndex = DecompressTab;
+            Vm.LogMessage($"[GUI] Drop: CSO routed to the Decompress tab: {image}");
+        }
+        else
+        {
+            Vm.ExImage = image;
+            OpTabs.SelectedIndex = ExtractTab;
+            Vm.LogMessage($"[GUI] Drop: image routed to the Extract tab: {image}");
+        }
+    }
+
+    private void DropDirectory(string dir)
+    {
+        // A folder full of ISOs reads as a batch library; anything else reads
+        // as files to pack into a new image.
+        bool hasIsos;
+        try
+        {
+            hasIsos = Directory.EnumerateFiles(dir, "*.iso").Any();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Vm.LogMessage($"[GUI] Drop skipped (cannot read folder): {dir} ({ex.Message})");
+            return;
+        }
+
+        if (hasIsos)
+        {
+            Vm.BaDir = dir;
+            OpTabs.SelectedIndex = BatchTab;
+            Vm.LogMessage($"[GUI] Drop: folder with ISOs routed to the Batch tab: {dir}");
+        }
+        else
+        {
+            Vm.CrSource = dir;
+            OpTabs.SelectedIndex = CreateTab;
+            Vm.LogMessage($"[GUI] Drop: folder routed to the Create tab: {dir}");
+        }
+    }
+
+    private static bool IsImage(string path) =>
+        ImageExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase)
+        || IsCso(path);
+
+    private static bool IsCso(string path) =>
+        CsoExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
+
+    private static string AppendDistinctLines(string current, IEnumerable<string> added)
+    {
+        var existing = new HashSet<string>(
+            current.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim()),
+            StringComparer.OrdinalIgnoreCase);
+        var fresh = added.Select(a => a.Trim()).Where(a => existing.Add(a)).ToList();
+        return AppendLines(current, fresh);
     }
 
     private static string AppendLines(string current, IEnumerable<string> added)

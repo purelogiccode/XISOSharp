@@ -48,7 +48,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `-c <dir> [name]` | **Create** an ISO from the contents of `<dir>`. Optional `name` overrides the output filename (may include a path). Repeatable for batch creation. Excludes `-X` patterns; with `-s`, `$SystemUpdate` is skipped automatically. |
 | `--pack <input> [name]` | **Pack** a directory into an ISO (1:1 mapping; `name` defaults to the directory name and may include a path), or **repack** an existing ISO in place (rewrite mode, source renamed to `.old`). Translates internally to create or rewrite mode. Already-optimized images are skipped. |
 | `-x` | **Extract** (explicit; the default mode). |
-| `--unpack <file> [dest]` | **Unpack** the whole image to `dest`, or to a directory named after the ISO (minus `.iso`) in the current directory when omitted. Detects the optimized layout automatically; supports `--skip-sectors`. |
+| `--unpack <file> [dest]` | **Unpack** the whole image to `dest`, or to a directory named after the ISO (minus `.iso`) in the current directory when omitted. Detects the optimized layout automatically; supports `--skip-sectors` and `--skip-existing` (resume). |
 | `-l` | **List** the top-level entries of each ISO (non-recursive). |
 | `-t` | **Tree** — recursive listing with full paths, sizes, and totals. |
 | `-i <file> [path]` | **Info** — volume descriptor metadata plus per-entry details (sector, size, attributes, left/right child offsets). `path` defaults to `/`. |
@@ -59,7 +59,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `-V <file1.xiso> ...` | **Audit** — deep integrity check of one or more images: header, tree walk, sector bounds, cycle detection, reserved attribute bits `0x48` masked, `0x0000` sentinel, optimized tag. Prints `Files checked` / `Dirs checked` / `Result: PASS|FAIL (N issue(s))`. |
 | `--batch <dir>` | Process **all `.iso` files** in `<dir>` instead of explicit filenames. Sorted for deterministic order. Works with extract, list, tree, rewrite (`-r`), and audit (`-V`), and `checksum`; rejected with single-ISO modes and explicit filenames. |
 | `--batch-recursive` | With `--batch`, search subdirectories recursively. |
-| `--copy-out <iso> <path> <dest>` | Copy a single file **or an entire directory** out of an ISO to `<dest>`. |
+| `--copy-out <iso> <path> <dest>` | Copy a single file **or an entire directory** out of an ISO to `<dest>`. Supports `--skip-existing` (resume). |
 | `-r` | **Rewrite** each ISO as an optimized ISO (see [Optimized-tag detection](#optimized-tag-detection)). Already-optimized images are skipped. |
 | `validate <src> <out>` | Standalone **validation** command — must be the **first** token. See [Validation](validation.md). |
 | `--video` | **Redump:** extract video partition (`L0` head + `L1` tail) via `XisoRedump.TryExtractVideo` + `XgdTables` wave tables; writes `*.video.iso`. Fails gracefully when `videoType==-1`. See [Archival](archival.md#video). |
@@ -97,6 +97,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `-n`, `--no` | Never overwrite: refuse when an output file exists (prints `[ERROR] File already exists`, skips the operation). Cannot be combined with `-y`. |
 | `--skip-sectors N` | Treat the image as if the XISO filesystem starts `N` sectors (2048 bytes each) into the file — for Redump images with a video partition. Valid in extract, list, tree, rewrite, unpack, video, audit where noted. See [Redump & Disc Layouts](redump-workflows.md). |
 | `--prepend-sectors N` | Write the output image with `N` empty sectors before the XISO filesystem, reserving room for a video partition. Valid in create (`-c`) and rewrite (`-r`) modes. See [Redump & Disc Layouts](redump-workflows.md). |
+| `--skip-existing` | In extract, `--unpack`, and `--copy-out` modes, skip files already on disk with matching sizes (logged as `skip: <path>`) instead of overwriting them. Re-run an interrupted unpack to resume it; pairs with `--batch`. See [Resume interrupted unpacks](#resume-interrupted-unpacks). |
 | `--ciso-level 0..9` | CISO compression level (`compress`/`cso`, default `9`). v1: maps to `CompressionLevel` for BCL DEFLATE (`0` NoCompression, `1..3` Fastest, `4..6` Optimal, `7..9` SmallestSize). v2: `0` = store all plain, `1..9` = LZ4 acceleration `10 - level` (level 9 byte-identical to xdvdfs). |
 | `--ciso-version 1\|2\|auto` | CISO payload codec (`compress`/`cso`). Default `2` (LZ4, `align 2` — modern xdvdfs parity); `1` = classic DEFLATE. |
 | `--ciso-split <bytes>` | Split point for `.1.cso`/`.2.cso`… output (`compress`/`cso`). Default `0xffbf6000` (~4 GiB, xdvdfs `SplitOutput`); `0` = single `.cso`. |
@@ -114,6 +115,45 @@ prompting (the operation is skipped; batch runs continue with the remaining outp
 but exit 1). Per-file extract/unpack outputs are not gated. For `compress` with split
 output the first part (`<base>.1.cso`) is the probe path; rewrite checks `-o` before
 moving the input aside to `<name>.old`.
+
+### Input==output safety guard
+
+Separately from the prompt above, an output that points back at one of its inputs is
+**refused outright** (exit 1, before any prompt, move, or write) — it can never be
+what you meant:
+
+- rewrite `-o` equal to the input (`omit -o to rewrite in place`), or to the
+  `<name>.old` backup the rewrite itself needs;
+- any other single-input `-o` (wipe/trim/compress/decompress/…) equal to the input;
+- `rebuild -o` equal to any component (xiso, video, filler/seed) or the sectors file;
+- `compress` whose split output parts (`.1.cso`/`.2.cso`…) would overwrite the source.
+
+The only same-path write allowed is the one with explicit in-place semantics and no
+`-o`: `TrimXiso(input, input)` (safe `SetLength` truncation), and rewrite without
+`-o` (which works via the `.old` rename). Diagnostics name both sides, e.g.
+`Error: rewrite output game.iso is the same file as the input; omit -o to rewrite in place`.
+
+### Resume interrupted unpacks
+
+An unpack killed mid-run (Ctrl+C, power loss, disk full) leaves a partial destination.
+Re-run the same command with `--skip-existing` to resume: every file already on disk
+**with the same byte size** is left untouched and logged as `skip: <path>`; missing
+files — and short files from torn writes — are written normally.
+
+```bash
+XISOSharp.Cli --unpack game.iso ./out                 # interrupted halfway
+XISOSharp.Cli --skip-existing --unpack game.iso ./out # resumes: skips done files
+XISOSharp.Cli --skip-existing --batch ./isos -d ./out # bulk runs resume per image
+```
+
+Notes:
+
+- Size is the identity signal: XISO stores no per-file timestamps, so a same-size
+  file is assumed to be a complete earlier write (even if its content differs — the
+  flag means "don't touch what's there").
+- Cancellation is honored per entry, so Ctrl+C stops promptly; the working directory
+  is always restored.
+- `--skip-existing` is rejected outside extract / `--unpack` / `--copy-out` (exit 1).
 
 ### Exclude patterns
 
@@ -158,6 +198,7 @@ Enforced at parse time; violations print an error and exit 1:
 | `--prepend-sectors` without `-c` or `-r` | Error |
 | `--skip-sectors`/`--prepend-sectors` with `-i`, hash, `--copy-out`, `-V`, `validate`, or `--validate*` | Error |
 | `-X` without `-c` | Error |
+| `--skip-existing` without extract/`--unpack`/`--copy-out` (e.g. with `-l`, `-t`, `-r`, `-c`, redump verbs) | Error |
 | `-c` with extra positional arguments | Usage error |
 | `-y` with `-n` | Error (`[ERROR] Cannot use both --no (-n) and --yes (-y)`) |
 | No positional arguments in a non-create/non-verb mode | Usage error |
@@ -222,6 +263,9 @@ XISOSharp.Cli --unpack game.iso
 # Unpack to a specific destination
 XISOSharp.Cli --unpack game.iso ./out
 
+# Resume an interrupted unpack (skips files already on disk)
+XISOSharp.Cli --skip-existing --unpack game.iso ./out
+
 # Extract several ISOs (default mode)
 XISOSharp.Cli game1.iso game2.iso game3.iso
 
@@ -252,6 +296,7 @@ XISOSharp.Cli -V game1.iso game2.iso
 # Batch-process every ISO in a directory (recursive)
 XISOSharp.Cli -r --batch ./isos --batch-recursive
 XISOSharp.Cli --batch ./isos -d ./extracted
+XISOSharp.Cli --skip-existing --batch ./isos -d ./extracted  # resume interrupted bulk extract
 
 # Hash all files in an image with SHA-256
 XISOSharp.Cli --sha256 game.iso

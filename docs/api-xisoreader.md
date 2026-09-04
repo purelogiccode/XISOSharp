@@ -7,6 +7,7 @@ directory listing, auditing, hashing, and copy-out.
 - [Method index](#method-index)
 - [VerifyXiso](#verifyxiso)
 - [Extract / List / Tree / Rewrite](#extract--list--tree--rewrite)
+- [Resume interrupted unpacks](#resume-interrupted-unpacks)
 - [DecodeXiso (main entry)](#decodexiso-main-entry)
 - [DecodeXisoAsync](#decodexisoasync)
 - [GetVolumeInfo](#getvolumeinfo)
@@ -62,11 +63,13 @@ Throws: `XisoFormatException` (invalid/corrupt), `IOException` (file too short),
 ```csharp
 public static int Extract(
     string xisoPath, string? outputPath, bool llCompat,
-    CancellationToken cancellationToken = default, int? skipSectors = null)
+    CancellationToken cancellationToken = default, int? skipSectors = null,
+    UnpackOptions? options = null, IProgress<ProgressInfo>? progress = null)
 
 public static int UnpackImage(
     string isoPath, string? outputPath = null,
-    CancellationToken cancellationToken = default, int? skipSectors = null)
+    CancellationToken cancellationToken = default, int? skipSectors = null,
+    UnpackOptions? options = null, IProgress<ProgressInfo>? progress = null)
 
 public static int List(
     string xisoPath, bool llCompat,
@@ -91,13 +94,33 @@ public static int Rewrite(
 | `outputName` | Rewrite only: custom output filename (default: original name with `.iso`) |
 | `skipSectors` | Read offset (Redump video partition), in 2048-byte sectors |
 | `prependSectors` | Rewrite only: reserve zero-filled sectors before the filesystem |
-| `progress` | Rewrite only: structured progress channel (`IProgress<ProgressInfo>`) — see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo) |
+| `progress` | Rewrite: structured progress channel (`IProgress<ProgressInfo>`) — see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo). Extract: a `FileAdded` event per file actually written (skipped/excluded files are silent) |
+| `options` | Extract/unpack only: resume options — see [Resume interrupted unpacks](#resume-interrupted-unpacks) |
 
 `UnpackImage` is the convenience form of `Extract`: it probes the optimized-tag marker
 to pick `llCompat` automatically and defaults the output directory to the ISO name
 (minus `.iso`), so callers never need to know the image layout.
 
 All return 0 on success.
+
+## Resume interrupted unpacks
+
+```csharp
+public sealed class UnpackOptions
+{
+    public bool SkipExisting { get; set; }
+    public bool ShouldSkip(string destPath, long fileSize);
+}
+```
+
+When `SkipExisting` is set, `Extract` / `UnpackImage` / `CopyOut` leave any
+destination file already holding the same byte count untouched (logged as
+`skip: <path>`) instead of overwriting it — re-running an interrupted unpack
+completes the missing files instead of redoing the finished ones. XISO stores no
+per-file timestamps, so **size is the identity signal**: a same-size file is assumed
+to be a complete earlier write, while a missing or short file (a torn write) is
+rewritten. Cancellation is honored per entry (`OperationCanceledException`), and the
+process working directory is restored even when the run aborts.
 
 ## DecodeXiso (main entry)
 
@@ -112,7 +135,8 @@ public static int DecodeXiso(
     string? outputName = null,
     int? skipSectors = null,
     int? prependSectors = null,
-    IProgress<ProgressInfo>? progress = null)
+    IProgress<ProgressInfo>? progress = null,
+    UnpackOptions? unpackOptions = null)
 ```
 
 The generic entry point used by the wrappers above. `mode` is one of `ExtractMode`:
@@ -125,7 +149,7 @@ public static async Task<(int Result, string? OutIsoPath)> DecodeXisoAsync(
     string xisoPath, string? outputPath, ExtractMode mode,
     bool llCompat = false, CancellationToken cancellationToken = default,
     string? outputName = null, int? skipSectors = null, int? prependSectors = null,
-    IProgress<ProgressInfo>? progress = null)
+    IProgress<ProgressInfo>? progress = null, UnpackOptions? unpackOptions = null)
 ```
 
 Runs `DecodeXiso` on the thread pool. Returns the result code and, in rewrite mode,
@@ -168,11 +192,13 @@ public static EntryInfo? GetEntryInfo(string isoPath, string internalPath)
 ## CopyOut
 
 ```csharp
-public static void CopyOut(string isoPath, string internalPath, string destPath)
+public static void CopyOut(string isoPath, string internalPath, string destPath,
+    UnpackOptions? options = null, CancellationToken cancellationToken = default)
 ```
 
 Copies one file — or an entire directory, recursively — out of the image to
-`destPath` without a full extraction.
+`destPath` without a full extraction. With `SkipExisting`, up-to-date destinations
+are skipped per [Resume interrupted unpacks](#resume-interrupted-unpacks).
 
 ## ComputeFileHash / ComputeDirectoryHashes
 
