@@ -4,7 +4,7 @@ namespace ZARSharp.Tests;
 
 /// <summary>
 /// Phase 4 acceptance: the match finders emit <em>valid</em> sequence streams
-/// for every level (1–6) and input shape. Validity is proved by an independent
+/// for every level (1–22) and input shape. Validity is proved by an independent
 /// replay validator that mirrors the decoder (<c>ZstdDecompressor</c>):
 /// literals are copied, repeat codes resolve through a {1,4,8} history with
 /// RFC 8878 §4.1.1 update rules, every offset must satisfy
@@ -108,10 +108,11 @@ public sealed class ZstdMatchFinderTests
         Assert.Equal(store.TrailingLength, trailing);
         Replay(input, store);
 
-        // Every stored match meets the finder minimum (4 for all strategies).
+        // Every stored match meets MINMATCH (3; optimal parsing can emit
+        // 3-byte matches, other strategies use 4+).
         for (var i = 0; i < store.Count; i++)
         {
-            Assert.True(store.Get(i).MatchLength >= 4, $"Level {level}: match < 4 bytes.");
+            Assert.True(store.Get(i).MatchLength >= ZstdSeq.MinMatch, $"Level {level}: match < MINMATCH.");
         }
 
         return store;
@@ -199,7 +200,7 @@ public sealed class ZstdMatchFinderTests
         var data = new TheoryData<int, string, int>();
         string[] kinds = ["zeros", "period1", "period2", "period3", "text", "mixed-reps", "random"];
         int[] sizes = [0, 1, 2, 3, 4, 5, 7, 8, 9, 12, 16, 31, 64, 100, 1000, 8192, 65536];
-        foreach (var level in new[] { 1, 2, 3, 4, 5, 6 })
+        for (var level = 1; level <= 22; level++)
         {
             foreach (var kind in kinds)
             {
@@ -226,7 +227,7 @@ public sealed class ZstdMatchFinderTests
     {
         // Incompressible input: no matches, everything trailing.
         var input = MakeInput("random", 4096, 42);
-        for (var level = 1; level <= 6; level++)
+        for (var level = 1; level <= 22; level++)
         {
             var store = new ZstdSequenceStore(input.Length);
             var finder = new ZstdMatchFinder(level);
@@ -244,7 +245,7 @@ public sealed class ZstdMatchFinderTests
         // This is the "offset 1 with empty history" trap: at block start the
         // history is {1,4,8}, so offset 1 is valid from position 1 on.
         var input = new byte[100];
-        for (var level = 1; level <= 6; level++)
+        for (var level = 1; level <= 22; level++)
         {
             var store = ParseAndReplay(input, level);
             Assert.True(store.Count >= 1, $"Level {level}: expected matches for zeros.");
@@ -263,7 +264,7 @@ public sealed class ZstdMatchFinderTests
     public void Finder_Deterministic()
     {
         var input = MakeInput("mixed-reps", 20000, 7);
-        for (var level = 1; level <= 6; level++)
+        for (var level = 1; level <= 22; level++)
         {
             var a = ParseAndReplay(input, level);
             var b = ParseAndReplay(input, level);
@@ -285,7 +286,7 @@ public sealed class ZstdMatchFinderTests
         var big = MakeInput("text", 10000, 99);
         var slice = new byte[3000];
         Array.Copy(big, 1234, slice, 0, slice.Length);
-        for (var level = 1; level <= 6; level++)
+        for (var level = 1; level <= 22; level++)
         {
             var fromSlice =
                 ParseAndReplay(new ReadOnlySpan<byte>(big, 1234, slice.Length).ToArray(), level);
@@ -301,10 +302,13 @@ public sealed class ZstdMatchFinderTests
         // the validator threads the same history (encoder and decoder evolve
         // it identically). Zeros guarantee immediate offset-1 matches in the
         // second block; text exercises chaining on realistic data.
+        // Native block compressors (fast through lazy2) only track rep[0..1]
+        // across blocks and leave rep[2] stale, while the decoder evolves all
+        // three — so only the first two entries are required to agree.
         foreach (var kind in new[] { "zeros", "text" })
         {
             var block = MakeInput(kind, 4096, 5);
-            for (var level = 1; level <= 6; level++)
+            for (var level = 1; level <= 22; level++)
             {
                 var finder = new ZstdMatchFinder(level);
                 var encRep = ZstdSeq.FreshRepeatOffsets();
@@ -312,12 +316,15 @@ public sealed class ZstdMatchFinderTests
                 var s1 = new ZstdSequenceStore(block.Length);
                 finder.FindMatches(block, s1, encRep);
                 Replay(block, s1, decRep);
-                Assert.Equal(encRep, decRep); // Histories agree after block 1.
+                Assert.Equal(encRep[0], decRep[0]);
+                Assert.Equal(encRep[1], decRep[1]);
 
                 var s2 = new ZstdSequenceStore(block.Length);
                 finder.FindMatches(block, s2, encRep); // Same finder, chained history.
                 Replay(block, s2, decRep);
-                Assert.Equal(encRep, decRep); // ... and after block 2.
+                Assert.Equal(encRep[0], decRep[0]);
+                Assert.Equal(encRep[1], decRep[1]);
+
                 Assert.True(s2.Count >= 1, $"Level {level}/{kind}: repeated block should match.");
             }
         }
@@ -330,7 +337,7 @@ public sealed class ZstdMatchFinderTests
         for (var size = 0; size <= 20; size++)
         {
             var input = MakeInput("period2", size, 1);
-            for (var level = 1; level <= 6; level++)
+            for (var level = 1; level <= 22; level++)
             {
                 ParseAndReplay(input, level);
             }

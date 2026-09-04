@@ -3,49 +3,61 @@ namespace ZARSharp.Zstd;
 #pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
 
 /// <summary>
-/// zstd strategy selector. Upstream level 6 uses a binary-tree lazy strategy
-/// (<c>clevels.h</c>); this port maps levels 1–2 → fast/double-fast
-/// (<c>zstd_fast.c</c>), 3 → greedy, 4–6 → lazy (<c>zstd_lazy.c</c>).
-/// Ratio stays close to upstream at a fraction of the port cost.
+/// zstd strategy selector. Exact names from <c>lib/zstd.h</c>
+/// (<c>ZSTD_strategy</c>); parameters per level come from
+/// <see cref="ZstdCompressionParameters"/> (port of <c>clevels.h</c>).
+/// All strategies are implemented across levels 1..22 (fast, double-fast,
+/// greedy, lazy, lazy2, btlazy2, btopt, btultra, btultra2).
 /// </summary>
 public enum ZstdStrategy
 {
     /// <summary>Level 1 (zstd_fast.c).</summary>
     Fast = 1,
 
-    /// <summary>Level 2 (double-fast; currently maps to fast).</summary>
+    /// <summary>Double-fast (zstd_double_fast.c).</summary>
     DoubleFast = 2,
 
-    /// <summary>Level 3 (greedy; lazy with depth 1).</summary>
+    /// <summary>Greedy (zstd_lazy.c depth 0).</summary>
     Greedy = 3,
 
-    /// <summary>Levels 4–6 (lazy, no binary tree).</summary>
+    /// <summary>Lazy (zstd_lazy.c depth 1).</summary>
     Lazy = 4,
 
-    /// <summary>Lazy2 (reserved; maps to lazy).</summary>
+    /// <summary>Lazy2 (zstd_lazy.c depth 2).</summary>
     Lazy2 = 5,
 
-    /// <summary>Binary-tree lazy (reserved; maps to lazy — bt not ported).</summary>
+    /// <summary>Binary-tree lazy2 (zstd_opt.c, bt).</summary>
     BtLazy2 = 6,
+
+    /// <summary>Binary-tree optimal (zstd_opt.c).</summary>
+    BtOpt = 7,
+
+    /// <summary>Binary-tree ultra (zstd_opt.c).</summary>
+    BtUltra = 8,
+
+    /// <summary>Binary-tree ultra2 (zstd_opt.c).</summary>
+    BtUltra2 = 9,
 }
 
 /// <summary>
-/// Compression options. Level 1..6 only (ZAR blocks are always 64 KiB, so the
-/// <c>clevels.h</c> row for <c>srcSize &lt;= 128 KiB</c> applies).
+/// Compression options. Levels 1..22 (full <c>ZSTD_MAX_CLEVEL</c> range).
+/// ZAR blocks are always 64 KiB, so the <c>clevels.h</c> row for
+/// <c>srcSize &lt;= 128 KiB</c> applies; see
+/// <see cref="ZstdCompressionParameters"/>.
 /// </summary>
 public sealed class ZstdCompressionOptions
 {
-    /// <summary>Compression level 1..6 (default 6, matching upstream).</summary>
+    /// <summary>Compression level 1..22 (default 6, matching upstream).</summary>
     public int Level { get; init; } = 6;
 
     /// <summary>Write a 4-byte XXH64 content checksum (default false, matching upstream).</summary>
     public bool ChecksumFlag { get; init; }
 
-    /// <summary>Creates options for <paramref name="level"/> (1..6).</summary>
+    /// <summary>Creates options for <paramref name="level"/> (1..22).</summary>
     public static ZstdCompressionOptions FromLevel(int level)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(level, 1);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(level, 6);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(level, 22);
         return new ZstdCompressionOptions { Level = level };
     }
 }
@@ -62,7 +74,6 @@ public sealed class ZstdCompressionOptions
 public sealed class ZstdCompressor : IZarBlockCompressor
 {
     private const uint FrameMagic = 0xFD2FB528;
-    private const int WindowLog = 17; // Covers 64 KiB blocks (window 128 KiB).
     private const int MaxChunk = 65536; // One independent block per 64 KiB.
 
     /// <summary>Creates a compressor (default level 6).</summary>
@@ -70,7 +81,7 @@ public sealed class ZstdCompressor : IZarBlockCompressor
     {
         Options = options ?? new ZstdCompressionOptions();
         ArgumentOutOfRangeException.ThrowIfLessThan(Options.Level, 1);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(Options.Level, 6);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(Options.Level, 22);
     }
 
     /// <summary>Options in effect.</summary>
@@ -147,7 +158,7 @@ public sealed class ZstdCompressor : IZarBlockCompressor
     private static byte[] EncodeFrame(ReadOnlySpan<byte> src, int level, bool checksum)
     {
         var dst = new byte[GetCompressBound(src.Length)];
-        var pos = WriteFrameHeader(dst, 0, src.Length, checksum);
+        var pos = WriteFrameHeader(dst, 0, src.Length, checksum, level);
 
         // Independent 64 KiB blocks (fresh tables each; repeat/treeless never
         // used, which is always legal). Repeat-offset history is frame-scoped
@@ -215,37 +226,68 @@ public sealed class ZstdCompressor : IZarBlockCompressor
     }
 
     /// <summary>
-    /// Writes magic + descriptor + explicit window descriptor + frame content
-    /// size (<c>ZSTD_writeFrameHeader</c>). No dictionary, no single-segment
-    /// mode. Returns the header length.
+    /// Writes magic + descriptor + optional window descriptor + frame content
+    /// size. Exact port of <c>ZSTD_writeFrameHeader</c>
+    /// (<c>lib/compress/zstd_compress.c</c>) for the single-shot no-dict case:
+    /// <c>windowLog</c> is the <em>adjusted</em> log
+    /// (<see cref="ZstdCompressionParameters.AdjustForSize"/>),
+    /// <c>singleSegment</c> omits the window byte when the window covers the
+    /// content, and the FCS width follows the 256 / 65792 / 2³² thresholds.
+    /// Returns the header length.
     /// </summary>
-    private static int WriteFrameHeader(byte[] dst, int offset, int contentSize, bool checksum)
+    private static int WriteFrameHeader(byte[] dst, int offset, int contentSize, bool checksum, int level)
     {
-        // 2-byte FCS form holds size-256 in a u16 (max 65791); larger inputs
-        // use the 4-byte form; sub-256-byte inputs omit FCS (still valid —
-        // DecompressFrame does not need it).
-        var fcsFlag = contentSize < 256 ? 0 : contentSize <= 65791 ? 1 : 2;
+        var applied = ZstdCompressionParameters.ForSizeAndLevel(contentSize, level).AdjustForSize(contentSize);
+        return WriteFrameHeader(applied.WindowLog, dst, offset, contentSize, checksum);
+    }
+
+    internal static int WriteFrameHeader(int windowLog, byte[] dst, int offset, int contentSize, bool checksum)
+    {
+        var content = (long)contentSize;
+        var windowSize = 1L << windowLog;
+        var singleSegment = windowSize >= content ? 1 : 0;
+        var fcsCode = (content >= 256 ? 1 : 0) + (content >= 65792 ? 1 : 0) + (content >= 0xFFFFFFFFL ? 1 : 0);
         dst[offset] = (byte)(FrameMagic & 0xFF);
         dst[offset + 1] = (byte)((FrameMagic >> 8) & 0xFF);
         dst[offset + 2] = (byte)((FrameMagic >> 16) & 0xFF);
         dst[offset + 3] = (byte)((FrameMagic >> 24) & 0xFF);
-        dst[offset + 4] = (byte)((fcsFlag << 6) | (checksum ? 0x04 : 0));
-        dst[offset + 5] = (byte)((WindowLog - 10) << 3);
-        var pos = offset + 6;
-        if (fcsFlag == 1)
+        dst[offset + 4] = (byte)((checksum ? 0x04 : 0) | (singleSegment << 5) | (fcsCode << 6));
+        var pos = offset + 5;
+        if (singleSegment == 0)
         {
-            var biased = contentSize - 256;
-            dst[pos] = (byte)biased;
-            dst[pos + 1] = (byte)(biased >> 8);
-            pos += 2;
+            dst[pos++] = (byte)((windowLog - 10) << 3);
         }
-        else if (fcsFlag == 2)
+
+        switch (fcsCode)
         {
-            dst[pos] = (byte)contentSize;
-            dst[pos + 1] = (byte)(contentSize >> 8);
-            dst[pos + 2] = (byte)(contentSize >> 16);
-            dst[pos + 3] = (byte)(contentSize >> 24);
-            pos += 4;
+            case 0:
+                if (singleSegment == 1)
+                {
+                    dst[pos++] = (byte)content;
+                }
+
+                break;
+            case 1:
+                var biased = content - 256;
+                dst[pos++] = (byte)biased;
+                dst[pos++] = (byte)(biased >> 8);
+                break;
+            case 2:
+                dst[pos++] = (byte)content;
+                dst[pos++] = (byte)(content >> 8);
+                dst[pos++] = (byte)(content >> 16);
+                dst[pos++] = (byte)(content >> 24);
+                break;
+            default:
+                dst[pos++] = (byte)content;
+                dst[pos++] = (byte)(content >> 8);
+                dst[pos++] = (byte)(content >> 16);
+                dst[pos++] = (byte)(content >> 24);
+                dst[pos++] = (byte)(content >> 32);
+                dst[pos++] = (byte)(content >> 40);
+                dst[pos++] = (byte)(content >> 48);
+                dst[pos++] = (byte)(content >> 56);
+                break;
         }
 
         return pos - offset;

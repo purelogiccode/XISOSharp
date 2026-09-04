@@ -21,11 +21,16 @@ public static class ZArchiveTool
     /// Block compressor, or null for the default <see cref="Zstd.ZstdCompressor"/>
     /// (level 6). Pass <c>new ZarRawCompressor()</c> to store blocks raw.
     /// </param>
+    /// <param name="deterministicOrder">
+    /// True (default) sorts entries ordinally for reproducible archives.
+    /// False preserves native filesystem enumeration order, mirroring
+    /// <c>recursive_directory_iterator</c> for byte-parity runs.
+    /// </param>
     /// <exception cref="IOException">On I/O errors or when refusing to overwrite.</exception>
     /// <exception cref="InvalidOperationException">On archive structure errors.</exception>
     public static void Pack(
         string inputDirectory, string? outputFile = null, Action<string>? progress = null,
-        IZarBlockCompressor? compressor = null)
+        IZarBlockCompressor? compressor = null, bool deterministicOrder = true)
     {
         if (!Directory.Exists(inputDirectory))
         {
@@ -48,10 +53,10 @@ public static class ZArchiveTool
             using var writer = new ZArchiveWriter(output, compressor);
             var buffer = new byte[ZArchiveCommon.CompressedBlockSize];
 
-            // Deterministic order (the C++ iterator order is unspecified).
-            var entries = Directory.EnumerateFileSystemEntries(inputDirectory, "*", SearchOption.AllDirectories)
-                .OrderBy(p => p, StringComparer.Ordinal)
-                .ToList();
+            var enumerated = Directory.EnumerateFileSystemEntries(inputDirectory, "*", SearchOption.AllDirectories);
+            var entries = deterministicOrder
+                ? enumerated.OrderBy(p => p, StringComparer.Ordinal).ToList()
+                : enumerated.ToList();
 
             foreach (var entry in entries)
             {

@@ -161,7 +161,7 @@ public sealed class ZstdEncoderFuzzTests
         Directory.CreateDirectory(work);
         try
         {
-            var manifest = new List<(string Name, string Frame, string Input)>();
+            var manifest = new List<(string Name, string Frame, string Input, int Size, int Level)>();
             foreach (var kind in kinds)
             {
                 foreach (var size in sizes)
@@ -174,22 +174,21 @@ public sealed class ZstdEncoderFuzzTests
                         var name = $"{kind}_{size}_{level}";
                         File.WriteAllBytes(Path.Combine(work, name + ".zst"), frame);
                         File.WriteAllBytes(Path.Combine(work, name + ".bin"), input);
-                        manifest.Add((name, name + ".zst", name + ".bin"));
+                        manifest.Add((name, name + ".zst", name + ".bin", size, level));
                     }
                 }
             }
 
             File.WriteAllText(
                 Path.Combine(work, "manifest.json"),
-                JsonSerializer.Serialize(manifest.Select(m => new[] { m.Name, m.Frame, m.Input })));
+                JsonSerializer.Serialize(manifest.Select(m => new[] { m.Name, m.Frame, m.Input, $"{m.Size}", $"{m.Level}" })));
 
             const string script =
                 "import compression.zstd as z, json, os, sys\n" +
                 "work = sys.argv[1]\n" +
                 "manifest = json.load(open(os.path.join(work, 'manifest.json')))\n" +
                 "fails = []\n" +
-                "native_text_l6 = None\n" +
-                "for name, f, x in manifest:\n" +
+                "for name, f, x, size, lvl in manifest:\n" +
                 "    frame = open(os.path.join(work, f), 'rb').read()\n" +
                 "    want = open(os.path.join(work, x), 'rb').read()\n" +
                 "    try:\n" +
@@ -199,9 +198,10 @@ public sealed class ZstdEncoderFuzzTests
                 "        continue\n" +
                 "    if got != want:\n" +
                 "        fails.append(f'{name}: mismatch ({len(got)} != {len(want)})')\n" +
-                "    if name == 'text_65536_6':\n" +
-                "        native_text_l6 = len(z.compress(want, level=6))\n" +
-                "        print(f'NATIVE_L6 {native_text_l6} OURS_L6 {len(frame)}')\n" +
+                "    if int(size) <= 65536:\n" +
+                "        native = z.compress(want, level=int(lvl))\n" +
+                "        if native != frame:\n" +
+                "            fails.append(f'{name}: not byte-identical (native {len(native)} ours {len(frame)})')\n" +
                 "print(f'CHECKED {len(manifest)} FAILED {len(fails)}')\n" +
                 "for f in fails:\n" +
                 "    print('FAIL ' + f)\n" +
@@ -224,20 +224,6 @@ public sealed class ZstdEncoderFuzzTests
                 stdout.Contains(
                     $"CHECKED {manifest.Count} FAILED 0", StringComparison.Ordinal),
                 $"native batch count mismatch.\n{stdout}");
-
-            // Phase 9 ratio gate: our text-64K L6 within 5% of native L6.
-            foreach (var line in stdout.Split('\n'))
-            {
-                if (line.StartsWith("NATIVE_L6", StringComparison.Ordinal))
-                {
-                    var parts = line.Split(' ');
-                    var native = int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
-                    var ours = int.Parse(parts[3], System.Globalization.CultureInfo.InvariantCulture);
-                    Assert.True(
-                        ours <= (long)(native * 1.05) + 64,
-                        $"ratio regression: ours L6 {ours} B vs native L6 {native} B");
-                }
-            }
         }
         finally
         {

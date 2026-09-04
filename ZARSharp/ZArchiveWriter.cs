@@ -90,7 +90,7 @@ public sealed class ZArchiveWriter : IDisposable
         _newOutputFile = newOutputFile ?? throw new ArgumentNullException(nameof(newOutputFile));
         _writeOutputData = writeOutputData ?? throw new ArgumentNullException(nameof(writeOutputData));
         _compressor = compressor ?? new ZstdCompressor();
-        _compressionBuffer = new byte[ZArchiveCommon.CompressedBlockSize + 1024];
+        _compressionBuffer = new byte[ZstdCompressor.GetCompressBound(ZArchiveCommon.CompressedBlockSize)];
         _sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         _newOutputFile(-1);
     }
@@ -408,11 +408,15 @@ public sealed class ZArchiveWriter : IDisposable
         for (var i = 0; i < _nodeNames.Count; i++)
         {
             _nodeNameOffsets[i] = tableOffset;
-            var nameBytes = ZArchiveCommon.Encode1252(_nodeNames[i].AsSpan());
-            if (nameBytes.Length > ZArchiveCommon.MaxNameLength)
+            // Match C++: truncate the name to 0x7FFF *characters* before
+            // encoding (substr(0, 0x7FFF)), not post-encode bytes.
+            var nameSpan = _nodeNames[i].AsSpan();
+            if (nameSpan.Length > ZArchiveCommon.MaxNameLength)
             {
-                Array.Resize(ref nameBytes, ZArchiveCommon.MaxNameLength);
+                nameSpan = nameSpan.Slice(0, ZArchiveCommon.MaxNameLength);
             }
+
+            var nameBytes = ZArchiveCommon.Encode1252(nameSpan);
 
             if (nameBytes.Length >= 0x80)
             {

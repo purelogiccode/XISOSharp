@@ -115,8 +115,8 @@ internal static class ZstdHuffmanEncoder
 
     /// <summary>
     /// Cheap table-log selection (<c>HUF_optimalTableLog</c> without the
-    /// optimal-depth probing, which upstream only enables for strategies we do
-    /// not implement): <c>FSE_optimalTableLog_internal</c> with minus = 1,
+    /// optimal-depth probing, which upstream only enables at strategy ≥
+    /// btultra): <c>FSE_optimalTableLog_internal</c> with minus = 1,
     /// capped at 11 bits so the existing <see cref="ZstdHuffman"/> decoder
     /// (RFC 8878: codes ≤ 11 bits) accepts every table.
     /// </summary>
@@ -124,6 +124,60 @@ internal static class ZstdHuffmanEncoder
     {
         var tableLog = ZstdFseEncoder.OptimalTableLog(maxTableLog, srcSize, maxSymbolValue, minus: 1);
         return Math.Min(tableLog, TableLogDefault);
+    }
+
+    /// <summary>
+    /// Probing table-log selection (<c>HUF_optimalTableLog</c> with
+    /// <c>HUF_flags_optimalDepth</c>, which upstream enables at strategy ≥
+    /// btultra): builds the table at each log from the minimum up, tracking
+    /// the estimated total size (streams plus description), and stops at the
+    /// first size increase. Ties keep the smaller log.
+    /// </summary>
+    public static int OptimalTableLogDepth(uint[] count, int maxSymbolValue, int maxTableLog)
+    {
+        ArgumentNullException.ThrowIfNull(count);
+        var minTableLog = MinTableLog(Cardinality(count, maxSymbolValue));
+        var scratch = new byte[CTableBound];
+        var optSize = long.MaxValue - 1;
+        var optLog = maxTableLog;
+        for (var guess = minTableLog; guess <= maxTableLog; guess++)
+        {
+            HuffmanCTable table;
+            int maxBits;
+            try
+            {
+                (table, maxBits) = BuildCTable(count, maxSymbolValue, guess);
+            }
+            catch (ZstdException)
+            {
+                continue;
+            }
+
+            if (maxBits < guess && guess > minTableLog)
+            {
+                break;
+            }
+
+            var hSize = WriteCTable(scratch, 0, scratch.Length, table);
+            if (hSize <= 0)
+            {
+                continue;
+            }
+
+            var newSize = EstimateCompressedSize(table, count, maxSymbolValue) + hSize;
+            if (newSize > optSize + 1)
+            {
+                break;
+            }
+
+            if (newSize < optSize)
+            {
+                optSize = newSize;
+                optLog = guess;
+            }
+        }
+
+        return optLog;
     }
 
     /// <summary>
@@ -664,11 +718,18 @@ internal static class ZstdHuffmanEncoder
     /// (empty, tiny, or incompressible), 1 for RLE (<c>dst[dstOffset]</c> holds
     /// the repeated byte), else the compressed size (table description plus
     /// streams, always ≥ 2 so it cannot collide with the RLE sentinel).
+    /// <paramref name="suspectUncompressible"/> enables the sampling
+    /// pre-check (<c>HUF_flags_suspectUncompressible</c>); the caller sets it
+    /// when there are no sequences or literals-per-sequence ≥ 20.
+    /// <paramref name="optimalDepth"/> enables the probing table-log selection
+    /// (<c>HUF_flags_optimalDepth</c>); the caller sets it at strategy ≥
+    /// btultra.
     /// </summary>
     public static int Compress(
         byte[] dst, int dstOffset, int dstCapacity,
         byte[] src, int srcOffset, int srcLength,
-        int maxSymbolValue = SymbolValueMax, int huffLog = TableLogDefault)
+        int maxSymbolValue = SymbolValueMax, int huffLog = TableLogDefault,
+        bool suspectUncompressible = false, bool optimalDepth = false)
     {
         ArgumentNullException.ThrowIfNull(dst);
         ArgumentNullException.ThrowIfNull(src);
@@ -707,6 +768,18 @@ internal static class ZstdHuffmanEncoder
             count[src[i]]++;
         }
 
+        // Suspect-uncompressible sampling (4096 head + 4096 tail bytes).
+        if (suspectUncompressible && srcLength >= 40960)
+        {
+            var sample = new uint[SymbolValueMax + 1];
+            var largestTotal = LargestInRange(src, srcOffset, 4096, sample)
+                + LargestInRange(src, end - 4096, 4096, sample);
+            if (largestTotal <= ((2 * 4096) >> 7) + 4)
+            {
+                return 0;
+            }
+        }
+
         var maxSv = maxSymbolValue;
         while (maxSv > 0 && count[maxSv] == 0)
         {
@@ -730,7 +803,9 @@ internal static class ZstdHuffmanEncoder
             return 0;
         }
 
-        var tableLog = OptimalTableLog(srcLength, maxSv, huffLog);
+        var tableLog = optimalDepth
+            ? OptimalTableLogDepth(count, maxSv, huffLog)
+            : OptimalTableLog(srcLength, maxSv, huffLog);
         var (table, maxBits) = BuildCTable(count, maxSv, tableLog);
         huffLog = maxBits;
 
@@ -753,13 +828,25 @@ internal static class ZstdHuffmanEncoder
             return 0;
         }
 
-        var total = hSize + cSize;
-        if (total >= srcLength - 1)
+        // No "total >= srcLength - 1" early-out here: like HUF_compress, the
+        // caller (ZSTD_compressLiterals) applies ZSTD_minGain instead.
+        return hSize + cSize;
+    }
+
+    private static uint LargestInRange(byte[] src, int offset, int length, uint[] scratch)
+    {
+        Array.Clear(scratch);
+        uint largest = 0;
+        for (var i = offset; i < offset + length; i++)
         {
-            return 0;
+            var c = ++scratch[src[i]];
+            if (c > largest)
+            {
+                largest = c;
+            }
         }
 
-        return total;
+        return largest;
     }
 
     private static void WriteU16Le(byte[] dst, int offset, ushort value)

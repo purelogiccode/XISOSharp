@@ -74,6 +74,19 @@ public static class ZstdSeq
     }
 
     /// <summary>
+    /// <c>ZSTD_newRep</c>: copies <paramref name="rep"/> and applies
+    /// <see cref="UpdateRep"/>, returning the new history (the input is left
+    /// untouched).
+    /// </summary>
+    public static uint[] NewRep(uint[] rep, uint offBase, uint litLengthZero)
+    {
+        ArgumentNullException.ThrowIfNull(rep);
+        var fresh = (uint[])rep.Clone();
+        UpdateRep(fresh, offBase, litLengthZero);
+        return fresh;
+    }
+
+    /// <summary>
     /// <c>ZSTD_updateRep</c>: updates the 3-entry repeat-offset history in place
     /// after storing a sequence with the given <c>offBase</c>.
     /// <paramref name="litLengthZero"/> is 1 when the sequence's literal length

@@ -75,22 +75,27 @@ public sealed class ZstdDecoderTests
     }
 
     [Theory]
-    [InlineData(17)] // as emitted (128 KiB)
+    [InlineData(17)] // as emitted (explicit form rebuilt below)
     [InlineData(24)] // 16 MiB foreign-style window
     [InlineData(27)] // 128 MiB foreign-style window
     [InlineData(29)] // 512 MiB = default cap, boundary accepted
     public void LargeWindowDescriptorAcceptedUpToCap(int windowLog)
     {
-        // Foreign frames may declare windows far larger than their content;
-        // patch our frame's window descriptor (byte 5: magic + descriptor)
-        // to claim windowLog and verify content still decodes.
-        // (Claiming a SMALLER window would invalidate real offsets, so the
-        // sweep starts at the emitted windowLog 17.)
+        // Native single-shot frames use single-segment (no window byte);
+        // rebuild an explicit-window foreign frame with the same body to
+        // verify the decoder accepts large declared windows up to the cap.
         var input = Text(65536);
         var frame = new ZstdCompressor().CompressBlock(input);
-        Assert.Equal(0x38, frame[5]); // locks layout: explicit windowLog 17
-        frame[5] = (byte)((windowLog - 10) << 3);
-        Assert.Equal(input, ZstdDecompressor.Decompress(frame));
+        Assert.Equal(0x60, frame[4]); // locks layout: single-segment, FCS 2-byte
+        var body = frame[7..]; // skip magic+descriptor+FCS (no window byte)
+        var patched = new byte[body.Length + 8];
+        Buffer.BlockCopy(frame, 0, patched, 0, 4);
+        patched[4] = 0x40; // clear single-segment, keep FCS code 1
+        patched[5] = (byte)((windowLog - 10) << 3);
+        patched[6] = frame[5];
+        patched[7] = frame[6];
+        Buffer.BlockCopy(body, 0, patched, 8, body.Length);
+        Assert.Equal(input, ZstdDecompressor.Decompress(patched));
     }
 
     [Theory]
@@ -100,11 +105,18 @@ public sealed class ZstdDecoderTests
     {
         var input = Text(65536);
         var frame = new ZstdCompressor().CompressBlock(input);
-        frame[5] = (byte)((windowLog - 10) << 3);
+        var body = frame[7..];
+        var patched = new byte[body.Length + 8];
+        Buffer.BlockCopy(frame, 0, patched, 0, 4);
+        patched[4] = 0x40;
+        patched[5] = (byte)((windowLog - 10) << 3);
+        patched[6] = frame[5];
+        patched[7] = frame[6];
+        Buffer.BlockCopy(body, 0, patched, 8, body.Length);
 
-        Assert.Throws<ZstdException>(() => ZstdDecompressor.Decompress(frame));
+        Assert.Throws<ZstdException>(() => ZstdDecompressor.Decompress(patched));
         var wide = new ZstdDecoderOptions { MaxWindowSize = 1UL << 32 };
-        Assert.Equal(input, ZstdDecompressor.Decompress(frame, wide));
+        Assert.Equal(input, ZstdDecompressor.Decompress(patched, wide));
     }
 
     [Fact]
