@@ -40,7 +40,8 @@ internal static class CliRunner
         {
             process.Start();
         }
-        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException
+                                       or System.ComponentModel.Win32Exception)
         {
             onLine($"[GUI] Failed to start CLI: {ex.Message}");
             return -1;
@@ -55,7 +56,8 @@ internal static class CliRunner
                     process.Kill(entireProcessTree: true);
                 }
             }
-            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception
+                                           or NotSupportedException)
             {
                 // Already exited or cannot kill — the wait below still completes.
             }

@@ -31,7 +31,7 @@ public static class Lz4
     /// Returns the minimum destination size <see cref="Compress"/> requires for
     /// <paramref name="inputLength"/> input bytes (<c>16 + 4 + inputLength * 110 / 100</c>).
     /// </summary>
-    public static int MaxCompressedOutputSize(int inputLength) => 16 + 4 + inputLength * 110 / 100;
+    public static int MaxCompressedOutputSize(int inputLength) => 16 + 4 + (inputLength * 110 / 100);
 
     /// <summary>
     /// Compresses <paramref name="input"/> into <paramref name="destination"/> as a raw LZ4 block.
@@ -43,8 +43,11 @@ public static class Lz4
         ArgumentOutOfRangeException.ThrowIfLessThan(acceleration, 1);
         var required = MaxCompressedOutputSize(input.Length);
         if (destination.Length < required)
+        {
             throw new ArgumentException(
-                $"Destination is too small ({destination.Length} bytes); at least {required} required", nameof(destination));
+                $"Destination is too small ({destination.Length} bytes); at least {required} required",
+                nameof(destination));
+        }
 
         var outPos = 0;
         if (input.Length < MinLength)
@@ -155,8 +158,7 @@ public static class Lz4
                         throw new InvalidDataException("LZ4: truncated literal length");
                     add = source[srcPos++];
                     litLen += add;
-                }
-                while (add == 0xFF);
+                } while (add == 0xFF);
             }
 
             if (srcPos + litLen > source.Length || dstPos + litLen > destination.Length)
@@ -186,8 +188,7 @@ public static class Lz4
                         throw new InvalidDataException("LZ4: truncated match length");
                     add = source[srcPos++];
                     matchLen += add;
-                }
-                while (add == 0xFF);
+                } while (add == 0xFF);
             }
 
             matchLen += MinMatch;

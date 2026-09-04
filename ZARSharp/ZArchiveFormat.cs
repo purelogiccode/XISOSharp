@@ -224,15 +224,24 @@ public struct Footer
             IntegrityHash = new byte[32],
         };
         int o = 0;
-        f.SectionCompressedData = ReadInfo(src.Slice(o)); o += 16;
-        f.SectionOffsetRecords = ReadInfo(src.Slice(o)); o += 16;
-        f.SectionNames = ReadInfo(src.Slice(o)); o += 16;
-        f.SectionFileTree = ReadInfo(src.Slice(o)); o += 16;
-        f.SectionMetaDirectory = ReadInfo(src.Slice(o)); o += 16;
-        f.SectionMetaData = ReadInfo(src.Slice(o)); o += 16;
-        src.Slice(o, 32).CopyTo(f.IntegrityHash.AsSpan()); o += 32;
-        f.TotalSize = ZArchiveCommon.ReadU64BE(src.Slice(o)); o += 8;
-        f.Version = ZArchiveCommon.ReadU32BE(src.Slice(o)); o += 4;
+        f.SectionCompressedData = ReadInfo(src.Slice(o));
+        o += 16;
+        f.SectionOffsetRecords = ReadInfo(src.Slice(o));
+        o += 16;
+        f.SectionNames = ReadInfo(src.Slice(o));
+        o += 16;
+        f.SectionFileTree = ReadInfo(src.Slice(o));
+        o += 16;
+        f.SectionMetaDirectory = ReadInfo(src.Slice(o));
+        o += 16;
+        f.SectionMetaData = ReadInfo(src.Slice(o));
+        o += 16;
+        src.Slice(o, 32).CopyTo(f.IntegrityHash.AsSpan());
+        o += 32;
+        f.TotalSize = ZArchiveCommon.ReadU64BE(src.Slice(o));
+        o += 8;
+        f.Version = ZArchiveCommon.ReadU32BE(src.Slice(o));
+        o += 4;
         f.Magic = ZArchiveCommon.ReadU32BE(src.Slice(o));
         return f;
 
@@ -247,15 +256,24 @@ public struct Footer
     public readonly void WriteTo(Span<byte> dst)
     {
         int o = 0;
-        WriteInfo(dst.Slice(o), SectionCompressedData); o += 16;
-        WriteInfo(dst.Slice(o), SectionOffsetRecords); o += 16;
-        WriteInfo(dst.Slice(o), SectionNames); o += 16;
-        WriteInfo(dst.Slice(o), SectionFileTree); o += 16;
-        WriteInfo(dst.Slice(o), SectionMetaDirectory); o += 16;
-        WriteInfo(dst.Slice(o), SectionMetaData); o += 16;
-        IntegrityHash.AsSpan(0, 32).CopyTo(dst.Slice(o, 32)); o += 32;
-        ZArchiveCommon.WriteU64BE(dst.Slice(o), TotalSize); o += 8;
-        ZArchiveCommon.WriteU32BE(dst.Slice(o), Version); o += 4;
+        WriteInfo(dst.Slice(o), SectionCompressedData);
+        o += 16;
+        WriteInfo(dst.Slice(o), SectionOffsetRecords);
+        o += 16;
+        WriteInfo(dst.Slice(o), SectionNames);
+        o += 16;
+        WriteInfo(dst.Slice(o), SectionFileTree);
+        o += 16;
+        WriteInfo(dst.Slice(o), SectionMetaDirectory);
+        o += 16;
+        WriteInfo(dst.Slice(o), SectionMetaData);
+        o += 16;
+        IntegrityHash.AsSpan(0, 32).CopyTo(dst.Slice(o, 32));
+        o += 32;
+        ZArchiveCommon.WriteU64BE(dst.Slice(o), TotalSize);
+        o += 8;
+        ZArchiveCommon.WriteU32BE(dst.Slice(o), Version);
+        o += 4;
         ZArchiveCommon.WriteU32BE(dst.Slice(o), Magic);
 
         static void WriteInfo(Span<byte> d, OffsetInfo i)

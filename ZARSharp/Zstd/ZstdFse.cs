@@ -107,6 +107,7 @@ internal static class ZstdFse
             {
                 remaining -= 1; // -1 counts as 1 point (reference: remaining += count)
             }
+
             norms[charnum++] = (short)count;
             previous0 = count == 0;
 

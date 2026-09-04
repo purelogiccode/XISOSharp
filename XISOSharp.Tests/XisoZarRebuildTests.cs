@@ -65,7 +65,7 @@ public class XisoZarRebuildTests : IDisposable
             Logger.RealQuiet = false;
         }
 
-        public string Output => _out.ToString() + _err.ToString();
+        public string Output => _out.ToString() + _err;
 
         public void Dispose()
         {

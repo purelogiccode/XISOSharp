@@ -47,16 +47,16 @@ internal static class Program
     private static void PrintUsage()
     {
         Console.WriteLine("""
-            Usage: XISOSharp.TestDataGenerator [path] [--force]
+                          Usage: XISOSharp.TestDataGenerator [path] [--force]
 
-            Restores the TestData fixture used by the XISOSharp test suite:
-              source\file1.txt, source\file2.txt, source\binary.bin, source\test.xbe,
-              source\subdir\subfile.txt, source\subdir\nested\deep.txt
-              output\source.iso (rebuilt from source on every run)
+                          Restores the TestData fixture used by the XISOSharp test suite:
+                            source\file1.txt, source\file2.txt, source\binary.bin, source\test.xbe,
+                            source\subdir\subfile.txt, source\subdir\nested\deep.txt
+                            output\source.iso (rebuilt from source on every run)
 
-              path     Target TestData root directory
-                       (default: <repo root>\TestData)
-              --force  Rewrite existing source files with the canonical content
-            """);
+                            path     Target TestData root directory
+                                     (default: <repo root>\TestData)
+                            --force  Rewrite existing source files with the canonical content
+                          """);
     }
 }

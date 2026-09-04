@@ -329,8 +329,10 @@ public static class XisoValidator
             hash != null ? Convert.ToHexString(hash).ToLowerInvariant() : null;
 
         var report = new ValidationReport(
-            new ValidationReportSide(sourcePath, result.SourceFileCount, result.SourceDirCount, result.SourceTotalBytes),
-            new ValidationReportSide(outputPath, result.OutputFileCount, result.OutputDirCount, result.OutputTotalBytes),
+            new ValidationReportSide(sourcePath, result.SourceFileCount, result.SourceDirCount,
+                result.SourceTotalBytes),
+            new ValidationReportSide(outputPath, result.OutputFileCount, result.OutputDirCount,
+                result.OutputTotalBytes),
             result.Passed,
             result.Issues.Count,
             result.Issues.Select(static i => new ValidationReportIssue(

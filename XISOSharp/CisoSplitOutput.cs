@@ -11,13 +11,12 @@ internal sealed class CisoSplitOutput : Stream
     private readonly long _splitPoint;
     private readonly Dictionary<long, FileStream> _parts = [];
     private readonly List<string> _partPaths = [];
-    private long _position;
     private bool _disposed;
 
     public CisoSplitOutput(string outputPath, long splitPoint)
     {
         _outputPath = outputPath ?? throw new ArgumentNullException(nameof(outputPath));
-        if (splitPoint <= 0) throw new ArgumentOutOfRangeException(nameof(splitPoint));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(splitPoint);
         _splitPoint = splitPoint;
     }
 
@@ -44,7 +43,7 @@ internal sealed class CisoSplitOutput : Stream
         var written = 0;
         while (written < buffer.Length)
         {
-            var globalPosition = _position + written;
+            var globalPosition = Position + written;
             var handle = GetPart(globalPosition / _splitPoint);
 
             // Bytes remaining to the split point (a write starting exactly on the boundary
@@ -58,26 +57,22 @@ internal sealed class CisoSplitOutput : Stream
             written += toWrite;
         }
 
-        _position += buffer.Length;
+        Position += buffer.Length;
     }
 
     public override long Seek(long offset, SeekOrigin origin)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        _position = origin switch
+        Position = origin switch
         {
             SeekOrigin.Begin => offset,
-            SeekOrigin.Current => _position + offset,
+            SeekOrigin.Current => Position + offset,
             _ => throw new NotSupportedException("SeekOrigin.End is not supported for split output")
         };
-        return _position;
+        return Position;
     }
 
-    public override long Position
-    {
-        get => _position;
-        set => _position = value;
-    }
+    public override long Position { get; set; }
 
     public override long Length => throw new NotSupportedException();
 

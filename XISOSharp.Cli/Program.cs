@@ -695,7 +695,7 @@ internal static class Program
             return 1;
         }
 
-        if ((anyRedumpMode) && batchDir != null)
+        if (anyRedumpMode && batchDir != null)
         {
             Logger.LogErr("Error: --batch cannot be combined with redump modes\n");
             return 1;
@@ -1477,23 +1477,23 @@ internal static class Program
                 Logger.Quiet = Logger.RealQuiet = true;
             }
             else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
             {
                 assumeYes = true;
             }
             else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
             {
                 assumeNo = true;
             }
             else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
             {
                 PrintUsage();
                 return 0;
             }
             else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
             {
                 Console.Write(Constants.Banner);
                 return 0;
@@ -1985,10 +1985,14 @@ internal static class Program
 
                 var v = args[++i];
                 if (string.Equals(v, "1", StringComparison.OrdinalIgnoreCase))
+                {
                     version = CisoWriter.VersionDeflate;
+                }
                 else if (string.Equals(v, "2", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(v, "auto", StringComparison.OrdinalIgnoreCase))
+                {
                     version = CisoWriter.VersionLz4;
+                }
                 else
                 {
                     Logger.LogErr("Error: --ciso-version requires 1, 2 or auto\n");
@@ -2009,12 +2013,12 @@ internal static class Program
                 i++;
             }
             else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
             {
                 assumeYes = true;
             }
             else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
             {
                 assumeNo = true;
             }
@@ -2027,13 +2031,13 @@ internal static class Program
                 Logger.Quiet = Logger.RealQuiet = true;
             }
             else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
             {
                 PrintUsage();
                 return 0;
             }
             else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
             {
                 Console.Write(Constants.Banner);
                 return 0;
@@ -2109,12 +2113,12 @@ internal static class Program
                 output = args[++i];
             }
             else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
             {
                 assumeYes = true;
             }
             else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
             {
                 assumeNo = true;
             }
@@ -2127,13 +2131,13 @@ internal static class Program
                 Logger.Quiet = Logger.RealQuiet = true;
             }
             else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
             {
                 PrintUsage();
                 return 0;
             }
             else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
             {
                 Console.Write(Constants.Banner);
                 return 0;
@@ -2170,7 +2174,9 @@ internal static class Program
         // triggers the -y/-n prompt instead of silent overwrite.
         if (!OverwritePrompt.ConfirmOverwrite(outIso ?? CisoReader.DeriveDefaultIsoPath(source), assumeYes,
                 assumeNo))
+        {
             return 1;
+        }
 
         try
         {
@@ -2491,7 +2497,7 @@ internal static class Program
                 // the failure cleanup below must not touch a file we refused to overwrite.
                 var seedConfirmed = ConfirmOutput(outSeed, $"--seed for {iso}");
                 var ok = !seedConfirmed ||
-                    XisoOperations.TryExtractSeed(iso, outSeed, isRedump ? isoOffset : 0, Logger.Quiet);
+                         XisoOperations.TryExtractSeed(iso, outSeed, isRedump ? isoOffset : 0, Logger.Quiet);
                 if (!ok)
                 {
                     if (singleModeCount)
@@ -2596,7 +2602,7 @@ internal static class Program
                         // (skipped) but the structural continue below still applies.
                         var trimConfirmed = ConfirmOutput(outPath2, $"--trim for {iso}");
                         var ok = !trimConfirmed ||
-                            XisoOperations.WipeAndTrim(iso, outPath2, isRedump ? isoOffset : 0, Logger.Quiet);
+                                 XisoOperations.WipeAndTrim(iso, outPath2, isRedump ? isoOffset : 0, Logger.Quiet);
                         if (!ok)
                         {
                             Logger.LogErr($"[ERROR] Failed wiping+trimming {iso}\n");
@@ -2619,7 +2625,7 @@ internal static class Program
                     // A declined output counts as handled (skipped) so later ops still run.
                     var trimConfirmed = ConfirmOutput(outTrim, $"--trim for {iso}");
                     var ok = !trimConfirmed ||
-                        XisoOperations.TrimXiso(iso, outTrim, isRedump ? isoOffset : 0, Logger.Quiet);
+                             XisoOperations.TrimXiso(iso, outTrim, isRedump ? isoOffset : 0, Logger.Quiet);
                     if (!ok)
                     {
                         Logger.LogErr($"[ERROR] Failed trimming {iso}\n");

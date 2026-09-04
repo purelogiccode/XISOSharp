@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using ZARSharp.Zstd;
 
 namespace ZARSharp;
 
@@ -71,7 +72,7 @@ public sealed class ZArchiveWriter : IDisposable
     {
         _newOutputFile = newOutputFile ?? throw new ArgumentNullException(nameof(newOutputFile));
         _writeOutputData = writeOutputData ?? throw new ArgumentNullException(nameof(writeOutputData));
-        _compressor = compressor ?? new ZarRawCompressor();
+        _compressor = compressor ?? new ZstdCompressor();
         _compressionBuffer = new byte[ZArchiveCommon.CompressedBlockSize + 1024];
         _sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         _newOutputFile(-1);

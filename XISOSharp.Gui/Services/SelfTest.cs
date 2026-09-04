@@ -53,11 +53,17 @@ internal static class SelfTest
         Check("unpack", CliCommands.Unpack("a.iso", "out"), ["--unpack", "a.iso", "out"]);
         Check("copy-out", CliCommands.CopyOut("a.iso", "/f.txt", "f.txt"),
             ["--copy-out", "a.iso", "/f.txt", "f.txt"]);
-        Check("create", CliCommands.Create("src", "game", ["*.tmp"], skipSystemUpdate: true, disableXbePatch: false, overwrite: true),
+        Check("create",
+            CliCommands.Create("src", "game", ["*.tmp"], skipSystemUpdate: true, disableXbePatch: false,
+                overwrite: true),
             ["-c", "src", "game", "-X", "*.tmp", "-s", "-y"]);
         Check("rewrite", CliCommands.Rewrite(["a.iso"], "b.iso", null, deleteOld: true, disableXbePatch: false,
-            validate: true, validateChecksums: false, validateStrict: true, validateReport: "r.json", overwrite: false),
-            ["-r", "-o", "b.iso", "-D", "--validate", "--validate-strict", "--validate-report", "r.json", "a.iso", "-n"]);
+                validate: true, validateChecksums: false, validateStrict: true, validateReport: "r.json",
+                overwrite: false),
+            [
+                "-r", "-o", "b.iso", "-D", "--validate", "--validate-strict", "--validate-report", "r.json", "a.iso",
+                "-n"
+            ]);
         Check("wipe", CliCommands.Wipe("a.iso", null, overwrite: true), ["--wipe", "a.iso", "-y"]);
         Check("trim", CliCommands.Trim("a.iso", "t.iso", overwrite: false), ["--trim", "a.iso", "t.iso", "-n"]);
         Check("rebuild", CliCommands.Rebuild(["x.iso", "v.iso"], "r.iso", "s.txt", overwrite: true),

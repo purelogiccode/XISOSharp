@@ -13,11 +13,15 @@ reference-comparison scripts, and the benchmarks.
 
 ## Test suite
 
-The xUnit suite lives in `XISOSharp.Tests` (target: net10.0). Run it with:
+The xUnit suites live in `XISOSharp.Tests` (engine + CLI, target: net10.0) and
+`ZARSharp.Tests` (pure-C# ZArchive/zstd port, target: net10.0). Run them with:
 
 ```bash
 dotnet test XISOSharp.Tests
+dotnet test ZARSharp.Tests/ZARSharp.Tests.csproj
 ```
+
+(Plain `dotnet test` on the solution runs both.)
 
 Highlights:
 

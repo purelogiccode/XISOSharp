@@ -32,7 +32,7 @@ internal static class CisoSplitFile
     {
         var baseName = firstPartPath[..^PartSuffixLength];
         var parts = new List<FileStream>();
-        for (var i = 0; ; i++)
+        for (var i = 0;; i++)
         {
             var partPath = PartPath(baseName, i);
             if (!File.Exists(partPath)) break;

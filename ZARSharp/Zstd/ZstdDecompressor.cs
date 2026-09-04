@@ -5,8 +5,8 @@ namespace ZARSharp.Zstd;
 /// Supports standard frames (raw, RLE and compressed blocks; Huffman and FSE
 /// entropy coding; predefined/RLE/FSE/repeat sequence tables; content
 /// checksums; multi-frame concatenation) and skippable frames. Dictionaries
-/// are not supported. Decoder limits: window sizes above 64 MiB and frames
-/// above 512 MiB are rejected.
+/// are not supported. Decoder limits default to 512 MiB windows and 512 MiB
+/// frames (see <see cref="ZstdDecoderOptions"/>); ZArchive needs only 64 KiB.
 /// </summary>
 public static class ZstdDecompressor
 {
@@ -16,9 +16,11 @@ public static class ZstdDecompressor
     private const int BlockHeaderSize = 3;
     private const int MaxBlockSizeLimit = 128 * 1024;
 
-    // Decoder limits (documented; ZArchive needs only 64 KiB).
-    private const ulong MaxWindowSize = 64UL * 1024 * 1024;
-    private const ulong MaxFrameContentSize = 512UL * 1024 * 1024;
+    // Default decoder limits (documented; ZArchive needs only 64 KiB).
+    // The window cap is a validity bound only: history is retained in full,
+    // so raising it never changes allocation behavior beyond the frame cap.
+    private const ulong DefaultMaxWindowSize = 512UL * 1024 * 1024;
+    private const ulong DefaultMaxFrameContentSize = 512UL * 1024 * 1024;
 
     // ------------------------------------------------------------------
     // Sequence code tables (verified against the reference implementation)
@@ -161,15 +163,21 @@ public static class ZstdDecompressor
     /// Decompresses concatenated zstd frames, returning the output.
     /// </summary>
     /// <exception cref="ZstdException">On corrupt input or unsupported features.</exception>
-    public static byte[] Decompress(byte[] src, int offset, int length)
+    public static byte[] Decompress(byte[] src, int offset, int length) =>
+        Decompress(src, offset, length, ZstdDecoderOptions.Default);
+
+    /// <summary>
+    /// Decompresses concatenated zstd frames, returning the output,
+    /// enforcing the limits in <paramref name="options"/>.
+    /// </summary>
+    /// <exception cref="ZstdException">On corrupt input or unsupported features.</exception>
+    public static byte[] Decompress(byte[] src, int offset, int length, ZstdDecoderOptions options)
     {
-        if (src is null)
-        {
-            throw new ArgumentNullException(nameof(src));
-        }
+        ArgumentNullException.ThrowIfNull(src);
+        ArgumentNullException.ThrowIfNull(options);
 
         var output = new List<byte>();
-        int pos = DecompressFrames(src, offset, length, output, null);
+        int pos = DecompressFrames(src, offset, length, output, null, options);
         if (pos != offset + length)
         {
             throw new ZstdException("Trailing data after zstd frame.");
@@ -183,16 +191,35 @@ public static class ZstdDecompressor
         Decompress(src, 0, src is null ? 0 : src.Length);
 
     /// <summary>
+    /// Decompresses concatenated zstd frames, returning the output,
+    /// enforcing the limits in <paramref name="options"/>.
+    /// </summary>
+    public static byte[] Decompress(byte[] src, ZstdDecoderOptions options) =>
+        Decompress(src, 0, src is null ? 0 : src.Length, options);
+
+    /// <summary>
     /// Decompresses exactly one frame region into <paramref name="dst"/>,
     /// which must fill exactly (like <c>ZSTD_decompress</c> into a
     /// content-sized buffer). The input must be exactly one frame.
     /// </summary>
     public static void DecompressExact(
         byte[] src, int srcOffset, int srcLength,
-        byte[] dst, int dstOffset, int dstLength)
+        byte[] dst, int dstOffset, int dstLength) =>
+        DecompressExact(src, srcOffset, srcLength, dst, dstOffset, dstLength, ZstdDecoderOptions.Default);
+
+    /// <summary>
+    /// Decompresses exactly one frame region into <paramref name="dst"/>,
+    /// which must fill exactly (like <c>ZSTD_decompress</c> into a
+    /// content-sized buffer). The input must be exactly one frame.
+    /// Enforces the limits in <paramref name="options"/>.
+    /// </summary>
+    public static void DecompressExact(
+        byte[] src, int srcOffset, int srcLength,
+        byte[] dst, int dstOffset, int dstLength, ZstdDecoderOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options);
         var output = new List<byte>(dstLength);
-        int pos = DecompressFrame(src, srcOffset, srcLength, output, (ulong)dstLength);
+        int pos = DecompressFrame(src, srcOffset, srcLength, output, (ulong)dstLength, options);
         if (pos != srcOffset + srcLength)
         {
             throw new ZstdException("Trailing data after zstd frame.");
@@ -222,7 +249,8 @@ public static class ZstdDecompressor
     }
 
     private static int DecompressFrames(
-        byte[] src, int offset, int length, List<byte> output, ulong? exactSize)
+        byte[] src, int offset, int length, List<byte> output, ulong? exactSize,
+        ZstdDecoderOptions options)
     {
         int end = offset + length;
         int pos = offset;
@@ -257,7 +285,7 @@ public static class ZstdDecompressor
                 throw new ZstdException($"Bad zstd magic 0x{magic:X8}.");
             }
 
-            pos = DecompressFrame(src, pos, end - pos, output, exactSize);
+            pos = DecompressFrame(src, pos, end - pos, output, exactSize, options);
             anyFrame = true;
             if (exactSize.HasValue)
             {
@@ -274,7 +302,8 @@ public static class ZstdDecompressor
     }
 
     private static int DecompressFrame(
-        byte[] src, int offset, int length, List<byte> output, ulong? exactSize)
+        byte[] src, int offset, int length, List<byte> output, ulong? exactSize,
+        ZstdDecoderOptions options)
     {
         int end = offset + length;
         int pos = offset + 4; // magic already validated by caller... (validated below for exact path)
@@ -359,16 +388,16 @@ public static class ZstdDecompressor
             throw new ZstdException("Invalid zstd window size.");
         }
 
-        if (ctx.WindowSize > MaxWindowSize)
+        if (ctx.WindowSize > options.MaxWindowSize)
         {
             throw new ZstdException(
-                $"zstd window size {ctx.WindowSize} exceeds decoder limit {MaxWindowSize}.");
+                $"zstd window size {ctx.WindowSize} exceeds decoder limit {options.MaxWindowSize}.");
         }
 
-        if (fcsKnown && fcs > MaxFrameContentSize)
+        if (fcsKnown && fcs > options.MaxFrameContentSize)
         {
             throw new ZstdException(
-                $"zstd frame content size {fcs} exceeds decoder limit {MaxFrameContentSize}.");
+                $"zstd frame content size {fcs} exceeds decoder limit {options.MaxFrameContentSize}.");
         }
 
         if (exactSize.HasValue && (!fcsKnown || fcs != exactSize.Value))
@@ -386,7 +415,7 @@ public static class ZstdDecompressor
         }
 
         int frameStart = output.Count;
-        ulong frameCap = fcsKnown ? fcs : MaxFrameContentSize;
+        ulong frameCap = fcsKnown ? fcs : options.MaxFrameContentSize;
         bool lastBlock = false;
         while (!lastBlock)
         {
@@ -627,7 +656,7 @@ public static class ZstdDecompressor
             else
             {
                 huffman = ctx.HuffmanTable ??
-                    throw new ZstdException("Treeless literals without a Huffman table.");
+                          throw new ZstdException("Treeless literals without a Huffman table.");
             }
 
             literals = new byte[regen];
@@ -734,9 +763,11 @@ public static class ZstdDecompressor
             int ofMode = (modes >> 4) & 3;
             int mlMode = (modes >> 2) & 3;
 
-            pos = BuildSeqTableForMode(src, pos, end, llMode, MaxLL, 9, LLBase, LLBits, LLDefaultTable, ref ctx.LLTable);
+            pos = BuildSeqTableForMode(src, pos, end, llMode, MaxLL, 9, LLBase, LLBits, LLDefaultTable,
+                ref ctx.LLTable);
             pos = BuildOFTableForMode(src, pos, end, ofMode, ref ctx.OFTable);
-            pos = BuildSeqTableForMode(src, pos, end, mlMode, MaxML, 9, MLBase, MLBits, MLDefaultTable, ref ctx.MLTable);
+            pos = BuildSeqTableForMode(src, pos, end, mlMode, MaxML, 9, MLBase, MLBits, MLDefaultTable,
+                ref ctx.MLTable);
 
             DecodeSequences(src, pos, end, numSeq, literals, output, maxOut, frameStart, ctx);
         }
@@ -1035,4 +1066,41 @@ public static class ZstdDecompressor
 
         return value;
     }
+}
+
+/// <summary>
+/// Decoder resource limits for <see cref="ZstdDecompressor"/>.
+/// ZArchive blocks need only 64 KiB windows; the defaults accept foreign
+/// frames up to 512 MiB. Lower the caps to harden untrusted-input paths.
+/// </summary>
+public sealed class ZstdDecoderOptions
+{
+    /// <summary>Default limits: 512 MiB window, 512 MiB frame content.</summary>
+    public static ZstdDecoderOptions Default { get; } = new();
+
+    /// <summary>
+    /// Maximum accepted window size in bytes (default 512 MiB).
+    /// Frames declaring a larger window are rejected before decoding.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">When set to zero.</exception>
+    public ulong MaxWindowSize
+    {
+        get;
+        init => field = value > 0
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), "MaxWindowSize must be positive.");
+    } = 512UL * 1024 * 1024;
+
+    /// <summary>
+    /// Maximum accepted frame content size in bytes (default 512 MiB).
+    /// Bounds allocation for frames without a declared content size.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">When set to zero.</exception>
+    public ulong MaxFrameContentSize
+    {
+        get;
+        init => field = value > 0
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), "MaxFrameContentSize must be positive.");
+    } = 512UL * 1024 * 1024;
 }

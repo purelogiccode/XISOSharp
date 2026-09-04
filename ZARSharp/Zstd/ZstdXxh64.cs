@@ -47,10 +47,14 @@ internal static class ZstdXxh64
             int limit = end - 32;
             while (p <= limit)
             {
-                v1 = Round(v1, BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(p))); p += 8;
-                v2 = Round(v2, BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(p))); p += 8;
-                v3 = Round(v3, BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(p))); p += 8;
-                v4 = Round(v4, BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(p))); p += 8;
+                v1 = Round(v1, BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(p)));
+                p += 8;
+                v2 = Round(v2, BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(p)));
+                p += 8;
+                v3 = Round(v3, BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(p)));
+                p += 8;
+                v4 = Round(v4, BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(p)));
+                p += 8;
             }
 
             hash = Rotl(v1, 1) + Rotl(v2, 7) + Rotl(v3, 12) + Rotl(v4, 18);

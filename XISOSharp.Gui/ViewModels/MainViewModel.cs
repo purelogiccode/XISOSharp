@@ -21,76 +21,112 @@ internal sealed partial class MainViewModel : ObservableObject
     private CancellationTokenSource? runningCts;
 
     // Settings
-    [ObservableProperty] private string cliPath = string.Empty;
-    [ObservableProperty] private string cliStatus = "CLI not located yet.";
-    [ObservableProperty] private bool overwriteExisting;
+    [ObservableProperty] public partial string CliPath { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string CliStatus { get; set; } = "CLI not located yet.";
+
+    [ObservableProperty] public partial bool OverwriteExisting { get; set; }
 
     // Shared run state
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
-    private bool isRunning;
+    public partial bool IsRunning { get; set; }
+
     public bool CanRun => !IsRunning;
 
-    [ObservableProperty] private string logText = string.Empty;
-    [ObservableProperty] private string lastExit = string.Empty;
+    [ObservableProperty] public partial string LogText { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string LastExit { get; set; } = string.Empty;
 
     // Extract tab
-    [ObservableProperty] private string exImage = string.Empty;
-    [ObservableProperty] private string exDest = string.Empty;
-    [ObservableProperty] private string exInfoPath = string.Empty;
-    [ObservableProperty] private string exCopyPath = string.Empty;
-    [ObservableProperty] private string exCopyDest = string.Empty;
+    [ObservableProperty] public partial string ExImage { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string ExDest { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string ExInfoPath { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string ExCopyPath { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string ExCopyDest { get; set; } = string.Empty;
 
     // Create tab
-    [ObservableProperty] private string crSource = string.Empty;
-    [ObservableProperty] private string crName = string.Empty;
-    [ObservableProperty] private string crExcludes = string.Empty;
-    [ObservableProperty] private bool crSkipSystemUpdate;
-    [ObservableProperty] private bool crDisableXbePatch;
+    [ObservableProperty] public partial string CrSource { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string CrName { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string CrExcludes { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial bool CrSkipSystemUpdate { get; set; }
+
+    [ObservableProperty] public partial bool CrDisableXbePatch { get; set; }
 
     // Rewrite tab (+ wipe/trim helpers)
-    [ObservableProperty] private string rwImages = string.Empty;
-    [ObservableProperty] private string rwOutput = string.Empty;
-    [ObservableProperty] private string rwWorkDir = string.Empty;
-    [ObservableProperty] private bool rwDeleteOld;
-    [ObservableProperty] private bool rwDisableXbePatch;
-    [ObservableProperty] private bool rwValidate;
-    [ObservableProperty] private bool rwChecksums;
-    [ObservableProperty] private bool rwStrict;
-    [ObservableProperty] private string rwReport = string.Empty;
-    [ObservableProperty] private string wpImage = string.Empty;
-    [ObservableProperty] private string wpOutput = string.Empty;
+    [ObservableProperty] public partial string RwImages { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string RwOutput { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string RwWorkDir { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial bool RwDeleteOld { get; set; }
+
+    [ObservableProperty] public partial bool RwDisableXbePatch { get; set; }
+
+    [ObservableProperty] public partial bool RwValidate { get; set; }
+
+    [ObservableProperty] public partial bool RwChecksums { get; set; }
+
+    [ObservableProperty] public partial bool RwStrict { get; set; }
+
+    [ObservableProperty] public partial string RwReport { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string WpImage { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string WpOutput { get; set; } = string.Empty;
 
     // Rebuild tab
-    [ObservableProperty] private string rbParts = string.Empty;
-    [ObservableProperty] private string rbOutput = string.Empty;
-    [ObservableProperty] private string rbSectors = string.Empty;
+    [ObservableProperty] public partial string RbParts { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string RbOutput { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string RbSectors { get; set; } = string.Empty;
 
     // Compress tab
-    [ObservableProperty] private string cpSource = string.Empty;
-    [ObservableProperty] private string cpOutput = string.Empty;
-    [ObservableProperty] private int cpLevel = 9;
-    [ObservableProperty] private string cpVersion = "2";
-    [ObservableProperty] private string cpSplit = string.Empty;
+    [ObservableProperty] public partial string CpSource { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string CpOutput { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial int CpLevel { get; set; } = 9;
+
+    [ObservableProperty] public partial string CpVersion { get; set; } = "2";
+
+    [ObservableProperty] public partial string CpSplit { get; set; } = string.Empty;
 
     // Decompress tab
-    [ObservableProperty] private string dcCso = string.Empty;
-    [ObservableProperty] private string dcOutput = string.Empty;
+    [ObservableProperty] public partial string DcCso { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string DcOutput { get; set; } = string.Empty;
 
     // Validate tab (+ checksum group)
-    [ObservableProperty] private string vaSource = string.Empty;
-    [ObservableProperty] private string vaOutput = string.Empty;
-    [ObservableProperty] private bool vaChecksums;
-    [ObservableProperty] private string vaReport = string.Empty;
-    [ObservableProperty] private string csImages = string.Empty;
-    [ObservableProperty] private bool csSilent;
+    [ObservableProperty] public partial string VaSource { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string VaOutput { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial bool VaChecksums { get; set; }
+
+    [ObservableProperty] public partial string VaReport { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string CsImages { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial bool CsSilent { get; set; }
 
     // Batch tab
-    [ObservableProperty] private string baDir = string.Empty;
-    [ObservableProperty] private bool baRecursive;
-    [ObservableProperty] private string baMode = "Extract";
-    [ObservableProperty] private string baDest = string.Empty;
+    [ObservableProperty] public partial string BaDir { get; set; } = string.Empty;
 
+    [ObservableProperty] public partial bool BaRecursive { get; set; }
+
+    [ObservableProperty] public partial string BaMode { get; set; } = "Extract";
+
+    [ObservableProperty] public partial string BaDest { get; set; } = string.Empty;
     internal IReadOnlyList<string> BatchModes { get; } = ["Extract", "List", "Tree", "Rewrite", "Audit"];
     internal IReadOnlyList<string> CisoVersions { get; } = ["1", "2"];
 
@@ -143,20 +179,33 @@ internal sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand] private Task RunExtractAsync() => GuardedAsync(() => RunSingleImageAsync("extract", ExImage,
+    [RelayCommand]
+    private Task RunExtractAsync() => GuardedAsync(() => RunSingleImageAsync("extract", ExImage,
         CliCommands.Extract(RequireOne(ExImage, "image"), NullIfEmpty(ExDest), OverwriteExisting)));
-    [RelayCommand] private Task RunListAsync() => GuardedAsync(() => RunSingleImageAsync("list", ExImage,
-        CliCommands.List(RequireOne(ExImage, "image"))));
-    [RelayCommand] private Task RunTreeAsync() => GuardedAsync(() => RunSingleImageAsync("tree", ExImage,
-        CliCommands.Tree(RequireOne(ExImage, "image"))));
-    [RelayCommand] private Task RunInfoAsync() => GuardedAsync(() => RunSingleImageAsync("info", ExImage,
-        CliCommands.Info(RequireValue(ExImage, "image"), NullIfEmpty(ExInfoPath))));
-    [RelayCommand] private Task RunUnpackAsync() => GuardedAsync(() => RunSingleImageAsync("unpack", ExImage,
-        CliCommands.Unpack(RequireValue(ExImage, "image"), NullIfEmpty(ExDest))));
-    [RelayCommand] private Task RunCopyOutAsync() => GuardedAsync(() => RunJobAsync("copy-out",
-        CliCommands.CopyOut(RequireValue(ExImage, "image"), RequireValue(ExCopyPath, "in-image path"), RequireValue(ExCopyDest, "destination"))));
 
-    [RelayCommand] private Task RunCreateAsync() => GuardedAsync(() =>
+    [RelayCommand]
+    private Task RunListAsync() => GuardedAsync(() => RunSingleImageAsync("list", ExImage,
+        CliCommands.List(RequireOne(ExImage, "image"))));
+
+    [RelayCommand]
+    private Task RunTreeAsync() => GuardedAsync(() => RunSingleImageAsync("tree", ExImage,
+        CliCommands.Tree(RequireOne(ExImage, "image"))));
+
+    [RelayCommand]
+    private Task RunInfoAsync() => GuardedAsync(() => RunSingleImageAsync("info", ExImage,
+        CliCommands.Info(RequireValue(ExImage, "image"), NullIfEmpty(ExInfoPath))));
+
+    [RelayCommand]
+    private Task RunUnpackAsync() => GuardedAsync(() => RunSingleImageAsync("unpack", ExImage,
+        CliCommands.Unpack(RequireValue(ExImage, "image"), NullIfEmpty(ExDest))));
+
+    [RelayCommand]
+    private Task RunCopyOutAsync() => GuardedAsync(() => RunJobAsync("copy-out",
+        CliCommands.CopyOut(RequireValue(ExImage, "image"), RequireValue(ExCopyPath, "in-image path"),
+            RequireValue(ExCopyDest, "destination"))));
+
+    [RelayCommand]
+    private Task RunCreateAsync() => GuardedAsync(() =>
     {
         var source = RequireValue(CrSource, "source directory");
         var excludes = SplitLines(CrExcludes);
@@ -164,7 +213,8 @@ internal sealed partial class MainViewModel : ObservableObject
             CrSkipSystemUpdate, CrDisableXbePatch, OverwriteExisting));
     });
 
-    [RelayCommand] private Task RunRewriteAsync() => GuardedAsync(() =>
+    [RelayCommand]
+    private Task RunRewriteAsync() => GuardedAsync(() =>
     {
         var images = RequireLines(RwImages, "image");
         return RunJobAsync("rewrite", CliCommands.Rewrite(images, NullIfEmpty(RwOutput), NullIfEmpty(RwWorkDir),
@@ -172,42 +222,52 @@ internal sealed partial class MainViewModel : ObservableObject
             OverwriteExisting));
     });
 
-    [RelayCommand] private Task RunWipeAsync() => GuardedAsync(() => RunJobAsync("wipe",
+    [RelayCommand]
+    private Task RunWipeAsync() => GuardedAsync(() => RunJobAsync("wipe",
         CliCommands.Wipe(RequireValue(WpImage, "image"), NullIfEmpty(WpOutput), OverwriteExisting)));
-    [RelayCommand] private Task RunTrimAsync() => GuardedAsync(() => RunJobAsync("trim",
+
+    [RelayCommand]
+    private Task RunTrimAsync() => GuardedAsync(() => RunJobAsync("trim",
         CliCommands.Trim(RequireValue(WpImage, "image"), NullIfEmpty(WpOutput), OverwriteExisting)));
 
-    [RelayCommand] private Task RunRebuildAsync() => GuardedAsync(() =>
+    [RelayCommand]
+    private Task RunRebuildAsync() => GuardedAsync(() =>
     {
         var parts = RequireLines(RbParts, "component");
         var output = RequireValue(RbOutput, "output Redump ISO");
         return RunJobAsync("rebuild", CliCommands.Rebuild(parts, output, NullIfEmpty(RbSectors), OverwriteExisting));
     });
 
-    [RelayCommand] private Task RunCompressAsync() => GuardedAsync(() =>
+    [RelayCommand]
+    private Task RunCompressAsync() => GuardedAsync(() =>
     {
         var source = RequireValue(CpSource, "source directory or image");
         return RunJobAsync("compress", CliCommands.Compress(source, NullIfEmpty(CpOutput),
-            Math.Clamp(CpLevel, 0, 9), string.Equals(CpVersion, "1", StringComparison.Ordinal) ? 1 : 2, NullIfEmpty(CpSplit), OverwriteExisting));
+            Math.Clamp(CpLevel, 0, 9), string.Equals(CpVersion, "1", StringComparison.Ordinal) ? 1 : 2,
+            NullIfEmpty(CpSplit), OverwriteExisting));
     });
 
-    [RelayCommand] private Task RunDecompressAsync() => GuardedAsync(() => RunJobAsync("decompress",
+    [RelayCommand]
+    private Task RunDecompressAsync() => GuardedAsync(() => RunJobAsync("decompress",
         CliCommands.Decompress(RequireValue(DcCso, "CSO file"), NullIfEmpty(DcOutput), OverwriteExisting)));
 
-    [RelayCommand] private Task RunValidateAsync() => GuardedAsync(() =>
+    [RelayCommand]
+    private Task RunValidateAsync() => GuardedAsync(() =>
     {
         var source = RequireValue(VaSource, "source ISO");
         var output = RequireValue(VaOutput, "output ISO");
         return RunJobAsync("validate", CliCommands.Validate(source, output, VaChecksums, NullIfEmpty(VaReport)));
     });
 
-    [RelayCommand] private Task RunChecksumAsync() => GuardedAsync(() =>
+    [RelayCommand]
+    private Task RunChecksumAsync() => GuardedAsync(() =>
     {
         var images = RequireLines(string.IsNullOrWhiteSpace(CsImages) ? VaSource : CsImages, "image");
         return RunJobAsync("checksum", CliCommands.Checksum(images, CsSilent));
     });
 
-    [RelayCommand] private Task RunBatchAsync() => GuardedAsync(() =>
+    [RelayCommand]
+    private Task RunBatchAsync() => GuardedAsync(() =>
     {
         var dir = RequireValue(BaDir, "batch directory");
         var modeFlag = BaMode switch
@@ -218,7 +278,8 @@ internal sealed partial class MainViewModel : ObservableObject
             "Audit" => "-V",
             _ => "-x",
         };
-        return RunJobAsync("batch", CliCommands.Batch(dir, BaRecursive, modeFlag, NullIfEmpty(BaDest), OverwriteExisting));
+        return RunJobAsync("batch",
+            CliCommands.Batch(dir, BaRecursive, modeFlag, NullIfEmpty(BaDest), OverwriteExisting));
     });
 
     private async Task GuardedAsync(Func<Task> run)

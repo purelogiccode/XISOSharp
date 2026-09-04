@@ -1,6 +1,8 @@
-# Compression (CISO)
+# Compression (CISO + ZAR/zstd)
 
 Pure-managed **CISO** (Compressed ISO) writer/reader with BCL DEFLATE (version 1) + LZ4 (version 2) — port of xdvdfs `ciso` crate (`SectorLinearBlockDevice` + `CisoSectorInput` → `ciso::write::write_ciso_image` + `SplitOutput`), including split `.1.cso`/`.2.cso`… output and input (`ciso::split` parity).
+
+Also covered here: **ZAR/ZArchive block compression** (`ZARSharp`, pure-C# zstd) — see [ZArchive / zstd block compression](#zarchive--zstd-block-compression).
 
 - [Format](#format)
 - [CISO v2 (LZ4) writer](#ciso-v2-lz4-writer)
@@ -185,5 +187,38 @@ XISOSharp.Cli decompress out.1.cso rebuilt.iso
 XISOSharp.Cli checksum source.iso rebuilt.iso --silent  # hex match
 # Also: decompress Rust-produced v2 CISO → same checksum
 ```
+
+---
+
+## ZArchive / zstd block compression
+
+`ZARSharp` packs directories into `.zar` archives (ZArchive 0.1.2 format),
+compressing every 64 KiB block with a dependency-free pure-C# zstd encoder
+(RFC 8878), level 6 by default — the same rule as upstream
+`src/zarchivewriter.cpp::StoreBlock` (`ZSTD_compress(..., 6)`, store raw when
+the compressed form is not smaller).
+
+```csharp
+ZArchiveTool.Pack("./game_dir", "game.zar");                    // zstd L6 default
+ZArchiveTool.Pack("./game_dir", "game.zar", compressor: new ZstdCompressor(ZstdCompressionOptions.FromLevel(1)));
+ZArchiveTool.Pack("./game_dir", "game.zar", compressor: new ZarRawCompressor()); // store raw
+ZArchiveTool.Extract("game.zar", "./game_out");
+```
+
+```csharp
+// Standalone single-shot frames, levels 1-6 (fast → lazy strategies).
+var c = new ZstdCompressor(ZstdCompressionOptions.FromLevel(6));
+byte[] frame = c.CompressBlock(data);
+```
+
+- **Ratio**: within ~1% of native libzstd at the same level on text-like input
+  (measured: 64 KiB source blob L6 2573 B vs native 2572 B); incompressible
+  blocks are stored raw with zero expansion beyond the frame header.
+- **Interop**: archives written by `ZARSharp` open in `zarchive.exe` and vice
+  versa; raw frames additionally decode with native `zstd -d`.
+- **Limits**: single-shot 64 KiB blocks only; no dictionaries, legacy frames,
+  multithreading, or streaming API. Decoder caps default to 512 MiB window /
+  frame content (configurable via `ZstdDecoderOptions`); output is valid
+  interoperable zstd, not byte-identical to libzstd.
 
 See also: [CLI](cli.md) · [xdvdfs Compat](xdvdfs-compat.md) · [Archival](archival.md) · [Xiso Format](xiso-format.md)

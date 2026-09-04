@@ -28,7 +28,8 @@ internal sealed class GuiSettings
             var json = File.ReadAllText(SettingsPath);
             return JsonSerializer.Deserialize<GuiSettings>(json) ?? new GuiSettings();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
+                                       or NotSupportedException)
         {
             return new GuiSettings();
         }

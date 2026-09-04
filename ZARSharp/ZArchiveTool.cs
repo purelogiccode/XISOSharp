@@ -8,15 +8,24 @@ namespace ZARSharp;
 /// </summary>
 public static class ZArchiveTool
 {
-    /// <summary>Packs <paramref name="inputDirectory"/> into a new .zar file.</summary>
+    /// <summary>
+    /// Packs <paramref name="inputDirectory"/> into a new .zar file, compressing
+    /// every 64 KiB block (zstd level 6 by default).
+    /// </summary>
     /// <param name="inputDirectory">Directory to pack (recursively).</param>
     /// <param name="outputFile">
     /// Destination path, or null for <c>&lt;stem&gt;.zar</c> next to the input.
     /// </param>
     /// <param name="progress">Optional per-file callback (relative path).</param>
+    /// <param name="compressor">
+    /// Block compressor, or null for the default <see cref="Zstd.ZstdCompressor"/>
+    /// (level 6). Pass <c>new ZarRawCompressor()</c> to store blocks raw.
+    /// </param>
     /// <exception cref="IOException">On I/O errors or when refusing to overwrite.</exception>
     /// <exception cref="InvalidOperationException">On archive structure errors.</exception>
-    public static void Pack(string inputDirectory, string? outputFile = null, Action<string>? progress = null)
+    public static void Pack(
+        string inputDirectory, string? outputFile = null, Action<string>? progress = null,
+        IZarBlockCompressor? compressor = null)
     {
         if (!Directory.Exists(inputDirectory))
         {
@@ -25,7 +34,8 @@ public static class ZArchiveTool
 
         outputFile ??= Path.Combine(
             Path.GetDirectoryName(Path.GetFullPath(inputDirectory)) ?? "",
-            Path.GetFileNameWithoutExtension(inputDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) + ".zar");
+            Path.GetFileNameWithoutExtension(inputDirectory.TrimEnd(Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar)) + ".zar");
 
         if (File.Exists(outputFile) || Directory.Exists(outputFile))
         {
@@ -35,7 +45,7 @@ public static class ZArchiveTool
         try
         {
             using var output = new FileStream(outputFile, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536);
-            using var writer = new ZArchiveWriter(output);
+            using var writer = new ZArchiveWriter(output, compressor);
             byte[] buffer = new byte[ZArchiveCommon.CompressedBlockSize];
 
             // Deterministic order (the C++ iterator order is unspecified).
@@ -74,7 +84,14 @@ public static class ZArchiveTool
         }
         catch
         {
-            try { File.Delete(outputFile); } catch { /* best effort */ }
+            try
+            {
+                File.Delete(outputFile);
+            }
+            catch
+            {
+                /* best effort */
+            }
 
             throw;
         }
@@ -91,7 +108,7 @@ public static class ZArchiveTool
         }
 
         using var reader = ZArchiveReader.TryOpen(inputFile) ??
-            throw new InvalidOperationException("Failed to open ZArchive.");
+                           throw new InvalidOperationException("Failed to open ZArchive.");
 
         Directory.CreateDirectory(outputDirectory);
         ExtractRecursive(reader, string.Empty, outputDirectory);

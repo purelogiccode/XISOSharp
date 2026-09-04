@@ -621,7 +621,7 @@ public class CisoTests : IDisposable
         var pattern = new byte[2048];
         for (var i = 0; i < pattern.Length; i++) pattern[i] = (byte)(i * 7);
 
-        var dataStart = 24 + 4 * 2; // header + 2 index entries
+        const int dataStart = 24 + (4 * 2); // header + 2 index entries
         var cso = new MemoryStream();
         var header = new byte[24];
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(0, 4), CisoReader.Magic);
@@ -679,7 +679,7 @@ public class CisoTests : IDisposable
     {
         var parts = new List<string>();
         var baseName = csoPath[..^4]; // strip ".cso"
-        for (var i = 1; ; i++)
+        for (var i = 1;; i++)
         {
             var part = $"{baseName}.{i}.cso";
             if (!File.Exists(part)) break;

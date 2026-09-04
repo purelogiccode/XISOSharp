@@ -16,8 +16,6 @@ internal sealed class CisoSplitInputStream : Stream
 {
     private readonly FileStream[] _parts;
     private readonly long[] _starts;
-    private readonly long _length;
-    private long _position;
     private bool _disposed;
 
     public CisoSplitInputStream(List<FileStream> parts)
@@ -29,7 +27,7 @@ internal sealed class CisoSplitInputStream : Stream
         _starts = new long[_parts.Length];
         for (var i = 1; i < _parts.Length; i++)
             _starts[i] = _parts[i - 1].Length;
-        _length = _parts[^1].Length;
+        Length = _parts[^1].Length;
     }
 
     public override int Read(byte[] buffer, int offset, int count)
@@ -44,12 +42,12 @@ internal sealed class CisoSplitInputStream : Stream
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         var total = 0;
-        while (total < buffer.Length && _position < _length)
+        while (total < buffer.Length && Position < Length)
         {
             var partIndex = _parts.Length - 1;
             for (var i = 1; i < _parts.Length; i++)
             {
-                if (_starts[i] > _position)
+                if (_starts[i] > Position)
                 {
                     partIndex = i - 1;
                     break;
@@ -57,15 +55,15 @@ internal sealed class CisoSplitInputStream : Stream
             }
 
             var part = _parts[partIndex];
-            var available = part.Length - _position;
+            var available = part.Length - Position;
             if (available <= 0) break;
 
             var toRead = (int)Math.Min(buffer.Length - total, available);
-            part.Seek(_position, SeekOrigin.Begin);
+            part.Seek(Position, SeekOrigin.Begin);
             var n = part.Read(buffer.Slice(total, toRead));
             if (n <= 0) break;
 
-            _position += n;
+            Position += n;
             total += n;
         }
 
@@ -78,21 +76,17 @@ internal sealed class CisoSplitInputStream : Stream
         var target = origin switch
         {
             SeekOrigin.Begin => offset,
-            SeekOrigin.Current => _position + offset,
-            _ => _length + offset
+            SeekOrigin.Current => Position + offset,
+            _ => Length + offset
         };
         if (target < 0) throw new IOException("Seek before beginning of split input");
-        _position = target;
-        return _position;
+        Position = target;
+        return Position;
     }
 
-    public override long Position
-    {
-        get => _position;
-        set => _position = value;
-    }
+    public override long Position { get; set; }
 
-    public override long Length => _length;
+    public override long Length { get; }
 
     public override void SetLength(long value) => throw new NotSupportedException();
 

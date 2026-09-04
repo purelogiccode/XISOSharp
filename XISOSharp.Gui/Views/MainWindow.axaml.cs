@@ -14,10 +14,12 @@ public partial class MainWindow : Window
     {
         Patterns = ["*.iso", "*.xiso", "*.cso", "*.zar", "*.img"],
     };
+
     private static readonly FilePickerFileType CsoFilter = new("CISO images")
     {
         Patterns = ["*.cso", "*.1.cso"],
     };
+
     private static readonly FilePickerFileType IsoFilter = new("ISO images")
     {
         Patterns = ["*.iso", "*.xiso"],
@@ -44,7 +46,8 @@ public partial class MainWindow : Window
         return files.Count > 0 ? files[0] : null;
     }
 
-    private async Task<List<string>> PickFilesAsync(IReadOnlyList<FilePickerFileType> filters, string title, bool allowMultiple)
+    private async Task<List<string>> PickFilesAsync(IReadOnlyList<FilePickerFileType> filters, string title,
+        bool allowMultiple)
     {
         var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
         if (storage is null)
@@ -171,7 +174,8 @@ public partial class MainWindow : Window
 
     private async void AddRbParts_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var picked = await PickFilesAsync([ImageFilter], "Add rebuild components", allowMultiple: true).ConfigureAwait(false);
+        var picked = await PickFilesAsync([ImageFilter], "Add rebuild components", allowMultiple: true)
+            .ConfigureAwait(false);
         Vm.RbParts = AppendLines(Vm.RbParts, picked);
     }
 
@@ -186,7 +190,8 @@ public partial class MainWindow : Window
 
     private async void BrowseRbSectors_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var picked = await PickSingleFileAsync([FilePickerFileTypes.TextPlain], "Select sectors file").ConfigureAwait(false);
+        var picked = await PickSingleFileAsync([FilePickerFileTypes.TextPlain], "Select sectors file")
+            .ConfigureAwait(false);
         if (picked is not null)
         {
             Vm.RbSectors = picked;

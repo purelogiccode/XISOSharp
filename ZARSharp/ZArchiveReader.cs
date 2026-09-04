@@ -159,7 +159,8 @@ public sealed class ZArchiveReader : IDisposable
                 return null;
             }
 
-            long numOffsetRecords = (long)(footer.SectionOffsetRecords.Size / (ulong)CompressionOffsetRecord.SizeOnDisk);
+            long numOffsetRecords =
+                (long)(footer.SectionOffsetRecords.Size / (ulong)CompressionOffsetRecord.SizeOnDisk);
             if (numOffsetRecords == 0)
             {
                 return null;
@@ -190,7 +191,8 @@ public sealed class ZArchiveReader : IDisposable
             }
 
             byte[] nameTable = new byte[(int)footer.SectionNames.Size];
-            if (nameTable.Length > 0 && !TryReadAt(stream, (long)footer.SectionNames.Offset, nameTable, 0, nameTable.Length))
+            if (nameTable.Length > 0 &&
+                !TryReadAt(stream, (long)footer.SectionNames.Offset, nameTable, 0, nameTable.Length))
             {
                 return null;
             }

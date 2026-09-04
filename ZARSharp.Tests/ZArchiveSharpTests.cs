@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using ZARSharp;
 using ZARSharp.Zstd;
 
-namespace XISOSharp.Tests;
+namespace ZARSharp.Tests;
 
 /// <summary>
 /// Tests for the ZARSharp pure-C# ZArchive port: writer/reader round-trips,
@@ -41,10 +41,10 @@ public sealed class ZArchiveSharpTests
     private static byte[] PatternBytes(int length, int seed = 0)
     {
         byte[] data = new byte[length];
-        uint state = (uint)(seed * 2654435761u + 1);
+        uint state = (uint)((seed * 2654435761u) + 1);
         for (int i = 0; i < length; i++)
         {
-            state = state * 1664525 + 1013904223;
+            state = (state * 1664525) + 1013904223;
             data[i] = (byte)(state >> 24);
         }
 
@@ -321,7 +321,7 @@ public sealed class ZArchiveSharpTests
     {
         // RLE block frame: "A" x 500. Single-segment FCS=500 -> 2-byte form (500-256).
         var frame = new List<byte> { 0x28, 0xB5, 0x2F, 0xFD, 0x60, 0xF4, 0x00 };
-        uint header = (uint)((500 << 3) | (1 << 1) | 1);
+        const uint header = (uint)((500 << 3) | (1 << 1) | 1);
         frame.Add((byte)(header & 0xFF));
         frame.Add((byte)((header >> 8) & 0xFF));
         frame.Add((byte)((header >> 16) & 0xFF));
@@ -400,7 +400,9 @@ public sealed class ZArchiveSharpTests
             Directory.CreateDirectory(indir);
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal)
             {
-                ["hello.txt"] = System.Text.Encoding.ASCII.GetBytes(string.Concat(Enumerable.Repeat("Hello ZArchive world! ", 5000))),
+                ["hello.txt"] =
+                    System.Text.Encoding.ASCII.GetBytes(
+                        string.Concat(Enumerable.Repeat("Hello ZArchive world! ", 5000))),
                 ["blob.bin"] = PatternBytes(65536, 11),
                 ["zeros.bin"] = new byte[70000],
                 ["empty.bin"] = [],
@@ -439,7 +441,13 @@ public sealed class ZArchiveSharpTests
         }
         finally
         {
-            try { Directory.Delete(tmp, true); } catch { }
+            try
+            {
+                Directory.Delete(tmp, true);
+            }
+            catch
+            {
+            }
         }
     }
 
@@ -481,7 +489,13 @@ public sealed class ZArchiveSharpTests
         }
         finally
         {
-            try { Directory.Delete(tmp, true); } catch { }
+            try
+            {
+                Directory.Delete(tmp, true);
+            }
+            catch
+            {
+            }
         }
     }
 
@@ -512,8 +526,8 @@ public sealed class ZArchiveSharpTests
         byte[] one = new byte[1];
         for (int b = 0; b < 80; b++)
         {
-            Assert.Equal(1ul, reader.ReadFromFile(node, (ulong)(b * 65536 + b), one));
-            Assert.Equal(data[b * 65536 + b], one[0]);
+            Assert.Equal(1ul, reader.ReadFromFile(node, (ulong)((b * 65536) + b), one));
+            Assert.Equal(data[(b * 65536) + b], one[0]);
         }
     }
 
@@ -643,7 +657,13 @@ public sealed class ZArchiveSharpTests
         }
         finally
         {
-            try { Directory.Delete(tmp, true); } catch { }
+            try
+            {
+                Directory.Delete(tmp, true);
+            }
+            catch
+            {
+            }
         }
     }
 
@@ -668,7 +688,13 @@ public sealed class ZArchiveSharpTests
         }
         finally
         {
-            try { Directory.Delete(tmp, true); } catch { }
+            try
+            {
+                Directory.Delete(tmp, true);
+            }
+            catch
+            {
+            }
         }
     }
 }

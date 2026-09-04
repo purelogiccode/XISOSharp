@@ -43,7 +43,7 @@ public class CisoAutoDetectTests : IDisposable
         File.WriteAllText(Path.Combine(dir, "sub", "c.txt"), "nested");
     }
 
-    private string CreateIso(string work)
+    private static string CreateIso(string work)
     {
         var src = Path.Combine(work, "src");
         Directory.CreateDirectory(src);
@@ -57,7 +57,8 @@ public class CisoAutoDetectTests : IDisposable
 
     private static string Compress(string iso, string csoPath, long? splitBytes = null, byte? version = null)
     {
-        Assert.Equal(0, CisoWriter.CompressToCso(iso, csoPath, splitBytes: splitBytes, version: version ?? CisoWriter.VersionLz4));
+        Assert.Equal(0,
+            CisoWriter.CompressToCso(iso, csoPath, splitBytes: splitBytes, version: version ?? CisoWriter.VersionLz4));
         return csoPath;
     }
 
@@ -89,7 +90,7 @@ public class CisoAutoDetectTests : IDisposable
             Logger.RealQuiet = false;
         }
 
-        public string Output => _out.ToString() + _err.ToString();
+        public string Output => _out.ToString() + _err;
 
         public void Dispose()
         {

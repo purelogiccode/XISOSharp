@@ -39,7 +39,8 @@ The solution contains:
 |---|---|---|
 | `XISOSharp.Core` | net8.0, net9.0, net10.0 | `XISOSharp.dll` + NuGet package |
 | `XISOSharp.Cli` | net10.0 | `XISOSharp.Cli` executable |
-| `XISOSharp.Tests` | net10.0 | xUnit test assembly |
+| `XISOSharp.Tests` | net10.0 | xUnit test assembly (engine + CLI) |
+| `ZARSharp.Tests` | net10.0 | xUnit test assembly (ZArchive/zstd port) |
 | `XISOSharp.Benchmarks` | net10.0 | BenchmarkDotNet harness |
 | `XISOSharpTester` | net10.0-windows | WPF regression-test GUI |
 

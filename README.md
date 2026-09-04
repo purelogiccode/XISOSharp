@@ -12,7 +12,8 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI `XISOSharp.Cli` (`net10.0`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 20 extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (675 tests) — golden fixtures + `MemoryBlockDevice` |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (735 tests) — golden fixtures + `MemoryBlockDevice` |
+| [ZARSharp.Tests](ZARSharp.Tests/) | xUnit suite (1238 tests) — pure-C# ZArchive/zstd port (encoder, decoder, fuzz, corruption, `zarchive.exe` interop) |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | Battle harness vs `References/extract-xiso-build-202505152050/extract-xiso.c` |
@@ -388,7 +389,7 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | `--petrify` skeleton + SHA-1 per file | ✅ | ❌ | ✅ | ❌ |
 | `--update` tail `su20076000_00000000` (XGD3) | ✅ | ❌ | ✅ | ❌ |
 | `--zar` ZArchive/zstd | ✅ | ❌ | ✅ | ❌ |
-| ZArchive read/write/pack/extract library (`ZARSharp`, pure C#, zero packages, incl. RFC 8878 zstd decoder) | ✅ | ❌ | ❌ | ❌ |
+| ZArchive read/write/pack/extract library (`ZARSharp`, pure C#, zero packages, incl. RFC 8878 zstd encoder + decoder) | ✅ | ❌ | ❌ | ❌ |
 | `rebuild` from `.zar` sidecar (XboxKit roadmap "coming soon") | ✅ | ❌ | ❌ | ❌ |
 | `rebuild` lossless (L0/`l0Padding`+game+`l1Padding`+L1) | ✅ | ❌ | ✅ | ❌ |
 | `--security-sectors` `4096`-aligned `sectors.txt` | ✅ | ❌ | 🟡 `sectors.txt` sidecar | ❌ |
@@ -445,7 +446,7 @@ dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
 dotnet test -c Release                       # 724 tests
 ```
 
-Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF); `ZARSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library). CI builds on `ubuntu`/`windows`/`macos`.
+Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF); `ZARSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library); `ZARSharp.Tests` (`net10.0`). CI builds on `ubuntu`/`windows`/`macos`.
 
 ## Requirements
 

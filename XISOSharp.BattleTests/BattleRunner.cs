@@ -22,8 +22,14 @@ internal static class BattleRunner
         using var wrapper = exeExists ? new ExtractXisoWrapper(exePath) : null;
         if (wrapper != null)
         {
-            try { session.NativeVersion = wrapper.GetVersion(); }
-            catch { session.NativeVersion = "unknown"; }
+            try
+            {
+                session.NativeVersion = wrapper.GetVersion();
+            }
+            catch
+            {
+                session.NativeVersion = "unknown";
+            }
         }
 
         Console.WriteLine(
@@ -227,7 +233,7 @@ internal static class BattleRunner
                     TestName = "Audit",
                     Status = BattleStatus.Failed,
                     Detail =
-                                    $"Invalid files={res.FilesChecked} issues={res.Issues.Count} first={res.Issues.FirstOrDefault()}",
+                        $"Invalid files={res.FilesChecked} issues={res.Issues.Count} first={res.Issues.FirstOrDefault()}",
                     ElapsedSeconds = sw.Elapsed.TotalSeconds
                 };
             }
@@ -364,8 +370,14 @@ internal static class BattleRunner
             {
                 var q = Logger.Quiet;
                 Logger.Quiet = true;
-                try { XisoReader.Extract(path, csDir, false); }
-                finally { Logger.Quiet = q; }
+                try
+                {
+                    XisoReader.Extract(path, csDir, false);
+                }
+                finally
+                {
+                    Logger.Quiet = q;
+                }
             }
             catch (ExtractErrorException ex) when (ex.ErrorCode == ExtractError.ErrIsoNoFiles)
             {
@@ -495,8 +507,14 @@ internal static class BattleRunner
             {
                 var q = Logger.Quiet;
                 Logger.Quiet = true;
-                try { XisoReader.Rewrite(csInput, csOutDir, out _); }
-                finally { Logger.Quiet = q; }
+                try
+                {
+                    XisoReader.Rewrite(csInput, csOutDir, out _);
+                }
+                finally
+                {
+                    Logger.Quiet = q;
+                }
             }
             catch (ExtractErrorException ex) when (ex.ErrorCode is ExtractError.ErrIsoRewritten
                                                        or ExtractError.ErrIsoNoFiles)
@@ -635,7 +653,10 @@ internal static class BattleRunner
                 };
             }
         }
-        finally { DeleteDir(tmp); }
+        finally
+        {
+            DeleteDir(tmp);
+        }
     }
 
     private static SubBattleResult RunChecksum(string path)
@@ -785,8 +806,14 @@ internal static class BattleRunner
             {
                 var q = Logger.Quiet;
                 Logger.Quiet = true;
-                try { XisoWriter.PackFromDirectory(dir, csIso); }
-                finally { Logger.Quiet = q; }
+                try
+                {
+                    XisoWriter.PackFromDirectory(dir, csIso);
+                }
+                finally
+                {
+                    Logger.Quiet = q;
+                }
             }
             catch (Exception ex)
             {
@@ -843,7 +870,10 @@ internal static class BattleRunner
                         if (found != null) File.Copy(found, exeIso, true);
                     }
                 }
-                finally { Directory.SetCurrentDirectory(current); }
+                finally
+                {
+                    Directory.SetCurrentDirectory(current);
+                }
             }
 
             if (code != 0 || !File.Exists(exeIso))
@@ -887,8 +917,14 @@ internal static class BattleRunner
             {
                 var q = Logger.Quiet;
                 Logger.Quiet = true;
-                try { XisoReader.Extract(csIso, csExt, false); }
-                finally { Logger.Quiet = q; }
+                try
+                {
+                    XisoReader.Extract(csIso, csExt, false);
+                }
+                finally
+                {
+                    Logger.Quiet = q;
+                }
 
                 (var ec, _, var ese) = wrapper.ExtractFiles(exeIso, exeExt);
                 if (ec != 0)
@@ -928,7 +964,10 @@ internal static class BattleRunner
             result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
             return result;
         }
-        finally { DeleteDir(tmp); }
+        finally
+        {
+            DeleteDir(tmp);
+        }
     }
 
     private static PerFileBattleResult RunAdvancedChecks(string? sampleIso)
@@ -1085,8 +1124,14 @@ internal static class BattleRunner
         {
             var lines = new[] { "0-4095", "100000-104095" };
             var ok = true;
-            try { SecuritySectors.ParseLines(lines, 0, 0, true); }
-            catch { ok = false; }
+            try
+            {
+                SecuritySectors.ParseLines(lines, 0, 0, true);
+            }
+            catch
+            {
+                ok = false;
+            }
 
             sw.Stop();
             return new SubBattleResult
@@ -1241,7 +1286,10 @@ internal static class BattleRunner
             Logger.Quiet = false;
             using var sw = new StringWriter();
             Console.SetOut(sw);
-            try { XisoReader.List(isoPath, false); }
+            try
+            {
+                XisoReader.List(isoPath, false);
+            }
             catch
             {
                 // ignored
@@ -1389,8 +1437,14 @@ internal static class BattleRunner
 
     private static int CountFiles(string dir)
     {
-        try { return Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Length; }
-        catch { return 0; }
+        try
+        {
+            return Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Length;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     private static string CreateTempDir(string name)

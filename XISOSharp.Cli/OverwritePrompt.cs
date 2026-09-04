@@ -38,6 +38,6 @@ internal static class OverwritePrompt
         output.WriteLine("Would you like to overwrite? (Y/N)");
         var response = input.ReadLine()?.Trim();
         return string.Equals(response, "Y", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(response, "YES", StringComparison.OrdinalIgnoreCase);
+               string.Equals(response, "YES", StringComparison.OrdinalIgnoreCase);
     }
 }
