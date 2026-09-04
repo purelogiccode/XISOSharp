@@ -109,7 +109,7 @@ Each issue entry carries `type`, `path`, `sourceSize`, `outputSize`, `sourceHash
 
 ```bash
 # Compare a Redump source with a rebuilt XISO, including checksums
-XISOSharp.Cli validate game.redump.iso rebuilt.xiso --validate-checksums
+XISOSharp.Cli validate --validate-checksums game.redump.iso rebuilt.xiso
 
 # Rewrite and validate with a JSON report; fail the build on mismatch
 XISOSharp.Cli -r --validate --validate-strict --validate-report report.json game.iso

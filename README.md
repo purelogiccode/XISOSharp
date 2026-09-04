@@ -105,7 +105,7 @@ XISOSharp.Cli -V game.iso game2.iso         # deep audit (header/tag/cycles/boun
 # Create / pack / rewrite
 XISOSharp.Cli -c ./game_files                # -> ./game_files.iso
 XISOSharp.Cli -c ./game_files custom.iso
-XISOSharp.Cli -c ./src ./out.iso -s -X "**/*.tmp" -X "**/node_modules/**"
+XISOSharp.Cli -s -X "**/*.tmp" -X "**/node_modules/**" -c ./src ./out.iso
 XISOSharp.Cli --pack ./game_files            # dir → create
 XISOSharp.Cli --pack game.iso                # iso → rewrite (keeps .old)
 XISOSharp.Cli -r game.iso                    # rewrite optimized (skips if already in!xiso)
@@ -115,8 +115,8 @@ XISOSharp.Cli -r -D game.iso                 # + delete .old
 XISOSharp.Cli --copy-out game.iso /media ./media_out
 XISOSharp.Cli --md5 game.iso                 # or --sha256
 XISOSharp.Cli --xex-info game360.iso /default.xex
-XISOSharp.Cli --batch ./isos -d ./out        # all *.iso sorted
-XISOSharp.Cli --batch ./isos --batch-recursive -r
+XISOSharp.Cli --batch -d ./out ./isos        # all *.iso sorted
+XISOSharp.Cli --batch --batch-recursive -r ./isos
 
 # Resume an interrupted unpack (skip files already on disk, logged as "skip: <path>")
 XISOSharp.Cli --skip-existing --unpack game.iso ./out
@@ -132,12 +132,12 @@ XISOSharp.Cli -r -o game.iso game.iso        # Error: ... is the same file as th
 ```bash
 # Video partition precedes game partition — auto-probed, or explicit
 XISOSharp.Cli --skip-sectors 129824 -d ./out redump.iso     # GLOBAL/XGD2
-XISOSharp.Cli -c ./files redump.iso --prepend-sectors 16640 # XGD3
-XISOSharp.Cli -c ./files hybrid.iso --prepend-sectors 283392 # Hybrid 0x89D80000
+XISOSharp.Cli -c --prepend-sectors 16640 ./files redump.iso # XGD3
+XISOSharp.Cli -c --prepend-sectors 283392 ./files hybrid.iso # Hybrid 0x89D80000
 XISOSharp.Cli -r --skip-sectors 283392 game.iso             # rewrite offset image to bare
 
 # Validate lossless round-trip
-XISOSharp.Cli validate game.redump.iso rebuilt.iso --validate-checksums
+XISOSharp.Cli validate --validate-checksums game.redump.iso rebuilt.iso
 XISOSharp.Cli -r --validate --validate-strict --validate-report report.json game.iso
 ```
 
@@ -148,11 +148,11 @@ XISOSharp.Cli -r --validate --validate-strict --validate-report report.json game
 XISOSharp.Cli --video game.redump.iso                  # -> game.video.iso (L0 head + L1 tail)
 XISOSharp.Cli --random game.iso                        # -> game.filler (gap bytes)
 XISOSharp.Cli --seed game.iso                          # -> game.seed (XGD1 PRNG brute-force, 4-byte LE)
-XISOSharp.Cli --wipe game.iso -o wiped.iso             # zero filler gaps
-XISOSharp.Cli --trim game.iso -o trimmed.iso           # truncate after last extent
+XISOSharp.Cli --wipe -o wiped.iso game.iso             # zero filler gaps
+XISOSharp.Cli --trim -o trimmed.iso game.iso           # truncate after last extent
 XISOSharp.Cli --petrify game.iso                       # -> skeleton.iso + .hash (SHA-1 per file)
 XISOSharp.Cli --update game.redump.iso                 # XGD3 -> su20076000_00000000 (+ zeroes it in video)
-XISOSharp.Cli --zar game.iso -o game.zar               # ZArchive/zstd
+XISOSharp.Cli --zar -o game.zar game.iso               # ZArchive/zstd
 
 # Aliases (mirrors xboxkit -a/-b/-c)
 XISOSharp.Cli --all game.redump.iso                    # --random --seed --trim --update --video --wipe
@@ -308,7 +308,7 @@ var merged = XisoRanges.MergeRanges(sys, file);
 var files = XisoRanges.CollectFileEntries(File.OpenRead("game.iso"), isoOffset: 0); // sorted by Offset
 
 // ZAR (zstd)
-int zar = XisoZarchive.CreateZar("game.iso", "game.zar");
+bool zar = XisoZarchive.CreateZar("game.iso", "game.zar");
 
 // Tables & PRNG
 int videoType = XgdTables.GetVideoType("game.redump.iso"); // via PVD 0x832D → WAVE_PVD
@@ -470,7 +470,7 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
-dotnet test -c Release                       # 2071 tests (833 XISOSharp + 1238 ZARSharp)
+dotnet test -c Release                       # 2079 tests (841 XISOSharp + 1238 ZARSharp)
 ```
 
 Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF); `ZARSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library); `ZARSharp.Tests` (`net10.0`). CI builds on `ubuntu`/`windows`/`macos`.

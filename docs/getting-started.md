@@ -145,16 +145,16 @@ int result = XisoReader.List("game.iso", llCompat: false);
 XISOSharp.Cli --video game.redump.iso              # L0 head + L1 tail via XgdTables
 XISOSharp.Cli --random game.iso                    # filler gaps via GetXisoRanges/MergeRanges
 XISOSharp.Cli --seed game.iso                      # XGD1 PRNG brute-force (XboxPrng)
-XISOSharp.Cli --wipe game.iso -o wiped.iso
-XISOSharp.Cli --trim game.iso -o trimmed.iso
+XISOSharp.Cli --wipe -o wiped.iso game.iso
+XISOSharp.Cli --trim -o trimmed.iso game.iso
 XISOSharp.Cli --petrify game.iso                   # skeleton + .hash SHA-1
 XISOSharp.Cli --update game.redump.iso             # XGD3 su20076000_00000000
-XISOSharp.Cli --zar game.iso -o game.zar           # zstd
+XISOSharp.Cli --zar -o game.zar game.iso           # zstd
 XISOSharp.Cli --all game.redump.iso                # all of the above + --video/--wipe
 
 # Lossless rebuild
 XISOSharp.Cli rebuild game.xiso video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso --security-sectors sectors.txt
-XISOSharp.Cli validate game.redump.iso rebuilt.redump.iso --validate-checksums
+XISOSharp.Cli validate --validate-checksums game.redump.iso rebuilt.redump.iso
 ```
 
 See [Archival Workflows](archival.md).

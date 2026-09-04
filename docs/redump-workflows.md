@@ -80,7 +80,7 @@ XISO filesystem begins. The header must then be at `N × 2048 + 0x10000`.
 ## Prepend sectors (writing offset images)
 
 ```bash
-XISOSharp.Cli -c ./game_files redump.iso --prepend-sectors <N>
+XISOSharp.Cli -c --prepend-sectors <N> ./game_files redump.iso
 ```
 
 Writes the image with `N` zero-filled sectors **before** the XISO filesystem, reserving
@@ -103,10 +103,10 @@ layout of a real dump and is readable by other Xbox tools.
 XISOSharp.Cli --skip-sectors 129824 -d ./extracted game.redump.iso
 
 # 2. Rebuild a Redump-style image at the same offset
-XISOSharp.Cli -c ./extracted rebuilt.iso --prepend-sectors 129824
+XISOSharp.Cli -c --prepend-sectors 129824 ./extracted rebuilt.iso
 
 # 3. Prove the conversion is lossless
-XISOSharp.Cli validate game.redump.iso rebuilt.iso --validate-checksums
+XISOSharp.Cli validate --validate-checksums game.redump.iso rebuilt.iso
 ```
 
 ### Optimize an offset image in place
@@ -120,7 +120,7 @@ XISOSharp.Cli -r --skip-sectors 129824 game.redump.iso
 ### Offset images with exclusion and media patching
 
 ```bash
-XISOSharp.Cli -s -X "**/*.tmp" -c ./files custom.iso --prepend-sectors 16640   # XGD3 offset
+XISOSharp.Cli -s -X "**/*.tmp" -c --prepend-sectors 16640 ./files custom.iso   # XGD3 offset
 ```
 
 ## Advanced: archival pipeline (video / filler / seed / wipe / trim / petrify / update / ZAR)
@@ -137,7 +137,7 @@ Quick taste:
 XISOSharp.Cli --all game.redump.iso                  # video+filler+seed+trim+update+wipe in one pass
 XISOSharp.Cli rebuild game.xiso video.iso filler.bin su20076000_00000000 -o game.redump.iso --security-sectors sectors.txt
 XISOSharp.Cli rebuild game.zar video.iso filler.bin su20076000_00000000 -o game.redump.iso   # .zar sidecar as <xiso>
-XISOSharp.Cli --zar game.iso -o game.zar
+XISOSharp.Cli --zar -o game.zar game.iso
 ```
 
 ## Sector math reference

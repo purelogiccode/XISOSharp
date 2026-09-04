@@ -55,7 +55,7 @@ XGD1 only. `XisoOperations.TryExtractSeed` + `XboxPrng.BruteForceSeed(ReadOnlySp
 ## Wipe
 
 ```bash
-XISOSharp.Cli --wipe <input.iso> -o <wiped.xiso>
+XISOSharp.Cli --wipe -o <wiped.xiso> <input.iso>
 ```
 
 `XisoOperations.WipeFiller` → `ProcessWipe` — walks `currentByte < xisoLength`, writing zeroes for filler extents instead of original/PRNG bytes. Part of `--best` (`-twx`). Improves compression for emulator use.
@@ -91,16 +91,27 @@ XISOSharp.Cli --zar <input.iso|redump.iso> [output.zar]
 XISOSharp.Cli rebuild <game.zar> [video.iso] [filler|seed] [su...] -o <redump.iso>
 ```
 
-`XisoZarchive.CreateZar` — packs the XISO file tree with the XboxKit header layout using
-raw (uncompressed) blocks, valid per the ZArchive spec (no native deps, trimmable/AOT-safe).
-Full read/write/pack/extract support lives in the `ZARSharp` project: a pure-C# port of
-`References/ZArchive-0.1.2` with an in-repo RFC 8878 zstd decoder (zero packages), so
-reference `zarchive.exe` archives (zstd-compressed) open transparently.
+`XisoZarchive.CreateZar` — streams the XISO file tree straight into `ZARSharp.ZArchiveWriter`
+(no intermediate directory): every 64 KiB block is compressed with the pure-C# zstd
+encoder (level 6 by default, `IZarBlockCompressor` overridable, raw fallback for
+incompressible blocks — all BCL-only, trimmable/AOT-safe). Output is byte-compatible
+with `zarchive.exe` archives: reference archives open here and ours open there
+(covered both directions in tests). This is the same layout ZarManager produces
+(extract ISO → pack tree), and what Xenia canary loads as a compressed dump —
+`--zar` is the one-step equivalent:
+
+```bash
+XISOSharp.Cli --zar -o game.zar game.iso   # load game.zar directly in Xenia canary
+```
+
+Notes: empty directories survive the conversion; `--zar` also runs inside the
+Redump batch (zar of the XISO component); pass-through `removeUpdate` drops
+`$SystemUpdate` from the archive tree.
 
 ## Security sectors
 
 ```bash
-XISOSharp.Cli --security-sectors <sectors.txt> <redump.iso> --video ...
+XISOSharp.Cli --video --security-sectors <sectors.txt> <redump.iso>
 XISOSharp.Cli rebuild ... --security-sectors <sectors.txt> -o <redump.iso>
 ```
 
@@ -150,7 +161,7 @@ XISOSharp.Cli rebuild game.xiso game.video.iso seed.bin -o rebuilt.redump.iso
 XISOSharp.Cli rebuild game.zar game.video.iso game.filler su20076000_00000000 -o rebuilt.redump.iso
 
 # Validate
-XISOSharp.Cli validate game.redump.iso rebuilt.redump.iso --validate-checksums
+XISOSharp.Cli validate --validate-checksums game.redump.iso rebuilt.redump.iso
 ```
 
 ## API surface
@@ -178,11 +189,11 @@ XISOSharp.Cli --update game.redump.iso su.bin
 XISOSharp.Cli --video game.redump.iso game.video.iso
 XISOSharp.Cli --random game.xiso game.filler
 XISOSharp.Cli rebuild game.xiso game.video.iso game.filler su.bin -o rebuilt.redump.iso
-XISOSharp.Cli validate game.redump.iso rebuilt.redump.iso --validate-checksums
+XISOSharp.Cli validate --validate-checksums game.redump.iso rebuilt.redump.iso
 
 # Trim for emulator
 XISOSharp.Cli --best game.iso          # trimmed + wiped
-XISOSharp.Cli --trim game.iso -o small.xiso
+XISOSharp.Cli --trim -o small.xiso game.iso
 ```
 
 See also: [CLI](cli.md) · [Redump & Disc Layouts](redump-workflows.md) · [Compression](compression.md) · [Library](library.md)

@@ -661,9 +661,14 @@ public class XisoRedumpAndSkeletonTests : IDisposable
 
         Assert.True(ok);
         var len = new FileInfo(zar).Length;
-        // ZAR should be larger than just footer (144) and contain compressed data
-        Assert.True(len > 1024);
-        // For large content (>64KB), there should be multiple blocks, verify file > header
-        Assert.True(len > 144 + 65536);
+        // ZAR should be larger than just footer (144); blocks are zstd-compressed
+        // (see XisoZarConvertTests for ratio assertions), so only the footer bound holds.
+        Assert.True(len > 144);
+        // Output must open in the real reader with all three files present.
+        using var reader = ZARSharp.ZArchiveReader.TryOpen(zar);
+        Assert.NotNull(reader);
+        Assert.Equal(10000UL, reader!.GetFileSize(reader.LookUp("a.txt")));
+        Assert.Equal(70000UL, reader.GetFileSize(reader.LookUp("b.txt")));
+        Assert.Equal(150000UL, reader.GetFileSize(reader.LookUp("sub/big.bin")));
     }
 }

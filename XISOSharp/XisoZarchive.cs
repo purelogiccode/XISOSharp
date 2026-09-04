@@ -1,21 +1,20 @@
-using System.Security.Cryptography;
 using System.Text;
+using ZARSharp;
 
 namespace XISOSharp;
 
 /// <summary>
-/// ZArchive / ZAR creation, ported from <c>References/XboxKit-0.7/LibXGD/ZArchive.cs</c>
-/// and <c>References/ZArchive-0.1.2/*</c>. Uses raw (uncompressed) blocks for
-/// trimmable/AOT compatibility; wire <c>ZstdSharp.Port</c> via <c>FlushBlock</c> for
-/// size parity if desired (format supports both — raw fallback is valid per spec).
+/// XISO → ZArchive (<c>.zar</c>) conversion — the compressed single-file layout
+/// Xenia canary loads for Xbox dumps. Mirrors the ZarManager pipeline
+/// (<c>References/ZarManager-1.2.0/core.py</c>: extract ISO, pack the tree with
+/// <c>zarchive.exe</c>), but streams file bytes straight from the image into
+/// <see cref="ZARSharp.ZArchiveWriter"/> with no intermediate directory.
+/// Every 64 KiB block is compressed with the pure-C# zstd encoder (level 6 by
+/// default); incompressible blocks are stored raw, which is valid per spec.
+/// Output opens in <c>zarchive.exe</c> and vice versa.
 /// </summary>
 public static class XisoZarchive
 {
-    private const int BlockSize = 64 * 1024;
-    private const int BlocksPerRecord = 16;
-    private static readonly byte[] Magic = [0x16, 0x9F, 0x52, 0xD6];
-    private static readonly byte[] Version1 = [0x61, 0xBF, 0x3A, 0x01];
-
     private sealed class PathNode
     {
         public readonly List<PathNode> Subnodes = [];
@@ -23,66 +22,6 @@ public static class XisoZarchive
         public int NameIndex;
         public long SourceOffset;
         public ulong FileSize;
-        public ulong FileOffset;
-        public uint NodeStartIndex;
-    }
-
-    private sealed class HashingStream(FileStream fs)
-    {
-        private readonly FileStream _fs = fs;
-        private readonly SHA256 _sha = SHA256.Create();
-        private readonly byte[] _buf = new byte[8];
-        public long Position;
-
-        public void Write(byte[] buf, int offset, int count)
-        {
-            _fs.Write(buf, offset, count);
-            _sha.TransformBlock(buf, offset, count, null, 0);
-            Position += count;
-        }
-
-        public void Write(byte b)
-        {
-            _buf[0] = b;
-            Write(_buf, 0, 1);
-        }
-
-        public void Write(ushort v)
-        {
-            _buf[0] = (byte)(v >> 8);
-            _buf[1] = (byte)v;
-            Write(_buf, 0, 2);
-        }
-
-        public void Write(uint v)
-        {
-            _buf[0] = (byte)(v >> 24);
-            _buf[1] = (byte)(v >> 16);
-            _buf[2] = (byte)(v >> 8);
-            _buf[3] = (byte)v;
-            Write(_buf, 0, 4);
-        }
-
-        public void Write(ulong v)
-        {
-            _buf[0] = (byte)(v >> 56);
-            _buf[1] = (byte)(v >> 48);
-            _buf[2] = (byte)(v >> 40);
-            _buf[3] = (byte)(v >> 32);
-            _buf[4] = (byte)(v >> 24);
-            _buf[5] = (byte)(v >> 16);
-            _buf[6] = (byte)(v >> 8);
-            _buf[7] = (byte)v;
-            Write(_buf, 0, 8);
-        }
-
-        public byte[] FinalizeHash(byte[] lastBlock)
-        {
-            _sha.TransformFinalBlock(lastBlock, 0, lastBlock.Length);
-            var hash = _sha.Hash!;
-            _sha.Dispose();
-            return hash;
-        }
     }
 
     private static int GetOrAddName(List<string> names, Dictionary<string, int> lookup, string name)
@@ -142,14 +81,18 @@ public static class XisoZarchive
     /// <param name="isoOffset">Byte offset of the XISO partition.</param>
     /// <param name="quiet">When <c>true</c>, suppresses logging.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="compressor">
+    /// Block compressor, or <c>null</c> for the default zstd level 6.
+    /// Pass <c>new ZarRawCompressor()</c> to store blocks raw.
+    /// </param>
     /// <returns><c>true</c> on success; otherwise <c>false</c>.</returns>
     public static bool CreateZar(string isoPath, string? zarPath = null, long isoOffset = 0, bool quiet = false,
-        CancellationToken ct = default)
+        CancellationToken ct = default, IZarBlockCompressor? compressor = null)
     {
         ct.ThrowIfCancellationRequested();
         var outZar = zarPath ?? DeriveZarPath(isoPath);
         using var isoFs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        return CreateZar(isoFs, isoOffset, outZar, false, quiet, ct);
+        return CreateZar(isoFs, isoOffset, outZar, false, quiet, ct, compressor);
     }
 
     private static string DeriveZarPath(string input)
@@ -170,9 +113,13 @@ public static class XisoZarchive
     /// <param name="removeUpdate">When <c>true</c>, excludes the $SystemUpdate directory.</param>
     /// <param name="quiet">When <c>true</c>, suppresses logging.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="compressor">
+    /// Block compressor, or <c>null</c> for the default zstd level 6.
+    /// Pass <c>new ZarRawCompressor()</c> to store blocks raw.
+    /// </param>
     /// <returns><c>true</c> on success; otherwise <c>false</c>.</returns>
     public static bool CreateZar(FileStream isoFs, long xisoOffset, string zarPath, bool removeUpdate, bool quiet,
-        CancellationToken ct = default)
+        CancellationToken ct = default, IZarBlockCompressor? compressor = null)
     {
         ct.ThrowIfCancellationRequested();
         var headerOffset = xisoOffset + Constants.HeaderOffset;
@@ -184,26 +131,43 @@ public static class XisoZarchive
             out var rootNode, out var names);
 
         if (!quiet) Logger.Log($"[INFO] Writing ZArchive to {zarPath}\n");
-        using var zarFs = new FileStream(zarPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 65536);
-        var hs = new HashingStream(zarFs);
+        try
+        {
+            bool ok;
+            using (var zarFs = new FileStream(zarPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536))
+            using (var writer = new ZArchiveWriter(zarFs, compressor))
+            {
+                ok = WriteArchiveData(isoFs, xisoOffset, writer, rootNode, names, quiet, ct);
+                if (ok)
+                {
+                    writer.Finalize();
+                }
+            }
 
-        if (!WriteCompressedData(isoFs, xisoOffset, hs, rootNode, out var offsetRecords, ct))
-            return false;
-        var compressedDataEnd = (ulong)hs.Position;
+            if (!ok)
+            {
+                DeleteIncomplete(zarPath);
+            }
 
-        while (hs.Position % 8 != 0) hs.Write(0);
+            return ok;
+        }
+        catch
+        {
+            DeleteIncomplete(zarPath);
+            throw;
+        }
 
-        var offsetRecordsStart = (ulong)hs.Position;
-        WriteOffsetRecords(hs, offsetRecords);
-
-        var nameTableStart = (ulong)hs.Position;
-        WriteNameTable(hs, names, out var nameOffsets);
-
-        var fileTreeStart = (ulong)hs.Position;
-        WriteFileTree(hs, rootNode, nameOffsets);
-
-        WriteFooter(zarFs, hs, compressedDataEnd, offsetRecordsStart, nameTableStart, fileTreeStart);
-        return true;
+        static void DeleteIncomplete(string path)
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch
+            {
+                // best effort
+            }
+        }
     }
 
     private static void ParseXdvdfs(FileStream isoFs, long isoOffset, long dirOffset, uint dirSize, bool removeUpdate,
@@ -230,6 +194,7 @@ public static class XisoZarchive
         var pos = isoOffset + dirOffset + childOffset;
         isoFs.Seek(pos, SeekOrigin.Begin);
         var left = ReadUShort(isoFs);
+        if (childOffset == 0 && IsEmptyTable(isoFs, left)) return;
         var right = ReadUShort(isoFs);
         var entrySector = ReadUInt(isoFs);
         var entrySize = ReadUInt(isoFs);
@@ -272,187 +237,89 @@ public static class XisoZarchive
             ParseNode(isoFs, isoOffset, dirOffset, dirSize, (long)right * 4, parent, names, lookup);
     }
 
-    private static bool WriteCompressedData(FileStream isoFs, long xisoOffset, HashingStream hs, PathNode root,
-        out List<(ulong BaseOffset, ushort[] Sizes)> offsetRecords, CancellationToken ct)
+    /// <summary>
+    /// Empty directory tables are filled with 0xFF (or 0x00) — the first entry's
+    /// left offset is the giveaway. Mirrors the <c>XisoReader</c> traversal guard:
+    /// 0xFFFF at table start is empty; 0x0000 needs the following 12 bytes to be
+    /// all zero to distinguish it from a valid entry with no left child.
+    /// The stream is positioned just after <paramref name="left"/> on entry and exit.
+    /// </summary>
+    private static bool IsEmptyTable(FileStream isoFs, ushort left)
     {
-        offsetRecords = [];
-        var sizes = new ushort[BlocksPerRecord];
-        var count = 0;
-        ulong recordBase = 0;
-        var buf = new byte[BlockSize];
-        var bufPos = 0;
-        ulong inputOffset = 0;
+        if (left == Constants.PadShort) return true;
+        if (left != Constants.EmptyDirectorySentinel) return false;
+        Span<byte> peek = stackalloc byte[12];
+        var total = 0;
+        while (total < 12)
+        {
+            var n = isoFs.Read(peek[total..]);
+            if (n == 0) break;
+            total += n;
+        }
 
-        var stack = new Stack<(PathNode node, int idx)>();
-        stack.Push((root, 0));
-        while (stack.Count > 0)
+        isoFs.Seek(-total, SeekOrigin.Current);
+        return total == 12 && peek.IndexOfAnyExcept((byte)0) < 0;
+    }
+
+    private static bool WriteArchiveData(FileStream isoFs, long xisoOffset, ZArchiveWriter writer,
+        PathNode root, List<string> names, bool quiet, CancellationToken ct)
+    {
+        var buf = new byte[ZArchiveCommon.CompressedBlockSize];
+        return WriteNode(isoFs, xisoOffset, writer, root, names, "", buf, quiet, ct);
+    }
+
+    private static bool WriteNode(FileStream isoFs, long xisoOffset, ZArchiveWriter writer,
+        PathNode dir, List<string> names, string path, byte[] buf, bool quiet, CancellationToken ct)
+    {
+        foreach (var child in dir.Subnodes)
         {
             ct.ThrowIfCancellationRequested();
-            (PathNode dir, var i) = stack.Pop();
-            while (i < dir.Subnodes.Count)
+            var childPath = path.Length == 0 ? names[child.NameIndex] : path + "/" + names[child.NameIndex];
+            if (!child.IsFile)
             {
-                var child = dir.Subnodes[i++];
-                if (!child.IsFile)
+                if (!writer.MakeDir(childPath, recursive: false))
                 {
-                    stack.Push((dir, i));
-                    dir = child;
-                    i = 0;
-                    continue;
+                    Fail(quiet, $"Failed to create directory {childPath}");
+                    return false;
                 }
 
-                child.FileOffset = inputOffset;
-                isoFs.Seek(xisoOffset + child.SourceOffset, SeekOrigin.Begin);
-                var remaining = (long)child.FileSize;
-                while (remaining > 0)
+                if (!WriteNode(isoFs, xisoOffset, writer, child, names, childPath, buf, quiet, ct))
                 {
-                    var toRead = (int)Math.Min(BlockSize - bufPos, remaining);
-                    var n = isoFs.Read(buf, bufPos, toRead);
-                    if (n == 0) return false;
-                    bufPos += n;
-                    remaining -= n;
-                    inputOffset += (ulong)n;
-                    if (bufPos == BlockSize)
-                    {
-                        FlushBlock(hs, buf, offsetRecords, ref sizes, ref count, ref recordBase);
-                        bufPos = 0;
-                    }
+                    return false;
                 }
+
+                continue;
+            }
+
+            if (!writer.StartNewFile(childPath))
+            {
+                Fail(quiet, $"Failed to create archive file {childPath}");
+                return false;
+            }
+
+            isoFs.Seek(xisoOffset + child.SourceOffset, SeekOrigin.Begin);
+            var remaining = (long)child.FileSize;
+            while (remaining > 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                var toRead = (int)Math.Min(buf.Length, remaining);
+                var n = isoFs.Read(buf, 0, toRead);
+                if (n == 0)
+                {
+                    Fail(quiet, $"Truncated file data for {childPath}");
+                    return false;
+                }
+
+                writer.AppendData(buf.AsSpan(0, n));
+                remaining -= n;
             }
         }
 
-        if (bufPos > 0)
-        {
-            Array.Clear(buf, bufPos, BlockSize - bufPos);
-            FlushBlock(hs, buf, offsetRecords, ref sizes, ref count, ref recordBase);
-        }
-
-        if (count > 0) offsetRecords.Add((recordBase, sizes));
         return true;
-    }
 
-    // Raw-only flush (valid per ZArchive spec). Replace body with ZstdSharp when desired:
-    //   CompressedSize < BlockSize -> store compressed, else raw.
-    private static void FlushBlock(HashingStream hs, byte[] data, List<(ulong, ushort[])> records, ref ushort[] sizes,
-        ref int count, ref ulong recordBase)
-    {
-        if (count == BlocksPerRecord)
+        static void Fail(bool quiet, string message)
         {
-            records.Add((recordBase, sizes));
-            sizes = new ushort[BlocksPerRecord];
-            count = 0;
-        }
-
-        if (count == 0) recordBase = (ulong)hs.Position;
-
-        // No compression: store raw block verbatim (ZArchive readers accept this)
-        hs.Write(data, 0, BlockSize);
-        sizes[count++] = BlockSize - 1;
-    }
-
-    private static void WriteOffsetRecords(HashingStream hs, List<(ulong BaseOffset, ushort[] Sizes)> records)
-    {
-        foreach ((var baseOff, var sizes) in records)
-        {
-            hs.Write(baseOff);
-            foreach (var s in sizes) hs.Write(s);
+            if (!quiet) Logger.LogErr($"[ERROR] {message}\n");
         }
     }
-
-    private static void WriteNameTable(HashingStream hs, List<string> names, out uint[] offsets)
-    {
-        offsets = new uint[names.Count];
-        uint pos = 0;
-        for (var i = 0; i < names.Count; i++)
-        {
-            offsets[i] = pos;
-            var nameBytes = Encoding.UTF8.GetBytes(names[i]);
-            var len = nameBytes.Length;
-            if (len >= 0x80)
-            {
-                byte[] hdr = [(byte)((len & 0x7F) | 0x80), (byte)(len >> 7)];
-                hs.Write(hdr, 0, 2);
-                pos += 2;
-            }
-            else
-            {
-                hs.Write([(byte)(len & 0x7F)], 0, 1);
-                pos++;
-            }
-
-            hs.Write(nameBytes, 0, nameBytes.Length);
-            pos += (uint)nameBytes.Length;
-        }
-    }
-
-    private static void WriteFileTree(HashingStream hs, PathNode root, uint[] nameOffsets)
-    {
-        var nodes = new List<PathNode>();
-        var q = new Queue<PathNode>([root]);
-        uint idx = 1;
-        while (q.Count > 0)
-        {
-            var n = q.Dequeue();
-            nodes.Add(n);
-            if (n.IsFile) continue;
-            n.NodeStartIndex = idx;
-            idx += (uint)n.Subnodes.Count;
-            foreach (var c in n.Subnodes) q.Enqueue(c);
-        }
-
-        foreach (var n in nodes)
-        {
-            if (n == root) hs.Write(0x7FFFFFFF);
-            else if (n.IsFile) hs.Write(0x80000000u | nameOffsets[n.NameIndex]);
-            else hs.Write(nameOffsets[n.NameIndex]);
-
-            if (n.IsFile)
-            {
-                hs.Write((uint)(n.FileOffset & 0xFFFFFFFF));
-                hs.Write((uint)(n.FileSize & 0xFFFFFFFF));
-                hs.Write((ushort)(n.FileSize >> 32));
-                hs.Write((ushort)(n.FileOffset >> 32));
-            }
-            else
-            {
-                hs.Write(n.NodeStartIndex);
-                hs.Write((uint)n.Subnodes.Count);
-                hs.Write((uint)0);
-            }
-        }
-    }
-
-    private static void WriteFooter(FileStream zarFs, HashingStream hs, ulong compressedDataSize,
-        ulong offsetRecordsStart, ulong nameTableStart, ulong fileTreeStart)
-    {
-        var end = (ulong)hs.Position;
-        var totalSize = end + 144;
-        using var ms = new MemoryStream(144);
-        using var bw = new BinaryWriter(ms);
-        WriteBe(bw, 0UL);
-        WriteBe(bw, compressedDataSize);
-        WriteBe(bw, offsetRecordsStart);
-        WriteBe(bw, nameTableStart - offsetRecordsStart);
-        WriteBe(bw, nameTableStart);
-        WriteBe(bw, fileTreeStart - nameTableStart);
-        WriteBe(bw, fileTreeStart);
-        WriteBe(bw, end - fileTreeStart);
-        WriteBe(bw, end);
-        WriteBe(bw, 0UL);
-        WriteBe(bw, end);
-        WriteBe(bw, 0UL);
-        bw.Write(new byte[32]);
-        WriteBe(bw, totalSize);
-        bw.Write(Version1);
-        bw.Write(Magic);
-        var footer = ms.ToArray();
-        var hash = hs.FinalizeHash(footer);
-        Array.Copy(hash, 0, footer, 96, 32);
-        zarFs.Write(footer, 0, footer.Length);
-    }
-
-    private static void WriteBe(BinaryWriter bw, ulong v) =>
-        bw.Write([
-            (byte)(v >> 56), (byte)(v >> 48), (byte)(v >> 40), (byte)(v >> 32), (byte)(v >> 24), (byte)(v >> 16),
-            (byte)(v >> 8), (byte)v
-        ]);
 }

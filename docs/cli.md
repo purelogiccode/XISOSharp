@@ -69,7 +69,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--trim` | **Redump:** truncate after last file extent (`ranges[^1].End+1 * SectorSize`); writes `*.trim.xiso`. See [Archival](archival.md#trim). |
 | `--petrify` | **Redump:** skeleton — XISO with file extents zeroed + SHA-1 per file (`XisoSkeleton.Petrify`, `CollectFileEntries` sorted); writes skeleton + `*.hash`. See [Archival](archival.md#petrify). |
 | `--update` | **Redump:** extract system update `su20076000_00000000` from XGD3 video `L1` tail (`XisoRedump.TryExtractUpdate`, `FindUpdateOffset` `ABCDABCD`); warns on XGD1/2. See [Archival](archival.md#update). |
-| `--zar` | **Redump:** create ZArchive/zstd (`XisoZarchive.CreateZar`, skeleton+update+video sidecars). See [Archival](archival.md#zar). |
+| `--zar` | Create ZArchive/zstd (`XisoZarchive.CreateZar` → `ZARSharp.ZArchiveWriter`, L6 blocks + raw fallback; standalone `--zar <iso> [out.zar]` or Redump-batch zar of the XISO component). Load the result directly in Xenia canary. See [Archival](archival.md#zar). |
 | `--all` | Alias: `--random --seed --trim --update --video --wipe` (→ `--xiso` as batch). Mirrors XboxKit `-a`. |
 | `--best` | Alias: `--trim --wipe` (XISO). Mirrors XboxKit `-b`. |
 | `--compress` | Alias: `--petrify --update --video --zar`. Mirrors XboxKit `-c`. Also see xdvdfs `compress`. |
@@ -346,7 +346,7 @@ XISOSharp.Cli game1.iso game2.iso game3.iso
 XISOSharp.Cli -s -X "**/*.tmp" -c ./game_files custom_name.iso
 
 # Create a Redump-style image (game partition at the XGD2 offset)
-XISOSharp.Cli -c ./game_files redump.iso --prepend-sectors 129824
+XISOSharp.Cli -c --prepend-sectors 129824 ./game_files redump.iso
 
 # Pack a directory into an ISO (alias-style convenience)
 XISOSharp.Cli --pack ./game_files
@@ -361,7 +361,7 @@ XISOSharp.Cli --skip-sectors 129824 -d ./out redump.iso
 XISOSharp.Cli -r --validate --validate-strict game.iso
 
 # Validate two images against each other
-XISOSharp.Cli validate source.iso rebuilt.iso --validate-checksums --validate-report report.json
+XISOSharp.Cli validate --validate-checksums --validate-report report.json source.iso rebuilt.iso
 
 # Deep-audit several images
 XISOSharp.Cli -V game1.iso game2.iso
@@ -395,15 +395,15 @@ XISOSharp.Cli --video game.redump.iso
 # Extract filler + seed, wipe & trim
 XISOSharp.Cli --random game.redump.iso
 XISOSharp.Cli --seed game.redump.iso          # XGD1 only
-XISOSharp.Cli --wipe game.redump.iso -o wiped.xiso
-XISOSharp.Cli --trim game.redump.iso -o trimmed.xiso
+XISOSharp.Cli --wipe -o wiped.xiso game.redump.iso
+XISOSharp.Cli --trim -o trimmed.xiso game.redump.iso
 XISOSharp.Cli --all game.redump.iso           # all-of-the-above + video/wipe
 XISOSharp.Cli --best game.redump.iso          # trim + wipe
 
 # Petrify + update + zar
 XISOSharp.Cli --petrify game.iso              # skeleton + .hash (SHA-1)
 XISOSharp.Cli --update game.redump.iso        # XGD3 su20076000_00000000
-XISOSharp.Cli --zar game.iso -o game.zar
+XISOSharp.Cli --zar -o game.zar game.iso
 
 # Rebuild Redump from components (lossless round-trip)
 XISOSharp.Cli rebuild x.iso video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso
