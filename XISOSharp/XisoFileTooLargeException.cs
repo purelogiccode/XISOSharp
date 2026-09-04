@@ -47,5 +47,9 @@ public class XisoFileTooLargeException : IOException
         FileName = fileName;
         FileSize = fileSize;
     }
+
+    public XisoFileTooLargeException(string? message, int hresult) : base(message, hresult)
+    {
+    }
 }
 #pragma warning restore RCS1194

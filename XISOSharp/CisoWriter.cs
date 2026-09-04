@@ -148,7 +148,7 @@ public static class CisoWriter
     /// </summary>
     private static void GuardSplitParts(string sourcePath, string output, long splitBytes)
     {
-        var maxPart = new FileInfo(sourcePath).Length / splitBytes + 2;
+        var maxPart = (new FileInfo(sourcePath).Length / splitBytes) + 2;
         for (var i = 0L; i < maxPart; i++)
         {
             var part = CisoSplitFile.PartPath(output, i);

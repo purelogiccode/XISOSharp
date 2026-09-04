@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace ZARSharp.Zstd;
 
 /// <summary>
@@ -993,6 +995,7 @@ public static class ZstdDecompressor
         }
     }
 
+    [StructLayout(LayoutKind.Auto)]
     private readonly struct SeqEntry
     {
         public readonly uint Baseline;

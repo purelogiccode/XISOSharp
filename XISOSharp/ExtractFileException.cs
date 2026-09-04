@@ -53,6 +53,30 @@ public sealed class ExtractFileException : ExtractErrorException
         BytesRead = bytesRead;
     }
 
+    public ExtractFileException() : base()
+    {
+    }
+
+    public ExtractFileException(string message) : base(message)
+    {
+    }
+
+    public ExtractFileException(string message, Exception innerException) : base(message, innerException)
+    {
+    }
+
+    public ExtractFileException(ExtractError code) : base(code)
+    {
+    }
+
+    public ExtractFileException(ExtractError code, string message) : base(code, message)
+    {
+    }
+
+    public ExtractFileException(ExtractError code, string message, Exception innerException) : base(code, message, innerException)
+    {
+    }
+
     private static string FormatMessage(string internalPath, string destPath, uint startSector, long fileSize,
         string detail, long bytesRead)
     {

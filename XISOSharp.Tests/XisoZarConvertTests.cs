@@ -93,7 +93,7 @@ public sealed class XisoZarConvertTests : IDisposable
     private static byte[] PatternBytes(int length, int seed)
     {
         byte[] data = new byte[length];
-        uint state = (uint)(seed * 2654435761u + 1);
+        uint state = (uint)((seed * 2654435761u) + 1);
         for (int i = 0; i < length; i++)
         {
             state = (state * 1664525) + 1013904223;

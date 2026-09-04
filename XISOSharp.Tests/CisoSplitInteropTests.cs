@@ -4,12 +4,13 @@ using System.Security.Cryptography;
 namespace XISOSharp.Tests;
 
 /// <summary>
+/// <para>
 /// Golden round-trips against actual Rust-produced <c>.N.cso</c> files from the
 /// reference <c>xdvdfs-cli 0.8.3</c> binary (<c>ciso 0.2.1</c> split writer/reader).
 /// The binary lives in the gitignored <c>References/xdvdfs-0.8.3</c> folder; tests that
 /// need it silently pass when it is absent (same pattern as the <c>zarchive.exe</c> interop).
-///
-/// Notes on the reference tooling, verified against <c>ciso 0.2.1</c> sources:
+/// </para>
+/// <para>Notes on the reference tooling, verified against <c>ciso 0.2.1</c> sources:</para>
 /// <list type="bullet">
 /// <item><c>unpack</c>/<c>copy-out</c> use <c>open_image_raw</c> and do NOT accept <c>.cso</c>
 /// input, so the content oracle here is <c>xdvdfs md5</c> (cso-aware via

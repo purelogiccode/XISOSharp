@@ -3,12 +3,14 @@ using ZARSharp.Zstd;
 namespace ZARSharp.Tests;
 
 /// <summary>
+/// <para>
 /// Phase 9 corruption tests. Core property: a flipped / truncated byte must
 /// either throw <see cref="ZstdException"/> or decode byte-identical to the
 /// original — never silent corruption, never a hang. Every decode runs under
 /// a 10 s guard (the decoder is fully bounds-checked, so the guard only ever
 /// fires on a regression).
-///
+/// </para>
+/// <para>
 /// Assertion strength by region (all sound):
 /// - Frame header bytes (magic / descriptor / window / FCS) and content
 ///   checksum bytes: every flip MUST throw (these bytes are always
@@ -24,6 +26,7 @@ namespace ZARSharp.Tests;
 /// Goldens use seeded randomized text so frames are KB-sized with rich
 /// entropy tables (a cycled 66 B phrase would collapse to ~80 B and exercise
 /// nothing).
+/// </para>
 /// </summary>
 public sealed class ZstdCorruptionTests
 {
@@ -42,10 +45,12 @@ public sealed class ZstdCorruptionTests
     }
 
     private static readonly byte[] TextInput = MakeText(65536, 0xC04E);
+
     private static readonly byte[] TextFrame =
         new ZstdCompressor(ZstdCompressionOptions.FromLevel(6)).CompressBlock(TextInput);
 
     private static readonly byte[] SmallInput = MakeText(2048, 0x5EEE);
+
     private static readonly byte[] ChecksumFrame =
         new ZstdCompressor(new ZstdCompressionOptions { Level = 6, ChecksumFlag = true })
             .CompressBlock(SmallInput);

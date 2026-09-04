@@ -557,7 +557,8 @@ public static class XisoReader
                                                    ex is not OperationCanceledException)
                         {
                             var failure = ex as ExtractFileException
-                                ?? ExtractFileException.ForDirectory(string.Concat(path, filename), filename, ex);
+                                          ?? ExtractFileException.ForDirectory(string.Concat(path, filename), filename,
+                                              ex);
                             unpackOptions.RecordFailure(failure);
                             Logger.LogErr($"Error: {failure.Message}\n");
                             dirOk = false;
@@ -625,8 +626,8 @@ public static class XisoReader
                                                    ex is not OperationCanceledException)
                         {
                             var failure = ex as ExtractFileException
-                                ?? ExtractFileException.ForWrite(string.Concat(path, filename), filename,
-                                    startSector, fileSize, -1, ex);
+                                          ?? ExtractFileException.ForWrite(string.Concat(path, filename), filename,
+                                              startSector, fileSize, -1, ex);
                             unpackOptions.RecordFailure(failure);
                             Logger.LogErr($"Error: {failure.Message}\n");
                             written = false;
@@ -750,8 +751,10 @@ public static class XisoReader
                 var imageLength = fs.Length;
                 var dataEnd = ((long)startSector * Constants.SectorSize) + discLseek + fileSize;
                 if (dataEnd > imageLength)
+                {
                     throw ExtractFileException.ForTruncated(internalPath, filename, startSector, fileSize,
                         Math.Max(0, imageLength - (((long)startSector * Constants.SectorSize) + discLseek)));
+                }
             }
             catch (ExtractFileException)
             {
@@ -814,8 +817,10 @@ public static class XisoReader
                     } while (totalSize < fileSize && size > 0);
 
                     if (totalSize < fileSize)
+                    {
                         throw ExtractFileException.ForTruncated(internalPath, filename, startSector, fileSize,
                             totalSize);
+                    }
                 }
             }
 
@@ -1047,8 +1052,7 @@ public static class XisoReader
     /// </exception>
     public static bool IsOptimizedImage(Stream imageStream, int? skipSectors = null)
     {
-        if (imageStream == null)
-            throw new ArgumentNullException(nameof(imageStream));
+        ArgumentNullException.ThrowIfNull(imageStream);
         if (!imageStream.CanRead || !imageStream.CanSeek)
             throw new ArgumentException("Image stream must be readable and seekable.", nameof(imageStream));
 
@@ -1297,13 +1301,14 @@ public static class XisoReader
         UnpackOptions? unpackOptions = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (imageStream == null)
-            throw new ArgumentNullException(nameof(imageStream));
+        ArgumentNullException.ThrowIfNull(imageStream);
         if (!imageStream.CanRead || !imageStream.CanSeek)
             throw new ArgumentException("Image stream must be readable and seekable.", nameof(imageStream));
         if (mode == ExtractMode.Rewrite)
+        {
             throw new ArgumentException("Rewrite mode requires a file path; use DecodeXiso(string, ...).",
                 nameof(mode));
+        }
 
         return DecodeXisoCore(imageStream, imageName, outputPath, mode, out outIsoPath, llCompat,
             cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions);
@@ -1333,7 +1338,7 @@ public static class XisoReader
         // Batch scripts can pass an empty -d (`-d "%UNSET_VAR%"`): fail fast
         // with a named error instead of an IndexOutOfRangeException deep in
         // path-prefix building or a BCL ArgumentException from CreateDirectory.
-        if (outputPath != null && outputPath.Length == 0)
+        if (outputPath?.Length == 0)
             throw new ArgumentException("Output path must not be empty.", nameof(outputPath));
 
         var filename = imageName;
@@ -2284,8 +2289,10 @@ public static class XisoReader
                     var toRead = (int)Math.Min(remaining, Constants.ReadWriteBufferSize);
                     var read = fs.Read(buffer, 0, toRead);
                     if (read <= 0)
+                    {
                         throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
                             entry.FileSize, totalRead);
+                    }
 
                     outFile.Write(buffer, 0, read);
                     remaining -= (uint)read;
@@ -2294,8 +2301,10 @@ public static class XisoReader
             }
 
             if (new FileInfo(destPath).Length != (long)entry.FileSize)
+            {
                 throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
                     entry.FileSize, new FileInfo(destPath).Length);
+            }
         }
         catch (ExtractFileException)
         {
@@ -2336,8 +2345,8 @@ public static class XisoReader
             catch (Exception ex) when (options?.ContinueOnError == true && ex is not OperationCanceledException)
             {
                 var failure = ex as ExtractFileException
-                    ?? ExtractFileException.ForWrite(entryInternalPath, entryDestPath, entry.StartSector,
-                        entry.FileSize, -1, ex);
+                              ?? ExtractFileException.ForWrite(entryInternalPath, entryDestPath, entry.StartSector,
+                                  entry.FileSize, -1, ex);
                 options.RecordFailure(failure);
                 Logger.LogErr($"Error: {failure.Message}\n");
             }

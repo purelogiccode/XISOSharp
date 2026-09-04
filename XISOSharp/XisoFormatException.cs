@@ -25,5 +25,9 @@ public class XisoFormatException : IOException
     public XisoFormatException(string message, Exception innerException) : base(message, innerException)
     {
     }
+
+    public XisoFormatException(string? message, int hresult) : base(message, hresult)
+    {
+    }
 }
 #pragma warning restore RCS1194

@@ -9,4 +9,12 @@ public sealed class ZstdException : Exception
         : base(message)
     {
     }
+
+    public ZstdException() : base()
+    {
+    }
+
+    public ZstdException(string? message, Exception? innerException) : base(message, innerException)
+    {
+    }
 }

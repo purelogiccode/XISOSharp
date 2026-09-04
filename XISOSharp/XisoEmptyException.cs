@@ -27,5 +27,17 @@ public class XisoEmptyException : ExtractErrorException
         innerException)
     {
     }
+
+    public XisoEmptyException(ExtractError code) : base(code)
+    {
+    }
+
+    public XisoEmptyException(ExtractError code, string message) : base(code, message)
+    {
+    }
+
+    public XisoEmptyException(ExtractError code, string message, Exception innerException) : base(code, message, innerException)
+    {
+    }
 }
 #pragma warning restore RCS1194

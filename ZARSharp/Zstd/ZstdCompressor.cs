@@ -97,10 +97,7 @@ public sealed class ZstdCompressor : IZarBlockCompressor
     /// <summary>Matches <c>ZSTD_compressBound</c> for single-shot frames.</summary>
     public static int GetCompressBound(int sourceSize)
     {
-        if (sourceSize < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(sourceSize));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(sourceSize);
 
         // lib/zstd.h: ZSTD_COMPRESSBOUND(s) = s + (s>>8) + (s<128KB ? (128KB-s)>>11 : 0).
         long bound = (long)sourceSize + (sourceSize >> 8);
@@ -194,8 +191,7 @@ public sealed class ZstdCompressor : IZarBlockCompressor
             pos += blockSize;
             inPos += chunk;
             remaining -= chunk;
-        }
-        while (remaining > 0);
+        } while (remaining > 0);
 
         if (checksum)
         {

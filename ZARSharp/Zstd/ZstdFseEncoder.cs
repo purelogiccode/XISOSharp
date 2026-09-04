@@ -85,10 +85,7 @@ internal static class ZstdFseEncoder
     /// </summary>
     public static int MinTableLogFor(int srcSize, int maxSymbolValue)
     {
-        if (srcSize <= 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(srcSize));
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(srcSize, 1);
 
         uint minBitsSrc = (uint)BitOperations.Log2((uint)srcSize) + 1;
         uint minBitsSymbols = (uint)BitOperations.Log2((uint)maxSymbolValue) + 2;
@@ -111,10 +108,7 @@ internal static class ZstdFseEncoder
     /// </summary>
     public static int OptimalTableLog(int maxTableLog, int srcSize, int maxSymbolValue, int minus)
     {
-        if (srcSize <= 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(srcSize));
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(srcSize, 1);
 
         uint maxBitsSrc = unchecked((uint)(BitOperations.Log2((uint)(srcSize - 1)) - minus));
         uint tableLog = maxTableLog == 0 ? DefaultTableLog : (uint)maxTableLog;
@@ -163,10 +157,7 @@ internal static class ZstdFseEncoder
             throw new ArgumentOutOfRangeException(nameof(maxSymbolValue));
         }
 
-        if (total <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(total));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(total);
 
         if (tableLog == 0)
         {
@@ -387,10 +378,7 @@ internal static class ZstdFseEncoder
             throw new ZstdException("FSE tableLog too small.");
         }
 
-        if (norm.Length <= maxSymbolValue)
-        {
-            throw new ArgumentOutOfRangeException(nameof(maxSymbolValue));
-        }
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(maxSymbolValue, norm.Length);
 
         var writer = new ForwardBitWriter(dst, offset, capacity);
         writer.AddBits((uint)(tableLog - MinTableLog), 4);
@@ -477,10 +465,7 @@ internal static class ZstdFseEncoder
             throw new ZstdException("Invalid FSE tableLog.");
         }
 
-        if (norm.Length <= maxSymbolValue)
-        {
-            throw new ArgumentOutOfRangeException(nameof(maxSymbolValue));
-        }
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(maxSymbolValue, norm.Length);
 
         int tableSize = 1 << tableLog;
         int tableMask = tableSize - 1;
@@ -601,10 +586,7 @@ internal static class ZstdFseEncoder
     public static bool IsSingleSymbol(byte[] src, int offset, int length, out byte symbol)
     {
         ArgumentNullException.ThrowIfNull(src);
-        if (length <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(length));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
 
         symbol = src[offset];
         for (int i = 1; i < length; i++)

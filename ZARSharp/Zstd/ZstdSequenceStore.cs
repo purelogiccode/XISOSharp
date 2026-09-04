@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace ZARSharp.Zstd;
 
 /// <summary>
@@ -32,8 +34,9 @@ public static class ZstdSeq
 
     /// <summary><c>OFFSET_TO_OFFBASE(o)</c>: encodes a real offset (must be ≥ 1).</summary>
     public static uint OffsetToOffBase(uint offset) =>
-        offset > 0 ? offset + RepNum
-        : throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be >= 1.");
+        offset > 0
+            ? offset + RepNum
+            : throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be >= 1.");
 
     /// <summary><c>OFFBASE_IS_OFFSET(o)</c>.</summary>
     public static bool IsOffset(uint offBase) => offBase > RepNum;
@@ -43,13 +46,15 @@ public static class ZstdSeq
 
     /// <summary><c>OFFBASE_TO_OFFSET(o)</c>: decodes a real offset (must be an offset code).</summary>
     public static uint ToOffset(uint offBase) =>
-        IsOffset(offBase) ? offBase - RepNum
-        : throw new ArgumentOutOfRangeException(nameof(offBase), "Not an offset code.");
+        IsOffset(offBase)
+            ? offBase - RepNum
+            : throw new ArgumentOutOfRangeException(nameof(offBase), "Not an offset code.");
 
     /// <summary><c>OFFBASE_TO_REPCODE(o)</c>: decodes a repeat code id 1..3.</summary>
     public static uint ToRepcode(uint offBase) =>
-        IsRepcode(offBase) ? offBase
-        : throw new ArgumentOutOfRangeException(nameof(offBase), "Not a repeat code.");
+        IsRepcode(offBase)
+            ? offBase
+            : throw new ArgumentOutOfRangeException(nameof(offBase), "Not a repeat code.");
 
     /// <summary>
     /// <c>ZSTD_updateRep</c>: updates the 3-entry repeat-offset history in place
@@ -96,6 +101,7 @@ public static class ZstdSeq
 /// <param name="LitLength">Literal run length in bytes.</param>
 /// <param name="OffBase">Offset base code (see <see cref="ZstdSeq"/>).</param>
 /// <param name="MatchLength">Full match length in bytes (≥ <see cref="ZstdSeq.MinMatch"/>).</param>
+[StructLayout(LayoutKind.Auto)]
 public readonly record struct ZstdSequence(uint LitLength, uint OffBase, uint MatchLength);
 
 /// <summary>
@@ -211,10 +217,7 @@ public sealed class ZstdSequenceStore
     public ZstdSequence Get(int index)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
-        if (index >= _count)
-        {
-            throw new ArgumentOutOfRangeException(nameof(index));
-        }
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _count);
 
         uint litLength = _litLengths[index];
         uint matchLength = (uint)(_mlBases[index] + ZstdSeq.MinMatch);

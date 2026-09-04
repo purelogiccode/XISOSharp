@@ -105,12 +105,12 @@ public class ExtractRobustnessTests : IDisposable
     /// all but the last <paramref name="dropBytes"/> of that file.
     /// (Cutting the tail is not enough: created images end with zero padding.)
     /// </summary>
-    private string TruncateInsideFile(string isoPath, string internalPath, int dropBytes)
+    private static string TruncateInsideFile(string isoPath, string internalPath, int dropBytes)
     {
         var entry = XisoReader.GetEntryInfo(isoPath, internalPath);
         Assert.NotNull(entry);
         var vol = XisoReader.GetVolumeInfo(isoPath);
-        var dataEnd = (long)entry.StartSector * Constants.SectorSize + vol.DiscLseek + entry.FileSize;
+        var dataEnd = ((long)entry.StartSector * Constants.SectorSize) + vol.DiscLseek + entry.FileSize;
         Assert.True(dataEnd - dropBytes > Constants.HeaderOffset,
             "fixture layout unexpectedly small; cannot truncate inside file data");
 

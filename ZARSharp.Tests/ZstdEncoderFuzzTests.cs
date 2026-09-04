@@ -43,7 +43,8 @@ public sealed class ZstdEncoderFuzzTests
                 break;
             case "text":
             {
-                const string sample = "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. ";
+                const string sample =
+                    "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. ";
                 byte[] ascii = System.Text.Encoding.ASCII.GetBytes(sample);
                 for (int i = 0; i < n; i++)
                 {
@@ -54,7 +55,7 @@ public sealed class ZstdEncoderFuzzTests
             }
 
             case "sparse":
-                for (int i = 0; i < n / 97 + 1 && i * 97 < n; i++)
+                for (int i = 0; i < (n / 97) + 1 && i * 97 < n; i++)
                 {
                     buf[rng.Next(n == 0 ? 1 : n)] = (byte)rng.Next(256);
                 }
@@ -82,7 +83,7 @@ public sealed class ZstdEncoderFuzzTests
             case "allbytes":
                 for (int i = 0; i < n; i++)
                 {
-                    buf[i] = (byte)((i * 31 + rng.Next(256)) % 256);
+                    buf[i] = (byte)(((i * 31) + rng.Next(256)) % 256);
                 }
 
                 break;

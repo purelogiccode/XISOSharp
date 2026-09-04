@@ -1227,7 +1227,7 @@ internal static class Program
                 Logger.Log($"Copied {internalPath} to {destPath}\n");
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException
-                or ExtractErrorException)
+                                           or ExtractErrorException)
             {
                 Logger.LogErr($"Error: {ex.Message}\n");
                 return 1;
@@ -1411,12 +1411,18 @@ internal static class Program
                 try
                 {
                     if (extract)
+                    {
                         XisoReader.Extract(xisoPath, path, !optimized, skipSectors: skipSectors,
                             options: unpackOptions);
+                    }
                     else if (tree)
+                    {
                         XisoReader.Tree(xisoPath, !optimized, skipSectors: skipSectors);
+                    }
                     else
+                    {
                         XisoReader.List(xisoPath, !optimized, skipSectors: skipSectors);
+                    }
                 }
                 catch (ExtractErrorException ex) when (ex.ErrorCode == ExtractError.ErrIsoNoFiles)
                 {

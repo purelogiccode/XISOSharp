@@ -137,7 +137,7 @@ public class CliDestinationDirTests : IDisposable
         var isoPath = CreateIso(src, "game.iso");
         var control = CreateTempDir("xiso_d_control2");
         var doubled = CreateTempDir("xiso_d_doubled")
-            + new string(Path.DirectorySeparatorChar, 2);
+                      + new string(Path.DirectorySeparatorChar, 2);
 
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, control));
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, doubled));
@@ -230,7 +230,7 @@ public class CliDestinationDirTests : IDisposable
         var src = CreateSourceTree();
         var isoPath = CreateIso(src, "game.iso");
         var dest = Path.Combine(CreateTempDir("xiso_d_cli"), "my games out")
-            + Path.DirectorySeparatorChar;
+                   + Path.DirectorySeparatorChar;
 
         var rc = Program.Main(["-x", "-d", dest, isoPath]);
 

@@ -297,7 +297,8 @@ public sealed class ZstdEncoderTests
                 UseShellExecute = false,
             };
             psi.ArgumentList.Add("-c");
-            psi.ArgumentList.Add("import sys,compression.zstd; sys.stdout.buffer.write(compression.zstd.decompress(open(sys.argv[1],'rb').read()))");
+            psi.ArgumentList.Add(
+                "import sys,compression.zstd; sys.stdout.buffer.write(compression.zstd.decompress(open(sys.argv[1],'rb').read()))");
             psi.ArgumentList.Add(path);
             using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Could not start python.");
             using var stdout = new MemoryStream();

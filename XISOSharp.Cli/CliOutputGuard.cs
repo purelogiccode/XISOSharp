@@ -99,8 +99,10 @@ internal static class CliOutputGuard
         foreach (var part in parts)
         {
             if (!string.IsNullOrWhiteSpace(part) && XisoPaths.AreSamePath(part, output))
+            {
                 return $"Error: rebuild output {output} is the same file as input {part};" +
                        " choose another name\n";
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(securitySectorsPath) &&

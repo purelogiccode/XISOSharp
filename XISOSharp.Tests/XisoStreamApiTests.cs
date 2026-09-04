@@ -96,6 +96,7 @@ public class XisoStreamApiTests : IDisposable
         public override bool CanSeek => false;
         public override bool CanWrite => false;
         public override long Length => throw new NotSupportedException();
+
         public override long Position
         {
             get => throw new NotSupportedException();
@@ -168,7 +169,7 @@ public class XisoStreamApiTests : IDisposable
     public async Task DecodeXisoAsync_FromStream_Extracts()
     {
         var isoPath = CreateIso();
-        using var ms = new MemoryStream(File.ReadAllBytes(isoPath), writable: false);
+        await using var ms = new MemoryStream(File.ReadAllBytes(isoPath), writable: false);
         var dest = CreateTempDir("xiso_stream_dest3");
 
         var (result, outIso) = await XisoReader.DecodeXisoAsync(

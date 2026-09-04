@@ -265,7 +265,7 @@ internal static class ZstdBlockEncoder
         byte[] dst, int pos, int lhSize, int sizeFormat, int regen, int compSize)
     {
         uint header = SetCompressed + ((uint)sizeFormat << 2)
-            + ((uint)regen << 4);
+                                    + ((uint)regen << 4);
         if (lhSize == 3)
         {
             header += (uint)compSize << 14;
@@ -466,7 +466,11 @@ internal static class ZstdBlockEncoder
     /// normalized counts the NCount header is written from.
     /// </summary>
     private readonly record struct SeqAlphabet(
-        FseCTable Table, int Mode, int TableLog, short[]? Norm, int MaxObserved);
+        FseCTable Table,
+        int Mode,
+        int TableLog,
+        short[]? Norm,
+        int MaxObserved);
 
     /// <summary>
     /// Builds one sequence-alphabet table: RLE when a single symbol holds all

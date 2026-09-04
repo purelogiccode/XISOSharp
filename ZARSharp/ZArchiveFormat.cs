@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace ZARSharp;
 
 /// <summary>
@@ -54,6 +56,7 @@ public struct CompressionOffsetRecord
 /// File/directory tree entry. 16 bytes = 4 x u32 big-endian. The C++
 /// serializer treats both variants as the same 3 x u32 layout.
 /// </summary>
+[StructLayout(LayoutKind.Auto)]
 public struct FileDirectoryEntry
 {
     /// <summary>Size on disk in bytes.</summary>
@@ -151,6 +154,7 @@ public struct FileDirectoryEntry
 }
 
 /// <summary>Section offset + size pair.</summary>
+[StructLayout(LayoutKind.Auto)]
 public struct OffsetInfo
 {
     /// <summary>Section offset.</summary>

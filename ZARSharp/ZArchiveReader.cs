@@ -45,7 +45,11 @@ public sealed class ZArchiveReader : IDisposable
         public ulong BlockIndex = ulong.MaxValue;
     }
 
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _mutex = new();
+#else
     private readonly object _mutex = new();
+#endif
     private readonly Stream _stream;
     private readonly bool _leaveOpen;
 

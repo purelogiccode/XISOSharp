@@ -310,7 +310,8 @@ public sealed class ZstdHuffmanTests
 
     private static void DecodeAndVerify(byte[] dst, int offset, int length, byte[] expected, bool singleStream)
     {
-        int treeSize = ZstdHuffman.ReadStats(dst, offset, length, out byte[] weights, out int tableLog, out int numSymbols);
+        int treeSize =
+            ZstdHuffman.ReadStats(dst, offset, length, out byte[] weights, out int tableLog, out int numSymbols);
         Assert.InRange(tableLog, 1, 11);
         var table = ZstdHuffman.BuildTable(weights, numSymbols, tableLog);
 

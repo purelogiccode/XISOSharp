@@ -17,18 +17,24 @@ namespace ZARSharp.Zstd;
 /// <param name="Depth">Lazy depth: 0 = greedy, 1 = lazy (never 2 below level 7).</param>
 /// <param name="UseChain">False = fast (hash table only), true = lazy/greedy.</param>
 public readonly record struct ZstdMatchParams(
-    int WindowLog, int ChainLog, int HashLog, int SearchLog,
-    int MinMatch, int TargetLength, int Depth, bool UseChain)
+    int WindowLog,
+    int ChainLog,
+    int HashLog,
+    int SearchLog,
+    int MinMatch,
+    int TargetLength,
+    int Depth,
+    bool UseChain)
 {
     /// <summary>Parameters for <paramref name="level"/> (1..6).</summary>
     public static ZstdMatchParams ForLevel(int level) => level switch
     {
         1 => new(17, 12, 13, 1, 6, 0, 0, UseChain: false), // fast
         2 => new(17, 13, 15, 1, 5, 0, 0, UseChain: false), // fast (dfast mapped here)
-        3 => new(17, 15, 16, 2, 5, 0, 0, UseChain: true),  // greedy = lazy depth 0
-        4 => new(17, 17, 17, 2, 4, 0, 1, UseChain: true),  // lazy depth 1
-        5 => new(17, 16, 17, 3, 4, 2, 1, UseChain: true),  // lazy depth 1
-        6 => new(17, 16, 17, 3, 4, 4, 1, UseChain: true),  // lazy depth 1
+        3 => new(17, 15, 16, 2, 5, 0, 0, UseChain: true), // greedy = lazy depth 0
+        4 => new(17, 17, 17, 2, 4, 0, 1, UseChain: true), // lazy depth 1
+        5 => new(17, 16, 17, 3, 4, 2, 1, UseChain: true), // lazy depth 1
+        6 => new(17, 16, 17, 3, 4, 4, 1, UseChain: true), // lazy depth 1
         _ => throw new ArgumentOutOfRangeException(nameof(level), "Level must be 1..6."),
     };
 }
@@ -254,7 +260,7 @@ public sealed class ZstdMatchFinder
 
                 // Repcode probe (guarded; upstream relies on the invariant).
                 if (offset1 > 0 && offset1 <= (uint)(pos - WindowLow(pos))
-                    && Read32(src, pos) == Read32(src, pos - (int)offset1))
+                                && Read32(src, pos) == Read32(src, pos - (int)offset1))
                 {
                     int start = pos;
                     int match = pos - (int)offset1;
@@ -382,7 +388,7 @@ public sealed class ZstdMatchFinder
         // every visited position exactly once; writing hashTable[hash(ip)] = ip
         // early would let a later catch-up store chain[ip] = ip (self-loop).
         while (ip <= ilimit && history[1] > 0 && history[1] <= (uint)(ip - WindowLowFor(ip, windowLog))
-            && Read32(src, ip) == Read32(src, ip - (int)history[1]))
+               && Read32(src, ip) == Read32(src, ip - (int)history[1]))
         {
             int length = 4 + CountMatches(src, ip + 4, ip + 4 - (int)history[1], n);
             store.StoreSequence([], ZstdSeq.Repcode1, length);
@@ -433,7 +439,7 @@ public sealed class ZstdMatchFinder
 
             // Repcode probe at ip+1 (upstream checks rep at the next position).
             if (offset1 > 0 && offset1 <= (uint)(ip + 1 - WindowLow(ip + 1))
-                && Read32(src, ip + 1) == Read32(src, ip + 1 - (int)offset1))
+                            && Read32(src, ip + 1) == Read32(src, ip + 1 - (int)offset1))
             {
                 matchLength = 4 + CountMatches(src, ip + 5, ip + 5 - (int)offset1, n);
                 if (depth == 0)
@@ -445,7 +451,8 @@ public sealed class ZstdMatchFinder
             // First search (depth 0).
             {
                 uint found = 999999999;
-                int ml2 = HcFindBestMatch(src, ip, n, ref found, hashLog, mls, searchLog, chainMask, chainSize, ref nextToUpdate, ref lazySkipping);
+                int ml2 = HcFindBestMatch(src, ip, n, ref found, hashLog, mls, searchLog, chainMask, chainSize,
+                    ref nextToUpdate, ref lazySkipping);
                 if (ml2 > matchLength)
                 {
                     matchLength = ml2;
@@ -485,7 +492,8 @@ public sealed class ZstdMatchFinder
 
                     {
                         uint candidate = 999999999;
-                        int ml2 = HcFindBestMatch(src, ip, n, ref candidate, hashLog, mls, searchLog, chainMask, chainSize, ref nextToUpdate, ref lazySkipping);
+                        int ml2 = HcFindBestMatch(src, ip, n, ref candidate, hashLog, mls, searchLog, chainMask,
+                            chainSize, ref nextToUpdate, ref lazySkipping);
                         int gain2 = (ml2 * 4) - Highbit32(candidate);
                         int gain1 = (matchLength * 4) - Highbit32(offBase) + 4;
                         if (ml2 >= 4 && gain2 > gain1)
@@ -501,13 +509,13 @@ public sealed class ZstdMatchFinder
                 }
             }
 
-        StoreSequence:
+            StoreSequence:
             // Catch up (offsets only; repcode matches need none).
             if (ZstdSeq.IsOffset(offBase))
             {
                 uint offset = ZstdSeq.ToOffset(offBase);
                 while (start > anchor && start - (int)offset > WindowLow(start)
-                    && src[start - 1] == src[start - (int)offset - 1])
+                                      && src[start - 1] == src[start - (int)offset - 1])
                 {
                     start--;
                     matchLength++;
@@ -526,7 +534,7 @@ public sealed class ZstdMatchFinder
 
             // Immediate repcode (offset_2).
             while (ip <= ilimit && offset2 > 0 && offset2 <= (uint)(ip - WindowLow(ip))
-                && Read32(src, ip) == Read32(src, ip - (int)offset2))
+                   && Read32(src, ip) == Read32(src, ip - (int)offset2))
             {
                 int repLength = 4 + CountMatches(src, ip + 4, ip + 4 - (int)offset2, n);
                 history[0] = offset1;
@@ -597,7 +605,7 @@ public sealed class ZstdMatchFinder
             // Prefilter: read the 4 bytes ending at the current best length.
             // Guarded so both reads stay in bounds (upstream over-reads here).
             if (matchIndex + best + 1 <= end && ip + best + 1 <= end
-                && Read32(src, matchIndex + best - 3) == Read32(src, ip + best - 3))
+                                             && Read32(src, matchIndex + best - 3) == Read32(src, ip + best - 3))
             {
                 current = CountMatches(src, ip, matchIndex, end);
             }

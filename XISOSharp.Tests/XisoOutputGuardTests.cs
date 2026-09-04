@@ -33,7 +33,7 @@ public sealed class XisoOutputGuardTests : IDisposable
         return dir;
     }
 
-    private string CreateDummy(string dir, string name)
+    private static string CreateDummy(string dir, string name)
     {
         var path = Path.Combine(dir, name);
         File.WriteAllBytes(path, new byte[4096]);

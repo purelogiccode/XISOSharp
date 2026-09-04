@@ -77,7 +77,8 @@ public sealed class ZstdMatchFinderTests
             }
 
             // Decoder validity rule (ZstdDecompressor.ExecuteSequence).
-            Assert.True(dist >= 1 && dist <= (ulong)output.Count, $"Seq {i}: invalid offset {dist} at pos {output.Count}.");
+            Assert.True(dist >= 1 && dist <= (ulong)output.Count,
+                $"Seq {i}: invalid offset {dist} at pos {output.Count}.");
 
             int matchPos = output.Count - (int)dist;
             for (uint k = 0; k < seq.MatchLength; k++)
@@ -253,7 +254,7 @@ public sealed class ZstdMatchFinderTests
             // rep[0] = 1 from the fresh {1,4,8} history).
             bool isOffsetOne = ZstdSeq.IsOffset(first.OffBase) && ZstdSeq.ToOffset(first.OffBase) == 1;
             bool isRepOne = ZstdSeq.IsRepcode(first.OffBase) && ZstdSeq.ToRepcode(first.OffBase) == 1
-                && first.LitLength >= 1;
+                                                             && first.LitLength >= 1;
             Assert.True(isOffsetOne || isRepOne, $"Level {level}: first seq {first} does not use offset 1.");
         }
     }
@@ -286,7 +287,8 @@ public sealed class ZstdMatchFinderTests
         Array.Copy(big, 1234, slice, 0, slice.Length);
         for (int level = 1; level <= 6; level++)
         {
-            ZstdSequenceStore fromSlice = ParseAndReplay(new ReadOnlySpan<byte>(big, 1234, slice.Length).ToArray(), level);
+            ZstdSequenceStore fromSlice =
+                ParseAndReplay(new ReadOnlySpan<byte>(big, 1234, slice.Length).ToArray(), level);
             ZstdSequenceStore standalone = ParseAndReplay(slice, level);
             Assert.Equal(standalone.Count, fromSlice.Count);
         }
@@ -342,6 +344,7 @@ public sealed class ZstdMatchFinderTests
         // fast (L1) on repetitive text (validity is proven by replay; this
         // guards against a silently degenerate lazy path).
         byte[] input = MakeInput("text", 32768, 1234);
+
         long MatchedBytes(ZstdSequenceStore s)
         {
             long total = 0;
@@ -370,12 +373,12 @@ public sealed class ZstdMatchFinderTests
         // hash4(u,h) = (u * 2654435761) >> (32-h), u = LE32.
         byte[] src = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
         uint u = 0x04030201u;
-        uint expected4 = (u * 2654435761u) >> (32 - 10); // U32 wraps, like the C.
+        uint expected4 = unchecked((u * 2654435761u) >> (32 - 10)); // U32 wraps, like the C.
         Assert.Equal(expected4, ZstdMatchFinder.HashPtr(src, 0, 10, 4));
 
         // hash8(u,h) = (u * 0xCF1BBCDCB7A56463) >> (64-h), u = LE64.
         ulong w = 0x0807060504030201UL;
-        ulong expected8 = (w * 0xCF1BBCDCB7A56463UL) >> (64 - 17);
+        ulong expected8 = unchecked((w * 0xCF1BBCDCB7A56463UL) >> (64 - 17));
         Assert.Equal((uint)expected8, ZstdMatchFinder.HashPtr(src, 0, 17, 8));
 
         // Tables bounds: every hash fits its table.

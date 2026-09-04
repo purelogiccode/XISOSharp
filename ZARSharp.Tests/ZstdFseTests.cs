@@ -83,7 +83,7 @@ public sealed class ZstdFseTests
         byte[] symbols = new byte[length];
         for (int i = 0; i < length; i++)
         {
-            symbols[i] = (byte)((i * 3 + 1) % Alphabet); // Never single-symbol.
+            symbols[i] = (byte)(((i * 3) + 1) % Alphabet); // Never single-symbol.
         }
 
         RoundTripOnce(symbols, Alphabet, 6, false, $"small-{length}");
@@ -334,7 +334,7 @@ public sealed class ZstdFseTests
     }
 
     private static int SeedFor(int alphabet, int tableLog, bool useLowProb, int dist) =>
-        alphabet * 100003 + tableLog * 1013 + (useLowProb ? 77 : 0) + dist * 37 + 11;
+        (alphabet * 100003) + (tableLog * 1013) + (useLowProb ? 77 : 0) + (dist * 37) + 11;
 
     private static int CeilLog2(int v)
     {

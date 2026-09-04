@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.InteropServices;
 
 namespace ZARSharp.Zstd;
 
@@ -635,7 +636,8 @@ internal static class ZstdHuffmanEncoder
         op += c3;
 
         int lastLength = srcLength - (3 * segmentSize);
-        int c4 = Compress1X(dst, op, dstCapacity - (op - dstOffset), src, srcOffset + (3 * segmentSize), lastLength, table);
+        int c4 = Compress1X(dst, op, dstCapacity - (op - dstOffset), src, srcOffset + (3 * segmentSize), lastLength,
+            table);
         if (c4 == 0 || c4 > 65535)
         {
             return 0;
@@ -676,20 +678,14 @@ internal static class ZstdHuffmanEncoder
             maxSymbolValue = SymbolValueMax;
         }
 
-        if (maxSymbolValue > SymbolValueMax)
-        {
-            throw new ArgumentOutOfRangeException(nameof(maxSymbolValue));
-        }
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(maxSymbolValue, SymbolValueMax);
 
         if (huffLog == 0)
         {
             huffLog = TableLogDefault;
         }
 
-        if (huffLog > TableLogMax)
-        {
-            throw new ArgumentOutOfRangeException(nameof(huffLog));
-        }
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(huffLog, TableLogMax);
 
         // The decoder caps codes at 11 bits (RFC 8878 Section 4.2).
         huffLog = Math.Min(huffLog, TableLogDefault);
@@ -763,6 +759,7 @@ internal static class ZstdHuffmanEncoder
     }
 
     // One Huffman tree node (nodeElt from lib/compress/huf_compress.c).
+    [StructLayout(LayoutKind.Auto)]
     private struct NodeElt
     {
         public uint Count;
