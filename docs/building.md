@@ -42,6 +42,7 @@ The solution contains:
 | `XISOSharp.Tests` | net10.0 | xUnit test assembly (engine + CLI) |
 | `ZARSharp.Tests` | net10.0 | xUnit test assembly (ZArchive/zstd port) |
 | `XISOSharp.Benchmarks` | net10.0 | BenchmarkDotNet harness |
+| `ZARSharp.Benchmarks` | net10.0 | BenchmarkDotNet harness (ZARSharp only; no XISOSharp dependency) |
 | `XISOSharpTester` | net10.0-windows | WPF regression-test GUI |
 
 > [!NOTE]

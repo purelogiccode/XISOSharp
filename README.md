@@ -15,6 +15,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 | [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (833 tests) — golden fixtures + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/robustness coverage |
 | [ZARSharp.Tests](ZARSharp.Tests/) | xUnit suite (1238 tests) — pure-C# ZArchive/zstd port (encoder, decoder, fuzz, corruption, `zarchive.exe` interop) |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
+| [ZARSharp.Benchmarks](ZARSharp.Benchmarks/) | BenchmarkDotNet for ZARSharp only (zstd L1/L6/L19 compress + decode, `.zar` pack/extract) — references `ZARSharp` alone so it moves with a future solution split |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | Battle harness vs `References/extract-xiso-build-202505152050/extract-xiso.c` |
 

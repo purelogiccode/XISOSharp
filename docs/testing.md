@@ -179,6 +179,15 @@ The report (`coverage.cobertura.xml`) is uploaded as a CI artifact from the
 dotnet run --project XISOSharp.Benchmarks -c Release
 ```
 
+`ZARSharp.Benchmarks` is the ZARSharp-only counterpart (zstd L1/L6/L19
+compress + decode, `.zar` pack/extract over memory streams). It references
+`ZARSharp` alone — no `XISOSharp` dependency — so it moves untouched into a
+future ZARSharp-only solution:
+
+```bash
+dotnet run --project ZARSharp.Benchmarks -c Release -- --filter *
+```
+
 ## The GUI regression tester
 
 `XISOSharpTester` is a WPF application (net10.0-windows) for **batch regression

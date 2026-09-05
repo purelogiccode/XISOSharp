@@ -20,6 +20,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XISOSharp.Gui", "XISOSharp.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZARSharp.Tests", "ZARSharp.Tests\ZARSharp.Tests.csproj", "{61070DC0-8302-4DE6-A373-9824D3AC9140}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZARSharp.Benchmarks", "ZARSharp.Benchmarks\ZARSharp.Benchmarks.csproj", "{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -150,6 +152,18 @@ Global
 		{61070DC0-8302-4DE6-A373-9824D3AC9140}.Release|x64.Build.0 = Release|Any CPU
 		{61070DC0-8302-4DE6-A373-9824D3AC9140}.Release|x86.ActiveCfg = Release|Any CPU
 		{61070DC0-8302-4DE6-A373-9824D3AC9140}.Release|x86.Build.0 = Release|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Debug|x64.Build.0 = Debug|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Debug|x86.Build.0 = Debug|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Release|x64.ActiveCfg = Release|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Release|x64.Build.0 = Release|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Release|x86.ActiveCfg = Release|Any CPU
+		{0E2CFB43-E756-47A5-AFA2-7BEEF1760E5B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
