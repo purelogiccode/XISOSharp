@@ -208,19 +208,6 @@ internal static class BattleRunner
     private static SubBattleResult RunAudit(string path)
     {
         var sw = Stopwatch.StartNew();
-        var size = new FileInfo(path).Length;
-        if (size > 200L * 1024 * 1024)
-        {
-            sw.Stop();
-            return new SubBattleResult
-            {
-                TestName = "Audit",
-                Status = BattleStatus.Skipped,
-                Detail = $"Skipped large {size / (1024 * 1024)} MB",
-                ElapsedSeconds = sw.Elapsed.TotalSeconds
-            };
-        }
-
         try
         {
             var res = XisoReader.AuditXiso(path);
@@ -232,6 +219,20 @@ internal static class BattleRunner
                     TestName = "Audit",
                     Status = BattleStatus.Passed,
                     Detail = $"Valid files={res.FilesChecked} dirs={res.DirsChecked}",
+                    ElapsedSeconds = sw.Elapsed.TotalSeconds
+                };
+            }
+            else if (res.Issues.Count == 1 &&
+                     res.Issues[0].Contains("Optimized tag not found", StringComparison.Ordinal))
+            {
+                // Pristine (never-rewritten) dump: every file/dir checked clean, only the
+                // "already optimized" marker is absent. That is valid input, just unoptimized.
+                return new SubBattleResult
+                {
+                    TestName = "Audit",
+                    Status = BattleStatus.Passed,
+                    Detail =
+                        $"Pristine unoptimized files={res.FilesChecked} dirs={res.DirsChecked} (tag absent) \u2713",
                     ElapsedSeconds = sw.Elapsed.TotalSeconds
                 };
             }
@@ -338,39 +339,6 @@ internal static class BattleRunner
     private static SubBattleResult RunExtract(string path, ExtractXisoWrapper? wrapper)
     {
         var sw = Stopwatch.StartNew();
-        var size = new FileInfo(path).Length;
-        // Skip full extract for very large images (>200 MB) to keep battle fast; List/Audit cover parity.
-        // Redump 7 GB ISOs are tested via List/Audit/Ranges instead. Use --full to force.
-        if (size > 200L * 1024 * 1024)
-        {
-            // Quick probe via List instead of full extract
-            try
-            {
-                var csListProbe = CaptureCSharpList(path);
-                var hasFiles = csListProbe.Contains("Size:", StringComparison.Ordinal);
-                sw.Stop();
-                return new SubBattleResult
-                {
-                    TestName = "Extract",
-                    Status = BattleStatus.Skipped,
-                    Detail =
-                        $"Skipped large {size / (1024 * 1024)} MB (use --full to force, list probe {(hasFiles ? "has files" : "empty")})",
-                    ElapsedSeconds = sw.Elapsed.TotalSeconds
-                };
-            }
-            catch
-            {
-                sw.Stop();
-                return new SubBattleResult
-                {
-                    TestName = "Extract",
-                    Status = BattleStatus.Skipped,
-                    Detail = $"Skipped large {size / (1024 * 1024)} MB",
-                    ElapsedSeconds = sw.Elapsed.TotalSeconds
-                };
-            }
-        }
-
         var csDir = CreateTempDir("cs_ext");
         var exeDir = CreateTempDir("exe_ext");
         try
@@ -456,19 +424,6 @@ internal static class BattleRunner
     private static SubBattleResult RunRewrite(string path, ExtractXisoWrapper? wrapper)
     {
         var sw = Stopwatch.StartNew();
-        var size = new FileInfo(path).Length;
-        if (size > 200L * 1024 * 1024)
-        {
-            sw.Stop();
-            return new SubBattleResult
-            {
-                TestName = "Rewrite",
-                Status = BattleStatus.Skipped,
-                Detail = $"Skipped large {size / (1024 * 1024)} MB",
-                ElapsedSeconds = sw.Elapsed.TotalSeconds
-            };
-        }
-
         if (wrapper?.Available != true)
         {
             sw.Stop();
@@ -611,19 +566,6 @@ internal static class BattleRunner
             var dec = Path.Combine(tmp, "test.dec.iso");
             try
             {
-                var len = new FileInfo(path).Length;
-                if (len > 20 * 1024 * 1024)
-                {
-                    sw.Stop();
-                    return new SubBattleResult
-                    {
-                        TestName = "CISO",
-                        Status = BattleStatus.Skipped,
-                        Detail = $"Skipped large file {len / (1024 * 1024)} MB",
-                        ElapsedSeconds = sw.Elapsed.TotalSeconds
-                    };
-                }
-
                 CisoWriter.CompressToCso(path, cso, level: 1);
                 if (!CisoReader.IsCso(cso))
                 {
@@ -671,19 +613,6 @@ internal static class BattleRunner
     private static SubBattleResult RunChecksum(string path)
     {
         var sw = Stopwatch.StartNew();
-        var size = new FileInfo(path).Length;
-        if (size > 200L * 1024 * 1024)
-        {
-            sw.Stop();
-            return new SubBattleResult
-            {
-                TestName = "Checksum",
-                Status = BattleStatus.Skipped,
-                Detail = $"Skipped large {size / (1024 * 1024)} MB",
-                ElapsedSeconds = sw.Elapsed.TotalSeconds
-            };
-        }
-
         try
         {
             var h1 = XisoChecksum.ComputeImageChecksumHex(path);
@@ -1292,11 +1221,15 @@ internal static class BattleRunner
     private static string CaptureCSharpList(string isoPath)
     {
         var saveQuiet = Logger.Quiet;
+        var saveOut = Logger.Out;
         var origOut = Console.Out;
         try
         {
             Logger.Quiet = false;
             using var sw = new StringWriter();
+            // XisoReader.List writes via Logger.Out (captured at startup), NOT via
+            // Console.Out, so Console.SetOut alone captures nothing — redirect both.
+            Logger.Out = sw;
             Console.SetOut(sw);
             try
             {
@@ -1313,32 +1246,31 @@ internal static class BattleRunner
         finally
         {
             Logger.Quiet = saveQuiet;
+            Logger.Out = saveOut;
             Console.SetOut(origOut);
         }
     }
 
-    private sealed record ListEntry(string Path, bool IsDirectory, uint Size, uint StartSector);
+    private sealed record ListEntry(string Path, bool IsDirectory, long Size);
 
     private static List<ListEntry> ParseListOutput(string output)
     {
+        // Both XISOSharp and native extract-xiso print one entry per line:
+        //   \path\to\file.ext (12345 bytes)      files
+        //   \path\to\dir\ (0 bytes)              directories (trailing slash)
+        // Neither side prints StartSector in list mode, so parity compares path+size+kind.
         var entries = new List<ListEntry>();
-        var fileRegex =
-            new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}Size:\s*(?<size>\d+)\s*bytes,\s*StartSector:\s*(?<sector>\d+)",
-                RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-        var dirRegex = new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}DIR", RegexOptions.Multiline | RegexOptions.Compiled,
-            TimeSpan.FromSeconds(5));
-        foreach (Match m in fileRegex.Matches(output))
+        var lineRegex = new Regex(@"^\s*(?<path>.*?)\s*\((?<size>\d+) bytes\)\s*$",
+            RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromSeconds(30));
+        foreach (Match m in lineRegex.Matches(output))
         {
             var p = m.Groups["path"].Value.Trim();
-            var s = uint.Parse(m.Groups["size"].Value, CultureInfo.InvariantCulture);
-            var sec = uint.Parse(m.Groups["sector"].Value, CultureInfo.InvariantCulture);
-            entries.Add(new ListEntry(p, false, s, sec));
-        }
-
-        foreach (Match m in dirRegex.Matches(output))
-        {
-            var p = m.Groups["path"].Value.Trim();
-            entries.Add(new ListEntry(p, true, 0, 0));
+            if (p.Length == 0)
+                continue;
+            if (!long.TryParse(m.Groups["size"].Value, CultureInfo.InvariantCulture, out var s))
+                continue;
+            var isDir = p.EndsWith('\\') || p.EndsWith('/');
+            entries.Add(new ListEntry(p.TrimEnd('\\', '/'), isDir, s));
         }
 
         entries.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
@@ -1358,14 +1290,14 @@ internal static class BattleRunner
         {
             if (exeDict.TryGetValue(p, out var ee))
             {
-                if (ce.IsDirectory == ee.IsDirectory && ce.Size == ee.Size && ce.StartSector == ee.StartSector)
+                if (ce.IsDirectory == ee.IsDirectory && ce.Size == ee.Size)
                 {
                     match++;
                 }
                 else
                 {
                     mis++;
-                    details.Add($"MISMATCH {p} C#{ce.Size}/{ce.StartSector} exe{ee.Size}/{ee.StartSector}");
+                    details.Add($"MISMATCH {p} C#:{(ce.IsDirectory ? "DIR" : ce.Size.ToString(CultureInfo.InvariantCulture))} exe:{(ee.IsDirectory ? "DIR" : ee.Size.ToString(CultureInfo.InvariantCulture))}");
                 }
             }
             else
