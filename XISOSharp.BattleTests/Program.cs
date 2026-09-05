@@ -150,7 +150,43 @@ internal static class Program
         }
 
         var sw = Stopwatch.StartNew();
-        var session = BattleRunner.RunAsync(isoFiles, exePath, createDirs).GetAwaiter().GetResult();
+        var onlyExtended = args.Any(a => string.Equals(a, "--extended-only", StringComparison.OrdinalIgnoreCase));
+        var session = onlyExtended
+            ? new BattleSessionResult()
+            : BattleRunner.RunAsync(isoFiles, exePath, createDirs).GetAwaiter().GetResult();
+
+        if (args.Any(a => string.Equals(a, "--extended", StringComparison.OrdinalIgnoreCase)) || onlyExtended)
+        {
+            var xkPath = FindOracle(args, "--xboxkit", "xboxkit.exe");
+            var xdPath = FindOracle(args, "--xdvdfs", "xdvdfs.exe");
+            var keepSandbox = args.Contains("--keep-sandbox", StringComparer.OrdinalIgnoreCase);
+            using var xk = new XboxKitWrapper(xkPath);
+            using var xd = new XdvdfsWrapper(xdPath);
+            Console.WriteLine($"\nExtended battle — xboxkit: {xkPath} {(xk.Available ? "(found)" : "(NOT FOUND)")}");
+            Console.WriteLine($"Extended battle — xdvdfs: {xdPath} {(xd.Available ? "(found)" : "(NOT FOUND)")}");
+            if (xk.Available)
+                Console.WriteLine($"  xboxkit: {xk.GetVersion()}");
+            if (xd.Available)
+                Console.WriteLine($"  xdvdfs: {xd.GetVersion()}");
+            for (var i = 0; i < isoFiles.Count; i++)
+            {
+                var file = isoFiles[i];
+                if (!File.Exists(file))
+                    continue;
+                Console.Write($"[EXT {i + 1}/{isoFiles.Count}] {Path.GetFileName(file)} ... ");
+                var er = ExtendedBattleRunner.RunExtendedForIso(file, xk, xd, keepSandbox);
+                session.FileResults.Add(er);
+                var color = er.HasFailures ? ConsoleColor.Red : ConsoleColor.Green;
+                var prev = Console.ForegroundColor;
+                Console.ForegroundColor = color;
+                Console.WriteLine(
+                    $"{(er.HasFailures ? "FAIL" : "PASS")} ({er.ElapsedSeconds:F1}s) {string.Join(" ", er.SubTests.Select(s => $"{s.TestName}:{Symbol(s.Status)}"))}");
+                Console.ForegroundColor = prev;
+                foreach (var sub in er.SubTests.Where(s => s.Status is BattleStatus.Failed or BattleStatus.Error))
+                    Console.WriteLine($"  \u2717 {sub.TestName}: {sub.Detail.Split('\n').FirstOrDefault()?.Trim()}");
+            }
+        }
+
         sw.Stop();
 
         PrintSummary(session);
@@ -344,6 +380,31 @@ internal static class Program
         return 5; // default to 5 ISOs + create battle; user can --limit 0 or --all for all
     }
 
+    private static string FindOracle(string[] args, string flag, string fileName)
+    {
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            if (string.Equals(args[i], flag, StringComparison.OrdinalIgnoreCase))
+                return args[i + 1];
+        }
+
+        var here = Path.Combine(AppContext.BaseDirectory, fileName);
+        if (File.Exists(here))
+            return here;
+        var local = Path.Combine(Directory.GetCurrentDirectory(), fileName);
+        if (File.Exists(local))
+            return local;
+        return here;
+    }
+
+    private static string Symbol(BattleStatus s)
+    {
+        return s switch
+        {
+            BattleStatus.Passed => "\u2713", BattleStatus.Failed => "\u2717", BattleStatus.Skipped => "-", _ => "?"
+        };
+    }
+
     private static void PrintUsage()
     {
         Console.WriteLine("""
@@ -357,6 +418,12 @@ internal static class Program
                             --recursive               Scan dirs recursively for *.iso (top-level by default)
                             --limit <N>               Limit number of ISOs tested (default 5, use --all for all, --limit 0 for no limit)
                             --all                     Test all found ISOs (no limit)
+                            --extended                Extended battles: XboxKit-borrowed features vs xboxkit.exe,
+                                                      xdvdfs-borrowed features vs xdvdfs.exe (oracles beside the harness)
+                            --extended-only           Extended battles without the extract-xiso parity battle
+                            --keep-sandbox            Keep extended-battle sandboxes for debugging (default: delete; they hold ~4x the ISO size)
+                            --xboxkit <path>          Path to xboxkit.exe (default: beside the harness)
+                            --xdvdfs <path>           Path to xdvdfs.exe (default: beside the harness)
                             -h, --help                Show this help
 
                           Examples:

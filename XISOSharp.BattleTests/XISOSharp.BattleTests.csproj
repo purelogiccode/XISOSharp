@@ -22,6 +22,16 @@
         <None Update="extract-xiso.exe">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
+        <None Update="xboxkit.exe">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="xdvdfs.exe">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <!-- xboxkit -z shells out to zarchive.exe beside itself; without it the
+             XK-Zar battle is skipped. Same binary ZARSharp interop tests use. -->
+        <None Include="..\..\CSharp_ZARSharp\References\ZArchive-0.1.2\zarchive.exe" Link="zarchive.exe"
+              CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <ItemGroup>

@@ -270,6 +270,13 @@ public static class XisoRanges
         isoFs.Seek(pos, SeekOrigin.Begin);
 
         var leftChild = ReadUShort(isoFs);
+        // Empty-directory sentinel (all-0xFF table): without this, the 0xFF bytes
+        // parse as a garbage entry (name length 255, entry sector ~4G) that either
+        // poisons the result set or sends later seeks past EOF. Mirrors the
+        // leftChild == 0xFFFF check in GetValidSectors above and extract-xiso.
+        if (leftChild == 0xFFFF)
+            return;
+
         var rightChild = ReadUShort(isoFs);
         var entrySector = ReadUInt(isoFs);
         var entrySize = ReadUInt(isoFs);
