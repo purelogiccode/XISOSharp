@@ -188,6 +188,55 @@ public sealed class ZstdCompressor : IZarBlockCompressor
 
         var dst = new byte[GetCompressBound(src.Length)];
         var pos = WriteFrameHeader(dst, 0, src.Length, checksum, level);
+        return EncodeFrameCore(src, level, prm, blockMax, dst, pos, checksum);
+    }
+
+    /// <summary>
+    /// Encodes <paramref name="chunk"/> as one streaming-style frame: the
+    /// unknown-size parameter row (<c>ZSTD_getCParams</c> row 0, verbatim —
+    /// <c>ZSTD_adjustCParams_internal</c> is a no-op for
+    /// <c>ZSTD_CONTENTSIZE_UNKNOWN</c>) with a content-size-flag-0 header
+    /// (never single-segment, no FCS). This is what
+    /// <c>ZSTD_compressStream2</c> emits per frame, and therefore what
+    /// seekable writers (<c>zeekstd</c>) store. An empty chunk takes the
+    /// single-shot path: ending a fresh session with no input emits the
+    /// pledged-0 form (verified byte-for-byte against libzstd).
+    /// </summary>
+    internal static byte[] EncodeStreamingFrame(ReadOnlySpan<byte> chunk, int level, bool checksum)
+    {
+        if (chunk.Length == 0)
+        {
+            return EncodeFrame(chunk, level, checksum);
+        }
+
+        var prm = ZstdCompressionParameters.ForTierLevel(
+            ZstdCompressionParameters.SizeTier.Default, level);
+        var blockMax = (int)Math.Min(MaxBlockSize, 1L << prm.WindowLog);
+        var dst = new byte[GetCompressBound(chunk.Length)];
+        var pos = WriteStreamingFrameHeader(prm.WindowLog, dst, 0, checksum);
+        return EncodeFrameCore(chunk, level, prm, blockMax, dst, pos, checksum, streaming: true);
+    }
+
+    /// <summary>
+    /// <c>ZSTD_writeFrameHeader</c> with <c>contentSizeFlag == 0</c> (pledged
+    /// size unknown): descriptor carries only the checksum flag, the window
+    /// byte is always present, and no FCS field follows. Returns 6.
+    /// </summary>
+    internal static int WriteStreamingFrameHeader(int windowLog, byte[] dst, int offset, bool checksum)
+    {
+        dst[offset] = (byte)(FrameMagic & 0xFF);
+        dst[offset + 1] = (byte)((FrameMagic >> 8) & 0xFF);
+        dst[offset + 2] = (byte)((FrameMagic >> 16) & 0xFF);
+        dst[offset + 3] = (byte)((FrameMagic >> 24) & 0xFF);
+        dst[offset + 4] = checksum ? (byte)0x04 : (byte)0x00;
+        dst[offset + 5] = (byte)((windowLog - 10) << 3);
+        return 6;
+    }
+
+    private static byte[] EncodeFrameCore(
+        ReadOnlySpan<byte> src, int level, ZstdCompressionParameters prm, int blockMax,
+        byte[] dst, int pos, bool checksum, bool streaming = false)
+    {
 
         // Persistent match state (M2) for every strategy: the state holds the
         // frame copy the engines index absolutely (copied only when
@@ -215,6 +264,7 @@ public sealed class ZstdCompressor : IZarBlockCompressor
         var remaining = src.Length;
         var inPos = 0;
         var isFirstBlock = true;
+        var trailingEmptyBlock = false;
         // Running consumed-minus-produced balance: splitting past the first
         // full block needs verified savings (ZSTD_compress_frameChunk).
         long savings = 0;
@@ -226,6 +276,19 @@ public sealed class ZstdCompressor : IZarBlockCompressor
             var chunk = ZstdBlockSplitter.OptimalBlockSize(
                 frameSpan, inPos, remaining, blockMax, prm.Strategy, ref savings);
             var last = chunk == remaining;
+            if (streaming && last && src.Length > 0 && src.Length % MaxBlockSize == 0)
+            {
+                // Streaming end-of-frame rule (zstd_compress.c:6208): full
+                // 128 KiB inBuff units are always emitted non-last during
+                // e_continue (a filled inBuff is compressed in the same call,
+                // spilling to the internal output buffer when the user buffer
+                // is full, so it can never stay buffered into e_end); the
+                // e_end flush then finds an empty buffer and appends an empty
+                // last block via ZSTD_writeEpilogue. Single-shot instead marks
+                // the final block last, hence the 3-byte difference.
+                last = false;
+                trailingEmptyBlock = true;
+            }
             var chunkBytes = state is not null
                 ? new ReadOnlySpan<byte>(frame, inPos, chunk)
                 : src.Slice(inPos, chunk);
@@ -249,6 +312,13 @@ public sealed class ZstdCompressor : IZarBlockCompressor
             inPos += chunk;
             remaining -= chunk;
         } while (remaining > 0);
+
+        if (trailingEmptyBlock)
+        {
+            // ZSTD_writeLastEmptyBlock: 3-byte empty raw last block.
+            WriteRawBlock([], dst, pos, last: true);
+            pos += 3;
+        }
 
         if (checksum)
         {
