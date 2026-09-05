@@ -232,7 +232,9 @@ public sealed class PipelineTests : IDisposable
         var root = NewTempDir("pipe_corrupt");
         var zar = Path.Combine(root, "bad.zar");
         File.WriteAllBytes(zar, PatternBytes(1024, 3));
-        Assert.Throws<InvalidOperationException>(
+        // Garbage fails the footer-gated open (a ZarArchiveOpenException,
+        // which is an InvalidOperationException for the -12 mapping).
+        Assert.Throws<ZarArchiveOpenException>(
             () => ZarPipeline.Extract(zar, Path.Combine(root, "dest")));
     }
 

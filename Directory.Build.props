@@ -8,7 +8,7 @@
     <PackageProjectUrl>https://github.com/purelogiccode/XISOSharp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/purelogiccode/XISOSharp.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <RepositoryBranch>main</RepositoryBranch>
+    <RepositoryBranch>master</RepositoryBranch>
   </PropertyGroup>
 
 </Project>

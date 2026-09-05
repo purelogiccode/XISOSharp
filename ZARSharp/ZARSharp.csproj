@@ -37,6 +37,10 @@
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+        <!-- API compatibility validation across target frameworks -->
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <EnableStrictModeForPackageValidation>true</EnableStrictModeForPackageValidation>
     </PropertyGroup>
 
     <ItemGroup>

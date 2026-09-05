@@ -32,7 +32,21 @@ public sealed class ZstdEncoderFuzzTests
     private static byte[] MakeInput(string kind, int n, int level)
     {
         // Distinct stream per (kind, size, level) from the master seed.
-        var rng = new Random(HashCode.Combine(Seed, kind, n, level));
+        // NOTE: deterministic arithmetic mix, not System.HashCode.Combine
+        // (per-process randomized, even for integer inputs): failing inputs
+        // must be reproducible from the seed + theory arguments.
+        var kindIndex = kind switch
+        {
+            "zeros" => 0,
+            "random" => 1,
+            "text" => 2,
+            "sparse" => 3,
+            "pattern" => 4,
+            "alternating" => 5,
+            "allbytes" => 6,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+        var rng = new Random(unchecked((int)(0x5332026u + (uint)kindIndex * 0x9E3779B9u + (uint)n * 31u + (uint)level * 131u + (uint)Seed * 131u)));
         var buf = new byte[n];
         switch (kind)
         {

@@ -186,6 +186,87 @@ public sealed class PipelineCliTests : IDisposable
         Assert.False(File.Exists(zar));
     }
 
+    [Fact]
+    public void Cli_ExtractGarbage_ReturnsRefused()
+    {
+        var root = NewTempDir("cli_garbage");
+        var zar = Path.Combine(root, "garbage.zar");
+        File.WriteAllBytes(zar, [0xDE, 0xAD, 0xBE, 0xEF, 1, 2, 3, 4]);
+
+        var sink = new LogSink();
+        Assert.Equal(ZarchiveCli.Refused, ZarchiveCli.Run([zar], log: sink.Log));
+        Assert.Contains(sink.Lines, l => l.Contains("Failed to open ZArchive", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Cli_PackLockedInput_ReturnsInputNotReadable()
+    {
+        var root = NewTempDir("cli_locked");
+        var src = Directory.CreateDirectory(Path.Combine(root, "src")).FullName;
+        var victim = Path.Combine(src, "a.txt");
+        File.WriteAllText(victim, "hello");
+        var zar = Path.Combine(root, "out.zar");
+
+        var sink = new LogSink();
+        using var lockStream = new FileStream(victim, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Assert.Equal(ZarchiveCli.InputNotReadable, ZarchiveCli.Run([src, zar], log: sink.Log));
+        Assert.Contains(sink.Lines, l => l.Contains("Failed to open input file", StringComparison.Ordinal));
+        Assert.False(File.Exists(zar));
+    }
+
+    [Fact]
+    public void Cli_Extract_LogsNativeEntryLines()
+    {
+        var root = NewTempDir("cli_extlog");
+        var src = Directory.CreateDirectory(Path.Combine(root, "game")).FullName;
+        File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
+        var sub = Directory.CreateDirectory(Path.Combine(src, "sub")).FullName;
+        File.WriteAllBytes(Path.Combine(sub, "b.bin"), [1, 2, 3]);
+        var zar = Path.Combine(root, "game.zar");
+        ZarPipeline.Pack(src, zar);
+
+        var sink = new LogSink();
+        Assert.Equal(ZarchiveCli.Ok, ZarchiveCli.Run([zar, Path.Combine(root, "out")], log: sink.Log));
+
+        // main.cpp prints srcPath/name per entry (leading "/" at the top
+        // level), directories included, in preorder — kept byte-identical.
+        var entryLines = sink.Lines.Where(l => l.StartsWith("/", StringComparison.Ordinal) || l.Contains('/')).ToList();
+        Assert.Equal(["/a.txt", "/sub", "sub/b.bin"], entryLines);
+    }
+
+    [Fact]
+    public void Cli_Pack_AddingUsesOsSeparators()
+    {
+        var root = NewTempDir("cli_addsep");
+        var src = Directory.CreateDirectory(Path.Combine(root, "game")).FullName;
+        var sub = Directory.CreateDirectory(Path.Combine(src, "sub")).FullName;
+        File.WriteAllText(Path.Combine(sub, "b.txt"), "hello");
+
+        var sink = new LogSink();
+        Assert.Equal(ZarchiveCli.Ok, ZarchiveCli.Run([src, Path.Combine(root, "game.zar")], log: sink.Log));
+
+        var expected = "Adding sub" + Path.DirectorySeparatorChar + "b.txt";
+        Assert.Contains(sink.Lines, l => string.Equals(l, expected, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Engine_PackDuplicateEntries_ThrowsEntryCreateFault()
+    {
+        var root = NewTempDir("cli_dupe");
+        var zar = Path.Combine(root, "out.zar");
+        var payload = new byte[] { 1, 2, 3 };
+        var entries = new List<ZarPackEntry>
+        {
+            new() { RelativePath = "dup.txt", IsDirectory = false, Length = payload.Length, OpenRead = () => new MemoryStream(payload, writable: false) },
+            new() { RelativePath = "dup.txt", IsDirectory = false, Length = payload.Length, OpenRead = () => new MemoryStream(payload, writable: false) },
+        };
+
+        var ex = Assert.Throws<ZarEntryCreateException>(() =>
+            ZarPackEngine.PackEntries(entries, root, zar, new ZarPipelineOptions()));
+        Assert.Contains("Failed to create archive file", ex.Message, StringComparison.Ordinal);
+        Assert.False(File.Exists(zar));
+    }
+
     // ------------------------------------------------------------------
     // ProcessRunner
     // ------------------------------------------------------------------

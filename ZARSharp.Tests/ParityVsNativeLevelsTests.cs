@@ -16,7 +16,20 @@ public sealed class ParityVsNativeLevelsTests
 {
     private static byte[] MakeInput(string kind, int n, int seed)
     {
-        var rng = new Random(HashCode.Combine(0x5332026, kind, n, seed));
+        // NOTE: deterministic arithmetic mix. System.HashCode.Combine carries
+        // a per-process random seed (even for integer inputs), so it must
+        // never seed corpus generation; that would silently redraw every
+        // vector on each run and make failures unreproducible.
+        var kindIndex = kind switch
+        {
+            "zeros" => 0,
+            "random" => 1,
+            "text" => 2,
+            "code" => 3,
+            "binary" => 4,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+        var rng = new Random(unchecked((int)(0x5332026u + (uint)kindIndex * 0x9E3779B9u + (uint)n * 31u + (uint)seed * 131u)));
         var buf = new byte[n];
         switch (kind)
         {

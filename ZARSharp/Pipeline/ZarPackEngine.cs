@@ -121,15 +121,15 @@ public static class ZarPackEngine
 
                 if (entry.OpenRead == null)
                 {
-                    throw new InvalidOperationException($"Failed to create archive file {entry.RelativePath}");
+                    throw new ZarEntryCreateException($"Failed to create archive file {entry.RelativePath}");
                 }
 
                 if (!writer.StartNewFile(entry.RelativePath))
                 {
-                    throw new InvalidOperationException($"Failed to create archive file {entry.RelativePath}");
+                    throw new ZarEntryCreateException($"Failed to create archive file {entry.RelativePath}");
                 }
 
-                using var input = entry.OpenRead();
+                using var input = OpenEntryInput(entry);
                 int read;
                 while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
                 {
@@ -166,14 +166,40 @@ public static class ZarPackEngine
         }
     }
 
-    private sealed record ExtractPlanEntry(string SrcPath, string RelativePath, bool IsDirectory, ulong Size);
+    /// <summary>Opens an entry for reading, mapping I/O faults to the native <c>-15</c> fault.</summary>
+    /// <exception cref="ZarInputOpenException">When the input file cannot be opened.</exception>
+    private static Stream OpenEntryInput(ZarPackEntry entry)
+    {
+        try
+        {
+            return entry.OpenRead!();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new ZarInputOpenException($"Failed to open input file {entry.RelativePath}", ex);
+        }
+    }
+
+    private sealed record ExtractPlanEntry(string SrcPath, string RelativePath, bool IsDirectory, ulong Size, string LogLine);
 
     /// <summary>
     /// Extracts <paramref name="zarPath"/> into <paramref name="destDir"/>
     /// (created; files overwritten like <c>zarchive.exe</c>). Returns the
     /// extracted file paths relative to the archive root (<c>/</c> separated).
     /// </summary>
+    /// <param name="zarPath">Archive file.</param>
+    /// <param name="destDir">Destination directory (created).</param>
+    /// <param name="displayPath">Label used in progress reports.</param>
+    /// <param name="options">Extract options (pause, ...).</param>
+    /// <param name="progress">Per-file/byte progress sink.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <param name="log">
+    /// Optional per-entry stdout sink. When set, every visited entry is logged
+    /// as <c>main.cpp</c> prints it (<c>srcPath/name</c>, i.e. a leading
+    /// <c>/</c> for top-level entries), directories included, in preorder.
+    /// </param>
     /// <exception cref="FileNotFoundException">When the archive is missing.</exception>
+    /// <exception cref="ZarArchiveOpenException">When the archive cannot be opened (corrupt header).</exception>
     /// <exception cref="InvalidOperationException">On corrupt archives.</exception>
     public static IReadOnlyList<string> ExtractEntries(
         string zarPath,
@@ -181,7 +207,8 @@ public static class ZarPackEngine
         string? displayPath = null,
         ZarPipelineOptions? options = null,
         IProgress<ZarProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<string>? log = null)
     {
         if (!File.Exists(zarPath))
         {
@@ -189,15 +216,22 @@ public static class ZarPackEngine
         }
 
         using var reader = ZArchiveReader.TryOpen(zarPath) ??
-            throw new InvalidOperationException("Failed to open ZArchive.");
+            throw new ZarArchiveOpenException("Failed to open ZArchive.");
 
-        return ExtractOpen(reader, zarPath, destDir, options, progress, cancellationToken);
+        return ExtractOpen(reader, zarPath, destDir, options, progress, cancellationToken, log);
     }
 
     /// <summary>
     /// Extracts an already-open <paramref name="reader"/> into
     /// <paramref name="destDir"/>. See <see cref="ExtractEntries"/>.
     /// </summary>
+    /// <param name="reader">Open archive reader.</param>
+    /// <param name="displayPath">Label used in progress reports.</param>
+    /// <param name="destDir">Destination directory (created).</param>
+    /// <param name="options">Extract options (pause, ...).</param>
+    /// <param name="progress">Per-file/byte progress sink.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <param name="log">Optional per-entry stdout sink (see <see cref="ExtractEntries"/>).</param>
     /// <exception cref="InvalidOperationException">On corrupt archives.</exception>
     public static IReadOnlyList<string> ExtractOpen(
         ZArchiveReader reader,
@@ -205,7 +239,8 @@ public static class ZarPackEngine
         string destDir,
         ZarPipelineOptions? options = null,
         IProgress<ZarProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<string>? log = null)
     {
         ArgumentNullException.ThrowIfNull(reader);
         options ??= new ZarPipelineOptions();
@@ -241,6 +276,9 @@ public static class ZarPackEngine
         {
             pause.WaitIfPaused(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
+            // Native stdout order: each entry line prints before its bytes
+            // are extracted, so a mid-archive failure leaves the same prefix.
+            log?.Invoke(item.LogLine);
             var outPath = Path.Combine(destDir, item.RelativePath);
             if (item.IsDirectory)
             {
@@ -312,14 +350,17 @@ public static class ZarPackEngine
 
             var childSrc = string.IsNullOrEmpty(srcPath) ? entry.Name : srcPath + "/" + entry.Name;
             var childRel = string.IsNullOrEmpty(relPath) ? entry.Name : relPath + "/" + entry.Name;
+            // Native stdout quirk, kept byte-identical: the root call passes
+            // srcPath "" so top-level entries print with a leading "/".
+            var logLine = string.IsNullOrEmpty(srcPath) ? "/" + entry.Name : childSrc;
             if (entry.IsDirectory)
             {
-                plan.Add(new ExtractPlanEntry(childSrc, childRel, true, 0));
+                plan.Add(new ExtractPlanEntry(childSrc, childRel, true, 0, logLine));
                 CollectEntries(reader, childSrc, childRel, plan, cancellationToken);
             }
             else
             {
-                plan.Add(new ExtractPlanEntry(childSrc, childRel, false, entry.Size));
+                plan.Add(new ExtractPlanEntry(childSrc, childRel, false, entry.Size, logLine));
             }
         }
     }

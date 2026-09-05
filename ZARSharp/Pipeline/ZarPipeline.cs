@@ -62,13 +62,20 @@ public static class ZarPipeline
     /// (created; files overwritten like <c>zarchive.exe</c>). Returns the
     /// extracted file paths relative to the archive root (<c>/</c> separated).
     /// </summary>
+    /// <param name="zarPath">Archive file.</param>
+    /// <param name="destDir">Destination directory (created).</param>
+    /// <param name="options">Extract options (pause, ...).</param>
+    /// <param name="progress">Per-file/byte progress sink.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <param name="log">Optional per-entry stdout sink (native <c>main.cpp</c> entry lines).</param>
     public static IReadOnlyList<string> Extract(
         string zarPath,
         string destDir,
         ZarPipelineOptions? options = null,
         IProgress<ZarProgress>? progress = null,
-        CancellationToken cancellationToken = default) =>
-        ZarPackEngine.ExtractEntries(zarPath, destDir, zarPath, options, progress, cancellationToken);
+        CancellationToken cancellationToken = default,
+        Action<string>? log = null) =>
+        ZarPackEngine.ExtractEntries(zarPath, destDir, zarPath, options, progress, cancellationToken, log);
 
     /// <summary>
     /// Packs several directories in parallel (worker count
