@@ -13,9 +13,9 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI `XISOSharp.Cli` (`net10.0`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 20 extra modes |
 | [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (833 tests) — golden fixtures + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/robustness coverage |
-| [ZARSharp.Tests](ZARSharp.Tests/) | xUnit suite (1238 tests) — pure-C# ZArchive/zstd port (encoder, decoder, fuzz, corruption, `zarchive.exe` interop) |
+| ZARSharp.Tests | **Moved** to the sibling `../CSharp_ZARSharp` repo (own solution + CI) — xUnit suite for the pure-C# ZArchive/zstd port |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
-| [ZARSharp.Benchmarks](ZARSharp.Benchmarks/) | BenchmarkDotNet for ZARSharp only (zstd L1/L6/L19 compress + decode, `.zar` pack/extract) — references `ZARSharp` alone so it moves with a future solution split |
+| ZARSharp.Benchmarks | **Moved** to the sibling `../CSharp_ZARSharp` repo — BenchmarkDotNet for ZARSharp only |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | Battle harness vs `References/extract-xiso-build-202505152050/extract-xiso.c` |
 
@@ -471,10 +471,10 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
-dotnet test -c Release                       # 2079 tests (841 XISOSharp + 1238 ZARSharp)
+dotnet test -c Release                       # 847 tests (`XISOSharp.Tests`; ZARSharp lives in `../CSharp_ZARSharp`)
 ```
 
-Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF); `ZARSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library); `ZARSharp.Tests` (`net10.0`). CI builds on `ubuntu`/`windows`/`macos`.
+Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF). `ZARSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZARSharp.Tests` + `ZARSharp.Benchmarks` moved to the sibling `../CSharp_ZARSharp` repo (own solution); `XISOSharp` consumes the library via a relative `ProjectReference`. CI builds on `ubuntu`/`windows`/`macos`.
 
 ## Requirements
 

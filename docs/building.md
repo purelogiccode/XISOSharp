@@ -40,9 +40,8 @@ The solution contains:
 | `XISOSharp.Core` | net8.0, net9.0, net10.0 | `XISOSharp.dll` + NuGet package |
 | `XISOSharp.Cli` | net10.0 | `XISOSharp.Cli` executable |
 | `XISOSharp.Tests` | net10.0 | xUnit test assembly (engine + CLI) |
-| `ZARSharp.Tests` | net10.0 | xUnit test assembly (ZArchive/zstd port) |
+| `ZARSharp` / `ZARSharp.Tests` / `ZARSharp.Benchmarks` | — | **Moved** to the sibling `../CSharp_ZARSharp` repo (own solution); referenced here via a relative `ProjectReference` |
 | `XISOSharp.Benchmarks` | net10.0 | BenchmarkDotNet harness |
-| `ZARSharp.Benchmarks` | net10.0 | BenchmarkDotNet harness (ZARSharp only; no XISOSharp dependency) |
 | `XISOSharpTester` | net10.0-windows | WPF regression-test GUI |
 
 > [!NOTE]

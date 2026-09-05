@@ -55,7 +55,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\ZARSharp\ZARSharp.csproj" />
+        <!-- ZARSharp lives in the sibling CSharp_ZARSharp repo (separate solution). -->
+        <ProjectReference Include="..\..\CSharp_ZARSharp\ZARSharp\ZARSharp.csproj" />
     </ItemGroup>
 
     <!-- Source Link + versioning -->

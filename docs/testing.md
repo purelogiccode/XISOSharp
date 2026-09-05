@@ -13,15 +13,15 @@ reference-comparison scripts, and the benchmarks.
 
 ## Test suite
 
-The xUnit suites live in `XISOSharp.Tests` (engine + CLI, target: net10.0) and
-`ZARSharp.Tests` (pure-C# ZArchive/zstd port, target: net10.0). Run them with:
+The xUnit suite lives in `XISOSharp.Tests` (engine + CLI, target: net10.0).
+`ZARSharp.Tests` (pure-C# ZArchive/zstd port) moved to the sibling
+`../CSharp_ZARSharp` repo with its own solution and CI. Run the local suite with:
 
 ```bash
 dotnet test XISOSharp.Tests
-dotnet test ZARSharp.Tests/ZARSharp.Tests.csproj
 ```
 
-(Plain `dotnet test` on the solution runs both.)
+(Plain `dotnet test` on the solution runs it.)
 
 Highlights:
 
@@ -104,8 +104,8 @@ Parameters (all optional):
 ## Reference-binary interop tests
 
 `XISOSharp.Tests/CisoSplitInteropTests.cs` (split-CSO golden vectors vs the
-reference `xdvdfs-cli 0.8.3`) and `ZARSharp.Tests/ZArchiveSharpTests.cs`
-(`zarchive.exe` both-directions interop) shell out to reference binaries that live
+reference `xdvdfs-cli 0.8.3`) and (in the sibling `../CSharp_ZARSharp` repo)
+`ZARSharp.Tests/ZArchiveSharpTests.cs` (`zarchive.exe` both-directions interop) shell out to reference binaries that live
 in the gitignored `References/` folder (`References/xdvdfs-0.8.3/xdvdfs.exe`,
 `References/ZArchive-0.1.2/zarchive.exe`). The convention, mirroring the
 `zarchive.exe` pattern:
@@ -179,10 +179,9 @@ The report (`coverage.cobertura.xml`) is uploaded as a CI artifact from the
 dotnet run --project XISOSharp.Benchmarks -c Release
 ```
 
-`ZARSharp.Benchmarks` is the ZARSharp-only counterpart (zstd L1/L6/L19
-compress + decode, `.zar` pack/extract over memory streams). It references
-`ZARSharp` alone — no `XISOSharp` dependency — so it moves untouched into a
-future ZARSharp-only solution:
+`ZARSharp.Benchmarks` (zstd L1/L6/L19 compress + decode, `.zar` pack/extract
+over memory streams) moved with the library to the sibling `../CSharp_ZARSharp`
+repo — run it there:
 
 ```bash
 dotnet run --project ZARSharp.Benchmarks -c Release -- --filter *
