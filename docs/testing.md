@@ -106,8 +106,9 @@ Parameters (all optional):
 `XISOSharp.Tests/CisoSplitInteropTests.cs` (split-CSO golden vectors vs the
 reference `xdvdfs-cli 0.8.3`) and (in the sibling `../CSharp_ZARSharp` repo)
 `ZARSharp.Tests/ZArchiveSharpTests.cs` (`zarchive.exe` both-directions interop) shell out to reference binaries that live
-in the gitignored `References/` folder (`References/xdvdfs-0.8.3/xdvdfs.exe`,
-`References/ZArchive-0.1.2/zarchive.exe`). The convention, mirroring the
+in the gitignored `References/` folder (`References/xdvdfs-0.8.3/xdvdfs.exe`;
+the ZARSharp-side `zarchive.exe` now lives in the sibling `../CSharp_ZARSharp`
+repo at `References/ZArchive-0.1.2/zarchive.exe`). The convention, mirroring the
 `zarchive.exe` pattern:
 
 - Tests silently pass (early `return`) when the binary is absent, so CI and clean

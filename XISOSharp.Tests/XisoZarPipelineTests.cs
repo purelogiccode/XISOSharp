@@ -98,7 +98,7 @@ public sealed class XisoZarPipelineTests : IDisposable
 
     private sealed class Collector : IProgress<ZarProgress>
     {
-        private readonly object _gate = new();
+        private readonly Lock _gate = new();
         public readonly List<ZarProgress> Events = [];
 
         public void Report(ZarProgress value)

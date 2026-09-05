@@ -267,7 +267,8 @@ public sealed class XisoZarConvertTests : IDisposable
     [Fact]
     public void Interop_ReferenceExeExtractsOurZar()
     {
-        var exe = Path.Combine(SolutionRoot(), "References", "ZArchive-0.1.2", "zarchive.exe");
+        // zarchive.exe moved with ZARSharp to the sibling CSharp_ZARSharp repo.
+        var exe = Path.Combine(SolutionRoot(), "..", "CSharp_ZARSharp", "References", "ZArchive-0.1.2", "zarchive.exe");
         if (!File.Exists(exe))
         {
             return; // reference binary not present; covered by round-trip tests

@@ -7,7 +7,7 @@ namespace XISOSharp;
 /// <summary>
 /// XISO → ZArchive (<c>.zar</c>) conversion — the compressed single-file layout
 /// Xenia canary loads for Xbox dumps. Mirrors the ZarManager pipeline
-/// (<c>References/ZarManager-1.2.0/core.py</c>: extract ISO, pack the tree with
+/// (<c>../CSharp_ZARSharp/References/ZarManager-1.2.0/core.py</c>: extract ISO, pack the tree with
 /// <c>zarchive.exe</c>), but streams file bytes straight from the image into
 /// <see cref="ZARSharp.ZArchiveWriter"/> with no intermediate directory.
 /// Every 64 KiB block is compressed with the pure-C# zstd encoder (level 6 by
