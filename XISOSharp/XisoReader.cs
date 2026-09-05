@@ -134,60 +134,33 @@ public static class XisoReader
         }
         else
         {
-            fs.Seek(Constants.HeaderOffset, SeekOrigin.Begin);
-
-            ReadExact(fs, buffer);
-
-            if (!buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+            // Probe the header magic at every known partition base (mirrors the
+            // IBlockDevice overload below and extract-xiso's verify_xiso chain:
+            // plain XISO, XGD2/Redump-360, XGD3, XGD2-hybrid, XGD1). The first
+            // match wins and its base becomes discLseek for all later I/O.
+            long[] probes =
+            [
+                0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
+                Constants.Xgd1LseekOffset
+            ];
+            var found = false;
+            foreach (var probe in probes)
             {
-                fs.Seek((long)Constants.HeaderOffset + Constants.GlobalLseekOffset, SeekOrigin.Begin);
+                fs.Seek((long)Constants.HeaderOffset + probe, SeekOrigin.Begin);
                 ReadExact(fs, buffer);
 
-                if (!buffer.SequenceEqual(HeaderDataBytes))
+                if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
                 {
-                    fs.Seek((long)Constants.HeaderOffset + Constants.GlobalLseekOffset, SeekOrigin.Begin);
-                    ReadExact(fs, buffer);
-
-                    if (!buffer.SequenceEqual(HeaderDataBytes))
-                    {
-                        fs.Seek((long)Constants.HeaderOffset + Constants.Xgd3LseekOffset, SeekOrigin.Begin);
-                        ReadExact(fs, buffer);
-
-                        if (!buffer.SequenceEqual(HeaderDataBytes))
-                        {
-                            fs.Seek((long)Constants.HeaderOffset + Constants.Xgd2HybridLseekOffset, SeekOrigin.Begin);
-                            ReadExact(fs, buffer);
-
-                            if (!buffer.SequenceEqual(HeaderDataBytes))
-                            {
-                                fs.Seek((long)Constants.HeaderOffset + Constants.Xgd1LseekOffset, SeekOrigin.Begin);
-                                ReadExact(fs, buffer);
-
-                                if (!buffer.SequenceEqual(HeaderDataBytes))
-                                {
-                                    Logger.LogErr($"{isoName} does not appear to be a valid xbox iso image\n");
-                                    throw new XisoFormatException($"Invalid XISO: {isoName}");
-                                }
-                                else
-                                {
-                                    discLseek = Constants.Xgd1LseekOffset;
-                                }
-                            }
-                            else
-                            {
-                                discLseek = Constants.Xgd2HybridLseekOffset;
-                            }
-                        }
-                        else
-                        {
-                            discLseek = Constants.Xgd3LseekOffset;
-                        }
-                    }
-                    else
-                    {
-                        discLseek = Constants.GlobalLseekOffset;
-                    }
+                    discLseek = probe;
+                    found = true;
+                    break;
                 }
+            }
+
+            if (!found)
+            {
+                Logger.LogErr($"{isoName} does not appear to be a valid xbox iso image\n");
+                throw new XisoFormatException($"Invalid XISO: {isoName}");
             }
         }
 
