@@ -181,6 +181,33 @@ internal static class ZstdHuffmanEncoder
     }
 
     /// <summary>
+    /// Checks a previous Huffman table against a new histogram
+    /// (<c>HUF_validateCTable</c>): every symbol present in
+    /// <paramref name="count"/> must have a nonzero code length in
+    /// <paramref name="table"/>, which must also cover
+    /// <paramref name="maxSymbolValue"/>.
+    /// </summary>
+    public static bool ValidateCTable(HuffmanCTable table, uint[] count, int maxSymbolValue)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(count);
+        if (table.MaxSymbolValue < maxSymbolValue)
+        {
+            return false;
+        }
+
+        for (var s = 0; s <= maxSymbolValue; s++)
+        {
+            if (count[s] != 0 && table.NbBits[s] == 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Estimated stream size in bytes, without the table description
     /// (<c>HUF_estimateCompressedSize</c>).
     /// </summary>
@@ -219,29 +246,17 @@ internal static class ZstdHuffmanEncoder
             tableLog = TableLogDefault;
         }
 
-        // Sort symbols by decreasing count (HUF_sort); ties by ascending
-        // symbol for determinism (the reference leaves ties unspecified).
-        var alphabetSize = maxSymbolValue + 1;
-        var order = new int[alphabetSize];
-        for (var i = 0; i < alphabetSize; i++)
-        {
-            order[i] = i;
-        }
-
-        Array.Sort(order, (a, b) =>
-        {
-            var c = count[b].CompareTo(count[a]);
-            return c != 0 ? c : a.CompareTo(b);
-        });
-
         // huffNode array with 1-based indexing (huffNode == huffNode0 + 1):
         // leaves at t[1 + i], internal nodes at t[1 + n], barrier at t[0].
         var t = new NodeElt[(2 * (SymbolValueMax + 1)) + 1];
+        var alphabetSize = maxSymbolValue + 1;
         for (var i = 0; i < alphabetSize; i++)
         {
-            t[1 + i].Count = count[order[i]];
-            t[1 + i].Symbol = (byte)order[i];
+            t[1 + i].Count = count[i];
+            t[1 + i].Symbol = (byte)i;
         }
+
+        SortNodes(t, alphabetSize);
 
         var nonNullRank = maxSymbolValue;
         while (nonNullRank > 0 && t[1 + nonNullRank].Count == 0)
@@ -271,6 +286,134 @@ internal static class ZstdHuffmanEncoder
         };
         BuildTableFromTree(table, t, nonNullRank, maxNbBits);
         return (table, maxNbBits);
+    }
+
+    // HUF_sort bucket constants (lib/compress/huf_compress.c:507-525).
+    // Buckets [0, cutoff) hold one distinct count each; buckets
+    // [cutoff, 191) group large counts by highbit. Code-exact:
+    // LogBucketsBegin = 158, highbit32(158) = 7, cutoff = 165 (the stale
+    // "== 166" comment upstream notwithstanding).
+    private const int RankPositionTableSize = 192;
+    private const int RankPositionMaxCountLog = 32;
+    private const int RankPositionLogBucketsBegin = (RankPositionTableSize - 1) - RankPositionMaxCountLog - 1;
+    private const int RankPositionDistinctCountCutoff = RankPositionLogBucketsBegin + 7;
+    private const int QuickSortInsertionThreshold = 8;
+
+    /// <summary><c>HUF_getIndex</c>: bucket index for a symbol count.</summary>
+    private static uint GetRankIndex(uint count)
+    {
+        // count >= cutoff > 0 in the lower branch, so LeadingZeroCount < 32.
+        return count < RankPositionDistinctCountCutoff
+            ? count
+            : (uint)(31 - BitOperations.LeadingZeroCount(count)) + RankPositionLogBucketsBegin;
+    }
+
+    // HUF_sort: bucket symbols by count rank with stable ascending-symbol
+    // insertion, then HUF_simpleQuickSort within the large-count buckets
+    // [cutoff, tableSize - 1). Byte parity depends on this exact order: the
+    // tree merge below breaks count ties toward internal nodes, so any
+    // initial-order difference occasionally flips equal-count code lengths.
+    private static void SortNodes(NodeElt[] t, int alphabetSize)
+    {
+        var basePos = new int[RankPositionTableSize];
+        var currPos = new int[RankPositionTableSize];
+        for (var n = 0; n < alphabetSize; n++)
+        {
+            basePos[GetRankIndex(t[1 + n].Count)]++;
+        }
+
+        for (var n = RankPositionTableSize - 1; n > 0; n--)
+        {
+            basePos[n - 1] += basePos[n];
+            currPos[n - 1] = basePos[n - 1];
+        }
+
+        // Scatter a copy back in bucket order (stable: ascending symbol).
+        var tmp = new NodeElt[alphabetSize];
+        for (var i = 0; i < alphabetSize; i++)
+        {
+            tmp[i] = t[1 + i];
+        }
+
+        for (var n = 0; n < alphabetSize; n++)
+        {
+            var r = (int)GetRankIndex(tmp[n].Count) + 1;
+            t[1 + currPos[r]++] = tmp[n];
+        }
+
+        for (var n = RankPositionDistinctCountCutoff; n < RankPositionTableSize - 1; n++)
+        {
+            var bucketSize = currPos[n] - basePos[n];
+            if (bucketSize > 1)
+            {
+                SimpleQuickSort(t, 1 + basePos[n], 1 + basePos[n] + bucketSize - 1);
+            }
+        }
+    }
+
+    // HUF_simpleQuickSort over t[low..high] (T-indices): rightmost pivot,
+    // strict-greater partition, insertion sort below the threshold, smaller
+    // side recursed first. The recursion order cannot affect the final
+    // permutation (partitioning is deterministic); it is kept anyway.
+    private static void SimpleQuickSort(NodeElt[] t, int low, int high)
+    {
+        if (high - low < QuickSortInsertionThreshold)
+        {
+            InsertionSort(t, low, high);
+            return;
+        }
+
+        while (low < high)
+        {
+            var idx = QuickSortPartition(t, low, high);
+            if (idx - low < high - idx)
+            {
+                SimpleQuickSort(t, low, idx - 1);
+                low = idx + 1;
+            }
+            else
+            {
+                SimpleQuickSort(t, idx + 1, high);
+                high = idx - 1;
+            }
+        }
+    }
+
+    // HUF_quickSortPartition: Lomuto, rightmost pivot, strict-greater move.
+    private static int QuickSortPartition(NodeElt[] t, int low, int high)
+    {
+        var pivot = t[high].Count;
+        var i = low - 1;
+        for (var j = low; j < high; j++)
+        {
+            if (t[j].Count > pivot)
+            {
+                i++;
+                (t[i], t[j]) = (t[j], t[i]);
+            }
+        }
+
+        (t[i + 1], t[high]) = (t[high], t[i + 1]);
+        return i + 1;
+    }
+
+    // HUF_insertionSort by descending count (strict-less shift: stable for
+    // equal counts, preserving ascending-symbol order).
+    private static void InsertionSort(NodeElt[] t, int low, int high)
+    {
+        var size = high - low + 1;
+        for (var i = 1; i < size; i++)
+        {
+            var key = t[low + i];
+            var j = i - 1;
+            while (j >= 0 && t[low + j].Count < key.Count)
+            {
+                t[low + j + 1] = t[low + j];
+                j--;
+            }
+
+            t[low + j + 1] = key;
+        }
     }
 
     // HUF_buildTree: merges the two smallest nodes until one root remains,
@@ -731,9 +874,41 @@ internal static class ZstdHuffmanEncoder
         int maxSymbolValue = SymbolValueMax, int huffLog = TableLogDefault,
         bool suspectUncompressible = false, bool optimalDepth = false)
     {
+        var repeat = ZstdHufRepeat.None;
+        return CompressWithRepeat(
+            dst, dstOffset, dstCapacity, src, srcOffset, srcLength,
+            null, ref repeat, preferRepeat: false,
+            suspectUncompressible, optimalDepth, out _,
+            maxSymbolValue, huffLog);
+    }
+
+    /// <summary>
+    /// Compresses literals with optional previous-table reuse
+    /// (<c>HUF_compress_internal</c> via <c>HUF_compress1X/4X_repeat</c>).
+    /// <paramref name="prevTable"/> is the previous block's table (null on
+    /// the first block); <paramref name="repeat"/> is updated exactly like
+    /// native: validated check tables downgrade to none, a reused table
+    /// leaves the mode untouched (the caller emits treeless), and a fresh
+    /// table resets it to none (the caller records check on emit).
+    /// <paramref name="preferRepeat"/> is set below lazy for inputs ≤ 1 KiB
+    /// (<c>HUF_flags_preferRepeat</c>). Returns 0 (store raw), 1 (RLE,
+    /// <c>dst[dstOffset]</c> holds the byte), or the stream bytes — including
+    /// the table description on the fresh path (<paramref name="nextTable"/>
+    /// then holds the built table), bare streams on the reuse path
+    /// (<paramref name="nextTable"/> null).
+    /// </summary>
+    public static int CompressWithRepeat(
+        byte[] dst, int dstOffset, int dstCapacity,
+        byte[] src, int srcOffset, int srcLength,
+        HuffmanCTable? prevTable, ref ZstdHufRepeat repeat,
+        bool preferRepeat, bool suspectUncompressible, bool optimalDepth,
+        out HuffmanCTable? nextTable,
+        int maxSymbolValue = SymbolValueMax, int huffLog = TableLogDefault)
+    {
         ArgumentNullException.ThrowIfNull(dst);
         ArgumentNullException.ThrowIfNull(src);
 
+        nextTable = null;
         if (srcLength <= 0 || dstCapacity <= 0)
         {
             return 0;
@@ -760,6 +935,17 @@ internal static class ZstdHuffmanEncoder
 
         // The decoder caps codes at 11 bits (RFC 8878 Section 4.2).
         huffLog = Math.Min(huffLog, TableLogDefault);
+
+        // Stream layout is fixed before the reuse decision (the valid-table
+        // override does not depend on preferRepeat).
+        var singleStream = srcLength < SingleStreamThreshold
+            || (repeat == ZstdHufRepeat.Valid && srcLength < 1024);
+
+        // Small inputs with a valid table go straight to the old table.
+        if (preferRepeat && repeat == ZstdHufRepeat.Valid && prevTable is not null)
+        {
+            return CompressStreams(dst, dstOffset, dstCapacity, src, srcOffset, srcLength, prevTable, singleStream);
+        }
 
         var count = new uint[SymbolValueMax + 1];
         var end = srcOffset + srcLength;
@@ -803,6 +989,19 @@ internal static class ZstdHuffmanEncoder
             return 0;
         }
 
+        // A check table that misses a live symbol is unusable (none).
+        if (repeat == ZstdHufRepeat.Check
+            && (prevTable is null || !ValidateCTable(prevTable, count, maxSv)))
+        {
+            repeat = ZstdHufRepeat.None;
+        }
+
+        // Small inputs reuse any surviving table.
+        if (preferRepeat && repeat != ZstdHufRepeat.None && prevTable is not null)
+        {
+            return CompressStreams(dst, dstOffset, dstCapacity, src, srcOffset, srcLength, prevTable, singleStream);
+        }
+
         var tableLog = optimalDepth
             ? OptimalTableLogDepth(count, maxSv, huffLog)
             : OptimalTableLog(srcLength, maxSv, huffLog);
@@ -815,22 +1014,44 @@ internal static class ZstdHuffmanEncoder
             return 0;
         }
 
+        // Reuse the old table when its estimate beats the new table plus its
+        // description (or the description alone kills the gain).
+        if (repeat != ZstdHufRepeat.None && prevTable is not null)
+        {
+            var oldSize = EstimateCompressedSize(prevTable, count, maxSv);
+            var newSize = EstimateCompressedSize(table, count, maxSv);
+            if (oldSize <= hSize + newSize || hSize + 12 >= srcLength)
+            {
+                return CompressStreams(dst, dstOffset, dstCapacity, src, srcOffset, srcLength, prevTable, singleStream);
+            }
+        }
+
         if (hSize + 12 >= srcLength)
         {
             return 0;
         }
 
-        var cSize = srcLength < SingleStreamThreshold
-            ? Compress1X(dst, dstOffset + hSize, dstCapacity - hSize, src, srcOffset, srcLength, table)
-            : Compress4X(dst, dstOffset + hSize, dstCapacity - hSize, src, srcOffset, srcLength, table);
+        repeat = ZstdHufRepeat.None;
+        nextTable = table;
+        var cSize = CompressStreams(dst, dstOffset + hSize, dstCapacity - hSize, src, srcOffset, srcLength, table, singleStream);
         if (cSize == 0)
         {
+            nextTable = null;
             return 0;
         }
 
         // No "total >= srcLength - 1" early-out here: like HUF_compress, the
         // caller (ZSTD_compressLiterals) applies ZSTD_minGain instead.
         return hSize + cSize;
+    }
+
+    private static int CompressStreams(
+        byte[] dst, int dstOffset, int dstCapacity,
+        byte[] src, int srcOffset, int srcLength, HuffmanCTable table, bool singleStream)
+    {
+        return singleStream
+            ? Compress1X(dst, dstOffset, dstCapacity, src, srcOffset, srcLength, table)
+            : Compress4X(dst, dstOffset, dstCapacity, src, srcOffset, srcLength, table);
     }
 
     private static uint LargestInRange(byte[] src, int offset, int length, uint[] scratch)

@@ -71,30 +71,54 @@ internal static class ZstdDoubleFast
         ReadOnlySpan<byte> source, ZstdSequenceStore store, uint[] repeatOffsets,
         ZstdCompressionParameters prm)
     {
-        var n = source.Length;
-        if (n == 0)
+        if (source.Length == 0)
         {
             store.SetTrailingLiterals([]);
             return 0;
         }
 
+        var hashLong = new uint[1 << prm.HashLog];
+        var hashSmall = new uint[1 << prm.ChainLog];
+        return FindMatchesCore(source, 0, source.Length, hashLong, hashSmall, store, repeatOffsets, prm);
+    }
+
+    /// <summary>
+    /// Parses one frame block <c>[blockStart, blockEnd)</c> of the frame held
+    /// by <paramref name="state"/>, with the frame-persistent long and small
+    /// tables (see <see cref="ZstdFast.FindMatches(ZstdFrameState,int,int,ZstdSequenceStore,uint[])"/>
+    /// for the positioning contract).
+    /// </summary>
+    internal static int FindMatches(
+        ZstdFrameState state, int blockStart, int blockEnd,
+        ZstdSequenceStore store, uint[] repeatOffsets)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var (longTable, smallTable) = state.DoubleFastTables();
+        return FindMatchesCore(
+            state.Frame, blockStart, blockEnd, longTable, smallTable,
+            store, repeatOffsets, state.Prm);
+    }
+
+    private static int FindMatchesCore(
+        ReadOnlySpan<byte> source, int blockStart, int blockEnd,
+        uint[] hashLong, uint[] hashSmall,
+        ZstdSequenceStore store, uint[] repeatOffsets, ZstdCompressionParameters prm)
+    {
         var hBitsL = prm.HashLog;
         var hBitsS = prm.ChainLog;
         var mls = prm.MinMatch;
         var windowLog = prm.WindowLog;
-        var hashLong = new uint[1 << hBitsL];
-        var hashSmall = new uint[1 << hBitsS];
-        var ilimit = n - 8;
+        var ilimit = blockEnd - 8;
 
         var offset1 = repeatOffsets[0];
         var offset2 = repeatOffsets[1];
         uint saved1 = 0, saved2 = 0;
 
-        var anchor = 0;
-        var ip = 0;
+        var anchor = blockStart;
+        var ip = blockStart;
         if (ip == 0)
         {
-            ip++; // ip == prefixLowest (fresh window starts at 0)
+            ip++; // ip == prefixLowest (frame start; later blocks never equal it)
         }
 
         {
@@ -142,7 +166,7 @@ internal static class ZstdDoubleFast
                 if (offset1 > 0 && ip + 1 - (int)offset1 >= 0
                     && Read32(source, ip + 1 - (int)offset1) == Read32(source, ip + 1))
                 {
-                    lastLen = 4 + CountMatches(source, ip + 1 + 4, ip + 1 + 4 - (int)offset1, n);
+                    lastLen = 4 + CountMatches(source, ip + 1 + 4, ip + 1 + 4 - (int)offset1, blockEnd);
                     ip++;
                     store.StoreSequence(source.Slice(anchor, ip - anchor), ZstdSeq.Repcode1, lastLen);
                     stored = true;
@@ -156,7 +180,7 @@ internal static class ZstdDoubleFast
                 uint foundOff;
                 if (idxl0 >= 0 && Read64(source, idxl0) == Read64(source, ip))
                 {
-                    foundLen = 8 + CountMatches(source, ip + 8, idxl0 + 8, n);
+                    foundLen = 8 + CountMatches(source, ip + 8, idxl0 + 8, blockEnd);
                     foundOff = (uint)(ip - idxl0);
                     foundIp = ip;
                     var back = idxl0;
@@ -195,14 +219,14 @@ internal static class ZstdDoubleFast
                     }
 
                     // _search_next_long: short match, maybe a longer one at ip1.
-                    foundLen = 4 + CountMatches(source, ip + 4, idxs0 + 4, n);
+                    foundLen = 4 + CountMatches(source, ip + 4, idxs0 + 4, blockEnd);
                     foundOff = (uint)(ip - idxs0);
                     foundIp = ip;
                     var back = idxs0;
 
                     if (idxl1 > 0 && Read64(source, idxl1) == Read64(source, ip1))
                     {
-                        var l1len = 8 + CountMatches(source, ip1 + 8, idxl1 + 8, n);
+                        var l1len = 8 + CountMatches(source, ip1 + 8, idxl1 + 8, blockEnd);
                         if (l1len > foundLen)
                         {
                             foundIp = ip1;
@@ -259,7 +283,7 @@ internal static class ZstdDoubleFast
                 while (ip <= ilimit && offset2 > 0 && ip - (int)offset2 >= 0
                     && Read32(source, ip) == Read32(source, ip - (int)offset2))
                 {
-                    var repLen = 4 + CountMatches(source, ip + 4, ip + 4 - (int)offset2, n);
+                    var repLen = 4 + CountMatches(source, ip + 4, ip + 4 - (int)offset2, blockEnd);
                     (offset2, offset1) = (offset1, offset2);
                     hashSmall[ZstdMatchFinder.HashPtr(source, ip, hBitsS, mls)] = (uint)ip + 1;
                     hashLong[ZstdMatchFinder.HashPtr(source, ip, hBitsL, 8)] = (uint)ip + 1;
@@ -273,7 +297,7 @@ internal static class ZstdDoubleFast
         saved2 = saved1 != 0 && offset1 != 0 ? saved1 : saved2;
         repeatOffsets[0] = offset1 != 0 ? offset1 : saved1;
         repeatOffsets[1] = offset2 != 0 ? offset2 : saved2;
-        store.SetTrailingLiterals(source.Slice(anchor, n - anchor));
-        return n - anchor;
+        store.SetTrailingLiterals(source.Slice(anchor, blockEnd - anchor));
+        return blockEnd - anchor;
     }
 }

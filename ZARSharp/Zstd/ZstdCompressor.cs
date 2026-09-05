@@ -63,10 +63,11 @@ public sealed class ZstdCompressionOptions
 }
 
 /// <summary>
-/// Pure-C# zstd compressor: single-shot frames of one or more independent
-/// 64 KiB blocks (fresh match finder and tables per block; repeat-offset
-/// history carried across blocks, frame-scoped per RFC 8878 §4.1.1).
-/// C# port of <c>ZSTD_writeFrameHeader</c> / <c>ZSTD_compressEnd</c> framing
+/// Pure-C# zstd compressor: single-shot frames of native 128 KiB blocks
+/// (<c>ZSTD_BLOCKSIZE_MAX</c>, smaller when the adjusted window is smaller),
+/// with frame-level parameters shared by every block and persistent
+/// frame-scoped repeat-offset history (RFC 8878 §4.1.1). C# port of
+/// <c>ZSTD_writeFrameHeader</c> / <c>ZSTD_compress_frameChunk</c> framing
 /// (<c>lib/compress/zstd_compress.c</c>, RFC 8878 §3) over
 /// <see cref="ZstdBlockEncoder"/> blocks. Default level 6, matching the
 /// upstream <c>ZSTD_compress(..., 6)</c> call in <c>StoreBlock</c>.
@@ -74,7 +75,24 @@ public sealed class ZstdCompressionOptions
 public sealed class ZstdCompressor : IZarBlockCompressor
 {
     private const uint FrameMagic = 0xFD2FB528;
-    private const int MaxChunk = 65536; // One independent block per 64 KiB.
+
+    /// <summary>
+    /// Maximum block size (<c>ZSTD_BLOCKSIZE_MAX == 1 &lt;&lt; ZSTD_BLOCKSIZELOG_MAX</c>).
+    /// </summary>
+    private const int MaxBlockSize = 131072;
+
+    /// <summary>
+    /// Blocks below this size go raw without attempting compression
+    /// (<c>ZSTD_buildSeqStore</c>: <c>srcSize &lt; MIN_CBLOCK_SIZE +
+    /// ZSTD_blockHeaderSize + 1 + 1</c>, with <c>MIN_CBLOCK_SIZE == 2</c>).
+    /// </summary>
+    private const int MinCompressibleBlock = 2 + 3 + 1 + 1;
+
+    /// <summary>
+    /// Entropy payloads below this size on uniform non-first blocks emit
+    /// <c>bt_rle</c> (<c>rleMaxLength</c> in <c>ZSTD_compressBlock_internal</c>).
+    /// </summary>
+    internal const int RleMaxLength = 25;
 
     /// <summary>Creates a compressor (default level 6).</summary>
     public ZstdCompressor(ZstdCompressionOptions? options = null)
@@ -152,56 +170,82 @@ public sealed class ZstdCompressor : IZarBlockCompressor
     }
 
     // ------------------------------------------------------------------
-    // Frame writer (ZSTD_writeFrameHeader / ZSTD_compressEnd, single-shot)
+    // Frame writer (ZSTD_writeFrameHeader / ZSTD_compress_frameChunk,
+    // single-shot, no dict, no target block size)
     // ------------------------------------------------------------------
 
     private static byte[] EncodeFrame(ReadOnlySpan<byte> src, int level, bool checksum)
     {
+        // Single-shot cParams from the TOTAL size (ZSTD_getCParams +
+        // ZSTD_adjustCParams_internal), shared by the frame header and every
+        // block — never re-resolved per block.
+        var prm = ZstdCompressionParameters.ForSizeAndLevel(src.Length, level).AdjustForSize(src.Length);
+
+        // ZSTD_resetCCtx_internal: windowSize = MAX(1, MIN(1<<windowLog,
+        // pledgedSrcSize)); blockSize = MIN(maxBlockSize, windowSize).
+        var windowSize = Math.Max(1L, Math.Min(1L << prm.WindowLog, (long)src.Length));
+        var blockMax = (int)Math.Min(MaxBlockSize, windowSize);
+
         var dst = new byte[GetCompressBound(src.Length)];
         var pos = WriteFrameHeader(dst, 0, src.Length, checksum, level);
 
-        // Independent 64 KiB blocks (fresh tables each; repeat/treeless never
-        // used, which is always legal). Repeat-offset history is frame-scoped
-        // (RFC 8878 §4.1.1) and carried across blocks; resetting it per block
-        // would corrupt repeat codes in later blocks. Empty input still emits
-        // one empty last block — a frame with zero blocks would not decode.
+        // Persistent match state (M2) for every strategy: the state holds the
+        // frame copy the engines index absolutely (copied only when
+        // stateful). Single-shot inputs below two blocks never touch it
+        // beyond the first block, so behavior there is unchanged.
+        var stateful = prm.Strategy
+            is ZstdStrategy.Fast or ZstdStrategy.DoubleFast
+            or ZstdStrategy.Greedy or ZstdStrategy.Lazy or ZstdStrategy.Lazy2 or ZstdStrategy.BtLazy2
+            or ZstdStrategy.BtOpt or ZstdStrategy.BtUltra or ZstdStrategy.BtUltra2;
+        var frame = stateful ? src.ToArray() : [];
+        ZstdFrameState? state = stateful ? new ZstdFrameState(frame, level, prm) : null;
+
+        // Post-block splitter for optimal-parser strategies with a big
+        // window (M4: ZSTD_resolveBlockSplitterMode).
+        var splitBlocks = state is not null && ZstdBlockSplitter.Enabled(prm);
+
+        // Repeat-offset history is frame-scoped (RFC 8878 §4.1.1): initialized
+        // once and carried across blocks. The decoder leaves its history
+        // untouched for raw/RLE blocks, so the staged history is confirmed
+        // only for emitted compressed blocks (upstream runs
+        // ZSTD_blockState_confirmRepcodesAndEntropyTables only for those).
+        // Empty input still emits one empty last block — a frame with zero
+        // blocks would not decode.
         var rep = ZstdSeq.FreshRepeatOffsets();
         var remaining = src.Length;
         var inPos = 0;
+        var isFirstBlock = true;
+        // Running consumed-minus-produced balance: splitting past the first
+        // full block needs verified savings (ZSTD_compress_frameChunk).
+        long savings = 0;
+        var frameSpan = state is not null
+            ? new ReadOnlySpan<byte>(frame)
+            : src;
         do
         {
-            var chunk = Math.Min(remaining, MaxChunk);
+            var chunk = ZstdBlockSplitter.OptimalBlockSize(
+                frameSpan, inPos, remaining, blockMax, prm.Strategy, ref savings);
             var last = chunk == remaining;
-            var r0 = rep[0];
-            var r1 = rep[1];
-            var r2 = rep[2];
-            var blockSize = ZstdBlockEncoder.EncodeBlock(
-                src.Slice(inPos, chunk), level, dst, pos, dst.Length - pos, last, rep);
-            if (blockSize < 0 || blockSize >= chunk + 3)
+            var chunkBytes = state is not null
+                ? new ReadOnlySpan<byte>(frame, inPos, chunk)
+                : src.Slice(inPos, chunk);
+            int written;
+            if (splitBlocks)
             {
-                // Raw block (ZSTD_noCompressBlock): 3-byte header + copy.
-                // The decoder leaves its repeat history untouched for raw
-                // blocks, so un-confirm the staged history (upstream only runs
-                // ZSTD_blockState_confirmRepcodesAndEntropyTables for emitted
-                // compressed blocks). Always fits: the bound's slack covers
-                // 3 bytes per chunk.
-                rep[0] = r0;
-                rep[1] = r1;
-                rep[2] = r2;
-                if (pos + 3 + chunk > dst.Length)
-                {
-                    throw new ZstdException("Frame destination too small.");
-                }
-
-                var header = (last ? 1u : 0u) | ((uint)chunk << 3); // Type raw(0).
-                dst[pos] = (byte)header;
-                dst[pos + 1] = (byte)(header >> 8);
-                dst[pos + 2] = (byte)(header >> 16);
-                src.Slice(inPos, chunk).CopyTo(new Span<byte>(dst, pos + 3, chunk));
-                blockSize = 3 + chunk;
+                written = ZstdBlockSplitter.WriteSplitBlock(
+                    state!, inPos, chunkBytes, dst, pos, dst.Length - pos,
+                    last, rep, isFirstBlock);
+                isFirstBlock = false;
+            }
+            else
+            {
+                written = WriteFrameBlock(
+                    chunkBytes, inPos, level, prm,
+                    dst, pos, dst.Length - pos, last, rep, ref isFirstBlock, state);
             }
 
-            pos += blockSize;
+            savings += (long)chunk - written;
+            pos += written;
             inPos += chunk;
             remaining -= chunk;
         } while (remaining > 0);
@@ -223,6 +267,130 @@ public sealed class ZstdCompressor : IZarBlockCompressor
 
         Array.Resize(ref dst, pos);
         return dst;
+    }
+
+    /// <summary>
+    /// Writes one frame block (header included) at <c>dst[pos]</c>; returns
+    /// the bytes written. Exact port of the plain (no splitter, no target
+    /// size) arm of <c>ZSTD_compress_frameChunk</c> over
+    /// <c>ZSTD_compressBlock_internal</c>: tiny blocks go raw directly
+    /// (<c>ZSTDbss_noCompress</c>), otherwise the entropy payload must beat
+    /// <c>blockSize - ZSTD_minGain</c> (else raw), and a tiny payload on a
+    /// uniform non-first block emits <c>bt_rle</c> (the first block never
+    /// does, for pre-1.4.3 decoder compatibility). Always fits: the bound's
+    /// slack covers headers plus one raw block per chunk.
+    /// </summary>
+    private static int WriteFrameBlock(
+        ReadOnlySpan<byte> chunk, int blockStart, int level, ZstdCompressionParameters prm,
+        byte[] dst, int pos, int capacity, bool last, uint[] rep, ref bool isFirstBlock,
+        ZstdFrameState? state)
+    {
+        if (chunk.Length < MinCompressibleBlock)
+        {
+            // Tiny blocks go raw without parsing; the offset-code downgrade
+            // still applies (native reaches the same tail past ZSTDbss_noCompress).
+            state?.DeclineEntropy();
+            WriteRawBlock(chunk, dst, pos, last);
+            isFirstBlock = false;
+            return 3 + chunk.Length;
+        }
+
+        var r0 = rep[0];
+        var r1 = rep[1];
+        var r2 = rep[2];
+        int payload;
+        try
+        {
+            payload = state is not null
+                ? ZstdBlockEncoder.EncodeBlockPayloadStateful(
+                    state, blockStart, blockStart + chunk.Length, dst, pos + 3, capacity - 3, rep)
+                : ZstdBlockEncoder.EncodeBlockPayload(
+                    chunk, level, prm, dst, pos + 3, capacity - 3, rep);
+        }
+        catch (ZstdException)
+        {
+            payload = -1;
+        }
+
+        var maxCSize = chunk.Length - ZstdBlockEncoder.MinGain(chunk.Length, prm.Strategy);
+        int written;
+        if (payload < 0 || payload >= maxCSize || payload > (1 << 21) - 1)
+        {
+            // Raw block (ZSTD_noCompressBlock): 3-byte header + copy.
+            rep[0] = r0;
+            rep[1] = r1;
+            rep[2] = r2;
+            state?.DeclineEntropy();
+            WriteRawBlock(chunk, dst, pos, last);
+            written = 3 + chunk.Length;
+        }
+        else if (!isFirstBlock && payload < RleMaxLength && IsUniform(chunk))
+        {
+            // RLE block (ZSTD_rleCompressBlock): header carries the
+            // decompressed size, payload is the single repeated byte. Like
+            // raw, it resets the decoder-side history: un-confirm staged rep.
+            rep[0] = r0;
+            rep[1] = r1;
+            rep[2] = r2;
+            state?.DeclineEntropy();
+            if (capacity < 4)
+            {
+                throw new ZstdException("Frame destination too small.");
+            }
+
+            var header = (last ? 1u : 0u) | (1u << 1) | ((uint)chunk.Length << 3); // Type RLE(1).
+            dst[pos] = (byte)header;
+            dst[pos + 1] = (byte)(header >> 8);
+            dst[pos + 2] = (byte)(header >> 16);
+            dst[pos + 3] = chunk[0];
+            written = 4;
+        }
+        else
+        {
+            state?.ConfirmEntropy();
+            var header = (last ? 1u : 0u) | (2u << 1) | ((uint)payload << 3); // Type compressed(2).
+            dst[pos] = (byte)header;
+            dst[pos + 1] = (byte)(header >> 8);
+            dst[pos + 2] = (byte)(header >> 16);
+            written = 3 + payload;
+        }
+
+        isFirstBlock = false;
+        return written;
+    }
+
+    private static void WriteRawBlock(ReadOnlySpan<byte> chunk, byte[] dst, int pos, bool last)
+    {
+        if (pos + 3 + chunk.Length > dst.Length)
+        {
+            throw new ZstdException("Frame destination too small.");
+        }
+
+        var header = (last ? 1u : 0u) | ((uint)chunk.Length << 3); // Type raw(0).
+        dst[pos] = (byte)header;
+        dst[pos + 1] = (byte)(header >> 8);
+        dst[pos + 2] = (byte)(header >> 16);
+        chunk.CopyTo(new Span<byte>(dst, pos + 3, chunk.Length));
+    }
+
+    /// <summary><c>ZSTD_isRLE</c>: every byte identical (never called empty here).</summary>
+    internal static bool IsUniform(ReadOnlySpan<byte> chunk)
+    {
+        if (chunk.Length == 0)
+        {
+            return false;
+        }
+
+        var first = chunk[0];
+        for (var i = 1; i < chunk.Length; i++)
+        {
+            if (chunk[i] != first)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

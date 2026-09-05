@@ -153,6 +153,26 @@ internal static class ZstdOpt
     internal static int FindMatches(
         ReadOnlySpan<byte> source, ZstdSequenceStore store, uint[] repeatOffsets, int level)
     {
+        if (source.Length == 0)
+        {
+            store.SetTrailingLiterals([]);
+            return 0;
+        }
+
+        var table = ZstdCompressionParameters.ForSizeAndLevel(source.Length, level).AdjustForSize(source.Length);
+        return FindMatches(source, store, repeatOffsets, table);
+    }
+
+    /// <summary>
+    /// Parses one frame block with an explicitly supplied (already adjusted)
+    /// parameter row (see <see cref="ZstdMatchFinder.FindMatches(ReadOnlySpan{byte}, ZstdSequenceStore, uint[], ZstdCompressionParameters)"/> for why
+    /// multi-block frames share the frame-level row). Single-block path:
+    /// fresh tables and fresh statistics, exactly like a native first block.
+    /// </summary>
+    internal static int FindMatches(
+        ReadOnlySpan<byte> source, ZstdSequenceStore store, uint[] repeatOffsets,
+        ZstdCompressionParameters table)
+    {
         var n = source.Length;
         if (n == 0)
         {
@@ -160,13 +180,7 @@ internal static class ZstdOpt
             return 0;
         }
 
-        var table = ZstdCompressionParameters.ForSizeAndLevel(n, level).AdjustForSize(n);
-        var optLevel = table.Strategy switch
-        {
-            ZstdStrategy.BtOpt => 0,
-            ZstdStrategy.BtUltra or ZstdStrategy.BtUltra2 => 2,
-            _ => throw new ArgumentOutOfRangeException(nameof(level), $"Level {level} is not optimal-parsing."),
-        };
+        var optLevel = OptLevelFor(table.Strategy);
         var stats = new OptStats(); // fresh: litLengthSum == 0 (first block init)
 
         if (table.Strategy == ZstdStrategy.BtUltra2 && n > PredefThreshold)
@@ -177,10 +191,91 @@ internal static class ZstdOpt
             // invalidation, whose stale entries all sit below lowLimit).
             var tmpStore = new ZstdSequenceStore(n);
             var tmpRep = (uint[])repeatOffsets.Clone();
-            OptGeneric(source, tmpStore, tmpRep, table, optLevel, stats);
+            var tmpNext = 0;
+            OptGeneric(source, 0, n, tmpStore, tmpRep, table, optLevel, stats, NewTables(table), ref tmpNext);
         }
 
-        return OptGeneric(source, store, repeatOffsets, table, optLevel, stats);
+        var nextToUpdate = 0;
+        return OptGeneric(source, 0, n, store, repeatOffsets, table, optLevel, stats, NewTables(table), ref nextToUpdate);
+    }
+
+    /// <summary>
+    /// Parses one frame block <c>[blockStart, blockEnd)</c> of the frame held
+    /// by <paramref name="state"/> with the frame-persistent binary-tree
+    /// tables, statistics and update cursor — the native
+    /// <c>ZSTD_MatchState_t</c> + <c>ms-&gt;opt</c> contract across blocks:
+    /// later blocks scale down the accumulated statistics
+    /// (<c>ZSTD_rescaleFreqs</c> non-first arm) instead of re-initializing
+    /// them, and the btultra2 two-pass seeding runs only on the first block
+    /// (<c>litLengthSum == 0</c> at frame start, like native's
+    /// <c>curr == dictLimit</c> gate). Positions are absolute frame offsets;
+    /// matches may reference earlier blocks but never extend past
+    /// <paramref name="blockEnd"/> (native <c>iend</c>).
+    /// </summary>
+    internal static int FindMatches(
+        ZstdFrameState state, int blockStart, int blockEnd,
+        ZstdSequenceStore store, uint[] repeatOffsets)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (blockEnd == blockStart)
+        {
+            store.SetTrailingLiterals([]);
+            return 0;
+        }
+
+        var table = state.Prm;
+        var optLevel = OptLevelFor(table.Strategy);
+        var stats = state.OptStats();
+        var tables = state.OptTables();
+
+        if (table.Strategy == ZstdStrategy.BtUltra2
+            && stats.LitLengthSum == 0 && blockStart == 0
+            && blockEnd - blockStart > PredefThreshold)
+        {
+            // First-block two-pass seeding (ZSTD_initStats_ultra): the
+            // throwaway pass runs over temp tables (discarded, like the
+            // native window-shift invalidation) sharing the frame statistics;
+            // the real pass below refills the still-empty persistent tables.
+            var tmpStore = new ZstdSequenceStore(blockEnd - blockStart);
+            var tmpRep = (uint[])repeatOffsets.Clone();
+            var tmpNext = 0;
+            OptGeneric(state.Frame, blockStart, blockEnd, tmpStore, tmpRep, table, optLevel, stats, NewTables(table), ref tmpNext);
+        }
+
+        return OptGeneric(state.Frame, blockStart, blockEnd, store, repeatOffsets, table, optLevel, stats, tables, ref state.NextToUpdate);
+    }
+
+    private static int OptLevelFor(ZstdStrategy strategy)
+    {
+        return strategy switch
+        {
+            ZstdStrategy.BtOpt => 0,
+            ZstdStrategy.BtUltra or ZstdStrategy.BtUltra2 => 2,
+            _ => throw new ArgumentOutOfRangeException(nameof(strategy), $"Strategy {strategy} is not optimal-parsing."),
+        };
+    }
+
+    /// <summary>
+    /// Fresh binary-tree tables for one optimal-parser pass
+    /// (<c>hashLog</c>, <c>chainLog</c>, and the 3-byte table when
+    /// <c>minMatch</c> is 3).
+    /// </summary>
+    private static (uint[] Hash, uint[] Bt, uint[] Hash3) NewTables(ZstdCompressionParameters prm)
+    {
+        var hash = new uint[1 << prm.HashLog];
+        var bt = new uint[1 << prm.ChainLog];
+        var hashLog3 = HashLog3For(prm);
+        uint[] hash3 = hashLog3 > 0 ? new uint[1 << hashLog3] : [];
+        return (hash, bt, hash3);
+    }
+
+    /// <summary>
+    /// The 3-byte hash log for <paramref name="prm"/>
+    /// (<c>MIN(17, windowLog)</c> when <c>minMatch</c> is 3, else 0 = absent).
+    /// </summary>
+    internal static int HashLog3For(ZstdCompressionParameters prm)
+    {
+        return prm.MinMatch == 3 ? Math.Min(HashLog3Max, prm.WindowLog) : 0;
     }
 
     // ------------------------------------------------------------------
@@ -710,10 +805,11 @@ internal static class ZstdOpt
     // ------------------------------------------------------------------
 
     private static int OptGeneric(
-        ReadOnlySpan<byte> src, ZstdSequenceStore store, uint[] rep,
-        ZstdCompressionParameters prm, int optLevel, OptStats stats)
+        ReadOnlySpan<byte> src, int blockStart, int blockEnd,
+        ZstdSequenceStore store, uint[] rep,
+        ZstdCompressionParameters prm, int optLevel, OptStats stats,
+        (uint[] Hash, uint[] Bt, uint[] Hash3) tables, ref int nextToUpdate)
     {
-        var n = src.Length;
         var targetLength = prm.TargetLength;
         var minMatch = prm.MinMatch == 3 ? 3 : 4;
         var mls = Math.Clamp(prm.MinMatch, 3, 6);
@@ -722,22 +818,19 @@ internal static class ZstdOpt
         var windowLog = prm.WindowLog;
         var searchLog = prm.SearchLog;
         var sufficientLen = Math.Min(targetLength, OptNum - 1);
-        var hashTable = new uint[1 << hashLog];
-        var bt = new uint[1 << chainLog];
-        var hashLog3 = prm.MinMatch == 3 ? Math.Min(HashLog3Max, windowLog) : 0;
-        var hashTable3 = hashLog3 > 0 ? new uint[1 << hashLog3] : [];
-        var nextToUpdate = 0;
-        var nextToUpdate3 = 0;
+        var (hashTable, bt, hashTable3) = tables;
+        var hashLog3 = HashLog3For(prm);
+        var nextToUpdate3 = nextToUpdate; // native: local per block, seeded from ms->nextToUpdate
         var opt = new Optimal[OptSize];
         var matches = new OptMatch[OptSize];
-        var ilimit = n - 8;
+        var ilimit = blockEnd - 8;
 
-        RescaleFreqs(stats, src, optLevel);
-        var anchor = 0;
-        var ip = 0;
-        if (ip == 0)
+        RescaleFreqs(stats, src.Slice(blockStart, blockEnd - blockStart), optLevel);
+        var anchor = blockStart;
+        var ip = blockStart;
+        if (blockStart == 0)
         {
-            ip++; // ip == prefixStart
+            ip++; // ip == prefixStart (frame start; later blocks never equal it)
         }
 
         while (ip < ilimit)
@@ -750,7 +843,7 @@ internal static class ZstdOpt
                 var litlen = (uint)(ip - anchor);
                 var ll0 = litlen == 0 ? 1u : 0u;
                 var nbMatches = BtGetAllMatches(
-                    matches, src, n, ip, minMatch, mls, sufficientLen,
+                    matches, src, blockEnd, ip, minMatch, mls, sufficientLen,
                     hashLog, chainLog, windowLog, searchLog, hashLog3,
                     hashTable, bt, hashTable3,
                     ref nextToUpdate, ref nextToUpdate3,
@@ -828,7 +921,7 @@ internal static class ZstdOpt
                         if (optLevel >= 1
                             && prevMatch.Litlen == 0
                             && LitIncPrice(1, stats, optLevel) < 0
-                            && inr < n)
+                            && inr < blockEnd)
                         {
                             var with1literal = prevMatch.Price
                                 + (int)RawLiteralsCost(src, inr, 1, stats, optLevel)
@@ -892,7 +985,7 @@ internal static class ZstdOpt
                     var previousPrice = opt[cur].Price;
                     var basePrice = previousPrice + (int)LitLengthPrice(0, stats, optLevel);
                     var nbMatches = BtGetAllMatches(
-                        matches, src, n, inr, minMatch, mls, sufficientLen,
+                        matches, src, blockEnd, inr, minMatch, mls, sufficientLen,
                         hashLog, chainLog, windowLog, searchLog, hashLog3,
                         hashTable, bt, hashTable3,
                         ref nextToUpdate, ref nextToUpdate3,
@@ -906,7 +999,7 @@ internal static class ZstdOpt
                     var longestMl = matches[nbMatches - 1].Len;
                     if (longestMl > (uint)sufficientLen
                         || cur + (int)longestMl >= OptNum
-                        || inr + (int)longestMl >= n)
+                        || inr + (int)longestMl >= blockEnd)
                     {
                         StoreShortestPath(src, store, rep, stats, opt, optLevel,
                             ref anchor, ref ip, cur, cur + (int)longestMl,
@@ -959,8 +1052,8 @@ internal static class ZstdOpt
         NextSeries:;
         }
 
-        store.SetTrailingLiterals(src.Slice(anchor, n - anchor));
-        return n - anchor;
+        store.SetTrailingLiterals(src.Slice(anchor, blockEnd - anchor));
+        return blockEnd - anchor;
     }
 
     private static int LitIncPrice(uint litlen, OptStats o, int optLevel)

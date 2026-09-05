@@ -121,6 +121,70 @@ public static class ZstdSeq
             }
         }
     }
+
+    /// <summary>
+    /// Raw offset a repeat code refers to under <paramref name="rep"/>
+    /// (<c>ZSTD_resolveRepcodeToRawOffset</c>,
+    /// <c>lib/compress/zstd_compress.c</c>): repcodes are 1-based ids into the
+    /// history shifted by <paramref name="ll0"/>, with the id-3/ll0-1 slot
+    /// meaning first-history-minus-one (0 when the history holds 1 — an
+    /// invalid offset the caller compares away and discards).
+    /// </summary>
+    internal static uint ResolveRepcodeToRawOffset(uint[] rep, uint offBase, uint ll0)
+    {
+        ArgumentNullException.ThrowIfNull(rep);
+        var adjusted = ToRepcode(offBase) - 1 + ll0; // [0..3].
+        if (adjusted == RepNum)
+        {
+            return unchecked(rep[0] - 1);
+        }
+
+        return rep[adjusted];
+    }
+
+    /// <summary>
+    /// Reconciles offset histories split by a raw/RLE partition
+    /// (<c>ZSTD_seqStore_resolveOffCodes</c>): walks the chunk's sequences with
+    /// decompression-side (<paramref name="dRep"/>) and compression-side
+    /// (<paramref name="cRep"/>) histories; a repcode resolving differently on
+    /// the two sides is replaced in the store by the raw offset the
+    /// compression side meant. <paramref name="longLitLenIdx"/> is the
+    /// chunk-relative long-literal position (or <paramref name="nbSeq"/> when
+    /// the chunk has no long literal), which forces <c>ll0</c> off there like
+    /// upstream.
+    /// </summary>
+    internal static void ResolveOffCodes(
+        uint[] dRep, uint[] cRep, ZstdSequenceStore store, int nbSeq, int longLitLenIdx)
+    {
+        ArgumentNullException.ThrowIfNull(dRep);
+        ArgumentNullException.ThrowIfNull(cRep);
+        ArgumentNullException.ThrowIfNull(store);
+        for (var idx = 0; idx < nbSeq; idx++)
+        {
+            var seq = store.Get(idx);
+            var ll0 = (seq.LitLength == 0 ? 1u : 0u) & (idx != longLitLenIdx ? 1u : 0u);
+            var offBase = seq.OffBase;
+            var original = offBase;
+            if (IsRepcode(offBase))
+            {
+                var dRaw = ResolveRepcodeToRawOffset(dRep, offBase, ll0);
+                var cRaw = ResolveRepcodeToRawOffset(cRep, offBase, ll0);
+                if (dRaw != cRaw)
+                {
+                    // OFFSET_TO_OFFBASE without the >0 assert: a zero raw
+                    // offset (first-history 1 minus one) wraps to a repcode
+                    // id in release C, and is compared away downstream.
+                    offBase = unchecked(cRaw + RepNum);
+                    store.SetOffBase(idx, offBase);
+                }
+            }
+
+            // Decompression history follows the (possibly replaced) stored
+            // value; compression history follows the original sequence.
+            UpdateRep(dRep, offBase, ll0);
+            UpdateRep(cRep, original, ll0);
+        }
+    }
 }
 
 /// <summary>
@@ -272,6 +336,81 @@ public sealed class ZstdSequenceStore
         _trailingSet = false;
         _longLengthType = LongLengthNone;
         _longLengthPos = 0;
+    }
+
+    /// <summary>
+    /// Long-length kind of this store (<c>longLengthType</c>: 0 none, 1 literal,
+    /// 2 match). Needed for the splitter's repcode resolution
+    /// (<c>longLitLenIdx</c> in <c>ZSTD_seqStore_resolveOffCodes</c>).
+    /// </summary>
+    internal int LongLengthType => _longLengthType;
+
+    /// <summary>Chunk-relative long-length position (<c>longLengthPos</c>).</summary>
+    internal int LongLengthPos => _longLengthPos;
+
+    /// <summary>
+    /// Overwrites the offset base of sequence <paramref name="index"/>
+    /// (the splitter's repcode-resolution rewrite,
+    /// <c>ZSTD_seqStore_resolveOffCodes</c>).
+    /// </summary>
+    internal void SetOffBase(int index, uint offBase)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, Count);
+        if (offBase < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offBase), "offBase 0 is invalid.");
+        }
+
+        _offBases[index] = offBase;
+    }
+
+    /// <summary>
+    /// Derives the chunk store for sequences
+    /// <c>[startSeq, endSeq)</c> (<c>ZSTD_deriveSeqStoreChunk</c>): sequence
+    /// metadata and literals are copied; the trailing literals travel only
+    /// with the final chunk (<paramref name="isFinal"/>), earlier chunks end
+    /// exactly at their sequences' literals. The long-length marker moves
+    /// with its sequence (chunk-relative) or clears when outside.
+    /// </summary>
+    internal ZstdSequenceStore Slice(int startSeq, int endSeq, bool isFinal)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(startSeq);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(endSeq, Count);
+        if (endSeq < startSeq)
+        {
+            throw new ArgumentOutOfRangeException(nameof(endSeq));
+        }
+
+        var chunk = new ZstdSequenceStore(Math.Max(1, endSeq - startSeq));
+        var litPos = 0;
+        for (var i = 0; i < startSeq; i++)
+        {
+            litPos += (int)Get((int)i).LitLength;
+        }
+
+        var seqLits = new ReadOnlySpan<byte>(_literals, 0, LiteralLength);
+        for (var i = startSeq; i < endSeq; i++)
+        {
+            var seq = Get(i);
+            var litLen = (int)seq.LitLength;
+            // Match length round-trips through StoreSequenceOnly's u16 +
+            // long-length rule, exactly like the original parse.
+            chunk.StoreSequence(
+                seqLits.Slice(litPos, litLen), seq.OffBase, (int)seq.MatchLength);
+            litPos += litLen;
+        }
+
+        if (isFinal)
+        {
+            chunk.SetTrailingLiterals(TrailingLiterals.ToArray());
+        }
+        else
+        {
+            chunk.SetTrailingLiterals([]);
+        }
+
+        return chunk;
     }
 
     private void StoreSequenceOnly(uint litLength, uint offBase, int matchLength)

@@ -590,6 +590,54 @@ internal static class ZstdFseEncoder
     }
 
     /// <summary>
+    /// Cost in bits of encoding the <paramref name="count"/> distribution
+    /// with the previous block's table (<c>ZSTD_fseBitCost</c>,
+    /// <c>lib/compress/zstd_compress_sequences.c</c>): per-symbol
+    /// <c>FSE_bitCost</c> (<c>lib/common/fse.h</c>) summed with 8 fractional
+    /// bits, shifted down at the end. Returns <see cref="ulong.MaxValue"/>
+    /// (the native <c>ERROR(GENERIC)</c>) when the table cannot represent the
+    /// distribution: a symbol beyond its range, or a symbol with no
+    /// probability mass there (bit cost at or above the
+    /// <c>(tableLog + 1) &lt;&lt; 8</c> "bad cost").
+    /// </summary>
+    public static ulong FseBitCost(FseCTable table, uint[] count, int max)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(count);
+        if (table.MaxSymbolValue < max)
+        {
+            return ulong.MaxValue;
+        }
+
+        var tableLog = (uint)table.TableLog;
+        var badCost = (tableLog + 1) << 8;
+        ulong cost = 0;
+        for (var s = 0; s <= max; s++)
+        {
+            if (count[s] == 0)
+            {
+                continue;
+            }
+
+            // FSE_bitCost with accuracyLog 8, straight from deltaNbBits.
+            var minNbBits = table.DeltaNbBits[s] >> 16;
+            var threshold = (minNbBits + 1) << 16;
+            var tableSize = 1u << (int)tableLog;
+            var deltaFromThreshold = threshold - (table.DeltaNbBits[s] + tableSize);
+            var normalized = (deltaFromThreshold << 8) >> (int)tableLog;
+            var bitCost = ((minNbBits + 1) << 8) - normalized;
+            if (bitCost >= badCost)
+            {
+                return ulong.MaxValue;
+            }
+
+            cost += (ulong)count[s] * bitCost;
+        }
+
+        return cost >> 8;
+    }
+
+    /// <summary>
     /// True when every symbol in range has the same value (RLE shape:
     /// the caller must emit an RLE block instead of calling <see cref="Encode"/>).
     /// </summary>

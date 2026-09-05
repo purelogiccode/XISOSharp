@@ -176,15 +176,79 @@ internal static class ZstdLazyEngine
     internal static int FindMatches(
         ReadOnlySpan<byte> source, ZstdSequenceStore store, uint[] repeatOffsets, int level)
     {
-        var n = source.Length;
-        if (n == 0)
+        if (source.Length == 0)
         {
             store.SetTrailingLiterals([]);
             return 0;
         }
 
         // Tier row + ZSTD_adjustCParams_internal (no dict).
-        var table = ZstdCompressionParameters.ForSizeAndLevel(n, level).AdjustForSize(n);
+        var table = ZstdCompressionParameters.ForSizeAndLevel(source.Length, level).AdjustForSize(source.Length);
+        return FindMatches(source, store, repeatOffsets, table);
+    }
+
+    /// <summary>
+    /// Parses one frame block with an explicitly supplied (already adjusted)
+    /// parameter row (see <see cref="ZstdMatchFinder.FindMatches(ReadOnlySpan{byte}, ZstdSequenceStore, uint[], ZstdCompressionParameters)"/> for why
+    /// multi-block frames share the frame-level row).
+    /// </summary>
+    internal static int FindMatches(
+        ReadOnlySpan<byte> source, ZstdSequenceStore store, uint[] repeatOffsets,
+        ZstdCompressionParameters table)
+    {
+        if (source.Length == 0)
+        {
+            store.SetTrailingLiterals([]);
+            return 0;
+        }
+
+        uint[] hashTable = new uint[1 << table.HashLog];
+        uint[] chainTable = new uint[1 << table.ChainLog];
+        byte[] tagTable = new byte[1 << table.HashLog];
+        var nextToUpdate = 0;
+        return FindMatchesCore(
+            source, 0, source.Length, hashTable, chainTable, tagTable,
+            ref nextToUpdate, store, repeatOffsets, table);
+    }
+
+    /// <summary>
+    /// Parses one frame block <c>[blockStart, blockEnd)</c> of the frame held
+    /// by <paramref name="state"/>, with the frame-persistent tables and
+    /// update cursor (see <see cref="ZstdFast.FindMatches(ZstdFrameState,int,int,ZstdSequenceStore,uint[])"/>
+    /// for the positioning contract). The lazy-skipping flag resets per block
+    /// like upstream (<c>ms-&gt;lazySkipping = 0</c> at block entry).
+    /// </summary>
+    internal static int FindMatches(
+        ZstdFrameState state, int blockStart, int blockEnd,
+        ZstdSequenceStore store, uint[] repeatOffsets)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var table = state.Prm;
+        var useRow = table.Strategy is not ZstdStrategy.BtLazy2 && table.WindowLog > 14;
+        uint[] hashTable, chainTable;
+        byte[] tagTable;
+        if (useRow)
+        {
+            (hashTable, tagTable) = state.LazyRowTables();
+            chainTable = [];
+        }
+        else
+        {
+            (hashTable, chainTable) = state.LazyChainTables();
+            tagTable = [];
+        }
+
+        return FindMatchesCore(
+            state.Frame, blockStart, blockEnd, hashTable, chainTable, tagTable,
+            ref state.NextToUpdate, store, repeatOffsets, table);
+    }
+
+    private static int FindMatchesCore(
+        ReadOnlySpan<byte> source, int blockStart, int blockEnd,
+        uint[] hashTable, uint[] chainTable, byte[] tagTable,
+        ref int nextToUpdate,
+        ZstdSequenceStore store, uint[] repeatOffsets, ZstdCompressionParameters table)
+    {
         var windowLog = table.WindowLog;
         var chainLog = table.ChainLog;
         var hashLog = table.HashLog;
@@ -195,26 +259,25 @@ internal static class ZstdLazyEngine
             ZstdStrategy.Greedy => 0,
             ZstdStrategy.Lazy => 1,
             ZstdStrategy.Lazy2 or ZstdStrategy.BtLazy2 => 2,
-            _ => throw new ArgumentOutOfRangeException(nameof(level), $"Level {level} is not greedy/lazy."),
+            _ => throw new ArgumentOutOfRangeException(nameof(table), $"Strategy {table.Strategy} is not greedy/lazy."),
         };
         var useRow = !IsBinaryTree(table.Strategy) && windowLog > 14; // ZSTD_resolveRowMatchFinderMode.
         var useBt = table.Strategy == ZstdStrategy.BtLazy2;
         var rowLog = Math.Clamp(searchLog, 4, 6);
         var rowHashLog = hashLog - rowLog;
 
-        var ilimit = useRow ? n - 8 - RowHashCacheSize : n - 8;
-
-        uint[] hashTable = new uint[1 << hashLog];
-        uint[] chainTable = useRow ? [] : new uint[1 << chainLog];
-        byte[] tagTable = useRow ? new byte[1 << hashLog] : [];
+        var ilimit = useRow ? blockEnd - 8 - RowHashCacheSize : blockEnd - 8;
 
         var offset1 = repeatOffsets[0];
         var offset2 = repeatOffsets[1];
         uint offsetSaved1 = 0;
         uint offsetSaved2 = 0;
 
-        // Block-start rep invalidation (fresh window, lowLimit 0).
-        var curr0 = 1; // ip starts at 1 (dictAndPrefixLength == 0).
+        // Block-start rep invalidation (lowLimit 0 in practice; absolute
+        // positions keep the same formula across blocks).
+        // ip starts at 1 on the first block (dictAndPrefixLength == 0) and at
+        // the block start afterwards (never equal to the frame start again).
+        var curr0 = blockStart == 0 ? 1 : blockStart;
         var maxRep = curr0 - WindowLow(curr0, windowLog);
         if (offset2 > (uint)maxRep)
         {
@@ -228,10 +291,9 @@ internal static class ZstdLazyEngine
             offset1 = 0;
         }
 
-        var anchor = 0;
-        var ip = 1;
-        var nextToUpdate = 0;
-        var lazySkipping = false;
+        var anchor = blockStart;
+        var ip = blockStart == 0 ? 1 : blockStart;
+        var lazySkipping = false; // Reset per block, like ms->lazySkipping.
 
         while (ip < ilimit)
         {
@@ -242,7 +304,7 @@ internal static class ZstdLazyEngine
             // Repcode probe at ip+1.
             if (offset1 > 0 && Read32LE(source, ip + 1 - (int)offset1) == Read32LE(source, ip + 1))
             {
-                matchLength = 4 + CountMatches(source, ip + 5, ip + 5 - (int)offset1, n);
+                matchLength = 4 + CountMatches(source, ip + 5, ip + 5 - (int)offset1, blockEnd);
                 if (depth == 0)
                 {
                     goto StoreSequence;
@@ -253,12 +315,12 @@ internal static class ZstdLazyEngine
             {
                 uint found = 999999999;
                 var ml2 = useRow
-                    ? RowFindBestMatch(source, n, ip, ref found, mls, rowHashLog, rowLog, searchLog,
+                    ? RowFindBestMatch(source, blockEnd, ip, ref found, mls, rowHashLog, rowLog, searchLog,
                         windowLog, hashTable, tagTable, ref nextToUpdate, ref lazySkipping)
                     : useBt
-                        ? ZstdBinaryTree.BtFindBestMatch(source, n, ip, ref found, mls, hashLog, searchLog,
+                        ? ZstdBinaryTree.BtFindBestMatch(source, blockEnd, ip, ref found, mls, hashLog, searchLog,
                             chainLog, windowLog, hashTable, chainTable, ref nextToUpdate)
-                        : HcFindBestMatch(source, n, ip, ref found, mls, hashLog, searchLog, chainLog,
+                        : HcFindBestMatch(source, blockEnd, ip, ref found, mls, hashLog, searchLog, chainLog,
                             windowLog, hashTable, chainTable, ref nextToUpdate, ref lazySkipping);
                 if (ml2 > matchLength)
                 {
@@ -284,7 +346,7 @@ internal static class ZstdLazyEngine
                     ip++;
                     if (offBase != 0 && offset1 > 0 && Read32LE(source, ip) == Read32LE(source, ip - (int)offset1))
                     {
-                        var mlRep = 4 + CountMatches(source, ip + 4, ip + 4 - (int)offset1, n);
+                        var mlRep = 4 + CountMatches(source, ip + 4, ip + 4 - (int)offset1, blockEnd);
                         var gain2 = mlRep * 3;
                         var gain1 = (matchLength * 3) - Highbit32(offBase) + 1;
                         if (mlRep >= 4 && gain2 > gain1)
@@ -298,12 +360,12 @@ internal static class ZstdLazyEngine
                     {
                         uint candidate = 999999999;
                         var ml2 = useRow
-                            ? RowFindBestMatch(source, n, ip, ref candidate, mls, rowHashLog, rowLog, searchLog,
+                            ? RowFindBestMatch(source, blockEnd, ip, ref candidate, mls, rowHashLog, rowLog, searchLog,
                                 windowLog, hashTable, tagTable, ref nextToUpdate, ref lazySkipping)
                             : useBt
-                                ? ZstdBinaryTree.BtFindBestMatch(source, n, ip, ref candidate, mls, hashLog, searchLog,
+                                ? ZstdBinaryTree.BtFindBestMatch(source, blockEnd, ip, ref candidate, mls, hashLog, searchLog,
                                     chainLog, windowLog, hashTable, chainTable, ref nextToUpdate)
-                                : HcFindBestMatch(source, n, ip, ref candidate, mls, hashLog, searchLog, chainLog,
+                                : HcFindBestMatch(source, blockEnd, ip, ref candidate, mls, hashLog, searchLog, chainLog,
                                     windowLog, hashTable, chainTable, ref nextToUpdate, ref lazySkipping);
                         var gain2 = (ml2 * 4) - Highbit32(candidate);
                         var gain1 = (matchLength * 4) - Highbit32(offBase) + 4;
@@ -321,7 +383,7 @@ internal static class ZstdLazyEngine
                         ip++;
                         if (offBase != 0 && offset1 > 0 && Read32LE(source, ip) == Read32LE(source, ip - (int)offset1))
                         {
-                            var mlRep = 4 + CountMatches(source, ip + 4, ip + 4 - (int)offset1, n);
+                            var mlRep = 4 + CountMatches(source, ip + 4, ip + 4 - (int)offset1, blockEnd);
                             var gain2 = mlRep * 4;
                             var gain1 = (matchLength * 4) - Highbit32(offBase) + 1;
                             if (mlRep >= 4 && gain2 > gain1)
@@ -335,12 +397,12 @@ internal static class ZstdLazyEngine
                         {
                             uint candidate = 999999999;
                             var ml2 = useRow
-                                ? RowFindBestMatch(source, n, ip, ref candidate, mls, rowHashLog, rowLog, searchLog,
+                                ? RowFindBestMatch(source, blockEnd, ip, ref candidate, mls, rowHashLog, rowLog, searchLog,
                                     windowLog, hashTable, tagTable, ref nextToUpdate, ref lazySkipping)
                                 : useBt
-                                    ? ZstdBinaryTree.BtFindBestMatch(source, n, ip, ref candidate, mls, hashLog, searchLog,
+                                    ? ZstdBinaryTree.BtFindBestMatch(source, blockEnd, ip, ref candidate, mls, hashLog, searchLog,
                                         chainLog, windowLog, hashTable, chainTable, ref nextToUpdate)
-                                    : HcFindBestMatch(source, n, ip, ref candidate, mls, hashLog, searchLog, chainLog,
+                                    : HcFindBestMatch(source, blockEnd, ip, ref candidate, mls, hashLog, searchLog, chainLog,
                                         windowLog, hashTable, chainTable, ref nextToUpdate, ref lazySkipping);
                             var gain2 = (ml2 * 4) - Highbit32(candidate);
                             var gain1 = (matchLength * 4) - Highbit32(offBase) + 7;
@@ -382,7 +444,7 @@ internal static class ZstdLazyEngine
             while (ip <= ilimit && offset2 > 0
                 && Read32LE(source, ip) == Read32LE(source, ip - (int)offset2))
             {
-                var repLength = 4 + CountMatches(source, ip + 4, ip + 4 - (int)offset2, n);
+                var repLength = 4 + CountMatches(source, ip + 4, ip + 4 - (int)offset2, blockEnd);
                 var swap = offset2;
                 offset2 = offset1;
                 offset1 = swap;
@@ -397,8 +459,8 @@ internal static class ZstdLazyEngine
         repeatOffsets[0] = offset1 != 0 ? offset1 : offsetSaved1;
         repeatOffsets[1] = offset2 != 0 ? offset2 : offsetSaved2;
 
-        store.SetTrailingLiterals(source.Slice(anchor, n - anchor));
-        return n - anchor;
+        store.SetTrailingLiterals(source.Slice(anchor, blockEnd - anchor));
+        return blockEnd - anchor;
     }
 
     /// <summary>

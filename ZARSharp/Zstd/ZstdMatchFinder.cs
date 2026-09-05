@@ -129,14 +129,43 @@ public sealed class ZstdMatchFinder
         // Tier row + ZSTD_adjustCParams_internal (no dict), exactly like the
         // frame header (ZstdCompressor.WriteFrameHeader).
         var prm = ZstdCompressionParameters.ForSizeAndLevel(source.Length, Level).AdjustForSize(source.Length);
+        return FindMatches(source, store, repeatOffsets, prm);
+    }
+
+    /// <summary>
+    /// Parses one frame block with an explicitly supplied (already adjusted)
+    /// parameter row. Single-shot <c>ZSTD_compress</c> derives <c>cParams</c>
+    /// once from the total input size (<c>ZSTD_getCParams</c> +
+    /// <c>ZSTD_adjustCParams_internal</c>) and reuses the row for every
+    /// 128 KiB block, so multi-block frames must pass the frame-level row
+    /// here instead of re-resolving it per block. Tables stay block-scoped
+    /// (fresh per call); persistent match state is follow-up work.
+    /// </summary>
+    internal int FindMatches(
+        ReadOnlySpan<byte> source, ZstdSequenceStore store, uint[] repeatOffsets,
+        ZstdCompressionParameters prm)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(repeatOffsets);
+        if (repeatOffsets.Length < ZstdSeq.RepNum)
+        {
+            throw new ArgumentException("Repeat history needs 3 entries.", nameof(repeatOffsets));
+        }
+
+        if (source.Length == 0)
+        {
+            store.SetTrailingLiterals([]);
+            return 0;
+        }
+
         return prm.Strategy switch
         {
             ZstdStrategy.Fast => ZstdFast.FindMatches(source, store, repeatOffsets, prm),
             ZstdStrategy.DoubleFast => ZstdDoubleFast.FindMatches(source, store, repeatOffsets, prm),
             ZstdStrategy.Greedy or ZstdStrategy.Lazy or ZstdStrategy.Lazy2 or ZstdStrategy.BtLazy2 =>
-                ZstdLazyEngine.FindMatches(source, store, repeatOffsets, Level),
+                ZstdLazyEngine.FindMatches(source, store, repeatOffsets, prm),
             ZstdStrategy.BtOpt or ZstdStrategy.BtUltra or ZstdStrategy.BtUltra2 =>
-                ZstdOpt.FindMatches(source, store, repeatOffsets, Level),
+                ZstdOpt.FindMatches(source, store, repeatOffsets, prm),
             _ => throw new NotSupportedException($"Unknown strategy {prm.Strategy}."),
         };
     }

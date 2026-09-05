@@ -13,9 +13,11 @@ using System.Runtime.InteropServices;
 //   srcSize <= 256 KiB -> row 1
 //   srcSize <= 128 KiB -> row 2  (ZAR blocks are always 64 KiB: this row applies)
 //   srcSize <= 16 KiB  -> row 3
-// Single-shot ZAR note: the frame content size is 65536, so row 2 is the
-// only row the block encoder consults today. The other rows are ported
-// verbatim and honored per input size by the match finders.
+// Single-shot note: the frame derives one row from the TOTAL input size
+// (ZSTD_getCParams on the pledged size) and shares it across all 128 KiB
+// blocks; per-block re-resolution would pick the wrong row for later blocks.
+// ZAR 64 KiB blocks land in row 2. The other rows are ported verbatim and
+// honored per input size by the match finders.
 
 /// <summary>
 /// Exact C# port of <c>ZSTD_defaultCParameters</c> from

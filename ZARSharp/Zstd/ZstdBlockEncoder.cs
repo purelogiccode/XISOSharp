@@ -24,43 +24,45 @@ namespace ZARSharp.Zstd;
 /// </summary>
 internal static class ZstdBlockEncoder
 {
-    private const int BlockHeaderSize = 3;
+    internal const int BlockHeaderSize = 3;
     private const int BlockTypeCompressed = 2;
     private const int MaxBlockPayload = (1 << 21) - 1;
 
     // Sequence-alphabet accuracy logs (LLFSELog / MLFSELog / OffFSELog):
     // also the decoder's acceptance caps (ZstdDecompressor rereads them).
-    private const int LlFseLog = 9;
-    private const int MlFseLog = 9;
-    private const int OffFseLog = 8;
+    internal const int LlFseLog = 9;
+    internal const int MlFseLog = 9;
+    internal const int OffFseLog = 8;
 
-    private const int MaxLl = 35;
-    private const int MaxMl = 52;
-    private const int MaxOff = 31;
+    internal const int MaxLl = 35;
+    internal const int MaxMl = 52;
+    internal const int MaxOff = 31;
 
     // Literals-section mode tags (shared with the raw/RLE header forms).
     private const uint SetBasic = 0; // Raw literals.
     private const uint SetRle = 1; // RLE literals.
     private const uint SetCompressed = 2; // Huffman-compressed literals.
+    private const uint SetRepeat = 3; // Treeless (previous-table) literals.
 
     // Sequence-section mode tags (2 bits per alphabet in the modes byte).
-    private const int SeqModeBasic = 0;
-    private const int SeqModeRle = 1;
-    private const int SeqModeFse = 2;
+    internal const int SeqModeBasic = 0;
+    internal const int SeqModeRle = 1;
+    internal const int SeqModeFse = 2;
+    internal const int SeqModeRepeat = 3;
 
-    private const int DefaultMaxOff = 28;
-    private const int LlDefaultNormLog = 6;
-    private const int MlDefaultNormLog = 6;
-    private const int OfDefaultNormLog = 5;
+    internal const int DefaultMaxOff = 28;
+    internal const int LlDefaultNormLog = 6;
+    internal const int MlDefaultNormLog = 6;
+    internal const int OfDefaultNormLog = 5;
 
-    private static readonly short[] LlDefaultNorm =
+    internal static readonly short[] LlDefaultNorm =
     [
         4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1,
         2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 1, 1, 1, 1, 1,
         -1, -1, -1, -1,
     ];
 
-    private static readonly short[] MlDefaultNorm =
+    internal static readonly short[] MlDefaultNorm =
     [
         1, 4, 3, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1,
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -68,14 +70,14 @@ internal static class ZstdBlockEncoder
         -1, -1, -1, -1, -1,
     ];
 
-    private static readonly short[] OfDefaultNorm =
+    internal static readonly short[] OfDefaultNorm =
     [
         1, 1, 1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1,
         1, 1, 1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1,
     ];
 
     // nbSeq long form threshold (LONGNBSEQ).
-    private const int LongNbSeq = 0x7F00;
+    internal const int LongNbSeq = 0x7F00;
 
     // ZSTD_LLcode table (lib/compress/zstd_compress_internal.h:586-593).
     private static readonly byte[] LlCodeTable =
@@ -190,28 +192,13 @@ internal static class ZstdBlockEncoder
         ReadOnlySpan<byte> src, int level,
         byte[] dst, int dstOffset, int dstCapacity, bool lastBlock, uint[] rep)
     {
-        var end = dstOffset + dstCapacity;
         if (dstCapacity < BlockHeaderSize + 2)
         {
             throw new ZstdException("Block destination too small.");
         }
 
-        var finder = new ZstdMatchFinder(level);
-        var store = new ZstdSequenceStore(Math.Max(1, src.Length));
-        var srcCopy = src.ToArray();
-        finder.FindMatches(srcCopy, store, rep);
-        var nbSeq = store.Count;
-
-        // Tier strategy drives the literal gates (ZSTD_minLiteralsToCompress
-        // shift, minGain), exactly like ms->cParams.strategy upstream — never
-        // the level number itself (they coincide only for levels 1..6).
-        var strategy = ZstdCompressionParameters.ForSizeAndLevel(src.Length, level).Strategy;
-
-        var pos = dstOffset + BlockHeaderSize;
-        pos += EncodeLiteralsSection(store, nbSeq, strategy, dst, pos, end);
-        pos += EncodeSequencesSection(store, nbSeq, strategy, dst, pos, end);
-
-        var payload = pos - (dstOffset + BlockHeaderSize);
+        var prm = ZstdCompressionParameters.ForSizeAndLevel(src.Length, level).AdjustForSize(src.Length);
+        var payload = EncodeBlockPayload(src, level, prm, dst, dstOffset + BlockHeaderSize, dstCapacity - BlockHeaderSize, rep);
         if (payload > MaxBlockPayload)
         {
             throw new ZstdException("Block too large.");
@@ -225,13 +212,121 @@ internal static class ZstdBlockEncoder
         return BlockHeaderSize + payload;
     }
 
+    /// <summary>
+    /// Encodes <paramref name="src"/> as the payload (literals section +
+    /// sequences section, no block header) of one frame block, using the
+    /// explicitly supplied frame-level <paramref name="prm"/> row (see
+    /// <see cref="ZstdMatchFinder.FindMatches(ReadOnlySpan{byte}, ZstdSequenceStore, uint[], ZstdCompressionParameters)"/> for why multi-block frames
+    /// share one row). Returns the payload length. Throws
+    /// <see cref="ZstdException"/> when the payload does not fit
+    /// (<paramref name="dstCapacity"/> too small) or needs the unimplemented
+    /// long-offsets path — callers decline to a raw block instead (mirrors
+    /// C's <c>dstSize_tooSmall</c> → <c>ZSTD_noCompressBlock</c> fallback).
+    /// Repeat history (<paramref name="rep"/>) is updated in place for the
+    /// next block; callers restore their snapshot when they override the
+    /// payload with raw/RLE (upstream confirms repcode history only for
+    /// emitted compressed blocks).
+    /// </summary>
+    internal static int EncodeBlockPayload(
+        ReadOnlySpan<byte> src, int level, ZstdCompressionParameters prm,
+        byte[] dst, int dstOffset, int dstCapacity, uint[] rep)
+    {
+        var end = dstOffset + dstCapacity;
+        if (dstCapacity < 2)
+        {
+            throw new ZstdException("Block destination too small.");
+        }
+
+        var finder = new ZstdMatchFinder(level);
+        var store = new ZstdSequenceStore(Math.Max(1, src.Length));
+        var srcCopy = src.ToArray();
+        finder.FindMatches(srcCopy, store, rep, prm);
+        // Standalone block: entropy starts with no previous tables (first-
+        // block behavior); the staged next state is discarded.
+        return EncodeStore(store, prm.Strategy, dst, dstOffset, end, new ZstdEntropyState(), new ZstdEntropyState());
+    }
+
+    /// <summary>
+    /// Encodes one frame block <c>[blockStart, blockEnd)</c> with the frame
+    /// state's persistent match tables (M2) and entropy tables (M3). The next
+    /// entropy state stages into the frame; the frame writer confirms it only
+    /// for emitted compressed blocks. Same return/throw contract as
+    /// <see cref="EncodeBlockPayload(ReadOnlySpan{byte},int,ZstdCompressionParameters,byte[],int,int,uint[])"/>.
+    /// </summary>
+    internal static int EncodeBlockPayloadStateful(
+        ZstdFrameState state, int blockStart, int blockEnd, byte[] dst, int dstOffset, int dstCapacity, uint[] rep)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var end = dstOffset + dstCapacity;
+        if (dstCapacity < 2)
+        {
+            throw new ZstdException("Block destination too small.");
+        }
+
+        var store = new ZstdSequenceStore(Math.Max(1, blockEnd - blockStart));
+        state.FindMatches(blockStart, blockEnd, store, rep);
+        return EncodeStoreStateful(state, store, dst, dstOffset, end);
+    }
+
+    /// <summary>
+    /// Encodes an already-parsed <paramref name="store"/> with the frame
+    /// state's entropy tables, staging the next state (the splitter parses
+    /// once, then encodes each partition from its derived store — re-parsing
+    /// would double-insert match-table entries and corrupt later blocks).
+    /// <paramref name="end"/> is the absolute output limit. Same staging
+    /// contract as <see cref="EncodeBlockPayloadStateful"/>.
+    /// </summary>
+    internal static int EncodeStoreStateful(
+        ZstdFrameState state, ZstdSequenceStore store, byte[] dst, int dstOffset, int end)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(store);
+        // M3: the next entropy state stages into the frame; the caller
+        // confirms it only when it emits the block compressed (raw/RLE
+        // overrides decline it, like ZSTD_noCompressBlock).
+        var next = new ZstdEntropyState();
+        var size = EncodeStore(store, state.Prm.Strategy, dst, dstOffset, end, state.Entropy, next);
+        state.StageEntropy(next);
+        return size;
+    }
+
+    internal static int EncodeStore(
+        ZstdSequenceStore store, ZstdStrategy strategy, byte[] dst, int dstOffset, int end,
+        ZstdEntropyState prev, ZstdEntropyState next)
+    {
+        var nbSeq = store.Count;
+        var pos = dstOffset;
+        pos += EncodeLiteralsSection(store, nbSeq, strategy, dst, pos, end, prev, next);
+        pos += EncodeSequencesSection(store, nbSeq, strategy, dst, pos, end, prev, next);
+        return pos - dstOffset;
+    }
+
+    /// <summary>
+    /// <c>ZSTD_minGain</c> (<c>lib/compress/zstd_compress_internal.h</c>):
+    /// minimum compression gain (in bytes) required to emit a compressed
+    /// block or literals section — the same formula gates both. A payload of
+    /// <c>srcSize - MinGain</c> or more declines to raw.
+    /// </summary>
+    internal static int MinGain(int srcSize, ZstdStrategy strategy)
+    {
+        var minlog = strategy >= ZstdStrategy.BtUltra ? (int)strategy - 1 : 6;
+        return (srcSize >> minlog) + 2;
+    }
+
     // ------------------------------------------------------------------
     // Literals section (ZSTD_compressLiterals)
     // ------------------------------------------------------------------
 
     private static int EncodeLiteralsSection(
-        ZstdSequenceStore store, int nbSeq, ZstdStrategy strategy, byte[] dst, int pos, int end)
+        ZstdSequenceStore store, int nbSeq, ZstdStrategy strategy, byte[] dst, int pos, int end,
+        ZstdEntropyState prev, ZstdEntropyState next)
     {
+        // Every exit stages the next Huffman state (native memcpy(nextHuf,
+        // prevHuf) at the top of ZSTD_compressLiterals); paths below overwrite
+        // it when they build or validate a table.
+        next.HufRepeat = prev.HufRepeat;
+        next.HufTable = prev.HufTable;
+
         var start = pos;
         var litLen = store.LiteralLength + store.TrailingLength;
         if (litLen == 0)
@@ -245,10 +340,11 @@ internal static class ZstdBlockEncoder
         store.Literals.CopyTo(new Span<byte>(litBuf, 0, store.LiteralLength));
         store.TrailingLiterals.CopyTo(new Span<byte>(litBuf, store.LiteralLength, store.TrailingLength));
 
-        // Too small: don't even attempt compression (ZSTD_minLiteralsToCompress,
-        // fresh table so repeatMode is none: 8 << min(9-strategy, 3)).
+        // Too small: don't even attempt compression (ZSTD_minLiteralsToCompress:
+        // 8 << min(9-strategy, 3), or 6 with a valid repeat table).
         var shift = Math.Min(9 - (int)strategy, 3);
-        if (litLen < 8 << shift)
+        var minLit = prev.HufRepeat == ZstdHufRepeat.Valid ? 6 : 8 << shift;
+        if (litLen < minLit)
         {
             return WriteRawOrRle(dst, pos, end, litLen, SetBasic, 0, litBuf);
         }
@@ -256,21 +352,27 @@ internal static class ZstdBlockEncoder
         // Suspect-uncompressible sampling gate (SUSPECT_UNCOMPRESSIBLE_LITERAL_RATIO).
         var suspect = nbSeq == 0 || litLen / Math.Max(1, nbSeq) >= 20;
 
-        // Huffman attempt, exactly like HUF_compress_internal without reuse:
-        // output (table description + streams) lands after the header slot.
-        // Strategies at btultra and above probe the optimal table depth.
+        // Huffman attempt with previous-table reuse (HUF_compress1X/4X_repeat):
+        // output (table description + streams, or bare treeless streams) lands
+        // after the header slot. Strategies below lazy prefer the old table
+        // for inputs up to 1 KiB; btultra and above probe the optimal depth.
         var lhSize = 3 + (litLen >= 1024 ? 1 : 0) + (litLen >= 16384 ? 1 : 0);
+        var preferRepeat = strategy < ZstdStrategy.Lazy && litLen <= 1024;
         var huffSize = 0;
+        HuffmanCTable? huffTable = null;
+        var repeat = prev.HufRepeat;
         if (end > (pos + lhSize))
         {
-            huffSize = ZstdHuffmanEncoder.Compress(
+            huffSize = ZstdHuffmanEncoder.CompressWithRepeat(
                 dst, pos + lhSize, end - (pos + lhSize), litBuf, 0, litLen,
+                prev.HufTable, ref repeat, preferRepeat,
                 suspectUncompressible: suspect,
-                optimalDepth: strategy >= ZstdStrategy.BtUltra);
+                optimalDepth: strategy >= ZstdStrategy.BtUltra,
+                out huffTable);
         }
 
         // Minimum gain gate (ZSTD_minGain, same formula for blocks and literals).
-        var minGain = (litLen >> (strategy >= ZstdStrategy.BtUltra ? (int)strategy - 1 : 6)) + 2;
+        var minGain = MinGain(litLen, strategy);
         if (huffSize == 0 || huffSize >= litLen - minGain)
         {
             return WriteRawOrRle(dst, pos, end, litLen, SetBasic, 0, litBuf);
@@ -287,8 +389,24 @@ internal static class ZstdBlockEncoder
             return WriteRawOrRle(dst, pos, end, litLen, SetBasic, 0, litBuf);
         }
 
-        // Compressed literals with a fresh table (hType == set_compressed).
-        var singleStream = litLen < ZstdHuffmanEncoder.SingleStreamThreshold;
+        // Treeless (reused) streams carry no table description; the staged
+        // mode and table stay exactly as CompressWithRepeat left them (valid
+        // stays valid, check stays check).
+        uint hType = SetCompressed;
+        if (huffTable is null)
+        {
+            hType = SetRepeat;
+        }
+        else
+        {
+            next.HufTable = huffTable;
+            next.HufRepeat = ZstdHufRepeat.Check;
+        }
+
+        // The stream layout matches the encoder's choice (single below 256
+        // literals, or below 1 KiB with a valid table).
+        var singleStream = litLen < ZstdHuffmanEncoder.SingleStreamThreshold
+            || (prev.HufRepeat == ZstdHufRepeat.Valid && litLen < 1024);
         var sizeFormat = lhSize switch
         {
             3 => (singleStream ? 0 : 1),
@@ -302,15 +420,15 @@ internal static class ZstdBlockEncoder
         }
 
         Ensure(dst, pos, end, lhSize + huffSize);
-        WriteLiteralsCompressedHeader(dst, pos, lhSize, sizeFormat, litLen, huffSize);
+        WriteLiteralsCompressedHeader(dst, pos, hType, lhSize, sizeFormat, litLen, huffSize);
         return lhSize + huffSize; // Huffman bytes already in place.
     }
 
     private static void WriteLiteralsCompressedHeader(
-        byte[] dst, int pos, int lhSize, int sizeFormat, int regen, int compSize)
+        byte[] dst, int pos, uint hType, int lhSize, int sizeFormat, int regen, int compSize)
     {
-        var header = SetCompressed + ((uint)sizeFormat << 2)
-                                   + ((uint)regen << 4);
+        var header = hType + ((uint)sizeFormat << 2)
+                           + ((uint)regen << 4);
         if (lhSize == 3)
         {
             header += (uint)compSize << 14;
@@ -396,69 +514,58 @@ internal static class ZstdBlockEncoder
     // ------------------------------------------------------------------
 
     private static int EncodeSequencesSection(
-        ZstdSequenceStore store, int nbSeq, ZstdStrategy strategy, byte[] dst, int pos, int end)
+        ZstdSequenceStore store, int nbSeq, ZstdStrategy strategy, byte[] dst, int pos, int end,
+        ZstdEntropyState prev, ZstdEntropyState next)
     {
         var start = pos;
         if (nbSeq == 0)
         {
+            // Literals-only block: FSE tables carry over as if repeated.
+            next.LlRepeat = prev.LlRepeat;
+            next.OfRepeat = prev.OfRepeat;
+            next.MlRepeat = prev.MlRepeat;
+            next.LlTable = prev.LlTable;
+            next.OfTable = prev.OfTable;
+            next.MlTable = prev.MlTable;
             Ensure(dst, pos, end, 1);
             dst[pos++] = 0;
             return pos - start;
         }
 
         // --- Convert sequences to codes (ZSTD_seqToCodes) ---
-        var llCodes = new byte[nbSeq];
-        var ofCodes = new byte[nbSeq];
-        var mlCodes = new byte[nbSeq];
-        var litLens = new uint[nbSeq];
-        var mlBases = new uint[nbSeq];
-        var offBases = new uint[nbSeq];
-        var llCount = new uint[MaxLl + 1];
-        var ofCount = new uint[MaxOff + 1];
-        var mlCount = new uint[MaxMl + 1];
-        int llMax = 0, ofMax = 0, mlMax = 0;
-        for (var i = 0; i < nbSeq; i++)
-        {
-            var seq = store.Get(i);
-            var llCode = LLcode(seq.LitLength);
-            var mlBase = seq.MatchLength - (uint)ZstdSeq.MinMatch;
-            var mlCode = MLcode(mlBase);
-            var ofCode = BitOperations.Log2(seq.OffBase);
-            if (ofCode >= 32)
-            {
-                // longOffsets path: unreachable with windowLog <= 17.
-                throw new ZstdException("Offset code too large.");
-            }
+        var codes = DeriveCodes(store, nbSeq);
+        byte[] llCodes = codes.Ll, ofCodes = codes.Of, mlCodes = codes.Ml;
+        uint[] litLens = codes.LitLens, mlBases = codes.MlBases, offBases = codes.OffBases;
 
-            llCodes[i] = (byte)llCode;
-            ofCodes[i] = (byte)ofCode;
-            mlCodes[i] = (byte)mlCode;
-            litLens[i] = seq.LitLength;
-            mlBases[i] = mlBase;
-            offBases[i] = seq.OffBase;
-            llCount[llCode]++;
-            ofCount[ofCode]++;
-            mlCount[mlCode]++;
-            llMax = Math.Max(llMax, llCode);
-            ofMax = Math.Max(ofMax, ofCode);
-            mlMax = Math.Max(mlMax, mlCode);
-        }
-
-        // --- Build per-alphabet tables (exact ZSTD_selectEncodingType) ---
-        var ll = BuildSeqTable(llCount, llCodes, nbSeq, llMax, LlFseLog,
-            LlDefaultNorm, LlDefaultNormLog, MaxLl, defaultAllowed: true, strategy);
-        var of = BuildSeqTable(ofCount, ofCodes, nbSeq, ofMax, OffFseLog,
-            OfDefaultNorm, OfDefaultNormLog, DefaultMaxOff, defaultAllowed: ofMax <= DefaultMaxOff, strategy);
-        var ml = BuildSeqTable(mlCount, mlCodes, nbSeq, mlMax, MlFseLog,
-            MlDefaultNorm, MlDefaultNormLog, MaxMl, defaultAllowed: true, strategy);
+        // --- Build per-alphabet tables (ZSTD_selectEncodingType: repeat the
+        // previous table when its estimated cost wins, else rebuild) ---
+        var llMode = prev.LlRepeat;
+        var ofMode = prev.OfRepeat;
+        var mlMode = prev.MlRepeat;
+        var ll = BuildSeqTable(codes.LlCount, llCodes, nbSeq, codes.LlMax, LlFseLog,
+            LlDefaultNorm, LlDefaultNormLog, MaxLl, defaultAllowed: true, strategy,
+            prev.LlTable, ref llMode);
+        var of = BuildSeqTable(codes.OfCount, ofCodes, nbSeq, codes.OfMax, OffFseLog,
+            OfDefaultNorm, OfDefaultNormLog, DefaultMaxOff, defaultAllowed: codes.OfMax <= DefaultMaxOff, strategy,
+            prev.OfTable, ref ofMode);
+        var ml = BuildSeqTable(codes.MlCount, mlCodes, nbSeq, codes.MlMax, MlFseLog,
+            MlDefaultNorm, MlDefaultNormLog, MaxMl, defaultAllowed: true, strategy,
+            prev.MlTable, ref mlMode);
+        next.LlRepeat = llMode;
+        next.OfRepeat = ofMode;
+        next.MlRepeat = mlMode;
+        next.LlTable = ll.Table;
+        next.OfTable = of.Table;
+        next.MlTable = ml.Table;
 
         // --- Section header: nbSeq, modes, table descriptions (LL, OF, ML) ---
         pos += WriteNbSeq(dst, pos, end, nbSeq);
         Ensure(dst, pos, end, 1);
         dst[pos++] = (byte)((ll.Mode << 6) | (of.Mode << 4) | (ml.Mode << 2));
-        pos += WriteSeqTableDesc(dst, pos, end, ll, llCodes[0]);
-        pos += WriteSeqTableDesc(dst, pos, end, of, ofCodes[0]);
-        pos += WriteSeqTableDesc(dst, pos, end, ml, mlCodes[0]);
+        var lastCountSize = 0;
+        pos += WriteSeqTableDesc(dst, pos, end, ll, llCodes[0], ref lastCountSize);
+        pos += WriteSeqTableDesc(dst, pos, end, of, ofCodes[0], ref lastCountSize);
+        pos += WriteSeqTableDesc(dst, pos, end, ml, mlCodes[0], ref lastCountSize);
 
         var llTable = ll.Table;
         var ofTable = of.Table;
@@ -506,6 +613,13 @@ internal static class ZstdBlockEncoder
         FlushStateChecked(bs, stateLl, llLog);
 
         var streamSize = bs.Close();
+        // zstd ≤ 1.3.4 mis-decodes a trailing compressed table below 4 bytes
+        // total with the bitstream: emit raw instead (never worth optimizing).
+        if (lastCountSize > 0 && lastCountSize + streamSize < 4)
+        {
+            throw new ZstdException("Block too small for decoders before 1.3.5.");
+        }
+
         return (pos - start) + streamSize;
     }
 
@@ -518,7 +632,7 @@ internal static class ZstdBlockEncoder
     /// <param name="TableLog">Accuracy log for FSE tables.</param>
     /// <param name="Norm">Normalized counts for FSE mode, null for RLE.</param>
     /// <param name="MaxObserved">Maximum observed symbol value.</param>
-    private readonly record struct SeqAlphabet(
+    internal readonly record struct SeqAlphabet(
         FseCTable Table,
         int Mode,
         int TableLog,
@@ -526,20 +640,100 @@ internal static class ZstdBlockEncoder
         int MaxObserved);
 
     /// <summary>
-    /// Builds one sequence-alphabet table, exactly like
-    /// <c>ZSTD_selectEncodingType</c> + <c>ZSTD_buildCTable</c> for a fresh
-    /// block (previous repeat mode is none, so <c>set_repeat</c> never
-    /// triggers): single-symbol with <c>nbSeq ≤ 2</c> (and default allowed) →
-    /// basic, single-symbol otherwise → RLE, else the
-    /// <c>strategy &lt; lazy</c> count heuristic (fast/double-fast/greedy) or
-    /// the basic-vs-compressed cost comparison (lazy and above).
-    /// Compressed uses the last-symbol count decrement of
-    /// <c>ZSTD_buildCTable</c>.
+    /// Per-sequence codes and values for one sequence run
+    /// (<c>ZSTD_seqToCodes</c> output: LL/OF/ML code bytes plus the literal
+    /// lengths, match-length bases (<c>matchLength - MINMATCH</c>) and offset
+    /// bases the bitstream writes, with the histogram counts and maxima the
+    /// table builders need). Lengths are resolved (long-length +0x10000
+    /// applied), which yields the same codes as native's truncated-plus-patch
+    /// rule.
     /// </summary>
-    private static SeqAlphabet BuildSeqTable(
+    /// <param name="Ll">Literal-length codes.</param>
+    /// <param name="Of">Offset codes.</param>
+    /// <param name="Ml">Match-length codes.</param>
+    /// <param name="LitLens">Literal run lengths.</param>
+    /// <param name="MlBases">Match-length bases.</param>
+    /// <param name="OffBases">Offset bases.</param>
+    /// <param name="LlCount">Literal-length code histogram.</param>
+    /// <param name="OfCount">Offset code histogram.</param>
+    /// <param name="MlCount">Match-length code histogram.</param>
+    /// <param name="LlMax">Maximum literal-length code.</param>
+    /// <param name="OfMax">Maximum offset code.</param>
+    /// <param name="MlMax">Maximum match-length code.</param>
+    internal readonly record struct SeqCodes(
+        byte[] Ll, byte[] Of, byte[] Ml,
+        uint[] LitLens, uint[] MlBases, uint[] OffBases,
+        uint[] LlCount, uint[] OfCount, uint[] MlCount,
+        int LlMax, int OfMax, int MlMax);
+
+    /// <summary>
+    /// Converts <paramref name="nbSeq"/> sequences from
+    /// <paramref name="store"/> to codes (<c>ZSTD_seqToCodes</c>). Throws
+    /// <see cref="ZstdException"/> on the unimplemented long-offsets path
+    /// (offset codes ≥ 32).
+    /// </summary>
+    internal static SeqCodes DeriveCodes(ZstdSequenceStore store, int nbSeq)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        var llCodes = new byte[nbSeq];
+        var ofCodes = new byte[nbSeq];
+        var mlCodes = new byte[nbSeq];
+        var litLens = new uint[nbSeq];
+        var mlBases = new uint[nbSeq];
+        var offBases = new uint[nbSeq];
+        var llCount = new uint[MaxLl + 1];
+        var ofCount = new uint[MaxOff + 1];
+        var mlCount = new uint[MaxMl + 1];
+        int llMax = 0, ofMax = 0, mlMax = 0;
+        for (var i = 0; i < nbSeq; i++)
+        {
+            var seq = store.Get(i);
+            var llCode = LLcode(seq.LitLength);
+            var mlBase = seq.MatchLength - (uint)ZstdSeq.MinMatch;
+            var mlCode = MLcode(mlBase);
+            var ofCode = BitOperations.Log2(seq.OffBase);
+            if (ofCode >= 32)
+            {
+                // longOffsets path: unreachable with windowLog <= 17.
+                throw new ZstdException("Offset code too large.");
+            }
+
+            llCodes[i] = (byte)llCode;
+            ofCodes[i] = (byte)ofCode;
+            mlCodes[i] = (byte)mlCode;
+            litLens[i] = seq.LitLength;
+            mlBases[i] = mlBase;
+            offBases[i] = seq.OffBase;
+            llCount[llCode]++;
+            ofCount[ofCode]++;
+            mlCount[mlCode]++;
+            llMax = Math.Max(llMax, llCode);
+            ofMax = Math.Max(ofMax, ofCode);
+            mlMax = Math.Max(mlMax, mlCode);
+        }
+
+        return new SeqCodes(
+            llCodes, ofCodes, mlCodes, litLens, mlBases, offBases,
+            llCount, ofCount, mlCount, llMax, ofMax, mlMax);
+    }
+
+    /// <summary>
+    /// Builds one sequence-alphabet table, exactly like
+    /// <c>ZSTD_selectEncodingType</c> + <c>ZSTD_buildCTable</c>: single-symbol
+    /// with <c>nbSeq ≤ 2</c> (and default allowed) → basic, single-symbol
+    /// otherwise → RLE, else the <c>strategy &lt; lazy</c> count heuristic
+    /// (fast/double-fast/greedy, repeating a valid table below 1000
+    /// sequences) or the basic-vs-repeat-vs-compressed cost comparison (lazy
+    /// and above). A repeat selection keeps the incoming
+    /// <paramref name="mode"/> (valid stays valid, check stays check) and
+    /// shares the previous table; anything else overwrites the mode (basic
+    /// and RLE clear it, compressed arms it for validation). Compressed uses
+    /// the last-symbol count decrement of <c>ZSTD_buildCTable</c>.
+    /// </summary>
+    internal static SeqAlphabet BuildSeqTable(
         uint[] count, byte[] codes, int nbSeq, int maxObserved, int maxLog,
         short[] defaultNorm, int defaultNormLog, int defaultMax, bool defaultAllowed,
-        ZstdStrategy strategy)
+        ZstdStrategy strategy, FseCTable? prevTable, ref ZstdFseRepeat mode)
     {
         uint mostFrequent = 0;
         for (var s = 0; s <= maxObserved; s++)
@@ -549,6 +743,7 @@ internal static class ZstdBlockEncoder
 
         if (mostFrequent == (uint)nbSeq)
         {
+            mode = ZstdFseRepeat.None;
             if (defaultAllowed && nbSeq <= 2)
             {
                 var basicTable = ZstdFseEncoder.BuildCTable(defaultNorm, defaultMax, defaultNormLog);
@@ -565,8 +760,14 @@ internal static class ZstdBlockEncoder
             {
                 var mult = 10 - (int)strategy; // fast 9, double-fast 8, greedy 7
                 var dynamicMin = ((1 << defaultNormLog) * mult) >> 3;
+                if (mode == ZstdFseRepeat.Valid && prevTable is not null && nbSeq < 1000)
+                {
+                    return new SeqAlphabet(prevTable, SeqModeRepeat, prevTable.TableLog, null, prevTable.MaxSymbolValue);
+                }
+
                 if (nbSeq < dynamicMin || mostFrequent < (uint)(nbSeq >> (defaultNormLog - 1)))
                 {
+                    mode = ZstdFseRepeat.None;
                     var basicTable = ZstdFseEncoder.BuildCTable(defaultNorm, defaultMax, defaultNormLog);
                     return new SeqAlphabet(basicTable, SeqModeBasic, defaultNormLog, null, defaultMax);
                 }
@@ -574,18 +775,31 @@ internal static class ZstdBlockEncoder
         }
         else
         {
-            // Fresh block: repeatCost is an error (no previous table).
+            // Full cost model (lazy and above): basic and repeat estimates
+            // against a fresh table (the previous table scores ulong.MaxValue
+            // when it cannot cover the distribution, like ERROR(GENERIC)).
             var basicCost = defaultAllowed
                 ? CrossEntropyCost(defaultNorm, (uint)defaultNormLog, count, (uint)maxObserved)
                 : ulong.MaxValue;
+            var repeatCost = mode != ZstdFseRepeat.None && prevTable is not null
+                ? ZstdFseEncoder.FseBitCost(prevTable, count, maxObserved)
+                : ulong.MaxValue;
             var ncountCost = NCountCost(count, maxObserved, nbSeq, maxLog);
             var compressedCost = (ncountCost << 3) + EntropyCost(count, (uint)maxObserved, nbSeq);
-            if (defaultAllowed && basicCost <= compressedCost)
+            if (defaultAllowed && basicCost <= repeatCost && basicCost <= compressedCost)
             {
+                mode = ZstdFseRepeat.None;
                 var basicTable = ZstdFseEncoder.BuildCTable(defaultNorm, defaultMax, defaultNormLog);
                 return new SeqAlphabet(basicTable, SeqModeBasic, defaultNormLog, null, defaultMax);
             }
+
+            if (repeatCost <= compressedCost)
+            {
+                return new SeqAlphabet(prevTable!, SeqModeRepeat, prevTable!.TableLog, null, prevTable!.MaxSymbolValue);
+            }
         }
+
+        mode = ZstdFseRepeat.Check;
 
         var tableLog = ZstdFseEncoder.OptimalTableLog(maxLog, nbSeq, maxObserved);
         var total = nbSeq;
@@ -635,8 +849,7 @@ internal static class ZstdBlockEncoder
         5, 4, 2, 1,
     ];
 
-    private static ulong CrossEntropyCost(
-        short[] norm, uint accuracyLog, uint[] count, uint max)
+    internal static ulong CrossEntropyCost(        short[] norm, uint accuracyLog, uint[] count, uint max)
     {
         var shift = 8 - (int)accuracyLog;
         ulong cost = 0;
@@ -650,7 +863,7 @@ internal static class ZstdBlockEncoder
         return cost >> 8;
     }
 
-    private static ulong EntropyCost(uint[] count, uint max, int total)
+    internal static ulong EntropyCost(uint[] count, uint max, int total)
     {
         ulong cost = 0;
         for (uint s = 0; s <= max; s++)
@@ -667,7 +880,7 @@ internal static class ZstdBlockEncoder
         return cost >> 8;
     }
 
-    private static ulong NCountCost(uint[] count, int max, int nbSeq, int fseLog)
+    internal static ulong NCountCost(uint[] count, int max, int nbSeq, int fseLog)
     {
         var tableLog = ZstdFseEncoder.OptimalTableLog(fseLog, nbSeq, max);
         var norm = new short[max + 1];
@@ -685,9 +898,9 @@ internal static class ZstdBlockEncoder
     }
 
     private static int WriteSeqTableDesc(
-        byte[] dst, int pos, int end, SeqAlphabet alphabet, byte rleSymbol)
+        byte[] dst, int pos, int end, SeqAlphabet alphabet, byte rleSymbol, ref int lastCountSize)
     {
-        if (alphabet.Mode == SeqModeBasic)
+        if (alphabet.Mode == SeqModeBasic || alphabet.Mode == SeqModeRepeat)
         {
             return 0;
         }
@@ -701,6 +914,7 @@ internal static class ZstdBlockEncoder
 
         var size = ZstdFseEncoder.WriteNCount(
             dst, pos, end - pos, alphabet.Norm!, alphabet.MaxObserved, alphabet.TableLog);
+        lastCountSize = size;
         return size;
     }
 

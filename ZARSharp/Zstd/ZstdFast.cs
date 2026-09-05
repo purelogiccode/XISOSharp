@@ -66,29 +66,52 @@ internal static class ZstdFast
         ReadOnlySpan<byte> source, ZstdSequenceStore store, uint[] repeatOffsets,
         ZstdCompressionParameters prm)
     {
-        var n = source.Length;
-        if (n == 0)
+        if (source.Length == 0)
         {
             store.SetTrailingLiterals([]);
             return 0;
         }
 
+        var hashTable = new uint[1 << prm.HashLog];
+        return FindMatchesCore(source, 0, source.Length, hashTable, store, repeatOffsets, prm);
+    }
+
+    /// <summary>
+    /// Parses one frame block <c>[blockStart, blockEnd)</c> of the frame held
+    /// by <paramref name="state"/>, with the frame-persistent hash table.
+    /// Positions are absolute frame offsets; the anchor resets per block
+    /// while matches may reference earlier frame data (persistent match
+    /// state, <c>ZSTD_compress_frameChunk</c>).
+    /// </summary>
+    internal static int FindMatches(
+        ZstdFrameState state, int blockStart, int blockEnd,
+        ZstdSequenceStore store, uint[] repeatOffsets)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return FindMatchesCore(
+            state.Frame, blockStart, blockEnd, state.FastHashTable(),
+            store, repeatOffsets, state.Prm);
+    }
+
+    private static int FindMatchesCore(
+        ReadOnlySpan<byte> source, int blockStart, int blockEnd, uint[] hashTable,
+        ZstdSequenceStore store, uint[] repeatOffsets, ZstdCompressionParameters prm)
+    {
         var hashLog = prm.HashLog;
         var mls = prm.MinMatch;
         var windowLog = prm.WindowLog;
         var stepSize = prm.TargetLength + (prm.TargetLength == 0 ? 1 : 0) + 1; // min 2
-        var hashTable = new uint[1 << hashLog];
-        var ilimit = n - 8;
+        var ilimit = blockEnd - 8;
 
         var rep1 = repeatOffsets[0];
         var rep2 = repeatOffsets[1];
         uint saved1 = 0, saved2 = 0;
 
-        var anchor = 0;
-        var ip0 = 0;
+        var anchor = blockStart;
+        var ip0 = blockStart;
         if (ip0 == 0)
         {
-            ip0++; // ip0 == prefixStart (fresh window starts at 0)
+            ip0++; // ip0 == prefixStart (frame start; later blocks never equal it)
         }
 
         {
@@ -249,7 +272,7 @@ internal static class ZstdFast
 
             storeMatch:
                 // _match: count forward, store, refill, immediate reps.
-                seqLen += CountMatches(source, seqIp + seqLen, seqMatch + seqLen, n);
+                seqLen += CountMatches(source, seqIp + seqLen, seqMatch + seqLen, blockEnd);
                 store.StoreSequence(source.Slice(anchor, seqIp - anchor), seqOff, seqLen);
                 ip0 = seqIp + seqLen;
                 anchor = ip0;
@@ -264,7 +287,7 @@ internal static class ZstdFast
                     while (ip0 <= ilimit && rep2 > 0
                         && ip0 - (int)rep2 >= 0 && Read32(source, ip0) == Read32(source, ip0 - (int)rep2))
                     {
-                        var repLen = 4 + CountMatches(source, ip0 + 4, ip0 + 4 - (int)rep2, n);
+                        var repLen = 4 + CountMatches(source, ip0 + 4, ip0 + 4 - (int)rep2, blockEnd);
                         (rep2, rep1) = (rep1, rep2);
                         hashTable[ZstdMatchFinder.HashPtr(source, ip0, hashLog, mls)] = (uint)ip0 + 1;
                         store.StoreSequence([], ZstdSeq.Repcode1, repLen);
@@ -288,7 +311,7 @@ internal static class ZstdFast
         repeatOffsets[0] = rep1 != 0 ? rep1 : saved1;
         repeatOffsets[1] = rep2 != 0 ? rep2 : saved2;
 
-        store.SetTrailingLiterals(source.Slice(anchor, n - anchor));
-        return n - anchor;
+        store.SetTrailingLiterals(source.Slice(anchor, blockEnd - anchor));
+        return blockEnd - anchor;
     }
 }
