@@ -666,61 +666,9 @@ public static class XisoRedump
     private static List<string> ExtractZarTree(ZARSharp.ZArchiveReader reader, string outputDir,
         CancellationToken cancellationToken)
     {
-        var files = new List<string>();
-        ExtractZarDir(reader, string.Empty, outputDir, string.Empty, files, cancellationToken);
-        return files;
-    }
-
-    private static void ExtractZarDir(ZARSharp.ZArchiveReader reader, string srcPath, string outDir,
-        string relPath, List<string> files, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var dirHandle = reader.LookUp(srcPath);
-        if (dirHandle == ZARSharp.ZArchiveReader.InvalidNode || !reader.IsDirectory(dirHandle))
-            throw new InvalidOperationException($"Directory not found in archive: '{srcPath}'.");
-        Directory.CreateDirectory(outDir);
-
-        var count = reader.GetDirEntryCount(dirHandle);
-        for (uint i = 0; i < count; i++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!reader.GetDirEntry(dirHandle, i, out var entry))
-                throw new InvalidOperationException("Directory contains invalid node.");
-            var childSrc = string.IsNullOrEmpty(srcPath) ? entry.Name : srcPath + "/" + entry.Name;
-            var childRel = string.IsNullOrEmpty(relPath) ? entry.Name : relPath + "/" + entry.Name;
-            var childOut = Path.Combine(outDir, entry.Name);
-            if (entry.IsDirectory)
-            {
-                ExtractZarDir(reader, childSrc, childOut, childRel, files, cancellationToken);
-            }
-            else
-            {
-                ExtractZarFile(reader, childSrc, childOut, cancellationToken);
-                files.Add(childRel);
-            }
-        }
-    }
-
-    private static void ExtractZarFile(ZARSharp.ZArchiveReader reader, string srcPath, string outputPath,
-        CancellationToken cancellationToken)
-    {
-        var handle = reader.LookUp(srcPath);
-        if (handle == ZARSharp.ZArchiveReader.InvalidNode || !reader.IsFile(handle))
-            throw new InvalidOperationException($"Unable to extract file: {srcPath}");
-        using var output = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
-        var buffer = new byte[64 * 1024];
-        ulong offset = 0;
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var read = reader.ReadFromFile(handle, offset, buffer);
-            if (read == 0) break;
-            output.Write(buffer, 0, (int)read);
-            offset += read;
-        }
-
-        if (offset != reader.GetFileSize(handle))
-            throw new InvalidOperationException($"Extraction failed: {srcPath}");
+        // Shared engine: same walk, same files, same errors as before.
+        return ZARSharp.Pipeline.ZarPackEngine
+            .ExtractOpen(reader, outputDir, outputDir, null, null, cancellationToken).ToList();
     }
 
     private static bool HasXisoMagic(string path)

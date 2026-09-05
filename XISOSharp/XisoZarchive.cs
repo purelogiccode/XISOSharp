@@ -1,5 +1,6 @@
 using System.Text;
 using ZARSharp;
+using ZARSharp.Pipeline;
 
 namespace XISOSharp;
 
@@ -97,14 +98,16 @@ public static class XisoZarchive
     /// Block compressor, or <c>null</c> for the default zstd level 6.
     /// Pass <c>new ZarRawCompressor()</c> to store blocks raw.
     /// </param>
+    /// <param name="progress">Optional pack progress sink.</param>
     /// <returns><c>true</c> on success; otherwise <c>false</c>.</returns>
     public static bool CreateZar(string isoPath, string? zarPath = null, long isoOffset = 0, bool quiet = false,
-        CancellationToken ct = default, IZarBlockCompressor? compressor = null)
+        CancellationToken ct = default, IZarBlockCompressor? compressor = null,
+        IProgress<ZarProgress>? progress = null)
     {
         ct.ThrowIfCancellationRequested();
         var outZar = zarPath ?? DeriveZarPath(isoPath);
         using var isoFs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        return CreateZar(isoFs, isoOffset, outZar, false, quiet, ct, compressor);
+        return CreateZar(isoFs, isoOffset, outZar, false, quiet, ct, compressor, progress);
     }
 
     private static string DeriveZarPath(string input)
@@ -129,9 +132,11 @@ public static class XisoZarchive
     /// Block compressor, or <c>null</c> for the default zstd level 6.
     /// Pass <c>new ZarRawCompressor()</c> to store blocks raw.
     /// </param>
+    /// <param name="progress">Optional pack progress sink.</param>
     /// <returns><c>true</c> on success; otherwise <c>false</c>.</returns>
     public static bool CreateZar(FileStream isoFs, long xisoOffset, string zarPath, bool removeUpdate, bool quiet,
-        CancellationToken ct = default, IZarBlockCompressor? compressor = null)
+        CancellationToken ct = default, IZarBlockCompressor? compressor = null,
+        IProgress<ZarProgress>? progress = null)
     {
         ct.ThrowIfCancellationRequested();
         var headerOffset = xisoOffset + Constants.HeaderOffset;
@@ -145,23 +150,24 @@ public static class XisoZarchive
         if (!quiet) Logger.Log($"[INFO] Writing ZArchive to {zarPath}\n");
         try
         {
-            bool ok;
-            using (var zarFs = new FileStream(zarPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536))
-            using (var writer = new ZArchiveWriter(zarFs, compressor))
+            // The XISO walk order is the pack order (directories before
+            // children, siblings case-insensitively sorted); the shared
+            // engine streams it exactly like WriteNode did.
+            var source = new XisoPackSource(isoFs, xisoOffset, rootNode, names, $"XISO:{xisoOffset}");
+            var options = new ZarPipelineOptions
             {
-                ok = WriteArchiveData(isoFs, xisoOffset, writer, rootNode, names, quiet, ct);
-                if (ok)
-                {
-                    writer.Finalize();
-                }
-            }
-
-            if (!ok)
-            {
-                DeleteIncomplete(zarPath);
-            }
-
-            return ok;
+                Compressor = compressor,
+                // Historical behavior: the destination is truncated.
+                CollisionPolicy = ZarCollisionPolicy.Overwrite,
+            };
+            ZarPipeline.PackSource(source, zarPath, options, progress, ct);
+            return true;
+        }
+        catch (InvalidOperationException ex)
+        {
+            if (!quiet) Logger.LogErr($"[ERROR] {ex.Message}\n");
+            DeleteIncomplete(zarPath);
+            return false;
         }
         catch
         {
@@ -273,65 +279,118 @@ public static class XisoZarchive
         return total == 12 && peek.IndexOfAnyExcept((byte)0) < 0;
     }
 
-    private static bool WriteArchiveData(FileStream isoFs, long xisoOffset, ZArchiveWriter writer,
-        PathNode root, List<string> names, bool quiet, CancellationToken ct)
+    /// <summary>
+    /// <see cref="IZarPackSource"/> over the parsed XDVDFS walk: entries come
+    /// out in the old <c>WriteNode</c> order (directories before children), so
+    /// the shared engine emits the identical call sequence and identical bytes.
+    /// </summary>
+    private sealed class XisoPackSource(
+        FileStream isoFs, long xisoOffset, PathNode root, List<string> names, string displayPath) : IZarPackSource
     {
-        var buf = new byte[ZArchiveCommon.CompressedBlockSize];
-        return WriteNode(isoFs, xisoOffset, writer, root, names, "", buf, quiet, ct);
-    }
+        public string DisplayPath { get; } = displayPath;
 
-    private static bool WriteNode(FileStream isoFs, long xisoOffset, ZArchiveWriter writer,
-        PathNode dir, List<string> names, string path, byte[] buf, bool quiet, CancellationToken ct)
-    {
-        foreach (var child in dir.Subnodes)
+        public IReadOnlyList<ZarPackEntry> Collect(CancellationToken cancellationToken = default)
         {
-            ct.ThrowIfCancellationRequested();
-            var childPath = path.Length == 0 ? names[child.NameIndex] : path + "/" + names[child.NameIndex];
-            if (!child.IsFile)
-            {
-                if (!writer.MakeDir(childPath, recursive: false))
-                {
-                    Fail(quiet, $"Failed to create directory {childPath}");
-                    return false;
-                }
-
-                if (!WriteNode(isoFs, xisoOffset, writer, child, names, childPath, buf, quiet, ct))
-                {
-                    return false;
-                }
-
-                continue;
-            }
-
-            if (!writer.StartNewFile(childPath))
-            {
-                Fail(quiet, $"Failed to create archive file {childPath}");
-                return false;
-            }
-
-            isoFs.Seek(xisoOffset + child.SourceOffset, SeekOrigin.Begin);
-            var remaining = (long)child.FileSize;
-            while (remaining > 0)
-            {
-                ct.ThrowIfCancellationRequested();
-                var toRead = (int)Math.Min(buf.Length, remaining);
-                var n = isoFs.Read(buf, 0, toRead);
-                if (n == 0)
-                {
-                    Fail(quiet, $"Truncated file data for {childPath}");
-                    return false;
-                }
-
-                writer.AppendData(buf.AsSpan(0, n));
-                remaining -= n;
-            }
+            var entries = new List<ZarPackEntry>();
+            Walk(root, string.Empty, entries, cancellationToken);
+            return entries;
         }
 
-        return true;
-
-        static void Fail(bool quiet, string message)
+        private void Walk(PathNode dir, string path, List<ZarPackEntry> entries, CancellationToken ct)
         {
-            if (!quiet) Logger.LogErr($"[ERROR] {message}\n");
+            foreach (var child in dir.Subnodes)
+            {
+                ct.ThrowIfCancellationRequested();
+                var childPath = path.Length == 0 ? names[child.NameIndex] : path + "/" + names[child.NameIndex];
+                if (!child.IsFile)
+                {
+                    entries.Add(new ZarPackEntry { RelativePath = childPath, IsDirectory = true });
+                    Walk(child, childPath, entries, ct);
+                    continue;
+                }
+
+                var offset = xisoOffset + child.SourceOffset;
+                var size = (long)child.FileSize;
+                entries.Add(new ZarPackEntry
+                {
+                    RelativePath = childPath,
+                    IsDirectory = false,
+                    Length = size,
+                    OpenRead = () => new XisoSliceStream(isoFs, offset, size, childPath),
+                });
+            }
+        }
+    }
+
+    /// <summary>
+    /// Read-only slice of the open image stream. Seeks the shared base
+    /// stream on every read (consumed sequentially) and never closes it.
+    /// A short base stream surfaces as <see cref="InvalidOperationException"/>
+    /// (the old <c>Truncated file data</c> failure); real I/O faults
+    /// propagate like before.
+    /// </summary>
+    private sealed class XisoSliceStream(FileStream baseStream, long offset, long length, string path) : Stream
+    {
+        private long _position;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => true;
+        public override bool CanWrite => false;
+        public override long Length => length;
+
+        public override long Position
+        {
+            get => _position;
+            set => _position = Math.Clamp(value, 0, length);
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            Read(buffer.AsSpan(offset, count));
+
+        public override int Read(Span<byte> buffer)
+        {
+            var remaining = length - _position;
+            if (remaining <= 0)
+            {
+                return 0;
+            }
+
+            int toRead = (int)Math.Min(buffer.Length, remaining);
+            int n;
+            lock (baseStream)
+            {
+                baseStream.Seek(offset + _position, SeekOrigin.Begin);
+                n = baseStream.Read(buffer[..toRead]);
+            }
+
+            if (n == 0)
+            {
+                throw new InvalidOperationException($"Truncated file data for {path}");
+            }
+
+            _position += n;
+            return n;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => Position = origin switch
+        {
+            SeekOrigin.Begin => offset,
+            SeekOrigin.Current => _position + offset,
+            SeekOrigin.End => length + offset,
+            _ => throw new ArgumentOutOfRangeException(nameof(origin)),
+        };
+
+        public override void Flush()
+        {
+        }
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            // The image stream stays open; the owner disposes it.
         }
     }
 }

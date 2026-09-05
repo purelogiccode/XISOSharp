@@ -53,7 +53,7 @@ internal static class CliOutputGuard
         "--random", "--seed", "--wipe", "--trim", "--petrify", "--update",
         "--zar", "--all", "--best", "--compress", "--security-sectors",
         "--sectors", "--checksum", "--filetime", "--get-filetime",
-        "--set-filetime", "--silent", "--dry-run",
+        "--set-filetime", "--silent", "--dry-run", "--jobs", "--policy",
     };
 
     /// <summary>

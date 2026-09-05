@@ -1,10 +1,14 @@
 namespace ZARSharp;
 
+using ZARSharp.Pipeline;
+
 /// <summary>
 /// Directory pack / archive extract tool. Pure-C# port of
 /// <c>src/main.cpp</c> (ZArchive 0.1.2 CLI). Uses exceptions instead of
 /// process exit codes; refuse-overwrite and delete-incomplete-output
-/// semantics are preserved.
+/// semantics are preserved. The loops live in the shared
+/// <see cref="ZarPackEngine"/>; this class keeps the exact
+/// <c>main.cpp</c>-compatible surface.
 /// </summary>
 public static class ZArchiveTool
 {
@@ -32,73 +36,30 @@ public static class ZArchiveTool
         string inputDirectory, string? outputFile = null, Action<string>? progress = null,
         IZarBlockCompressor? compressor = null, bool deterministicOrder = true)
     {
-        if (!Directory.Exists(inputDirectory))
+        var options = new ZarPipelineOptions
         {
-            throw new DirectoryNotFoundException($"Input directory not found: {inputDirectory}");
-        }
+            Compressor = compressor,
+            DeterministicOrder = deterministicOrder,
+            CollisionPolicy = ZarCollisionPolicy.Fail,
+        };
+        IProgress<ZarProgress>? sink = progress == null ? null : new ActionProgress(progress);
+        // Fail policy never skips, so the result is always non-null here.
+        ZarPipeline.Pack(inputDirectory, outputFile, options, sink);
+    }
 
-        outputFile ??= Path.Combine(
-            Path.GetDirectoryName(Path.GetFullPath(inputDirectory)) ?? "",
-            Path.GetFileNameWithoutExtension(inputDirectory.TrimEnd(Path.DirectorySeparatorChar,
-                Path.AltDirectorySeparatorChar)) + ".zar");
+    /// <summary>Adapts a per-file <see cref="Action{T}"/> to <see cref="IProgress{T}"/>.</summary>
+    private sealed class ActionProgress(Action<string> action) : IProgress<ZarProgress>
+    {
+        private string _last = string.Empty;
 
-        if (File.Exists(outputFile) || Directory.Exists(outputFile))
+        public void Report(ZarProgress value)
         {
-            throw new IOException($"The output file already exists: {outputFile}");
-        }
-
-        try
-        {
-            using var output = new FileStream(outputFile, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536);
-            using var writer = new ZArchiveWriter(output, compressor);
-            var buffer = new byte[ZArchiveCommon.CompressedBlockSize];
-
-            var enumerated = Directory.EnumerateFileSystemEntries(inputDirectory, "*", SearchOption.AllDirectories);
-            var entries = deterministicOrder
-                ? enumerated.OrderBy(p => p, StringComparer.Ordinal).ToList()
-                : enumerated.ToList();
-
-            foreach (var entry in entries)
+            if (value.CurrentFile.Length != 0 &&
+                !string.Equals(value.CurrentFile, _last, StringComparison.Ordinal))
             {
-                var relative = Path.GetRelativePath(inputDirectory, entry).Replace('\\', '/');
-                if (Directory.Exists(entry))
-                {
-                    if (!writer.MakeDir(relative, recursive: false))
-                    {
-                        throw new InvalidOperationException($"Failed to create directory {relative}");
-                    }
-                }
-                else if (File.Exists(entry))
-                {
-                    progress?.Invoke(relative);
-                    if (!writer.StartNewFile(relative))
-                    {
-                        throw new InvalidOperationException($"Failed to create archive file {relative}");
-                    }
-
-                    using var input = new FileStream(entry, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-                    int read;
-                    while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-                        writer.AppendData(buffer.AsSpan(0, read));
-                    }
-                }
+                _last = value.CurrentFile;
+                action(value.CurrentFile);
             }
-
-            writer.Finalize();
-        }
-        catch
-        {
-            try
-            {
-                File.Delete(outputFile);
-            }
-            catch
-            {
-                /* best effort */
-            }
-
-            throw;
         }
     }
 
@@ -107,74 +68,6 @@ public static class ZArchiveTool
     /// <exception cref="InvalidOperationException">On corrupt archives.</exception>
     public static void Extract(string inputFile, string outputDirectory)
     {
-        if (!File.Exists(inputFile))
-        {
-            throw new FileNotFoundException($"Unable to find archive file: {inputFile}");
-        }
-
-        using var reader = ZArchiveReader.TryOpen(inputFile) ??
-                           throw new InvalidOperationException("Failed to open ZArchive.");
-
-        Directory.CreateDirectory(outputDirectory);
-        ExtractRecursive(reader, string.Empty, outputDirectory);
-    }
-
-    private static void ExtractRecursive(ZArchiveReader reader, string srcPath, string outputDirectory)
-    {
-        var dirHandle = reader.LookUp(srcPath);
-        if (dirHandle == ZArchiveReader.InvalidNode || !reader.IsDirectory(dirHandle))
-        {
-            throw new InvalidOperationException($"Directory not found in archive: '{srcPath}'.");
-        }
-
-        Directory.CreateDirectory(outputDirectory);
-        var count = reader.GetDirEntryCount(dirHandle);
-        for (uint i = 0; i < count; i++)
-        {
-            if (!reader.GetDirEntry(dirHandle, i, out var entry))
-            {
-                throw new InvalidOperationException("Directory contains invalid node.");
-            }
-
-            var childSrc = string.IsNullOrEmpty(srcPath) ? entry.Name : srcPath + "/" + entry.Name;
-            var childOut = Path.Combine(outputDirectory, entry.Name);
-            if (entry.IsDirectory)
-            {
-                ExtractRecursive(reader, childSrc, childOut);
-            }
-            else
-            {
-                ExtractFile(reader, childSrc, childOut);
-            }
-        }
-    }
-
-    private static void ExtractFile(ZArchiveReader reader, string srcPath, string outputPath)
-    {
-        var handle = reader.LookUp(srcPath);
-        if (handle == ZArchiveReader.InvalidNode || !reader.IsFile(handle))
-        {
-            throw new InvalidOperationException($"Unable to extract file: {srcPath}");
-        }
-
-        using var output = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
-        var buffer = new byte[ZArchiveCommon.CompressedBlockSize];
-        ulong offset = 0;
-        while (true)
-        {
-            var read = reader.ReadFromFile(handle, offset, buffer);
-            if (read == 0)
-            {
-                break;
-            }
-
-            output.Write(buffer, 0, (int)read);
-            offset += read;
-        }
-
-        if (offset != reader.GetFileSize(handle))
-        {
-            throw new InvalidOperationException($"Extraction failed: {srcPath}");
-        }
+        ZarPipeline.Extract(inputFile, outputDirectory);
     }
 }

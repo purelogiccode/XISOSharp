@@ -4,6 +4,7 @@ using System.Text;
 using Serilog;
 using XISOSharp.Cli.Logging;
 using XISOSharp.Models;
+using ZARSharp.Pipeline;
 
 namespace XISOSharp.Cli;
 
@@ -14,6 +15,38 @@ namespace XISOSharp.Cli;
 /// </summary>
 internal static class Program
 {
+    /// <summary>Serializes parallel <c>--zar</c> batch summaries.</summary>
+    private static readonly Lock _logLock = new();
+
+    /// <summary>
+    /// Parses a <c>--policy</c> value (<c>skip</c> / <c>overwrite</c> /
+    /// <c>auto-rename</c>) into a <see cref="ZarCollisionPolicy"/>.
+    /// </summary>
+    private static bool TryParseCollisionPolicy(string text, out ZarCollisionPolicy? policy)
+    {
+        if (string.Equals(text, "skip", StringComparison.OrdinalIgnoreCase))
+        {
+            policy = ZarCollisionPolicy.Skip;
+            return true;
+        }
+
+        if (string.Equals(text, "overwrite", StringComparison.OrdinalIgnoreCase))
+        {
+            policy = ZarCollisionPolicy.Overwrite;
+            return true;
+        }
+
+        if (string.Equals(text, "auto-rename", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(text, "autorename", StringComparison.OrdinalIgnoreCase))
+        {
+            policy = ZarCollisionPolicy.AutoRename;
+            return true;
+        }
+
+        policy = null;
+        return false;
+    }
+
     /// <summary>
     /// Entry point. Parses command-line flags and positional arguments,
     /// then invokes the appropriate XISO operation.
@@ -112,6 +145,8 @@ internal static class Program
         var allMode = false;
         var bestMode = false;
         var compressAlias = false;
+        var jobs = 1;
+        ZarCollisionPolicy? zarPolicy = null;
         string? securitySectorsPath = null;
 
         var optind = 0;
@@ -531,6 +566,25 @@ internal static class Program
                         extract = false;
                         zarMode = true;
                         break;
+                    case "--jobs":
+                        if (i + 1 >= args.Length || !int.TryParse(args[i + 1],
+                            NumberStyles.Integer, CultureInfo.InvariantCulture, out jobs) || jobs < 1)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        i++;
+                        break;
+                    case "--policy":
+                        if (i + 1 >= args.Length || !TryParseCollisionPolicy(args[i + 1], out zarPolicy))
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        i++;
+                        break;
                     case "--all":
                         if (xSeen || rewrite || createList.Count > 0)
                         {
@@ -939,7 +993,7 @@ internal static class Program
         if (videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode || zarMode)
         {
             return RunRedumpBatch(isoFiles, videoMode, randomMode, seedMode, wipeMode, trimMode, petrifyMode,
-                updateMode, zarMode, securitySectorsPath, outputName, assumeYes, assumeNo);
+                updateMode, zarMode, securitySectorsPath, outputName, assumeYes, assumeNo, jobs, zarPolicy);
         }
 
         if (createList.Count > 0)
@@ -2415,7 +2469,7 @@ internal static class Program
 
     private static int RunRedumpBatch(List<string> isoFiles, bool video, bool random, bool seed, bool wipe, bool trim,
         bool petrify, bool update, bool zar, string? securitySectorsPath, string? outputName,
-        bool assumeYes, bool assumeNo)
+        bool assumeYes, bool assumeNo, int jobs = 1, ZarCollisionPolicy? policy = null)
     {
         _ = securitySectorsPath;
         // Single-output guard
@@ -2438,6 +2492,19 @@ internal static class Program
         }
 
         var exit = 0;
+
+        // ZarManager-style batch: a lone --zar over several inputs with an
+        // explicit (non-interactive) policy packs in parallel.
+        if (zar && singleModeCount && policy.HasValue && jobs > 1 && isoFiles.Count > 1)
+        {
+            var failures = 0;
+            Parallel.ForEach(isoFiles, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, jobs) }, iso =>
+            {
+                if (DeriveAndPackZar(iso, policy.Value) != 0)
+                    Interlocked.Exchange(ref failures, 1);
+            });
+            return failures;
+        }
 
         foreach (var iso in isoFiles)
         {
@@ -2800,23 +2867,140 @@ internal static class Program
                 var outZar = (outputName != null && singleModeCount)
                     ? outputName
                     : Path.Combine(dir, baseName + ".zar");
-                if (!ConfirmOutput(outZar, $"--zar for {iso}"))
+                if (policy == null)
                 {
-                    // Skipped by user choice (-n refusal already failed this file above).
+                    if (!ConfirmOutput(outZar, $"--zar for {iso}"))
+                    {
+                        // Skipped by user choice (-n refusal already failed this file above).
+                    }
+                    else if (!XisoZarchive.CreateZar(iso, outZar, isRedump ? isoOffset : 0, Logger.Quiet))
+                    {
+                        Logger.LogErr($"[ERROR] Failed creating ZAR for {iso}\n");
+                        exit = 1;
+                    }
+                    else
+                    {
+                        Logger.Log($"ZAR written to {outZar}\n");
+                    }
                 }
-                else if (!XisoZarchive.CreateZar(iso, outZar, isRedump ? isoOffset : 0, Logger.Quiet))
+                else if (PackZarResolved(iso, outZar, isRedump ? isoOffset : 0, policy.Value, parallel: false) != 0)
                 {
-                    Logger.LogErr($"[ERROR] Failed creating ZAR for {iso}\n");
                     exit = 1;
-                }
-                else
-                {
-                    Logger.Log($"ZAR written to {outZar}\n");
                 }
             }
         }
 
         return exit;
+
+        // Non-interactive --zar for one ISO: resolve the output under the
+        // collision policy, then pack. Returns 0 on success or skip, 1 on
+        // failure. Parallel workers stay quiet; one summary line is logged
+        // under a lock so batch output does not interleave.
+        int DeriveAndPackZar(string isoPath, ZarCollisionPolicy pol)
+        {
+            long size;
+            try
+            {
+                size = new FileInfo(isoPath).Length;
+            }
+            catch
+            {
+                lock (_logLock) Logger.LogErr($"Cannot stat {isoPath}\n");
+                return 1;
+            }
+
+            var redumpType = XgdTables.GetRedumpIsoTypeBySize(size);
+            long offset = 0;
+            if (redumpType >= 0)
+            {
+                var xsType = XgdTables.GetXgdType(redumpType);
+                if (xsType >= 0 && xsType < XgdTables.XisoOffset.Length)
+                    offset = XgdTables.XisoOffset[xsType];
+            }
+
+            var isoDir = Path.GetDirectoryName(isoPath) ?? "";
+            var full = Path.GetFileName(isoPath) ?? "output";
+            var stem = full;
+            if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase))
+                stem = full[..^".redump.iso".Length];
+            else if (full.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase))
+                stem = full[..^".video.iso".Length];
+            else if (full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) stem = full[..^".iso".Length];
+            else if (full.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase)) stem = full[..^".xiso".Length];
+            return PackZarResolved(isoPath, Path.Combine(isoDir, stem + ".zar"), offset, pol, parallel: true);
+        }
+
+        int PackZarResolved(string isoPath, string outZar, long isoOffset, ZarCollisionPolicy pol, bool parallel)
+        {
+            string? resolved;
+            try
+            {
+                resolved = ZarPackEngine.ResolveOutputPath(outZar, pol);
+            }
+            catch (IOException)
+            {
+                Logger.LogErr($"[ERROR] Output file already exists: {outZar}\n");
+                return 1;
+            }
+
+            if (resolved == null)
+            {
+                if (parallel)
+                {
+                    lock (_logLock) Logger.Log($"[INFO] Skipping --zar for {isoPath}: output exists\n");
+                }
+                else
+                {
+                    Logger.Log($"[INFO] Skipping --zar for {isoPath}: output exists\n");
+                }
+
+                return 0;
+            }
+
+            bool ok;
+            try
+            {
+                ok = XisoZarchive.CreateZar(isoPath, resolved, isoOffset, quiet: parallel || Logger.Quiet);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                if (parallel)
+                {
+                    lock (_logLock) Logger.LogErr($"[ERROR] Failed creating ZAR for {isoPath}: {ex.Message}\n");
+                }
+                else
+                {
+                    Logger.LogErr($"[ERROR] Failed creating ZAR for {isoPath}: {ex.Message}\n");
+                }
+
+                return 1;
+            }
+
+            if (!ok)
+            {
+                if (parallel)
+                {
+                    lock (_logLock) Logger.LogErr($"[ERROR] Failed creating ZAR for {isoPath}\n");
+                }
+                else
+                {
+                    Logger.LogErr($"[ERROR] Failed creating ZAR for {isoPath}\n");
+                }
+
+                return 1;
+            }
+
+            if (parallel)
+            {
+                lock (_logLock) Logger.Log($"ZAR written to {resolved}\n");
+            }
+            else
+            {
+                Logger.Log($"ZAR written to {resolved}\n");
+            }
+
+            return 0;
+        }
 
         // -y/--yes/-n/--no gate for every file this batch writes (XboxKit ConfirmOverwrite
         // parity). A declined output skips just that operation; a -n refusal also fails
@@ -3140,6 +3324,10 @@ internal static class Program
                                                      --petrify <iso> [skeleton.xiso] [hash]  Zero file data, emit SHA1 hashes.
                                                      --update <video.iso|redump.iso> [update]  Extract su20076000_00000000 (XGD3) and zero it in video.
                                                      --zar <iso> [out.zar]      Create ZArchive (zstd blocks, raw fallback; trimmable).
+                                                     --jobs <n>               With a lone --zar over several inputs, pack
+                                                                            up to <n> archives in parallel (default 1).
+                                                     --policy <p>            --zar overwrite handling without prompting:
+                                                                            skip | overwrite | auto-rename.
                                                      --all <redump.iso>         Alias: --random --seed --trim --update --video --wipe
                                                      --best <iso>               Alias: --trim --wipe
                                                      --compress <iso>           Alias: --petrify --update --video --zar
