@@ -141,6 +141,7 @@ are delivered synchronously in order:
 | `FileCount` / `DirCount` | `Count` (totals) | Before writing starts. `DirCount` counts directory entries only (the image root `/` itself is not counted) |
 | `DirAdded` | `Path` (e.g. `"/subdir"`), `Sector` | When each directory's write begins (parent before children; includes the root `/`) |
 | `FileAdded` | `Path`, `Sector`, `Size` (written bytes) | After each file's data is written |
+| `FileProgress` | `Path`, `Sector`, `Size` (bytes copied so far), `Count` (total file bytes) | Per chunk while extracting (unpack/extract/copy-out); zero-byte files emit none |
 | `FinishedPacking` | — | Last, on success only |
 
 Paths use forward slashes (`"/"` = root). The channel is honored in create **and**

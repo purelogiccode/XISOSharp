@@ -66,7 +66,7 @@ The site is rendered with **Docsify** — a fixed **left sidebar** is provided b
 - **Redump archival (XboxKit parity):** `--video`, `--random` (filler), `--seed` (XGD1 PRNG brute-force), `--wipe`, `--trim`, `--petrify` (skeleton + SHA-1), `--update` (XGD3 `su…`), `--zar` (ZArchive/zstd), `--security-sectors <sectors.txt>`, aliases `--all`/`--best`/`--compress`, verb `rebuild` for lossless Redump ↔ XISO
 - **xdvdfs parity:** `build-image` ordered `host/**:image/{0|1}` (`!` + `{n}` captures, `xdvdfs.toml`, `--dry-run`), `image-spec from`, **CISO** `compress`/`decompress` (DEFLATE v1 `0x80000000` + LZ4 v2, `align` 0/1/2) with `CisoBlockDevice` random-access, `IBlockDevice` (`File`/`Memory`/`Offset`/`Ciso`)
 - Automatic `.xbe` **media-enable patching** (Boyer–Moore `E8 CA FD FF FF 85 C0 7D → EB`)
-- Async APIs, `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FinishedPacking`, with `FileAdded` also per written file in extract mode), `CancellationToken` throughout
+- Async APIs, `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FileProgress`/`FinishedPacking`, with `FileAdded` also per written file and per-chunk `FileProgress` in extract mode), `CancellationToken` throughout
 - Multi-targets **.NET 8, .NET 9, and .NET 10**; strong-named; trim/AOT compatible; **left sidebar** on Pages & Wiki
 
 ## Quick start

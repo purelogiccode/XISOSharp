@@ -91,8 +91,8 @@ Logger.RealQuiet = true;          // suppress everything
 Progress during extraction/creation is reported through `Logger` and — for write
 operations — through the optional `ProgressCallback` (`long currentBytes, long
 totalBytes`) and the structured `IProgress<ProgressInfo>` channel (`FileCount`,
-`DirCount`, `DirAdded`, `FileAdded`, `FinishedPacking` events — see
-[`ProgressInfo`](api-utilities.md#records)).
+`DirCount`, `DirAdded`, `FileAdded`, `FinishedPacking` events, plus per-chunk
+`FileProgress` while extracting — see [`ProgressInfo`](api-utilities.md#records)).
 
 ## Quick samples
 
@@ -190,7 +190,10 @@ Async variants: `XisoReader.DecodeXisoAsync`, `XisoWriter.CreateXisoAsync`.
 
 Cancellation is honored per entry during extraction (an interrupted unpack throws
 `OperationCanceledException` and still restores the working directory), and extract
-mode reports `ProgressInfoType.FileAdded` per written file. Outputs that collide
+mode reports `ProgressInfoType.FileAdded` per written file plus per-chunk
+`ProgressInfoType.FileProgress` while each file copies (driven by the shared
+`XisoFileCopier` core, which reuses one buffer instead of allocating per file).
+Outputs that collide
 with their inputs throw `IOException` before writing (input==output guard); path
 comparison lives in `XisoPaths`, resume options in `UnpackOptions`.
 

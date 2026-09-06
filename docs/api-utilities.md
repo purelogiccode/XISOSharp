@@ -244,7 +244,7 @@ explicit in-place one: `TrimXiso(input, input)` (safe `SetLength` truncation).
 | `AvlResult` | `NoErr`, `AvlError`, `AvlBalanced` |
 | `AvlTraversalMethod` | `Prefix`, `Infix`, `Postfix` |
 | `ValidationIssueType` | `MissingInOutput`, `ExtraInOutput`, `SizeMismatch`, `ChecksumMismatch` |
-| `ProgressInfoType` | `FileCount`, `DirCount`, `DirAdded`, `FileAdded`, `FinishedPacking` — progress event kinds (`FileAdded` also fires per written file in extract mode) |
+| `ProgressInfoType` | `FileCount`, `DirCount`, `DirAdded`, `FileAdded`, `FileProgress`, `FinishedPacking` — progress event kinds (`FileAdded` also fires per written file in extract mode; `FileProgress` fires per chunk while extracting) |
 
 ## Delegates
 

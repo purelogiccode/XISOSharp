@@ -12,7 +12,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI `XISOSharp.Cli` (`net10.0`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 20 extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1053 tests) — snapshot `test_fixture.iso` + corruption resilience + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + extract-xiso 2.7.1 legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/robustness coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1075 tests) — snapshot `test_fixture.iso` + corruption resilience + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + extract-xiso 2.7.1 legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/robustness coverage |
 | ZARSharp.Tests | **Moved** to the sibling `../CSharp_ZARSharp` repo (own solution + CI) — xUnit suite for the pure-C# ZArchive/zstd port |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | ZARSharp.Benchmarks | **Moved** to the sibling `../CSharp_ZARSharp` repo — BenchmarkDotNet for ZARSharp only |
@@ -259,7 +259,7 @@ Console.WriteLine($"{xex?.TitleId:X8} entry 0x{xex?.EntryPoint:X8} region {xex?.
 int rc = XisoWriter.PackFromDirectory("source_dir", "out/game.iso",
     excludePatterns: ["**/*.tmp", "**/node_modules/**"],
     progressCallback: (cur, total) => Console.Write($"\r{cur}/{total}"),
-    progress: myProgress); // IProgress<ProgressInfo> FileCount/DirCount/DirAdded/FileAdded/FinishedPacking
+    progress: myProgress); // IProgress<ProgressInfo> FileCount/DirCount/DirAdded/FileAdded/FileProgress/FinishedPacking
 
 // Full control (mirrors extract-xiso.c three-pass layout)
 int rc2 = XisoWriter.CreateXiso(
@@ -445,7 +445,7 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | LBA sector reads | ✅ | — | ✅ | ✅ |
 | Thread-safe random-access | ✅ | ❌ | ❌ | ✅ |
 | `CancellationToken` | ✅ | ❌ | ❌ | ❌ |
-| `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FinishedPacking`) | ✅ | 🟡 `progress_callback` | ❌ | 🟡 `ProgressInfo` |
+| `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FileProgress`/`FinishedPacking`) | ✅ | 🟡 `progress_callback` | ❌ | 🟡 `ProgressInfo` |
 | `*Async` (`Task.Run`) | ✅ | ❌ | ❌ | 🟡 `maybe-async` |
 | Parallel verify / encode | ✅ verify | ❌ | ❌ | ❌ |
 | Typed errors (`XisoFormatException` etc.) | ✅ | ❌ | ❌ | 🟡 `InvalidVolume` |
@@ -478,7 +478,7 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
-dotnet test -c Release                       # 1053 tests (`XISOSharp.Tests`; ZARSharp lives in `../CSharp_ZARSharp`)
+dotnet test -c Release                       # 1075 tests (`XISOSharp.Tests`; ZARSharp lives in `../CSharp_ZARSharp`)
 ```
 
 Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF). `ZARSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZARSharp.Tests` + `ZARSharp.Benchmarks` moved to the sibling `../CSharp_ZARSharp` repo (own solution); `XISOSharp` consumes the library via a relative `ProjectReference`. CI builds on `ubuntu`/`windows`/`macos`.

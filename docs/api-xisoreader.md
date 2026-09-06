@@ -100,7 +100,7 @@ public static int Rewrite(
 | `outputName` | Rewrite only: custom output filename (default: original name with `.iso`) |
 | `skipSectors` | Read offset (Redump video partition), in 2048-byte sectors |
 | `prependSectors` | Rewrite only: reserve zero-filled sectors before the filesystem |
-| `progress` | Rewrite: structured progress channel (`IProgress<ProgressInfo>`) — see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo). Extract: a `FileAdded` event per file actually written (skipped/excluded files are silent) |
+| `progress` | Rewrite: structured progress channel (`IProgress<ProgressInfo>`) — see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo). Extract: a `FileAdded` event per file actually written (skipped/excluded files are silent), plus a per-chunk `FileProgress` event (`Size` = bytes copied so far, `Count` = total file bytes) while each file copies |
 | `options` | Extract/unpack only: resume options — see [Resume interrupted unpacks](#resume-interrupted-unpacks) |
 
 `UnpackImage` is the convenience form of `Extract`: it probes the optimized-tag marker
@@ -273,12 +273,14 @@ public record SectorLayout(VolumeInfo Volume, IReadOnlyList<FileSectorExtent> En
 
 ```csharp
 public static void CopyOut(string isoPath, string internalPath, string destPath,
-    UnpackOptions? options = null, CancellationToken cancellationToken = default)
+    UnpackOptions? options = null, CancellationToken cancellationToken = default,
+    IProgress<ProgressInfo>? progress = null)
 ```
 
 Copies one file — or an entire directory, recursively — out of the image to
 `destPath` without a full extraction. With `SkipExisting`, up-to-date destinations
 are skipped per [Resume interrupted unpacks](#resume-interrupted-unpacks).
+Each copied file reports per-chunk `FileProgress` events on `progress`.
 
 ## CopyIn
 

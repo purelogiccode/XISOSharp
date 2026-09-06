@@ -691,7 +691,7 @@ public static class XisoReader
                         try
                         {
                             written = ExtractFile(fs, filename, startSector, fileSize, path, discLseek,
-                                unpackOptions, cancellationToken);
+                                unpackOptions, cancellationToken, progress);
                         }
                         catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
                                                    ex is not OperationCanceledException)
@@ -777,6 +777,10 @@ public static class XisoReader
     /// <c>skip: &lt;path&gt;</c> (TODO #13, xdvdfs #190).
     /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="progress">
+    /// Optional structured progress channel; receives a per-chunk
+    /// <see cref="ProgressInfoType.FileProgress"/> event while the file copies.
+    /// </param>
     /// <returns><c>true</c> when the file was written, <c>false</c> when it was skipped or excluded.</returns>
     /// <exception cref="ExtractFileException">
     /// Thrown naming the entry, its sector, and expected vs actual bytes when the
@@ -792,7 +796,8 @@ public static class XisoReader
         string? path,
         long discLseek,
         UnpackOptions? unpackOptions = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<ProgressInfo>? progress = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (Logger.RemoveSystemUpdate && path?.Contains("$SystemUpdate", StringComparison.Ordinal) == true)
@@ -866,27 +871,36 @@ public static class XisoReader
                 }
                 else
                 {
-                    var size = Math.Min(fileSize, Constants.ReadWriteBufferSize);
-
-                    do
+                    // Scenario-tuned copy (#8): small files finish in one chunk,
+                    // large files stream per chunk with byte-level progress. The
+                    // shared thread-static buffer keeps chunking (and therefore
+                    // the percent log sequence) identical to the old inline loop.
+                    var progressPath = string.Concat(path, filename).Replace('\\', '/');
+                    try
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var readSize = fs.Read(CopyBuffer, 0, (int)size);
-                        if (readSize == 0)
-                            break;
-
-                        outFile.Write(CopyBuffer, 0, readSize);
-
-                        totalSize += (uint)readSize;
-                        var percent = (uint)(totalSize * 100.0 / fileSize);
-                        Logger.Log(
-                            $"extracting {path}{filename} ({fileSize} bytes) [{percent}%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
-                        Logger.Flush();
-
-                        size = Math.Min(fileSize - totalSize, Constants.ReadWriteBufferSize);
-                    } while (totalSize < fileSize && size > 0);
-
-                    if (totalSize < fileSize)
+                        XisoFileCopier.CopyExact(
+                            fs,
+                            fileSize,
+                            (buffer, count) =>
+                            {
+                                // Write-then-count matches the old inline loop, so
+                                // ForWrite/ForTruncated carry identical byte counts.
+                                outFile.Write(buffer, 0, count);
+                                totalSize += (uint)count;
+                            },
+                            CopyBuffer,
+                            copied =>
+                            {
+                                var percent = (uint)(copied * 100.0 / fileSize);
+                                Logger.Log(
+                                    $"extracting {path}{filename} ({fileSize} bytes) [{percent}%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
+                                Logger.Flush();
+                                progress?.Report(new ProgressInfo(ProgressInfoType.FileProgress,
+                                    Count: fileSize, Path: progressPath, Sector: startSector, Size: copied));
+                            },
+                            cancellationToken);
+                    }
+                    catch (TruncatedCopyException)
                     {
                         throw ExtractFileException.ForTruncated(internalPath, filename, startSector, fileSize,
                             totalSize);
@@ -2609,6 +2623,10 @@ public static class XisoReader
     /// <c>skip: &lt;path&gt;</c> (TODO #13, xdvdfs #190).
     /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="progress">
+    /// Optional structured progress channel; receives a per-chunk
+    /// <see cref="ProgressInfoType.FileProgress"/> event for each file copied.
+    /// </param>
     /// <exception cref="FileNotFoundException">Thrown when the ISO file does not exist.</exception>
     /// <exception cref="InvalidDataException">Thrown when the internal path does not exist.</exception>
     /// <exception cref="ExtractFileException">
@@ -2620,7 +2638,8 @@ public static class XisoReader
     /// </exception>
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public static void CopyOut(string isoPath, string internalPath, string destPath,
-        UnpackOptions? options = null, CancellationToken cancellationToken = default)
+        UnpackOptions? options = null, CancellationToken cancellationToken = default,
+        IProgress<ProgressInfo>? progress = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var entry = GetEntryInfo(isoPath, internalPath);
@@ -2640,12 +2659,14 @@ public static class XisoReader
 
         if (entry.IsDirectory)
         {
-            CopyOutDirectory(fs, isoPath, internalPath, destPath, volInfo, options, cancellationToken);
+            CopyOutDirectory(fs, isoPath, internalPath, destPath, volInfo, options, cancellationToken,
+                progress: progress);
             options?.ThrowIfFailed(isoPath);
         }
         else
         {
-            CopyOutFile(fs, entry, internalPath, destPath, volInfo, options, cancellationToken);
+            CopyOutFile(fs, entry, internalPath, destPath, volInfo, options, cancellationToken,
+                progress: progress);
         }
     }
 
@@ -2677,7 +2698,8 @@ public static class XisoReader
     }
 
     private static void CopyOutFile(FileStream fs, EntryInfo entry, string internalPath, string destPath,
-        VolumeInfo volInfo, UnpackOptions? options = null, CancellationToken cancellationToken = default)
+        VolumeInfo volInfo, UnpackOptions? options = null, CancellationToken cancellationToken = default,
+        IProgress<ProgressInfo>? progress = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (options?.ShouldSkip(destPath, entry.FileSize) == true)
@@ -2712,24 +2734,30 @@ public static class XisoReader
             {
                 fs.Seek(((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek, SeekOrigin.Begin);
 
-                var remaining = entry.FileSize;
+                // Shared copier (#8): reuses the thread-static buffer instead of
+                // allocating 2 MB per file, and reports byte-level progress.
                 var totalRead = 0L;
-                var buffer = new byte[Constants.ReadWriteBufferSize];
-
-                while (remaining > 0)
+                try
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var toRead = (int)Math.Min(remaining, Constants.ReadWriteBufferSize);
-                    var read = fs.Read(buffer, 0, toRead);
-                    if (read <= 0)
-                    {
-                        throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
-                            entry.FileSize, totalRead);
-                    }
-
-                    outFile.Write(buffer, 0, read);
-                    remaining -= (uint)read;
-                    totalRead += read;
+                    XisoFileCopier.CopyExact(
+                        fs,
+                        entry.FileSize,
+                        (buffer, count) =>
+                        {
+                            outFile.Write(buffer, 0, count);
+                            totalRead += count;
+                        },
+                        CopyBuffer,
+                        copied => progress?.Report(new ProgressInfo(ProgressInfoType.FileProgress,
+                            Count: entry.FileSize,
+                            Path: internalPath.Replace('\\', '/'),
+                            Sector: entry.StartSector, Size: copied)),
+                        cancellationToken);
+                }
+                catch (TruncatedCopyException)
+                {
+                    throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
+                        entry.FileSize, totalRead);
                 }
             }
 
@@ -2751,7 +2779,7 @@ public static class XisoReader
 
     private static void CopyOutDirectory(FileStream fs, string isoPath, string internalPath, string destPath,
         VolumeInfo volInfo, UnpackOptions? options = null, CancellationToken cancellationToken = default,
-        int depth = 0)
+        int depth = 0, IProgress<ProgressInfo>? progress = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         // Hardening (#16): a subdirectory cycle (table pointing back at an ancestor)
@@ -2774,11 +2802,12 @@ public static class XisoReader
                 if (entry.IsDirectory)
                 {
                     CopyOutDirectory(fs, isoPath, entryInternalPath, entryDestPath, volInfo, options,
-                        cancellationToken, depth + 1);
+                        cancellationToken, depth + 1, progress);
                 }
                 else
                 {
-                    CopyOutFile(fs, entry, entryInternalPath, entryDestPath, volInfo, options, cancellationToken);
+                    CopyOutFile(fs, entry, entryInternalPath, entryDestPath, volInfo, options, cancellationToken,
+                        progress);
                 }
             }
             catch (Exception ex) when (options?.ContinueOnError == true && ex is not OperationCanceledException)
@@ -2831,18 +2860,18 @@ public static class XisoReader
 
         fs.Seek(((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek, SeekOrigin.Begin);
 
-        var buffer = new byte[Constants.ReadWriteBufferSize];
-        var remaining = entry.FileSize;
-
-        while (remaining > 0)
+        // Shared copier (#8): same bytes, same truncation error, no per-call buffer.
+        try
         {
-            var toRead = (int)Math.Min(remaining, Constants.ReadWriteBufferSize);
-            var read = fs.Read(buffer, 0, toRead);
-            if (read <= 0)
-                throw new IOException($"Unexpected end of file data at sector {entry.StartSector}");
-
-            hasher.TransformBlock(buffer, 0, read, buffer, 0);
-            remaining -= (uint)read;
+            XisoFileCopier.CopyExact(
+                fs,
+                entry.FileSize,
+                (buffer, count) => hasher.TransformBlock(buffer, 0, count, buffer, 0),
+                CopyBuffer);
+        }
+        catch (TruncatedCopyException)
+        {
+            throw new IOException($"Unexpected end of file data at sector {entry.StartSector}");
         }
 
         hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
