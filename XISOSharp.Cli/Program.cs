@@ -2798,7 +2798,7 @@ internal static class Program
             digits = text[..^1];
         }
 
-        if (!long.TryParse(digits, out var count) || count <= 0)
+        if (!long.TryParse(digits, CultureInfo.InvariantCulture, out var count) || count <= 0)
             return false;
         try
         {
@@ -3737,6 +3737,7 @@ internal static class Program
                                                                               build-image -m "bin:/" -m "assets/**:/assets/{1}" ./src dist/final.xiso.iso
                                                                               build-image --dry-run -f xdvdfs.toml ./src
                                                                             Globs support '*', '?', '**', '[]', '{a,b}'. Order matters; first match wins, negation clears and allows re-inclusion.
+                                                                            In -m rules the separator is the first unescaped ':' — write '\:' for a literal colon, '\\' for a backslash, and drive prefixes like C:/... are kept (TOML -f needs no escaping).
                                                                             When -m is used, -f is ignored; -O sets output when no positional is given. Dry-run prints "host -> image".
                                                       image-spec from -O <out> -m <host:image> ... [specPath]
                                                                             Generate an xdvdfs.toml from map rules (stdout when omitted, file when given). Example:

@@ -40,6 +40,17 @@ output = "dist/image.iso"
 
 Manual TOML subset parser (no `Tomlyn` dep) reads `[map_rules]` preserve-order, same semantics as xdvdfs `preserve_order` feature (`Cargo.toml:25`). CLI: `-f <toml>` loads rules, `-m "host:image"` appends, `-O` overrides `output`, `-D`/`--dry-run` calls `DryRunRemap` and prints host→image pairs without writing.
 
+**Colons in `-m` rules (TODO #20):** upstream splits a rule on *every* `:` and
+silently drops the extras, so host paths containing `:` never worked there
+either. Here the separator is the first *unescaped* `:`: write `\:` for a
+literal colon in either part and `\\` for a literal backslash (a backslash
+before any other character stays literal, so Windows paths are unaffected),
+and a `X:`/`!X:` drive prefix followed by `/` or `\` is never a separator —
+e.g. `-m "C:/games/**:{0}"`, `-m "my\:games/**:/{0}"`. The TOML form needs no
+escaping (values are TOML-quoted). Note globs are `/`-separated: `**` must be
+a whole `/`-component, so prefer forward slashes in host globs even on
+Windows.
+
 **Test vectors:** verified against `xdvdfs-0.8.3/tests/img.py::BuildImage` (capture semantics).
 
 ---

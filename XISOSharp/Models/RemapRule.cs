@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace XISOSharp.Models;
 
 /// <summary>
@@ -18,6 +20,14 @@ public sealed class RemapRule
     /// <summary>
     /// Tries to parse a remap rule string of the form <c>hostGlob[:imagePath]</c>.
     /// </summary>
+    /// <remarks>
+    /// The separator is the first <c>:</c> that is neither backslash-escaped nor a
+    /// Windows drive-letter colon (<c>X:</c> or <c>!X:</c> followed by <c>/</c> or
+    /// <c>\</c>). Inside either part, <c>\:</c> is a literal colon and <c>\\</c> a
+    /// literal backslash; a backslash before any other character stays literal so
+    /// Windows paths keep working. The TOML spec form needs no escaping (values
+    /// are already delimited by TOML quoting).
+    /// </remarks>
     /// <param name="raw">Raw rule text to parse.</param>
     /// <param name="rule">Parsed rule on success; otherwise <c>null</c>.</param>
     /// <param name="error">Error message on failure; otherwise <c>null</c>.</param>
@@ -32,8 +42,10 @@ public sealed class RemapRule
             return false;
         }
 
-        // Split on first ':'
-        var colon = raw.IndexOf(':');
+        // Split on the first ':' that is neither escaped nor a drive-letter colon
+        // (upstream xdvdfs splits on every ':' and drops the extras; the TOML
+        // spec form is unaffected — it never passes through this parser).
+        var colon = FindSeparator(raw);
         string host;
         string image;
         if (colon >= 0)
@@ -47,8 +59,8 @@ public sealed class RemapRule
             image = string.Empty;
         }
 
-        host = host.Trim();
-        image = image.Trim();
+        host = UnescapePart(host.Trim());
+        image = UnescapePart(image.Trim());
 
         if (string.IsNullOrEmpty(host))
         {
@@ -100,6 +112,70 @@ public sealed class RemapRule
     }
 
     internal string HostWithBang => IsExclusion ? "!" + HostGlob : HostGlob;
+
+    /// <summary>
+    /// Finds the host/image separator: the first <c>:</c> that is not escaped
+    /// with a backslash and is not a Windows drive-letter colon, or -1.
+    /// </summary>
+    private static int FindSeparator(string raw)
+    {
+        for (var i = 0; i < raw.Length; i++)
+        {
+            if (raw[i] == '\\' && i + 1 < raw.Length &&
+                (raw[i + 1] == ':' || raw[i + 1] == '\\'))
+            {
+                i++; // skip the escaped character
+                continue;
+            }
+
+            if (raw[i] == ':' && !IsDriveColon(raw, i))
+                return i;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Reports whether the colon at <paramref name="colon"/> is a Windows
+    /// drive-letter colon: <c>X:</c> (or <c>!X:</c> for exclusions) at the start
+    /// of the rule, followed by <c>/</c> or <c>\</c>.
+    /// </summary>
+    private static bool IsDriveColon(string raw, int colon)
+    {
+        var letter = colon - 1;
+        if (letter < 0 || !char.IsAsciiLetter(raw[letter]))
+            return false;
+        if (letter != 0 && !(letter == 1 && raw[0] == '!'))
+            return false;
+        return colon + 1 < raw.Length &&
+            (raw[colon + 1] == '/' || raw[colon + 1] == '\\');
+    }
+
+    /// <summary>
+    /// Resolves <c>\:</c> to <c>:</c> and <c>\\</c> to <c>\</c>; any other
+    /// backslash is kept literally so Windows paths survive untouched.
+    /// </summary>
+    private static string UnescapePart(string part)
+    {
+        if (part.IndexOf('\\') < 0)
+            return part;
+        var sb = new StringBuilder(part.Length);
+        for (var i = 0; i < part.Length; i++)
+        {
+            if (part[i] == '\\' && i + 1 < part.Length &&
+                (part[i + 1] == ':' || part[i + 1] == '\\'))
+            {
+                sb.Append(part[i + 1]);
+                i++;
+            }
+            else
+            {
+                sb.Append(part[i]);
+            }
+        }
+
+        return sb.ToString();
+    }
 
     internal static List<int> FindMatchIndices(string rewrite)
     {

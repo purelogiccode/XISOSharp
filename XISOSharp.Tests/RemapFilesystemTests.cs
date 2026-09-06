@@ -180,6 +180,87 @@ public class RemapFilesystemTests : IDisposable
     }
 
     [Fact]
+    public void TryParse_EscapedColonInHost_ParsesLiteralColon()
+    {
+        var ok = RemapRule.TryParse(@"my\:games/**:dest/{1}", out var rule, out var error);
+        Assert.True(ok);
+        Assert.NotNull(rule);
+        Assert.Null(error);
+        Assert.Equal(@"my:games/**", rule.HostGlob);
+        Assert.Equal("dest/{1}", rule.ImagePath);
+    }
+
+    [Fact]
+    public void TryParse_EscapedColonInImage_ParsesLiteralColon()
+    {
+        var ok = RemapRule.TryParse(@"src/**:dest\:v2/{1}", out var rule, out _);
+        Assert.True(ok);
+        Assert.NotNull(rule);
+        Assert.Equal("src/**", rule.HostGlob);
+        Assert.Equal(@"dest:v2/{1}", rule.ImagePath);
+    }
+
+    [Fact]
+    public void TryParse_EscapedBackslash_StaysSingleBackslash()
+    {
+        var ok = RemapRule.TryParse(@"dir\\*.bin:dest/{1}", out var rule, out _);
+        Assert.True(ok);
+        Assert.NotNull(rule);
+        Assert.Equal(@"dir\*.bin", rule.HostGlob);
+    }
+
+    [Fact]
+    public void TryParse_BackslashBeforeOtherChars_StaysLiteral()
+    {
+        // Windows separators must survive untouched: \g and \s are not escapes.
+        var ok = RemapRule.TryParse(@"games\saves\*.bin:dest/{1}", out var rule, out _);
+        Assert.True(ok);
+        Assert.NotNull(rule);
+        Assert.Equal(@"games\saves\*.bin", rule.HostGlob);
+    }
+
+    [Fact]
+    public void TryParse_DriveLetterColon_IsNotSeparator()
+    {
+        var ok = RemapRule.TryParse(@"C:\games\*.bin:{0}", out var rule, out var error);
+        Assert.True(ok);
+        Assert.NotNull(rule);
+        Assert.Null(error);
+        Assert.Equal(@"C:\games\*.bin", rule.HostGlob);
+        Assert.Equal("{0}", rule.ImagePath);
+    }
+
+    [Fact]
+    public void TryParse_DriveLetterForwardSlash_IsNotSeparator()
+    {
+        var ok = RemapRule.TryParse("D:/games/**:{0}", out var rule, out _);
+        Assert.True(ok);
+        Assert.NotNull(rule);
+        Assert.Equal("D:/games/**", rule.HostGlob);
+        Assert.Equal("{0}", rule.ImagePath);
+    }
+
+    [Fact]
+    public void TryParse_ExclusionDriveLetter_IsNotSeparator()
+    {
+        var ok = RemapRule.TryParse(@"!C:\secret\*.bin", out var rule, out _);
+        Assert.True(ok);
+        Assert.NotNull(rule);
+        Assert.True(rule.IsExclusion);
+        Assert.Equal(@"C:\secret\*.bin", rule.HostGlob);
+    }
+
+    [Fact]
+    public void TryParse_RuleWithoutSeparator_StillFails()
+    {
+        // No unescaped ':' outside a drive prefix => missing image path.
+        var ok = RemapRule.TryParse(@"my\:games\**", out var rule, out var error);
+        Assert.False(ok);
+        Assert.Null(rule);
+        Assert.NotNull(error);
+    }
+
+    [Fact]
     public void TryParse_InvalidRewrite_UnclosedBrace_Fails()
     {
         var ok = RemapRule.TryParse("src/**:dest/{1", out var rule, out var error);
