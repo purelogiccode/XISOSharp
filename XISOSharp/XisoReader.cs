@@ -359,6 +359,13 @@ public static class XisoReader
     /// images stay far below <see cref="Constants.MaxTocDepth"/>; deeper means a
     /// malicious subdir cycle and throws instead of overflowing the stack.
     /// </param>
+    /// <param name="filesystem">
+    /// Optional destination filesystem (TODO #7). When set (extract mode), directories
+    /// are created through <see cref="IFilesystem.CreateDirectory"/> at the
+    /// destination-root-relative path and no process working-directory changes happen;
+    /// path prefixes chain with <c>/</c>. When <c>null</c>, the legacy chdir-based
+    /// extraction into the current directory runs and prefixes keep the host separator.
+    /// </param>
     /// <exception cref="XisoFormatException">
     /// Thrown naming the offending path and offset when the table is
     /// structurally corrupt. Under <c>UnpackOptions.ContinueOnError</c> in
@@ -379,7 +386,8 @@ public static class XisoReader
         IProgress<ProgressInfo>? progress = null,
         HashSet<long>? visited = null,
         long tableSize = long.MaxValue,
-        int depth = 0)
+        int depth = 0,
+        IFilesystem? filesystem = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (depth > Constants.MaxTocDepth)
@@ -555,7 +563,7 @@ public static class XisoReader
                 {
                     var savedDir = dir.Left!;
                     TraverseXiso(fs, savedDir, dirStart, path, mode, ref avlRoot, llCompat, discLseek,
-                        unpackOptions, cancellationToken, progress, visited, tableSize, depth + 1);
+                        unpackOptions, cancellationToken, progress, visited, tableSize, depth + 1, filesystem);
                 }
                 catch (Exception ex) when (unpackOptions?.ContinueOnError == true && mode == ExtractMode.Extract &&
                                            ex is not OperationCanceledException)
@@ -572,10 +580,13 @@ public static class XisoReader
 
             if ((attributes & Constants.AttributeDir) != 0)
             {
+                // Destination-relative paths chain with '/' under a custom
+                // filesystem; the legacy chdir walk keeps the host separator.
+                var sep = filesystem != null ? "/" : Constants.PathCharStr;
                 string subPath = null!;
                 if (path != null)
                 {
-                    subPath = path + filename + Constants.PathCharStr;
+                    subPath = path + filename + sep;
                     fs.Seek(((long)startSector * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
                 }
 
@@ -589,14 +600,22 @@ public static class XisoReader
                     {
                         try
                         {
-                            Directory.CreateDirectory(filename);
-                            Directory.SetCurrentDirectory(filename);
+                            if (filesystem != null)
+                            {
+                                filesystem.CreateDirectory(string.Concat(path, filename));
+                            }
+                            else
+                            {
+                                Directory.CreateDirectory(filename);
+                                Directory.SetCurrentDirectory(filename);
+                            }
                         }
                         catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
                                                    ex is not OperationCanceledException)
                         {
                             var failure = ex as ExtractFileException
-                                          ?? ExtractFileException.ForDirectory(string.Concat(path, filename), filename,
+                                          ?? ExtractFileException.ForDirectory(string.Concat(path, filename),
+                                              filesystem != null ? string.Concat(path, filename) : filename,
                                               ex);
                             unpackOptions.RecordFailure(failure);
                             Logger.LogErr($"Error: {failure.Message}\n");
@@ -609,7 +628,7 @@ public static class XisoReader
                         if (mode != ExtractMode.GenerateAvl)
                         {
                             Logger.Log(
-                                $"{mode switch { ExtractMode.Extract => "creating ", _ => "" }}{path}{filename}{Constants.PathCharStr} (0 bytes){mode switch { ExtractMode.Extract => " [OK]", _ => "" }}\n");
+                                $"{mode switch { ExtractMode.Extract => "creating ", _ => "" }}{path}{filename}{sep} (0 bytes){mode switch { ExtractMode.Extract => " [OK]", _ => "" }}\n");
                             Logger.Flush();
                         }
 
@@ -655,7 +674,7 @@ public static class XisoReader
                                     subPath, mode,
                                     ref mode == ExtractMode.GenerateAvl ? ref dir.AvlNode!.Subdirectory : ref subAvlRoot,
                                     llCompat, discLseek, unpackOptions, cancellationToken, progress,
-                                    null, fileSize, depth + 1);
+                                    null, fileSize, depth + 1, filesystem);
                             }
                             catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
                                                        mode == ExtractMode.Extract &&
@@ -669,7 +688,7 @@ public static class XisoReader
                             }
                         }
 
-                        if (mode == ExtractMode.Extract)
+                        if (mode == ExtractMode.Extract && filesystem == null)
                         {
                             Directory.SetCurrentDirectory("..");
                         }
@@ -691,7 +710,7 @@ public static class XisoReader
                         try
                         {
                             written = ExtractFile(fs, filename, startSector, fileSize, path, discLseek,
-                                unpackOptions, cancellationToken, progress);
+                                unpackOptions, cancellationToken, progress, filesystem);
                         }
                         catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
                                                    ex is not OperationCanceledException)
@@ -781,6 +800,13 @@ public static class XisoReader
     /// Optional structured progress channel; receives a per-chunk
     /// <see cref="ProgressInfoType.FileProgress"/> event while the file copies.
     /// </param>
+    /// <param name="filesystem">
+    /// Optional destination filesystem (TODO #7): when set, the file is created
+    /// through <see cref="IFilesystem.CreateFile"/> at the destination-root-relative
+    /// path (<c>path</c> + <c>filename</c>) and the skip/post-write checks probe the
+    /// same filesystem. When <c>null</c>, the file lands in the process working
+    /// directory under its bare name (legacy chdir-based behavior).
+    /// </param>
     /// <returns><c>true</c> when the file was written, <c>false</c> when it was skipped or excluded.</returns>
     /// <exception cref="ExtractFileException">
     /// Thrown naming the entry, its sector, and expected vs actual bytes when the
@@ -797,7 +823,8 @@ public static class XisoReader
         long discLseek,
         UnpackOptions? unpackOptions = null,
         CancellationToken cancellationToken = default,
-        IProgress<ProgressInfo>? progress = null)
+        IProgress<ProgressInfo>? progress = null,
+        IFilesystem? filesystem = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (Logger.RemoveSystemUpdate && path?.Contains("$SystemUpdate", StringComparison.Ordinal) == true)
@@ -806,14 +833,19 @@ public static class XisoReader
             return false;
         }
 
-        if (unpackOptions?.ShouldSkip(filename, fileSize) == true)
+        var internalPath = string.Concat(path, filename);
+
+        // Destination in the filesystem's own path form: for a custom
+        // IFilesystem that is the image-internal path ("sub/file.bin"); the
+        // legacy path keeps the cwd-relative bare name.
+        var dest = filesystem != null ? internalPath : filename;
+
+        if (unpackOptions?.ShouldSkip(dest, fileSize, filesystem ?? LocalFilesystem.Instance) == true)
         {
             Logger.Log($"skip: {path}{filename} ({fileSize} bytes)\n");
             Logger.Flush();
             return false;
         }
-
-        var internalPath = string.Concat(path, filename);
 
         // Integrity pre-check: the entry's data range must lie inside the image.
         // Catches torn images and entries pointing past the end before an empty
@@ -841,19 +873,26 @@ public static class XisoReader
             }
         }
 
-        FileStream outFile;
+        Stream outFile;
         try
         {
-            outFile = new FileStream(
-                filename,
-                new FileStreamOptions
-                {
-                    Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
-                });
+            if (filesystem != null)
+            {
+                outFile = filesystem.CreateFile(dest);
+            }
+            else
+            {
+                outFile = new FileStream(
+                    filename,
+                    new FileStreamOptions
+                    {
+                        Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
+                    });
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            throw ExtractFileException.ForCreate(internalPath, filename, startSector, fileSize, ex);
+            throw ExtractFileException.ForCreate(internalPath, dest, startSector, fileSize, ex);
         }
 
         uint totalSize = 0;
@@ -908,10 +947,11 @@ public static class XisoReader
                 }
             }
 
-            // Post-write integrity: the bytes on disk must equal the reported size.
+            // Post-write integrity: the bytes written must equal the reported size.
             // Catches torn writes and anything that truncated the file behind us.
-            if (new FileInfo(filename).Length != fileSize)
-                throw ExtractFileException.ForTruncated(internalPath, filename, startSector, fileSize, totalSize);
+            var writtenLength = filesystem != null ? filesystem.FileLength(dest) : new FileInfo(filename).Length;
+            if (writtenLength != fileSize)
+                throw ExtractFileException.ForTruncated(internalPath, dest, startSector, fileSize, totalSize);
         }
         catch (ExtractFileException)
         {
@@ -1110,6 +1150,103 @@ public static class XisoReader
 
         return Extract(imageStream, imageName, outputPath, !IsOptimizedImage(imageStream, skipSectors),
             cancellationToken, skipSectors, options, progress);
+    }
+
+    /// <summary>
+    /// Filesystem-based <see cref="UnpackImage(string, string?, CancellationToken, int?, UnpackOptions?, IProgress{ProgressInfo}?)"/>:
+    /// unpacks into any <see cref="IFilesystem"/> destination — <see cref="LocalFilesystem"/>
+    /// for disk, <see cref="MemoryFilesystem"/> for in-memory, or a custom store
+    /// (zip archive, network upload, GUI preview; TODO #7, xdvdfs #166).
+    /// Files land at the filesystem root: no ISO-named subdirectory is created and
+    /// the process working directory never changes. The optimized-tag marker is
+    /// probed automatically.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file, or a <c>.cso</c> image (auto-detected).</param>
+    /// <param name="filesystem">Destination filesystem receiving the unpacked tree.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="skipSectors">
+    /// Optional number of 2048-byte sectors to skip in the source file before the XISO
+    /// filesystem begins (for Redump-style images with a video partition).
+    /// </param>
+    /// <param name="options">
+    /// Optional resume options; when <see cref="UnpackOptions.SkipExisting"/> is set,
+    /// files already present in <paramref name="filesystem"/> with the same size are
+    /// skipped, so an interrupted unpack resumes instead of redoing completed files.
+    /// </param>
+    /// <param name="progress">
+    /// Optional structured progress channel; receives a <see cref="ProgressInfoType.FileAdded"/>
+    /// event for each file actually written plus per-chunk <see cref="ProgressInfoType.FileProgress"/>
+    /// while each file copies.
+    /// </param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="filesystem"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="skipSectors"/> is negative.</exception>
+    /// <exception cref="XisoFormatException">
+    /// Thrown when the file is not a valid XISO image.
+    /// </exception>
+    /// <exception cref="XisoEmptyException">
+    /// Thrown when the XISO image contains no files.
+    /// </exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when the input file does not exist.</exception>
+    public static int UnpackImage(
+        string isoPath,
+        IFilesystem filesystem,
+        CancellationToken cancellationToken = default,
+        int? skipSectors = null,
+        UnpackOptions? options = null,
+        IProgress<ProgressInfo>? progress = null)
+    {
+        ArgumentNullException.ThrowIfNull(filesystem);
+        if (skipSectors < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value,
+                "Skip sectors must be non-negative.");
+        }
+
+        using var fs = OpenImageStream(isoPath);
+        return DecodeXisoCore(fs, isoPath, null, ExtractMode.Extract, out _,
+            !IsOptimizedImage(fs, skipSectors), cancellationToken, null, skipSectors, null, progress, options,
+            filesystem);
+    }
+
+    /// <summary>
+    /// Stream+filesystem <see cref="UnpackImage(Stream, string, string?, CancellationToken, int?, UnpackOptions?, IProgress{ProgressInfo}?)"/>:
+    /// unpacks an already-open image into any <see cref="IFilesystem"/> destination
+    /// (TODO #7). The stream must be readable + seekable and is left open; files land
+    /// at the filesystem root.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name for messages.</param>
+    /// <param name="filesystem">Destination filesystem receiving the unpacked tree.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="skipSectors">Optional skip before the XISO filesystem begins.</param>
+    /// <param name="options">Optional resume options (<see cref="UnpackOptions.SkipExisting"/>).</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="filesystem"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="imageStream"/> is not readable + seekable.
+    /// </exception>
+    public static int UnpackImage(
+        Stream imageStream,
+        string imageName,
+        IFilesystem filesystem,
+        CancellationToken cancellationToken = default,
+        int? skipSectors = null,
+        UnpackOptions? options = null,
+        IProgress<ProgressInfo>? progress = null)
+    {
+        ArgumentNullException.ThrowIfNull(filesystem);
+        if (skipSectors < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value,
+                "Skip sectors must be non-negative.");
+        }
+
+        return DecodeXisoCore(imageStream, imageName, null, ExtractMode.Extract, out _,
+            !IsOptimizedImage(imageStream, skipSectors), cancellationToken, null, skipSectors, null, progress,
+            options, filesystem);
     }
 
     /// <summary>
@@ -1403,6 +1540,11 @@ public static class XisoReader
     /// <summary>
     /// Shared engine behind both <c>DecodeXiso</c> overloads. The path overload
     /// opens (and owns) the stream; the public stream overload validates it.
+    /// The trailing <c>filesystem</c> parameter (extract mode) redirects the whole
+    /// unpack into an <see cref="IFilesystem"/> destination — files land at its root
+    /// via <see cref="IFilesystem.CreateFile"/>/<see cref="IFilesystem.CreateDirectory"/>
+    /// with no working-directory changes; <c>null</c> keeps the legacy
+    /// working-directory-based extraction.
     /// </summary>
     private static int DecodeXisoCore(
         Stream imageStream,
@@ -1416,7 +1558,8 @@ public static class XisoReader
         int? skipSectors = null,
         int? prependSectors = null,
         IProgress<ProgressInfo>? progress = null,
-        UnpackOptions? unpackOptions = null)
+        UnpackOptions? unpackOptions = null,
+        IFilesystem? filesystem = null)
     {
         outIsoPath = null;
         var repair = false;
@@ -1466,7 +1609,9 @@ public static class XisoReader
 
         // Change into the output directory only after the image verified successfully,
         // so an invalid image can never leave the process working directory modified.
-        if (mode == ExtractMode.Extract && outputPath != null)
+        // A custom destination filesystem replaces the chdir entirely: its root is
+        // materialized instead, then everything is created relative to it.
+        if (mode == ExtractMode.Extract && outputPath != null && filesystem == null)
         {
             cwd = Directory.GetCurrentDirectory();
             try
@@ -1485,6 +1630,10 @@ public static class XisoReader
                 throw;
             }
         }
+        else if (mode == ExtractMode.Extract && filesystem != null)
+        {
+            filesystem.CreateDirectory("/");
+        }
 
         var isoName = shortName ?? name;
 
@@ -1497,7 +1646,7 @@ public static class XisoReader
             {
                 Logger.Log($"{(mode == ExtractMode.Extract ? "extracting" : "listing")} {name}:\n\n");
 
-                if (mode == ExtractMode.Extract && outputPath == null)
+                if (mode == ExtractMode.Extract && outputPath == null && filesystem == null)
                 {
                     try
                     {
@@ -1553,9 +1702,9 @@ public static class XisoReader
                     try
                     {
                         TraverseXiso(fs, null, ((long)rootDirSect * Constants.SectorSize) + discLseek,
-                            buf, mode, ref avlRoot, llCompat, discLseek,
+                            filesystem != null ? "/" : buf, mode, ref avlRoot, llCompat, discLseek,
                             unpackOptions, cancellationToken, progress,
-                            null, rootDirSize);
+                            null, rootDirSize, 0, filesystem);
                     }
                     catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
                                                mode == ExtractMode.Extract &&

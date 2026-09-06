@@ -203,6 +203,7 @@ writes the current Windows FILETIME (8 bytes, little-endian) into the header are
 | `bool SkipExisting { get; set; }` | Skip destinations already holding a same-size file (`skip: <path>`) |
 | `bool ContinueOnError { get; set; }` | Record per-file failures and continue; the run ends with the `ErrExtractFailed` summary |
 | `bool ShouldSkip(string destPath, long fileSize)` | The size-match predicate (never skips unresolvable paths) |
+| `bool ShouldSkip(string destPath, long fileSize, IFilesystem filesystem)` | Same predicate against any destination filesystem (disk, memory, custom) |
 
 `public static class XisoPaths` — full-path comparison behind the input==output
 guards (an output must never silently overwrite one of its inputs). Case sensitivity
@@ -219,6 +220,31 @@ input (`CompressToCso` / `DecompressToIso`, split `.N.cso` parts onto the source
 even earlier — before any prompt, move, or write — and additionally covers rewrite
 `-o` onto the input or its `.old` backup. The only same-path write allowed is the
 explicit in-place one: `TrimXiso(input, input)` (safe `SetLength` truncation).
+
+## IFilesystem destinations
+
+`public interface IFilesystem` — write-only destination abstraction for extraction
+(TODO #7, xdvdfs #166). `UnpackImage` (see
+[filesystem-based overloads](api-xisoreader.md#filesystem-based-overloads-todo-7-xdvdfs-166))
+lands the unpacked tree in any implementation; `UnpackOptions.ShouldSkip` probes it
+for resume.
+
+| Member | Description |
+|---|---|
+| `Stream CreateFile(string path)` | Create/truncate the file for writing; the stream's final length must match the image's reported size |
+| `void CreateDirectory(string path)` | Create the directory and all parents; root is a no-op |
+| `bool FileExists(string path)` | `true` when a file (not a directory) exists — resume probe |
+| `long FileLength(string path)` | Byte length, or `-1` when unresolvable (never skipped, reports as truncated) |
+
+Paths are destination-root-relative, forward-slash separated, case-insensitive
+(`"sub/file.bin"`, `"/sub/file.bin"`, `"sub\\file.bin"` all denote the same file);
+`""`/`"/"` denotes the root. Implementations need not be thread-safe.
+
+| Implementation | Behavior |
+|---|---|
+| `LocalFilesystem(string? root = null)` | Local disk under `root` (cwd-relative when `null`, matching the legacy unpack). `static LocalFilesystem Instance` is the shared cwd-relative instance. File creation matches the reader's direct path (`FileMode.Create`, 64 KiB buffered, no sharing); parent directories are **not** auto-created |
+| `MemoryFilesystem` | In-process memory: files are byte snapshots committed when the unpack closes each stream (visible to `FileExists`/`FileLength`/`ReadAllBytes`/`FileNames` immediately after). Re-creating a file truncates it; parent directories are materialized automatically. `ReadAllBytes(path)`, `FileNames`, `DirectoryNames` for inspection |
+| custom | Zip archives, network uploads, GUI preview panes — implement the four members |
 
 ## Records
 

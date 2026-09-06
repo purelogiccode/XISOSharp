@@ -127,6 +127,35 @@ using var image = new MemoryStream(File.ReadAllBytes("game.iso"));
 int rc = XisoReader.UnpackImage(image, "game.iso", "./out"); // stream stays open
 ```
 
+### Filesystem-based overloads (TODO #7, xdvdfs #166)
+
+`UnpackImage` also takes any `IFilesystem` destination in place of `outputPath`:
+
+```csharp
+public static int UnpackImage(
+    string isoPath, IFilesystem filesystem,
+    CancellationToken cancellationToken = default, int? skipSectors = null,
+    UnpackOptions? options = null, IProgress<ProgressInfo>? progress = null)
+
+public static int UnpackImage(
+    Stream imageStream, string imageName, IFilesystem filesystem,
+    CancellationToken cancellationToken = default, int? skipSectors = null,
+    UnpackOptions? options = null, IProgress<ProgressInfo>? progress = null)
+```
+
+Files land at the **filesystem root** (no ISO-named subdirectory, no process
+working-directory changes), with the same per-file hardening as the disk path:
+skip-existing resume probes the destination filesystem, truncated data and
+failed writes throw the same `ExtractFileException` errors, and zero-byte files
+are created. See [`IFilesystem`](api-utilities.md#ifilesystem-destinations) for
+the `LocalFilesystem` / `MemoryFilesystem` implementations and the path rules.
+
+```csharp
+var memory = new MemoryFilesystem();
+XisoReader.UnpackImage("game.iso", memory);
+byte[] defaultXbe = memory.ReadAllBytes("default.xbe"); // never touched the disk
+```
+
 ## Resume interrupted unpacks
 
 ```csharp
@@ -135,6 +164,7 @@ public sealed class UnpackOptions
     public bool SkipExisting { get; set; }
     public bool ContinueOnError { get; set; }
     public bool ShouldSkip(string destPath, long fileSize);
+    public bool ShouldSkip(string destPath, long fileSize, IFilesystem filesystem);
 }
 ```
 

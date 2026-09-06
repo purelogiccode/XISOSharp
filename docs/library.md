@@ -128,6 +128,11 @@ XisoReader.List("game.iso", llCompat: false);
 using var image = new MemoryStream(File.ReadAllBytes("game.iso"));
 XisoReader.UnpackImage(image, "game.iso", "./out");
 
+// In-memory unpack (no disk writes; also LocalFilesystem / custom IFilesystem)
+var memory = new MemoryFilesystem();
+XisoReader.UnpackImage("game.iso", memory);
+byte[] xbe = memory.ReadAllBytes("default.xbe");
+
 // Create with exclusions (WaxGlob {0}/{n} also works for build-image)
 XisoWriter.CreateXiso(
     "source_dir", "./out", null, null, out var isoPath, "game.iso", null,

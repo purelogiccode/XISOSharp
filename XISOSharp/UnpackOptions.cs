@@ -73,12 +73,26 @@ public sealed class UnpackOptions
     /// </summary>
     public bool ShouldSkip(string destPath, long fileSize)
     {
+        return ShouldSkip(destPath, fileSize, LocalFilesystem.Instance);
+    }
+
+    /// <summary>
+    /// Filesystem-aware <see cref="ShouldSkip(string, long)"/>: probes
+    /// <paramref name="filesystem"/> instead of the local disk, so resume works
+    /// for every destination (<see cref="LocalFilesystem"/>,
+    /// <see cref="MemoryFilesystem"/>, custom stores; TODO #7).
+    /// </summary>
+    /// <param name="destPath">Destination path in the filesystem's own path form.</param>
+    /// <param name="fileSize">Byte size the image reports for the file.</param>
+    /// <param name="filesystem">Destination filesystem to probe.</param>
+    public bool ShouldSkip(string destPath, long fileSize, Interfaces.IFilesystem filesystem)
+    {
         if (!SkipExisting || string.IsNullOrWhiteSpace(destPath) || fileSize < 0)
             return false;
 
         try
         {
-            return File.Exists(destPath) && new FileInfo(destPath).Length == fileSize;
+            return filesystem.FileExists(destPath) && filesystem.FileLength(destPath) == fileSize;
         }
         catch (IOException)
         {

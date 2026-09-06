@@ -155,6 +155,44 @@ using var image = new MemoryStream(File.ReadAllBytes("game.iso"));
 int rc = XisoReader.UnpackImage(image, "game.iso", "./out"); // stream stays open
 ```
 
+#### Destination filesystems (`IFilesystem`, TODO #7)
+
+`UnpackImage` also accepts any `IFilesystem` destination in place of `outputPath`:
+
+```csharp
+public static int UnpackImage(
+    string isoPath, IFilesystem filesystem,
+    CancellationToken cancellationToken = default, int? skipSectors = null,
+    UnpackOptions? options = null, IProgress<ProgressInfo>? progress = null)
+
+public static int UnpackImage(
+    Stream imageStream, string imageName, IFilesystem filesystem,
+    CancellationToken cancellationToken = default, int? skipSectors = null,
+    UnpackOptions? options = null, IProgress<ProgressInfo>? progress = null)
+```
+
+Files land at the **filesystem root** (no ISO-named subdirectory, no process
+working-directory changes) with the same per-file hardening as the disk path:
+skip-existing resume probes the destination filesystem, truncated data and failed
+writes throw the same `ExtractFileException` errors. Paths are
+destination-root-relative, `/`-separated, case-insensitive; `FileLength` returns
+`-1` for unresolvable paths (never skipped, reports as truncated).
+
+Built-in implementations:
+
+| Type | Behavior |
+|------|----------|
+| `LocalFilesystem(string? root = null)` | Local disk under `root` (cwd-relative when `null`, matching the legacy unpack); `LocalFilesystem.Instance` is the shared cwd-relative instance; parent directories are not auto-created |
+| `MemoryFilesystem` | In-process byte snapshots committed when the unpack closes each file's stream; re-creating a file truncates it; parents auto-created; inspect via `ReadAllBytes(path)`, `FileNames`, `DirectoryNames` |
+
+```csharp
+var memory = new MemoryFilesystem();
+XisoReader.UnpackImage("game.iso", memory);
+byte[] defaultXbe = memory.ReadAllBytes("default.xbe"); // never touched the disk
+
+XisoReader.UnpackImage("game.iso", new LocalFilesystem(@"D:\games\out")); // disk, no chdir
+```
+
 #### `VerifyXiso`
 
 Low-level method that validates the XISO header and returns root directory metadata. Most users should use `DecodeXiso` instead.
