@@ -40,6 +40,10 @@ Highlights:
 | Skip/prepend sectors | `SkipPrependSectorsTests.cs` |
 | Unpack resume (`UnpackOptions.SkipExisting`, cancel+resume, copy-out) | `UnpackResumeTests.cs` |
 | Table writer (offsets, encoding, byte-identity with writer output) | `DirectoryEntryTableWriterTests.cs` |
+| Snapshot (`Fixtures/test_fixture.iso` byte-identity; extract/rewrite SHA-256 per file) | `XisoSnapshotTests.cs` |
+| Corruption resilience (truncated tables, bad pointers, huge sizes, bad names, >4 GB) | `XisoCorruptionResilienceTests.cs` |
+| Reader gap-closers (multi-sector tables, disc probes, device errors, sentinels) | `XisoCoverageTests.cs` |
+| Legacy interop (extract-xiso 2.7.1 images via `llCompat` extract/list/rewrite) | `XisoLegacyInteropTests.cs` |
 | In-place patching (replace/add, table moves, errors, backup, `.xbe`, `--copy-in` CLI) | `XisoPatcherTests.cs` |
 | Extraction robustness (truncation errors, file context, `--continue-on-error`, CLI) | `ExtractRobustnessTests.cs` |
 | XISO → ZAR conversion (extract round-trip, zstd ratio gate, reader hashes, `removeUpdate`, offsets, `zarchive.exe` interop) | `XisoZarConvertTests.cs` |
@@ -56,7 +60,13 @@ Conventions:
   operations temporarily change the current directory.
 - Tests create their own temp directories and clean up afterwards.
 - A snapshot-style round-trip (create → extract → compare SHA-256 of every file) is
-  the standard correctness pattern.
+  the standard correctness pattern, locked by the checked-in reference
+  `XISOSharp.Tests/Fixtures/test_fixture.iso` (built deterministically with
+  `fileTime: 0`; regenerate with `XISO_UPDATE_FIXTURE=1 dotnet test --filter
+  FullyQualifiedName~RegenerateFixtureIso_WhenRequested`).
+- Reference-binary interop tests (`CisoSplitInteropTests.cs`,
+  `XisoLegacyInteropTests.cs`) silently pass when the binary under `References/`
+  is absent, so CI and clean checkouts stay green.
 
 ## TestData fixtures
 
@@ -167,6 +177,14 @@ dotnet test XISOSharp.Tests --collect:"XPlat Code Coverage"
 
 The report (`coverage.cobertura.xml`) is uploaded as a CI artifact from the
 `ubuntu-latest` job.
+
+Measured line coverage (coverlet, full suite): `XisoReader.cs` 95.9%,
+`XisoWriter.cs` 86.6%, `AvlTree.cs` 100% — all above the 85% target. The
+remaining reader gaps are unreachable-by-construction defenses: the
+per-table entry-count caps (offsets are 16-bit, so >65536 distinct positions
+cannot occur), mid-copy I/O races, ACL-only permission paths, volume
+re-checks after a successful entry lookup, and legacy degenerate table
+shapes neither writer emits.
 
 ## Benchmarks
 

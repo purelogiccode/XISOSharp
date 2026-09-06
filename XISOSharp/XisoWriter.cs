@@ -399,6 +399,12 @@ public static class XisoWriter
             Logger.LogErr($"Error: permission denied: {xisoPath}\n{ex.Message}\n");
             err = 1;
         }
+        catch (XisoFileTooLargeException)
+        {
+            // A >4 GB source file cannot be represented (32-bit size field):
+            // fail loudly instead of returning success for a partial image.
+            throw;
+        }
         catch (IOException ex)
         {
             Logger.LogErr($"Error: cannot write to {xisoPath}: {ex.Message}\n");
@@ -758,6 +764,13 @@ public static class XisoWriter
             {
                 Logger.LogErr($"warning: directory not found: {entryName}, skipping.\n");
                 filesSkipped++;
+            }
+            catch (XisoFileTooLargeException)
+            {
+                // A >4 GB source file cannot be represented (32-bit size field):
+                // fail the run instead of silently dropping the file (the
+                // IOException catch below would otherwise skip it).
+                throw;
             }
             catch (IOException ex)
             {

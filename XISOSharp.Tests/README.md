@@ -21,6 +21,10 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **XisoReader.ComputeFileHash** — MD5 and SHA-256 per-file hashing
 - **XisoReader.ComputeDirectoryHashes** — batch hashing of all files in a directory
 - **XisoReader.AuditXiso** — deep integrity audit (header, tree, sectors, cycles)
+- **Snapshot** — `Fixtures/test_fixture.iso`: deterministic create (`fileTime: 0`) is byte-identical across runs and to the reference; extract/rewrite round-trips match SHA-256 per file
+- **Corruption resilience** — truncated tables, manipulated header pointers, out-of-image extents, `uint.MaxValue` sizes, invalid filenames, >4 GB inputs fail fast with named errors
+- **Reader gap-closers** — multi-sector tables, disc-layout probes, block-device errors, sentinel shapes (line coverage: `XisoReader` 95.9%, `XisoWriter` 86.6%, `AvlTree` 100%)
+- **Legacy interop** — images created by reference extract-xiso 2.7.1 round-trip through `llCompat` extract/list/rewrite
 
 ## Running Tests
 
