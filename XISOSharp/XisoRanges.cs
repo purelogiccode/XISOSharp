@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.Text;
 
 namespace XISOSharp;
 
@@ -336,7 +335,9 @@ public static class XisoRanges
             }
         }
 
-        var name = Encoding.ASCII.GetString(nameBuf);
+        // Xbox names are WINDOWS_1252 bytes; decode via Latin1 like every other
+        // reader path (ASCII would corrupt bytes >= 0x80 into '?').
+        var name = Latin1Encoding.Instance.GetString(nameBuf);
         var isDirectory = (attributes & 0x10) != 0;
         var entryOffset = entrySector * SectorSize;
         var entryPath = dirPath.Length > 0 ? dirPath + "/" + name : name;

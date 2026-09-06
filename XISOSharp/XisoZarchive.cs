@@ -1,4 +1,3 @@
-using System.Text;
 using ZARSharp;
 using ZARSharp.Pipeline;
 
@@ -243,7 +242,9 @@ public static class XisoZarchive
             }
         }
 
-        var name = Encoding.ASCII.GetString(nameBytes);
+        // Xbox names are WINDOWS_1252 bytes; decode via Latin1 like every other
+        // reader path (ASCII would corrupt bytes >= 0x80 into '?').
+        var name = Latin1Encoding.Instance.GetString(nameBytes);
         var isDir = (attrs & 0x10) != 0;
         var entryOffset = (long)entrySector * Constants.SectorSize;
 
