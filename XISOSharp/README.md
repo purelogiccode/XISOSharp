@@ -195,7 +195,7 @@ XisoReader.UnpackImage("game.iso", new LocalFilesystem(@"D:\games\out")); // dis
 
 #### Image explorer (`XisoExplorer`, TODO #11)
 
-UI-agnostic explorer over one plain `.iso` (the engine behind the Tester's
+UI-agnostic explorer over one `.iso` or `.cso` image (the engine behind the Tester's
 Explore tab). The constructor probes the volume eagerly; every operation opens
 and closes the image, so instances are safe for concurrent background use.
 Paths are image-internal, `/`-separated, case-insensitive.

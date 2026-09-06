@@ -15,7 +15,7 @@ A WPF desktop application for regression testing the XISOSharp C# implementation
 - **Explore** — browse an image's contents in-process (no extraction): `TreeView`
   with lazy directory loading, volume summary, per-node details, per-node
   **Copy out** (files and directories), **SHA-256** display, and an **XEX2 info
-  panel** for executables (plain `.iso` images only)
+  panel** for executables (`.iso` or `.cso` images)
 - **Side-by-side comparison** with the original `extract-xiso.exe` (included)
 
 ## Building

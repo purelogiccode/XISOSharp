@@ -23,14 +23,15 @@ public sealed record ExplorerNode(
     byte Attributes);
 
 /// <summary>
-/// UI-agnostic explorer over one XISO image (TODO #11, xdvdfs #120): open/load
-/// lifecycle, directory navigation, per-node copy-out, hashing, and XEX parsing
-/// behind the <see cref="XisoReader"/> primitives the WPF Tester's Explore tab
-/// binds to. Stateless per call (every operation opens and closes the image),
-/// so instances are safe for concurrent use from background workers.
-/// Only plain <c>.iso</c> XISO images are supported — the random-access
-/// primitives open the file directly and do not route <c>.cso</c> containers
-/// through the block-device layer.
+/// UI-agnostic explorer over one XISO image (TODO #11, xdvdfs #120; CSO support
+/// TODO #19): open/load lifecycle, directory navigation, per-node copy-out,
+/// hashing, and XEX parsing behind the <see cref="XisoReader"/> primitives the
+/// WPF Tester's Explore tab binds to. Stateless per call (every operation opens
+/// and closes the image), so instances are safe for concurrent use from
+/// background workers.
+/// Plain <c>.iso</c> images and CISO containers (single <c>.cso</c> or split
+/// <c>.1.cso</c> part sets) are supported — every operation routes through
+/// <see cref="XisoReader.OpenImageStream"/> and the stream reader overloads.
 /// </summary>
 public sealed class XisoExplorer
 {
@@ -38,7 +39,7 @@ public sealed class XisoExplorer
     /// Opens the image at <paramref name="isoPath"/> for exploration, probing
     /// the volume descriptor eagerly so a bad image fails fast.
     /// </summary>
-    /// <param name="isoPath">Path to the XISO image.</param>
+    /// <param name="isoPath">Path to the XISO image (plain <c>.iso</c> or <c>.cso</c>).</param>
     /// <exception cref="ArgumentException">Thrown when <paramref name="isoPath"/> is empty.</exception>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     /// <exception cref="XisoFormatException">Thrown when the file is not a valid XISO image.</exception>
@@ -49,7 +50,18 @@ public sealed class XisoExplorer
             throw new ArgumentException("Image path must not be empty.", nameof(isoPath));
 
         IsoPath = isoPath;
-        Volume = XisoReader.GetVolumeInfo(isoPath);
+        try
+        {
+            using var stream = XisoReader.OpenImageStream(isoPath);
+            Volume = XisoReader.GetVolumeInfo(stream, isoPath);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException)
+        {
+            // A corrupt CISO container fails in the block-device layer before the
+            // volume probe runs; surface it under the documented contract.
+            throw new XisoFormatException($"Not a valid XISO: {isoPath}", ex);
+        }
+
         if (!Volume.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");
     }
@@ -73,7 +85,8 @@ public sealed class XisoExplorer
     public IReadOnlyList<ExplorerNode> ListChildren(string internalPath)
     {
         var path = Normalize(internalPath);
-        return XisoReader.ListDirectory(IsoPath, path)
+        using var stream = XisoReader.OpenImageStream(IsoPath);
+        return XisoReader.ListDirectory(stream, IsoPath, path)
             .Select(e => FromEntry(e, Combine(path, e.Name)))
             .ToArray();
     }
@@ -92,7 +105,8 @@ public sealed class XisoExplorer
             return new ExplorerNode("/", "/", IsDirectory: true, Size: 0,
                 Volume.RootDirSector, Attributes: 0);
 
-        var entry = XisoReader.GetEntryInfo(IsoPath, path);
+        using var stream = XisoReader.OpenImageStream(IsoPath);
+        var entry = XisoReader.GetEntryInfo(stream, IsoPath, path);
         return entry is null ? null : FromEntry(entry, path);
     }
 
@@ -120,7 +134,9 @@ public sealed class XisoExplorer
         CancellationToken cancellationToken = default,
         IProgress<ProgressInfo>? progress = null)
     {
-        XisoReader.CopyOut(IsoPath, Normalize(internalPath), destPath, options, cancellationToken, progress);
+        using var stream = XisoReader.OpenImageStream(IsoPath);
+        XisoReader.CopyOut(stream, IsoPath, Normalize(internalPath), destPath, options, cancellationToken,
+            progress);
     }
 
     /// <summary>
@@ -135,7 +151,8 @@ public sealed class XisoExplorer
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public string? ComputeHashHex(string internalPath, HashAlgorithmName algorithm)
     {
-        var hash = XisoReader.ComputeFileHash(IsoPath, Normalize(internalPath), algorithm);
+        using var stream = XisoReader.OpenImageStream(IsoPath);
+        var hash = XisoReader.ComputeFileHash(stream, IsoPath, Normalize(internalPath), algorithm);
         return hash is null ? null : Convert.ToHexString(hash);
     }
 
@@ -151,7 +168,8 @@ public sealed class XisoExplorer
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public XexInfo? GetXexInfo(string internalPath)
     {
-        return XisoReader.GetXexInfo(IsoPath, Normalize(internalPath));
+        using var stream = XisoReader.OpenImageStream(IsoPath);
+        return XisoReader.GetXexInfo(stream, IsoPath, Normalize(internalPath));
     }
 
     /// <summary>

@@ -134,7 +134,7 @@ var memory = new MemoryFilesystem();
 XisoReader.UnpackImage("game.iso", memory);
 byte[] xbe = memory.ReadAllBytes("default.xbe");
 
-// Explore an image in-process (no extraction; plain .iso only)
+// Explore an image in-process (no extraction; .iso or .cso)
 var explorer = new XisoExplorer("game.iso");   // probes the volume, fails fast
 foreach (var node in explorer.ListChildren("/"))
     Console.WriteLine($"{(node.IsDirectory ? "dir " : "file")} {node.FullPath} ({node.Size} B)");

@@ -15,7 +15,7 @@ namespace XISOSharp;
 /// Splitting is a pure byte partition — every part holds a contiguous global
 /// byte range, so concatenation restores the image bit-for-bit. <see cref="Join"/>
 /// additionally probes the reassembled output with
-/// <see cref="XisoReader.GetVolumeInfo"/> and rejects it when the volume no
+/// <see cref="XisoReader.GetVolumeInfo(string)"/> and rejects it when the volume no
 /// longer parses (truncated/corrupt part sets); byte-level integrity across
 /// machines should still be confirmed with <c>checksum</c>/<c>validate</c>.
 /// Instances are not needed (all static); every call opens and closes its
@@ -231,7 +231,7 @@ public static class XisoSplitter
 
     /// <summary>
     /// Validates the image path/base pair shared by the split entries: path
-    /// presence plus a <see cref="XisoReader.GetVolumeInfo"/> probe. Returns
+    /// presence plus a <see cref="XisoReader.GetVolumeInfo(string)"/> probe. Returns
     /// the image length in bytes.
     /// </summary>
     /// <exception cref="ArgumentException">A path is null or empty.</exception>

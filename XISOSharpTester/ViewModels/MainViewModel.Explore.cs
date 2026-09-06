@@ -188,7 +188,7 @@ internal partial class MainViewModel
             var dlg = new OpenFileDialog
             {
                 Title = "Select XISO image to explore",
-                Filter = "XISO images (*.iso)|*.iso|All files (*.*)|*.*"
+                Filter = "XISO images (*.iso;*.cso)|*.iso;*.cso|All files (*.*)|*.*"
             };
             if (dlg.ShowDialog() == true)
             {

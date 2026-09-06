@@ -1840,6 +1840,21 @@ public static class XisoReader
                 Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
             });
 
+        return GetVolumeInfo(fs, isoPath);
+    }
+
+    /// <summary>
+    /// Stream overload of <see cref="GetVolumeInfo(string)"/>: probes an already-open
+    /// image (plain or CISO-backed) without throwing on validation errors. The stream
+    /// must be readable + seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name of the image (unused; kept for symmetry).</param>
+    /// <returns>Volume information including root directory location and disc format.</returns>
+    public static VolumeInfo GetVolumeInfo(Stream imageStream, string imageName = "memory")
+    {
+        _ = imageName;
+        var fs = imageStream;
         var fileLength = fs.Length;
         var totalSectors = fileLength / Constants.SectorSize;
 
@@ -2395,14 +2410,31 @@ public static class XisoReader
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public static IReadOnlyList<EntryInfo> ListDirectory(string isoPath, string internalPath = "/")
     {
-        using var fs = new FileStream(
-            isoPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
-            });
+        using var fs = OpenImageStream(isoPath);
+        return ListDirectory(fs, isoPath, internalPath);
+    }
 
-        var volInfo = GetVolumeInfo(isoPath);
+    /// <summary>
+    /// Stream overload of <see cref="ListDirectory(string, string)"/> over an
+    /// already-open image (plain or CISO-backed). The stream must be readable +
+    /// seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name of the image (used in error messages).</param>
+    /// <param name="internalPath">
+    /// Path within the ISO to list (e.g. <c>"/"</c> for root, <c>"/subdir"</c> for a subdirectory).
+    /// Use forward slashes as separators.
+    /// </param>
+    /// <returns>List of directory entries, or empty if the directory is empty.</returns>
+    /// <exception cref="XisoFormatException">Thrown when the image is not a valid XISO image.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the path does not exist in the image.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static IReadOnlyList<EntryInfo> ListDirectory(Stream imageStream, string imageName,
+        string internalPath = "/")
+    {
+        var fs = imageStream;
+        var isoPath = imageName;
+        var volInfo = GetVolumeInfo(fs);
         if (!volInfo.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");
 
@@ -2442,6 +2474,23 @@ public static class XisoReader
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public static EntryInfo? GetEntryInfo(string isoPath, string internalPath)
     {
+        using var fs = OpenImageStream(isoPath);
+        return GetEntryInfo(fs, isoPath, internalPath);
+    }
+
+    /// <summary>
+    /// Stream overload of <see cref="GetEntryInfo(string, string)"/> over an
+    /// already-open image (plain or CISO-backed). The stream must be readable +
+    /// seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name of the image (used in error messages).</param>
+    /// <param name="internalPath">Path within the image (e.g. <c>"/subdir/file.xbe"</c>).</param>
+    /// <returns>Entry information, or <c>null</c> if the path does not exist.</returns>
+    /// <exception cref="InvalidDataException">Thrown when the image is invalid.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static EntryInfo? GetEntryInfo(Stream imageStream, string imageName, string internalPath)
+    {
         if (string.IsNullOrEmpty(internalPath) || string.Equals(internalPath, "/", StringComparison.Ordinal))
             return null;
 
@@ -2455,7 +2504,7 @@ public static class XisoReader
 
         var entryName = segments[^1];
 
-        var entries = ListDirectory(isoPath, dirPath);
+        var entries = ListDirectory(imageStream, imageName, dirPath);
         return entries.FirstOrDefault(e =>
             string.Equals(e.Name, entryName, StringComparison.OrdinalIgnoreCase));
     }
@@ -2683,7 +2732,7 @@ public static class XisoReader
         return raw;
     }
 
-    private static void CheckTableBounds(FileStream fs, long fileLength, long tableStart, uint tableSize,
+    private static void CheckTableBounds(Stream fs, long fileLength, long tableStart, uint tableSize,
         string dirPath)
     {
         _ = fs;
@@ -2694,7 +2743,7 @@ public static class XisoReader
                 $"(size {tableSize}) points outside the image (length {fileLength}).");
     }
 
-    private static void CheckFileBounds(FileStream fs, long fileLength, long discLseek, EntryInfo entry,
+    private static void CheckFileBounds(Stream fs, long fileLength, long discLseek, EntryInfo entry,
         string entryPath)
     {
         _ = fs;
@@ -2790,21 +2839,43 @@ public static class XisoReader
         UnpackOptions? options = null, CancellationToken cancellationToken = default,
         IProgress<ProgressInfo>? progress = null)
     {
+        using var fs = OpenImageStream(isoPath);
+        CopyOut(fs, isoPath, internalPath, destPath, options, cancellationToken, progress);
+    }
+
+    /// <summary>
+    /// Stream overload of
+    /// <see cref="CopyOut(string, string, string, UnpackOptions?, CancellationToken, IProgress{ProgressInfo}?)"/>
+    /// over an already-open image (plain or CISO-backed). The stream must be
+    /// readable + seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name of the image (used in error messages).</param>
+    /// <param name="internalPath">Source path within the image.</param>
+    /// <param name="destPath">Destination path on the local filesystem.</param>
+    /// <param name="options">Optional resume options (see <see cref="UnpackOptions"/>).</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <exception cref="InvalidDataException">Thrown when the internal path does not exist.</exception>
+    /// <exception cref="ExtractFileException">
+    /// Thrown naming the entry, its sector, and expected vs actual bytes on
+    /// destination or data failures.
+    /// </exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static void CopyOut(Stream imageStream, string imageName, string internalPath, string destPath,
+        UnpackOptions? options = null, CancellationToken cancellationToken = default,
+        IProgress<ProgressInfo>? progress = null)
+    {
         cancellationToken.ThrowIfCancellationRequested();
-        var entry = GetEntryInfo(isoPath, internalPath);
+        var isoPath = imageName;
+        var fs = imageStream;
+        var entry = GetEntryInfo(fs, isoPath, internalPath);
         if (entry == null)
             throw new InvalidDataException($"Path not found in XISO: {internalPath}");
 
-        var volInfo = GetVolumeInfo(isoPath);
+        var volInfo = GetVolumeInfo(fs);
         if (!volInfo.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");
-
-        using var fs = new FileStream(
-            isoPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
-            });
 
         if (entry.IsDirectory)
         {
@@ -2893,7 +2964,7 @@ public static class XisoReader
         return XisoSplitter.Join(firstPartPath, outputPath, cancellationToken, progress);
     }
 
-    private static void CopyOutFile(FileStream fs, EntryInfo entry, string internalPath, string destPath,
+    private static void CopyOutFile(Stream fs, EntryInfo entry, string internalPath, string destPath,
         VolumeInfo volInfo, UnpackOptions? options = null, CancellationToken cancellationToken = default,
         IProgress<ProgressInfo>? progress = null)
     {
@@ -2973,7 +3044,7 @@ public static class XisoReader
         }
     }
 
-    private static void CopyOutDirectory(FileStream fs, string isoPath, string internalPath, string destPath,
+    private static void CopyOutDirectory(Stream fs, string imageName, string internalPath, string destPath,
         VolumeInfo volInfo, UnpackOptions? options = null, CancellationToken cancellationToken = default,
         int depth = 0, IProgress<ProgressInfo>? progress = null)
     {
@@ -2985,7 +3056,7 @@ public static class XisoReader
                 $"invalid TOC entry at '{internalPath}': maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
         Directory.CreateDirectory(destPath);
 
-        var entries = ListDirectory(isoPath, internalPath);
+        var entries = ListDirectory(fs, imageName, internalPath);
 
         foreach (var entry in entries)
         {
@@ -2997,7 +3068,7 @@ public static class XisoReader
             {
                 if (entry.IsDirectory)
                 {
-                    CopyOutDirectory(fs, isoPath, entryInternalPath, entryDestPath, volInfo, options,
+                    CopyOutDirectory(fs, imageName, entryInternalPath, entryDestPath, volInfo, options,
                         cancellationToken, depth + 1, progress);
                 }
                 else
@@ -3029,7 +3100,28 @@ public static class XisoReader
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public static byte[]? ComputeFileHash(string isoPath, string internalPath, HashAlgorithmName algorithm)
     {
-        var entry = GetEntryInfo(isoPath, internalPath);
+        using var fs = OpenImageStream(isoPath);
+        return ComputeFileHash(fs, isoPath, internalPath, algorithm);
+    }
+
+    /// <summary>
+    /// Stream overload of <see cref="ComputeFileHash(string, string, HashAlgorithmName)"/>
+    /// over an already-open image (plain or CISO-backed). The stream must be
+    /// readable + seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name of the image (used in error messages).</param>
+    /// <param name="internalPath">File path within the image.</param>
+    /// <param name="algorithm">Hash algorithm to use.</param>
+    /// <returns>Hash bytes, or <c>null</c> if the file does not exist.</returns>
+    /// <exception cref="InvalidDataException">Thrown when the image is invalid or path is a directory.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static byte[]? ComputeFileHash(Stream imageStream, string imageName, string internalPath,
+        HashAlgorithmName algorithm)
+    {
+        var isoPath = imageName;
+        var fs = imageStream;
+        var entry = GetEntryInfo(fs, isoPath, internalPath);
         if (entry == null)
             return null;
 
@@ -3043,16 +3135,9 @@ public static class XisoReader
             return hasher.ComputeHash(Array.Empty<byte>());
         }
 
-        var volInfo = GetVolumeInfo(isoPath);
+        var volInfo = GetVolumeInfo(fs);
         if (!volInfo.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");
-
-        using var fs = new FileStream(
-            isoPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
-            });
 
         fs.Seek(((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek, SeekOrigin.Begin);
 
@@ -3139,20 +3224,35 @@ public static class XisoReader
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public static XexInfo? GetXexInfo(string isoPath, string internalPath)
     {
-        var entry = GetEntryInfo(isoPath, internalPath);
+        using var fs = OpenImageStream(isoPath);
+        return GetXexInfo(fs, isoPath, internalPath);
+    }
+
+    /// <summary>
+    /// Stream overload of <see cref="GetXexInfo(string, string)"/> over an
+    /// already-open image (plain or CISO-backed). The stream must be readable +
+    /// seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name of the image (used in error messages).</param>
+    /// <param name="internalPath">Path of the <c>.xex</c> file within the image.</param>
+    /// <returns>
+    /// The parsed <see cref="XexInfo"/>, or <c>null</c> when the path does not exist,
+    /// points to a directory, or the file is not an XEX2 executable.
+    /// </returns>
+    /// <exception cref="XisoFormatException">Thrown when the image is not a valid XISO image.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static XexInfo? GetXexInfo(Stream imageStream, string imageName, string internalPath)
+    {
+        var isoPath = imageName;
+        var fs = imageStream;
+        var entry = GetEntryInfo(fs, isoPath, internalPath);
         if (entry?.IsDirectory != false || entry.FileSize < 0x18)
             return null;
 
-        var volInfo = GetVolumeInfo(isoPath);
+        var volInfo = GetVolumeInfo(fs);
         if (!volInfo.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");
-
-        using var fs = new FileStream(
-            isoPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
-            });
 
         fs.Seek(((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek, SeekOrigin.Begin);
 
@@ -3310,7 +3410,7 @@ public static class XisoReader
     /// offset outside the image, or an absurd entry count — previously an
     /// infinite loop growing <c>entries</c> until OOM.
     /// </exception>
-    private static List<EntryInfo> ReadDirectoryEntries(FileStream fs, long dirStart, string contextPath)
+    private static List<EntryInfo> ReadDirectoryEntries(Stream fs, long dirStart, string contextPath)
     {
         var entries = new List<EntryInfo>();
         var stack = new Stack<long>();

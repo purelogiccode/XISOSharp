@@ -114,6 +114,9 @@ All return 0 on success.
 `Extract`, `UnpackImage`, `List`, `Tree`, `DecodeXiso`, and `DecodeXisoAsync`
 each have a `Stream` overload taking `(Stream imageStream, string imageName, ...)`
 in place of the input path — for memory, network, or embedded-resource images.
+The random-access primitives have them too (TODO #19): `GetVolumeInfo`,
+`ListDirectory`, `GetEntryInfo`, `CopyOut`, `ComputeFileHash`, and `GetXexInfo` —
+these are what `XisoExplorer` uses to support `.cso` inputs.
 The stream must be readable and seekable (`ArgumentException` otherwise) and is
 left open; `imageName` (typically the file name) drives output naming and
 messages. `IsOptimizedImage` has a matching `Stream` overload (position
@@ -244,6 +247,7 @@ the output path.
 
 ```csharp
 public static VolumeInfo GetVolumeInfo(string isoPath)
+public static VolumeInfo GetVolumeInfo(Stream imageStream, string imageName = "memory") // TODO #19
 ```
 
 Reads the volume descriptor **without throwing** on validation errors. Returns a
@@ -262,8 +266,10 @@ Reads the volume descriptor **without throwing** on validation errors. Returns a
 
 ```csharp
 public static IReadOnlyList<EntryInfo> ListDirectory(string isoPath, string internalPath = "/")
+public static IReadOnlyList<EntryInfo> ListDirectory(Stream imageStream, string imageName, string internalPath = "/") // TODO #19
 public static IReadOnlyList<string> ListDirectoryFlat(string isoPath, string internalPath = "/")
 public static EntryInfo? GetEntryInfo(string isoPath, string internalPath)
+public static EntryInfo? GetEntryInfo(Stream imageStream, string imageName, string internalPath) // TODO #19
 ```
 
 - `internalPath` uses forward slashes, e.g. `"/"`, `"/subdir"`, `"/subdir/file.bin"`.
@@ -303,6 +309,9 @@ public record SectorLayout(VolumeInfo Volume, IReadOnlyList<FileSectorExtent> En
 
 ```csharp
 public static void CopyOut(string isoPath, string internalPath, string destPath,
+    UnpackOptions? options = null, CancellationToken cancellationToken = default,
+    IProgress<ProgressInfo>? progress = null)
+public static void CopyOut(Stream imageStream, string imageName, string internalPath, string destPath, // TODO #19
     UnpackOptions? options = null, CancellationToken cancellationToken = default,
     IProgress<ProgressInfo>? progress = null)
 ```
@@ -350,6 +359,8 @@ fail with `XisoFormatException` before anything is written. CLI: `--copy-in
 ```csharp
 public static byte[]? ComputeFileHash(
     string isoPath, string internalPath, HashAlgorithmName algorithm)
+public static byte[]? ComputeFileHash( // TODO #19
+    Stream imageStream, string imageName, string internalPath, HashAlgorithmName algorithm)
 
 public static IReadOnlyList<(string Path, byte[] Hash)> ComputeDirectoryHashes(
     string isoPath, string internalPath, HashAlgorithmName algorithm)
@@ -362,6 +373,7 @@ public static IReadOnlyList<(string Path, byte[] Hash)> ComputeDirectoryHashes(
 
 ```csharp
 public static XexInfo? GetXexInfo(string isoPath, string internalPath)
+public static XexInfo? GetXexInfo(Stream imageStream, string imageName, string internalPath) // TODO #19
 ```
 
 Parses the Xbox 360 executable (XEX2) header of a `.xex` file inside the image. All
