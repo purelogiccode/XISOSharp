@@ -141,6 +141,7 @@ foreach (var node in explorer.ListChildren("/"))
 explorer.CopyOut("/docs/readme.txt", "./readme.txt");
 string? sha256 = explorer.ComputeHashHex("/default.xbe", HashAlgorithmName.SHA256);
 XexInfo? xex = explorer.GetXexInfo("/default.xex");
+XbeInfo? xbe = explorer.GetXbeInfo("/default.xbe"); // OG-Xbox cert, no reference tool parses this
 
 // Split for FATX (4 GiB default cap) and reassemble (CLI: split / join)
 IReadOnlyList<string> parts = XisoReader.SplitXiso("game.iso", "game", 4L * 1024 * 1024 * 1024);
@@ -170,6 +171,17 @@ Console.WriteLine($"Valid: {info.IsValid}, root sector: {info.RootDirSector}");
 // Audit (flags reserved 0x48 + empty 0x0000)
 AuditResult audit = XisoReader.AuditXiso("game.iso");
 Console.WriteLine(audit.IsValid ? "PASS" : $"FAIL: {string.Join("; ", audit.Issues)}");
+
+// Repair patchable issues in place (keeps .old backup; dryRun previews)
+RepairResult repaired = XisoReader.Repair("game.iso");
+
+// Rebuild reachable entries from a damaged image into a fresh audited .iso
+SalvageResult salvaged = XisoReader.Salvage("game.iso"); // -> game.salvaged.iso
+
+// Executable + disc identity (no reference tool covers XBE)
+XbeInfo? cert = XisoReader.GetXbeInfo("game.iso", "/default.xbe");
+Console.WriteLine($"{cert?.TitleName} [{cert?.TitleId:X8}]");
+Console.WriteLine($"Layout: {XisoReader.GetVolumeInfo("game.iso").DiscFormat}");
 
 // Block device (in-memory golden fixture)
 using var dev = new MemoryBlockDevice(File.ReadAllBytes("game.iso"));

@@ -16,16 +16,34 @@ XISOSharp.Cli [options] -c <dir> [name] [-c <dir> [name]] ...
 | Flag | Description |
 |---|---|
 | `-c <dir> [name]` | Create xiso from file(s) starting in `<dir>` |
+| `--pack <input> [name]` | Pack a directory into an ISO, or repack an existing ISO in place |
+| `-x` | Extract xiso(s) (the default mode) |
+| `--unpack <file> [dest]` | Unpack the whole image (auto-named `./<game>/` when dest omitted) |
 | `--copy-out <iso> <path> <dest>` | Copy a file or directory out of an xiso |
 | `--copy-in <iso> <host> <path>` | Copy a host file into an xiso (replace or add; writes `<iso>.old` backup unless `--no-backup`) |
 | `-i <file> [path]` | Show volume info and directory entry metadata |
 | `-l` | List files in xiso(s) |
-| `--md5 <file> [path]` | Compute MD5 hash of file(s) in xiso |
-| `-r` | Rewrite xiso(s) as optimized xiso(s) |
-| `--sha256 <file> [path]` | Compute SHA-256 hash of file(s) in xiso |
 | `-t` | List all files recursively with sizes (tree) |
+| `--ls <file> [path]` | Flat directory listing (names only) |
+| `--md5 <file> [path]` | Compute MD5 hash of file(s) in xiso |
+| `--sha256 <file> [path]` | Compute SHA-256 hash of file(s) in xiso |
+| `--xex-info <file> <path>` | Xbox 360 XEX2 header of an executable in the image |
+| `--xbe-info <file> <path>` | Original-Xbox XBEH header + certificate of an executable in the image |
 | `-V <file1.xiso> ...` | Deep-audit xiso(s): validate header, tree, sectors |
-| `-x` | Extract xiso(s) (the default mode) |
+| `--repair <file>` | Fix audit-flagged issues in place (`.old` backup; `--dry-run` previews) |
+| `--salvage <file>` | Rebuild reachable entries into a fresh audited `.iso` (`--repair-out` overrides output) |
+| `-r` | Rewrite xiso(s) as optimized xiso(s) |
+| `validate <src> <out>` | Validate conversion between two images (+ `--validate*` report/strict/checksums) |
+| `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum |
+| `split` / `join` | Split a plain ISO into `<base>.1.iso`… parts / reassemble them |
+| `--filetime <image>` / `--set-filetime <image> <value>` | Show / set the FILETIME volume field |
+| `--batch <dir>` | Process all `.iso` files in `<dir>` (extract/list/tree/rewrite/audit) |
+| `compress` / `decompress` (`cso`/`uncso`) | CISO v2 LZ4 (default) / v1 DEFLATE round-trip, incl. split `.N.cso` |
+| `build-image` / `image-spec` | xdvdfs-parity ordered packing from globs / TOML spec |
+| `--video` / `--random` / `--seed` / `--wipe` / `--trim` / `--petrify` / `--update` / `--zar` | Redump archival verbs (+ `--all`/`--best`/`--compress` aliases) |
+| `rebuild` | Rebuild a lossless Redump image from components |
+
+Full flag reference (every option, exit code, matrix): [CLI Reference](../docs/cli.md).
 
 ### Options
 
@@ -46,12 +64,22 @@ XISOSharp.Cli [options] -c <dir> [name] [-c <dir> [name]] ...
 These commands are not present in the original C tool:
 
 - **`-t`** — Tree listing with file sizes and totals
-- **`-i`** — Volume metadata and directory entry inspection
-- **`-V`** — Deep integrity audit (header, tree, sector bounds, cycle detection)
+- **`-i`** — Volume metadata and directory entry inspection (incl. friendly disc-layout identity)
+- **`-V`** — Deep integrity audit (header, tag, tree, sector bounds, cycle detection)
+- **`--repair` / `--dry-run`** — In-place fix of audit-flagged issues (`.old` backup)
+- **`--salvage` / `--repair-out`** — Rebuild reachable entries from a damaged image into a fresh audited `.iso`
 - **`-o`** — Custom output filename for rewrite mode
+- **`--unpack` / `--batch`** — Whole-image unpack; sorted bulk processing
+- **`--pack`** — Directory → create, ISO → rewrite
 - **`--copy-out`** — Selective file/directory extraction
 - **`--copy-in`** — Patch a host file into an image in place
 - **`--md5` / `--sha256`** — Per-file hash computation
+- **`--xex-info` / `--xbe-info`** — Executable header parsing (no reference tool covers XBE)
+- **`--skip-existing` / `--continue-on-error`** — Resume and per-file robustness
+- **`checksum` / `validate`** — Deterministic SHA3-256 checksums; conversion validation + JSON reports
+- **`split` / `join`** — FATX-friendly part splitting and reassembly
+- **Redump archival** — `--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`rebuild`
+- **xdvdfs parity** — `build-image`/`image-spec`, CISO compress/decompress, `BlockDevice` random-access
 
 ## License
 

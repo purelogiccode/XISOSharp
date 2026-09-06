@@ -9,9 +9,9 @@ v2.7.1 — the tool and library for creating, extracting, listing, auditing, and
 Xbox ISO (XISO / XDVDFS) disc images. It is a direct, byte-identical port of the original
 C codebase into idiomatic managed C# — no native dependencies, no P/Invoke.
 
-This documentation set is the repository wiki **and** the GitHub Pages site. It covers the CLI, the .NET library API,
+This documentation set is served as the GitHub Pages site. It covers the CLI, the .NET library API,
 the XISO on-disk format, Xbox disc formats (XGD1/XGD2/XGD3/Hybrid, Redump images), archival workflows, and `xdvdfs` parity.
-The site is rendered with **Docsify** — a fixed **left sidebar** is provided by [`_sidebar.md`](_sidebar.md) and [`index.html`](index.html) (Pages) and mirrored as [`wiki/_Sidebar.md`](../wiki/_Sidebar.md) (Wiki).
+The site is rendered with **Docsify** — a fixed **left sidebar** is provided by [`_sidebar.md`](_sidebar.md) and [`index.html`](index.html).
 
 ---
 
@@ -59,15 +59,16 @@ The site is rendered with **Docsify** — a fixed **left sidebar** is provided b
 
 - **Create** XISO images from a directory, with glob-based exclusion (`-X` via `GlobMatcher`/`WaxGlob`)
 - **Extract** full images, or single files/directories with `--copy-out` / `--unpack` (auto `llCompat`); resume interrupted runs with `--skip-existing` (`skip: <path>`); patch single files back in with `--copy-in` (keeps `.old` backup)
-- **List** (`-l`), recursive **tree** (`-t`), volume **info** (`-i`), **hash** (`--md5` / `--sha256`), per-image **SHA3-256** `checksum`
+- **List** (`-l`), recursive **tree** (`-t`), volume **info** (`-i`), **hash** (`--md5` / `--sha256`), per-image **SHA3-256** `checksum`, XEX2 (`--xex-info`) and XBE (`--xbe-info`) executable info
 - **Rewrite** images into an optimized AVL layout (`-r`) + **validate** (`validate` / `--validate*`); outputs colliding with their inputs are refused (input==output guard)
 - **Audit** (`-V`) deep integrity: header (5 offsets), tag `31337`, tree cycles, sector bounds, reserved `0x48`, empty `0x0000`
+- **Repair** (`--repair`) fixable issues in place (reserved bits, tag, separators; `.old` backup, `--dry-run`) and **salvage** (`--salvage`) rebuilds of damaged images into fresh audited `.iso` — no reference tool does either
 - **Disc coverage** — RAW `0x0`, **GLOBAL/XGD2** `0x0FD90000`, **XGD3** `0x02080000`, **Hybrid** `0x89D80000`, **XGD1** `0x18300000` (native) + arbitrary `--skip-sectors`/`--prepend-sectors`
 - **Redump archival (XboxKit parity):** `--video`, `--random` (filler), `--seed` (XGD1 PRNG brute-force), `--wipe`, `--trim`, `--petrify` (skeleton + SHA-1), `--update` (XGD3 `su…`), `--zar` (ZArchive/zstd), `--security-sectors <sectors.txt>`, aliases `--all`/`--best`/`--compress`, verb `rebuild` for lossless Redump ↔ XISO
 - **xdvdfs parity:** `build-image` ordered `host/**:image/{0|1}` (`!` + `{n}` captures, `xdvdfs.toml`, `--dry-run`), `image-spec from`, **CISO** `compress`/`decompress` (DEFLATE v1 `0x80000000` + LZ4 v2, `align` 0/1/2) with `CisoBlockDevice` random-access, `IBlockDevice` (`File`/`Memory`/`Offset`/`Ciso`)
 - Automatic `.xbe` **media-enable patching** (Boyer–Moore `E8 CA FD FF FF 85 C0 7D → EB`)
 - Async APIs, `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FileProgress`/`FinishedPacking`, with `FileAdded` also per written file and per-chunk `FileProgress` in extract mode), `CancellationToken` throughout
-- Multi-targets **.NET 8, .NET 9, and .NET 10**; strong-named; trim/AOT compatible; **left sidebar** on Pages & Wiki
+- Multi-targets **.NET 8, .NET 9, and .NET 10**; strong-named; trim/AOT compatible; **left sidebar** on Pages
 
 ## Quick start
 

@@ -19,6 +19,8 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 - [AuditXiso](#auditxiso)
 - [Repair](#repair)
 - [Salvage](#salvage)
+- [Split / Join](#split--join)
+- [FILETIME](#filetime)
 - [Disc offset probing](#disc-offset-probing)
 
 ## Method index
@@ -48,6 +50,8 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 | `AuditXiso` | Deep integrity audit |
 | `Repair` | Fix safely-patchable issues in place (`.old` backup, dry-run) |
 | `Salvage` | Rebuild a readable image from a corrupt one (repack + re-audit) |
+| `SplitXiso` / `SplitXisoHalves` / `JoinSplitXiso` | Split a plain ISO into sector-aligned parts and reassemble them |
+| `GetFileTime` / `SetFileTime` | Read/write the FILETIME volume-descriptor field |
 
 ## VerifyXiso
 
@@ -569,6 +573,45 @@ overwritten and a missing parent directory is created. Returns
 `SalvageResult` (`Copied`, `Skipped`, `OutputPath`, `OutputIssues`). CLI:
 `--salvage <file>` (`--repair-out <path>` overrides the output; existing
 files follow the `-y`/`-n` convention).
+
+## Split / Join
+
+```csharp
+public static IReadOnlyList<string> SplitXiso(string isoPath, string outputBase, long partSizeBytes,
+    CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
+public static IReadOnlyList<string> SplitXisoHalves(string isoPath, string outputBase,
+    CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
+public static string JoinSplitXiso(string firstPartPath, string outputPath,
+    CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
+// facades over XisoSplitter.Split / SplitHalves / Join (TODO #17, xdvdfs #97)
+```
+
+Splits a plain `.iso` into FATX-friendly parts and reassembles them (the
+plain-ISO counterpart to CSO `--ciso-split`). Parts are a pure byte partition
+at sector-aligned cut points (`<base>.1.iso`, `<base>.2.iso`, …), so
+concatenation restores the image bit-for-bit. `SplitXisoHalves` cuts into two
+halves; both return the part paths in join order. Inputs are pre-validated,
+the joined output is post-validated, existing targets are refused, and partial
+outputs are removed on failure/cancel. CLI: `split` / `join`.
+
+## FILETIME
+
+```csharp
+public static ulong GetFileTimeRaw(string isoPath, int? skipSectors = null)
+public static DateTimeOffset GetFileTime(string isoPath, int? skipSectors = null)
+public static ulong GetFileTimeRaw(IBlockDevice dev, string isoName = "memory", int? skipSectors = null)
+public static DateTimeOffset GetFileTime(IBlockDevice dev, string isoName = "memory", int? skipSectors = null)
+public static void SetFileTime(string isoPath, ulong fileTime, int? skipSectors = null)
+public static void SetFileTime(string isoPath, DateTimeOffset dateTime, int? skipSectors = null)
+```
+
+Read and write the Windows FILETIME field of the volume descriptor
+(xdvdfs-compatible: `0` is 1601-01-01, the deterministic-image value). The
+`ulong` overloads work with raw values; the `DateTimeOffset` overloads convert
+(see `FileTimeHelper`). CLI: `--filetime <image>` (ISO-8601 + raw) and
+`--set-filetime <image> <value>` (ISO-8601, decimal raw, `0x` hex, `'now'`,
+or `'0'`); `--file-time <value>` fixes the stamp at create time (`-c`,
+`--pack`, `build-image`).
 
 ## Disc offset probing
 

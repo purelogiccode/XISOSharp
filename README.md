@@ -11,8 +11,8 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 | Project | Description |
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
-| [XISOSharp.Cli](XISOSharp.Cli/) | CLI `XISOSharp.Cli` (`net10.0`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 20 extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1234 tests) — snapshot `test_fixture.iso` + corruption resilience + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + extract-xiso 2.7.1 legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
+| [XISOSharp.Cli](XISOSharp.Cli/) | CLI `XISOSharp.Cli` (`net10.0`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 35+ extra modes |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1234 tests) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + extract-xiso 2.7.1 legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
 | ZARSharp.Tests | **Moved** to the sibling `../CSharp_ZARSharp` repo (own solution + CI) — xUnit suite for the pure-C# ZArchive/zstd port |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | ZARSharp.Benchmarks | **Moved** to the sibling `../CSharp_ZARSharp` repo — BenchmarkDotNet for ZARSharp only |
@@ -21,7 +21,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 
 ## Documentation
 
-Full docs live in [`docs/`](docs/README.md) — also served as a **Docsify site with a left sidebar** at [`docs/index.html`](docs/index.html) (GitHub Pages) and mirrored in [`wiki/`](wiki/Home.md):
+Full docs live in [`docs/`](docs/README.md) — also served as a **Docsify site with a left sidebar** at [`docs/index.html`](docs/index.html) (GitHub Pages):
 
 - [Getting Started](docs/getting-started.md) — install, first extract/create/list
 - [CLI Reference](docs/cli.md) — every flag, verb, exit code
@@ -33,7 +33,7 @@ Full docs live in [`docs/`](docs/README.md) — also served as a **Docsify site 
 - [Redump & Disc Layouts](docs/redump-workflows.md) — XGD offsets incl. hybrid `0x89D80000`
 - [Library Overview](docs/library.md) · [XisoReader](docs/api-xisoreader.md) · [XisoWriter](docs/api-xisowriter.md) · [Utilities](docs/api-utilities.md)
 
-> **Left menu:** open `docs/index.html` locally or via Pages — [`docs/_sidebar.md`](docs/_sidebar.md) (mirrored as [`wiki/_Sidebar.md`](wiki/_Sidebar.md)) is the sidebar.
+> **Left menu:** open `docs/index.html` locally or via Pages — [`docs/_sidebar.md`](docs/_sidebar.md) is the sidebar.
 
 ## Install
 
@@ -113,11 +113,12 @@ XISOSharp.Cli -r game.iso                    # rewrite optimized (skips if alrea
 XISOSharp.Cli -r -D game.iso                 # + delete .old
 XISOSharp.Cli -c --file-time 0 ./game_files det.iso  # deterministic: byte-identical output
 
-# Copy-out / hash / XEX / batch
+# Copy-out / hash / XEX / XBE / batch
 XISOSharp.Cli --copy-out game.iso /media ./media_out
 XISOSharp.Cli --copy-in game.iso ./my-config.ini /config.ini  # patch one file in (keeps .old backup)
 XISOSharp.Cli --md5 game.iso                 # or --sha256
 XISOSharp.Cli --xex-info game360.iso /default.xex
+XISOSharp.Cli --xbe-info game.iso /default.xbe  # title ID/name, media, region
 XISOSharp.Cli --batch -d ./out ./isos        # all *.iso sorted
 XISOSharp.Cli --batch --batch-recursive -r ./isos
 
@@ -128,6 +129,22 @@ XISOSharp.Cli --skip-existing --copy-out game.iso /media ./media_out
 
 # Safety: an -o that points back at the input (or its .old backup) is refused (exit 1)
 XISOSharp.Cli -r -o game.iso game.iso        # Error: ... is the same file as the input
+```
+
+### Audit, repair & salvage (no reference tool does this)
+
+```bash
+# Diagnose first: header, tag, full tree walk, sector bounds, cycles, names
+XISOSharp.Cli -V game.iso                    # Result: PASS, or FAIL + issue list
+
+# Fixable in place (reserved bits, missing tag, separators in names; keeps .old)
+XISOSharp.Cli --repair game.iso
+XISOSharp.Cli --dry-run --repair game.iso    # preview only, changes nothing
+XISOSharp.Cli --repair --no-backup game.iso  # skip the .old backup
+
+# Truncated / structurally damaged: rebuild what is still reachable
+XISOSharp.Cli --salvage game.iso             # -> game.salvaged.iso (source untouched)
+XISOSharp.Cli --salvage --repair-out fixed.iso game.iso
 ```
 
 ### Redump & disc offsets
@@ -200,7 +217,7 @@ Exit codes: `0` success/`-v`/`-h`/`validate` pass, `1` usage/I/O, `2` validation
 
 ## Using the Library
 
-All in `XISOSharp` namespace (`XISOSharp.Core`). Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), safety types (`UnpackOptions`, `XisoPaths`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
+All in `XISOSharp` namespace (`XISOSharp.Core`). Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), repair types (`XisoRepairer`, `XisoSalvager`), explorer/split/validate (`XisoExplorer`, `XisoSplitter`, `XisoValidator`, `XisoPatcher`), safety types (`UnpackOptions`, `XisoPaths`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `RepairResult`, `SalvageResult`, `XexInfo`, `XbeInfo`, `ValidationResult`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
 
 ### Extract / list / info
 
@@ -256,6 +273,36 @@ XisoValidator.WriteReport(vr, "src.iso", "out.iso", "report.json");
 // XEX2 (Xbox 360)
 XexInfo? xex = XisoReader.GetXexInfo("game360.iso", "/default.xex");
 Console.WriteLine($"{xex?.TitleId:X8} entry 0x{xex?.EntryPoint:X8} region {xex?.Region}");
+```
+
+### Repair, salvage & executable info (no reference tool does this)
+
+```csharp
+// Audit, then fix what is safely patchable in place (keeps game.iso.old)
+AuditResult audit = XisoReader.AuditXiso("game.iso");
+if (!audit.IsValid)
+{
+    RepairResult rep = XisoReader.Repair("game.iso"); // reserved bits, tag, separators
+    Console.WriteLine($"fixed {rep.Fixed.Count}, remaining {rep.Remaining.Count}");
+}
+
+// Truncated / structurally damaged: rebuild every reachable entry into a
+// fresh image (source only read, never written; CISO input allowed)
+SalvageResult salv = XisoReader.Salvage("game.iso"); // -> game.salvaged.iso
+SalvageResult salv2 = XisoReader.Salvage("game.iso", "fixed.iso");
+Console.WriteLine($"carried {salv.Copied.Count}, dropped {salv.Skipped.Count}, pass: {salv.Success}");
+
+// XBE (original Xbox): header + certificate of an executable inside the image
+XbeInfo? xbe = XisoReader.GetXbeInfo("game.iso", "/default.xbe");
+Console.WriteLine($"{xbe?.TitleName} [{xbe?.TitleId:X8}] media 0x{xbe?.AllowedMedia:X8}");
+
+// Split / join FATX-friendly parts (xdvdfs #97)
+IReadOnlyList<string> parts = XisoReader.SplitXiso("game.iso", "game", 4L * 1024 * 1024 * 1024);
+string rejoined = XisoReader.JoinSplitXiso(parts[0], "rejoined.iso");
+
+// FILETIME volume descriptor (xdvdfs-compatible semantics)
+DateTimeOffset stamped = XisoReader.GetFileTime("game.iso");
+XisoReader.SetFileTime("game.iso", DateTimeOffset.UtcNow);
 ```
 
 ### Create / rewrite

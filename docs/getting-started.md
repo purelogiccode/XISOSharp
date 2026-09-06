@@ -187,4 +187,4 @@ See [Build-Image](xdvdfs-compat.md#build-image) · [Compression](compression.md)
 - [XISO Format](xiso-format.md) — empty-dir `0x0000` sentinel + reserved bits
 - [FAQ](faq.md) — common questions
 
-> **Docs site:** open `docs/index.html` (left sidebar via `_sidebar.md`) or `wiki/Home.md` on GitHub Wiki — both share the same menu.
+> **Docs site:** open `docs/index.html` (left sidebar via `_sidebar.md`).

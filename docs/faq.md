@@ -23,7 +23,9 @@ continuously verify SHA-256 equality of outputs.
 
 **Which disc formats are supported?**
 
-RAW (bare XISO), GLOBAL, XGD2, XGD3, and XGD1 — detected automatically. Redump images
+RAW (bare XISO), GLOBAL, XGD2, XGD3, XGD2-Hybrid, and XGD1 — detected
+automatically and reported by friendly name (`VolumeInfo.DiscFormat`, the
+`-i` `Disc Format:` line). Redump images
 with a video partition are supported via `--skip-sectors` / `--prepend-sectors` (see
 [Redump & Disc Layouts](redump-workflows.md)).
 
@@ -80,6 +82,22 @@ Files already on disk with matching sizes are skipped (`skip: <path>`); missing 
 short files are written. XISO stores no per-file timestamps, so size is the match
 signal. See [CLI Reference](cli.md#resume-interrupted-unpacks).
 
+**My image is corrupt. Can XISOSharp fix it?**
+
+Often, yes — diagnose with the deep audit, then repair or rebuild:
+
+```bash
+XISOSharp.Cli -V game.iso            # list every issue found
+XISOSharp.Cli --repair game.iso      # patchable issues, in place (+ .old backup)
+XISOSharp.Cli --salvage game.iso     # rebuild game.salvaged.iso from reachable entries
+```
+
+`--repair` fixes reserved attribute bits, a missing optimized tag, and path
+separators in filenames. `--salvage` carries every entry still reachable
+through truncation or structural damage into a fresh image and reports
+`Carried:` vs `Dropped:`. See
+[Troubleshooting](troubleshooting.md#recovering-a-corrupt-image--v---repair---salvage).
+
 **How do I replace a file inside an ISO without rebuilding it?**
 
 Use `--copy-in` (the reverse of `--copy-out`): it patches one host file into the
@@ -114,9 +132,9 @@ self-contained for any platform (see [Building](building.md#publish)).
 **Is the library thread-safe?**
 
 The engine uses thread-static scratch buffers, so independent operations on different
-threads are safe. However, `CreateXiso` walks the file system using
-`Directory.SetCurrentDirectory` internally — concurrent create operations in the same
-process are not supported.
+threads are safe. `CreateXiso` holds a process-wide `CreateLock` (it changes the
+working directory internally), so concurrent creates are safe but run one at a
+time; the working directory is always restored.
 
 **How do I suppress console output from the library?**
 
@@ -154,16 +172,27 @@ leading `0xFFFF` as "end of table".
 
 **Does XISOSharp support split ISOs (.iso.001, …)?**
 
-No — split-file images are out of scope. XISOSharp works with single-file images only.
+Numbered `.001`-style spans are out of scope, but XISOSharp splits and
+reassembles its own FATX-friendly parts: `split` cuts a plain ISO into
+sector-aligned `<base>.1.iso`, `<base>.2.iso`, … parts and `join` concatenates
+them back bit-for-bit (`XisoReader.SplitXiso` / `JoinSplitXiso`). Split CISO
+input (`.1.cso`, …) is read transparently everywhere.
 
 ## Misc
 
 **Where is the C# code different from the C original?**
 
-Only additively: new CLI flags (`-t`, `-i`, `-V`, `-o`, `--copy-out`, `--copy-in`,
-`--no-backup`, `--md5`,
-`--sha256`, `-X`, `--skip-sectors`, `--prepend-sectors`, `--skip-existing`,
-`validate`/`--validate*`), the input==output safety guard, misplaced-flag
+Only additively: new CLI flags and verbs (`-t`, `-i`, `-V`, `-o`, `--ls`,
+`--copy-out`, `--copy-in`, `--no-backup`, `--md5`, `--sha256`, `-X`,
+`--skip-sectors`, `--prepend-sectors`, `--skip-existing`,
+`--continue-on-error`, `--xex-info`, `--xbe-info`, `--filetime`,
+`--set-filetime`, `--repair`, `--dry-run`, `--salvage`, `--repair-out`,
+`validate`/`--validate*`, `split`/`join`, Redump verbs
+`--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`rebuild`
+and aliases, xdvdfs verbs `build-image`/`image-spec`/`compress`/`decompress`/`checksum`),
+the deep audit plus in-place repair and salvage rebuild (no reference tool
+does these), XBE/XEX executable parsing, friendly disc-layout identity, the
+input==output safety guard, misplaced-flag
 diagnostics, `-d` tolerance for batch-script artifacts (trailing separators,
 UNC paths, spaces), unpack resume (`UnpackOptions`), per-file extraction
 errors with entry/sector/size context plus `--continue-on-error`

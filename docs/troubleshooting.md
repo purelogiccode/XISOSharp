@@ -31,12 +31,38 @@ The header magic (`MICROSOFT*XBOX*MEDIA`) was not found at any probed offset.
 
 The header was found, but the trailing magic (second `MICROSOFT*XBOX*MEDIA` at
 `0x107EC` within the partition) does not match. The file is damaged or has been
-modified.
+modified. See [Recovering a corrupt image](#recovering-a-corrupt-image--v---repair---salvage)
+below.
 
 ### `root directory sector ... exceeds total sectors`
 
 The root directory table pointer is beyond the end of the file — truncated image or
-corrupt header.
+corrupt header. See [Recovering a corrupt image](#recovering-a-corrupt-image--v---repair---salvage)
+below.
+
+### Recovering a corrupt image (`-V` → `--repair` → `--salvage`)
+
+No reference tool repairs images — XISOSharp does. Diagnose first, then pick the
+matching verb:
+
+```bash
+XISOSharp.Cli -V game.iso          # deep audit: header, tag, tree, bounds, cycles
+XISOSharp.Cli --repair game.iso    # fixable in place (keeps game.iso.old backup)
+XISOSharp.Cli --salvage game.iso   # rebuild game.salvaged.iso from the rest
+```
+
+- `-V` lists every issue found. Fixable-in-place issues (reserved attribute
+  bits, a missing optimized tag, path separators in filenames) are exactly what
+  `--repair` patches, byte for byte, with a `<file>.old` backup first
+  (`--no-backup` skips it; `--dry-run` previews without changing anything).
+- Truncation and structural damage (cut-off data, broken offset chains, cycles,
+  depth overflows) cannot be patched — `--salvage` carries every still-reachable
+  entry into a fresh `game.salvaged.iso` (or `--repair-out <path>`), reports
+  `Carried:` vs `Dropped:`, and re-audits the result. The source is never
+  modified, and CISO input is accepted (it rebuilds a plain `.iso`).
+- An image with no readable header at all (`does not appear to be a valid xbox
+  iso image`) has nothing to repair with — re-dump or re-download it.
+  See [Repair](api-xisoreader.md#repair) and [Salvage](api-xisoreader.md#salvage).
 
 ### `filename '...' contains invalid character(s), aborting`
 
@@ -121,7 +147,9 @@ a truncated download or corrupt/torn image. The file fails with
 of being left short on disk; add `--continue-on-error` to salvage the rest.
 (Retired warning text from older builds:
 `WARNING: File <name> is truncated. Reported size: X bytes, read size: Y bytes!`.)
-See [CLI Reference](cli.md#extraction-robustness).
+See [CLI Reference](cli.md#extraction-robustness). For a systematically damaged
+image (not just one short file), audit and rebuild it instead — see
+[Recovering a corrupt image](#recovering-a-corrupt-image--v---repair---salvage).
 
 ## Permission and file-system issues
 

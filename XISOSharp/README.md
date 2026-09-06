@@ -30,6 +30,7 @@ A pure C# class library for creating, extracting, listing, and rewriting Xbox IS
   - [Listing Files in an XISO](#listing-files-in-an-xiso)
   - [Rewriting an XISO](#rewriting-an-xiso)
   - [Creating an XISO from a Directory](#creating-an-xiso-from-a-directory)
+- [Auditing, Repairing, and Salvaging an XISO](#auditing-repairing-and-salvaging-an-xiso)
   - [Progress Reporting](#progress-reporting)
   - [Cancellation Support](#cancellation-support)
   - [Suppressing Output](#suppressing-output)
@@ -63,6 +64,7 @@ The package is strong-name signed and includes XML documentation, Source Link fo
 | **GLOBAL** | Retail/Xbox Live discs | `0x0FD90000` |
 | **XGD2** | Xbox 360 XGD2 discs (same as GLOBAL) | `0x0FD90000` |
 | **XGD3** | Xbox 360 XGD3 discs | `0x02080000` |
+| **XGD2 Hybrid** | Xbox 360 hybrid discs | `0x89D80000` |
 | **XGD1** | Xbox 360 XGD1 discs | `0x18300000` |
 
 The library automatically detects the disc format during verification by probing each known offset.
@@ -381,6 +383,38 @@ public static List<(string Path, byte[] Hash)> ComputeDirectoryHashes(
 
 **Returns**: List of `(path, hash)` tuples for all files.
 
+#### `GetXexInfo`
+
+Parses the Xbox 360 XEX2 header of a `.xex` file inside the image: module flags, header size, entry point, image base/size, load address, region, allowed media types, media/title IDs, version, platform, disc number/count, encryption and compression types. Path and `Stream` overloads.
+
+```csharp
+public static XexInfo? GetXexInfo(string isoPath, string internalPath)
+public static XexInfo? GetXexInfo(Stream imageStream, string imageName, string internalPath)
+```
+
+**Returns**: An `XexInfo` record, or `null` when the entry is missing, a directory, or not an XEX2 executable.
+
+**Exceptions**:
+- `FileNotFoundException` — input file does not exist (path overload)
+- `XisoFormatException` — not a valid XISO image
+- `IOException` — read errors
+
+#### `GetXbeInfo`
+
+Parses the original-Xbox XBEH header + certificate of a `.xbe` file inside the image — no reference tool does this: base address, entry point, section count, init flags, cert size/timestamp, title ID and UTF-16 title name (+ 16 alternate title IDs), allowed-media, region, and ratings bitmasks, disc number, version. All multi-byte fields are read little-endian (cert address is a load pointer: file offset = address − base). Path and `Stream` overloads.
+
+```csharp
+public static XbeInfo? GetXbeInfo(string isoPath, string internalPath)
+public static XbeInfo? GetXbeInfo(Stream imageStream, string imageName, string internalPath)
+```
+
+**Returns**: An `XbeInfo` record, or `null` when the entry is missing, a directory, not an XBEH executable, or the certificate is out of range, below base, truncated, or the wrong size.
+
+**Exceptions**:
+- `FileNotFoundException` — input file does not exist (path overload)
+- `XisoFormatException` — not a valid XISO image
+- `IOException` — read errors
+
 #### `AuditXiso`
 
 Performs a deep integrity audit of an XISO image. Validates the header, walks the entire directory tree, checks sector bounds, detects cycles, validates filenames and attributes, and verifies the optimized tag.
@@ -431,6 +465,24 @@ public static SalvageResult Salvage(string sourcePath, string? outputPath = null
 - `FileNotFoundException` — source file does not exist
 - `XisoFormatException` — not a valid XISO image, or the tree root itself is unreachable
 - `IOException` — read or write errors, or repacking failed
+
+#### `GetFileTime` / `SetFileTime`
+
+Read and write the Windows FILETIME field of the volume descriptor (xdvdfs-compatible: `0` is 1601-01-01, the deterministic-image value). Path and `IBlockDevice` overloads for reading; the setter takes a raw value or a `DateTimeOffset` (see `FileTimeHelper`).
+
+```csharp
+public static ulong GetFileTimeRaw(string isoPath, int? skipSectors = null)
+public static DateTimeOffset GetFileTime(string isoPath, int? skipSectors = null)
+public static ulong GetFileTimeRaw(IBlockDevice dev, string isoName = "memory", int? skipSectors = null)
+public static DateTimeOffset GetFileTime(IBlockDevice dev, string isoName = "memory", int? skipSectors = null)
+public static void SetFileTime(string isoPath, ulong fileTime, int? skipSectors = null)
+public static void SetFileTime(string isoPath, DateTimeOffset dateTime, int? skipSectors = null)
+```
+
+**Exceptions**:
+- `FileNotFoundException` — input file does not exist (path overloads)
+- `XisoFormatException` — not a valid XISO image
+- `IOException` — read or write errors
 
 ---
 
@@ -829,6 +881,50 @@ Outcome of a salvage rebuild (`Salvage`).
 | `OutputIssues` | `IReadOnlyList<string>` | Re-audit issues of the rebuilt image. |
 | `Success` | `bool` | True when the rebuilt image passes the audit. |
 
+#### `XexInfo`
+
+Xbox 360 XEX2 header of an executable inside the image (`GetXexInfo`).
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `ModuleFlags` | `uint` | Module flags. |
+| `HeaderSize` | `uint` | Header size in bytes. |
+| `EntryPoint` | `uint` | Entry point address. |
+| `ImageBaseAddress` | `uint` | Image base address. |
+| `ImageSize` | `uint` | Image size in bytes. |
+| `LoadAddress` | `uint` | Load address. |
+| `Region` | `uint` | Region bitmask. |
+| `AllowedMediaTypes` | `uint` | Allowed-media bitmask. |
+| `MediaId` | `uint` | Media ID. |
+| `TitleId` | `uint` | Title ID. |
+| `Version` | `uint` | Version. |
+| `Platform` | `byte` | Platform byte. |
+| `DiscNumber` | `byte` | Disc number of a multi-disc title. |
+| `DiscCount` | `byte` | Total disc count. |
+| `EncryptionType` | `ushort` | Encryption type. |
+| `CompressionType` | `ushort` | File compression type (0 = none, 1 = basic, 2 = normal, 3 = delta). |
+
+#### `XbeInfo`
+
+Original-Xbox XBEH header + certificate of an executable inside the image (`GetXbeInfo`).
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `BaseAddress` | `uint` | Image base address (retail: `0x00010000`). |
+| `EntryPoint` | `uint` | Entry point address. |
+| `SectionCount` | `uint` | Number of section headers. |
+| `InitFlags` | `uint` | Init flags (e.g. `0x01` mount utility drive). |
+| `CertSize` | `uint` | Certificate size in bytes (retail: 464, `0x1D0`). |
+| `CertTimeDate` | `uint` | Certificate timestamp (raw DWORD). |
+| `TitleId` | `uint` | Title ID from the certificate. |
+| `TitleName` | `string` | Title name from the certificate (UTF-16, up to 40 chars). |
+| `AlternateTitleIds` | `uint[]` | Alternate title IDs (16 entries, usually zero). |
+| `AllowedMedia` | `uint` | Allowed-media bitmask (`0x01` hard disk … `0x80` media board). |
+| `GameRegion` | `uint` | Game-region bitmask (`0x01` NA, `0x02` JP, `0x04` RoW). |
+| `GameRatings` | `uint` | Game-ratings bitmask (ESRB etc.). |
+| `DiskNumber` | `uint` | Disc number of a multi-disc title. |
+| `Version` | `uint` | Game version from the certificate. |
+
 ---
 
 ### Classes
@@ -1055,6 +1151,28 @@ var result = XisoWriter.CreateXiso(
 
 if (result == 0)
     Console.WriteLine($"ISO created at: {isoPath}");
+```
+
+### Auditing, Repairing, and Salvaging an XISO
+
+No reference tool repairs images — these APIs diagnose and recover corrupt ones:
+
+```csharp
+using XISOSharp;
+
+// Diagnose: header, tag, full tree walk, sector bounds, cycles, names
+AuditResult audit = XisoReader.AuditXiso("game.iso");
+if (!audit.IsValid)
+    foreach (var issue in audit.Issues)
+        Console.WriteLine($"  - {issue}");
+
+// Repair what is safely patchable in place (keeps game.iso.old unless disabled)
+RepairResult repaired = XisoReader.Repair("game.iso");
+Console.WriteLine($"fixed {repaired.Fixed.Count}, remaining {repaired.Remaining.Count}");
+
+// Truncated / structurally damaged: rebuild reachable entries into a fresh image
+SalvageResult salvaged = XisoReader.Salvage("game.iso"); // -> game.salvaged.iso
+Console.WriteLine($"carried {salvaged.Copied.Count}, dropped {salvaged.Skipped.Count}");
 ```
 
 ### Progress Reporting

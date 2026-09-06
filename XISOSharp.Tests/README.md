@@ -29,6 +29,10 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Filesystem destinations** — `IFilesystem`/`LocalFilesystem`/`MemoryFilesystem` semantics, generic `UnpackImage` byte-parity with the legacy disk unpack, resume/continue-on-error/cancel/truncation through custom destinations
 - **Image explorer** — `XisoExplorer` load/navigate/copy-out/hash/XEX/path helpers over `.iso` and `.cso` (engine behind the Tester's Explore tab)
 - **Image splitting** — `XisoSplitter` split/halves/join round-trips, sector alignment, guards, progress/cancel, `split`/`join` CLI verbs
+- **In-place repair** — `XisoRepairer` class-C fixes (reserved bits, tag, separator renames + collision refusal), convergence, backup/dry-run semantics, CISO/split refusals, `--repair` CLI
+- **Salvage rebuild** — `XisoSalvager` carry/drop exactness (forged sizes/sectors, real truncation, cycles, depth gate), CISO→plain ISO, re-salvage stability, `--salvage`/`--repair-out` CLI
+- **Executable info** — `GetXexInfo`/`GetXbeInfo` path + stream overloads, all-fields parsing, cert bounds, explorer surface, CLI end-to-end
+- **Disc identity** — `VolumeInfo.DiscFormat` across RAW/GLOBAL/XGD3/Hybrid/XGD1/unknown layouts
 
 ## Running Tests
 

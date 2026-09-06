@@ -1,4 +1,4 @@
-<!-- docs/_sidebar.md — Docsify left menu (also mirrored as wiki/_Sidebar.md) -->
+<!-- docs/_sidebar.md — Docsify left menu -->
 - [Home](README.md)
 
 - **User Guide**
