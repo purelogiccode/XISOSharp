@@ -39,6 +39,51 @@ public record EntryInfo(
     ushort RightChildOffset);
 
 /// <summary>
+/// A single file's (or directory table's) on-disk extent: the sector range its
+/// bytes occupy. All sectors are partition-relative — the same numbering as
+/// <see cref="EntryInfo.StartSector"/> and <see cref="VolumeInfo.RootDirSector"/>
+/// (add <see cref="VolumeInfo.DiscLseek"/>/<c>2048</c> for the file-absolute sector).
+/// </summary>
+/// <param name="Path">Image-internal path with forward slashes (<c>"/file"</c>, <c>"/sub/nested"</c>).</param>
+/// <param name="IsDirectory">Whether this extent is a directory's table region rather than file data.</param>
+/// <param name="StartSector">Partition-relative first sector of the extent.</param>
+/// <param name="SectorCount">Sectors occupied (<c>ceil(FileSize / 2048)</c>); 0 for empty files.</param>
+/// <param name="FileSize">Byte size (table byte size for directories).</param>
+public record FileSectorExtent(
+    string Path,
+    bool IsDirectory,
+    uint StartSector,
+    uint SectorCount,
+    uint FileSize);
+
+/// <summary>
+/// A contiguous run of partition-relative sectors.
+/// </summary>
+/// <param name="StartSector">First sector of the run.</param>
+/// <param name="SectorCount">Number of sectors in the run.</param>
+public record SectorRange(
+    uint StartSector,
+    uint SectorCount);
+
+/// <summary>
+/// Explicit sector layout of an XISO image (xdvdfs #49): every file and directory
+/// table mapped to its sector range, plus the merged allocated ranges and the free
+/// gaps between them. Low-level disk analysis/debugging view; the free ranges are
+/// the allocator input for in-place patching (TODO #5).
+/// </summary>
+/// <param name="Volume">Volume descriptor metadata.</param>
+/// <param name="Entries">Per-file and per-directory extents, sorted by start sector.</param>
+/// <param name="UsedRanges">Merged allocated ranges (volume header + tables + file data).</param>
+/// <param name="FreeRanges">Unallocated gaps tiling <c>[0, TotalSectors)</c> with <paramref name="UsedRanges"/>.</param>
+/// <param name="TotalSectors">Partition sector count (<c>(FileLength - DiscLseek) / 2048</c>).</param>
+public record SectorLayout(
+    VolumeInfo Volume,
+    IReadOnlyList<FileSectorExtent> Entries,
+    IReadOnlyList<SectorRange> UsedRanges,
+    IReadOnlyList<SectorRange> FreeRanges,
+    long TotalSectors);
+
+/// <summary>
 /// Result of a deep integrity audit of an XISO image.
 /// </summary>
 /// <param name="IsValid">Whether the image passed all checks.</param>

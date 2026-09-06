@@ -121,6 +121,7 @@ internal static class Program
 
         int? skipSectors = null;
         int? prependSectors = null;
+        ulong? createFileTime = null;
         var excludePatterns = new List<string>();
         string? batchDir = null;
         var batchRecursive = false;
@@ -441,6 +442,21 @@ internal static class Program
                         {
                             Logger.LogErr(
                                 "Error: --prepend-sectors requires a non-negative integer (number of 2048-byte sectors)\n");
+                            return 1;
+                        }
+
+                        break;
+                    case "--file-time":
+                        if (i + 1 < args.Length &&
+                            FileTimeHelper.TryParseFileTime(args[i + 1], out var createRaw, out _))
+                        {
+                            createFileTime = createRaw;
+                            i++;
+                        }
+                        else
+                        {
+                            Logger.LogErr(
+                                "Error: --file-time requires a value (ISO-8601, decimal raw, 0x hex, 'now', or '0' for deterministic images)\n");
                             return 1;
                         }
 
@@ -1027,7 +1043,8 @@ internal static class Program
 
                     XisoWriter.CreateXiso(dir, outputDir, null, null, out _, isoName, null,
                         prependSectors: prependSectors,
-                        excludePatterns: excludePatterns.Count > 0 ? excludePatterns : null);
+                        excludePatterns: excludePatterns.Count > 0 ? excludePatterns : null,
+                        fileTime: createFileTime);
                 }
                 catch (UnauthorizedAccessException ex)
                 {
@@ -1760,6 +1777,7 @@ internal static class Program
         var mapRaw = new List<string>();
         string? metaOutput = null;
         var dryRun = false;
+        ulong? fileTime = null;
         var positionals = new List<string>();
 
         for (var i = optind; i < args.Length; i++)
@@ -1803,6 +1821,19 @@ internal static class Program
                      string.Equals(a, "--dryrun", StringComparison.OrdinalIgnoreCase))
             {
                 dryRun = true;
+            }
+            else if (string.Equals(a, "--file-time", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length ||
+                    !FileTimeHelper.TryParseFileTime(args[i + 1], out var raw, out _))
+                {
+                    Logger.LogErr(
+                        "Error: --file-time requires a value (ISO-8601, decimal raw, 0x hex, 'now', or '0' for deterministic images)\n");
+                    return 1;
+                }
+
+                fileTime = raw;
+                i++;
             }
             else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
@@ -2001,7 +2032,7 @@ internal static class Program
             if (!string.IsNullOrEmpty(outDir))
                 Directory.CreateDirectory(outDir);
             Logger.Log($"{Constants.Banner}");
-            return RemapFilesystem.BuildImage(sourceDir, outputIso, rules);
+            return RemapFilesystem.BuildImage(sourceDir, outputIso, rules, fileTime: fileTime);
         }
     }
 
@@ -3353,7 +3384,7 @@ internal static class Program
 
                                                        XDVDFS / Packing modes (ordered remapping):
 
-                                                      build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run]
+                                                      build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run] [--file-time <value>]
                                                                             Pack an image with ordered wax-glob remapping ({0} whole match, {1..n} per '*'/'**' capture, '!' exclusion). Examples:
                                                                               build-image -m "bin:/" -m "assets/**:/assets/{1}" ./src dist/final.xiso.iso
                                                                               build-image --dry-run -f xdvdfs.toml ./src
@@ -3387,6 +3418,12 @@ internal static class Program
                                                                           a video partition. Valid in create (-c) and
                                                                           rewrite (-r) mode. Combine with --skip-sectors
                                                                           for round-trip Redump-style reconstruction.
+                                                     --file-time <value>  Fixed FILETIME for the volume descriptor
+                                                                          (value: ISO-8601, decimal raw, 0x hex,
+                                                                          'now', '0'). '0' writes the xdvdfs
+                                                                          deterministic timestamp so identical input
+                                                                          produces byte-identical output. Valid in
+                                                                          create (-c), --pack, and build-image modes.
                                                      --skip-existing      In extract, --unpack, and --copy-out modes,
                                                                           skip files already on disk with matching
                                                                           sizes (logged as "skip: <path>") instead of

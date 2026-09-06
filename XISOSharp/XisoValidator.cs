@@ -203,8 +203,14 @@ public static class XisoValidator
     /// <summary>
     /// Recursively collects entries from a directory within an XISO image.
     /// </summary>
-    private static void CollectEntries(string isoPath, string currentPath, List<FileTreeEntry> entries)
+    private static void CollectEntries(string isoPath, string currentPath, List<FileTreeEntry> entries,
+        int depth = 0)
     {
+        // Hardening (#16): bound subdirectory descent — a corrupt subdir cycle
+        // previously recursed until the stack overflowed.
+        if (depth > Constants.MaxTocDepth)
+            throw new XisoFormatException(
+                $"invalid TOC entry at '{currentPath}': maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
         var dirEntries = XisoReader.ListDirectory(isoPath, currentPath);
 
         foreach (var entry in dirEntries)
@@ -214,7 +220,7 @@ public static class XisoValidator
             if (entry.IsDirectory)
             {
                 entries.Add(new FileTreeEntry(fullPath, 0, true));
-                CollectEntries(isoPath, fullPath, entries);
+                CollectEntries(isoPath, fullPath, entries, depth + 1);
             }
             else
             {

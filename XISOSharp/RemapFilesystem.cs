@@ -195,8 +195,17 @@ public static class RemapFilesystem
     /// <summary>
     /// Builds an XISO image with ordered remapping.
     /// </summary>
+    /// <param name="sourceDir">Host directory the remap rules are evaluated against.</param>
+    /// <param name="outputIsoPath">Full path of the ISO to create.</param>
+    /// <param name="rules">Ordered host→image mapping rules (first match wins).</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <param name="ct">Token to monitor for cancellation requests.</param>
+    /// <param name="fileTime">
+    /// Optional fixed FILETIME for the volume descriptor (deterministic output, TODO #2).
+    /// When <c>null</c> (default), the current time is written.
+    /// </param>
     public static int BuildImage(string sourceDir, string outputIsoPath, IReadOnlyList<RemapRule> rules,
-        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default, ulong? fileTime = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(sourceDir);
         ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
@@ -234,7 +243,8 @@ public static class RemapFilesystem
         // Delegate to XisoWriter remap writer (handles isRemap flag)
         try
         {
-            return XisoWriter.CreateFromRemapTree(avlRoot, outputIsoPath, progress: progress, cancellationToken: ct);
+            return XisoWriter.CreateFromRemapTree(avlRoot, outputIsoPath, progress: progress, cancellationToken: ct,
+                fileTime: fileTime);
         }
         catch (OperationCanceledException)
         {
@@ -275,6 +285,9 @@ public static class RemapFilesystem
             try
             {
                 entries = Directory.GetFileSystemEntries(fullDir);
+                // Deterministic (TODO #2): enumeration order feeds mapping order and
+                // first-wins duplicate handling, so sort ordinally.
+                Array.Sort(entries, StringComparer.Ordinal);
             }
             catch
             {
@@ -595,6 +608,9 @@ public static class RemapFilesystem
             try
             {
                 entries = Directory.GetFileSystemEntries(fullDir);
+                // Deterministic (TODO #2): encounter order shapes the AVL tree and
+                // first-wins duplicates, so sort ordinally.
+                Array.Sort(entries, StringComparer.Ordinal);
             }
             catch
             {

@@ -12,6 +12,7 @@ directory listing, auditing, hashing, and copy-out.
 - [DecodeXisoAsync](#decodexisoasync)
 - [GetVolumeInfo](#getvolumeinfo)
 - [ListDirectory / GetEntryInfo](#listdirectory--getentryinfo)
+- [GetSectorLayout](#getsectorlayout)
 - [CopyOut](#copyout)
 - [ComputeFileHash / ComputeDirectoryHashes](#computefilehash--computedirectoryhashes)
 - [AuditXiso](#auditxiso)
@@ -35,6 +36,7 @@ directory listing, auditing, hashing, and copy-out.
 | `ListDirectory` | Metadata of entries in a directory |
 | `ListDirectoryFlat` | Entry **names** of a directory (non-recursive convenience) |
 | `GetEntryInfo` | Metadata of one entry by path |
+| `GetSectorLayout` | Explicit sector layout: files/tables → sector ranges + used/free ranges |
 | `CopyOut` | Copy one file or directory out of an image |
 | `ComputeFileHash` | Hash one file (MD5/SHA-256/… via `HashAlgorithmName`) |
 | `ComputeDirectoryHashes` | Hash every file under a path |
@@ -239,6 +241,31 @@ public static EntryInfo? GetEntryInfo(string isoPath, string internalPath)
   `--ls` flag.
 - Throws `InvalidDataException` when a path does not exist.
 - `GetEntryInfo` returns `null` for a missing path.
+
+## GetSectorLayout
+
+```csharp
+public static SectorLayout GetSectorLayout(string isoPath)
+```
+
+Explicit sector layout (xdvdfs #49, TODO #4) — the library behind low-level disk
+analysis and the allocator input for in-place patching (TODO #5):
+
+```csharp
+public record FileSectorExtent(string Path, bool IsDirectory, uint StartSector, uint SectorCount, uint FileSize);
+public record SectorRange(uint StartSector, uint SectorCount);
+public record SectorLayout(VolumeInfo Volume, IReadOnlyList<FileSectorExtent> Entries,
+    IReadOnlyList<SectorRange> UsedRanges, IReadOnlyList<SectorRange> FreeRanges, long TotalSectors);
+```
+
+- All sectors are partition-relative (same numbering as `EntryInfo.StartSector`).
+- `Entries`: one extent per file plus one per directory table (`IsDirectory`,
+  `FileSize` = table byte size), sorted by start sector. Empty files appear with
+  `SectorCount` 0.
+- `UsedRanges`: merged allocated ranges (volume header + tables + file data).
+- `FreeRanges`: unallocated gaps; used + free tile `[0, TotalSectors)` exactly.
+- Throws `XisoFormatException` on invalid images and on corrupt tables
+  (out-of-image extents, cycles) with `invalid TOC entry` messages.
 
 ## CopyOut
 

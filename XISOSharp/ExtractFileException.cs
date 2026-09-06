@@ -129,6 +129,18 @@ public sealed class ExtractFileException : ExtractErrorException
             $"could not create output directory: {inner.Message}", innerException: inner);
     }
 
+    /// <summary>
+    /// Directory table is structurally corrupt (TODO #16): cycle, child offset
+    /// outside the table/image, absurd entry count, or excessive nesting. The
+    /// bad subtree is skipped under <c>UnpackOptions.ContinueOnError</c>.
+    /// </summary>
+    internal static ExtractFileException ForToc(string internalPath, string destPath, uint startSector,
+        long tableSize, Exception inner)
+    {
+        return new ExtractFileException(ExtractError.ErrInvalidToc, internalPath, destPath, startSector, tableSize,
+            inner.Message, innerException: inner);
+    }
+
     /// <summary>Write failed mid-copy (disk full, device removed).</summary>
     internal static ExtractFileException ForWrite(string internalPath, string destPath, uint startSector,
         long fileSize, long bytesRead, Exception inner)

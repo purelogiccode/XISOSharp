@@ -111,6 +111,7 @@ XISOSharp.Cli --pack ./game_files            # dir → create
 XISOSharp.Cli --pack game.iso                # iso → rewrite (keeps .old)
 XISOSharp.Cli -r game.iso                    # rewrite optimized (skips if already in!xiso)
 XISOSharp.Cli -r -D game.iso                 # + delete .old
+XISOSharp.Cli -c --file-time 0 ./game_files det.iso  # deterministic: byte-identical output
 
 # Copy-out / hash / XEX / batch
 XISOSharp.Cli --copy-out game.iso /media ./media_out

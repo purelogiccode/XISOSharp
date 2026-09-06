@@ -9,6 +9,8 @@ three passes.
 - [Rewrite mode](#rewrite-mode)
 - [Exclusion patterns](#exclusion-patterns)
 - [Progress reporting](#progress-reporting)
+- [SectorAllocator](#sectorallocator)
+- [Deterministic output](#deterministic-output)
 
 ## CreateXiso / PackFromDirectory
 
@@ -19,7 +21,8 @@ public static int PackFromDirectory(
     IReadOnlyList<string>? excludePatterns = null,
     ProgressCallback? progressCallback = null,
     CancellationToken cancellationToken = default,
-    IProgress<ProgressInfo>? progress = null)
+    IProgress<ProgressInfo>? progress = null,
+    ulong? fileTime = null)
 
 public static async Task<int> PackFromDirectoryAsync(
     string sourceDirectory,
@@ -27,7 +30,8 @@ public static async Task<int> PackFromDirectoryAsync(
     IReadOnlyList<string>? excludePatterns = null,
     ProgressCallback? progressCallback = null,
     CancellationToken cancellationToken = default,
-    IProgress<ProgressInfo>? progress = null)
+    IProgress<ProgressInfo>? progress = null,
+    ulong? fileTime = null)
 ```
 
 `PackFromDirectory` is the convenience form of `CreateXiso` for packing a directory
@@ -47,7 +51,8 @@ public static int CreateXiso(
     CancellationToken cancellationToken = default,
     int? prependSectors = null,
     IReadOnlyList<string>? excludePatterns = null,
-    IProgress<ProgressInfo>? progress = null)
+    IProgress<ProgressInfo>? progress = null,
+    ulong? fileTime = null)
 ```
 
 | Parameter | Meaning |
@@ -63,6 +68,7 @@ public static int CreateXiso(
 | `prependSectors` | Reserve `N` zero-filled sectors before the filesystem (Redump layouts) |
 | `excludePatterns` | Glob patterns of files/directories to omit (create mode only) |
 | `progress` | Structured progress channel — `IProgress<ProgressInfo>` events (counts, per-entry additions, completion). See [Progress reporting](#progress-reporting) |
+| `fileTime` | Fixed FILETIME for the volume descriptor; `null` (default) = current time, or the preserved source timestamp in rewrite mode. See [Deterministic output](#deterministic-output) |
 
 Returns 0 on success, 1 on error (permission, I/O, or any exception while writing —
 errors are logged and converted to the return code).
@@ -83,7 +89,8 @@ public static async Task<(int Result, string? OutIsoPath)> CreateXisoAsync(
     CancellationToken cancellationToken = default,
     int? prependSectors = null,
     IReadOnlyList<string>? excludePatterns = null,
-    IProgress<ProgressInfo>? progress = null)
+    IProgress<ProgressInfo>? progress = null,
+    ulong? fileTime = null)
 ```
 
 Async wrapper returning the result code and the output path.
@@ -172,12 +179,13 @@ XisoWriter.CreateXiso(src, outDir, null, null, out _, "game.iso",
 ## BuildImage (xdvdfs parity)
 
 ```csharp
-public static int CreateFromRemapTree(
-    string sourceDirectory,
+public static int BuildImage(
+    string sourceDir,
     string outputIsoPath,
     IReadOnlyList<RemapRule> rules,
     IProgress<ProgressInfo>? progress = null,
-    CancellationToken ct = default);
+    CancellationToken ct = default,
+    ulong? fileTime = null);
 
 public static IReadOnlyList<(string HostPath, string ImagePath)> DryRunRemap(
     string sourceDirectory, IReadOnlyList<RemapRule> rules);
@@ -185,6 +193,64 @@ public static string GenerateSpecText(IEnumerable<RemapRule> rules, string? outp
 ```
 
 `RemapFilesystem` (wax `WaxGlob` engine: `*`/`**`/`?`/`[]`/`{a,b}` + `{0}` whole + `{1..n}` captures) evaluates rules ordered first-wins with `!negation` + suffix re-add, builds the AVL via `IsRemap` flag (skips CWD), then same `CalculateDirectoryRequirements`/`CalculateDirectoryOffsets`/`WriteTreeCallback` pipeline. `xdvdfs.toml` manual TOML parser (`[map_rules]` preserve-order). See [xdvdfs Compat — Build-Image](xdvdfs-compat.md#build-image) and [Archival — Build-Image](archival.md).
+
+## SectorAllocator
+
+```csharp
+public sealed class SectorAllocator
+{
+    public SectorAllocator(uint firstFreeSector = Constants.RootDirectorySector, long? totalSectors = null);
+    public uint FirstFreeSector { get; }
+    public long? TotalSectors { get; }
+    public uint NextFree { get; }
+    public ulong AllocatedSectorCount { get; }
+    public static uint RequiredSectors(ulong byteCount);
+    public uint AllocateContiguous(uint sectorCount);
+    public uint AllocateForBytes(ulong byteCount);
+    public void MarkUsed(uint startSector, uint sectorCount);
+    public bool IsFree(uint startSector, uint sectorCount);
+    public IReadOnlyList<SectorRange> UsedRanges { get; }
+    public IReadOnlyList<SectorRange> FreeRanges { get; }
+    public static SectorAllocator FromLayout(SectorLayout layout);
+}
+```
+
+Contiguous sector allocation with overlap prevention (xdvdfs #101, TODO #2).
+All sectors are partition-relative, matching `EntryInfo.StartSector`:
+
+- `AllocateContiguous` is first-fit at or above `FirstFreeSector`: gaps left by
+  `MarkUsed`/seeded ranges are reused before extending past the end. A zero count
+  returns the first free position without recording anything (mirrors the writer
+  assigning a start sector to empty files without consuming space).
+- `MarkUsed` records externally placed regions (volume header, seeded layout
+  extents); overlaps throw `ArgumentException`, out-of-range throws
+  `ArgumentOutOfRangeException`, adjacent ranges coalesce.
+- Bounded images (`totalSectors` set) throw `InvalidOperationException` when full;
+  unbounded images bump past the end (creation mode, starting at `0x108` like
+  extract-xiso — unlike xdvdfs, which starts at 33).
+- `RequiredSectors` is ceiling division with `0 → 0` (extract-xiso semantics;
+  xdvdfs allocates 1 sector for empty files).
+- `FromLayout(XisoReader.GetSectorLayout(iso))` seeds an allocator from an existing
+  image — the reallocation primitive for in-place patching (TODO #5).
+
+The writer's offset pass (`CalculateDirectoryOffsets` /
+`WriteDirStartAndFilePositions` via `OffsetCalcContext`) allocates through a
+`SectorAllocator`, so creation-time numbering is overlap-checked by construction.
+
+## Deterministic output
+
+Identical input produces byte-identical output when the two nondeterminism
+sources are pinned:
+
+1. **Entry order** — host filesystem enumeration order is OS-dependent and AVL
+   insertion order shapes the dirtab bytes, so `GenerateAvlTreeLocal` and the
+   `RemapFilesystem` walks sort entries ordinally before inserting. Always on.
+2. **Volume timestamp** — pass `fileTime: 0` (xdvdfs deterministic timestamp) to
+   `CreateXiso` / `PackFromDirectory(All)` / `CreateXisoAsync` /
+   `RemapFilesystem.BuildImage`; the default `null` keeps current-time (create)
+   or source-preserved (rewrite) behavior. CLI: `--file-time <value>` on create
+   (`-c`), `--pack`, and `build-image` (values: ISO-8601, decimal raw, `0x` hex,
+   `'now'`, `'0'` — same syntax as `--set-filetime`).
 
 ## CISO
 

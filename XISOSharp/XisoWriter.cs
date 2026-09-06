@@ -63,6 +63,12 @@ public static class XisoWriter
     /// <see cref="ProgressInfoType.FileAdded"/> as entries are written, and
     /// <see cref="ProgressInfoType.FinishedPacking"/> when the image is complete.
     /// </param>
+    /// <param name="fileTime">
+    /// Optional fixed FILETIME for the volume descriptor (deterministic output, TODO #2;
+    /// <c>0</c> matches xdvdfs deterministic images). When <c>null</c> (default), the
+    /// current time is written for new images, or the source timestamp is preserved
+    /// in rewrite mode.
+    /// </param>
     /// <returns>0 on success, 1 on error.</returns>
     public static int CreateXiso(
         string rootDirectory,
@@ -75,7 +81,8 @@ public static class XisoWriter
         CancellationToken cancellationToken = default,
         int? prependSectors = null,
         IReadOnlyList<string>? excludePatterns = null,
-        IProgress<ProgressInfo>? progress = null)
+        IProgress<ProgressInfo>? progress = null,
+        ulong? fileTime = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
@@ -252,7 +259,7 @@ public static class XisoWriter
         AvlTree.AvlTraverseDepthFirst(root, CalculateDirectoryRequirements, null,
             AvlTraversalMethod.Prefix, 0);
 
-        var offsetCtx = new OffsetCalcContext { CurrentSector = startSector, PrependOffset = prependOffset };
+        var offsetCtx = new OffsetCalcContext(startSector, prependOffset);
         AvlTree.AvlTraverseDepthFirst(root, static (n, c, _) =>
         {
             CalculateDirectoryOffsets(n, (OffsetCalcContext)c!);
@@ -297,18 +304,31 @@ public static class XisoWriter
 
             if (inRoot != null && sourceStream != null)
             {
-                sourceStream.Seek(Constants.HeaderOffset + Constants.HeaderDataLength +
-                                  Constants.SectorOffsetSize + Constants.DirTableSize + Logger.XboxDiscLseek,
-                    SeekOrigin.Begin);
-                Span<byte> ftBuf = stackalloc byte[8];
-                sourceStream.ReadExactly(ftBuf);
-                xisoFs.Write(ftBuf);
-                ftBuf.Clear();
+                if (fileTime.HasValue)
+                {
+                    Span<byte> ftBuf = stackalloc byte[8];
+                    FileTimeHelper.WriteFileTime(ftBuf, fileTime.Value);
+                    xisoFs.Write(ftBuf);
+                    ftBuf.Clear();
+                }
+                else
+                {
+                    sourceStream.Seek(Constants.HeaderOffset + Constants.HeaderDataLength +
+                                      Constants.SectorOffsetSize + Constants.DirTableSize + Logger.XboxDiscLseek,
+                        SeekOrigin.Begin);
+                    Span<byte> ftBuf = stackalloc byte[8];
+                    sourceStream.ReadExactly(ftBuf);
+                    xisoFs.Write(ftBuf);
+                    ftBuf.Clear();
+                }
             }
             else
             {
                 Span<byte> ftBuf = stackalloc byte[8];
-                FileTimeHelper.WriteFileTimeNow(ftBuf);
+                if (fileTime.HasValue)
+                    FileTimeHelper.WriteFileTime(ftBuf, fileTime.Value);
+                else
+                    FileTimeHelper.WriteFileTimeNow(ftBuf);
                 xisoFs.Write(ftBuf);
             }
 
@@ -695,6 +715,10 @@ public static class XisoWriter
         string relativePath)
     {
         var entries = Directory.GetFileSystemEntries(".");
+        // Deterministic (TODO #2): filesystem enumeration order is OS-dependent and
+        // insertion order shapes the AVL tree (hence the dirtab bytes), so sort
+        // ordinally — identical input trees then always produce identical images.
+        Array.Sort(entries, StringComparer.Ordinal);
         var emptyDir = true;
 
         foreach (var entryPath in entries)
@@ -795,6 +819,11 @@ public static class XisoWriter
     /// <param name="progress">
     /// Optional structured progress channel (<see cref="ProgressInfo"/> events).
     /// </param>
+    /// <param name="fileTime">
+    /// Optional fixed FILETIME for the volume descriptor (deterministic output, TODO #2;
+    /// <c>0</c> matches xdvdfs deterministic images). When <c>null</c> (default), the
+    /// current time is written.
+    /// </param>
     /// <returns>0 on success, 1 on error.</returns>
     /// <exception cref="ArgumentException">Thrown when <paramref name="outputIsoPath"/> is null or empty.</exception>
     /// <exception cref="DirectoryNotFoundException">Thrown when the source directory does not exist.</exception>
@@ -805,7 +834,8 @@ public static class XisoWriter
         IReadOnlyList<string>? excludePatterns = null,
         ProgressCallback? progressCallback = null,
         CancellationToken cancellationToken = default,
-        IProgress<ProgressInfo>? progress = null)
+        IProgress<ProgressInfo>? progress = null,
+        ulong? fileTime = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
 
@@ -820,7 +850,8 @@ public static class XisoWriter
         Directory.CreateDirectory(outputDirectory);
 
         return CreateXiso(sourceDirectory, outputDirectory, null, null, out _, inName,
-            progressCallback, cancellationToken, excludePatterns: excludePatterns, progress: progress);
+            progressCallback, cancellationToken, excludePatterns: excludePatterns, progress: progress,
+            fileTime: fileTime);
     }
 
     /// <summary>
@@ -832,6 +863,7 @@ public static class XisoWriter
     /// <param name="progressCallback">Optional byte-progress callback.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <param name="progress">Optional structured progress channel.</param>
+    /// <param name="fileTime">Optional fixed FILETIME for the volume descriptor (deterministic output).</param>
     /// <returns>A task that completes with 0 on success, 1 on error.</returns>
     public static async Task<int> PackFromDirectoryAsync(
         string sourceDirectory,
@@ -839,10 +871,12 @@ public static class XisoWriter
         IReadOnlyList<string>? excludePatterns = null,
         ProgressCallback? progressCallback = null,
         CancellationToken cancellationToken = default,
-        IProgress<ProgressInfo>? progress = null)
+        IProgress<ProgressInfo>? progress = null,
+        ulong? fileTime = null)
     {
         return await Task.Run(() => PackFromDirectory(
-                sourceDirectory, outputIsoPath, excludePatterns, progressCallback, cancellationToken, progress),
+                sourceDirectory, outputIsoPath, excludePatterns, progressCallback, cancellationToken, progress,
+                fileTime),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -850,9 +884,20 @@ public static class XisoWriter
     /// Creates an XISO from a pre-built remap AVL tree (used by <c>build-image</c>).
     /// The tree is expected to have <see cref="AvlNode.HostPath"/> set for file nodes.
     /// </summary>
+    /// <param name="remapRoot">Root of the pre-built remap AVL tree.</param>
+    /// <param name="outputIsoPath">Full path of the ISO to create.</param>
+    /// <param name="volumeName">Volume name for the image; derived from the output name when <c>null</c>.</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <param name="progressCallback">Optional byte-progress callback.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="prependSectors">Optional 2048-byte sectors prepended before the filesystem.</param>
+    /// <param name="fileTime">
+    /// Optional fixed FILETIME for the volume descriptor (deterministic output, TODO #2).
+    /// When <c>null</c> (default), the current time is written.
+    /// </param>
     internal static int CreateFromRemapTree(AvlNode? remapRoot, string outputIsoPath, string? volumeName = null,
         IProgress<ProgressInfo>? progress = null, ProgressCallback? progressCallback = null,
-        CancellationToken cancellationToken = default, int? prependSectors = null)
+        CancellationToken cancellationToken = default, int? prependSectors = null, ulong? fileTime = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
         cancellationToken.ThrowIfCancellationRequested();
@@ -904,7 +949,7 @@ public static class XisoWriter
         {
             // Directory layout
             AvlTree.AvlTraverseDepthFirst(root, CalculateDirectoryRequirements, null, AvlTraversalMethod.Prefix, 0);
-            var offsetCtx = new OffsetCalcContext { CurrentSector = root.StartSector, PrependOffset = prependOffset };
+            var offsetCtx = new OffsetCalcContext(root.StartSector, prependOffset);
             AvlTree.AvlTraverseDepthFirst(root, static (n, c, _) =>
             {
                 CalculateDirectoryOffsets(n, (OffsetCalcContext)c!);
@@ -938,7 +983,10 @@ public static class XisoWriter
             BinaryPrimitives.WriteUInt32LittleEndian(leBuf, root.FileSize);
             xisoFs.Write(leBuf);
             Span<byte> ftBuf = stackalloc byte[8];
-            FileTimeHelper.WriteFileTimeNow(ftBuf);
+            if (fileTime.HasValue)
+                FileTimeHelper.WriteFileTime(ftBuf, fileTime.Value);
+            else
+                FileTimeHelper.WriteFileTimeNow(ftBuf);
             xisoFs.Write(ftBuf);
             Span<byte> unused = stackalloc byte[Constants.UnusedSize];
             unused.Clear();
@@ -1178,24 +1226,20 @@ public static class XisoWriter
         {
             if (ReferenceEquals(avl.Subdirectory, AvlNode.EmptySubdirectory))
             {
-                avl.StartSector = ctx.CurrentSector;
-                ctx.CurrentSector++;
+                avl.StartSector = ctx.Allocator.AllocateContiguous(1);
             }
             else
             {
-                avl.StartSector = ctx.CurrentSector;
+                avl.StartSector = ctx.Allocator.AllocateContiguous(NumSectors(avl.FileSize));
                 var dirStart = ctx.PrependOffset + ((long)avl.StartSector * Constants.SectorSize);
-                ctx.CurrentSector += NumSectors(avl.FileSize);
 
-                var wdsafp = new WdsafpContext { CurrentSector = ctx.CurrentSector, DirStart = dirStart };
+                var wdsafp = new WdsafpContext { Allocator = ctx.Allocator, DirStart = dirStart };
 
                 AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, static (n, c, _) =>
                 {
                     WriteDirStartAndFilePositions(n, (WdsafpContext)c!);
                     return 0;
                 }, wdsafp, AvlTraversalMethod.Prefix, 0);
-
-                ctx.CurrentSector = wdsafp.CurrentSector;
 
                 AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, static (n, c, _) =>
                 {
@@ -1218,8 +1262,7 @@ public static class XisoWriter
 
         if (avl.Subdirectory == null)
         {
-            avl.StartSector = ctx.CurrentSector;
-            ctx.CurrentSector += NumSectors(avl.FileSize);
+            avl.StartSector = ctx.Allocator.AllocateContiguous(NumSectors(avl.FileSize));
         }
     }
 
@@ -1298,6 +1341,11 @@ public static class XisoWriter
     /// Optional structured progress channel; receives <see cref="ProgressInfo"/> events
     /// (counts, per-entry additions, completion) — see <see cref="CreateXiso"/>.
     /// </param>
+    /// <param name="fileTime">
+    /// Optional fixed FILETIME for the volume descriptor (deterministic output, TODO #2).
+    /// When <c>null</c> (default), the current time is written, or the source timestamp
+    /// is preserved in rewrite mode.
+    /// </param>
     /// <returns>A task that completes with 0 on success, 1 on error. The first tuple element is the result code; the second is the output ISO path.</returns>
     public static async Task<(int Result, string? OutIsoPath)> CreateXisoAsync(
         string rootDirectory,
@@ -1309,13 +1357,14 @@ public static class XisoWriter
         CancellationToken cancellationToken = default,
         int? prependSectors = null,
         IReadOnlyList<string>? excludePatterns = null,
-        IProgress<ProgressInfo>? progress = null)
+        IProgress<ProgressInfo>? progress = null,
+        ulong? fileTime = null)
     {
         return await Task.Run(() =>
         {
             var result = CreateXiso(rootDirectory, outputDirectory, inRoot, sourceStream,
                 out var outPath, inName, progressCallback, cancellationToken, prependSectors, excludePatterns,
-                progress);
+                progress, fileTime);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
     }

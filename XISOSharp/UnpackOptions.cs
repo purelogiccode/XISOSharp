@@ -27,10 +27,10 @@ public sealed class UnpackOptions
     /// <c>Failed to create file X</c> per file rather than dying silently).
     /// A directory that cannot be created skips its whole subtree. When the run
     /// ends with any recorded failure, <see cref="ThrowIfFailed"/> throws a
-    /// summary, so the exit code still signals failure. Structural image
-    /// corruption (unreadable directory tables) still aborts immediately: after
-    /// a mid-table failure the stream position is unknowable, so continuing
-    /// siblings would be unsound (see TODO #16).
+    /// summary, so the exit code still signals failure. Corrupt directory
+    /// tables (TODO #16: cycles, out-of-table offsets, absurd entry counts)
+    /// skip the bad subtree and are recorded like any other per-file failure:
+    /// every sibling seek is absolute, so the stream position stays recoverable.
     /// </summary>
     public bool ContinueOnError { get; set; }
 

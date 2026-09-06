@@ -92,6 +92,26 @@ public static class Constants
     /// <summary>Size of a DWORD in bytes.</summary>
     public const int DwordSize = 4;
 
+    /// <summary>
+    /// Maximum directory-table entries visited in a single table walk before the
+    /// table is rejected as corrupt (TODO #16, corrupt-TOC hardening). Table
+    /// offsets are 16-bit DWORD indexes, so at most 65536 distinct entries can
+    /// exist per table; anything beyond that is necessarily a cycle or garbage
+    /// chain that would otherwise hang then OOM (extract-xiso #25). In practice
+    /// the visited set fires first (a 65537th visit must revisit an offset);
+    /// this is the backstop that keeps the bound explicit.
+    /// </summary>
+    public const int MaxTocEntriesPerTable = 65536;
+
+    /// <summary>
+    /// Maximum directory nesting depth (subdirectory descent + intra-table AVL
+    /// recursion) before the image is rejected as corrupt (TODO #16). Genuine
+    /// Xbox images nest a handful of levels and AVL depth is logarithmic, so
+    /// this never fires on valid images; it converts a malicious subdir cycle
+    /// (Burnout PAL style) from a <c>StackOverflowException</c> into a named error.
+    /// </summary>
+    public const int MaxTocDepth = 64;
+
     /// <summary>Size of a table offset field (2 bytes).</summary>
     public const int TableOffsetSize = 2;
 

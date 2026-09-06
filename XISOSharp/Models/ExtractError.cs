@@ -28,5 +28,15 @@ public enum ExtractError
     ErrIsoRewritten = -5002,
 
     /// <summary>Unexpected end of sector while reading a directory entry chain.</summary>
-    ErrEndOfSector = -5001
+    ErrEndOfSector = -5001,
+
+    /// <summary>
+    /// A directory table is structurally corrupt: a cycle, a child offset
+    /// outside the table/image, an absurd entry count, or excessive nesting
+    /// (TODO #16, corrupt-TOC hardening). Carried by
+    /// <c>ExtractFileException</c> (under <c>UnpackOptions.ContinueOnError</c>,
+    /// where the bad subtree is skipped) or thrown fail-fast as
+    /// <c>XisoFormatException</c> naming the offending path and offset.
+    /// </summary>
+    ErrInvalidToc = -5007
 }

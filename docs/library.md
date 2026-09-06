@@ -134,7 +134,15 @@ XisoWriter.CreateXiso(
 
 // Build-image ordered remapping (wax captures, negation)
 var rules = new[] { new RemapRule("bin", "/"), new RemapRule("assets/**", "/assets/{1}") };
-XisoReader.BuildImage("./src", "out.iso", rules); // via RemapFilesystem → CreateFromRemapTree
+RemapFilesystem.BuildImage("./src", "out.iso", rules); // via RemapFilesystem → CreateFromRemapTree
+
+// Deterministic image (xdvdfs stamp 0 → byte-identical output for identical input)
+XisoWriter.PackFromDirectory("source_dir", "game.iso", fileTime: 0);
+
+// Explicit sector layout + allocator (reallocation primitive for in-place patching)
+SectorLayout layout = XisoReader.GetSectorLayout("game.iso");
+var allocator = SectorAllocator.FromLayout(layout);
+uint sector = allocator.AllocateForBytes(1_000_000); // first-fit free run, no overlaps
 
 // Info
 VolumeInfo info = XisoReader.GetVolumeInfo("game.iso");

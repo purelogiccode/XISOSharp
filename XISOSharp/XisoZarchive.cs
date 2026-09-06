@@ -206,9 +206,22 @@ public static class XisoZarchive
     }
 
     private static void ParseNode(FileStream isoFs, long isoOffset, long dirOffset, uint dirSize, long childOffset,
-        PathNode parent, List<string> names, Dictionary<string, int> lookup)
+        PathNode parent, List<string> names, Dictionary<string, int> lookup,
+        HashSet<long>? visited = null, int depth = 0)
     {
         if (childOffset >= dirSize) return;
+        // Hardening (#16): bound the walk — a corrupt cycle previously recursed
+        // until the stack overflowed instead of failing with a named error.
+        if (depth > Constants.MaxTocDepth)
+            throw new XisoFormatException(
+                $"invalid TOC entry: maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
+        visited ??= [];
+        if (!visited.Add(childOffset))
+            throw new XisoFormatException(
+                $"invalid TOC entry: directory cycle detected — table offset {childOffset} was already visited.");
+        if (visited.Count > Constants.MaxTocEntriesPerTable)
+            throw new XisoFormatException(
+                "invalid TOC entry: too many entries in one directory table (possible corrupt offset chain).");
         var pos = isoOffset + dirOffset + childOffset;
         isoFs.Seek(pos, SeekOrigin.Begin);
         var left = ReadUShort(isoFs);
@@ -235,13 +248,14 @@ public static class XisoZarchive
         var entryOffset = (long)entrySector * Constants.SectorSize;
 
         if (left != 0 && left != 0xFFFF)
-            ParseNode(isoFs, isoOffset, dirOffset, dirSize, (long)left * 4, parent, names, lookup);
+            ParseNode(isoFs, isoOffset, dirOffset, dirSize, (long)left * 4, parent, names, lookup, visited,
+                depth + 1);
 
         var nameIdx = GetOrAddName(names, lookup, name);
         var node = new PathNode { IsFile = !isDir, NameIndex = nameIdx };
         if (isDir)
         {
-            ParseNode(isoFs, isoOffset, entryOffset, entrySize, 0, node, names, lookup);
+            ParseNode(isoFs, isoOffset, entryOffset, entrySize, 0, node, names, lookup, null, depth + 1);
             node.Subnodes.Sort((a, b) => CompareNodeName(names[a.NameIndex], names[b.NameIndex]));
         }
         else
@@ -252,7 +266,8 @@ public static class XisoZarchive
 
         parent.Subnodes.Add(node);
         if (right != 0 && right != 0xFFFF)
-            ParseNode(isoFs, isoOffset, dirOffset, dirSize, (long)right * 4, parent, names, lookup);
+            ParseNode(isoFs, isoOffset, dirOffset, dirSize, (long)right * 4, parent, names, lookup, visited,
+                depth + 1);
     }
 
     /// <summary>

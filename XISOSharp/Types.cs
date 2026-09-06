@@ -50,8 +50,11 @@ internal class WdsafpContext
     /// <summary>Directory start offset in bytes (sector * 2048).</summary>
     public long DirStart;
 
-    /// <summary>Current sector counter being assigned.</summary>
-    public uint CurrentSector;
+    /// <summary>
+    /// Allocator shared with the owning <see cref="DataStructures.OffsetCalcContext"/>,
+    /// handing out file-data sectors within the directory.
+    /// </summary>
+    public SectorAllocator Allocator = null!;
 }
 
 /// <summary>

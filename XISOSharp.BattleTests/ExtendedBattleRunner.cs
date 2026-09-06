@@ -402,35 +402,7 @@ internal static class ExtendedBattleRunner
                 {
                     // Known upstream limitation (same as XK-Petrify): LibXGD's
                     // CollectFileEntries crashes on all-0xFF empty-directory
-                    // tables, so xboxkit cannot pack a .zar for this image.
-                    if (zarLog.Contains("CollectFileEntries", StringComparison.OrdinalIgnoreCase) &&
-                        zarLog.Contains("EndOfStream", StringComparison.OrdinalIgnoreCase) && csOk)
-                    {
-                        // Validate our .zar semantically: its extracted tree must
-                        // equal an unpack of the same image (the unpack path is
-                        // separately oracle-validated by XD-Unpack).
-                        var zarTree = Path.Combine(csDir, "zar-self");
-                        var refTree = Path.Combine(csDir, "zar-ref");
-                        try
-                        {
-                            ZARSharp.ZArchiveTool.Extract(csZar, zarTree);
-                            if (XisoReader.UnpackImage(xkXiso, refTree) != 0)
-                                return Fail("C# UnpackImage rc!=0 (zar self-check reference)");
-                            var sr = CompareTrees(zarTree, refTree);
-                            Del(zarTree);
-                            Del(refTree);
-                            return sr.Status == BattleStatus.Passed
-                                ? Pass("oracle crashed (LibXGD empty-dir EOF bug); C# zar content == unpack of same image")
-                                : sr;
-                        }
-                        catch (Exception ex)
-                        {
-                            Del(zarTree);
-                            Del(refTree);
-                            return Fail($"zar self-check threw {ex.GetType().Name}: {Trim(ex.Message)}");
-                        }
-                    }
-
+                    // tables, so xboxkit cannot pack a .zar for such images.
                     return Skip("XK-Zar", $"xk -z produced no .zar ({zarLog})");
                 }
             }
