@@ -3367,6 +3367,129 @@ public static class XisoReader
             compressionType);
     }
 
+    /// <summary>Certificate size in bytes (retail XBE certificates are always 464).</summary>
+    private const uint XbeCertSize = 0x1D0;
+
+    /// <summary>Maximum number of header bytes read from the executable.</summary>
+    private const int XbeHeaderReadLimit = 0x8000;
+
+    /// <summary>
+    /// Parses the original-Xbox XBEH header + certificate of an executable file
+    /// inside an XISO image. All fields are read little-endian per the XBE
+    /// specification (see <c>xbe.h</c> in Cxbx-Reloaded).
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="internalPath">
+    /// Path of the <c>.xbe</c> file within the ISO (e.g. <c>"/default.xbe"</c>).
+    /// Use forward slashes as separators.
+    /// </param>
+    /// <returns>
+    /// The parsed <see cref="XbeInfo"/>, or <c>null</c> when the path does not exist,
+    /// points to a directory, or the file is not an XBEH executable.
+    /// </returns>
+    /// <exception cref="FileNotFoundException">Thrown when the ISO file does not exist.</exception>
+    /// <exception cref="XisoFormatException">Thrown when the ISO is not a valid XISO image.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static XbeInfo? GetXbeInfo(string isoPath, string internalPath)
+    {
+        using var fs = OpenImageStream(isoPath);
+        return GetXbeInfo(fs, isoPath, internalPath);
+    }
+
+    /// <summary>
+    /// Stream overload of <see cref="GetXbeInfo(string, string)"/> over an
+    /// already-open image (plain or CISO-backed). The stream must be readable +
+    /// seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name of the image (used in error messages).</param>
+    /// <param name="internalPath">Path of the <c>.xbe</c> file within the image.</param>
+    /// <returns>
+    /// The parsed <see cref="XbeInfo"/>, or <c>null</c> when the path does not exist,
+    /// points to a directory, or the file is not an XBEH executable.
+    /// </returns>
+    /// <exception cref="XisoFormatException">Thrown when the image is not a valid XISO image.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static XbeInfo? GetXbeInfo(Stream imageStream, string imageName, string internalPath)
+    {
+        var isoPath = imageName;
+        var fs = imageStream;
+        var entry = GetEntryInfo(fs, isoPath, internalPath);
+        if (entry?.IsDirectory != false || entry.FileSize < 0x12C)
+            return null;
+
+        var volInfo = GetVolumeInfo(fs);
+        if (!volInfo.IsValid)
+            throw new XisoFormatException($"Not a valid XISO: {isoPath}");
+
+        fs.Seek(((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek, SeekOrigin.Begin);
+
+        var header = new byte[Math.Min(entry.FileSize, XbeHeaderReadLimit)];
+        fs.ReadExactly(header);
+
+        return ParseXbeHeader(header);
+    }
+
+    private static XbeInfo? ParseXbeHeader(byte[] header)
+    {
+        // Magic: 'XBEH'
+        if (header.Length < 0x12C ||
+            header[0] != (byte)'X' || header[1] != (byte)'B' || header[2] != (byte)'E' || header[3] != (byte)'H')
+        {
+            return null;
+        }
+
+        var baseAddress = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x104));
+        var certAddress = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x118));
+        var sectionCount = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x11C));
+        var initFlags = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x124));
+        var entryPoint = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x128));
+
+        // The certificate address is a load pointer: file offset = address - base.
+        // Long arithmetic keeps the bounds check overflow-safe for malformed headers.
+        var certOffset = (long)certAddress - baseAddress;
+        if (certOffset < 0 || certOffset + XbeCertSize > header.Length)
+            return null;
+
+        var cert = header.AsSpan((int)certOffset);
+        var certSize = BinaryPrimitives.ReadUInt32LittleEndian(cert);
+        if (certSize != XbeCertSize)
+            return null;
+
+        var certTimeDate = BinaryPrimitives.ReadUInt32LittleEndian(cert[4..]);
+        var titleId = BinaryPrimitives.ReadUInt32LittleEndian(cert[8..]);
+        var titleName = Encoding.Unicode.GetString(cert.Slice(0x0C, 80));
+        var nul = titleName.IndexOf('\0');
+        if (nul >= 0)
+            titleName = titleName[..nul];
+
+        var alternateTitleIds = new uint[16];
+        for (var i = 0; i < 16; i++)
+            alternateTitleIds[i] = BinaryPrimitives.ReadUInt32LittleEndian(cert.Slice(0x5C + (i * 4)));
+
+        var allowedMedia = BinaryPrimitives.ReadUInt32LittleEndian(cert[0x9C..]);
+        var gameRegion = BinaryPrimitives.ReadUInt32LittleEndian(cert[0xA0..]);
+        var gameRatings = BinaryPrimitives.ReadUInt32LittleEndian(cert[0xA4..]);
+        var diskNumber = BinaryPrimitives.ReadUInt32LittleEndian(cert[0xA8..]);
+        var version = BinaryPrimitives.ReadUInt32LittleEndian(cert[0xAC..]);
+
+        return new XbeInfo(
+            baseAddress,
+            entryPoint,
+            sectionCount,
+            initFlags,
+            certSize,
+            certTimeDate,
+            titleId,
+            titleName,
+            alternateTitleIds,
+            allowedMedia,
+            gameRegion,
+            gameRatings,
+            diskNumber,
+            version);
+    }
+
     private static void CollectHashes(
         string isoPath,
         string currentPath,

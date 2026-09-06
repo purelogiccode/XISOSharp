@@ -173,6 +173,22 @@ public sealed class XisoExplorer
     }
 
     /// <summary>
+    /// Parses the original-Xbox XBEH header + certificate of an executable inside the image.
+    /// </summary>
+    /// <param name="internalPath">Path of the <c>.xbe</c> file within the ISO.</param>
+    /// <returns>
+    /// The parsed <see cref="XbeInfo"/>, or <c>null</c> when the path does not exist,
+    /// points to a directory, or the file is not an XBEH executable.
+    /// </returns>
+    /// <exception cref="XisoFormatException">Thrown when the ISO is not a valid XISO image.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public XbeInfo? GetXbeInfo(string internalPath)
+    {
+        using var stream = XisoReader.OpenImageStream(IsoPath);
+        return XisoReader.GetXbeInfo(stream, IsoPath, Normalize(internalPath));
+    }
+
+    /// <summary>
     /// Joins a directory path and an entry name into an image-internal path.
     /// </summary>
     /// <param name="directory">Parent directory (<c>"/"</c> for the root).</param>

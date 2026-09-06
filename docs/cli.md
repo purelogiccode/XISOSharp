@@ -56,6 +56,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `-i <file> [path]` | **Info** — volume descriptor metadata plus per-entry details (sector, size, attributes, left/right child offsets). `path` defaults to `/`. |
 | `--ls <file> [path]` | **List directory** — entry names of a directory (default `/`), **without recursion**. Prints one name per line; `/path: empty directory` when empty. Mirrors `ls` on the image. |
 | `--xex-info <file> <path>` | **XEX info** — parse and display the Xbox 360 XEX2 executable header of a `.xex` file inside the image (module flags, entry point, image base/size, region, media types, media/title ID, version, disc, encryption/compression). |
+| `--xbe-info <file> <path>` | **XBE info** — parse and display the original-Xbox XBEH header + certificate of a `.xbe` file inside the image (base, entry point, sections, title ID/name, media, region, ratings, disc, version). No reference tool offers this. |
 | `--md5 <file> [path]` | Compute **MD5** hashes of files **inside** the image. No `path` → hash every file in the image; directory → recursive; file → single hash. Output: lowercase hex + two spaces + path. |
 | `--sha256 <file> [path]` | Compute **SHA-256** hashes of files inside the image (same semantics as `--md5`). |
 | `-V <file1.xiso> ...` | **Audit** — deep integrity check of one or more images: header, tree walk, sector bounds, cycle detection, reserved attribute bits `0x48` masked, `0x0000` sentinel, optimized tag. Prints `Files checked` / `Dirs checked` / `Result: PASS|FAIL (N issue(s))`. |
@@ -390,6 +391,10 @@ XISOSharp.Cli --ls game.iso /media
 # Show the Xbox 360 executable header of a game
 # (title ID, entry point, region, media types, ...)
 XISOSharp.Cli --xex-info game360.iso /default.xex
+
+# Show the original-Xbox executable header + certificate
+# (title ID/name, media, region, ...)
+XISOSharp.Cli --xbe-info game.iso /default.xbe
 
 # Copy one directory out of an image
 XISOSharp.Cli --copy-out game.iso /media ./media_out

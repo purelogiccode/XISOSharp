@@ -96,6 +96,7 @@ internal static class Program
         var info = false;
         var lsMode = false;
         var xexInfoMode = false;
+        var xbeInfoMode = false;
         var unpackMode = false;
         var hashMode = false;
         var copyOut = false;
@@ -302,6 +303,16 @@ internal static class Program
 
                         extract = false;
                         xexInfoMode = true;
+                        break;
+                    case "--xbe-info":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        xbeInfoMode = true;
                         break;
                     case "--md5":
                         if (xSeen || rewrite || createList.Count > 0)
@@ -746,14 +757,14 @@ internal static class Program
 
         // --pack translates to create mode (directory input) or rewrite mode (ISO input),
         // reusing the existing create/rewrite machinery.
-        if (TranslatePackInput(packInput, packName, batchDir, rewrite, info, lsMode, xexInfoMode,
+        if (TranslatePackInput(packInput, packName, batchDir, rewrite, info, lsMode, xexInfoMode, xbeInfoMode,
                 unpackMode, hashMode, copyOut, copyIn, auditMode, validateMode, tree, extract, checksumFlagMode,
                 optind, args.Length, createList, ref rewrite, ref packIsoFile, ref path) != 0)
         {
             return 1;
         }
 
-        if (checksumFlagMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (checksumFlagMode && (info || lsMode || xexInfoMode || xbeInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
                                  validateMode || unpackMode || createList.Count > 0 || rewrite || filetimeMode ||
                                  setFiletimeMode))
         {
@@ -761,7 +772,7 @@ internal static class Program
             return 1;
         }
 
-        if (filetimeMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (filetimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
                              validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                              setFiletimeMode))
         {
@@ -769,7 +780,7 @@ internal static class Program
             return 1;
         }
 
-        if (setFiletimeMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (setFiletimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
                                 validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                                 filetimeMode))
         {
@@ -790,7 +801,7 @@ internal static class Program
         }
 
         if ((skipSectors.HasValue || prependSectors.HasValue) &&
-            (info || lsMode || xexInfoMode || hashMode || copyOut || copyIn || auditMode || validateMode || validateFlag))
+            (info || lsMode || xexInfoMode || xbeInfoMode || hashMode || copyOut || copyIn || auditMode || validateMode || validateFlag))
         {
             Logger.LogErr(
                 "Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, and create (-c) modes\n");
@@ -809,7 +820,7 @@ internal static class Program
             return 1;
         }
 
-        if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || unpackMode || hashMode ||
+        if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || xbeInfoMode || unpackMode || hashMode ||
                                  copyOut || copyIn || validateMode || checksumFlagMode || filetimeMode || setFiletimeMode))
         {
             Logger.LogErr(
@@ -840,7 +851,7 @@ internal static class Program
             return 1;
         }
 
-        if (unpackMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || copyIn || auditMode || validateMode ||
+        if (unpackMode && (info || lsMode || xexInfoMode || xbeInfoMode || tree || hashMode || copyOut || copyIn || auditMode || validateMode ||
                            checksumFlagMode || filetimeMode || setFiletimeMode))
         {
             Logger.LogErr("Error: --unpack cannot be combined with other modes\n");
@@ -850,7 +861,7 @@ internal static class Program
         // XboxKit redump modes are mutually exclusive with other operational modes
         var anyRedumpMode = videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode ||
                             zarMode || allMode || bestMode || compressAlias;
-        if (anyRedumpMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (anyRedumpMode && (info || lsMode || xexInfoMode || xbeInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
                               validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                               filetimeMode || setFiletimeMode))
         {
@@ -1243,6 +1254,50 @@ internal static class Program
                 Logger.Log($"  Encryption:        {xex.EncryptionType} ({FormatXexEncryption(xex.EncryptionType)})\n");
                 Logger.Log(
                     $"  Compression:       {xex.CompressionType} ({FormatXexCompression(xex.CompressionType)})\n");
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IOException)
+            {
+                Logger.LogErr($"Error: {ex.Message}\n");
+                return 1;
+            }
+
+            return 0;
+        }
+
+        if (xbeInfoMode)
+        {
+            if (optind + 1 >= args.Length)
+            {
+                PrintUsage();
+                return 1;
+            }
+
+            var xisoPath = args[optind];
+            var internalPath = args[optind + 1];
+
+            try
+            {
+                var xbe = XisoReader.GetXbeInfo(xisoPath, internalPath);
+                if (xbe == null)
+                {
+                    Logger.LogErr($"Not an XBEH executable: {internalPath}\n");
+                    return 1;
+                }
+
+                Logger.Log($"XBE info: {internalPath}\n");
+                Logger.Log($"  Base address:    0x{xbe.BaseAddress:X8}\n");
+                Logger.Log($"  Entry point:     0x{xbe.EntryPoint:X8}\n");
+                Logger.Log($"  Sections:        {xbe.SectionCount}\n");
+                Logger.Log($"  Init flags:      0x{xbe.InitFlags:X8}\n");
+                Logger.Log($"  Cert size:       {xbe.CertSize} bytes\n");
+                Logger.Log($"  Cert timestamp:  0x{xbe.CertTimeDate:X8}\n");
+                Logger.Log($"  Title ID:        0x{xbe.TitleId:X8}\n");
+                Logger.Log($"  Title name:      {xbe.TitleName}\n");
+                Logger.Log($"  Media:           0x{xbe.AllowedMedia:X8}{FormatXbeMedia(xbe.AllowedMedia)}\n");
+                Logger.Log($"  Region:          0x{xbe.GameRegion:X8}{FormatXbeRegion(xbe.GameRegion)}\n");
+                Logger.Log($"  Ratings:         0x{xbe.GameRatings:X8}\n");
+                Logger.Log($"  Disc:            {xbe.DiskNumber}\n");
+                Logger.Log($"  Version:         0x{xbe.Version:X8}\n");
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
             {
@@ -3402,6 +3457,7 @@ internal static class Program
         bool info,
         bool lsMode,
         bool xexInfoMode,
+        bool xbeInfoMode,
         bool unpackMode,
         bool hashMode,
         bool copyOut,
@@ -3423,7 +3479,7 @@ internal static class Program
             return 0;
         }
 
-        if (rewrite || info || lsMode || xexInfoMode || unpackMode || hashMode || copyOut || copyIn || auditMode ||
+        if (rewrite || info || lsMode || xexInfoMode || xbeInfoMode || unpackMode || hashMode || copyOut || copyIn || auditMode ||
             validateMode || tree || !extract || checksumFlagMode)
         {
             Logger.LogErr("Error: --pack cannot be combined with other modes\n");
@@ -3618,6 +3674,35 @@ internal static class Program
     }
 
     /// <summary>
+    /// Formats the XBE allowed-media bitmask as a comma-separated list of names.
+    /// </summary>
+    private static string FormatXbeMedia(uint media)
+    {
+        var parts = new List<string>();
+        if ((media & 0x01) != 0) parts.Add("HardDisk");
+        if ((media & 0x02) != 0) parts.Add("DvdCd");
+        if ((media & 0x04) != 0) parts.Add("Dvd5Ro");
+        if ((media & 0x08) != 0) parts.Add("Dvd9Ro");
+        if ((media & 0x10) != 0) parts.Add("Dvd5Rw");
+        if ((media & 0x20) != 0) parts.Add("Dvd9Rw");
+        if ((media & 0x40) != 0) parts.Add("Dongle");
+        if ((media & 0x80) != 0) parts.Add("MediaBoard");
+        return parts.Count > 0 ? $" ({string.Join(", ", parts)})" : "";
+    }
+
+    /// <summary>
+    /// Formats the XBE game-region bitmask as a comma-separated list of names.
+    /// </summary>
+    private static string FormatXbeRegion(uint region)
+    {
+        var parts = new List<string>();
+        if ((region & 0x01) != 0) parts.Add("NorthAmerica");
+        if ((region & 0x02) != 0) parts.Add("Japan");
+        if ((region & 0x04) != 0) parts.Add("RestOfWorld");
+        return parts.Count > 0 ? $" ({string.Join(", ", parts)})" : "";
+    }
+
+    /// <summary>
     /// Formats a directory entry attribute byte as a human-readable string.
     /// </summary>
     private static string FormatAttributes(byte attrs)
@@ -3657,6 +3742,9 @@ internal static class Program
                                                      --xex-info <file> <path>  Show the Xbox 360 XEX2 executable
                                                                            header of a .xex file inside the image
                                                                            (module flags, entry point, title ID, ...).
+                                                     --xbe-info <file> <path>  Show the original-Xbox XBEH executable
+                                                                           header + certificate of a .xbe file inside
+                                                                           the image (title ID/name, media, region).
                                                      -l                  List files in xiso(s).
                                                      --md5 <file> [path] Compute MD5 hash of file(s) in xiso.
                                                      -r                  Rewrite xiso(s) as optimized xiso(s).

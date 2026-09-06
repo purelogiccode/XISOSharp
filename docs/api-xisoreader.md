@@ -399,6 +399,39 @@ Returns `null` when the path does not exist, points to a directory, or the file 
 an XEX2 executable. Validated against retail Xbox 360 Redump images (`Perfect Dark
 Zero`, `Payday 2`). The CLI exposes this as `--xex-info`.
 
+## GetXbeInfo
+
+```csharp
+public static XbeInfo? GetXbeInfo(string isoPath, string internalPath)
+public static XbeInfo? GetXbeInfo(Stream imageStream, string imageName, string internalPath)
+```
+
+Parses the original-Xbox executable (XBEH) header + certificate of a `.xbe` file
+inside the image — the OG-Xbox counterpart to `GetXexInfo`, which no reference
+tool offers. All fields are read little-endian per the XBE specification (see
+`xbe.h` in Cxbx-Reloaded):
+
+| `XbeInfo` member | Meaning |
+|---|---|
+| `BaseAddress` | Image base address (retail: `0x00010000`) |
+| `EntryPoint` | Entry point address |
+| `SectionCount` / `InitFlags` | Section count, init flags |
+| `CertSize` | Certificate size (retail: 464, `0x1D0` — anything else is rejected) |
+| `CertTimeDate` | Certificate timestamp (raw DWORD) |
+| `TitleId` | Title ID |
+| `TitleName` | Title name (UTF-16, up to 40 chars) |
+| `AlternateTitleIds` | 16 alternate title IDs (usually zero) |
+| `AllowedMedia` | Hard disk / DVD-CD / DVD-5-RO / DVD-9-RO / DVD-5-RW / DVD-9-RW / dongle / media board |
+| `GameRegion` | North America / Japan / rest-of-world bitmask (`0x07` = worldwide) |
+| `GameRatings` | Ratings bitmask (raw DWORD) |
+| `DiskNumber` / `Version` | Multi-disc number, game version (raw DWORD) |
+
+The certificate address is a load pointer (file offset = address − base);
+out-of-range, below-base, and truncated certificates return `null` instead of
+reading out of bounds. Returns `null` when the path does not exist, points to
+a directory, or the file is not an XBEH executable. The CLI exposes this as
+`--xbe-info`; `XisoExplorer` has a matching `GetXbeInfo` method.
+
 ## Checksum (SHA3-256)
 
 ```csharp

@@ -212,6 +212,7 @@ public sealed class XisoExplorer
         CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null);
     public string? ComputeHashHex(string internalPath, HashAlgorithmName algorithm); // null when missing
     public XexInfo? GetXexInfo(string internalPath); // null when missing/dir/not XEX2
+    public XbeInfo? GetXbeInfo(string internalPath); // null when missing/dir/not XBEH
     public static string Combine(string directory, string name);
     public static string Normalize(string? internalPath);
 }
