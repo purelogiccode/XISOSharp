@@ -14,6 +14,19 @@ public static class XisoWriter
     [ThreadStatic] private static BoyerMoore? _bm;
 
     /// <summary>
+    /// Serializes concurrent create/rewrite operations in the process (TODO #22).
+    /// The create path walks the host file system with
+    /// <c>Directory.SetCurrentDirectory</c> (like the C tool), which is
+    /// process-global: two concurrent creates would corrupt each other's
+    /// working directory. Holding this across the whole operation makes
+    /// concurrent calls safe (they run one at a time), including the
+    /// <c>Logger.TotalBytes/TotalFiles</c> progress counters.
+    /// </summary>
+#pragma warning disable MA0158 // object keeps net8 compat (System.Threading.Lock is net9+)
+    private static readonly object CreateLock = new();
+#pragma warning restore MA0158
+
+    /// <summary>
     /// Creates or rewrites an XISO image. When <paramref name="inRoot"/> is <c>null</c>,
     /// builds an AVL tree from the local file system and creates a new ISO.
     /// Otherwise, rewrites the ISO using the pre-built AVL tree and source stream.
@@ -70,7 +83,38 @@ public static class XisoWriter
     /// in rewrite mode.
     /// </param>
     /// <returns>0 on success, 1 on error.</returns>
+    /// <remarks>
+    /// Concurrent calls from multiple threads are safe but run one at a time
+    /// (see <c>CreateLock</c>); the process working directory is always
+    /// restored before returning or throwing.
+    /// </remarks>
     public static int CreateXiso(
+        string rootDirectory,
+        string? outputDirectory,
+        AvlNode? inRoot,
+        Stream? sourceStream,
+        out string? outIsoPath,
+        string? inName,
+        ProgressCallback? progressCallback,
+        CancellationToken cancellationToken = default,
+        int? prependSectors = null,
+        IReadOnlyList<string>? excludePatterns = null,
+        IProgress<ProgressInfo>? progress = null,
+        ulong? fileTime = null)
+    {
+        lock (CreateLock)
+        {
+            return CreateXisoCore(rootDirectory, outputDirectory, inRoot, sourceStream,
+                out outIsoPath, inName, progressCallback, cancellationToken, prependSectors,
+                excludePatterns, progress, fileTime);
+        }
+    }
+
+    /// <summary>
+    /// Core <c>CreateXiso</c> implementation. Callers must hold <c>CreateLock</c>
+    /// (use <see cref="CreateXiso"/>).
+    /// </summary>
+    private static int CreateXisoCore(
         string rootDirectory,
         string? outputDirectory,
         AvlNode? inRoot,

@@ -48,7 +48,8 @@ public static class XisoPatcher
     /// <exception cref="XisoFormatException">The image is not a valid XISO.</exception>
     /// <exception cref="InvalidDataException">
     /// The internal path is malformed, a parent is missing, the target is a
-    /// directory, or the data/table does not fit in free space.
+    /// directory, the host path is a directory (only single files can be
+    /// copied in), or the data/table does not fit in free space.
     /// </exception>
     public static void CopyIntoImage(string isoPath, string hostFile, string internalPath,
         bool createBackup = true)
@@ -56,6 +57,16 @@ public static class XisoPatcher
         ArgumentException.ThrowIfNullOrEmpty(isoPath);
         ArgumentException.ThrowIfNullOrEmpty(hostFile);
         ArgumentNullException.ThrowIfNull(internalPath);
+        if (Directory.Exists(hostFile))
+        {
+            // Directories cannot be copied in (single-file limit, TODO #22):
+            // fail with the documented InvalidDataException rather than the
+            // misleading FileNotFoundException that File.Exists would produce.
+            throw new InvalidDataException(
+                $"Cannot copy host directory '{hostFile}' into an image " +
+                "(copying directories into an image is not supported).");
+        }
+
         if (!File.Exists(hostFile))
             throw new FileNotFoundException($"Host file not found: {hostFile}", hostFile);
 

@@ -333,7 +333,9 @@ Copies one host file **into** the image, modifying it in place — the reverse o
 `CopyOut` (xdvdfs #165, TODO #5). Replaces `internalPath` when it exists, or
 adds it as a new file when only its parent directory exists (paths work like the
 reader APIs: `/`-separated, case-insensitive). Copying directories in is not
-supported.
+supported: a host *directory* fails fast with `InvalidDataException` (not the
+`FileNotFoundException` a missing host file raises), before anything is
+written.
 
 Two cases, chosen automatically (image size never changes):
 

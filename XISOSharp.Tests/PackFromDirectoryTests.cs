@@ -156,4 +156,87 @@ public class PackFromDirectoryTests : IDisposable
         var extracted = ExtractToTemp(isoPath);
         Assert.Equal(HashTree(src), HashTree(extracted));
     }
+
+    [Fact]
+    public void PackFromDirectory_RestoresCwd_OnSuccess()
+    {
+        // TODO #22: the create path hops CWD internally; it must not leak.
+        var before = Directory.GetCurrentDirectory();
+        try
+        {
+            var src = CreateSourceTree();
+            _tempDirs.Add(src);
+            var isoPath = Path.Combine(CreateTempDir(), "packed.iso");
+
+            Assert.Equal(0, XisoWriter.PackFromDirectory(src, isoPath));
+            Assert.Equal(before, Directory.GetCurrentDirectory());
+        }
+        finally
+        {
+            try
+            {
+                Directory.SetCurrentDirectory(before);
+            }
+            catch
+            {
+                // ignored: assertion above already reports the leak
+            }
+        }
+    }
+
+    [Fact]
+    public void CreateXiso_RestoresCwd_WhenOutputCollides()
+    {
+        // The #55 collision throws *after* chdir into the source; CWD must
+        // still be restored (TODO #22).
+        var before = Directory.GetCurrentDirectory();
+        var src = CreateSourceTree();
+        _tempDirs.Add(src);
+        try
+        {
+            var leaf = Path.GetFileName(src);
+            var parent = Path.GetDirectoryName(src)!;
+            Assert.Throws<ArgumentException>(() =>
+                XisoWriter.CreateXiso(src, parent, null, null, out _, leaf, null));
+            Assert.Equal(before, Directory.GetCurrentDirectory());
+        }
+        finally
+        {
+            try
+            {
+                Directory.SetCurrentDirectory(before);
+            }
+            catch
+            {
+                // ignored: assertion above already reports the leak
+            }
+        }
+    }
+
+    [Fact]
+    public void PackFromDirectory_ConcurrentCalls_AllSucceed()
+    {
+        // TODO #22: creates are serialized process-wide — parallel packs must
+        // all succeed with intact outputs instead of corrupting shared CWD.
+        var before = Directory.GetCurrentDirectory();
+        var cases = Enumerable.Range(0, 4).Select(_ =>
+        {
+            var src = CreateSourceTree();
+            _tempDirs.Add(src);
+            var iso = Path.Combine(CreateTempDir(), "packed.iso");
+            return (src, iso);
+        }).ToList();
+
+        var tasks = cases.Select(c => Task.Run(() => XisoWriter.PackFromDirectory(c.src, c.iso))).ToArray();
+        Task.WaitAll(tasks);
+
+        foreach (var (task, (src, iso)) in tasks.Zip(cases))
+        {
+            Assert.Equal(0, task.Result);
+            var extracted = ExtractToTemp(iso);
+            Assert.Equal(HashTree(src), HashTree(extracted));
+        }
+
+        Assert.Equal(before, Directory.GetCurrentDirectory());
+    }
 }

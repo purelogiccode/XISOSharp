@@ -1,3 +1,4 @@
+using XISOSharp.Cli;
 using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
@@ -243,5 +244,28 @@ public class XisoValidatorTests : IDisposable
 
         Assert.False(result.Passed);
         Assert.Equal(2, result.Passed ? 0 : 2);
+    }
+
+    [Fact]
+    public void Cli_Validate_WithSkipSectors_ReturnsOne()
+    {
+        // Sector-offset combos are deliberately rejected (TODO #22): the
+        // validator reads both images at detected offsets, and one value
+        // could not serve a Redump source + plain output anyway.
+        var iso = CreateIsoFromSource();
+        Assert.Equal(1, Program.Main(["validate", iso, iso, "--skip-sectors", "1"]));
+    }
+
+    [Fact]
+    public void Cli_RewriteValidate_WithPrependSectors_ReturnsOne()
+    {
+        var iso = CreateIsoFromSource();
+        Assert.Equal(1, Program.Main(["-r", "--validate", "--prepend-sectors", "1", iso]));
+    }
+
+    [Fact]
+    public void Cli_Create_WithSkipSectors_ReturnsOne()
+    {
+        Assert.Equal(1, Program.Main(["-c", SourceDir, "--skip-sectors", "1"]));
     }
 }

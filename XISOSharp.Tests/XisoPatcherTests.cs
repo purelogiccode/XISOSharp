@@ -595,4 +595,50 @@ public class XisoPatcherTests : IDisposable
         Assert.Equal(1, Program.Main(["-x", "--copy-in", iso, host, "/file1.txt"]));
         Assert.Equal(1, Program.Main(["--no-backup"]));
     }
+
+    [Fact]
+    public void CopyIn_HostDirectory_ThrowsInvalidData_AndLeavesImageUntouched()
+    {
+        // Single-file limit (TODO #22): a host directory fails fast with the
+        // documented InvalidDataException — not a misleading FileNotFoundException.
+        var src = CreateTempDir("xiso_patch_src");
+        PopulateMixed(src);
+        var iso = CreateIso(src);
+        var before = File.ReadAllBytes(iso);
+
+        var hostDir = CreateTempDir("xiso_patch_hostdir");
+        File.WriteAllText(Path.Combine(hostDir, "inner.txt"), "x");
+
+        var ex = Assert.Throws<InvalidDataException>(() =>
+            XisoPatcher.CopyIntoImage(iso, hostDir, "/file1.txt", createBackup: false));
+        Assert.Contains("director", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(before, File.ReadAllBytes(iso));
+        Assert.False(File.Exists(iso + ".old"));
+    }
+
+    [Fact]
+    public void CopyIn_ImageSizeNeverChanges()
+    {
+        // Fixed-size limit (TODO #22): both the in-place and realloc paths keep
+        // the image byte length identical.
+        var src = CreateTempDir("xiso_patch_src");
+        PopulateMixed(src);
+
+        var iso1 = CreateIso(src);
+        var len1 = new FileInfo(iso1).Length;
+        var small = Path.Combine(CreateTempDir("xiso_patch_host"), "small.bin");
+        File.WriteAllText(small, "tiny");
+        XisoPatcher.CopyIntoImage(iso1, small, "/file2.txt", createBackup: false); // 5000 -> 4 B, in place
+        Assert.Equal(len1, new FileInfo(iso1).Length);
+
+        var iso2 = CreateIso(src);
+        var len2 = new FileInfo(iso2).Length;
+        var big = Path.Combine(CreateTempDir("xiso_patch_host"), "big.bin");
+        var content = new byte[5000];
+        new Random(9).NextBytes(content);
+        File.WriteAllBytes(big, content);
+        XisoPatcher.CopyIntoImage(iso2, big, "/file1.txt", createBackup: false); // 5 -> 5000 B, realloc
+        Assert.Equal(len2, new FileInfo(iso2).Length);
+        Assert.Equal(content, File.ReadAllBytes(CopyOutToTemp(iso2, "/file1.txt")));
+    }
 }

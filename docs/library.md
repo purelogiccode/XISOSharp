@@ -62,8 +62,8 @@ Everything lives in the `XISOSharp` namespace, except the internal data structur
   allocation-light; async wrappers offload to the thread pool.
 - **Current-directory based creation**: like the C tool, `XisoWriter.CreateXiso` walks
   the file system using `Directory.SetCurrentDirectory` internally and restores the
-  original directory afterwards. Callers should not run concurrent create operations in
-  the same process.
+  original directory afterwards (even on failure). Concurrent creates are safe but
+  serialized process-wide via an internal lock — they run one at a time (TODO #22).
 
 ## Error handling
 

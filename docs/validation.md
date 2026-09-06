@@ -46,8 +46,12 @@ XISOSharp.Cli -r --validate [--validate-checksums] [--validate-strict] [--valida
 
 > [!NOTE]
 > `--skip-sectors` / `--prepend-sectors` cannot be combined with validation flags —
-> the validator currently reads images at their standard detected offsets. The CLI
-> rejects the combination explicitly.
+> the validator reads both images at their standard detected offsets (Redump game
+> partitions at known offsets are auto-detected, so the common case needs no
+> flags). A single offset value could not serve both sides anyway — e.g. a Redump
+> source with a video partition validates against a plain-XISO output — so
+> per-side offsets would need new CLI surface. The CLI rejects the combination
+> explicitly (TODO #22).
 
 ## What is compared
 
