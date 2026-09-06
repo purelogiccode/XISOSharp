@@ -2846,6 +2846,53 @@ public static class XisoReader
         XisoPatcher.CopyIntoImage(isoPath, hostFile, internalPath, createBackup);
     }
 
+    /// <summary>
+    /// Splits an XISO image into sector-aligned parts of at most
+    /// <paramref name="partSizeBytes"/> bytes (TODO #17, xdvdfs #97; facade
+    /// over <see cref="XisoSplitter.Split"/>).
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO image (plain <c>.iso</c>).</param>
+    /// <param name="outputBase">Base path for the parts (<c>game</c> → <c>game.1.iso</c>, …).</param>
+    /// <param name="partSizeBytes">Maximum part size in bytes (≥ one sector).</param>
+    /// <param name="cancellationToken">Cancels the copy (partial parts removed).</param>
+    /// <param name="progress">Optional <see cref="ProgressInfoType.FileProgress"/> reports.</param>
+    /// <returns>Paths of the parts written, in join order.</returns>
+    public static IReadOnlyList<string> SplitXiso(string isoPath, string outputBase, long partSizeBytes,
+        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
+    {
+        return XisoSplitter.Split(isoPath, outputBase, partSizeBytes, cancellationToken, progress);
+    }
+
+    /// <summary>
+    /// Splits an XISO image into two sector-aligned halves (TODO #17, xdvdfs
+    /// #97; facade over <see cref="XisoSplitter.SplitHalves"/>).
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO image (plain <c>.iso</c>).</param>
+    /// <param name="outputBase">Base path for the parts (<c>game</c> → <c>game.1.iso</c>, …).</param>
+    /// <param name="cancellationToken">Cancels the copy (partial parts removed).</param>
+    /// <param name="progress">Optional <see cref="ProgressInfoType.FileProgress"/> reports.</param>
+    /// <returns>Paths of the parts written, in join order.</returns>
+    public static IReadOnlyList<string> SplitXisoHalves(string isoPath, string outputBase,
+        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
+    {
+        return XisoSplitter.SplitHalves(isoPath, outputBase, cancellationToken, progress);
+    }
+
+    /// <summary>
+    /// Reassembles a split image into <paramref name="outputPath"/> (TODO #17,
+    /// xdvdfs #97; facade over <see cref="XisoSplitter.Join"/>).
+    /// </summary>
+    /// <param name="firstPartPath">Path of the first split part (<c>*.1.iso</c>).</param>
+    /// <param name="outputPath">Destination for the reassembled image.</param>
+    /// <param name="cancellationToken">Cancels the copy (partial output removed).</param>
+    /// <param name="progress">Optional <see cref="ProgressInfoType.FileProgress"/> reports.</param>
+    /// <returns><paramref name="outputPath"/>.</returns>
+    public static string JoinSplitXiso(string firstPartPath, string outputPath,
+        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
+    {
+        return XisoSplitter.Join(firstPartPath, outputPath, cancellationToken, progress);
+    }
+
     private static void CopyOutFile(FileStream fs, EntryInfo entry, string internalPath, string destPath,
         VolumeInfo volInfo, UnpackOptions? options = null, CancellationToken cancellationToken = default,
         IProgress<ProgressInfo>? progress = null)

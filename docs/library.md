@@ -142,6 +142,10 @@ explorer.CopyOut("/docs/readme.txt", "./readme.txt");
 string? sha256 = explorer.ComputeHashHex("/default.xbe", HashAlgorithmName.SHA256);
 XexInfo? xex = explorer.GetXexInfo("/default.xex");
 
+// Split for FATX (4 GiB default cap) and reassemble (CLI: split / join)
+IReadOnlyList<string> parts = XisoReader.SplitXiso("game.iso", "game", 4L * 1024 * 1024 * 1024);
+XisoReader.JoinSplitXiso(parts[0], "rejoined.iso");
+
 // Create with exclusions (WaxGlob {0}/{n} also works for build-image)
 XisoWriter.CreateXiso(
     "source_dir", "./out", null, null, out var isoPath, "game.iso", null,

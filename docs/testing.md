@@ -52,6 +52,7 @@ Highlights:
 | Public stream API (`OpenImageStream`, `Stream` overloads, seekability guards) | `XisoStreamApiTests.cs` |
 | Destination filesystems (`IFilesystem`, `LocalFilesystem`, `MemoryFilesystem`, generic `UnpackImage` parity) | `XisoFilesystemTests.cs` |
 | Image explorer (`XisoExplorer` load/navigate/copy-out/hash/XEX/path helpers) | `XisoExplorerTests.cs` |
+| Image splitting (`XisoSplitter` split/halves/join, alignment, guards, CLI verbs) | `XisoSplitTests.cs` |
 | CISO compress/decompress, split parts, `.cso` auto-detect | `CisoTests.cs`, `CisoAutoDetectTests.cs` |
 | Golden interop vs reference `xdvdfs-cli 0.8.3` (both directions, split layout) | `CisoSplitInteropTests.cs` |
 | Logging, constants, types, exceptions | `LoggerTests.cs`, `ConstantsTests.cs`, `TypesTests.cs`, `XisoExceptionTests.cs`, … |

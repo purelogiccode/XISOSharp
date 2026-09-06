@@ -28,6 +28,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **File copier** — `XisoFileCopier.CopyExact` size matrix, truncation counts, short-read stitching, pooled buffers, mid-copy cancel, per-chunk `FileProgress` on copy-out/unpack
 - **Filesystem destinations** — `IFilesystem`/`LocalFilesystem`/`MemoryFilesystem` semantics, generic `UnpackImage` byte-parity with the legacy disk unpack, resume/continue-on-error/cancel/truncation through custom destinations
 - **Image explorer** — `XisoExplorer` load/navigate/copy-out/hash/XEX/path helpers (engine behind the Tester's Explore tab)
+- **Image splitting** — `XisoSplitter` split/halves/join round-trips, sector alignment, guards, progress/cancel, `split`/`join` CLI verbs
 
 ## Running Tests
 

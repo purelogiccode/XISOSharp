@@ -190,6 +190,15 @@ internal static class Program
         {
             return RunChecksumMode(args, 1);
         }
+        else if (args.Length > 0 && string.Equals(args[0], "split", StringComparison.OrdinalIgnoreCase))
+        {
+            return RunSplitMode(args, 1);
+        }
+        else if (args.Length > 0 && (string.Equals(args[0], "join", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(args[0], "joinsplit", StringComparison.OrdinalIgnoreCase)))
+        {
+            return RunJoinMode(args, 1);
+        }
 
         for (var i = optind; i < args.Length; i++)
         {
@@ -2555,6 +2564,254 @@ internal static class Program
         return exit;
     }
 
+    private static int RunSplitMode(string[] args, int optind)
+    {
+        string? sizeText = null;
+        string? outputBase = null;
+        var positionals = new List<string>();
+
+        for (var i = optind; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (string.Equals(a, "--size", StringComparison.OrdinalIgnoreCase))
+            {
+                if (++i >= args.Length)
+                {
+                    Logger.LogErr("Error: --size requires a value (bytes, e.g. 732M, or 'half')\n");
+                    PrintUsage();
+                    return 1;
+                }
+
+                sizeText = args[i];
+            }
+            else if (string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase))
+            {
+                if (++i >= args.Length)
+                {
+                    Logger.LogErr("Error: --output requires a base path\n");
+                    PrintUsage();
+                    return 1;
+                }
+
+                outputBase = args[i];
+            }
+            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = true;
+            }
+            else if (string.Equals(a, "-Q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = Logger.RealQuiet = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Write(Constants.Banner);
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for split: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count == 0)
+        {
+            Logger.LogErr("Error: split requires at least one image\n");
+            PrintUsage();
+            return 1;
+        }
+
+        if (outputBase != null && positionals.Count > 1)
+        {
+            Logger.LogErr("Error: --output accepts a single base path; pass one image at a time\n");
+            return 1;
+        }
+
+        var halves = false;
+        var partSize = XisoSplitter.DefaultPartSizeBytes;
+        if (sizeText != null)
+        {
+            if (!TryParseSplitSize(sizeText, out partSize, out halves))
+            {
+                Logger.LogErr($"Error: invalid --size '{sizeText}' (bytes, K/M/G suffix, or 'half')\n");
+                return 1;
+            }
+
+            if (!halves && partSize < Constants.SectorSize)
+            {
+                Logger.LogErr($"Error: --size must be at least one sector ({Constants.SectorSize} bytes)\n");
+                return 1;
+            }
+        }
+
+        var exit = 0;
+        foreach (var iso in positionals)
+        {
+            try
+            {
+                var splitBase = outputBase
+                    ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(iso)) ?? "",
+                        Path.GetFileNameWithoutExtension(iso));
+                var parts = halves
+                    ? XisoReader.SplitXisoHalves(iso, splitBase)
+                    : XisoReader.SplitXiso(iso, splitBase, partSize);
+                foreach (var part in parts)
+                    Logger.Log($"split: {part}\n");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogErr($"Error splitting {iso}: {ex.Message}\n");
+                exit = 1;
+            }
+        }
+
+        return exit;
+    }
+
+    private static int RunJoinMode(string[] args, int optind)
+    {
+        string? outputPath = null;
+        var positionals = new List<string>();
+
+        for (var i = optind; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase))
+            {
+                if (++i >= args.Length)
+                {
+                    Logger.LogErr("Error: --output requires a file path\n");
+                    PrintUsage();
+                    return 1;
+                }
+
+                outputPath = args[i];
+            }
+            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = true;
+            }
+            else if (string.Equals(a, "-Q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = Logger.RealQuiet = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Write(Constants.Banner);
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for join: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count == 0)
+        {
+            Logger.LogErr("Error: join requires at least one *.1.iso part\n");
+            PrintUsage();
+            return 1;
+        }
+
+        if (outputPath != null && positionals.Count > 1)
+        {
+            Logger.LogErr("Error: --output accepts a single file; pass one part set at a time\n");
+            return 1;
+        }
+
+        var exit = 0;
+        foreach (var first in positionals)
+        {
+            try
+            {
+                var joined = outputPath
+                    ?? Path.ChangeExtension(first[..^".1.iso".Length], ".iso");
+                XisoReader.JoinSplitXiso(first, joined);
+                Logger.Log($"join: {joined}\n");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogErr($"Error joining {first}: {ex.Message}\n");
+                exit = 1;
+            }
+        }
+
+        return exit;
+    }
+
+    /// <summary>
+    /// Parses a <c>--size</c> value for split mode: a plain byte count with an
+    /// optional K/M/G (binary) suffix, or <c>half</c>/<c>halves</c>.
+    /// </summary>
+    private static bool TryParseSplitSize(string text, out long bytes, out bool halves)
+    {
+        bytes = 0;
+        halves = false;
+        if (string.Equals(text, "half", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(text, "halves", StringComparison.OrdinalIgnoreCase))
+        {
+            halves = true;
+            return true;
+        }
+
+        long multiplier = 1;
+        var digits = text;
+        if (text.Length > 1 && char.IsAsciiLetter(text[^1]))
+        {
+            multiplier = char.ToUpperInvariant(text[^1]) switch
+            {
+                'K' => 1024L,
+                'M' => 1024L * 1024,
+                'G' => 1024L * 1024 * 1024,
+                _ => 0,
+            };
+            if (multiplier == 0)
+                return false;
+            digits = text[..^1];
+        }
+
+        if (!long.TryParse(digits, out var count) || count <= 0)
+            return false;
+        try
+        {
+            bytes = checked(count * multiplier);
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+
+        return bytes > 0;
+    }
+
     private static string DeriveRedumpPath(string xisoPath)
     {
         var dir = Path.GetDirectoryName(xisoPath) ?? "";
@@ -3451,6 +3708,9 @@ internal static class Program
                                                                             Aliases: uncso, decso.
                                                        checksum <image> [images...] [--silent]  Compute SHA3-256 image checksum (xdvdfs-compatible:
                                                                              SHA3-256 over sorted path bytes + file data). Output: hex tab path.
+                                                       split <image> [images...] [--size <bytes|half>] [--output <base>]  Split ISO into sector-aligned
+                                                                             .1.iso/.2.iso… parts (default size 4G FATX cap; 'half' splits in two).
+                                                       join <first.1.iso> [...] [--output <file>]  Reassemble split parts (output validated as XISO).
                                                        --filetime <image>             Show FILETIME header field (human-readable + raw, supports --skip-sectors).
                                                        --set-filetime <image> <value> Set FILETIME header field (value: ISO-8601, decimal raw, 0x hex, 'now', '0').
 

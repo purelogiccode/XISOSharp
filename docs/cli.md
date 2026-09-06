@@ -29,6 +29,8 @@ XISOSharp.Cli compress|cso <sourceDir|image.iso> [output.cso] [--ciso-level 0..9
 XISOSharp.Cli decompress|uncso|decso <cso|.1.cso> [output.iso]
 XISOSharp.Cli checksum [--silent] <image> [images...]
 XISOSharp.Cli --checksum <image> [--silent]            # flag form
+XISOSharp.Cli split [--size <bytes|half>] [--output <base>] <image> [images...]
+XISOSharp.Cli join [--output <file>] <first.1.iso> [...]
 ```
 
 - Flags must precede positional arguments; the first non-flag token ends option parsing (except verbs above which are detected as first token).
@@ -82,6 +84,8 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `compress\|cso <src> [out.cso] [--ciso-level 0..9] [--ciso-version 1\|2\|auto] [--ciso-split bytes]` | **CISO** compress: `CisoWriter.CompressToCso` — v2 (default) LZ4 sectors with fixed `align 2`, byte-identical to modern `xdvdfs compress` (pure-managed `lz4_flex` port); v1 BCL DEFLATE `0x80000000` with dynamic `align` 0/1/2; threshold `+12`. Use on `sourceDir` or `image.iso`. Output splits at `0xffbf6000` (~4 GiB) into `.1.cso`/`.2.cso`… parts (xdvdfs `SplitOutput` parity); `--ciso-split 0` writes a single `.cso`. See [Compression](compression.md). |
 | `decompress\|uncso\|decso <cso\|.1.cso> [out.iso]` | **CISO** decompress: `CisoReader.DecompressToIso` handles both versions, single files and split `.N.cso` parts. |
 | `checksum [--silent] <image> [images...]` / `--checksum <image> [--silent]` | **SHA3-256** image checksum (`XisoChecksum.ComputeImageChecksum`, `SortedDictionary Ordinal` `/path` UTF-8 + streamed data, `xdvdfs` compat). `.cso` / split `.1.cso` inputs are auto-detected by extension and read through `CisoBlockDevice` (`img.rs::open_image` parity), hashing the decompressed view — result identical to the source ISO. Prints `hex tab path` (silent → hex only). Also `flag` form `--checksum` supports multiple ISOs. See [xdvdfs Compat](xdvdfs-compat.md#checksum). |
+| `split [--size <bytes\|half>] [--output <base>] <image> [images...]` | **Split** a plain ISO into sector-aligned `<base>.1.iso`, `<base>.2.iso`, … parts (`XisoSplitter.Split`, TODO #17 / xdvdfs #97 — the plain-ISO counterpart to CSO `--ciso-split`). `--size` accepts bytes with `K`/`M`/`G` suffixes or `half`/`halves`; default 4G (FATX cap). Base defaults to the input stem. Existing parts are refused; partial parts are removed on failure/cancel. |
+| `join [--output <file>] <first.1.iso> [...]` | **Reassemble** split parts (`XisoSplitter.Join`, aliases: `joinsplit`). Output defaults to the part stem + `.iso` and must not exist; the result is validated as an XISO afterwards. |
 
 ## Options
 

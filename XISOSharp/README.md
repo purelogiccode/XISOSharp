@@ -228,6 +228,37 @@ explorer.CopyOut("/docs/readme.txt", "./readme.txt");
 string? sha256 = explorer.ComputeHashHex("/default.xbe", HashAlgorithmName.SHA256);
 ```
 
+#### Image splitting (`XisoSplitter`, TODO #17)
+
+Splits a plain `.iso` into FATX-friendly parts and reassembles them (the
+plain-ISO counterpart to CSO `--ciso-split`). Parts are a pure byte partition
+at sector-aligned cut points (`<base>.1.iso`, `<base>.2.iso`, …), so
+concatenation restores the image bit-for-bit. Inputs are pre-validated, the
+joined output is post-validated, existing targets are refused, and partial
+outputs are removed on failure/cancel.
+
+```csharp
+public static class XisoSplitter
+{
+    public const long DefaultPartSizeBytes = 4294967296L; // FATX 4 GiB cap
+    public static IReadOnlyList<string> Split(string isoPath, string outputBase, long partSizeBytes,
+        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null);
+    public static IReadOnlyList<string> SplitHalves(string isoPath, string outputBase,
+        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null);
+    public static string Join(string firstPartPath, string outputPath,
+        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null);
+    public static string PartPath(string outputBase, int partIndex); // 0-based
+    public static bool IsSplitPath(string? path); // *.1.iso
+}
+// XisoReader facades: SplitXiso / SplitXisoHalves / JoinSplitXiso
+// CLI: split [--size <bytes|half>] [--output <base>] <image>… / join [--output <file>] <first.1.iso>…
+```
+
+```csharp
+var parts = XisoReader.SplitXiso("game.iso", "game", XisoSplitter.DefaultPartSizeBytes);
+XisoReader.JoinSplitXiso(parts[0], "rejoined.iso");
+```
+
 #### `VerifyXiso`
 
 Low-level method that validates the XISO header and returns root directory metadata. Most users should use `DecodeXiso` instead.
