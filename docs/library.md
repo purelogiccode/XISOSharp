@@ -98,6 +98,7 @@ totalBytes`) and the structured `IProgress<ProgressInfo>` channel (`FileCount`,
 
 ```csharp
 using XISOSharp;
+using System.Security.Cryptography; // HashAlgorithmName (explorer hashing)
 
 // Extract
 int result = XisoReader.Extract("game.iso", "./out", llCompat: false);
@@ -132,6 +133,14 @@ XisoReader.UnpackImage(image, "game.iso", "./out");
 var memory = new MemoryFilesystem();
 XisoReader.UnpackImage("game.iso", memory);
 byte[] xbe = memory.ReadAllBytes("default.xbe");
+
+// Explore an image in-process (no extraction; plain .iso only)
+var explorer = new XisoExplorer("game.iso");   // probes the volume, fails fast
+foreach (var node in explorer.ListChildren("/"))
+    Console.WriteLine($"{(node.IsDirectory ? "dir " : "file")} {node.FullPath} ({node.Size} B)");
+explorer.CopyOut("/docs/readme.txt", "./readme.txt");
+string? sha256 = explorer.ComputeHashHex("/default.xbe", HashAlgorithmName.SHA256);
+XexInfo? xex = explorer.GetXexInfo("/default.xex");
 
 // Create with exclusions (WaxGlob {0}/{n} also works for build-image)
 XisoWriter.CreateXiso(

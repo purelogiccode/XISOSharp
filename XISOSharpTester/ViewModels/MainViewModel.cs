@@ -21,7 +21,7 @@ namespace XISOSharpTester.ViewModels;
 /// View-model for the Tester main page. Manages the extract-xiso path, selected ISO list,
 /// test execution via <see cref="Services.XisoTestRunner"/>, progress, log, and results export.
 /// </summary>
-internal class MainViewModel : INotifyPropertyChanged
+internal partial class MainViewModel : INotifyPropertyChanged
 {
     /// <summary>
     /// Initializes commands and auto-detects a sibling extract-xiso.exe.
@@ -39,6 +39,7 @@ internal class MainViewModel : INotifyPropertyChanged
         AboutCommand = new RelayCommand(static _ => ShowAbout());
         ExitCommand = new RelayCommand(static _ => ExitApp());
 
+        InitExploreCommands();
         AutoDetectXisoSharp();
     }
 

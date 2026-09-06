@@ -193,6 +193,41 @@ byte[] defaultXbe = memory.ReadAllBytes("default.xbe"); // never touched the dis
 XisoReader.UnpackImage("game.iso", new LocalFilesystem(@"D:\games\out")); // disk, no chdir
 ```
 
+#### Image explorer (`XisoExplorer`, TODO #11)
+
+UI-agnostic explorer over one plain `.iso` (the engine behind the Tester's
+Explore tab). The constructor probes the volume eagerly; every operation opens
+and closes the image, so instances are safe for concurrent background use.
+Paths are image-internal, `/`-separated, case-insensitive.
+
+```csharp
+public sealed class XisoExplorer
+{
+    public XisoExplorer(string isoPath); // fail fast: ArgumentException / FileNotFoundException / XisoFormatException
+    public string IsoPath { get; }
+    public VolumeInfo Volume { get; }
+    public IReadOnlyList<ExplorerNode> ListChildren(string internalPath);
+    public ExplorerNode? GetNode(string internalPath); // synthetic "/" root; null when missing
+    public void CopyOut(string internalPath, string destPath, UnpackOptions? options = null,
+        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null);
+    public string? ComputeHashHex(string internalPath, HashAlgorithmName algorithm); // null when missing
+    public XexInfo? GetXexInfo(string internalPath); // null when missing/dir/not XEX2
+    public static string Combine(string directory, string name);
+    public static string Normalize(string? internalPath);
+}
+
+public sealed record ExplorerNode(
+    string Name, string FullPath, bool IsDirectory, long Size, uint StartSector, byte Attributes);
+```
+
+```csharp
+var explorer = new XisoExplorer("game.iso");
+foreach (var node in explorer.ListChildren("/sub"))
+    Console.WriteLine($"{node.FullPath} ({node.Size} B)");
+explorer.CopyOut("/docs/readme.txt", "./readme.txt");
+string? sha256 = explorer.ComputeHashHex("/default.xbe", HashAlgorithmName.SHA256);
+```
+
 #### `VerifyXiso`
 
 Low-level method that validates the XISO header and returns root directory metadata. Most users should use `DecodeXiso` instead.

@@ -351,6 +351,108 @@
                 </StackPanel>
             </Border>
 
+            <!-- SECTION 4: EXPLORE -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8" Padding="16" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Explore" FontSize="14" FontWeight="Bold"
+                               Margin="0,0,0,4" />
+                    <TextBlock Text="Browse the image contents in-process — no extraction. Plain .iso images only."
+                               FontSize="11" Margin="0,0,0,10"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Image (.iso):" VerticalAlignment="Center" FontWeight="SemiBold" />
+                        <TextBox Grid.Column="1" Text="{Binding ExploreImagePath, UpdateSourceTrigger=PropertyChanged}"
+                                 VerticalAlignment="Center"
+                                 Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+                            <ui:Button Content="Browse" Command="{Binding BrowseExploreImageCommand}"
+                                       Appearance="Secondary" Margin="0,0,6,0" />
+                            <ui:Button Content="Open" Command="{Binding OpenExploreImageCommand}"
+                                       Appearance="Primary" Margin="0,0,6,0" />
+                            <ui:Button Content="Refresh" Command="{Binding RefreshExploreCommand}"
+                                       Appearance="Secondary" Margin="0,0,6,0" />
+                            <ui:Button Content="Close" Command="{Binding CloseExploreImageCommand}"
+                                       Appearance="Secondary" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="{Binding ExploreVolumeText}" FontSize="11" Margin="0,0,0,8"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+                                CornerRadius="6" Padding="4" Margin="0,0,6,0">
+                            <TreeView ItemsSource="{Binding ExplorerRoots}"
+                                      MinHeight="260" MaxHeight="420"
+                                      BorderThickness="0" Background="Transparent"
+                                      SelectedItemChanged="ExploreTree_OnSelectedItemChanged">
+                                <TreeView.Resources>
+                                    <HierarchicalDataTemplate DataType="{x:Type vm:ExplorerTreeNode}"
+                                                              ItemsSource="{Binding Children}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <TextBlock FontSize="11" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                <TextBlock.Text>
+                                                    <Binding Path="Suffix" StringFormat="  ({0})" />
+                                                </TextBlock.Text>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </HierarchicalDataTemplate>
+                                </TreeView.Resources>
+                                <TreeView.ItemContainerStyle>
+                                    <Style TargetType="TreeViewItem">
+                                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                                    </Style>
+                                </TreeView.ItemContainerStyle>
+                            </TreeView>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                            <TextBox Text="{Binding ExplorerDetailsText, Mode=OneWay}"
+                                     IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                     FontFamily="Consolas" FontSize="11"
+                                     Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                     TextWrapping="Wrap" MinHeight="96" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <ui:Button Content="Copy out…" Command="{Binding CopyOutNodeCommand}"
+                                           Appearance="Primary" Margin="0,0,8,0" />
+                                <ui:Button Content="SHA-256" Command="{Binding HashNodeCommand}"
+                                           Appearance="Secondary" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding ExplorerHashText}" FontSize="11" Margin="0,8,0,0"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" FontFamily="Consolas" />
+                            <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+                                    CornerRadius="6" Padding="8" Margin="0,8,0,0"
+                                    Visibility="{Binding ShowExplorerXex, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding ExplorerXexText}" FontSize="11"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           TextWrapping="Wrap" FontFamily="Consolas" />
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="{Binding ExplorerStatusText}" FontSize="11" Margin="0,8,0,0"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
         </StackPanel>
     </ScrollViewer>
 

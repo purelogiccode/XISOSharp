@@ -12,6 +12,10 @@ A WPF desktop application for regression testing the XISOSharp C# implementation
 - **Audit** — deep integrity verification (header, tree, sector bounds, cycle detection)
 - **Round-trip** — creates XISO from extracted files and verifies the output
 - **PDF export** — exports detailed test results to PDF via QuestPDF
+- **Explore** — browse an image's contents in-process (no extraction): `TreeView`
+  with lazy directory loading, volume summary, per-node details, per-node
+  **Copy out** (files and directories), **SHA-256** display, and an **XEX2 info
+  panel** for executables (plain `.iso` images only)
 - **Side-by-side comparison** with the original `extract-xiso.exe` (included)
 
 ## Building

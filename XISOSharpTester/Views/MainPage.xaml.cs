@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using Serilog;
@@ -30,6 +31,20 @@ internal partial class MainPage
             Log.Error(ex, "MainPage initialization failed");
             BugReporter.ReportException(ex, "MainPage initialization failed");
             throw;
+        }
+    }
+
+    private void ExploreTree_OnSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    {
+        try
+        {
+            if (DataContext is MainViewModel vm)
+                vm.SetSelectedExplorerNode(e.NewValue as ExplorerTreeNode);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Explore selection failed");
+            BugReporter.ReportException(ex, "Explore selection failed");
         }
     }
 

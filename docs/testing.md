@@ -51,6 +51,7 @@ Highlights:
 | Extract destination edge cases: trailing separators, UNC, spaces, empty, CLI end-to-end | `CliDestinationDirTests.cs` |
 | Public stream API (`OpenImageStream`, `Stream` overloads, seekability guards) | `XisoStreamApiTests.cs` |
 | Destination filesystems (`IFilesystem`, `LocalFilesystem`, `MemoryFilesystem`, generic `UnpackImage` parity) | `XisoFilesystemTests.cs` |
+| Image explorer (`XisoExplorer` load/navigate/copy-out/hash/XEX/path helpers) | `XisoExplorerTests.cs` |
 | CISO compress/decompress, split parts, `.cso` auto-detect | `CisoTests.cs`, `CisoAutoDetectTests.cs` |
 | Golden interop vs reference `xdvdfs-cli 0.8.3` (both directions, split layout) | `CisoSplitInteropTests.cs` |
 | Logging, constants, types, exceptions | `LoggerTests.cs`, `ConstantsTests.cs`, `TypesTests.cs`, `XisoExceptionTests.cs`, … |
@@ -223,6 +224,10 @@ exports PDF reports (`PdfExporter`). Services:
 | `HashUtil` | SHA-256 comparison of extracted outputs |
 | `PdfExporter` | Test-session report generation |
 | `TestProgress` | UI progress reporting |
+
+Its main page also has an **Explore** section: an in-process image browser
+(`TreeView` with lazy directory loading over `XisoExplorer` — no extraction)
+with per-node copy-out, SHA-256 display, and an XEX2 info panel.
 
 It targets Windows only and is not part of CI.
 
