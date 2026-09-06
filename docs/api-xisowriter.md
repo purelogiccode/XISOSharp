@@ -231,11 +231,44 @@ All sectors are partition-relative, matching `EntryInfo.StartSector`:
 - `RequiredSectors` is ceiling division with `0 → 0` (extract-xiso semantics;
   xdvdfs allocates 1 sector for empty files).
 - `FromLayout(XisoReader.GetSectorLayout(iso))` seeds an allocator from an existing
-  image — the reallocation primitive for in-place patching (TODO #5).
+  image — the reallocation primitive used by in-place patching (`XisoPatcher`).
 
 The writer's offset pass (`CalculateDirectoryOffsets` /
 `WriteDirStartAndFilePositions` via `OffsetCalcContext`) allocates through a
 `SectorAllocator`, so creation-time numbering is overlap-checked by construction.
+
+## DirectoryEntryTableWriter
+
+```csharp
+public static class DirectoryEntryTableWriter
+{
+    public sealed record DirectoryTableEntry(string Name, bool IsDirectory, uint StartSector, uint FileSize);
+    public static AvlNode? BuildTable(IEnumerable<DirectoryTableEntry> entries);
+    public static void PlaceEntry(AvlNode node, ref uint size);
+    public static uint ComputeTableSize(AvlNode? tableRoot);
+    public static byte[] EncodeEntry(AvlNode node);
+    public static byte[] SerializeTable(AvlNode? tableRoot);
+}
+```
+
+Single-table build + serialization primitive (TODO #3), shared by the
+whole-image writer and the in-place patcher (`XisoPatcher`, TODO #5):
+
+- `BuildTable` inserts entries (ordinal filename order, so the layout is
+  deterministic) into a balanced AVL tree; duplicates (case-insensitive) and
+  invalid names throw `InvalidOperationException`.
+- `PlaceEntry` / `ComputeTableSize` assign `AvlNode.Offset` with the writer's
+  DWORD-alignment and no-sector-straddle rules; empty tables size one sector.
+- `EncodeEntry` emits one 14+N-byte record (child offsets in DWORDs,
+  sector-rounded size + `0x10` for directories, exact size + `0x20` for files,
+  Latin-1 name) — the same bytes the writer emits.
+- `SerializeTable` returns the full sector-padded, `0xFF`-filled table
+  (`0xFF` sector for empty directories).
+
+`XisoWriter` itself encodes records and assigns offsets through this class, so
+rewritten tables are byte-identical in format to created ones (proven by
+`DirectoryEntryTableWriterTests`, which re-serializes every table of a built
+image and compares bytes).
 
 ## Deterministic output
 

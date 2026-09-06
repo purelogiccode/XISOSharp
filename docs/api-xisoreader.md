@@ -2,7 +2,7 @@
 
 `XisoReader` (`XISOSharp` namespace) is a **static class** providing all read-side
 operations: verification, extraction, listing, tree traversal, rewriting, volume info,
-directory listing, auditing, hashing, and copy-out.
+directory listing, auditing, hashing, copy-out, and copy-in.
 
 - [Method index](#method-index)
 - [VerifyXiso](#verifyxiso)
@@ -14,6 +14,7 @@ directory listing, auditing, hashing, and copy-out.
 - [ListDirectory / GetEntryInfo](#listdirectory--getentryinfo)
 - [GetSectorLayout](#getsectorlayout)
 - [CopyOut](#copyout)
+- [CopyIn](#copyin)
 - [ComputeFileHash / ComputeDirectoryHashes](#computefilehash--computedirectoryhashes)
 - [AuditXiso](#auditxiso)
 - [Disc offset probing](#disc-offset-probing)
@@ -38,6 +39,7 @@ directory listing, auditing, hashing, and copy-out.
 | `GetEntryInfo` | Metadata of one entry by path |
 | `GetSectorLayout` | Explicit sector layout: files/tables → sector ranges + used/free ranges |
 | `CopyOut` | Copy one file or directory out of an image |
+| `CopyIn` | Copy one host file into an image (replace or add, in place) |
 | `ComputeFileHash` | Hash one file (MD5/SHA-256/… via `HashAlgorithmName`) |
 | `ComputeDirectoryHashes` | Hash every file under a path |
 | `GetXexInfo` | Parse the Xbox 360 XEX2 header of a `.xex` file |
@@ -277,6 +279,39 @@ public static void CopyOut(string isoPath, string internalPath, string destPath,
 Copies one file — or an entire directory, recursively — out of the image to
 `destPath` without a full extraction. With `SkipExisting`, up-to-date destinations
 are skipped per [Resume interrupted unpacks](#resume-interrupted-unpacks).
+
+## CopyIn
+
+```csharp
+public static void CopyIn(string isoPath, string hostFile, string internalPath,
+    bool createBackup = true)
+// same behavior via XisoPatcher.CopyIntoImage(isoPath, hostFile, internalPath, createBackup)
+```
+
+Copies one host file **into** the image, modifying it in place — the reverse of
+`CopyOut` (xdvdfs #165, TODO #5). Replaces `internalPath` when it exists, or
+adds it as a new file when only its parent directory exists (paths work like the
+reader APIs: `/`-separated, case-insensitive). Copying directories in is not
+supported.
+
+Two cases, chosen automatically (image size never changes):
+
+- **Fits the existing allocation** — data is overwritten in place (`0xFF` tail
+  fill) and only the parent table's 8-byte entry record (start sector + file
+  size) is updated. Every other byte is untouched.
+- **Larger, or a new file** — a free run is allocated via `SectorAllocator`
+  seeded from `GetSectorLayout`, and the parent table is re-serialized with
+  `DirectoryEntryTableWriter`. If the grown table no longer fits, it moves and
+  only the grandparent link (or the volume-header root fields, when the root
+  table moves) is updated — the cascade is exactly one table deep.
+
+A `<iso>.old` backup of the pre-patch image is written first (replacing any
+previous backup) unless `createBackup` is false. Copied-in `.xbe` files get the
+same media-enable patch as packed ones; the volume timestamp is preserved.
+`InvalidDataException` covers malformed paths, missing parents, directory
+targets, and out-of-space (`need N sectors but only M free`); corrupt images
+fail with `XisoFormatException` before anything is written. CLI: `--copy-in
+<iso> <host> <path>` (`--no-backup` skips the backup).
 
 ## ComputeFileHash / ComputeDirectoryHashes
 

@@ -2649,6 +2649,33 @@ public static class XisoReader
         }
     }
 
+    /// <summary>
+    /// Copies a host file into an XISO image: replaces the entry at
+    /// <paramref name="internalPath"/> when it exists, or adds it as a new file
+    /// when only its parent directory exists (TODO #5, xdvdfs #165).
+    /// The image is modified in place; a <c>.old</c> backup of the pre-patch
+    /// image is written first unless <paramref name="createBackup"/> is false.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO image (modified in place).</param>
+    /// <param name="hostFile">Host file whose bytes become the new content.</param>
+    /// <param name="internalPath">
+    /// Destination path inside the image (e.g. <c>/dir/file.bin</c>);
+    /// case-insensitive, <c>/</c>-separated.
+    /// </param>
+    /// <param name="createBackup">Write a <c>.old</c> backup first (default true).</param>
+    /// <exception cref="FileNotFoundException">The host file does not exist.</exception>
+    /// <exception cref="XisoFormatException">The image is not a valid XISO.</exception>
+    /// <exception cref="InvalidDataException">
+    /// The internal path is malformed, a parent is missing, the target is a
+    /// directory, or the data/table does not fit in free space.
+    /// </exception>
+    /// <exception cref="IOException">Thrown on read/write errors.</exception>
+    public static void CopyIn(string isoPath, string hostFile, string internalPath,
+        bool createBackup = true)
+    {
+        XisoPatcher.CopyIntoImage(isoPath, hostFile, internalPath, createBackup);
+    }
+
     private static void CopyOutFile(FileStream fs, EntryInfo entry, string internalPath, string destPath,
         VolumeInfo volInfo, UnpackOptions? options = null, CancellationToken cancellationToken = default)
     {

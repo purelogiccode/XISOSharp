@@ -58,7 +58,7 @@ The site is rendered with **Docsify** — a fixed **left sidebar** is provided b
 ## Feature highlights
 
 - **Create** XISO images from a directory, with glob-based exclusion (`-X` via `GlobMatcher`/`WaxGlob`)
-- **Extract** full images, or single files/directories with `--copy-out` / `--unpack` (auto `llCompat`); resume interrupted runs with `--skip-existing` (`skip: <path>`)
+- **Extract** full images, or single files/directories with `--copy-out` / `--unpack` (auto `llCompat`); resume interrupted runs with `--skip-existing` (`skip: <path>`); patch single files back in with `--copy-in` (keeps `.old` backup)
 - **List** (`-l`), recursive **tree** (`-t`), volume **info** (`-i`), **hash** (`--md5` / `--sha256`), per-image **SHA3-256** `checksum`
 - **Rewrite** images into an optimized AVL layout (`-r`) + **validate** (`validate` / `--validate*`); outputs colliding with their inputs are refused (input==output guard)
 - **Audit** (`-V`) deep integrity: header (5 offsets), tag `31337`, tree cycles, sector bounds, reserved `0x48`, empty `0x0000`

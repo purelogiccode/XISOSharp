@@ -99,6 +99,8 @@ internal static class Program
         var unpackMode = false;
         var hashMode = false;
         var copyOut = false;
+        var copyIn = false;
+        var copyInNoBackup = false;
         var auditMode = false;
         var validateMode = false;
         var checksumFlagMode = false;
@@ -365,6 +367,19 @@ internal static class Program
 
                         extract = false;
                         copyOut = true;
+                        break;
+                    case "--copy-in":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        copyIn = true;
+                        break;
+                    case "--no-backup":
+                        copyInNoBackup = true;
                         break;
                     case "-r":
                         if (xSeen || !extract || createList.Count > 0)
@@ -723,13 +738,13 @@ internal static class Program
         // --pack translates to create mode (directory input) or rewrite mode (ISO input),
         // reusing the existing create/rewrite machinery.
         if (TranslatePackInput(packInput, packName, batchDir, rewrite, info, lsMode, xexInfoMode,
-                unpackMode, hashMode, copyOut, auditMode, validateMode, tree, extract, checksumFlagMode,
+                unpackMode, hashMode, copyOut, copyIn, auditMode, validateMode, tree, extract, checksumFlagMode,
                 optind, args.Length, createList, ref rewrite, ref packIsoFile, ref path) != 0)
         {
             return 1;
         }
 
-        if (checksumFlagMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode ||
+        if (checksumFlagMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
                                  validateMode || unpackMode || createList.Count > 0 || rewrite || filetimeMode ||
                                  setFiletimeMode))
         {
@@ -737,7 +752,7 @@ internal static class Program
             return 1;
         }
 
-        if (filetimeMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode ||
+        if (filetimeMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
                              validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                              setFiletimeMode))
         {
@@ -745,7 +760,7 @@ internal static class Program
             return 1;
         }
 
-        if (setFiletimeMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode ||
+        if (setFiletimeMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
                                 validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                                 filetimeMode))
         {
@@ -766,7 +781,7 @@ internal static class Program
         }
 
         if ((skipSectors.HasValue || prependSectors.HasValue) &&
-            (info || lsMode || xexInfoMode || hashMode || copyOut || auditMode || validateMode || validateFlag))
+            (info || lsMode || xexInfoMode || hashMode || copyOut || copyIn || auditMode || validateMode || validateFlag))
         {
             Logger.LogErr(
                 "Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, and create (-c) modes\n");
@@ -786,7 +801,7 @@ internal static class Program
         }
 
         if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || unpackMode || hashMode ||
-                                 copyOut || validateMode || checksumFlagMode || filetimeMode || setFiletimeMode))
+                                 copyOut || copyIn || validateMode || checksumFlagMode || filetimeMode || setFiletimeMode))
         {
             Logger.LogErr(
                 "Error: --batch is only supported in extract, list, tree, rewrite (-r), and audit (-V) modes\n");
@@ -810,7 +825,13 @@ internal static class Program
             return 1;
         }
 
-        if (unpackMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode || validateMode ||
+        if (copyInNoBackup && !copyIn)
+        {
+            Logger.LogErr("Error: --no-backup requires --copy-in\n");
+            return 1;
+        }
+
+        if (unpackMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || copyIn || auditMode || validateMode ||
                            checksumFlagMode || filetimeMode || setFiletimeMode))
         {
             Logger.LogErr("Error: --unpack cannot be combined with other modes\n");
@@ -820,7 +841,7 @@ internal static class Program
         // XboxKit redump modes are mutually exclusive with other operational modes
         var anyRedumpMode = videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode ||
                             zarMode || allMode || bestMode || compressAlias;
-        if (anyRedumpMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || auditMode ||
+        if (anyRedumpMode && (info || lsMode || xexInfoMode || tree || hashMode || copyOut || copyIn || auditMode ||
                               validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                               filetimeMode || setFiletimeMode))
         {
@@ -1326,6 +1347,53 @@ internal static class Program
 
                 XisoReader.CopyOut(xisoPath, internalPath, destPath, unpackOptions);
                 Logger.Log($"Copied {internalPath} to {destPath}\n");
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException
+                                           or ExtractErrorException)
+            {
+                Logger.LogErr($"Error: {ex.Message}\n");
+                return 1;
+            }
+
+            return 0;
+        }
+
+        if (copyIn)
+        {
+            if (optind + 2 >= args.Length)
+            {
+                PrintUsage();
+                return 1;
+            }
+
+            var xisoPath = args[optind];
+            var hostPath = args[optind + 1];
+            var internalPath = args[optind + 2];
+            if (!File.Exists(hostPath))
+            {
+                Logger.LogErr($"Host file not found: {hostPath}\n");
+                return 1;
+            }
+
+            if (XisoPaths.AreSamePath(xisoPath, hostPath))
+            {
+                Logger.LogErr($"Error: host file {hostPath} is the image itself; choose another file\n");
+                return 1;
+            }
+
+            var backupPath = xisoPath + ".old";
+            var hadBackup = File.Exists(backupPath);
+            try
+            {
+                XisoReader.CopyIn(xisoPath, hostPath, internalPath, createBackup: !copyInNoBackup);
+                if (!copyInNoBackup)
+                {
+                    Logger.Log(hadBackup
+                        ? $"Backup of pre-patch image replaced at {backupPath}\n"
+                        : $"Backup of pre-patch image written to {backupPath}\n");
+                }
+
+                Logger.Log($"Copied {hostPath} into {xisoPath}:{internalPath}\n");
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException
                                            or ExtractErrorException)
@@ -3064,6 +3132,7 @@ internal static class Program
         bool unpackMode,
         bool hashMode,
         bool copyOut,
+        bool copyIn,
         bool auditMode,
         bool validateMode,
         bool tree,
@@ -3081,7 +3150,7 @@ internal static class Program
             return 0;
         }
 
-        if (rewrite || info || lsMode || xexInfoMode || unpackMode || hashMode || copyOut || auditMode ||
+        if (rewrite || info || lsMode || xexInfoMode || unpackMode || hashMode || copyOut || copyIn || auditMode ||
             validateMode || tree || !extract || checksumFlagMode)
         {
             Logger.LogErr("Error: --pack cannot be combined with other modes\n");
@@ -3305,7 +3374,10 @@ internal static class Program
                                                    Mutually exclusive modes:
 
                                                      -c <dir> [name]     Create xiso from file(s) starting in <dir>.
-                                                     --copy-out <iso> <path> <dest>  Copy a file or directory out of an xiso.
+                                                      --copy-out <iso> <path> <dest>  Copy a file or directory out of an xiso.
+                                                      --copy-in <iso> <host> <path>  Copy a host file into an xiso
+                                                                            (replace or add; writes <iso>.old backup
+                                                                            unless --no-backup).
                                                      -i <file> [path]    Show volume info and directory entry metadata.
                                                      --ls <file> [path]   List the entries of a directory (default root)
                                                                            without recursion. Mirrors 'ls' on the image.

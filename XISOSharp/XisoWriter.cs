@@ -518,26 +518,6 @@ public static class XisoWriter
     {
         var fs = (FileStream)context!;
 
-        var fileSizeForEntry = avl.FileSize;
-        if (avl.Subdirectory != null)
-        {
-            fileSizeForEntry += (Constants.SectorSize - (avl.FileSize % Constants.SectorSize)) % Constants.SectorSize;
-        }
-
-        if (avl.Filename.Contains('/') || avl.Filename.Contains('\\'))
-        {
-            throw new InvalidOperationException(
-                $"Filename '{avl.Filename}' contains path separator characters ('/' or '\\') which are not allowed in XISO directory entries.");
-        }
-
-        var attributes = avl.Subdirectory != null ? Constants.AttributeDir : Constants.AttributeArc;
-        var length = (byte)avl.Filename.Length;
-
-        var lOffset = (ushort)(avl.Left != null ? avl.Left.Offset / Constants.DwordSize : 0);
-        var rOffset = (ushort)(avl.Right != null ? avl.Right.Offset / Constants.DwordSize : 0);
-
-        Span<byte> leBuf = stackalloc byte[4];
-
         var pos = fs.Seek(0, SeekOrigin.Current);
         var targetPos = avl.Offset + avl.DirStart;
         var pad = targetPos - pos;
@@ -548,19 +528,9 @@ public static class XisoWriter
             fs.Write(padBuf);
         }
 
-        BinaryPrimitives.WriteUInt16LittleEndian(leBuf[..2], lOffset);
-        fs.Write(leBuf[..2]);
-        BinaryPrimitives.WriteUInt16LittleEndian(leBuf[..2], rOffset);
-        fs.Write(leBuf[..2]);
-        BinaryPrimitives.WriteUInt32LittleEndian(leBuf, avl.StartSector);
-        fs.Write(leBuf);
-        BinaryPrimitives.WriteUInt32LittleEndian(leBuf, fileSizeForEntry);
-        fs.Write(leBuf);
-        fs.WriteByte(attributes);
-        fs.WriteByte(length);
-
-        var nameBytes = Latin1Encoding.Instance.GetBytes(avl.Filename);
-        fs.Write(nameBytes, 0, length);
+        // Shared record encoder (TODO #3): byte-identical to the previous inline version.
+        var record = DirectoryEntryTableWriter.EncodeEntry(avl);
+        fs.Write(record, 0, record.Length);
 
         return 0;
     }
@@ -1196,16 +1166,8 @@ public static class XisoWriter
     /// <param name="outSize">Running total size of the directory table; updated in place.</param>
     internal static void CalculateDirectorySize(AvlNode avl, ref uint outSize)
     {
-        var length = (uint)(Constants.FilenameOffset + avl.Filename.Length);
-        length += (Constants.DwordSize - (length % Constants.DwordSize)) % Constants.DwordSize;
-
-        if (NumSectors(outSize + length) > NumSectors(outSize))
-        {
-            outSize += (Constants.SectorSize - (outSize % Constants.SectorSize)) % Constants.SectorSize;
-        }
-
-        avl.Offset = outSize;
-        outSize += length;
+        // Shared table-layout primitive (TODO #3): identical offsets to SerializeTable.
+        DirectoryEntryTableWriter.PlaceEntry(avl, ref outSize);
     }
 
     /// <summary>Local helper for sector count calculation (ceiling division).</summary>

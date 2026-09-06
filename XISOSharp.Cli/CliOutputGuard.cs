@@ -46,7 +46,7 @@ internal static class CliOutputGuard
         "-v", "-h", "-c", "-x", "--unpack", "-X", "-l", "-t", "-i",
         "--ls", "--xex-info", "--md5", "--sha256", "-V", "validate",
         "--validate", "--validate-checksums", "--validate-strict",
-        "--validate-report", "--copy-out", "-r", "-q", "-Q", "-s", "-D",
+        "--validate-report", "--copy-out", "--copy-in", "--no-backup", "-r", "-q", "-Q", "-s", "-D",
         "-m", "-y", "--yes", "-n", "--no", "-d", "-o", "-O", "--output",
         "-p", "--skip-sectors", "--prepend-sectors", "--batch",
         "--batch-recursive", "--skip-existing", "--continue-on-error", "--pack", "--video",

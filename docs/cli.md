@@ -60,6 +60,8 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--batch <dir>` | Process **all `.iso` files** in `<dir>` instead of explicit filenames. Sorted for deterministic order. Works with extract, list, tree, rewrite (`-r`), and audit (`-V`), and `checksum`; rejected with single-ISO modes and explicit filenames. |
 | `--batch-recursive` | With `--batch`, search subdirectories recursively. |
 | `--copy-out <iso> <path> <dest>` | Copy a single file **or an entire directory** out of an ISO to `<dest>`. Supports `--skip-existing` (resume). |
+| `--copy-in <iso> <host> <path>` | Copy a host file **into** an ISO, modifying it in place: replaces `<path>` when it exists, adds it as a new file otherwise. Writes an `<iso>.old` backup first unless `--no-backup`. See [CopyIn](api-xisoreader.md#copyin). |
+| `--no-backup` | With `--copy-in`, skip the `<iso>.old` backup (rejected without `--copy-in`). |
 | `-r` | **Rewrite** each ISO as an optimized ISO (see [Optimized-tag detection](#optimized-tag-detection)). Already-optimized images are skipped. |
 | `validate <src> <out>` | Standalone **validation** command — must be the **first** token. See [Validation](validation.md). |
 | `--video` | **Redump:** extract video partition (`L0` head + `L1` tail) via `XisoRedump.TryExtractVideo` + `XgdTables` wave tables; writes `*.video.iso`. Fails gracefully when `videoType==-1`. See [Archival](archival.md#video). |
@@ -300,7 +302,7 @@ only when the next token does not start with `-`.
 ## Batch / multi-ISO processing
 
 - `-l`, `-t`, `-x`, `-r`, `-V`, and `checksum` accept **multiple** ISO files.
-- `-i`, `--md5`, `--sha256`, `--copy-out`, and `validate` operate on a single ISO.
+- `-i`, `--md5`, `--sha256`, `--copy-out`, `--copy-in`, and `validate` operate on a single ISO.
 - `--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`--all`/`--best`/`--compress` are batch modes (run via `RunRedumpBatch`) with `-o` single-file guard.
 - Per-ISO counters reset for each image; cumulative counters (`TotalFilesAllIsos`,
   `TotalBytesAllIsos`) span the whole run.
@@ -387,6 +389,9 @@ XISOSharp.Cli --xex-info game360.iso /default.xex
 
 # Copy one directory out of an image
 XISOSharp.Cli --copy-out game.iso /media ./media_out
+
+# Patch one file into an image (replaces /config.ini; keeps game.iso.old backup)
+XISOSharp.Cli --copy-in game.iso ./my-config.ini /config.ini
 
 # --- Archival (Redump) ---
 

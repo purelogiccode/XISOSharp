@@ -80,6 +80,18 @@ Files already on disk with matching sizes are skipped (`skip: <path>`); missing 
 short files are written. XISO stores no per-file timestamps, so size is the match
 signal. See [CLI Reference](cli.md#resume-interrupted-unpacks).
 
+**How do I replace a file inside an ISO without rebuilding it?**
+
+Use `--copy-in` (the reverse of `--copy-out`): it patches one host file into the
+image in place, replacing the entry when it exists or adding it otherwise:
+
+```bash
+XISOSharp.Cli --copy-in game.iso ./my-config.ini /config.ini
+```
+
+A `game.iso.old` backup is kept unless `--no-backup` is passed. See
+[CLI Reference](cli.md) and [CopyIn](api-xisoreader.md#copyin).
+
 **Why does rewrite/compress refuse with "is the same file as the input"?**
 
 An output pointing back at its own input is refused (exit 1) to prevent silent data
@@ -148,7 +160,8 @@ No — split-file images are out of scope. XISOSharp works with single-file imag
 
 **Where is the C# code different from the C original?**
 
-Only additively: new CLI flags (`-t`, `-i`, `-V`, `-o`, `--copy-out`, `--md5`,
+Only additively: new CLI flags (`-t`, `-i`, `-V`, `-o`, `--copy-out`, `--copy-in`,
+`--no-backup`, `--md5`,
 `--sha256`, `-X`, `--skip-sectors`, `--prepend-sectors`, `--skip-existing`,
 `validate`/`--validate*`), the input==output safety guard, misplaced-flag
 diagnostics, `-d` tolerance for batch-script artifacts (trailing separators,

@@ -39,6 +39,8 @@ Highlights:
 | Exclude patterns | `ExcludePatternsTests.cs` |
 | Skip/prepend sectors | `SkipPrependSectorsTests.cs` |
 | Unpack resume (`UnpackOptions.SkipExisting`, cancel+resume, copy-out) | `UnpackResumeTests.cs` |
+| Table writer (offsets, encoding, byte-identity with writer output) | `DirectoryEntryTableWriterTests.cs` |
+| In-place patching (replace/add, table moves, errors, backup, `.xbe`, `--copy-in` CLI) | `XisoPatcherTests.cs` |
 | Extraction robustness (truncation errors, file context, `--continue-on-error`, CLI) | `ExtractRobustnessTests.cs` |
 | XISO → ZAR conversion (extract round-trip, zstd ratio gate, reader hashes, `removeUpdate`, offsets, `zarchive.exe` interop) | `XisoZarConvertTests.cs` |
 | Input==output safety guards (library + CLI) and misplaced-flag errors | `XisoOutputGuardTests.cs`, `CliOutputGuardTests.cs` |

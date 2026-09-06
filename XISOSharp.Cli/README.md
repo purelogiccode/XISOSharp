@@ -17,6 +17,7 @@ XISOSharp.Cli [options] -c <dir> [name] [-c <dir> [name]] ...
 |---|---|
 | `-c <dir> [name]` | Create xiso from file(s) starting in `<dir>` |
 | `--copy-out <iso> <path> <dest>` | Copy a file or directory out of an xiso |
+| `--copy-in <iso> <host> <path>` | Copy a host file into an xiso (replace or add; writes `<iso>.old` backup unless `--no-backup`) |
 | `-i <file> [path]` | Show volume info and directory entry metadata |
 | `-l` | List files in xiso(s) |
 | `--md5 <file> [path]` | Compute MD5 hash of file(s) in xiso |
@@ -49,6 +50,7 @@ These commands are not present in the original C tool:
 - **`-V`** — Deep integrity audit (header, tree, sector bounds, cycle detection)
 - **`-o`** — Custom output filename for rewrite mode
 - **`--copy-out`** — Selective file/directory extraction
+- **`--copy-in`** — Patch a host file into an image in place
 - **`--md5` / `--sha256`** — Per-file hash computation
 
 ## License

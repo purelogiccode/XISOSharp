@@ -235,6 +235,20 @@ public static void CopyOut(string isoPath, string internalPath, string destPath)
 - `InvalidDataException` — path does not exist in the XISO
 - `IOException` — read or write errors
 
+#### `CopyIn`
+
+Copies a host file into an XISO image, modifying it in place: replaces the entry at `internalPath` when it exists, or adds it as a new file when only its parent directory exists. A `.old` backup of the pre-patch image is written first unless `createBackup` is false.
+
+```csharp
+public static void CopyIn(string isoPath, string hostFile, string internalPath, bool createBackup = true)
+```
+
+**Exceptions**:
+- `FileNotFoundException` — host file does not exist
+- `InvalidDataException` — path malformed, parent missing, target is a directory, or data does not fit in free space
+- `XisoFormatException` — not a valid XISO image
+- `IOException` — read or write errors
+
 #### `ComputeFileHash`
 
 Computes the hash of a single file within an XISO image.

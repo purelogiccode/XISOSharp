@@ -115,6 +115,7 @@ XISOSharp.Cli -c --file-time 0 ./game_files det.iso  # deterministic: byte-ident
 
 # Copy-out / hash / XEX / batch
 XISOSharp.Cli --copy-out game.iso /media ./media_out
+XISOSharp.Cli --copy-in game.iso ./my-config.ini /config.ini  # patch one file in (keeps .old backup)
 XISOSharp.Cli --md5 game.iso                 # or --sha256
 XISOSharp.Cli --xex-info game360.iso /default.xex
 XISOSharp.Cli --batch -d ./out ./isos        # all *.iso sorted
@@ -233,6 +234,10 @@ EntryInfo? e = XisoReader.GetEntryInfo("game.iso", "/default.xbe");
 // Volume & copy-out
 VolumeInfo vol = XisoReader.GetVolumeInfo("game.iso"); // IsValid, RootDirSector/Size, DiscLseek, FileLength
 XisoReader.CopyOut("game.iso", "/media", "./media_out");
+
+// Copy-in: patch one host file into the image in place (replace or add;
+// keeps game.iso.old backup unless createBackup: false)
+XisoReader.CopyIn("game.iso", "./my-config.ini", "/config.ini");
 
 // Hash / audit / validate
 byte[]? md5 = XisoReader.ComputeFileHash("game.iso", "/default.xbe", System.Security.Cryptography.HashAlgorithmName.MD5);
@@ -387,6 +392,7 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | Per-file MD5 / SHA-256 | ✅ | ❌ | ❌ | 🟡 MD5 |
 | SHA3-256 image checksum (`checksum`) | ✅ | ❌ | ❌ | ✅ |
 | `copy-out` single file/dir | ✅ | ❌ | ❌ | ✅ |
+| `copy-in` single file (in-place patch + `.old` backup) | ✅ | ❌ | ❌ | ❌ (open #165) |
 | Resume interrupted unpack (`--skip-existing` / `UnpackOptions.SkipExisting`) | ✅ | ❌ | ❌ | ❌ (open #190) |
 | Deep audit `-V` (header/tag/cycles/bounds/0x48/0x0000) | ✅ | ❌ | ❌ | ❌ |
 | `validate` + `--validate*` JSON report | ✅ | ❌ | ❌ | ❌ |
