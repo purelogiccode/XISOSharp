@@ -17,6 +17,7 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 - [CopyIn](#copyin)
 - [ComputeFileHash / ComputeDirectoryHashes](#computefilehash--computedirectoryhashes)
 - [AuditXiso](#auditxiso)
+- [Repair](#repair)
 - [Disc offset probing](#disc-offset-probing)
 
 ## Method index
@@ -44,6 +45,7 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 | `ComputeDirectoryHashes` | Hash every file under a path |
 | `GetXexInfo` | Parse the Xbox 360 XEX2 header of a `.xex` file |
 | `AuditXiso` | Deep integrity audit |
+| `Repair` | Fix safely-patchable issues in place (`.old` backup, dry-run) |
 
 ## VerifyXiso
 
@@ -493,6 +495,42 @@ Deep integrity audit — the library behind the CLI's `-V` flag:
 - filename validity
 
 Returns `AuditResult` (`IsValid`, `FilesChecked`, `DirsChecked`, `Issues`).
+
+## Repair
+
+```csharp
+public static RepairResult Repair(string isoPath, bool createBackup = true, bool dryRun = false)
+// same behavior via XisoRepairer.RepairInPlace(isoPath, createBackup, dryRun)
+```
+
+Fixes the audit's safely-patchable (class-C) issues in place — the only repair
+verb any of the reference tools offers (TODO #26, Phase 1):
+
+- **Reserved attribute bits** — the entry's attribute byte is rewritten with
+  `Constants.MaskAttributes` (`& 0xB7`); readers already mask, so this is pure
+  normalization.
+- **Missing optimized tag** — the exact tag bytes `CreateXiso` writes are
+  stored at offset 31337 (only when the file is long enough to hold them).
+- **Separators in filenames** — length-preserving `_` substitution (the name
+  length byte is untouched, so the table layout cannot shift). When two names
+  would collide, the entry is left alone and reported.
+
+Every patch is length-preserving: the image size never changes and every other
+byte is untouched. Pointers from records with reserved bits are not trusted
+(the collect walk skips descending into them until their fix is decided, then
+converges over bounded passes), so a corrupt directory entry can never send
+repairs wandering into file data. Each pass ends with a re-audit — repairing a
+clean image is a no-op success.
+
+Truncation, structural (depth/chain/cycle), and refused (bad magic/root)
+classes are reported, never patched (Phase 2 salvage rebuild). CISO
+containers and split parts are refused with `InvalidDataException`
+(decompress/reassemble first); invalid images fail with `XisoFormatException`
+before anything is written. A `<iso>.old` backup is written first (replacing
+any previous backup) unless `createBackup` is false. Returns `RepairResult`
+(`Fixed`, `Remaining`, `BackupPath`, `DryRun`; `Success` when the image now
+passes). CLI: `--repair <file>` (`--dry-run` previews; `--no-backup` skips the
+backup).
 
 ## Disc offset probing
 

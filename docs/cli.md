@@ -60,11 +60,13 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--md5 <file> [path]` | Compute **MD5** hashes of files **inside** the image. No `path` → hash every file in the image; directory → recursive; file → single hash. Output: lowercase hex + two spaces + path. |
 | `--sha256 <file> [path]` | Compute **SHA-256** hashes of files inside the image (same semantics as `--md5`). |
 | `-V <file1.xiso> ...` | **Audit** — deep integrity check of one or more images: header, tree walk, sector bounds, cycle detection, reserved attribute bits `0x48` masked, `0x0000` sentinel, optimized tag. Prints `Files checked` / `Dirs checked` / `Result: PASS|FAIL (N issue(s))`. |
+| `--repair <file>` | **Repair** — fix the audit's safely-patchable issues in place: reserved attribute bits, missing optimized tag, separators in filenames. Writes `<file>.old` backup first unless `--no-backup`. Prints `Fixed:` / `Result: PASS|FAIL`. Truncation/structural issues are reported, never patched. See [Repair](api-xisoreader.md#repair). |
+| `--dry-run` | With `--repair`, preview the fixes without changing anything (exit mirrors the audit: `1` when fixes would apply). Rejected without `--repair`. |
 | `--batch <dir>` | Process **all `.iso` files** in `<dir>` instead of explicit filenames. Sorted for deterministic order. Works with extract, list, tree, rewrite (`-r`), and audit (`-V`), and `checksum`; rejected with single-ISO modes and explicit filenames. |
 | `--batch-recursive` | With `--batch`, search subdirectories recursively. |
 | `--copy-out <iso> <path> <dest>` | Copy a single file **or an entire directory** out of an ISO to `<dest>`. Supports `--skip-existing` (resume). |
 | `--copy-in <iso> <host> <path>` | Copy a host file **into** an ISO, modifying it in place: replaces `<path>` when it exists, adds it as a new file otherwise. Writes an `<iso>.old` backup first unless `--no-backup`. See [CopyIn](api-xisoreader.md#copyin). |
-| `--no-backup` | With `--copy-in`, skip the `<iso>.old` backup (rejected without `--copy-in`). |
+| `--no-backup` | With `--copy-in` or `--repair`, skip the `<iso>.old` backup (rejected without either). |
 | `-r` | **Rewrite** each ISO as an optimized ISO (see [Optimized-tag detection](#optimized-tag-detection)). Already-optimized images are skipped. |
 | `validate <src> <out>` | Standalone **validation** command — must be the **first** token. See [Validation](validation.md). |
 | `--video` | **Redump:** extract video partition (`L0` head + `L1` tail) via `XisoRedump.TryExtractVideo` + `XgdTables` wave tables; writes `*.video.iso`. Fails gracefully when `videoType==-1`. See [Archival](archival.md#video). |

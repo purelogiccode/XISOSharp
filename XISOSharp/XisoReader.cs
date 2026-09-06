@@ -146,7 +146,7 @@ public static class XisoReader
             var found = false;
             foreach (var probe in probes)
             {
-                fs.Seek((long)Constants.HeaderOffset + probe, SeekOrigin.Begin);
+                fs.Seek(Constants.HeaderOffset + probe, SeekOrigin.Begin);
                 ReadExact(fs, buffer);
 
                 if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
@@ -643,10 +643,10 @@ public static class XisoReader
                                 throw new XisoFormatException(
                                     $"invalid TOC entry at '{subPath}': directory start sector {startSector} " +
                                     $"(seek {subStart}) points outside the image (length {fs.Length}).");
-                            if ((ulong)fileSize > (ulong)(fs.Length - subStart))
+                            if (fileSize > (ulong)(fs.Length - subStart))
                                 throw new XisoFormatException(
                                     $"invalid TOC entry at '{subPath}': directory size {fileSize} " +
-                                    $"(ends at {subStart + (long)fileSize}) exceeds image length {fs.Length}).");
+                                    $"(ends at {subStart + fileSize}) exceeds image length {fs.Length}).");
 
                             var subdir = new DirEntry
                             {
@@ -2578,7 +2578,7 @@ public static class XisoReader
             CheckTableBounds(fs, fileLength, tableStart, tableSize, dirPath);
 
             var tableSector = (uint)((tableStart - discLseek) / Constants.SectorSize);
-            var tableSectorCount = (uint)((tableSize + Constants.SectorSize - 1) / Constants.SectorSize);
+            var tableSectorCount = (tableSize + Constants.SectorSize - 1) / Constants.SectorSize;
             entries.Add(new FileSectorExtent(dirPath, true, tableSector, tableSectorCount, tableSize));
             if (tableSectorCount > 0)
                 used.Add(new SectorRange(tableSector, tableSectorCount));
@@ -2603,7 +2603,7 @@ public static class XisoReader
                     CheckFileBounds(fs, fileLength, discLseek, entry, entryPath);
                     var sectorCount = size == 0
                         ? 0u
-                        : (uint)((size + Constants.SectorSize - 1) / Constants.SectorSize);
+                        : (size + Constants.SectorSize - 1) / Constants.SectorSize;
                     entries.Add(new FileSectorExtent(entryPath, false, sector, sectorCount, size));
                     if (sectorCount > 0)
                         used.Add(new SectorRange(sector, sectorCount));
@@ -2737,7 +2737,7 @@ public static class XisoReader
     {
         _ = fs;
         if (tableStart < 0 || tableStart >= fileLength ||
-            tableSize > (ulong)fileLength || tableStart > fileLength - (long)tableSize)
+            tableSize > (ulong)fileLength || tableStart > fileLength - tableSize)
             throw new XisoFormatException(
                 $"invalid TOC entry at '{dirPath}': directory table at offset {tableStart} " +
                 $"(size {tableSize}) points outside the image (length {fileLength}).");
@@ -2764,7 +2764,7 @@ public static class XisoReader
         {
             if (r.SectorCount == 0 || r.StartSector >= totalSectors)
                 continue;
-            var count = Math.Min((long)r.SectorCount, totalSectors - r.StartSector);
+            var count = Math.Min(r.SectorCount, totalSectors - r.StartSector);
             clamped.Add(r with { SectorCount = (uint)count });
         }
 
@@ -2776,7 +2776,7 @@ public static class XisoReader
             {
                 var last = merged[^1];
                 var lastEnd = (long)last.StartSector + last.SectorCount;
-                if ((long)r.StartSector <= lastEnd)
+                if (r.StartSector <= lastEnd)
                 {
                     var end = Math.Max(lastEnd, (long)r.StartSector + r.SectorCount);
                     merged[^1] = last with { SectorCount = (uint)(end - last.StartSector) };
@@ -2797,7 +2797,7 @@ public static class XisoReader
         long cursor = 0;
         foreach (var r in used)
         {
-            if ((long)r.StartSector > cursor)
+            if (r.StartSector > cursor)
                 free.Add(new SectorRange((uint)cursor, (uint)(r.StartSector - cursor)));
             cursor = Math.Max(cursor, (long)r.StartSector + r.SectorCount);
         }
@@ -2918,6 +2918,31 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Repairs the class-C issues of an XISO image in place (TODO #26, Phase 1;
+    /// facade over <see cref="XisoRepairer.RepairInPlace"/>): reserved attribute
+    /// bits, a missing optimized tag, and path separators in filenames.
+    /// The image is modified in place; a <c>.old</c> backup of the pre-repair
+    /// image is written first unless <paramref name="createBackup"/> is false.
+    /// Truncation, structural, and refused classes are reported, never patched.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO image (modified in place).</param>
+    /// <param name="createBackup">Write a <c>.old</c> backup first (default true).</param>
+    /// <param name="dryRun">Preview the fixes without changing anything (default false).</param>
+    /// <returns>
+    /// The applied (or would-be) fixes plus the post-repair audit issues.
+    /// </returns>
+    /// <exception cref="FileNotFoundException">The image file does not exist.</exception>
+    /// <exception cref="XisoFormatException">The image is not a valid XISO.</exception>
+    /// <exception cref="InvalidDataException">
+    /// The image is a CISO container or a split part; neither is patch-stable.
+    /// </exception>
+    /// <exception cref="IOException">Thrown on read/write errors.</exception>
+    public static RepairResult Repair(string isoPath, bool createBackup = true, bool dryRun = false)
+    {
+        return XisoRepairer.RepairInPlace(isoPath, createBackup, dryRun);
+    }
+
+    /// <summary>
     /// Splits an XISO image into sector-aligned parts of at most
     /// <paramref name="partSizeBytes"/> bytes (TODO #17, xdvdfs #97; facade
     /// over <see cref="XisoSplitter.Split"/>).
@@ -3028,7 +3053,7 @@ public static class XisoReader
                 }
             }
 
-            if (new FileInfo(destPath).Length != (long)entry.FileSize)
+            if (new FileInfo(destPath).Length != entry.FileSize)
             {
                 throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
                     entry.FileSize, new FileInfo(destPath).Length);

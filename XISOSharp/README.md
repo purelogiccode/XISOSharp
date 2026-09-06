@@ -399,6 +399,22 @@ public static AuditResult AuditXiso(string isoPath)
 - `FileNotFoundException` — input file does not exist
 - `IOException` — read errors
 
+#### `Repair`
+
+Repairs the audit's safely-patchable (class-C) issues in place: reserved attribute bits (rewritten with `MaskAttributes`), a missing optimized tag (exact `CreateXiso` tag bytes at offset 31337), and path separators in filenames (length-preserving `_` substitution; left alone on collision). Every patch is length-preserving — image size never changes. Pointers from corrupt records are not trusted (converges over bounded passes); truncation, structural, and refused classes are reported, never patched. A `.old` backup is written first unless `createBackup` is false.
+
+```csharp
+public static RepairResult Repair(string isoPath, bool createBackup = true, bool dryRun = false)
+```
+
+**Returns**: A `RepairResult` record with `Fixed`, `Remaining`, `BackupPath`, `DryRun`, and `Success` (true when the image now passes the audit).
+
+**Exceptions**:
+- `FileNotFoundException` — input file does not exist
+- `InvalidDataException` — CISO container or split part (decompress/reassemble first)
+- `XisoFormatException` — not a valid XISO image
+- `IOException` — read or write errors
+
 ---
 
 Static class for creating and rewriting XISO disc images.
@@ -771,6 +787,18 @@ Result of a deep integrity audit of an XISO image.
 | `FilesChecked` | `int` | Number of file entries audited. |
 | `DirsChecked` | `int` | Number of directory entries audited. |
 | `Issues` | `IReadOnlyList<string>` | List of human-readable issues found during the audit. |
+
+#### `RepairResult`
+
+Outcome of an in-place repair pass (`Repair`).
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Fixed` | `IReadOnlyList<string>` | Applied (or dry-run would-be) fixes. |
+| `Remaining` | `IReadOnlyList<string>` | Post-repair audit issues; empty when the image passes. |
+| `BackupPath` | `string?` | Path of the `.old` pre-repair backup, or `null` when none was written. |
+| `DryRun` | `bool` | Whether this was a preview pass that changed nothing. |
+| `Success` | `bool` | True when `Remaining` is empty. |
 
 ---
 

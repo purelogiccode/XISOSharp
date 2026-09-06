@@ -253,6 +253,7 @@ Paths are destination-root-relative, forward-slash separated, case-insensitive
 | `VolumeInfo` | `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name), `FileLength`, `TotalSectors` |
 | `EntryInfo` | `Name`, `IsDirectory`, `StartSector`, `FileSize`, `Attributes` (masked `0xB7`), `LeftChildOffset`, `RightChildOffset` |
 | `AuditResult` | `IsValid`, `FilesChecked`, `DirsChecked`, `Issues` (incl. `Reserved attribute bits set: 0x…`) |
+| `RepairResult` | `Fixed`, `Remaining`, `BackupPath`, `DryRun`, `Success` — outcome of `XisoReader.Repair` (see [Repair](api-xisoreader.md#repair)) |
 | `ValidationIssue` | `Type`, `Path`, `SourceSize`, `OutputSize`, `SourceHash`, `OutputHash` |
 | `ValidationResult` | `Passed`, `SourceFileCount`, `OutputFileCount`, `SourceDirCount`, `OutputDirCount`, `SourceTotalBytes`, `OutputTotalBytes`, `Issues` |
 | `ProgressInfo` | `Type` (`ProgressInfoType`), `Count`, `Path`, `Sector`, `Size` — structured progress event for writes and extraction (see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo)) |
