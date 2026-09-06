@@ -45,22 +45,26 @@ public class XisoFilesystemTests : IDisposable
     /// <summary>Synchronous progress sink: handlers run inline on the unpacking thread.</summary>
     private sealed class InlineProgress(Action<ProgressInfo> callback) : IProgress<ProgressInfo>
     {
-        public void Report(ProgressInfo info) => callback(info);
+        private readonly Action<ProgressInfo> _callback = callback;
+        public void Report(ProgressInfo info) => _callback(info);
     }
 
     /// <summary>Destination that fails one exact path, for continue-on-error tests.</summary>
     private sealed class ThrowingFilesystem(IFilesystem inner, string bombPath) : IFilesystem
     {
+        private readonly string _bombPath = bombPath;
+        private readonly IFilesystem _inner = inner;
+
         public Stream CreateFile(string path) =>
-            path.Equals(bombPath, StringComparison.OrdinalIgnoreCase)
+            path.Equals(_bombPath, StringComparison.OrdinalIgnoreCase)
                 ? throw new IOException("disk full")
-                : inner.CreateFile(path);
+                : _inner.CreateFile(path);
 
-        public void CreateDirectory(string path) => inner.CreateDirectory(path);
+        public void CreateDirectory(string path) => _inner.CreateDirectory(path);
 
-        public bool FileExists(string path) => inner.FileExists(path);
+        public bool FileExists(string path) => _inner.FileExists(path);
 
-        public long FileLength(string path) => inner.FileLength(path);
+        public long FileLength(string path) => _inner.FileLength(path);
     }
 
     // ------------------------------------------------------------------
@@ -189,9 +193,9 @@ public class XisoFilesystemTests : IDisposable
         }
 
         Assert.Equal(["x/y/z.bin"], fs.FileNames);
-        Assert.Contains("x", fs.DirectoryNames);
-        Assert.Contains("x/y", fs.DirectoryNames);
-        Assert.DoesNotContain("x/y/z.bin", fs.DirectoryNames);
+        Assert.Contains("x", fs.DirectoryNames, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("x/y", fs.DirectoryNames, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("x/y/z.bin", fs.DirectoryNames, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]

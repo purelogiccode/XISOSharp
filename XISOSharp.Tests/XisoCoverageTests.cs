@@ -634,7 +634,9 @@ public class XisoCoverageTests : IDisposable
 
         var path = Path.Combine(dir, "zeros.iso");
         using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
             fs.SetLength(0x89D80000L + Constants.HeaderOffset + 1024);
+        }
 
         Assert.False(XisoReader.GetVolumeInfo(path).IsValid);
     }
@@ -760,16 +762,16 @@ public class XisoCoverageTests : IDisposable
     public void ListDirectory_DotEntry_SkippedButSiblingsListed()
     {
         var entries = XisoReader.ListDirectory(CreateDotEntryIso(), "/");
-        Assert.DoesNotContain(entries, static e => e.Name == ".");
-        Assert.Contains(entries, static e => e.Name == "b.txt");
+        Assert.DoesNotContain(entries, static e => string.Equals(e.Name, ".", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(entries, static e => string.Equals(e.Name, "b.txt", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
     public void GetSectorLayout_DotEntry_Skipped()
     {
         var layout = XisoReader.GetSectorLayout(CreateDotEntryIso());
-        Assert.DoesNotContain(layout.Entries, static e => e.Path == "/.");
-        Assert.Contains(layout.Entries, static e => e.Path == "/b.txt");
+        Assert.DoesNotContain(layout.Entries, static e => string.Equals(e.Path, "/.", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(layout.Entries, static e => string.Equals(e.Path, "/b.txt", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -790,7 +792,7 @@ public class XisoCoverageTests : IDisposable
         File.WriteAllBytes(bad, img);
 
         var layout = XisoReader.GetSectorLayout(bad);
-        Assert.Contains(layout.Entries, static e => e.Path == "/sub" && e.FileSize == 0);
+        Assert.Contains(layout.Entries, static e => string.Equals(e.Path, "/sub", StringComparison.OrdinalIgnoreCase) && e.FileSize == 0);
     }
 
     [Fact]
@@ -803,7 +805,7 @@ public class XisoCoverageTests : IDisposable
         }, "game.iso");
 
         var layout = XisoReader.GetSectorLayout(isoPath);
-        Assert.Contains(layout.Entries, static e => e.Path == "/empty.txt" && e.SectorCount == 0);
+        Assert.Contains(layout.Entries, static e => string.Equals(e.Path, "/empty.txt", StringComparison.OrdinalIgnoreCase) && e.SectorCount == 0);
     }
 
     [Fact]
@@ -1096,7 +1098,7 @@ public class XisoCoverageTests : IDisposable
         var isoPath = CreateIso(src =>
         {
             var fake = new byte[64];
-            Encoding.ASCII.GetBytes("XEX2").CopyTo(fake, 0);
+            "XEX2"u8.ToArray().CopyTo(fake, 0);
             BinaryPrimitives.WriteUInt32BigEndian(fake.AsSpan(0x14), 65u);
             File.WriteAllBytes(Path.Combine(src, "fake.xex"), fake);
         }, "game.iso");

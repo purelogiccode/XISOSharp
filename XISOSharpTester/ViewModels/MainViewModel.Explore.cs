@@ -170,15 +170,15 @@ internal partial class MainViewModel
     private void InitExploreCommands()
     {
         BrowseExploreImageCommand = new RelayCommand(_ => BrowseExploreImage());
-        OpenExploreImageCommand = new RelayCommand(_ => _ = OpenExploreImageAsync());
+        OpenExploreImageCommand = new RelayCommand(o => o = OpenExploreImageAsync());
         RefreshExploreCommand = new RelayCommand(
-            _ => _ = OpenExploreImageAsync(refresh: true),
+            o => o = OpenExploreImageAsync(refresh: true),
             _ => _explorer is not null && !IsExplorerBusy);
         CloseExploreImageCommand = new RelayCommand(
             _ => CloseExploreImage(),
             _ => _explorer is not null && !IsExplorerBusy);
-        CopyOutNodeCommand = new RelayCommand(_ => _ = CopyOutNodeAsync());
-        HashNodeCommand = new RelayCommand(_ => _ = HashNodeAsync());
+        CopyOutNodeCommand = new RelayCommand(o => o = CopyOutNodeAsync());
+        HashNodeCommand = new RelayCommand(o => o = HashNodeAsync());
     }
 
     private void BrowseExploreImage()

@@ -302,12 +302,16 @@ public static class XisoZarchive
     private sealed class XisoPackSource(
         FileStream isoFs, long xisoOffset, PathNode root, List<string> names, string displayPath) : IZarPackSource
     {
+        private readonly PathNode _root = root;
+        private readonly List<string> _names = names;
+        private readonly long _xisoOffset = xisoOffset;
+        private readonly FileStream _isoFs = isoFs;
         public string DisplayPath { get; } = displayPath;
 
         public IReadOnlyList<ZarPackEntry> Collect(CancellationToken cancellationToken = default)
         {
             var entries = new List<ZarPackEntry>();
-            Walk(root, string.Empty, entries, cancellationToken);
+            Walk(_root, string.Empty, entries, cancellationToken);
             return entries;
         }
 
@@ -316,7 +320,7 @@ public static class XisoZarchive
             foreach (var child in dir.Subnodes)
             {
                 ct.ThrowIfCancellationRequested();
-                var childPath = path.Length == 0 ? names[child.NameIndex] : path + "/" + names[child.NameIndex];
+                var childPath = path.Length == 0 ? _names[child.NameIndex] : path + "/" + _names[child.NameIndex];
                 if (!child.IsFile)
                 {
                     entries.Add(new ZarPackEntry { RelativePath = childPath, IsDirectory = true });
@@ -324,14 +328,14 @@ public static class XisoZarchive
                     continue;
                 }
 
-                var offset = xisoOffset + child.SourceOffset;
+                var offset = _xisoOffset + child.SourceOffset;
                 var size = (long)child.FileSize;
                 entries.Add(new ZarPackEntry
                 {
                     RelativePath = childPath,
                     IsDirectory = false,
                     Length = size,
-                    OpenRead = () => new XisoSliceStream(isoFs, offset, size, childPath),
+                    OpenRead = () => new XisoSliceStream(_isoFs, offset, size, childPath),
                 });
             }
         }
@@ -347,16 +351,19 @@ public static class XisoZarchive
     private sealed class XisoSliceStream(FileStream baseStream, long offset, long length, string path) : Stream
     {
         private long _position;
+        private readonly FileStream _baseStream = baseStream;
+        private readonly long _offset = offset;
+        private readonly string _path = path;
 
         public override bool CanRead => true;
         public override bool CanSeek => true;
         public override bool CanWrite => false;
-        public override long Length => length;
+        public override long Length { get; } = length;
 
         public override long Position
         {
             get => _position;
-            set => _position = Math.Clamp(value, 0, length);
+            set => _position = Math.Clamp(value, 0, Length);
         }
 
         public override int Read(byte[] buffer, int offset, int count) =>
@@ -364,7 +371,7 @@ public static class XisoZarchive
 
         public override int Read(Span<byte> buffer)
         {
-            var remaining = length - _position;
+            var remaining = Length - _position;
             if (remaining <= 0)
             {
                 return 0;
@@ -372,15 +379,15 @@ public static class XisoZarchive
 
             int toRead = (int)Math.Min(buffer.Length, remaining);
             int n;
-            lock (baseStream)
+            lock (_baseStream)
             {
-                baseStream.Seek(offset + _position, SeekOrigin.Begin);
-                n = baseStream.Read(buffer[..toRead]);
+                _baseStream.Seek(_offset + _position, SeekOrigin.Begin);
+                n = _baseStream.Read(buffer[..toRead]);
             }
 
             if (n == 0)
             {
-                throw new InvalidOperationException($"Truncated file data for {path}");
+                throw new InvalidOperationException($"Truncated file data for {_path}");
             }
 
             _position += n;
@@ -391,7 +398,7 @@ public static class XisoZarchive
         {
             SeekOrigin.Begin => offset,
             SeekOrigin.Current => _position + offset,
-            SeekOrigin.End => length + offset,
+            SeekOrigin.End => Length + offset,
             _ => throw new ArgumentOutOfRangeException(nameof(origin)),
         };
 

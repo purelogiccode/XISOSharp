@@ -1,5 +1,4 @@
 using XISOSharp.Cli;
-using ZARSharp;
 using ZARSharp.Pipeline;
 
 namespace XISOSharp.Tests;

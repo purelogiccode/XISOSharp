@@ -26,11 +26,14 @@ public sealed class MemoryFilesystem : IFilesystem
     /// </summary>
     private sealed class SinkStream(MemoryFilesystem owner, string key) : MemoryStream
     {
+        private readonly MemoryFilesystem _owner = owner;
+        private readonly string _key = key;
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
-                owner._files[key] = ToArray();
+                _owner._files[_key] = ToArray();
             }
 
             base.Dispose(disposing);

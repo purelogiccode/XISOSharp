@@ -41,8 +41,7 @@ public static class XisoSplitter
     /// <exception cref="ArgumentOutOfRangeException">The part index is negative.</exception>
     public static string PartPath(string outputBase, int partIndex)
     {
-        if (string.IsNullOrEmpty(outputBase))
-            throw new ArgumentException("Output base path must not be empty.", nameof(outputBase));
+        ArgumentException.ThrowIfNullOrEmpty(outputBase);
         if (partIndex < 0)
             throw new ArgumentOutOfRangeException(nameof(partIndex), "Part index must not be negative.");
         return Path.ChangeExtension(outputBase, $"{partIndex + 1}.iso");
@@ -146,10 +145,8 @@ public static class XisoSplitter
     public static string Join(string firstPartPath, string outputPath,
         CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
     {
-        if (string.IsNullOrEmpty(firstPartPath))
-            throw new ArgumentException("First part path must not be empty.", nameof(firstPartPath));
-        if (string.IsNullOrEmpty(outputPath))
-            throw new ArgumentException("Output path must not be empty.", nameof(outputPath));
+        ArgumentException.ThrowIfNullOrEmpty(firstPartPath);
+        ArgumentException.ThrowIfNullOrEmpty(outputPath);
         if (!IsSplitPath(firstPartPath))
             throw new ArgumentException(
                 $"Join expects the first split part (*.1.iso): {firstPartPath}", nameof(firstPartPath));
@@ -158,7 +155,7 @@ public static class XisoSplitter
 
         var baseName = firstPartPath[..^PartSuffixLength];
         var parts = new List<string> { firstPartPath };
-        for (var i = 1; ; i++)
+        for (var i = 1;; i++)
         {
             var next = PartPath(baseName, i);
             if (!File.Exists(next))
@@ -239,10 +236,8 @@ public static class XisoSplitter
     /// <exception cref="XisoFormatException">The image is not a valid XISO.</exception>
     private static long ValidateImage(string isoPath, string outputBase)
     {
-        if (string.IsNullOrEmpty(isoPath))
-            throw new ArgumentException("Image path must not be empty.", nameof(isoPath));
-        if (string.IsNullOrEmpty(outputBase))
-            throw new ArgumentException("Output base path must not be empty.", nameof(outputBase));
+        ArgumentException.ThrowIfNullOrEmpty(isoPath);
+        ArgumentException.ThrowIfNullOrEmpty(outputBase);
         if (!File.Exists(isoPath))
             throw new FileNotFoundException($"Image not found: {isoPath}", isoPath);
         var volume = XisoReader.GetVolumeInfo(isoPath);

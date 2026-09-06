@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using XISOSharp.BattleTests.Models;
-using ZARSharp;
 
 namespace XISOSharp.BattleTests;
 
@@ -192,12 +191,10 @@ internal static class ExtendedBattleRunner
             var csXiso = Path.Combine(csDir, "input.xiso");
             try
             {
-                using (var src = new FileStream(workInput, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
-                using (var dst = new FileStream(csXiso, FileMode.Create, FileAccess.Write, FileShare.None, 65536))
-                {
-                    src.Seek(isoOffset, SeekOrigin.Begin);
-                    CopyExact(src, dst, xisoLength);
-                }
+                using var src = new FileStream(workInput, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+                using var dst = new FileStream(csXiso, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+                src.Seek(isoOffset, SeekOrigin.Begin);
+                CopyExact(src, dst, xisoLength);
             }
             catch (Exception ex)
             {

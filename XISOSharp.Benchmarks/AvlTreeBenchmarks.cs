@@ -7,10 +7,6 @@ namespace XISOSharp.Benchmarks;
 [MemoryDiagnoser]
 [MinIterationCount(5)]
 [MaxIterationCount(20)]
-/// <summary>
-/// Benchmarks AVL directory-tree insert, fetch, traversal, and key comparison
-/// over a fixed set of 1000 file names.
-/// </summary>
 public class AvlTreeBenchmarks
 {
     private AvlNode? _root;

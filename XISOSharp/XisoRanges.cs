@@ -88,7 +88,7 @@ public static class XisoRanges
                     $"invalid TOC entry: directory cycle detected — table offset {childOffset} was already visited.");
             if (visited.Count > Constants.MaxTocEntriesPerTable)
                 throw new XisoFormatException(
-                    $"invalid TOC entry: too many entries in one directory table (possible corrupt offset chain).");
+                    "invalid TOC entry: too many entries in one directory table (possible corrupt offset chain).");
 
             var cur = isoOffset + rootOffset + childOffset;
             var curOffset = cur / SectorSize;

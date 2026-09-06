@@ -1,6 +1,5 @@
 using System.Buffers.Binary;
 using System.Text;
-using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
 
@@ -129,7 +128,10 @@ public sealed class XisoVerifyProbeTests : IDisposable
         // allocation); all probes miss, so the chain must reject the image.
         var path = Path.Combine(Path.GetTempPath(), $"xiso_probe_{Guid.NewGuid():N}.iso");
         using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
             fs.SetLength((long)Constants.Xgd2HybridLseekOffset + Constants.HeaderOffset + 64);
+        }
+
         _tempFiles.Add(path);
         Assert.Throws<XisoFormatException>(() => Verify(path));
     }

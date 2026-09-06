@@ -2716,7 +2716,7 @@ public static class XisoReader
             if (r.SectorCount == 0 || r.StartSector >= totalSectors)
                 continue;
             var count = Math.Min((long)r.SectorCount, totalSectors - r.StartSector);
-            clamped.Add(new SectorRange(r.StartSector, (uint)count));
+            clamped.Add(r with { SectorCount = (uint)count });
         }
 
         clamped.Sort(static (a, b) => a.StartSector.CompareTo(b.StartSector));
@@ -2730,7 +2730,7 @@ public static class XisoReader
                 if ((long)r.StartSector <= lastEnd)
                 {
                     var end = Math.Max(lastEnd, (long)r.StartSector + r.SectorCount);
-                    merged[^1] = new SectorRange(last.StartSector, (uint)(end - last.StartSector));
+                    merged[^1] = last with { SectorCount = (uint)(end - last.StartSector) };
                     continue;
                 }
             }

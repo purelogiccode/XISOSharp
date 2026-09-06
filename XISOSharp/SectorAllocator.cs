@@ -41,7 +41,7 @@ public sealed class SectorAllocator
                 "Total sectors must be non-negative.");
         }
 
-        if (totalSectors.HasValue && firstFreeSector > totalSectors.Value)
+        if (firstFreeSector > totalSectors)
         {
             throw new ArgumentOutOfRangeException(nameof(firstFreeSector), firstFreeSector,
                 "First free sector must not exceed total sectors.");

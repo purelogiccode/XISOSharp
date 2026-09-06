@@ -5,10 +5,6 @@ namespace XISOSharp.Benchmarks;
 [MemoryDiagnoser]
 [MinIterationCount(5)]
 [MaxIterationCount(20)]
-/// <summary>
-/// Benchmarks <see cref="BoyerMoore.Search(byte[])"/> over random haystacks of several
-/// sizes, with the media-enable pattern planted at the end.
-/// </summary>
 public class BoyerMooreBenchmarks
 {
     private BoyerMoore _bm = null!;

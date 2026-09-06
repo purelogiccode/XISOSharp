@@ -244,7 +244,9 @@ public class XisoCorruptionResilienceTests : IDisposable
         var src = CreateTempDir("xiso_corrupt_src");
         var bigPath = Path.Combine(src, "huge.bin");
         using (var fs = new FileStream(bigPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
             fs.SetLength(5L * 1024 * 1024 * 1024);
+        }
 
         var ex = Assert.Throws<XisoFileTooLargeException>(() =>
             XisoWriter.CreateXiso(src, CreateTempDir("xiso_corrupt_iso"), null, null, out _, null, null));

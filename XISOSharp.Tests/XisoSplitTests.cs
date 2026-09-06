@@ -143,8 +143,8 @@ public class XisoSplitTests : IDisposable
     [Fact]
     public void PartPath_Naming_And_IsSplitPath()
     {
-        Assert.Equal($"game.1.iso", XisoSplitter.PartPath("game", 0));
-        Assert.Equal($"game.2.iso", XisoSplitter.PartPath("game", 1));
+        Assert.Equal("game.1.iso", XisoSplitter.PartPath("game", 0));
+        Assert.Equal("game.2.iso", XisoSplitter.PartPath("game", 1));
         var withExt = Path.Combine("d", "game.iso");
         Assert.Equal(Path.Combine("d", "game.1.iso"), XisoSplitter.PartPath(withExt, 0));
         Assert.True(XisoSplitter.IsSplitPath(Path.Combine("d", "game.1.iso")));
@@ -247,7 +247,7 @@ public class XisoSplitTests : IDisposable
         var expected = parts.SelectMany(File.ReadAllBytes).ToArray();
         XisoReader.JoinSplitXiso(parts[0], joined);
         Assert.Equal(Sha(expected), Sha(File.ReadAllBytes(joined)));
-        Assert.NotEqual(Sha(File.ReadAllBytes(iso)), Sha(expected));
+        Assert.NotEqual(Sha(File.ReadAllBytes(iso)), Sha(expected), StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -346,6 +346,7 @@ public class XisoSplitTests : IDisposable
 
     private sealed class ProgressRecorder(List<ProgressInfo> events) : IProgress<ProgressInfo>
     {
-        public void Report(ProgressInfo value) => events.Add(value);
+        private readonly List<ProgressInfo> _events = events;
+        public void Report(ProgressInfo value) => _events.Add(value);
     }
 }

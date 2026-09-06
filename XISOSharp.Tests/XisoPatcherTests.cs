@@ -64,7 +64,7 @@ public class XisoPatcherTests : IDisposable
         return dest;
     }
 
-    private static void AssertAllFF(byte[] bytes)
+    private static void AssertAllFf(byte[] bytes)
     {
         Assert.All(bytes, static b => Assert.Equal(Constants.PadByte, b));
     }
@@ -133,7 +133,7 @@ public class XisoPatcherTests : IDisposable
         Assert.Equal("nested", File.ReadAllText(CopyOutToTemp(iso, "/subdir/nested.txt")));
         // Layout still fully valid.
         var layout = XisoReader.GetSectorLayout(iso);
-        Assert.Contains(layout.Entries, static e => e.Path == "/file2.txt" && e.FileSize == 100);
+        Assert.Contains(layout.Entries, static e => string.Equals(e.Path, "/file2.txt", StringComparison.OrdinalIgnoreCase) && e.FileSize == 100);
     }
 
     [Fact]
@@ -147,7 +147,7 @@ public class XisoPatcherTests : IDisposable
         var layout = XisoReader.GetSectorLayout(iso);
         var oldEntry = XisoReader.GetEntryInfo(iso, "/file2.txt");
         Assert.NotNull(oldEntry);
-        var parent = layout.Entries.First(static e => e.IsDirectory && e.Path == "/");
+        var parent = layout.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
         var oldSectors = (uint)((oldEntry.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize);
 
         var host = Path.Combine(CreateTempDir("xiso_patch_host"), "new.bin");
@@ -209,10 +209,10 @@ public class XisoPatcherTests : IDisposable
 
         // Old run wiped with 0xFF.
         var oldSectors = (uint)((oldEntry.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize);
-        AssertAllFF(ReadSectors(iso, layout.Volume.DiscLseek, oldEntry.StartSector, oldSectors));
+        AssertAllFf(ReadSectors(iso, layout.Volume.DiscLseek, oldEntry.StartSector, oldSectors));
 
         // Whole tree still extracts correctly.
-        AssertTreeEqual(iso, new Dictionary<string, byte[]>
+        AssertTreeEqual(iso, new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase)
         {
             ["file1.txt"] = content,
             ["file2.txt"] = File.ReadAllBytes(Path.Combine(src, "file2.txt")),
@@ -261,7 +261,7 @@ public class XisoPatcherTests : IDisposable
         Assert.Equal(0, new FileInfo(CopyOutToTemp(iso, "/file2.txt")).Length);
 
         var oldSectors = (uint)((oldEntry.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize);
-        AssertAllFF(ReadSectors(iso, layout.Volume.DiscLseek, oldEntry.StartSector, oldSectors));
+        AssertAllFf(ReadSectors(iso, layout.Volume.DiscLseek, oldEntry.StartSector, oldSectors));
     }
 
     [Fact]
@@ -281,7 +281,7 @@ public class XisoPatcherTests : IDisposable
 
         Assert.Equal(content, File.ReadAllBytes(CopyOutToTemp(iso, "/brand-new.bin")));
         var names = XisoReader.ListDirectoryFlat(iso, "/");
-        Assert.Contains("brand-new.bin", names);
+        Assert.Contains("brand-new.bin", names, StringComparer.OrdinalIgnoreCase);
 
         var backup = iso + ".old";
         Assert.True(File.Exists(backup));
@@ -337,8 +337,8 @@ public class XisoPatcherTests : IDisposable
         var iso = CreateIso(src);
 
         var before = XisoReader.GetSectorLayout(iso);
-        var subBefore = before.Entries.First(static e => e.IsDirectory && e.Path == "/subdir");
-        var rootBefore = before.Entries.First(static e => e.IsDirectory && e.Path == "/");
+        var subBefore = before.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/subdir", StringComparison.OrdinalIgnoreCase));
+        var rootBefore = before.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
         // On-disk directory sizes are sector-rounded (in-memory table is 2040 bytes).
         Assert.Equal(2048u, subBefore.FileSize);
         Assert.Equal(1u, subBefore.SectorCount);
@@ -348,14 +348,14 @@ public class XisoPatcherTests : IDisposable
         XisoPatcher.CopyIntoImage(iso, host, "/subdir/newf", createBackup: false);
 
         var after = XisoReader.GetSectorLayout(iso);
-        var subAfter = after.Entries.First(static e => e.IsDirectory && e.Path == "/subdir");
-        var rootAfter = after.Entries.First(static e => e.IsDirectory && e.Path == "/");
+        var subAfter = after.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/subdir", StringComparison.OrdinalIgnoreCase));
+        var rootAfter = after.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(2u, subAfter.SectorCount);
         Assert.NotEqual(subBefore.StartSector, subAfter.StartSector);
         // Grandparent (root) table itself did not move — only its entry changed.
         Assert.Equal(rootBefore.StartSector, rootAfter.StartSector);
         // Old table span wiped.
-        AssertAllFF(ReadSectors(iso, after.Volume.DiscLseek, subBefore.StartSector, subBefore.SectorCount));
+        AssertAllFf(ReadSectors(iso, after.Volume.DiscLseek, subBefore.StartSector, subBefore.SectorCount));
 
         Assert.Equal("0123456789", File.ReadAllText(CopyOutToTemp(iso, "/subdir/newf")));
         Assert.Equal("root", File.ReadAllText(CopyOutToTemp(iso, "/root.txt")));
@@ -371,7 +371,7 @@ public class XisoPatcherTests : IDisposable
 
         var volBefore = XisoReader.GetVolumeInfo(iso);
         var layoutBefore = XisoReader.GetSectorLayout(iso);
-        var rootBefore = layoutBefore.Entries.First(static e => e.IsDirectory && e.Path == "/");
+        var rootBefore = layoutBefore.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
         // Asymmetry by writer construction: the volume header stores the UNROUNDED
         // root table size, while subdirectory entry records store sector-rounded
         // sizes (the patcher preserves both conventions).
@@ -384,7 +384,7 @@ public class XisoPatcherTests : IDisposable
         var volAfter = XisoReader.GetVolumeInfo(iso);
         Assert.NotEqual(volBefore.RootDirSector, volAfter.RootDirSector);
         Assert.Equal(2068u, volAfter.RootDirSize);
-        AssertAllFF(ReadSectors(iso, volAfter.DiscLseek, rootBefore.StartSector, rootBefore.SectorCount));
+        AssertAllFf(ReadSectors(iso, volAfter.DiscLseek, rootBefore.StartSector, rootBefore.SectorCount));
 
         Assert.Equal("0123456789", File.ReadAllText(CopyOutToTemp(iso, "/newf")));
     }

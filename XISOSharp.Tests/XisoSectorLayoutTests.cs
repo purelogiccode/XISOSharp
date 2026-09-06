@@ -1,6 +1,5 @@
 using System.Buffers.Binary;
 using System.Text;
-using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
 
@@ -196,7 +195,7 @@ public class XisoSectorLayoutTests : IDisposable
     public void GetSectorLayout_InvalidImage_Throws()
     {
         var bad = Path.Combine(CreateTempDir("xiso_lay_bad"), "bad.iso");
-        File.WriteAllBytes(bad, Encoding.ASCII.GetBytes("not an xiso image at all"));
+        File.WriteAllBytes(bad, "not an xiso image at all"u8.ToArray());
 
         Assert.Throws<XisoFormatException>(() => XisoReader.GetSectorLayout(bad));
     }
@@ -220,7 +219,7 @@ public class XisoSectorLayoutTests : IDisposable
         }
 
         var ex = Assert.Throws<XisoFormatException>(() => XisoReader.GetSectorLayout(iso));
-        Assert.Contains("invalid TOC entry", ex.Message);
+        Assert.Contains("invalid TOC entry", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -249,8 +248,8 @@ public class XisoSectorLayoutTests : IDisposable
         }
 
         var ex = Assert.Throws<XisoFormatException>(() => XisoReader.GetSectorLayout(iso));
-        Assert.Contains("invalid TOC entry", ex.Message);
-        Assert.Contains("already visited", ex.Message);
+        Assert.Contains("invalid TOC entry", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("already visited", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

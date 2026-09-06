@@ -12,7 +12,7 @@ namespace XISOSharp.Tests;
 [Collection("Sequential")]
 public class XisoFileCopierTests : IDisposable
 {
-    private const int TwoMB = 2 * 1024 * 1024;
+    private const int TwoMb = 2 * 1024 * 1024;
 
     private readonly List<string> _tempDirs = [];
 
@@ -81,9 +81,9 @@ public class XisoFileCopierTests : IDisposable
     [InlineData(2047)]
     [InlineData(2048)]
     [InlineData(65536)]
-    [InlineData(TwoMB - 1)]
-    [InlineData(TwoMB)]
-    [InlineData(TwoMB + 1)]
+    [InlineData(TwoMb - 1)]
+    [InlineData(TwoMb)]
+    [InlineData(TwoMb + 1)]
     [InlineData(3 * 1024 * 1024)]
     public void CopyExact_RoundTrips_AllSizes(int size)
     {
@@ -95,7 +95,7 @@ public class XisoFileCopierTests : IDisposable
         var copied = XisoFileCopier.CopyExact(
             source, size,
             (buffer, count) => dest.Write(buffer, 0, count),
-            new byte[TwoMB],
+            new byte[TwoMb],
             progress.Add);
 
         Assert.Equal(size, copied);
@@ -122,7 +122,7 @@ public class XisoFileCopierTests : IDisposable
         var copied = XisoFileCopier.CopyExact(
             source, 0,
             (_, _) => chunks++,
-            new byte[TwoMB],
+            new byte[TwoMb],
             _ => progress++);
 
         Assert.Equal(0, copied);
@@ -136,7 +136,7 @@ public class XisoFileCopierTests : IDisposable
         using var source = new MemoryStream(new byte[300], writable: false);
 
         var ex = Assert.Throws<TruncatedCopyException>(() =>
-            XisoFileCopier.CopyExact(source, 1000, (_, _) => { }, new byte[TwoMB]));
+            XisoFileCopier.CopyExact(source, 1000, (_, _) => { }, new byte[TwoMb]));
 
         Assert.Equal(1000, ex.ExpectedBytes);
         Assert.Equal(300, ex.CopiedBytes);
@@ -152,7 +152,7 @@ public class XisoFileCopierTests : IDisposable
         var copied = XisoFileCopier.CopyExact(
             source, data.Length,
             (buffer, count) => dest.Write(buffer, 0, count),
-            new byte[TwoMB]);
+            new byte[TwoMb]);
 
         Assert.Equal(data.Length, copied);
         Assert.Equal(data, dest.ToArray());
@@ -187,7 +187,7 @@ public class XisoFileCopierTests : IDisposable
     {
         using var source = new MemoryStream([1], writable: false);
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            XisoFileCopier.CopyExact(source, -1, (_, _) => { }, new byte[TwoMB]));
+            XisoFileCopier.CopyExact(source, -1, (_, _) => { }, new byte[TwoMb]));
     }
 
     [Fact]
@@ -198,7 +198,7 @@ public class XisoFileCopierTests : IDisposable
         cts.Cancel();
 
         Assert.Throws<OperationCanceledException>(() =>
-            XisoFileCopier.CopyExact(source, 100, (_, _) => { }, new byte[TwoMB],
+            XisoFileCopier.CopyExact(source, 100, (_, _) => { }, new byte[TwoMb],
                 cancellationToken: cts.Token));
     }
 
@@ -213,7 +213,7 @@ public class XisoFileCopierTests : IDisposable
             XisoFileCopier.CopyExact(
                 source, data.Length,
                 (_, _) => { },
-                new byte[TwoMB],
+                new byte[TwoMb],
                 _ => cts.Cancel(),
                 cts.Token));
     }
@@ -225,7 +225,7 @@ public class XisoFileCopierTests : IDisposable
         var boom = new InvalidOperationException("boom");
 
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            XisoFileCopier.CopyExact(source, 100, (_, _) => throw boom, new byte[TwoMB]));
+            XisoFileCopier.CopyExact(source, 100, (_, _) => throw boom, new byte[TwoMb]));
 
         Assert.Same(boom, ex);
     }
@@ -258,7 +258,7 @@ public class XisoFileCopierTests : IDisposable
         var events = progress.Events.Where(static e => e.Type == ProgressInfoType.FileProgress).ToList();
         // 3 MB through a 2 MB buffer = exactly two chunks.
         Assert.Equal(2, events.Count);
-        Assert.Equal(TwoMB, events[0].Size);
+        Assert.Equal(TwoMb, events[0].Size);
         Assert.Equal(big.Length, events[1].Size);
         Assert.All(events, e => Assert.Equal(big.Length, e.Count));
         Assert.All(events, static e => Assert.Equal("/big.bin", e.Path));
@@ -319,7 +319,7 @@ public class XisoFileCopierTests : IDisposable
         {
             if (file.Size == 0)
             {
-                Assert.DoesNotContain(file.Path!, byFile.Keys);
+                Assert.DoesNotContain(file.Path!, byFile.Keys, StringComparer.OrdinalIgnoreCase);
             }
             else
             {

@@ -202,8 +202,7 @@ public static class DirectoryEntryTableWriter
 
     private static void ValidateName(string name)
     {
-        if (name == null)
-            throw new ArgumentNullException(nameof(name));
+        ArgumentNullException.ThrowIfNull(name);
         if (name.Length == 0 || name.Length > Constants.FilenameMaxChars)
         {
             throw new InvalidOperationException(

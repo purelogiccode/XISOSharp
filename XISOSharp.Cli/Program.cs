@@ -16,7 +16,7 @@ namespace XISOSharp.Cli;
 internal static class Program
 {
     /// <summary>Serializes parallel <c>--zar</c> batch summaries.</summary>
-    private static readonly Lock _logLock = new();
+    private static readonly Lock LogLock = new();
 
     /// <summary>
     /// Parses a <c>--policy</c> value (<c>skip</c> / <c>overwrite</c> /
@@ -3261,7 +3261,11 @@ internal static class Program
             }
             catch
             {
-                lock (_logLock) Logger.LogErr($"Cannot stat {isoPath}\n");
+                lock (LogLock)
+                {
+                    Logger.LogErr($"Cannot stat {isoPath}\n");
+                }
+
                 return 1;
             }
 
@@ -3286,7 +3290,7 @@ internal static class Program
             return PackZarResolved(isoPath, Path.Combine(isoDir, stem + ".zar"), offset, pol, parallel: true);
         }
 
-        int PackZarResolved(string isoPath, string outZar, long isoOffset, ZarCollisionPolicy pol, bool parallel)
+        static int PackZarResolved(string isoPath, string outZar, long isoOffset, ZarCollisionPolicy pol, bool parallel)
         {
             string? resolved;
             try
@@ -3303,7 +3307,10 @@ internal static class Program
             {
                 if (parallel)
                 {
-                    lock (_logLock) Logger.Log($"[INFO] Skipping --zar for {isoPath}: output exists\n");
+                    lock (LogLock)
+                    {
+                        Logger.Log($"[INFO] Skipping --zar for {isoPath}: output exists\n");
+                    }
                 }
                 else
                 {
@@ -3322,7 +3329,10 @@ internal static class Program
             {
                 if (parallel)
                 {
-                    lock (_logLock) Logger.LogErr($"[ERROR] Failed creating ZAR for {isoPath}: {ex.Message}\n");
+                    lock (LogLock)
+                    {
+                        Logger.LogErr($"[ERROR] Failed creating ZAR for {isoPath}: {ex.Message}\n");
+                    }
                 }
                 else
                 {
@@ -3336,7 +3346,10 @@ internal static class Program
             {
                 if (parallel)
                 {
-                    lock (_logLock) Logger.LogErr($"[ERROR] Failed creating ZAR for {isoPath}\n");
+                    lock (LogLock)
+                    {
+                        Logger.LogErr($"[ERROR] Failed creating ZAR for {isoPath}\n");
+                    }
                 }
                 else
                 {
@@ -3348,7 +3361,10 @@ internal static class Program
 
             if (parallel)
             {
-                lock (_logLock) Logger.Log($"ZAR written to {resolved}\n");
+                lock (LogLock)
+                {
+                    Logger.Log($"ZAR written to {resolved}\n");
+                }
             }
             else
             {
