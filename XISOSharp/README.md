@@ -415,6 +415,23 @@ public static RepairResult Repair(string isoPath, bool createBackup = true, bool
 - `XisoFormatException` — not a valid XISO image
 - `IOException` — read or write errors
 
+#### `Salvage`
+
+Rebuilds a readable image from a corrupt one: a bounded walk reusing the auditor's hardening limits carries every entry reachable without tripping a truncation or structural gate into a staging directory, then repacks it via `CreateXiso` into a fresh plain `.iso`. The source is only read, never modified (CISO input allowed); the rebuilt image is re-audited.
+
+```csharp
+public static SalvageResult Salvage(string sourcePath, string? outputPath = null)
+```
+
+`outputPath` defaults to the source's directory plus the source stem with a `.salvaged.iso` suffix; an existing file is overwritten and a missing parent directory is created.
+
+**Returns**: A `SalvageResult` record with `Copied`, `Skipped`, `OutputPath`, and `OutputIssues` (`Success` when the rebuilt image passes the audit).
+
+**Exceptions**:
+- `FileNotFoundException` — source file does not exist
+- `XisoFormatException` — not a valid XISO image, or the tree root itself is unreachable
+- `IOException` — read or write errors, or repacking failed
+
 ---
 
 Static class for creating and rewriting XISO disc images.
@@ -799,6 +816,18 @@ Outcome of an in-place repair pass (`Repair`).
 | `BackupPath` | `string?` | Path of the `.old` pre-repair backup, or `null` when none was written. |
 | `DryRun` | `bool` | Whether this was a preview pass that changed nothing. |
 | `Success` | `bool` | True when `Remaining` is empty. |
+
+#### `SalvageResult`
+
+Outcome of a salvage rebuild (`Salvage`).
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Copied` | `IReadOnlyList<string>` | Carried image-internal paths (directories carry a trailing `/`). |
+| `Skipped` | `IReadOnlyList<string>` | Dropped entries with reasons. |
+| `OutputPath` | `string` | Path of the rebuilt plain `.iso` image. |
+| `OutputIssues` | `IReadOnlyList<string>` | Re-audit issues of the rebuilt image. |
+| `Success` | `bool` | True when the rebuilt image passes the audit. |
 
 ---
 

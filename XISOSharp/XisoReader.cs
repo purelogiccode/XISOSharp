@@ -2943,6 +2943,31 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Rebuilds a readable image from a corrupt one (TODO #26, Phase 2;
+    /// facade over <see cref="XisoSalvager.Salvage"/>): carries every entry
+    /// reachable without tripping a truncation or structural gate and repacks
+    /// them through the <c>CreateXiso</c> pipeline into a fresh plain
+    /// <c>.iso</c>. The source is only read, never modified; CISO input is
+    /// allowed (reads go through the decompressed view).
+    /// </summary>
+    /// <param name="sourcePath">Path of the corrupt image (plain or CISO).</param>
+    /// <param name="outputPath">
+    /// Destination for the rebuilt image (<c>null</c> = same directory,
+    /// source stem plus <c>.salvaged.iso</c>). An existing file is
+    /// overwritten; a missing parent directory is created.
+    /// </param>
+    /// <returns>Carried paths, dropped lines, output path, and re-audit issues.</returns>
+    /// <exception cref="FileNotFoundException">The source file does not exist.</exception>
+    /// <exception cref="XisoFormatException">
+    /// Not a valid XISO image, or the tree root itself is unreachable.
+    /// </exception>
+    /// <exception cref="IOException">Thrown on read/write errors.</exception>
+    public static SalvageResult Salvage(string sourcePath, string? outputPath = null)
+    {
+        return XisoSalvager.Salvage(sourcePath, outputPath);
+    }
+
+    /// <summary>
     /// Splits an XISO image into sector-aligned parts of at most
     /// <paramref name="partSizeBytes"/> bytes (TODO #17, xdvdfs #97; facade
     /// over <see cref="XisoSplitter.Split"/>).

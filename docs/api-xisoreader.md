@@ -18,6 +18,7 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 - [ComputeFileHash / ComputeDirectoryHashes](#computefilehash--computedirectoryhashes)
 - [AuditXiso](#auditxiso)
 - [Repair](#repair)
+- [Salvage](#salvage)
 - [Disc offset probing](#disc-offset-probing)
 
 ## Method index
@@ -46,6 +47,7 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 | `GetXexInfo` | Parse the Xbox 360 XEX2 header of a `.xex` file |
 | `AuditXiso` | Deep integrity audit |
 | `Repair` | Fix safely-patchable issues in place (`.old` backup, dry-run) |
+| `Salvage` | Rebuild a readable image from a corrupt one (repack + re-audit) |
 
 ## VerifyXiso
 
@@ -531,6 +533,42 @@ any previous backup) unless `createBackup` is false. Returns `RepairResult`
 (`Fixed`, `Remaining`, `BackupPath`, `DryRun`; `Success` when the image now
 passes). CLI: `--repair <file>` (`--dry-run` previews; `--no-backup` skips the
 backup).
+
+## Salvage
+
+```csharp
+public static SalvageResult Salvage(string sourcePath, string? outputPath = null)
+// same behavior via XisoSalvager.Salvage(sourcePath, outputPath)
+```
+
+Rebuilds a readable image from a corrupt one — the answer to the audit's
+truncation and structural classes, which no in-place patch can fix (TODO #26,
+Phase 2):
+
+- A bounded walk reusing the auditor's hardening limits (depth cap, per-table
+  entry cap, cycle tracking) copies every entry reachable without tripping a
+  truncation or structural gate into a staging directory, then repacks it
+  through the `CreateXiso` pipeline into a fresh plain `.iso`.
+- Class-C quirks do not block salvage: reserved bits are masked and path
+  separators in names are sanitized to `_`. Anything uncarriable is reported
+  in `Skipped`: unreadable entries, orphaned right-link tails,
+  separator-collision (or host-unusable) names, and subtrees past the depth
+  gate (dropped whole — carrying them would rebuild an image that still fails
+  the audit).
+- The source is only ever read, never written: no backup is needed and CISO
+  input is allowed (reads go through the decompressed view). Split parts read
+  as the truncated images they are. A missing tree root (class R) throws
+  `XisoFormatException` — there is nothing to salvage with.
+- The rebuilt image is re-audited; `OutputIssues` carries the verdict
+  (`Success` when it passes). A salvage that still fails is reported, not
+  hidden.
+
+`outputPath` defaults to the source's directory plus the source stem with a
+`.salvaged.iso` suffix (`XisoSalvager.DefaultOutputPath`); an existing file is
+overwritten and a missing parent directory is created. Returns
+`SalvageResult` (`Copied`, `Skipped`, `OutputPath`, `OutputIssues`). CLI:
+`--salvage <file>` (`--repair-out <path>` overrides the output; existing
+files follow the `-y`/`-n` convention).
 
 ## Disc offset probing
 

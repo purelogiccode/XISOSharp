@@ -99,6 +99,8 @@ internal static class Program
         var xbeInfoMode = false;
         var repairMode = false;
         var repairDryRun = false;
+        var salvageMode = false;
+        string? repairOut = null;
         var unpackMode = false;
         var hashMode = false;
         var copyOut = false;
@@ -326,6 +328,16 @@ internal static class Program
                         extract = false;
                         repairMode = true;
                         break;
+                    case "--salvage":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        salvageMode = true;
+                        break;
                     case "--md5":
                         if (xSeen || rewrite || createList.Count > 0)
                         {
@@ -415,6 +427,18 @@ internal static class Program
                         break;
                     case "--dry-run":
                         repairDryRun = true;
+                        break;
+                    case "--repair-out":
+                        if (i + 1 < args.Length)
+                        {
+                            repairOut = args[++i];
+                        }
+                        else
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
                         break;
                     case "-r":
                         if (xSeen || !extract || createList.Count > 0)
@@ -772,14 +796,14 @@ internal static class Program
 
         // --pack translates to create mode (directory input) or rewrite mode (ISO input),
         // reusing the existing create/rewrite machinery.
-        if (TranslatePackInput(packInput, packName, batchDir, rewrite, info, lsMode, xexInfoMode, xbeInfoMode, repairMode,
+        if (TranslatePackInput(packInput, packName, batchDir, rewrite, info, lsMode, xexInfoMode, xbeInfoMode, repairMode, salvageMode,
                 unpackMode, hashMode, copyOut, copyIn, auditMode, validateMode, tree, extract, checksumFlagMode,
                 optind, args.Length, createList, ref rewrite, ref packIsoFile, ref path) != 0)
         {
             return 1;
         }
 
-        if (checksumFlagMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (checksumFlagMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree || hashMode || copyOut || copyIn || auditMode ||
                                  validateMode || unpackMode || createList.Count > 0 || rewrite || filetimeMode ||
                                  setFiletimeMode))
         {
@@ -787,7 +811,7 @@ internal static class Program
             return 1;
         }
 
-        if (filetimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (filetimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree || hashMode || copyOut || copyIn || auditMode ||
                              validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                              setFiletimeMode))
         {
@@ -795,7 +819,7 @@ internal static class Program
             return 1;
         }
 
-        if (setFiletimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (setFiletimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree || hashMode || copyOut || copyIn || auditMode ||
                                 validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                                 filetimeMode))
         {
@@ -816,7 +840,7 @@ internal static class Program
         }
 
         if ((skipSectors.HasValue || prependSectors.HasValue) &&
-            (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || hashMode || copyOut || copyIn || auditMode || validateMode || validateFlag))
+            (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || hashMode || copyOut || copyIn || auditMode || validateMode || validateFlag))
         {
             Logger.LogErr(
                 "Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, and create (-c) modes\n");
@@ -835,7 +859,7 @@ internal static class Program
             return 1;
         }
 
-        if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || unpackMode || hashMode ||
+        if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || unpackMode || hashMode ||
                                  copyOut || copyIn || validateMode || checksumFlagMode || filetimeMode || setFiletimeMode))
         {
             Logger.LogErr(
@@ -872,7 +896,13 @@ internal static class Program
             return 1;
         }
 
-        if (unpackMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || tree || hashMode || copyOut || copyIn || auditMode || validateMode ||
+        if (repairOut != null && !salvageMode)
+        {
+            Logger.LogErr("Error: --repair-out requires --salvage\n");
+            return 1;
+        }
+
+        if (unpackMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree || hashMode || copyOut || copyIn || auditMode || validateMode ||
                            checksumFlagMode || filetimeMode || setFiletimeMode))
         {
             Logger.LogErr("Error: --unpack cannot be combined with other modes\n");
@@ -882,7 +912,7 @@ internal static class Program
         // XboxKit redump modes are mutually exclusive with other operational modes
         var anyRedumpMode = videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode ||
                             zarMode || allMode || bestMode || compressAlias;
-        if (anyRedumpMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (anyRedumpMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree || hashMode || copyOut || copyIn || auditMode ||
                               validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                               filetimeMode || setFiletimeMode))
         {
@@ -1369,6 +1399,68 @@ internal static class Program
                 {
                     Logger.Log($"  Result:         FAIL ({result.Remaining.Count} issue(s))\n");
                     foreach (var issue in result.Remaining)
+                    {
+                        Logger.LogErr($"    - {issue}\n");
+                    }
+
+                    return 1;
+                }
+
+                Logger.Log("\n");
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+            {
+                Logger.LogErr($"Error: {ex.Message}\n");
+                return 1;
+            }
+
+            return 0;
+        }
+
+        if (salvageMode)
+        {
+            if (optind >= args.Length || optind + 1 < args.Length)
+            {
+                PrintUsage();
+                return 1;
+            }
+
+            var xisoPath = args[optind];
+            var salvageOutput = repairOut ?? XisoSalvager.DefaultOutputPath(xisoPath);
+            if (!OverwritePrompt.ConfirmOverwrite(salvageOutput, assumeYes, assumeNo))
+                return 1;
+
+            try
+            {
+                var result = XisoReader.Salvage(xisoPath, salvageOutput);
+                Logger.Log($"Salvaging {xisoPath} -> {result.OutputPath}:\n\n");
+                if (result.Copied.Count > 0)
+                {
+                    Logger.Log($"  Carried ({result.Copied.Count}):\n");
+                    foreach (var carried in result.Copied)
+                    {
+                        Logger.Log($"    + {carried}\n");
+                    }
+                }
+
+                if (result.Skipped.Count > 0)
+                {
+                    Logger.Log($"  Dropped ({result.Skipped.Count}):\n");
+                    foreach (var dropped in result.Skipped)
+                    {
+                        Logger.LogErr($"    - {dropped}\n");
+                    }
+                }
+
+                if (result.OutputIssues.Count == 0)
+                {
+                    Logger.Log("  Result:         PASS\n");
+                }
+                else
+                {
+                    Logger.Log(
+                        $"  Result:         FAIL ({result.OutputIssues.Count} issue(s) in rebuilt image)\n");
+                    foreach (var issue in result.OutputIssues)
                     {
                         Logger.LogErr($"    - {issue}\n");
                     }
@@ -3538,6 +3630,7 @@ internal static class Program
         bool xexInfoMode,
         bool xbeInfoMode,
         bool repairMode,
+        bool salvageMode,
         bool unpackMode,
         bool hashMode,
         bool copyOut,
@@ -3559,7 +3652,7 @@ internal static class Program
             return 0;
         }
 
-        if (rewrite || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || unpackMode || hashMode || copyOut || copyIn || auditMode ||
+        if (rewrite || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || unpackMode || hashMode || copyOut || copyIn || auditMode ||
             validateMode || tree || !extract || checksumFlagMode)
         {
             Logger.LogErr("Error: --pack cannot be combined with other modes\n");
@@ -3835,8 +3928,15 @@ internal static class Program
                                                                            attribute bits, missing optimized tag,
                                                                            separators in names); writes <file>.old
                                                                            backup unless --no-backup.
-                                                     --dry-run           With --repair, preview fixes without changing
-                                                                           anything (rejected without --repair).
+                                                      --dry-run           With --repair, preview fixes without changing
+                                                                            anything (rejected without --repair).
+                                                      --salvage <file>    Rebuild a readable image from a corrupt
+                                                                            one: carry every reachable entry into
+                                                                            <file> without its extension plus
+                                                                            '.salvaged.iso' (source never modified;
+                                                                            CISO input allowed). --repair-out
+                                                                            overrides the output path (existing
+                                                                            files follow the -y/-n convention).
                                                       --filetime <image>   Show FILETIME header field (ISO-8601 + raw u64, xdvdfs compatible; 0 = 1601-01-01).
                                                       --set-filetime <image> <value>  Set FILETIME field: value may be ISO-8601 (2023-08-26T15:00:00Z), decimal raw, 0x hex, 'now', or '0'.
                                                       --batch <dir>        Process all .iso files in <dir> instead of
