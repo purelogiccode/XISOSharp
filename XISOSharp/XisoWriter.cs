@@ -722,6 +722,18 @@ public static class XisoWriter
                 Logger.Flush();
 
                 var attr = File.GetAttributes(entryPath);
+                if ((attr & FileAttributes.Directory) != FileAttributes.None &&
+                    (attr & FileAttributes.ReparsePoint) != FileAttributes.None)
+                {
+                    // Never descend into directory reparse points (symlinks,
+                    // junctions, mount points): XISO has no link representation,
+                    // and a cyclic link would recurse forever (TODO #21).
+                    // Symlinks to files are still packed (target content).
+                    Logger.LogErr($"warning: skipping reparse point (symlink/junction): {entryName}, not descending.\n");
+                    filesSkipped++;
+                    continue;
+                }
+
                 var avl = new AvlNode { Filename = entryName };
 
                 if ((attr & FileAttributes.Directory) != FileAttributes.None)

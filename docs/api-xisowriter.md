@@ -76,6 +76,13 @@ errors are logged and converted to the return code).
 Throws: `ArgumentOutOfRangeException` for a negative `prependSectors`;
 `XisoFileTooLargeException` when a source file exceeds ~4 GB.
 
+**Symlinks (TODO #21):** directory reparse points (symlinks, junctions, mount
+points) are skipped with a warning and never descended — XISO has no link
+representation, and a cyclic link would otherwise recurse forever. Symlinks to
+files are packed normally (target content under the link name). Upstream
+`xdvdfs` rejects a symlink *pack root* outright; here the source root itself
+is resolved once and may be a link.
+
 ## CreateXisoAsync
 
 ```csharp

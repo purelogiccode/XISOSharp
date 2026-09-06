@@ -53,6 +53,10 @@ Windows.
 
 **Test vectors:** verified against `xdvdfs-0.8.3/tests/img.py::BuildImage` (capture semantics).
 
+**Symlinks (TODO #21):** same policy as pack — directory reparse points are
+skipped with a warning, never descended (cyclic links terminate instead of
+looping the walk); file symlinks are followed.
+
 ---
 
 ## Image-Spec

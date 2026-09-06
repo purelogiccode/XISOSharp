@@ -306,6 +306,16 @@ public static class RemapFilesystem
                 {
                     var attr = File.GetAttributes(fullEntry);
                     isDir = (attr & FileAttributes.Directory) != FileAttributes.None;
+                    if (isDir && (attr & FileAttributes.ReparsePoint) != FileAttributes.None)
+                    {
+                        // Never descend into directory reparse points (symlinks,
+                        // junctions, mount points): XISO has no link representation,
+                        // and a cyclic link would loop the walk forever (TODO #21).
+                        // Symlinks to files are still followed (target content).
+                        Logger.LogErr($"warning: skipping reparse point (symlink/junction): {entryRel}, not descending.\n");
+                        continue;
+                    }
+
                     if (!isDir)
                     {
                         len = new FileInfo(fullEntry).Length;
@@ -628,6 +638,16 @@ public static class RemapFilesystem
                 {
                     var attr = File.GetAttributes(fullEntry);
                     isDir = (attr & FileAttributes.Directory) != FileAttributes.None;
+                    if (isDir && (attr & FileAttributes.ReparsePoint) != FileAttributes.None)
+                    {
+                        // Never descend into directory reparse points (symlinks,
+                        // junctions, mount points): XISO has no link representation,
+                        // and a cyclic link would loop the walk forever (TODO #21).
+                        // Symlinks to files are still followed (target content).
+                        Logger.LogErr($"warning: skipping reparse point (symlink/junction): {entryRel}, not descending.\n");
+                        continue;
+                    }
+
                     if (!isDir) len = new FileInfo(fullEntry).Length;
                 }
                 catch
