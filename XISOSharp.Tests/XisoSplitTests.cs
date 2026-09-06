@@ -154,6 +154,7 @@ public class XisoSplitTests : IDisposable
         Assert.False(XisoSplitter.IsSplitPath(null));
         Assert.Throws<ArgumentOutOfRangeException>(() => XisoSplitter.PartPath("game", -1));
         Assert.Throws<ArgumentException>(() => XisoSplitter.PartPath("", 0));
+        Assert.Throws<ArgumentException>(() => XisoSplitter.PartPath(null!, 0));
     }
 
     [Fact]
@@ -164,7 +165,9 @@ public class XisoSplitTests : IDisposable
         var okBase = Path.Combine(work, "game");
 
         Assert.Throws<ArgumentException>(() => XisoSplitter.Split("", okBase, PartSize));
+        Assert.Throws<ArgumentException>(() => XisoSplitter.Split(null!, okBase, PartSize));
         Assert.Throws<ArgumentException>(() => XisoSplitter.Split(iso, "", PartSize));
+        Assert.Throws<ArgumentException>(() => XisoSplitter.Split(iso, null!, PartSize));
         Assert.Throws<FileNotFoundException>(() =>
             XisoSplitter.Split(Path.Combine(work, "missing.iso"), okBase, PartSize));
         Assert.Throws<ArgumentOutOfRangeException>(() => XisoSplitter.Split(iso, okBase, Sector - 1));

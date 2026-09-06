@@ -45,7 +45,8 @@ public sealed class XisoExplorer
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public XisoExplorer(string isoPath)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(isoPath);
+        if (string.IsNullOrWhiteSpace(isoPath))
+            throw new ArgumentException("Image path must not be empty.", nameof(isoPath));
 
         IsoPath = isoPath;
         Volume = XisoReader.GetVolumeInfo(isoPath);
