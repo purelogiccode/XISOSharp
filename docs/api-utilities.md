@@ -250,7 +250,7 @@ Paths are destination-root-relative, forward-slash separated, case-insensitive
 
 | Record | Members |
 |---|---|
-| `VolumeInfo` | `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `FileLength`, `TotalSectors` |
+| `VolumeInfo` | `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name), `FileLength`, `TotalSectors` |
 | `EntryInfo` | `Name`, `IsDirectory`, `StartSector`, `FileSize`, `Attributes` (masked `0xB7`), `LeftChildOffset`, `RightChildOffset` |
 | `AuditResult` | `IsValid`, `FilesChecked`, `DirsChecked`, `Issues` (incl. `Reserved attribute bits set: 0x…`) |
 | `ValidationIssue` | `Type`, `Path`, `SourceSize`, `OutputSize`, `SourceHash`, `OutputHash` |

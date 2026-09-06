@@ -301,7 +301,7 @@ Reads the XISO volume descriptor and returns metadata about the image without th
 public static VolumeInfo GetVolumeInfo(string isoPath)
 ```
 
-**Returns**: A `VolumeInfo` record containing `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `FileLength`, and `TotalSectors`.
+**Returns**: A `VolumeInfo` record containing `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name: `RAW`, `GLOBAL (XGD2)`, `XGD3`, `XGD2 Hybrid`, `XGD1`, `Unknown`), `FileLength`, and `TotalSectors`.
 
 #### `ListDirectory`
 
@@ -743,6 +743,7 @@ Metadata about an XISO volume descriptor.
 | `RootDirSector` | `uint` | Sector index of the root directory table. |
 | `RootDirSize` | `uint` | Size of the root directory table in bytes. |
 | `DiscLseek` | `long` | Disc lseek offset detected during probing. |
+| `DiscFormat` | `string` | Friendly disc-layout identity from `DiscLseek` (`RAW`, `GLOBAL (XGD2)`, `XGD3`, `XGD2 Hybrid`, `XGD1`, `Unknown`; `Unknown` when invalid). |
 | `FileLength` | `long` | Total size of the ISO file in bytes. |
 | `TotalSectors` | `long` | Total number of sectors in the ISO. |
 

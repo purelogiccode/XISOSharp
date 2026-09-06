@@ -17,7 +17,24 @@ public record VolumeInfo(
     uint RootDirSize,
     long DiscLseek,
     long FileLength,
-    long TotalSectors);
+    long TotalSectors)
+{
+    /// <summary>
+    /// Friendly name of the detected disc layout derived from
+    /// <see cref="DiscLseek"/>: <c>RAW</c> (plain, offset 0), <c>GLOBAL (XGD2)</c>,
+    /// <c>XGD3</c>, <c>XGD2 Hybrid</c>, or <c>XGD1</c>. Returns <c>Unknown</c> when
+    /// the volume is invalid or the offset matches no known layout.
+    /// </summary>
+    public string DiscFormat => !IsValid ? "Unknown" : DiscLseek switch
+    {
+        0 => "RAW",
+        (long)XISOSharp.Constants.GlobalLseekOffset => "GLOBAL (XGD2)",
+        (long)XISOSharp.Constants.Xgd3LseekOffset => "XGD3",
+        (long)XISOSharp.Constants.Xgd2HybridLseekOffset => "XGD2 Hybrid",
+        (long)XISOSharp.Constants.Xgd1LseekOffset => "XGD1",
+        _ => "Unknown",
+    };
+}
 
 /// <summary>
 /// Metadata about a single directory entry within an XISO image.

@@ -53,7 +53,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--unpack <file> [dest]` | **Unpack** the whole image to `dest`, or to a directory named after the ISO (minus `.iso`) in the current directory when omitted. Detects the optimized layout automatically; supports `--skip-sectors` and `--skip-existing` (resume). |
 | `-l` | **List** the top-level entries of each ISO (non-recursive). |
 | `-t` | **Tree** — recursive listing with full paths, sizes, and totals. |
-| `-i <file> [path]` | **Info** — volume descriptor metadata plus per-entry details (sector, size, attributes, left/right child offsets). `path` defaults to `/`. |
+| `-i <file> [path]` | **Info** — volume descriptor metadata (incl. detected disc format: `RAW` / `GLOBAL (XGD2)` / `XGD3` / `XGD2 Hybrid` / `XGD1`) plus per-entry details (sector, size, attributes, left/right child offsets). `path` defaults to `/`. |
 | `--ls <file> [path]` | **List directory** — entry names of a directory (default `/`), **without recursion**. Prints one name per line; `/path: empty directory` when empty. Mirrors `ls` on the image. |
 | `--xex-info <file> <path>` | **XEX info** — parse and display the Xbox 360 XEX2 executable header of a `.xex` file inside the image (module flags, entry point, image base/size, region, media types, media/title ID, version, disc, encryption/compression). |
 | `--xbe-info <file> <path>` | **XBE info** — parse and display the original-Xbox XBEH header + certificate of a `.xbe` file inside the image (base, entry point, sections, title ID/name, media, region, ratings, disc, version). No reference tool offers this. |

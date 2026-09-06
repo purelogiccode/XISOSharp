@@ -259,6 +259,7 @@ Reads the volume descriptor **without throwing** on validation errors. Returns a
 | `RootDirSector` | `uint` | Root directory table sector |
 | `RootDirSize` | `uint` | Root directory table size (bytes) |
 | `DiscLseek` | `long` | Detected disc offset |
+| `DiscFormat` | `string` | Friendly disc-layout identity from `DiscLseek`: `RAW`, `GLOBAL (XGD2)`, `XGD3`, `XGD2 Hybrid`, `XGD1`, or `Unknown` (invalid volumes always report `Unknown`) |
 | `FileLength` | `long` | File size |
 | `TotalSectors` | `long` | Total sectors |
 

@@ -1133,6 +1133,7 @@ internal static class Program
                 Logger.Log($"  File Length:    {volInfo.FileLength} bytes ({volInfo.FileLength / 1024 / 1024} MB)\n");
                 Logger.Log($"  Total Sectors:  {volInfo.TotalSectors}\n");
                 Logger.Log($"  Disc Offset:    0x{volInfo.DiscLseek:X8}\n");
+                Logger.Log($"  Disc Format:    {volInfo.DiscFormat}\n");
                 Logger.Log($"  Root Sector:    {volInfo.RootDirSector}\n");
                 Logger.Log($"  Root Size:      {volInfo.RootDirSize} bytes\n");
                 try
