@@ -104,6 +104,7 @@ See [Getting Started](getting-started.md) for details.
 | `XISOSharpTester` | WPF GUI for batch regression testing against the reference C tool |
 | `References/` | Reference sources: `extract-xiso.c` v2.7.1, xdvdfs 0.8.3, XboxKit 0.7 |
 | `TestData/` | Fixtures used by tests and the output-comparison scripts |
+| `XISOSharp.Tests/Fixtures/` | Checked-in `test_fixture.iso` snapshot reference (see [Testing](testing.md#test-suite)) |
 
 ## License
 

@@ -71,8 +71,10 @@ the tracked backlog):
 - Remaining `NOT DONE` enhancements and parity fixes (e.g. empty-entry `0x0000`
   sentinel, reserved attribute-bit masking).
 - `docs/` improvements — accuracy passes, examples, screenshots.
-- Test coverage growth (target >85% line coverage on `XisoReader.cs`,
-  `XisoWriter.cs`, `AvlTree.cs`).
+- Test coverage: sustain >85% line coverage on `XisoReader.cs`,
+  `XisoWriter.cs`, `AvlTree.cs` (currently 95.9% / 86.6% / 100% — see
+  [Testing](testing.md#coverage)); new code paths need tests, and new
+  corruption shapes belong in `XisoCorruptionResilienceTests.cs`.
 - Batch-script edge cases for `-d` on Windows.
 
 See also: [Building](building.md) · [Testing](testing.md) ·
