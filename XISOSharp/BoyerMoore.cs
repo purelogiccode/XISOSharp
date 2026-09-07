@@ -28,9 +28,31 @@ public class BoyerMoore
     /// The pattern is stored but tables are not built until <see cref="Init"/> is called.
     /// </summary>
     /// <param name="pattern">Byte pattern to search for.</param>
-    /// <param name="alphabetSize">Size of the alphabet for the bad-character table (default 256).</param>
+    /// <param name="alphabetSize">
+    /// Size of the alphabet for the bad-character table (default 256). Custom
+    /// sizes below 256 are supported, but every pattern byte must fit in them.
+    /// </param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="pattern"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="alphabetSize"/> is less than 1.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when a pattern byte is outside the <paramref name="alphabetSize"/>-symbol
+    /// alphabet (BUG-LIB-033: previously an unchecked <c>alphabetSize &lt; 256</c>
+    /// threw <c>IndexOutOfRangeException</c> from <see cref="Init"/> instead).
+    /// </exception>
     public BoyerMoore(byte[] pattern, int alphabetSize = Constants.DefaultAlphabetSize)
     {
+        ArgumentNullException.ThrowIfNull(pattern);
+        ArgumentOutOfRangeException.ThrowIfLessThan(alphabetSize, 1, nameof(alphabetSize));
+        foreach (var b in pattern)
+        {
+            if (b >= alphabetSize)
+            {
+                throw new ArgumentException(
+                    $"Pattern byte 0x{b:X2} is outside the {alphabetSize}-symbol alphabet.",
+                    nameof(pattern));
+            }
+        }
+
         _pattern = pattern;
         _patLen = pattern.Length;
         _alphabetSize = alphabetSize;
@@ -120,6 +142,11 @@ public class BoyerMoore
     /// The index of the first match relative to the start of <paramref name="text"/>,
     /// or -1 if the pattern was not found.
     /// </returns>
+    /// <remarks>
+    /// Every byte in the searched range must fit the constructor's alphabet size
+    /// (always true for the default 256-symbol alphabet); larger bytes index
+    /// outside the bad-character table.
+    /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the shift tables have not been built — call <see cref="Init"/>
     /// first (also after <see cref="Done"/> released them).

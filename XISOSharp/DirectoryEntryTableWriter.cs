@@ -34,7 +34,13 @@ public static class DirectoryEntryTableWriter
     /// File size in bytes, or subdirectory table size in bytes (sector-rounded
     /// on disk; <see cref="Constants.SectorSize"/> for an empty directory).
     /// </param>
-    public sealed record DirectoryTableEntry(string Name, bool IsDirectory, uint StartSector, uint FileSize);
+    /// <param name="Attributes">
+    /// On-disk attribute byte (masked); 0 (default) means unspecified and the
+    /// encoder falls back to directory/archive. Pass the source entry's
+    /// attributes when rewriting so RO/HID/SYS survive (BUG-LIB-034).
+    /// </param>
+    public sealed record DirectoryTableEntry(string Name, bool IsDirectory, uint StartSector, uint FileSize,
+        byte Attributes = 0);
 
     /// <summary>
     /// Builds a balanced AVL tree from directory entries. Entries are inserted
@@ -69,6 +75,7 @@ public static class DirectoryEntryTableWriter
                 Subdirectory = entry.IsDirectory ? new AvlNode() : null,
                 StartSector = entry.StartSector,
                 FileSize = entry.FileSize,
+                Attributes = entry.Attributes,
             };
             if (AvlTree.AvlInsert(ref root, node) == AvlResult.AvlError)
             {
@@ -90,8 +97,12 @@ public static class DirectoryEntryTableWriter
     public static void PlaceEntry(AvlNode node, ref uint size)
     {
         ArgumentNullException.ThrowIfNull(node);
+        ValidateName(node.Filename);
 
-        var length = (uint)(Constants.FilenameOffset + node.Filename.Length);
+        // BUG-LIB-035: size in bytes, not chars — Filename.Length undercounts
+        // names outside ASCII. Latin-1 is 1:1, but the byte count is the
+        // contract EncodeEntry below allocates against.
+        var length = (uint)(Constants.FilenameOffset + Latin1Encoding.Instance.GetByteCount(node.Filename));
         length += (Constants.DwordSize - (length % Constants.DwordSize)) % Constants.DwordSize;
 
         if (NumSectors(size + length) > NumSectors(size))
@@ -150,7 +161,12 @@ public static class DirectoryEntryTableWriter
                 (Constants.SectorSize - (node.FileSize % Constants.SectorSize)) % Constants.SectorSize;
         }
 
-        var attributes = node.Subdirectory != null ? Constants.AttributeDir : Constants.AttributeArc;
+        // BUG-LIB-034: preserve the source attribute bits (RO/HID/SYS) instead
+        // of normalizing every file to Archive. Nodes built without attributes
+        // (fresh pack) carry 0 and keep the historical directory/archive default.
+        var attributes = node.Attributes != 0
+            ? node.Attributes
+            : node.Subdirectory != null ? Constants.AttributeDir : Constants.AttributeArc;
         var lOffset = (ushort)(node.Left != null ? node.Left.Offset / Constants.DwordSize : 0);
         var rOffset = (ushort)(node.Right != null ? node.Right.Offset / Constants.DwordSize : 0);
 
@@ -213,6 +229,20 @@ public static class DirectoryEntryTableWriter
         {
             throw new InvalidOperationException(
                 $"Filename '{name}' contains path separator characters ('/' or '\\') which are not allowed in XISO directory entries.");
+        }
+
+        // BUG-LIB-035: fail fast on names the Latin-1 record can never hold.
+        // Without this, sizing (chars) and encoding (bytes) disagree and the
+        // throw surfaces mid-write as a generic ArgumentException (err=1).
+        try
+        {
+            _ = Latin1Encoding.Instance.GetByteCount(name);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidOperationException(
+                $"Invalid directory entry name '{name}': contains characters outside the Latin-1 range.",
+                ex);
         }
     }
 

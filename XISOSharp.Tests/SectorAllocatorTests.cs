@@ -113,6 +113,16 @@ public class SectorAllocatorTests : IDisposable
         Assert.Empty(allocator.UsedRanges);
     }
 
+    [Fact]
+    public void NextFree_TopOfSpace_ThrowsInsteadOfClamping()
+    {
+        // BUG-LIB-031: the old uint.MaxValue clamp hid allocation overflow.
+        var allocator = new SectorAllocator(0);
+        allocator.MarkUsed(uint.MaxValue, 1);
+
+        Assert.Throws<InvalidOperationException>(() => allocator.NextFree);
+    }
+
     [Theory]
     [InlineData(302u, 1u)] // inside
     [InlineData(298u, 5u)] // straddles start

@@ -31,9 +31,23 @@ public static class Lz4
     /// Returns the minimum destination size <see cref="Compress"/> requires for
     /// <paramref name="inputLength"/> input bytes (<c>16 + 4 + inputLength * 110 / 100</c>).
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="inputLength"/> is negative, or the required
+    /// size exceeds <see cref="int.MaxValue"/> (BUG-LIB-032: the old
+    /// <c>inputLength * 110 / 100</c> overflowed <c>int</c> for ~20 MB+ inputs,
+    /// yielding a negative required size).
+    /// </exception>
     public static int MaxCompressedOutputSize(int inputLength)
     {
-        return 16 + 4 + (inputLength * 110 / 100);
+        ArgumentOutOfRangeException.ThrowIfNegative(inputLength);
+        var required = 20L + ((long)inputLength * 110 / 100);
+        if (required > int.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(nameof(inputLength), inputLength,
+                $"Required output size {required} exceeds the maximum addressable length.");
+        }
+
+        return (int)required;
     }
 
     /// <summary>

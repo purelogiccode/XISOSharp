@@ -61,6 +61,10 @@ public sealed class SectorAllocator
     /// Sector where a bump allocation would land: the end of tracked used space,
     /// or <see cref="FirstFreeSector"/> when nothing is tracked yet.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when tracked used space reaches past <see cref="uint.MaxValue"/>
+    /// (BUG-LIB-031: previously clamped silently, hiding allocation overflow).
+    /// </exception>
     public uint NextFree
     {
         get
@@ -71,7 +75,13 @@ public sealed class SectorAllocator
                 end = Math.Max(end, (ulong)start + count);
             }
 
-            return end > uint.MaxValue ? uint.MaxValue : (uint)end;
+            if (end > uint.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    $"Tracked used space ends at sector {end}, exceeding the addressable sector range.");
+            }
+
+            return (uint)end;
         }
     }
 

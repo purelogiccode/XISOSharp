@@ -850,4 +850,50 @@ public class CisoTests : IDisposable
         // by the file-size guard before any such allocation happens.
         Assert.Throws<InvalidDataException>(() => CisoReader.DecompressStream(src, dst));
     }
+
+    [Fact]
+    public void MaxCompressedOutputSize_LargeInput_DoesNotOverflow()
+    {
+        // BUG-LIB-032: int math overflowed for ~20 MB+ inputs (negative size).
+        Assert.Equal(27500020, Lz4.MaxCompressedOutputSize(25000000));
+        Assert.Equal(20, Lz4.MaxCompressedOutputSize(0));
+    }
+
+    [Fact]
+    public void MaxCompressedOutputSize_UnrepresentableOrNegative_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => Lz4.MaxCompressedOutputSize(int.MaxValue));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Lz4.MaxCompressedOutputSize(-1));
+    }
+
+    [Fact]
+    public void GetVolumeInfo_CsoPath_SeesDecompressedView()
+    {
+        // BUG-LIB-037: the string overload opened a plain FileStream, probing
+        // the .cso container invalid while stream/list paths saw it valid.
+        var isoPath = CreateTempIso();
+        var csoDir = CreateTempDir();
+        var csoPath = Path.Combine(csoDir, "vol.cso");
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, csoPath, level: 6));
+
+        var vol = XisoReader.GetVolumeInfo(csoPath);
+
+        Assert.True(vol.IsValid);
+    }
+
+    [Fact]
+    public void GetSectorLayout_CsoPath_RoutesThroughDecompressedView()
+    {
+        // BUG-LIB-037: same gap in GetSectorLayout (threw XisoFormatException
+        // on a valid .cso because the volume probe saw the container).
+        var isoPath = CreateTempIso();
+        var csoDir = CreateTempDir();
+        var csoPath = Path.Combine(csoDir, "layout.cso");
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, csoPath, level: 6));
+
+        var layout = XisoReader.GetSectorLayout(csoPath);
+
+        Assert.True(layout.Volume.IsValid);
+        Assert.NotEmpty(layout.Entries);
+    }
 }

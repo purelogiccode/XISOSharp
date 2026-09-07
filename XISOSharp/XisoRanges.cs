@@ -108,13 +108,17 @@ public static class XisoRanges
             isoFs.Seek(cur, SeekOrigin.Begin);
 
             var leftChildOffset = ReadUShort(isoFs);
-            if (leftChildOffset == 0xFFFF) return;
+            // BUG-LIB-036: 0xFFFF marks an empty table only at the table start
+            // (mirrors TraverseXiso/ReadDirectoryEntries/CollectFileEntries which
+            // require offset == 0). Deeper nodes use it as "no left child" and
+            // must still be processed, or their right siblings get dropped.
+            if (leftChildOffset == 0xFFFF && childOffset == 0) return;
             var rightChildOffset = ReadUShort(isoFs);
             var entryOffset = ReadUInt(isoFs) * SectorSize;
             var entrySize = ReadUInt(isoFs);
             var isDirectory = ((byte)isoFs.ReadByte() & 0x10) != 0;
 
-            if (leftChildOffset != 0)
+            if (leftChildOffset != 0 && leftChildOffset != 0xFFFF)
             {
                 GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize,
                     (long)leftChildOffset * 4, visited, depth + 1);
@@ -132,7 +136,7 @@ public static class XisoRanges
                 for (var i = fileOffset; i < fileOffset + fileSize; i++) fileSectors.Add((uint)i);
             }
 
-            if (rightChildOffset != 0)
+            if (rightChildOffset != 0 && rightChildOffset != 0xFFFF)
             {
                 childOffset = (long)rightChildOffset * 4;
                 continue;
@@ -162,7 +166,10 @@ public static class XisoRanges
         for (var k = 1; k < merged.Count; k++)
         {
             var last = result[^1];
-            if (merged[k].Item1 <= last.Item2 + 1)
+            // BUG-LIB-030: last.Item2 + 1 wraps to 0 when a range reaches the
+            // top of the addressable space (uint.MaxValue), so every later
+            // range compared false and overlapping tails never merged.
+            if (last.Item2 == uint.MaxValue || merged[k].Item1 <= last.Item2 + 1)
                 result[^1] = (last.Item1, Math.Max(last.Item2, merged[k].Item2));
             else
                 result.Add(merged[k]);
@@ -345,7 +352,9 @@ public static class XisoRanges
         // parse as a garbage entry (name length 255, entry sector ~4G) that either
         // poisons the result set or sends later seeks past EOF. Mirrors the
         // leftChild == 0xFFFF check in GetValidSectors above and extract-xiso.
-        if (leftChild == 0xFFFF)
+        // BUG-LIB-036: only at the table start — deeper 0xFFFF nodes are "no left
+        // child" markers whose right siblings must still be collected.
+        if (leftChild == 0xFFFF && childOffset == 0)
             return;
 
         var rightChild = ReadUShort(isoFs);

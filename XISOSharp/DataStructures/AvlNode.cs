@@ -26,6 +26,14 @@ public class AvlNode
     /// <summary>Size of the file in bytes, or size of the directory entry table for directories.</summary>
     public uint FileSize;
 
+    /// <summary>
+    /// On-disk attribute byte (masked, e.g. read-only/hidden/system/archive/directory).
+    /// Carried from the source entry so a rewrite re-encodes the original bits
+    /// instead of normalizing everything (BUG-LIB-034). Zero means unspecified
+    /// and the table encoder falls back to directory/archive for fresh nodes.
+    /// </summary>
+    public byte Attributes;
+
     /// <summary>Sector index where the file data or subdirectory table begins in the XISO image.</summary>
     public uint StartSector;
 

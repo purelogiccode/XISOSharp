@@ -578,4 +578,36 @@ public class BlockDeviceTests : IDisposable
         Assert.Equal(256, r);
         Assert.True(buf.SequenceEqual(payload));
     }
+
+    [Fact]
+    public void VerifyXiso_BlockDevice_ZeroRootSizeWithSector_ThrowsLikeStream()
+    {
+        // BUG-LIB-037: the IBlockDevice overload omitted the rootDirSize == 0
+        // check the Stream overload performs — it returned a tuple for corrupt.
+        using var dev = new MemoryBlockDevice(BuildCorruptHeader(33, 0));
+
+        Assert.Throws<XisoFormatException>(() => XisoReader.VerifyXiso(dev, "mem"));
+    }
+
+    [Fact]
+    public void VerifyXiso_BlockDevice_OversizedRoot_ThrowsLikeStream()
+    {
+        // BUG-LIB-037: same parity gap for the availableBytes check.
+        using var dev = new MemoryBlockDevice(BuildCorruptHeader(33, 0x100000));
+
+        Assert.Throws<XisoFormatException>(() => XisoReader.VerifyXiso(dev, "mem"));
+    }
+
+    private static byte[] BuildCorruptHeader(uint rootSector, uint rootSize)
+    {
+        var bytes = new byte[64 * Constants.SectorSize];
+        var magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
+        var header = Constants.HeaderOffset;
+        magic.CopyTo(bytes.AsSpan(header, magic.Length));
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(header + 20, 4), rootSector);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(header + 24, 4), rootSize);
+        magic.CopyTo(bytes.AsSpan(
+            header + 20 + 4 + 4 + Constants.FileTimeSize + Constants.UnusedSize, magic.Length));
+        return bytes;
+    }
 }

@@ -25,17 +25,14 @@ public static class FileTimeHelper
     /// The destination must be at least 8 bytes.
     /// </summary>
     /// <param name="destination">A span of at least 8 bytes to receive the FILETIME.</param>
+    /// <remarks>
+    /// BUG-LIB-038: the extract-xiso double formula loses low bits (~1e17
+    /// exceeds the 53-bit mantissa), so the same "now" differed between paths.
+    /// Uses the precise integer <see cref="ToFileTimeRaw"/> instead.
+    /// </remarks>
     public static void WriteFileTimeNow(Span<byte> destination)
     {
-        double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var tmp = (now + ((369.0 * 365.25 * 24.0 * 60.0 * 60.0) - ((3.0 * 24.0 * 60.0 * 60.0) + (6.0 * 60.0 * 60.0)))) *
-                  1.0e7;
-
-        var h = (uint)(tmp * (1.0 / (4.0 * (1L << 30))));
-        var l = (uint)(tmp - (h * 4.0 * (1L << 30)));
-
-        BinaryPrimitives.WriteUInt32LittleEndian(destination, l);
-        BinaryPrimitives.WriteUInt32LittleEndian(destination[4..], h);
+        WriteFileTime(destination, ToFileTimeRaw(DateTimeOffset.UtcNow));
     }
 
     /// <summary>

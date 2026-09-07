@@ -305,6 +305,22 @@ public static class XisoReader
                 $"Corrupt XISO: {isoName} — root sector {rootDirSector} beyond end ({totalSectors} sectors).");
         }
 
+        // BUG-LIB-037: parity with the Stream overload above — a zero root size
+        // with a non-zero sector, or a root table running past end of image,
+        // must fail here too instead of probing invalid later.
+        if (rootDirSize == 0)
+        {
+            throw new XisoFormatException(
+                $"Corrupt XISO: {isoName} — root directory size is zero with non-zero sector pointer.");
+        }
+
+        var availableBytes = (totalSectors - rootDirSector) * Constants.SectorSize;
+        if (rootDirSize > availableBytes)
+        {
+            throw new XisoFormatException(
+                $"Corrupt XISO: {isoName} — root directory size {rootDirSize} bytes exceeds available space ({availableBytes} bytes from sector {rootDirSector}).");
+        }
+
         return (rootDirSector, rootDirSize, discLseek);
     }
 
@@ -586,7 +602,13 @@ public static class XisoReader
 
             if (mode == ExtractMode.GenerateAvl)
             {
-                var avl = new AvlNode { Filename = filename, FileSize = fileSize, OldStartSector = startSector };
+                // BUG-LIB-034: carry the masked attribute bits so a rewrite
+                // re-encodes RO/HID/SYS instead of normalizing to Archive.
+                var avl = new AvlNode
+                {
+                    Filename = filename, FileSize = fileSize, OldStartSector = startSector,
+                    Attributes = attributes
+                };
                 dir.AvlNode = avl;
 
                 // XISO names are case-insensitive: a tree holding both cases
@@ -1638,7 +1660,6 @@ public static class XisoReader
         IFilesystem? filesystem = null)
     {
         outIsoPath = null;
-        var repair = false;
 
         // Batch scripts can pass an empty -d (`-d "%UNSET_VAR%"`): fail fast
         // with a named error instead of an IndexOutOfRangeException deep in
@@ -1651,7 +1672,6 @@ public static class XisoReader
         if (mode == ExtractMode.Rewrite)
         {
             filename = StripRewriteSuffix(filename);
-            repair = true;
         }
 
         var nameStart = filename.LastIndexOf(Constants.PathChar) + 1;
@@ -1805,14 +1825,6 @@ public static class XisoReader
                 }
             }
 
-            if (shortName != null)
-            {
-            }
-
-            if (repair)
-            {
-            }
-
             return 0;
         }
         finally
@@ -1910,12 +1922,10 @@ public static class XisoReader
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static VolumeInfo GetVolumeInfo(string isoPath)
     {
-        using var fs = new FileStream(
-            isoPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
-            });
+        // BUG-LIB-037: route through the CISO-aware opener like every other
+        // string overload — a plain FileStream probed a .cso invalid here while
+        // ListDirectory/CopyOut/ComputeFileHash saw it valid.
+        using var fs = OpenImageStream(isoPath);
 
         return GetVolumeInfo(fs, isoPath);
     }
@@ -2616,12 +2626,8 @@ public static class XisoReader
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public static SectorLayout GetSectorLayout(string isoPath)
     {
-        using var fs = new FileStream(
-            isoPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
-            });
+        // BUG-LIB-037: same CISO-aware routing as GetVolumeInfo above.
+        using var fs = OpenImageStream(isoPath);
 
         var volInfo = GetVolumeInfo(isoPath);
         if (!volInfo.IsValid)
@@ -2722,7 +2728,7 @@ public static class XisoReader
     /// zeroes out). Same traversal, sentinel, and hardening rules; keep in sync.
     /// </summary>
     private static List<(string Name, bool IsDir, uint Sector, uint Size)> ReadRawEntries(
-        FileStream fs, long dirStart, string contextPath)
+        Stream fs, long dirStart, string contextPath)
     {
         var raw = new List<(string Name, bool IsDir, uint Sector, uint Size)>();
         var stack = new Stack<long>();

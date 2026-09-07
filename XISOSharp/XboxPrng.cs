@@ -172,42 +172,64 @@ public sealed class XboxPrng
     /// <summary>Brute-force seed from the first 4096 bytes (2 sectors). Mirrors <c>TryGetSeed</c>.</summary>
     public static bool TryGetSeed(byte[] sector, out uint outSeed)
     {
+        return TryGetSeed(sector, out outSeed, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Brute-force seed from the first 4096 bytes (2 sectors), honoring
+    /// <paramref name="cancellationToken"/> (BUG-LIB-041: the search can burn
+    /// CPU for hours — callers must be able to cancel it).
+    /// </summary>
+    /// <param name="sector">First 4096 bytes of PRNG output to match.</param>
+    /// <param name="outSeed">Recovered seed on success.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns>True when the seed was recovered; false when not found or canceled.</returns>
+    public static bool TryGetSeed(byte[] sector, out uint outSeed, CancellationToken cancellationToken)
+    {
         uint foundSeed = 0;
         var seedFound = false;
 
         const long maxUInt32 = (long)uint.MaxValue + 1;
         var range = Partitioner.Create(0L, maxUInt32);
-        Parallel.ForEach(range, (chunk, state) =>
+        try
         {
-            for (var i = chunk.Item1; i < chunk.Item2; i++)
-            {
-                if (Volatile.Read(ref seedFound))
-                    break;
-                var seedGuess = (uint)i;
-                var multGuess = FixedSeeds[seedGuess & 7];
-                var stateGuess = (uint)(((seedGuess + 1UL) * multGuess) % 0xFFFFFFFB);
-                var maskAttempt = stateGuess;
-                var match = true;
-                for (var j = 0; j < Constants.SectorSize * 2; j += 2)
+            Parallel.ForEach(range, new ParallelOptions { CancellationToken = cancellationToken },
+                (chunk, state) =>
                 {
-                    stateGuess = (uint)(((stateGuess + 1UL) * multGuess) % 0xFFFFFFFB);
-                    var sample = (ushort)((stateGuess ^ maskAttempt) >> 8);
-                    if (sector[j] != (byte)sample || sector[j + 1] != (byte)(sample >> 8))
+                    for (var i = chunk.Item1; i < chunk.Item2; i++)
                     {
-                        match = false;
-                        break;
-                    }
-                }
+                        if (Volatile.Read(ref seedFound))
+                            break;
+                        var seedGuess = (uint)i;
+                        var multGuess = FixedSeeds[seedGuess & 7];
+                        var stateGuess = (uint)(((seedGuess + 1UL) * multGuess) % 0xFFFFFFFB);
+                        var maskAttempt = stateGuess;
+                        var match = true;
+                        for (var j = 0; j < Constants.SectorSize * 2; j += 2)
+                        {
+                            stateGuess = (uint)(((stateGuess + 1UL) * multGuess) % 0xFFFFFFFB);
+                            var sample = (ushort)((stateGuess ^ maskAttempt) >> 8);
+                            if (sector[j] != (byte)sample || sector[j + 1] != (byte)(sample >> 8))
+                            {
+                                match = false;
+                                break;
+                            }
+                        }
 
-                if (match)
-                {
-                    Volatile.Write(ref foundSeed, seedGuess);
-                    Volatile.Write(ref seedFound, true);
-                    state.Stop();
-                    break;
-                }
-            }
-        });
+                        if (match)
+                        {
+                            Volatile.Write(ref foundSeed, seedGuess);
+                            Volatile.Write(ref seedFound, true);
+                            state.Stop();
+                            break;
+                        }
+                    }
+                });
+        }
+        catch (OperationCanceledException)
+        {
+            // Canceled: report "not found" like a failed search (Try-pattern).
+        }
 
         outSeed = foundSeed;
         return seedFound;

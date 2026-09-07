@@ -374,6 +374,19 @@ public class SecurityAndPrngTests : IDisposable
     }
 
     [Fact]
+    public void XboxPrng_TryGetSeed_PreCanceledToken_ReturnsFalseImmediately()
+    {
+        // BUG-LIB-041: the search previously took no token and could burn CPU
+        // for hours without any way to stop it.
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var random = new byte[Constants.SectorSize * 2];
+        new Random(123).NextBytes(random);
+
+        Assert.False(XboxPrng.TryGetSeed(random, out _, cts.Token));
+    }
+
+    [Fact]
     public void XboxPrng_ExtractSeed_InvalidPath_Throws()
     {
         var missing = Path.Combine(Path.GetTempPath(), $"missing_{Guid.NewGuid():N}.iso");

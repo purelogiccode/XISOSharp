@@ -138,7 +138,10 @@ public static class XisoPatcher
                 e.Name,
                 e.IsDirectory,
                 e.StartSector,
-                e.IsDirectory ? dirSizes[JoinPath(canonicalParent, e.Name)] : e.FileSize));
+                e.IsDirectory ? dirSizes[JoinPath(canonicalParent, e.Name)] : e.FileSize,
+                // BUG-LIB-034: keep the source attribute bits so the rewritten
+                // table preserves RO/HID/SYS instead of normalizing to Archive.
+                e.Attributes));
         }
 
         return siblings;

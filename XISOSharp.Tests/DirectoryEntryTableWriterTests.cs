@@ -180,6 +180,50 @@ public class DirectoryEntryTableWriterTests : IDisposable
     }
 
     [Fact]
+    public void EncodeEntry_PreservesSourceAttributes()
+    {
+        // BUG-LIB-034: rewrite used to normalize every file to Archive (0x20),
+        // losing read-only/hidden/system bits.
+        var file = new AvlNode { Filename = "R", FileSize = 10, Attributes = 0x21 };
+        Assert.Equal(0x21, DirectoryEntryTableWriter.EncodeEntry(file)[12]);
+
+        var dir = new AvlNode
+        {
+            Filename = "D", Subdirectory = new AvlNode(), FileSize = 2048, Attributes = 0x13
+        };
+        Assert.Equal(0x13, DirectoryEntryTableWriter.EncodeEntry(dir)[12]);
+    }
+
+    [Fact]
+    public void EncodeEntry_UnspecifiedAttributes_FallsBackToKindDefault()
+    {
+        var file = new AvlNode { Filename = "F", FileSize = 10 };
+        Assert.Equal(Constants.AttributeArc, DirectoryEntryTableWriter.EncodeEntry(file)[12]);
+
+        var dir = new AvlNode { Filename = "D", Subdirectory = new AvlNode(), FileSize = 2048 };
+        Assert.Equal(Constants.AttributeDir, DirectoryEntryTableWriter.EncodeEntry(dir)[12]);
+    }
+
+    [Fact]
+    public void BuildTable_NonLatin1Name_ThrowsInvalidOperation()
+    {
+        // BUG-LIB-035: must fail fast with a named error, not mid-write with a
+        // generic ArgumentException after sizing already ran.
+        var ex = Assert.Throws<InvalidOperationException>(() => DirectoryEntryTableWriter.BuildTable(
+            [new DirectoryEntryTableWriter.DirectoryTableEntry("😀.txt", false, 10, 100)]));
+        Assert.Contains("Latin-1", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildTable_AttributesFlowIntoEncodedRecord()
+    {
+        var root = DirectoryEntryTableWriter.BuildTable(
+            [new DirectoryEntryTableWriter.DirectoryTableEntry("r.txt", false, 7, 5, 0x23)]);
+        Assert.NotNull(root);
+        Assert.Equal(0x23, DirectoryEntryTableWriter.EncodeEntry(root)[12]);
+    }
+
+    [Fact]
     public void SerializeTable_MatchesWriterOutput_ForEveryTableInImage()
     {
         var src = CreateTempDir("xiso_tbl_src");
@@ -208,7 +252,9 @@ public class DirectoryEntryTableWriterTests : IDisposable
                     e.Name,
                     e.IsDirectory,
                     e.StartSector,
-                    e.IsDirectory ? dirSizes[JoinPath(dir.Path, e.Name)] : e.FileSize))
+                    e.IsDirectory ? dirSizes[JoinPath(dir.Path, e.Name)] : e.FileSize,
+                    // BUG-LIB-034: round-trip the on-disk attribute bits too.
+                    e.Attributes))
                 .ToList();
 
             var table = DirectoryEntryTableWriter.BuildTable(entries);

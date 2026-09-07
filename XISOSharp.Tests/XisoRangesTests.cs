@@ -1,3 +1,6 @@
+using System.Buffers.Binary;
+using System.Text;
+
 namespace XISOSharp.Tests;
 
 /// <summary>
@@ -195,6 +198,84 @@ public class XisoRangesTests : IDisposable
         // Adjacent ranges where start == last.End + 1 are coalesced
         var expected = new List<(uint Start, uint End)> { (1, 10) };
         Assert.Equal(expected, merged);
+    }
+
+    [Fact]
+    public void MergeRanges_TopOfSpace_MergesOverlapping()
+    {
+        // BUG-LIB-030: last.End + 1 wraps to 0 at uint.MaxValue, so an
+        // overlapping tail compared false and was never merged.
+        var a = new List<(uint Start, uint End)> { (0, uint.MaxValue) };
+        var b = new List<(uint Start, uint End)> { (uint.MaxValue, uint.MaxValue) };
+
+        var merged = XisoRanges.MergeRanges(a, b);
+
+        Assert.Equal(new List<(uint Start, uint End)> { (0, uint.MaxValue) }, merged);
+    }
+
+    [Fact]
+    public void CollectFileEntries_NonFirstFfffLeft_KeepsRightSibling()
+    {
+        // BUG-LIB-036: any 0xFFFF left child was treated as an empty table,
+        // dropping the entry and its right siblings.
+        var iso = CreateSentinelIso();
+
+        var entries = XisoRanges.GetFileEntries(iso);
+
+        Assert.Equal(2, entries.Count);
+        Assert.Contains(entries, static e => string.Equals(e.Path, "a.txt", StringComparison.Ordinal));
+        Assert.Contains(entries, static e => string.Equals(e.Path, "b.txt", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void GetXisoRanges_NonFirstFfffLeft_KeepsRightSiblingSectors()
+    {
+        // BUG-LIB-036 (GetValidSectors twin of the test above).
+        var iso = CreateSentinelIso();
+
+        using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var (_, files) = XisoRanges.GetXisoRanges(fs, 0, true);
+
+        Assert.Contains(files, static r => r.Start == 34 && r.End == 35);
+    }
+
+    /// <summary>
+    /// Builds a minimal image whose root table holds two file entries where the
+    /// second (non-first) entry uses a 0xFFFF left child ("no left child",
+    /// xdvdfs semantics) with no right sibling after it.
+    /// </summary>
+    private string CreateSentinelIso()
+    {
+        var bytes = new byte[64 * Constants.SectorSize];
+        var magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
+        var header = Constants.HeaderOffset;
+        magic.CopyTo(bytes.AsSpan(header, magic.Length));
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(header + 20, 4), 33);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(header + 24, 4), (uint)Constants.SectorSize);
+        magic.CopyTo(bytes.AsSpan(header + 20 + 4 + 4 + Constants.FileTimeSize + Constants.UnusedSize,
+            magic.Length));
+
+        var table = 33 * Constants.SectorSize;
+        WriteTableEntry(bytes, table, 0, 5, 34, 100, Constants.AttributeArc, "a.txt");
+        WriteTableEntry(bytes, table + 20, 0xFFFF, 0, 35, 100, Constants.AttributeArc, "b.txt");
+
+        var dir = CreateTempDir();
+        var iso = Path.Combine(dir, "sentinel.iso");
+        File.WriteAllBytes(iso, bytes);
+        return iso;
+    }
+
+    private static void WriteTableEntry(byte[] img, int offset, ushort left, ushort right,
+        uint sector, uint size, byte attr, string name)
+    {
+        var nameBytes = Encoding.ASCII.GetBytes(name);
+        BinaryPrimitives.WriteUInt16LittleEndian(img.AsSpan(offset, 2), left);
+        BinaryPrimitives.WriteUInt16LittleEndian(img.AsSpan(offset + 2, 2), right);
+        BinaryPrimitives.WriteUInt32LittleEndian(img.AsSpan(offset + 4, 4), sector);
+        BinaryPrimitives.WriteUInt32LittleEndian(img.AsSpan(offset + 8, 4), size);
+        img[offset + 12] = attr;
+        img[offset + 13] = (byte)nameBytes.Length;
+        nameBytes.CopyTo(img.AsSpan(offset + 14, nameBytes.Length));
     }
 
     [Fact]

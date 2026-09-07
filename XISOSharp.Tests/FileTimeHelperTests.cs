@@ -31,25 +31,31 @@ public class FileTimeHelperTests
 
     /// <summary>
     /// Verifies that repeated calls to <see cref="FileTimeHelper.WriteFileTimeNow"/>
-    /// within a short interval produce values that are equal or close together,
+    /// within a short interval produce values that agree within a tight tolerance,
     /// and are not all zeros.
     /// </summary>
     [Fact]
     public void WriteFileTimeNow_IdempotentPerCall()
     {
         Span<byte> first = stackalloc byte[8];
-        Span<byte> second = stackalloc byte[8];
         Span<byte> immediate = stackalloc byte[8];
+        Span<byte> second = stackalloc byte[8];
 
         FileTimeHelper.WriteFileTimeNow(first);
         FileTimeHelper.WriteFileTimeNow(immediate);
         FileTimeHelper.WriteFileTimeNow(second);
 
-        Assert.True(first.SequenceEqual(immediate) || first.SequenceEqual(second),
-            "FILETIME should be within 1-2 seconds");
+        var f = FileTimeHelper.ReadFileTimeRaw(first);
+        var i = FileTimeHelper.ReadFileTimeRaw(immediate);
+        var s = FileTimeHelper.ReadFileTimeRaw(second);
 
-        Assert.False(first.SequenceEqual(stackalloc byte[8]),
-            "FILETIME should not be all zeros");
+        // Precise integer conversion (BUG-LIB-038): consecutive calls can
+        // straddle a clock tick, so assert a tight tolerance (5 s) instead of
+        // the exact equality the old second-truncated formula gave for free.
+        Assert.InRange(i >= f ? i - f : f - i, 0UL, 50_000_000UL);
+        Assert.InRange(s >= i ? s - i : i - s, 0UL, 50_000_000UL);
+
+        Assert.NotEqual(0UL, f);
     }
 
     /// <summary>
@@ -76,5 +82,22 @@ public class FileTimeHelperTests
 
         Assert.True(unixTime >= now - 10 && unixTime <= now + 10,
             $"FILETIME should represent current time. Got unix={unixTime}, now={now}");
+    }
+
+    /// <summary>
+    /// Verifies that <see cref="FileTimeHelper.WriteFileTimeNow"/> agrees with the
+    /// precise integer conversion (BUG-LIB-038: the old double formula truncated
+    /// to whole seconds, so the same "now" differed between paths).
+    /// </summary>
+    [Fact]
+    public void WriteFileTimeNow_MatchesIntegerConversionOfNow()
+    {
+        var before = DateTimeOffset.UtcNow;
+        Span<byte> dest = stackalloc byte[8];
+        FileTimeHelper.WriteFileTimeNow(dest);
+        var after = DateTimeOffset.UtcNow;
+
+        var ft = FileTimeHelper.ReadFileTimeRaw(dest);
+        Assert.InRange(ft, FileTimeHelper.ToFileTimeRaw(before), FileTimeHelper.ToFileTimeRaw(after));
     }
 }
