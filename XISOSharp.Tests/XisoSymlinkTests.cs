@@ -131,7 +131,8 @@ public class XisoSymlinkTests : IDisposable
         var pairs = RemapFilesystem.DryRunRemap(root, CatchAllRule());
 
         Assert.Contains(pairs, p => string.Equals(p.HostPath, "/orig.txt", StringComparison.OrdinalIgnoreCase));
-        var alias = Assert.Single(pairs, p => string.Equals(p.HostPath, "/alias.txt", StringComparison.OrdinalIgnoreCase));
+        var alias = Assert.Single(pairs,
+            p => string.Equals(p.HostPath, "/alias.txt", StringComparison.OrdinalIgnoreCase));
         Assert.Equal("/alias.txt", alias.ImagePath);
     }
 

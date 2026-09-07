@@ -73,9 +73,13 @@ internal static class AppLogging
             var text = msg.TrimEnd('\r', '\n');
             if (msg.StartsWith("warning:", StringComparison.OrdinalIgnoreCase) ||
                 msg.StartsWith("[WARNING]", StringComparison.OrdinalIgnoreCase))
+            {
                 Log.Warning("{Message}", text);
+            }
             else
+            {
                 Log.Error("{Message}", text);
+            }
         };
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -99,7 +103,10 @@ internal static class AppLogging
             }
             finally
             {
-                try { Log.CloseAndFlush(); }
+                try
+                {
+                    Log.CloseAndFlush();
+                }
                 catch
                 {
                     // ignored
@@ -121,7 +128,8 @@ internal static class AppLogging
             }
         };
 
-        Log.Information("{App} logging initialized (version {Version})", applicationName, EnvironmentInfo.ApplicationVersion());
+        Log.Information("{App} logging initialized (version {Version})", applicationName,
+            EnvironmentInfo.ApplicationVersion());
     }
 
     internal static void CloseAndFlush()
@@ -136,4 +144,3 @@ internal static class AppLogging
         }
     }
 }
-

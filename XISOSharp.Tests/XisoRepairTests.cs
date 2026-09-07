@@ -202,7 +202,7 @@ public class XisoRepairTests : IDisposable
         // entry's sector exceeds the file length (class T — unfixable).
         using (var fs = new FileStream(isoPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
-            fs.SetLength((long)vol.RootDirSector * Constants.SectorSize + vol.RootDirSize);
+            fs.SetLength(((long)vol.RootDirSector * Constants.SectorSize) + vol.RootDirSize);
         }
 
         Assert.NotEmpty(XisoReader.AuditXiso(isoPath).Issues);
@@ -402,7 +402,7 @@ public class XisoRepairTests : IDisposable
         var vol = XisoReader.GetVolumeInfo(isoPath);
         using (var fs = new FileStream(isoPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
-            fs.SetLength((long)vol.RootDirSector * Constants.SectorSize + vol.RootDirSize);
+            fs.SetLength(((long)vol.RootDirSector * Constants.SectorSize) + vol.RootDirSize);
         }
 
         Assert.Equal(1, Program.Main(["--repair", isoPath]));

@@ -74,7 +74,7 @@ internal sealed class XboxKitWrapper : IDisposable
             (var code, var so, var se) = Run(Path.GetTempPath(), "--help");
             var txt = string.IsNullOrWhiteSpace(so) ? se : so;
             return txt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim()
-                ?? $"exit:{code}";
+                   ?? $"exit:{code}";
         }
         catch (Exception ex)
         {

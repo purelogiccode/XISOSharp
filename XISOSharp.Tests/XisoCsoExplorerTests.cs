@@ -69,7 +69,8 @@ public sealed class XisoCsoExplorerTests : IDisposable
         Assert.True(explorer.Volume.IsValid);
         Assert.Equal(cso, explorer.IsoPath);
         var names = explorer.ListChildren("/").Select(n => n.Name + (n.IsDirectory ? "/" : "")).ToArray();
-        Assert.Equal(new XisoExplorer(iso).ListChildren("/").Select(n => n.Name + (n.IsDirectory ? "/" : "")).ToArray(), names);
+        Assert.Equal(new XisoExplorer(iso).ListChildren("/").Select(n => n.Name + (n.IsDirectory ? "/" : "")).ToArray(),
+            names);
     }
 
     [Fact]

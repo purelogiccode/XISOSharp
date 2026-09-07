@@ -25,15 +25,17 @@ public record VolumeInfo(
     /// <c>XGD3</c>, <c>XGD2 Hybrid</c>, or <c>XGD1</c>. Returns <c>Unknown</c> when
     /// the volume is invalid or the offset matches no known layout.
     /// </summary>
-    public string DiscFormat => !IsValid ? "Unknown" : DiscLseek switch
-    {
-        0 => "RAW",
-        Constants.GlobalLseekOffset => "GLOBAL (XGD2)",
-        Constants.Xgd3LseekOffset => "XGD3",
-        Constants.Xgd2HybridLseekOffset => "XGD2 Hybrid",
-        Constants.Xgd1LseekOffset => "XGD1",
-        _ => "Unknown",
-    };
+    public string DiscFormat => !IsValid
+        ? "Unknown"
+        : DiscLseek switch
+        {
+            0 => "RAW",
+            Constants.GlobalLseekOffset => "GLOBAL (XGD2)",
+            Constants.Xgd3LseekOffset => "XGD3",
+            Constants.Xgd2HybridLseekOffset => "XGD2 Hybrid",
+            Constants.Xgd1LseekOffset => "XGD1",
+            _ => "Unknown",
+        };
 }
 
 /// <summary>

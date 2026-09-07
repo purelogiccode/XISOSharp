@@ -658,7 +658,7 @@ internal static class Program
                         break;
                     case "--jobs":
                         if (i + 1 >= args.Length || !int.TryParse(args[i + 1],
-                            NumberStyles.Integer, CultureInfo.InvariantCulture, out jobs) || jobs < 1)
+                                NumberStyles.Integer, CultureInfo.InvariantCulture, out jobs) || jobs < 1)
                         {
                             PrintUsage();
                             return 1;
@@ -796,14 +796,16 @@ internal static class Program
 
         // --pack translates to create mode (directory input) or rewrite mode (ISO input),
         // reusing the existing create/rewrite machinery.
-        if (TranslatePackInput(packInput, packName, batchDir, rewrite, info, lsMode, xexInfoMode, xbeInfoMode, repairMode, salvageMode,
+        if (TranslatePackInput(packInput, packName, batchDir, rewrite, info, lsMode, xexInfoMode, xbeInfoMode,
+                repairMode, salvageMode,
                 unpackMode, hashMode, copyOut, copyIn, auditMode, validateMode, tree, extract, checksumFlagMode,
                 optind, args.Length, createList, ref rewrite, ref packIsoFile, ref path) != 0)
         {
             return 1;
         }
 
-        if (checksumFlagMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (checksumFlagMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree ||
+                                 hashMode || copyOut || copyIn || auditMode ||
                                  validateMode || unpackMode || createList.Count > 0 || rewrite || filetimeMode ||
                                  setFiletimeMode))
         {
@@ -811,7 +813,8 @@ internal static class Program
             return 1;
         }
 
-        if (filetimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (filetimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree ||
+                             hashMode || copyOut || copyIn || auditMode ||
                              validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                              setFiletimeMode))
         {
@@ -819,7 +822,8 @@ internal static class Program
             return 1;
         }
 
-        if (setFiletimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (setFiletimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree ||
+                                hashMode || copyOut || copyIn || auditMode ||
                                 validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                                 filetimeMode))
         {
@@ -840,7 +844,8 @@ internal static class Program
         }
 
         if ((skipSectors.HasValue || prependSectors.HasValue) &&
-            (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || hashMode || copyOut || copyIn || auditMode || validateMode || validateFlag))
+            (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || hashMode || copyOut ||
+             copyIn || auditMode || validateMode || validateFlag))
         {
             Logger.LogErr(
                 "Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, and create (-c) modes\n");
@@ -859,8 +864,10 @@ internal static class Program
             return 1;
         }
 
-        if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || unpackMode || hashMode ||
-                                 copyOut || copyIn || validateMode || checksumFlagMode || filetimeMode || setFiletimeMode))
+        if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || xbeInfoMode || repairMode ||
+                                 salvageMode || unpackMode || hashMode ||
+                                 copyOut || copyIn || validateMode || checksumFlagMode || filetimeMode ||
+                                 setFiletimeMode))
         {
             Logger.LogErr(
                 "Error: --batch is only supported in extract, list, tree, rewrite (-r), and audit (-V) modes\n");
@@ -902,7 +909,8 @@ internal static class Program
             return 1;
         }
 
-        if (unpackMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree || hashMode || copyOut || copyIn || auditMode || validateMode ||
+        if (unpackMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree ||
+                           hashMode || copyOut || copyIn || auditMode || validateMode ||
                            checksumFlagMode || filetimeMode || setFiletimeMode))
         {
             Logger.LogErr("Error: --unpack cannot be combined with other modes\n");
@@ -912,7 +920,8 @@ internal static class Program
         // XboxKit redump modes are mutually exclusive with other operational modes
         var anyRedumpMode = videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode ||
                             zarMode || allMode || bestMode || compressAlias;
-        if (anyRedumpMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree || hashMode || copyOut || copyIn || auditMode ||
+        if (anyRedumpMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree ||
+                              hashMode || copyOut || copyIn || auditMode ||
                               validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
                               filetimeMode || setFiletimeMode))
         {
@@ -2890,8 +2899,8 @@ internal static class Program
             try
             {
                 var splitBase = outputBase
-                    ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(iso)) ?? "",
-                        Path.GetFileNameWithoutExtension(iso));
+                                ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(iso)) ?? "",
+                                    Path.GetFileNameWithoutExtension(iso));
                 var parts = halves
                     ? XisoReader.SplitXisoHalves(iso, splitBase)
                     : XisoReader.SplitXiso(iso, splitBase, partSize);
@@ -2979,7 +2988,7 @@ internal static class Program
             try
             {
                 var joined = outputPath
-                    ?? Path.ChangeExtension(first[..^".1.iso".Length], ".iso");
+                             ?? Path.ChangeExtension(first[..^".1.iso".Length], ".iso");
                 XisoReader.JoinSplitXiso(first, joined);
                 Logger.Log($"join: {joined}\n");
             }
@@ -3043,9 +3052,16 @@ internal static class Program
         var dir = Path.GetDirectoryName(xisoPath) ?? "";
         var full = Path.GetFileName(xisoPath) ?? "redump";
         var baseName = full;
-        if (full.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase)) baseName = full[..^5];
+        if (full.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase))
+        {
+            baseName = full[..^5];
+        }
         else if (full.EndsWith(".zar", StringComparison.OrdinalIgnoreCase) ||
-                 full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) baseName = full[..^4];
+                 full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+        {
+            baseName = full[..^4];
+        }
+
         return Path.Combine(dir, baseName + ".redump.iso");
     }
 
@@ -3652,7 +3668,8 @@ internal static class Program
             return 0;
         }
 
-        if (rewrite || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || unpackMode || hashMode || copyOut || copyIn || auditMode ||
+        if (rewrite || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || unpackMode ||
+            hashMode || copyOut || copyIn || auditMode ||
             validateMode || tree || !extract || checksumFlagMode)
         {
             Logger.LogErr("Error: --pack cannot be combined with other modes\n");

@@ -133,7 +133,8 @@ public class XisoPatcherTests : IDisposable
         Assert.Equal("nested", File.ReadAllText(CopyOutToTemp(iso, "/subdir/nested.txt")));
         // Layout still fully valid.
         var layout = XisoReader.GetSectorLayout(iso);
-        Assert.Contains(layout.Entries, static e => string.Equals(e.Path, "/file2.txt", StringComparison.OrdinalIgnoreCase) && e.FileSize == 100);
+        Assert.Contains(layout.Entries,
+            static e => string.Equals(e.Path, "/file2.txt", StringComparison.OrdinalIgnoreCase) && e.FileSize == 100);
     }
 
     [Fact]
@@ -147,7 +148,8 @@ public class XisoPatcherTests : IDisposable
         var layout = XisoReader.GetSectorLayout(iso);
         var oldEntry = XisoReader.GetEntryInfo(iso, "/file2.txt");
         Assert.NotNull(oldEntry);
-        var parent = layout.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
+        var parent = layout.Entries.First(static e =>
+            e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
         var oldSectors = (oldEntry.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize;
 
         var host = Path.Combine(CreateTempDir("xiso_patch_host"), "new.bin");
@@ -337,8 +339,10 @@ public class XisoPatcherTests : IDisposable
         var iso = CreateIso(src);
 
         var before = XisoReader.GetSectorLayout(iso);
-        var subBefore = before.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/subdir", StringComparison.OrdinalIgnoreCase));
-        var rootBefore = before.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
+        var subBefore = before.Entries.First(static e =>
+            e.IsDirectory && string.Equals(e.Path, "/subdir", StringComparison.OrdinalIgnoreCase));
+        var rootBefore = before.Entries.First(static e =>
+            e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
         // On-disk directory sizes are sector-rounded (in-memory table is 2040 bytes).
         Assert.Equal(2048u, subBefore.FileSize);
         Assert.Equal(1u, subBefore.SectorCount);
@@ -348,8 +352,10 @@ public class XisoPatcherTests : IDisposable
         XisoPatcher.CopyIntoImage(iso, host, "/subdir/newf", createBackup: false);
 
         var after = XisoReader.GetSectorLayout(iso);
-        var subAfter = after.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/subdir", StringComparison.OrdinalIgnoreCase));
-        var rootAfter = after.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
+        var subAfter = after.Entries.First(static e =>
+            e.IsDirectory && string.Equals(e.Path, "/subdir", StringComparison.OrdinalIgnoreCase));
+        var rootAfter = after.Entries.First(static e =>
+            e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(2u, subAfter.SectorCount);
         Assert.NotEqual(subBefore.StartSector, subAfter.StartSector);
         // Grandparent (root) table itself did not move — only its entry changed.
@@ -371,7 +377,8 @@ public class XisoPatcherTests : IDisposable
 
         var volBefore = XisoReader.GetVolumeInfo(iso);
         var layoutBefore = XisoReader.GetSectorLayout(iso);
-        var rootBefore = layoutBefore.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
+        var rootBefore = layoutBefore.Entries.First(static e =>
+            e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
         // Asymmetry by writer construction: the volume header stores the UNROUNDED
         // root table size, while subdirectory entry records store sector-rounded
         // sizes (the patcher preserves both conventions).

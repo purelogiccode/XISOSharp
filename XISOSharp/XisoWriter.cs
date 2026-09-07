@@ -773,7 +773,8 @@ public static class XisoWriter
                     // junctions, mount points): XISO has no link representation,
                     // and a cyclic link would recurse forever (TODO #21).
                     // Symlinks to files are still packed (target content).
-                    Logger.LogErr($"warning: skipping reparse point (symlink/junction): {entryName}, not descending.\n");
+                    Logger.LogErr(
+                        $"warning: skipping reparse point (symlink/junction): {entryName}, not descending.\n");
                     filesSkipped++;
                     continue;
                 }

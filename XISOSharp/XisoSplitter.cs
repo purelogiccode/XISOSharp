@@ -54,7 +54,7 @@ public static class XisoSplitter
     /// </summary>
     public static bool IsSplitPath(string? path)
     {
-        return path != null && path.EndsWith(".1.iso", StringComparison.OrdinalIgnoreCase);
+        return path?.EndsWith(".1.iso", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     /// <summary>
@@ -87,8 +87,11 @@ public static class XisoSplitter
             throw new ArgumentException("Output base path must not be empty.", nameof(outputBase));
         var length = ValidateImage(isoPath);
         if (partSizeBytes < Constants.SectorSize)
+        {
             throw new ArgumentOutOfRangeException(nameof(partSizeBytes),
                 $"Part size must be at least one sector ({Constants.SectorSize} bytes).");
+        }
+
         var aligned = (partSizeBytes / Constants.SectorSize) * Constants.SectorSize;
         return SplitCore(isoPath, outputBase, aligned, length, cancellationToken, progress);
     }
@@ -118,7 +121,7 @@ public static class XisoSplitter
         if (string.IsNullOrEmpty(outputBase))
             throw new ArgumentException("Output base path must not be empty.", nameof(outputBase));
         var length = ValidateImage(isoPath);
-        var cut = ((length + 1) / 2 + Constants.SectorSize - 1) / Constants.SectorSize * Constants.SectorSize;
+        var cut = (((length + 1) / 2) + Constants.SectorSize - 1) / Constants.SectorSize * Constants.SectorSize;
         if (cut <= 0 || cut >= length)
             cut = length;
         return SplitCore(isoPath, outputBase, cut, length, cancellationToken, progress);
@@ -155,8 +158,11 @@ public static class XisoSplitter
         if (string.IsNullOrEmpty(outputPath))
             throw new ArgumentException("Output path must not be empty.", nameof(outputPath));
         if (!IsSplitPath(firstPartPath))
+        {
             throw new ArgumentException(
                 $"Join expects the first split part (*.1.iso): {firstPartPath}", nameof(firstPartPath));
+        }
+
         if (!File.Exists(firstPartPath))
             throw new FileNotFoundException($"Split part not found: {firstPartPath}", firstPartPath);
 
@@ -174,8 +180,10 @@ public static class XisoSplitter
         foreach (var part in parts)
         {
             if (string.Equals(Path.GetFullPath(part), outputFull, StringComparison.OrdinalIgnoreCase))
+            {
                 throw new ArgumentException($"Output must not be one of the parts: {outputPath}",
                     nameof(outputPath));
+            }
         }
 
         if (File.Exists(outputPath))
@@ -210,8 +218,11 @@ public static class XisoSplitter
 
             var volume = XisoReader.GetVolumeInfo(outputPath);
             if (!volume.IsValid)
+            {
                 throw new XisoFormatException(
                     $"Joined output is not a valid XISO (missing or corrupt parts?): {outputPath}");
+            }
+
             return outputPath;
         }
         catch
@@ -264,7 +275,7 @@ public static class XisoSplitter
         cancellationToken.ThrowIfCancellationRequested();
         // Overflow-safe ceil(length / alignedPartSize); length is positive here
         // (ValidateImage rejects non-images, including empty files).
-        var partCount = (int)((length - 1) / alignedPartSize + 1);
+        var partCount = (int)(((length - 1) / alignedPartSize) + 1);
         var parts = new List<string>(partCount);
         for (var i = 0; i < partCount; i++)
         {

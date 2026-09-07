@@ -51,7 +51,10 @@ internal static class OverwritePrompt
             Log.Error(ex, "Overwrite prompt failed for {Path}", path);
             BugReporter.ReportException(ex, $"Overwrite prompt failed for {path}");
             output ??= Console.Out;
-            try { output.WriteLine($"[ERROR] Overwrite check failed: {path} ({ex.Message})"); }
+            try
+            {
+                output.WriteLine($"[ERROR] Overwrite check failed: {path} ({ex.Message})");
+            }
             catch
             {
                 // ignored

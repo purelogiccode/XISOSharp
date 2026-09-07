@@ -134,8 +134,11 @@ public static class XisoChecksum
         // Hardening (#16): bound subdirectory descent — a corrupt subdir cycle
         // previously recursed until the stack overflowed.
         if (depth > Constants.MaxTocDepth)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry at '{parent}': maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
+        }
+
         // Gather immediate children of this directory table
         var children = WalkDirentTree(dev, dirStart, dirSize);
 
@@ -197,11 +200,16 @@ public static class XisoChecksum
             // Bounds check: ensure we don't read beyond dir table
             if (top >= dirSize) continue;
             if (!visited.Add(top))
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry: directory cycle detected — table offset {top} was already visited.");
+            }
+
             if (visited.Count > Constants.MaxTocEntriesPerTable)
+            {
                 throw new XisoFormatException(
                     "invalid TOC entry: too many entries in one directory table (possible corrupt offset chain).");
+            }
 
             var opt = ReadDirent(dev, offset);
             if (opt == null) continue; // empty directory sentinel

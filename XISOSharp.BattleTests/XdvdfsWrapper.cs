@@ -89,7 +89,7 @@ internal sealed class XdvdfsWrapper : IDisposable
             (var code, var so, var se) = Run("-V");
             var txt = string.IsNullOrWhiteSpace(so) ? se : so;
             return txt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim()
-                ?? $"exit:{code}";
+                   ?? $"exit:{code}";
         }
         catch (Exception ex)
         {

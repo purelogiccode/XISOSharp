@@ -151,7 +151,7 @@ public class XisoSnapshotTests : IDisposable
     {
         Assert.True(File.Exists(FixtureIsoPath),
             $"Reference fixture missing: {FixtureIsoPath}. Regenerate with XISO_UPDATE_FIXTURE=1 " +
-            $"dotnet test --filter FullyQualifiedName~RegenerateFixtureIso_WhenRequested");
+            "dotnet test --filter FullyQualifiedName~RegenerateFixtureIso_WhenRequested");
 
         var src = CreateTempDir("xiso_snap_src");
         BuildSnapshotTree(src);
@@ -226,7 +226,9 @@ public class XisoSnapshotTests : IDisposable
     {
         if (!string.Equals(Environment.GetEnvironmentVariable("XISO_UPDATE_FIXTURE"), "1",
                 StringComparison.Ordinal))
+        {
             return;
+        }
 
         var src = CreateTempDir("xiso_snap_src");
         BuildSnapshotTree(src);

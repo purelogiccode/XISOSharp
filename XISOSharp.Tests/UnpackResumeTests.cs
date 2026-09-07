@@ -183,8 +183,10 @@ public class UnpackResumeTests : IDisposable
             var progress = new SyncProgress(info =>
             {
                 if (info.Type == ProgressInfoType.FileAdded && ++written == 2)
+                {
                     // ReSharper disable once AccessToDisposedClosure
                     cts.Cancel();
+                }
             });
 
             ex = Record.Exception(() => XisoReader.DecodeXiso(isoPath, dest, ExtractMode.Extract,

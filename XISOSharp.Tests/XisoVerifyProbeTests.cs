@@ -45,8 +45,8 @@ public sealed class XisoVerifyProbeTests : IDisposable
     {
         var path = Path.Combine(Path.GetTempPath(), $"xiso_probe_{Guid.NewGuid():N}.iso");
         var magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
-        var headerLength = Constants.HeaderOffset + Constants.HeaderDataLength + 4 + 4
-            + Constants.FileTimeSize + Constants.UnusedSize + Constants.HeaderDataLength;
+        const int headerLength = Constants.HeaderOffset + Constants.HeaderDataLength + 4 + 4
+                                 + Constants.FileTimeSize + Constants.UnusedSize + Constants.HeaderDataLength;
         using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
             fs.SetLength(Constants.Xgd2HybridLseekOffset + headerLength + Constants.SectorSize);

@@ -95,14 +95,17 @@ public class XisoSectorLayoutTests : IDisposable
         var layout = XisoReader.GetSectorLayout(iso);
 
         Assert.Equal(vol.RootDirSector, layout.Volume.RootDirSector);
-        var expectedFiles = new[] { "/file1.txt", "/file2.txt", "/empty.txt", "/subdir/nested.txt", "/subdir/data.bin" };
+        var expectedFiles = new[]
+            { "/file1.txt", "/file2.txt", "/empty.txt", "/subdir/nested.txt", "/subdir/data.bin" };
         foreach (var path in expectedFiles)
         {
-            var extent = Assert.Single(layout.Entries, e => string.Equals(e.Path, path, StringComparison.Ordinal) && !e.IsDirectory);
+            var extent = Assert.Single(layout.Entries,
+                e => string.Equals(e.Path, path, StringComparison.Ordinal) && !e.IsDirectory);
             var info = XisoReader.GetEntryInfo(iso, path);
             Assert.NotNull(info);
             Assert.Equal(info.StartSector, extent.StartSector);
-            var sourceBytes = File.ReadAllBytes(Path.Combine(src, path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)));
+            var sourceBytes =
+                File.ReadAllBytes(Path.Combine(src, path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)));
             Assert.Equal((uint)sourceBytes.Length, extent.FileSize);
             Assert.Equal(SectorCountFor(sourceBytes.Length), extent.SectorCount);
 
@@ -110,7 +113,7 @@ public class XisoSectorLayoutTests : IDisposable
             if (sourceBytes.Length > 0)
             {
                 using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read);
-                fs.Seek(vol.DiscLseek + (long)extent.StartSector * Constants.SectorSize, SeekOrigin.Begin);
+                fs.Seek(vol.DiscLseek + ((long)extent.StartSector * Constants.SectorSize), SeekOrigin.Begin);
                 var actual = new byte[sourceBytes.Length];
                 var read = 0;
                 while (read < actual.Length)
@@ -125,9 +128,13 @@ public class XisoSectorLayoutTests : IDisposable
         }
 
         // Multi-sector spans: 5000 bytes -> 3 sectors, 7000 -> 4.
-        Assert.Equal(3u, layout.Entries.Single(e => string.Equals(e.Path, "/file2.txt", StringComparison.Ordinal)).SectorCount);
-        Assert.Equal(4u, layout.Entries.Single(e => string.Equals(e.Path, "/subdir/data.bin", StringComparison.Ordinal)).SectorCount);
-        Assert.Equal(0u, layout.Entries.Single(e => string.Equals(e.Path, "/empty.txt", StringComparison.Ordinal)).SectorCount);
+        Assert.Equal(3u,
+            layout.Entries.Single(e => string.Equals(e.Path, "/file2.txt", StringComparison.Ordinal)).SectorCount);
+        Assert.Equal(4u,
+            layout.Entries.Single(e => string.Equals(e.Path, "/subdir/data.bin", StringComparison.Ordinal))
+                .SectorCount);
+        Assert.Equal(0u,
+            layout.Entries.Single(e => string.Equals(e.Path, "/empty.txt", StringComparison.Ordinal)).SectorCount);
     }
 
     [Fact]
@@ -139,12 +146,14 @@ public class XisoSectorLayoutTests : IDisposable
 
         var layout = XisoReader.GetSectorLayout(iso);
 
-        var root = Assert.Single(layout.Entries, e => string.Equals(e.Path, "/", StringComparison.Ordinal) && e.IsDirectory);
+        var root = Assert.Single(layout.Entries,
+            e => string.Equals(e.Path, "/", StringComparison.Ordinal) && e.IsDirectory);
         Assert.Equal(vol.RootDirSector, root.StartSector);
         Assert.Equal(vol.RootDirSize, root.FileSize);
         Assert.Equal(SectorCountFor(vol.RootDirSize), root.SectorCount);
 
-        var sub = Assert.Single(layout.Entries, e => string.Equals(e.Path, "/subdir", StringComparison.Ordinal) && e.IsDirectory);
+        var sub = Assert.Single(layout.Entries,
+            e => string.Equals(e.Path, "/subdir", StringComparison.Ordinal) && e.IsDirectory);
         var subInfo = XisoReader.GetEntryInfo(iso, "/subdir");
         Assert.NotNull(subInfo);
         Assert.True(subInfo.IsDirectory);
@@ -166,8 +175,10 @@ public class XisoSectorLayoutTests : IDisposable
 
         // Used ranges sorted and non-overlapping.
         for (var i = 1; i < layout.UsedRanges.Count; i++)
+        {
             Assert.True(layout.UsedRanges[i].StartSector >=
                         (long)layout.UsedRanges[i - 1].StartSector + layout.UsedRanges[i - 1].SectorCount);
+        }
 
         // Used + free cover [0, TotalSectors) exactly once.
         var coverage = new int[(int)layout.TotalSectors];
@@ -209,7 +220,7 @@ public class XisoSectorLayoutTests : IDisposable
 
         // Point the first root entry's right child far outside the table
         // (0xFFFF is the pad sentinel and would merely terminate the branch).
-        var rootAbs = vol.DiscLseek + (long)vol.RootDirSector * Constants.SectorSize;
+        var rootAbs = vol.DiscLseek + ((long)vol.RootDirSector * Constants.SectorSize);
         using (var fs = new FileStream(iso, FileMode.Open, FileAccess.Write, FileShare.None))
         {
             fs.Seek(rootAbs + 2, SeekOrigin.Begin);
@@ -235,7 +246,7 @@ public class XisoSectorLayoutTests : IDisposable
         // re-enters an already-visited table (Burnout-style cycle across tables).
         // NOTE: GetEntryInfo zeroes FileSize for directories, so locate the entry
         // by linearly scanning the packed table for its name instead.
-        var rootAbs = vol.DiscLseek + (long)vol.RootDirSector * Constants.SectorSize;
+        var rootAbs = vol.DiscLseek + ((long)vol.RootDirSector * Constants.SectorSize);
         var table = File.ReadAllBytes(iso);
         var at = FindEntrySectorOffset(table, (int)rootAbs, (int)(rootAbs + vol.RootDirSize), "subdir");
         Assert.True(at >= 0, "subdir entry not found in root table");
@@ -268,7 +279,10 @@ public class XisoSectorLayoutTests : IDisposable
             var entryName = Encoding.ASCII.GetString(image, pos + 14, nameLen);
             if (string.Equals(entryName, name, StringComparison.Ordinal) &&
                 (image[pos + 12] & 0x10) != 0)
+            {
                 return pos + 4;
+            }
+
             pos += (14 + nameLen + 3) & ~3;
         }
 

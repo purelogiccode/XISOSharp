@@ -603,8 +603,8 @@ internal partial class MainViewModel : INotifyPropertyChanged
             sb.AppendLine("=== XISOSharp Tester Results ===");
             sb.AppendLine(CultureInfo.InvariantCulture, $"Date: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine(CultureInfo.InvariantCulture, $"Summary: {SessionResult.TotalFiles} files | " +
-                                                         $"{SessionResult.PassedSubTests} passed, {SessionResult.FailedSubTests} failed, " +
-                                                         $"{SessionResult.SkippedSubTests} skipped | {SessionResult.TotalElapsedSeconds:N1}s");
+                                                        $"{SessionResult.PassedSubTests} passed, {SessionResult.FailedSubTests} failed, " +
+                                                        $"{SessionResult.SkippedSubTests} skipped | {SessionResult.TotalElapsedSeconds:N1}s");
             sb.AppendLine();
 
             foreach (var file in SessionResult.FileResults)
@@ -647,11 +647,17 @@ internal partial class MainViewModel : INotifyPropertyChanged
             LogText += $"[{ts}] {message}\n";
             if (message.StartsWith("FATAL", StringComparison.OrdinalIgnoreCase) ||
                 message.StartsWith("Error", StringComparison.OrdinalIgnoreCase))
+            {
                 Log.Error("{TesterLog}", message);
+            }
             else if (message.StartsWith("WARNING", StringComparison.OrdinalIgnoreCase))
+            {
                 Log.Warning("{TesterLog}", message);
+            }
             else
+            {
                 Log.Information("{TesterLog}", message);
+            }
         }
         catch (Exception ex)
         {

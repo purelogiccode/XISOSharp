@@ -5,18 +5,21 @@ using XISOSharp.BattleTests.Models;
 namespace XISOSharp.BattleTests;
 
 /// <summary>
+/// <para>
 /// Extended battles for features that do not exist in the original extract-xiso:
 /// XboxKit-borrowed archival operations (video/xiso/filler/seed/update split,
 /// petrify, ZAR, rebuild) oracled against <c>xboxkit.exe</c>, and xdvdfs-borrowed
 /// operations (checksum, unpack, pack, tree, copy-out, md5) oracled against
 /// <c>xdvdfs.exe</c>.
-///
+/// </para>
+/// <para>
 /// Oracle hygiene (learned the hard way):
 /// - Both oracles write outputs next to their inputs, so every ISO is first
 ///   copied into a private sandbox; H:\ sources are never touched.
 /// - xboxkit exit codes are meaningless (0 even on [ERROR]): only artifacts compare.
 /// - xdvdfs has no partition probing and silently walks garbage on raw Redump
 ///   images: it only ever runs on plain XISOs (game-partition splits, created ISOs).
+/// </para>
 /// </summary>
 internal static class ExtendedBattleRunner
 {
@@ -184,7 +187,8 @@ internal static class ExtendedBattleRunner
         });
     }
 
-    private static SubBattleResult XkXisoSplit(string workInput, string csDir, string? xkDir, long isoOffset, long xisoLength)
+    private static SubBattleResult XkXisoSplit(string workInput, string csDir, string? xkDir, long isoOffset,
+        long xisoLength)
     {
         return Timed("XK-Xiso", () =>
         {
@@ -230,7 +234,8 @@ internal static class ExtendedBattleRunner
         });
     }
 
-    private static SubBattleResult XkFiller(string workInput, string csDir, string? xkDir, long isoOffset, long xisoLength)
+    private static SubBattleResult XkFiller(string workInput, string csDir, string? xkDir, long isoOffset,
+        long xisoLength)
     {
         return Timed("XK-Filler", () =>
         {
@@ -266,7 +271,8 @@ internal static class ExtendedBattleRunner
             }
 
             string? xkSeed = xkDir == null ? null : Path.Combine(xkDir, "input.seed");
-            return CompareFiles("seed", csOk ? csSeed : null, xkSeed, bothMissingOk: true, bothMissingNote: "N/A (not XGD1)");
+            return CompareFiles("seed", csOk ? csSeed : null, xkSeed, bothMissingOk: true,
+                bothMissingNote: "N/A (not XGD1)");
         });
     }
 
@@ -338,7 +344,7 @@ internal static class ExtendedBattleRunner
                     && oracleOut.Contains("CollectFileEntries", StringComparison.OrdinalIgnoreCase)
                     && oracleOut.Contains("EndOfStream", StringComparison.OrdinalIgnoreCase))
                 {
-                    return Pass($"oracle crashed (LibXGD empty-dir EOF bug); C# petrify OK " +
+                    return Pass("oracle crashed (LibXGD empty-dir EOF bug); C# petrify OK " +
                                 $"({(csOk && File.Exists(csSkel) ? new FileInfo(csSkel).Length : -1)} bytes)");
                 }
 
@@ -349,7 +355,8 @@ internal static class ExtendedBattleRunner
         });
     }
 
-    private static SubBattleResult XkZar(string workInput, string csDir, string? xkDir, long isoOffset, XboxKitWrapper? xk)
+    private static SubBattleResult XkZar(string workInput, string csDir, string? xkDir, long isoOffset,
+        XboxKitWrapper? xk)
     {
         return Timed("XK-Zar", () =>
         {
@@ -444,7 +451,10 @@ internal static class ExtendedBattleRunner
             var fillerOrSeed = File.Exists(filler) ? filler : File.Exists(seed) ? seed : null;
             var update = Directory.GetFiles(xkDir, "su20076000_00000000", SearchOption.AllDirectories).FirstOrDefault();
             if (!File.Exists(xiso) || !File.Exists(video) || fillerOrSeed == null)
-                return Fail($"xk split incomplete (xiso={Exists(xiso)} video={Exists(video)} filler/seed={fillerOrSeed != null})");
+            {
+                return Fail(
+                    $"xk split incomplete (xiso={Exists(xiso)} video={Exists(video)} filler/seed={fillerOrSeed != null})");
+            }
 
             var rebuilt = Path.Combine(csDir, "rebuilt.iso");
             bool ok;
@@ -482,7 +492,9 @@ internal static class ExtendedBattleRunner
                     string.Equals(n, "input.seed", StringComparison.Ordinal) ||
                     string.Equals(n, "input.xiso", StringComparison.Ordinal) ||
                     string.Equals(n, "su20076000_00000000", StringComparison.Ordinal))
+                {
                     File.Copy(f, Path.Combine(rbDir, n));
+                }
             }
 
             // Our cs split names: ensure an .xiso exists for rebuild input.
@@ -490,18 +502,23 @@ internal static class ExtendedBattleRunner
             if (!File.Exists(rbXiso))
                 return Skip("XK-RebuildXk", "no C# xiso split staged");
             var parts = Directory.GetFiles(rbDir).Where(f => !f.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)
-                    || f.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase)).ToList();
+                                                             || f.EndsWith(".video.iso",
+                                                                 StringComparison.OrdinalIgnoreCase)).ToList();
             var before = Directory.GetFiles(rbDir, "*.iso", SearchOption.AllDirectories)
                 .Select(f => f.ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
-            xk.Rebuild(rbDir, new[] { rbXiso }.Concat(parts.Where(f => !string.Equals(f, rbXiso, StringComparison.Ordinal))).ToArray());
+            xk.Rebuild(rbDir,
+                new[] { rbXiso }.Concat(parts.Where(f => !string.Equals(f, rbXiso, StringComparison.Ordinal)))
+                    .ToArray());
             var after = Directory.GetFiles(rbDir, "*.iso", SearchOption.AllDirectories)
                 .Where(f => !before.Contains(f.ToLowerInvariant())).ToList();
-            var rebuilt = after.FirstOrDefault(f => Path.GetFileName(f).Contains("redump", StringComparison.OrdinalIgnoreCase))
+            var rebuilt =
+                after.FirstOrDefault(f => Path.GetFileName(f).Contains("redump", StringComparison.OrdinalIgnoreCase))
                 ?? after.FirstOrDefault();
             if (rebuilt == null)
             {
                 Del(rbDir);
-                return Fail($"xk rebuild produced no new ISO (files: {string.Join(",", Directory.GetFiles(rbDir).Select(Path.GetFileName))})");
+                return Fail(
+                    $"xk rebuild produced no new ISO (files: {string.Join(",", Directory.GetFiles(rbDir).Select(Path.GetFileName))})");
             }
 
             var rr = CompareFiles("xk-rebuilt redump", rebuilt, workInput);
@@ -589,7 +606,8 @@ internal static class ExtendedBattleRunner
                 return Pass($"{csSet.Count} entries match");
             var onlyCs = csSet.Where(e => !xdSet.Contains(e)).Take(3).ToList();
             var onlyXd = xdSet.Where(e => !csSet.Contains(e)).Take(3).ToList();
-            return Fail($"tree mismatch C#={csSet.Count} xd={xdSet.Count} ONLY cs [{string.Join(";", onlyCs)}] ONLY xd [{string.Join(";", onlyXd)}]");
+            return Fail(
+                $"tree mismatch C#={csSet.Count} xd={xdSet.Count} ONLY cs [{string.Join(";", onlyCs)}] ONLY xd [{string.Join(";", onlyXd)}]");
         });
     }
 
@@ -898,9 +916,9 @@ internal static class ExtendedBattleRunner
             if (size.Length == 0 || !size.All(char.IsAsciiDigit))
                 continue;
             var p = line[..open];
-            if (p.EndsWith("/", StringComparison.Ordinal))
+            if (p.EndsWith('/'))
                 p = p[..^1];
-            if (!p.StartsWith("/", StringComparison.Ordinal))
+            if (!p.StartsWith('/'))
                 p = "/" + p;
             if (listingRootPrefix != null)
             {
@@ -910,7 +928,7 @@ internal static class ExtendedBattleRunner
                     continue; // the image root itself, not an entry
             }
 
-            if (!p.StartsWith("/", StringComparison.Ordinal))
+            if (!p.StartsWith('/'))
                 p = "/" + p;
             set.Add(p + "|" + size);
         }

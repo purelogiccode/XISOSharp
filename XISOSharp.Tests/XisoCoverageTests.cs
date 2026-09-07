@@ -90,7 +90,7 @@ public class XisoCoverageTests : IDisposable
     {
         var vol = XisoReader.GetVolumeInfo(isoPath);
         Assert.True(vol.IsValid, $"fixture ISO invalid: {isoPath}");
-        return (vol.RootDirSize, (long)vol.RootDirSector * Constants.SectorSize + vol.DiscLseek);
+        return (vol.RootDirSize, ((long)vol.RootDirSector * Constants.SectorSize) + vol.DiscLseek);
     }
 
     private static bool IsNtfs(string path)
@@ -154,7 +154,7 @@ public class XisoCoverageTests : IDisposable
     private static string ZeroTableStart(string isoPath, Func<string, string> copy)
     {
         var vol = XisoReader.GetVolumeInfo(isoPath);
-        var rootAbs = (long)vol.RootDirSector * Constants.SectorSize + vol.DiscLseek;
+        var rootAbs = ((long)vol.RootDirSector * Constants.SectorSize) + vol.DiscLseek;
         var img = File.ReadAllBytes(isoPath);
         Array.Clear(img, (int)rootAbs, 14);
         var bad = copy(isoPath);
@@ -770,8 +770,10 @@ public class XisoCoverageTests : IDisposable
     public void GetSectorLayout_DotEntry_Skipped()
     {
         var layout = XisoReader.GetSectorLayout(CreateDotEntryIso());
-        Assert.DoesNotContain(layout.Entries, static e => string.Equals(e.Path, "/.", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(layout.Entries, static e => string.Equals(e.Path, "/b.txt", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(layout.Entries,
+            static e => string.Equals(e.Path, "/.", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(layout.Entries,
+            static e => string.Equals(e.Path, "/b.txt", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -792,7 +794,8 @@ public class XisoCoverageTests : IDisposable
         File.WriteAllBytes(bad, img);
 
         var layout = XisoReader.GetSectorLayout(bad);
-        Assert.Contains(layout.Entries, static e => string.Equals(e.Path, "/sub", StringComparison.OrdinalIgnoreCase) && e.FileSize == 0);
+        Assert.Contains(layout.Entries,
+            static e => string.Equals(e.Path, "/sub", StringComparison.OrdinalIgnoreCase) && e.FileSize == 0);
     }
 
     [Fact]
@@ -805,7 +808,8 @@ public class XisoCoverageTests : IDisposable
         }, "game.iso");
 
         var layout = XisoReader.GetSectorLayout(isoPath);
-        Assert.Contains(layout.Entries, static e => string.Equals(e.Path, "/empty.txt", StringComparison.OrdinalIgnoreCase) && e.SectorCount == 0);
+        Assert.Contains(layout.Entries,
+            static e => string.Equals(e.Path, "/empty.txt", StringComparison.OrdinalIgnoreCase) && e.SectorCount == 0);
     }
 
     [Fact]
@@ -1025,7 +1029,7 @@ public class XisoCoverageTests : IDisposable
         var entry = XisoReader.GetEntryInfo(isoPath, "/c.bin");
         Assert.NotNull(entry);
         var vol = XisoReader.GetVolumeInfo(isoPath);
-        var dataEnd = (long)entry.StartSector * Constants.SectorSize + vol.DiscLseek + entry.FileSize;
+        var dataEnd = ((long)entry.StartSector * Constants.SectorSize) + vol.DiscLseek + entry.FileSize;
 
         var cut = CopyIso(isoPath, "xiso_cov_cut");
         File.WriteAllBytes(cut, File.ReadAllBytes(isoPath)[..(int)(dataEnd - 5000)]);

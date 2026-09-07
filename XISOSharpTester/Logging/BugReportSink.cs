@@ -31,4 +31,3 @@ internal sealed class BugReportSink : ILogEventSink
         }
     }
 }
-

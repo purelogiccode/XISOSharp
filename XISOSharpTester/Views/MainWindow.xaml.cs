@@ -58,7 +58,10 @@ internal partial class MainWindow
         {
             Log.Error(ex, "MainWindow OnClosing failed");
             BugReporter.ReportException(ex, "MainWindow OnClosing failed");
-            try { base.OnClosing(e); }
+            try
+            {
+                base.OnClosing(e);
+            }
             catch
             {
                 // ignored

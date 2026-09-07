@@ -232,7 +232,7 @@ public static class XisoPatcher
             var grandparent = FindDirExtent(layout, grandparentPath, internalPath);
             var parentName = canonicalParent[(canonicalParent.LastIndexOf('/') + 1)..];
             var rounded = newTableSize +
-                ((Constants.SectorSize - (newTableSize % Constants.SectorSize)) % Constants.SectorSize);
+                          ((Constants.SectorSize - (newTableSize % Constants.SectorSize)) % Constants.SectorSize);
             PatchEntryRecord(fs, discLseek, grandparent, parentName, tableTarget, rounded,
                 grandparentPath);
         }

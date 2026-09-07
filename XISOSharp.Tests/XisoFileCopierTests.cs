@@ -109,7 +109,7 @@ public class XisoFileCopierTests : IDisposable
         {
             Assert.NotEmpty(progress);
             Assert.Equal(size, progress[^1]);
-            Assert.Equal(progress.OrderBy(static x => x).ToArray(), progress.ToArray());
+            Assert.Equal(progress.Order().ToArray(), progress.ToArray());
         }
     }
 

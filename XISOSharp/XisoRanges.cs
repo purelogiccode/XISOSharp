@@ -78,19 +78,27 @@ public static class XisoRanges
         // stack overflows. Out-of-table offsets keep the historical silent
         // truncate (linked-list compat quirk); cycles never occur legitimately.
         if (depth > Constants.MaxTocDepth)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry: maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
+        }
+
         visited ??= [];
         while (true)
         {
             if (childOffset >= rootSize) return;
 
             if (!visited.Add(childOffset))
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry: directory cycle detected — table offset {childOffset} was already visited.");
+            }
+
             if (visited.Count > Constants.MaxTocEntriesPerTable)
+            {
                 throw new XisoFormatException(
                     "invalid TOC entry: too many entries in one directory table (possible corrupt offset chain).");
+            }
 
             var cur = isoOffset + rootOffset + childOffset;
             var curOffset = cur / SectorSize;
@@ -200,13 +208,18 @@ public static class XisoRanges
 
         // Hardening (#16): validate the root pointer before walking — a corrupt
         // rootSize would otherwise pre-allocate millions of sector entries.
-        var rootAbs = offset + rootOffset * SectorSize;
+        var rootAbs = offset + (rootOffset * SectorSize);
         if (rootAbs < 0 || rootAbs >= isoFs.Length)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry: root directory sector {rootOffset} (offset {rootAbs}) points outside the image (length {isoFs.Length}).");
+        }
+
         if (rootSize > (ulong)(isoFs.Length - rootAbs))
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry: root directory size {rootSize} (ends at {rootAbs + rootSize}) exceeds image length {isoFs.Length}.");
+        }
 
         GetValidSectors(isoFs, offset, sysSectors, fileSectors, rootOffset * SectorSize, rootSize, 0);
 
@@ -300,20 +313,31 @@ public static class XisoRanges
 
         // Hardening (#16): bound the walk like GetValidSectors above.
         if (depth > Constants.MaxTocDepth)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry at '{dirPath}': maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
+        }
+
         visited ??= [];
         if (!visited.Add(childOffset))
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry at '{dirPath}': directory cycle detected — table offset {childOffset} was already visited.");
+        }
+
         if (visited.Count > Constants.MaxTocEntriesPerTable)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry at '{dirPath}': too many entries in one directory table (possible corrupt offset chain).");
+        }
 
         var pos = isoOffset + dirOffset + childOffset;
         if (pos < 0 || pos >= isoFs.Length)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry at '{dirPath}': table offset {childOffset} (seek {pos}) points outside the image (length {isoFs.Length}).");
+        }
+
         isoFs.Seek(pos, SeekOrigin.Begin);
 
         var leftChild = ReadUShort(isoFs);
@@ -349,8 +373,10 @@ public static class XisoRanges
         var entryPath = dirPath.Length > 0 ? dirPath + "/" + name : name;
 
         if (leftChild != 0 && leftChild != 0xFFFF)
+        {
             CollectFileEntries(isoFs, isoOffset, dirOffset, dirSize, (long)leftChild * 4, dirPath, results,
                 visited, depth + 1);
+        }
 
         if (isDirectory)
             CollectFileEntries(isoFs, isoOffset, entryOffset, entrySize, 0, entryPath, results, null, depth + 1);
@@ -358,7 +384,9 @@ public static class XisoRanges
             results.Add((Path: entryPath, Offset: isoOffset + entryOffset, Size: entrySize));
 
         if (rightChild != 0 && rightChild != 0xFFFF)
+        {
             CollectFileEntries(isoFs, isoOffset, dirOffset, dirSize, (long)rightChild * 4, dirPath, results,
                 visited, depth + 1);
+        }
     }
 }

@@ -292,7 +292,7 @@ internal partial class MainViewModel
     {
         SelectedExplorerNode = node;
         ShowExplorerXex = false;
-        if (node is null || node.IsDummy)
+        if (node?.IsDummy != false)
         {
             ExplorerDetailsText = string.Empty;
             return;
@@ -352,7 +352,7 @@ internal partial class MainViewModel
     {
         var node = SelectedExplorerNode;
         var explorer = _explorer;
-        if (node is null || node.IsDummy || explorer is null)
+        if (node?.IsDummy != false || explorer is null)
         {
             AddLog("Select a file or directory in the explore tree first.");
             return;
@@ -419,7 +419,7 @@ internal partial class MainViewModel
     {
         var node = SelectedExplorerNode;
         var explorer = _explorer;
-        if (node is null || node.IsDummy || explorer is null)
+        if (node?.IsDummy != false || explorer is null)
         {
             AddLog("Select a file or directory in the explore tree first.");
             return;
@@ -438,7 +438,8 @@ internal partial class MainViewModel
         ExplorerStatusText = $"Hashing {node.FullPath}...";
         try
         {
-            var hex = await Task.Run(() => explorer.ComputeHashHex(node.FullPath, HashAlgorithmName.SHA256)).ConfigureAwait(false);
+            var hex = await Task.Run(() => explorer.ComputeHashHex(node.FullPath, HashAlgorithmName.SHA256))
+                .ConfigureAwait(false);
             OnUi(() =>
             {
                 ExplorerHashText = $"SHA-256({node.FullPath}) = {hex}";
@@ -466,7 +467,7 @@ internal partial class MainViewModel
     private static void OnUi(Action action)
     {
         var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess())
+        if (dispatcher?.CheckAccess() != false)
             action();
         else
             dispatcher.Invoke(action);

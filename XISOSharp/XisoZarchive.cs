@@ -215,15 +215,24 @@ public static class XisoZarchive
         // Hardening (#16): bound the walk — a corrupt cycle previously recursed
         // until the stack overflowed instead of failing with a named error.
         if (depth > Constants.MaxTocDepth)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry: maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
+        }
+
         visited ??= [];
         if (!visited.Add(childOffset))
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry: directory cycle detected — table offset {childOffset} was already visited.");
+        }
+
         if (visited.Count > Constants.MaxTocEntriesPerTable)
+        {
             throw new XisoFormatException(
                 "invalid TOC entry: too many entries in one directory table (possible corrupt offset chain).");
+        }
+
         var pos = isoOffset + dirOffset + childOffset;
         isoFs.Seek(pos, SeekOrigin.Begin);
         var left = ReadUShort(isoFs);
@@ -252,8 +261,10 @@ public static class XisoZarchive
         var entryOffset = (long)entrySector * Constants.SectorSize;
 
         if (left != 0 && left != 0xFFFF)
+        {
             ParseNode(isoFs, isoOffset, dirOffset, dirSize, (long)left * 4, parent, names, lookup, visited,
                 depth + 1);
+        }
 
         var nameIdx = GetOrAddName(names, lookup, name);
         var node = new PathNode { IsFile = !isDir, NameIndex = nameIdx };
@@ -270,8 +281,10 @@ public static class XisoZarchive
 
         parent.Subnodes.Add(node);
         if (right != 0 && right != 0xFFFF)
+        {
             ParseNode(isoFs, isoOffset, dirOffset, dirSize, (long)right * 4, parent, names, lookup, visited,
                 depth + 1);
+        }
     }
 
     /// <summary>
@@ -304,7 +317,11 @@ public static class XisoZarchive
     /// the shared engine emits the identical call sequence and identical bytes.
     /// </summary>
     private sealed class XisoPackSource(
-        FileStream isoFs, long xisoOffset, PathNode root, List<string> names, string displayPath) : IZarPackSource
+        FileStream isoFs,
+        long xisoOffset,
+        PathNode root,
+        List<string> names,
+        string displayPath) : IZarPackSource
     {
         private readonly PathNode _root = root;
         private readonly List<string> _names = names;

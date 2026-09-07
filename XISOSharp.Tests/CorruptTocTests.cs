@@ -328,7 +328,7 @@ public class CorruptTocTests : IDisposable
     private static string CreateSubdirCycleIso(
         CorruptTocTests self, string isoName, out string subName)
     {
-        var sub = "sub";
+        const string sub = "sub";
         const string inner = "inner.txt";
         var isoPath = self.CreateIso(src =>
         {
@@ -429,8 +429,8 @@ public class CorruptTocTests : IDisposable
         // most 65536 distinct entries can ever exist per table — the walk must
         // terminate; without bounds it would not.
         const uint rootSector = 40;
-        var rootSize = (uint)(entryCount * 16);
-        var rootAbs = (long)rootSector * Constants.SectorSize;
+        const uint rootSize = (uint)(entryCount * 16);
+        const long rootAbs = (long)rootSector * Constants.SectorSize;
         using (var fs = new FileStream(isoPath, FileMode.Create, FileAccess.Write, FileShare.None))
         {
             fs.SetLength(rootAbs + rootSize);

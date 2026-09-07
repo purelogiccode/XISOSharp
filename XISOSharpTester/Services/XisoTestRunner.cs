@@ -72,7 +72,8 @@ public static class XisoTestRunner
                 progress?.Report(new TestProgress(file.FileName, fileIndex + 1, files.Count,
                     "Starting", $"Testing {file.FileName}..."));
 
-                var result = await Task.Run(() => TestSingleFile(file, currentWrapper, progress, fileIndex, files.Count))
+                var result = await Task
+                    .Run(() => TestSingleFile(file, currentWrapper, progress, fileIndex, files.Count))
                     .ConfigureAwait(false);
                 session.FileResults.Add(result);
             }
@@ -631,31 +632,32 @@ public static class XisoTestRunner
             ArgumentNullException.ThrowIfNull(output);
             var entries = new List<ListEntry>();
 
-        // Matches: " - Path: filename                        Size: N bytes,  StartSector: S"
-        // or with nesting: " - filename                        Size: N bytes,  StartSector: S"
-        // or dir: " - dirname                                 DIR"
-        var fileRegex =
-            new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}Size:\s*(?<size>\d+)\s*bytes,\s*StartSector:\s*(?<sector>\d+)",
-                RegexOptions.Multiline | RegexOptions.ExplicitCapture | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-        var dirRegex = new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}DIR", RegexOptions.Multiline | RegexOptions.Compiled,
-            TimeSpan.FromSeconds(5));
+            // Matches: " - Path: filename                        Size: N bytes,  StartSector: S"
+            // or with nesting: " - filename                        Size: N bytes,  StartSector: S"
+            // or dir: " - dirname                                 DIR"
+            var fileRegex =
+                new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}Size:\s*(?<size>\d+)\s*bytes,\s*StartSector:\s*(?<sector>\d+)",
+                    RegexOptions.Multiline | RegexOptions.ExplicitCapture | RegexOptions.Compiled,
+                    TimeSpan.FromSeconds(5));
+            var dirRegex = new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}DIR", RegexOptions.Multiline | RegexOptions.Compiled,
+                TimeSpan.FromSeconds(5));
 
-        foreach (Match m in fileRegex.Matches(output))
-        {
-            var path = m.Groups["path"].Value.Trim();
-            var size = uint.Parse(m.Groups["size"].Value, CultureInfo.InvariantCulture);
-            var sector = uint.Parse(m.Groups["sector"].Value, CultureInfo.InvariantCulture);
-            entries.Add(new ListEntry(path, false, size, sector));
-        }
+            foreach (Match m in fileRegex.Matches(output))
+            {
+                var path = m.Groups["path"].Value.Trim();
+                var size = uint.Parse(m.Groups["size"].Value, CultureInfo.InvariantCulture);
+                var sector = uint.Parse(m.Groups["sector"].Value, CultureInfo.InvariantCulture);
+                entries.Add(new ListEntry(path, false, size, sector));
+            }
 
-        foreach (Match m in dirRegex.Matches(output))
-        {
-            var path = m.Groups["path"].Value.Trim();
-            entries.Add(new ListEntry(path, true, 0, 0));
-        }
+            foreach (Match m in dirRegex.Matches(output))
+            {
+                var path = m.Groups["path"].Value.Trim();
+                entries.Add(new ListEntry(path, true, 0, 0));
+            }
 
-        entries.Sort(static (a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
-        return entries;
+            entries.Sort(static (a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
+            return entries;
         }
         catch (Exception ex)
         {

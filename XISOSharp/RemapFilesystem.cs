@@ -312,7 +312,8 @@ public static class RemapFilesystem
                         // junctions, mount points): XISO has no link representation,
                         // and a cyclic link would loop the walk forever (TODO #21).
                         // Symlinks to files are still followed (target content).
-                        Logger.LogErr($"warning: skipping reparse point (symlink/junction): {entryRel}, not descending.\n");
+                        Logger.LogErr(
+                            $"warning: skipping reparse point (symlink/junction): {entryRel}, not descending.\n");
                         continue;
                     }
 
@@ -644,7 +645,8 @@ public static class RemapFilesystem
                         // junctions, mount points): XISO has no link representation,
                         // and a cyclic link would loop the walk forever (TODO #21).
                         // Symlinks to files are still followed (target content).
-                        Logger.LogErr($"warning: skipping reparse point (symlink/junction): {entryRel}, not descending.\n");
+                        Logger.LogErr(
+                            $"warning: skipping reparse point (symlink/junction): {entryRel}, not descending.\n");
                         continue;
                     }
 

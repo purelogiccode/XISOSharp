@@ -211,8 +211,11 @@ public static class XisoValidator
         // Hardening (#16): bound subdirectory descent — a corrupt subdir cycle
         // previously recursed until the stack overflowed.
         if (depth > Constants.MaxTocDepth)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry at '{currentPath}': maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
+        }
+
         var dirEntries = XisoReader.ListDirectory(isoPath, currentPath);
 
         foreach (var entry in dirEntries)

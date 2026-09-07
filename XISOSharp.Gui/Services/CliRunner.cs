@@ -71,21 +71,22 @@ internal static class CliRunner
         // disposed in the outer scope"). The registration stays in an inner scope
         // so it is always unregistered before `process` is disposed.
         await using (ct.Register(static state =>
-        {
-            var proc = (Process)state!;
-            try
-            {
-                if (!proc.HasExited)
-                {
-                    proc.Kill(entireProcessTree: true);
-                }
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception
-                                           or NotSupportedException or ObjectDisposedException)
-            {
-                // Already exited, disposed, or cannot kill — the wait below still completes.
-            }
-        }, process))
+                     {
+                         var proc = (Process)state!;
+                         try
+                         {
+                             if (!proc.HasExited)
+                             {
+                                 proc.Kill(entireProcessTree: true);
+                             }
+                         }
+                         catch (Exception ex) when (ex is InvalidOperationException
+                                                        or System.ComponentModel.Win32Exception
+                                                        or NotSupportedException or ObjectDisposedException)
+                         {
+                             // Already exited, disposed, or cannot kill — the wait below still completes.
+                         }
+                     }, process))
         {
             var stdout = PumpAsync(process.StandardOutput, onLine, ct);
             var stderr = PumpAsync(process.StandardError, onLine, ct);

@@ -52,9 +52,8 @@ public static class XisoFileCopier
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(onChunk);
-        if (byteCount < 0)
-            throw new ArgumentOutOfRangeException(nameof(byteCount));
-        if (buffer is not null && buffer.Length == 0)
+        ArgumentOutOfRangeException.ThrowIfNegative(byteCount);
+        if (buffer?.Length == 0)
             throw new ArgumentException("Buffer must not be empty.", nameof(buffer));
 
         if (byteCount == 0)

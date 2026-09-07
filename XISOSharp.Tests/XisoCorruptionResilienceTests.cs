@@ -85,7 +85,7 @@ public class XisoCorruptionResilienceTests : IDisposable
     {
         var vol = XisoReader.GetVolumeInfo(isoPath);
         Assert.True(vol.IsValid, $"fixture ISO invalid: {isoPath}");
-        return (vol.RootDirSize, (long)vol.RootDirSector * Constants.SectorSize + vol.DiscLseek);
+        return (vol.RootDirSize, ((long)vol.RootDirSector * Constants.SectorSize) + vol.DiscLseek);
     }
 
     // ------------------------------------------------------------------
@@ -392,7 +392,7 @@ public class XisoCorruptionResilienceTests : IDisposable
 
         // Position P: dword-aligned, first header ushort in-bounds, 12-byte
         // peek past EOF.
-        var p = fileLen - 6 - ((fileLen - 6 - (int)rootAbs) % 4 + 4) % 4;
+        var p = fileLen - 6 - ((((fileLen - 6 - (int)rootAbs) % 4) + 4) % 4);
         Assert.True(p > rootAbs && p + 2 <= fileLen && p + 14 > fileLen,
             $"no suitable peek-past-end position (rootAbs={rootAbs}, fileLen={fileLen})");
 

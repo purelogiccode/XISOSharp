@@ -123,7 +123,7 @@ public class XisoSplitTests : IDisposable
             Assert.Equal(PartSize, new FileInfo(parts[i]).Length);
         var last = new FileInfo(parts[^1]).Length;
         Assert.True(last > 0 && last <= PartSize);
-        Assert.Equal(length, PartSize * (parts.Count - 1) + last);
+        Assert.Equal(length, (PartSize * (parts.Count - 1)) + last);
     }
 
     [Fact]

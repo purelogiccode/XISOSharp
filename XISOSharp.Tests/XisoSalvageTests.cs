@@ -95,7 +95,7 @@ public class XisoSalvageTests : IDisposable
     {
         var vol = XisoReader.GetVolumeInfo(isoPath);
         Assert.True(vol.IsValid, $"fixture ISO invalid: {isoPath}");
-        return (vol.RootDirSector, vol.RootDirSize, (long)vol.RootDirSector * Constants.SectorSize + vol.DiscLseek);
+        return (vol.RootDirSector, vol.RootDirSize, ((long)vol.RootDirSector * Constants.SectorSize) + vol.DiscLseek);
     }
 
     private static string Sha256(string path)

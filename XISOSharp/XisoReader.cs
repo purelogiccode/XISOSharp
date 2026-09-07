@@ -393,8 +393,11 @@ public static class XisoReader
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (depth > Constants.MaxTocDepth)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry at '{path}': maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
+        }
+
         visited ??= [];
         Span<byte> intBuf = stackalloc byte[4];
         Span<byte> shortBuf = stackalloc byte[2];
@@ -425,16 +428,24 @@ public static class XisoReader
             var entryPos = fs.Position;
             if (entryPos < dirStart || entryPos >= fs.Length ||
                 (tableSize != long.MaxValue && entryPos >= dirStart + tableSize))
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry at '{path}': entry offset {entryPos} lies outside the directory table " +
                     $"(table at {dirStart}, size {tableSize}, image length {fs.Length}).");
+            }
+
             if (!visited.Add(entryPos))
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry at '{path}': directory cycle detected — entry at offset {entryPos} was already visited.");
+            }
+
             if (visited.Count > Constants.MaxTocEntriesPerTable)
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry at '{path}': too many entries in one directory table " +
                     $"(>{Constants.MaxTocEntriesPerTable}, possible corrupt offset chain).");
+            }
 
             ReadExact(fs, shortBuf);
             var tmp = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
@@ -547,9 +558,11 @@ public static class XisoReader
                 var leftSeek = dirStart + ((long)lOffset * Constants.DwordSize);
                 if (leftSeek < dirStart || leftSeek >= fs.Length ||
                     (tableSize != long.MaxValue && leftSeek >= dirStart + tableSize))
+                {
                     throw new XisoFormatException(
                         $"invalid TOC entry at '{path}{filename}': left child offset {lOffset} (seek {leftSeek}) " +
                         $"points outside the directory table (table at {dirStart}, size {tableSize}, image length {fs.Length}).");
+                }
 
                 var left = new DirEntry();
                 dir.Left = left;
@@ -642,13 +655,18 @@ public static class XisoReader
                             // or overflowed the stack on cycles (Burnout PAL).
                             var subStart = ((long)startSector * Constants.SectorSize) + discLseek;
                             if (subStart < 0 || subStart >= fs.Length)
+                            {
                                 throw new XisoFormatException(
                                     $"invalid TOC entry at '{subPath}': directory start sector {startSector} " +
                                     $"(seek {subStart}) points outside the image (length {fs.Length}).");
+                            }
+
                             if (fileSize > (ulong)(fs.Length - subStart))
+                            {
                                 throw new XisoFormatException(
                                     $"invalid TOC entry at '{subPath}': directory size {fileSize} " +
                                     $"(ends at {subStart + fileSize}) exceeds image length {fs.Length}).");
+                            }
 
                             var subdir = new DirEntry
                             {
@@ -674,7 +692,9 @@ public static class XisoReader
                                     fs, subdir,
                                     subStart,
                                     subPath, mode,
-                                    ref mode == ExtractMode.GenerateAvl ? ref dir.AvlNode!.Subdirectory : ref subAvlRoot,
+                                    ref mode == ExtractMode.GenerateAvl
+                                        ? ref dir.AvlNode!.Subdirectory
+                                        : ref subAvlRoot,
                                     llCompat, discLseek, unpackOptions, cancellationToken, progress,
                                     null, fileSize, depth + 1, filesystem);
                             }
@@ -764,9 +784,11 @@ public static class XisoReader
                 var rightSeek = dirStart + ((long)rOffset * Constants.DwordSize);
                 if (rightSeek < dirStart || rightSeek >= fs.Length ||
                     (tableSize != long.MaxValue && rightSeek >= dirStart + tableSize))
+                {
                     throw new XisoFormatException(
                         $"invalid TOC entry at '{path}': right child offset {rOffset} (seek {rightSeek}) " +
                         $"points outside the directory table (table at {dirStart}, size {tableSize}, image length {fs.Length}).");
+                }
 
                 fs.Seek(rightSeek, SeekOrigin.Begin);
 
@@ -2551,15 +2573,17 @@ public static class XisoReader
         var totalSectors = (fileLength - discLseek) / Constants.SectorSize;
 
         // Partition-relative sector of the volume descriptor (always sector 32).
-        var headerSector = (uint)(Constants.HeaderOffset / Constants.SectorSize);
+        const uint headerSector = (uint)(Constants.HeaderOffset / Constants.SectorSize);
         var used = new List<SectorRange> { new(headerSector, 1) };
         var entries = new List<FileSectorExtent>();
 
         if (volInfo is { RootDirSector: 0, RootDirSize: 0 })
+        {
             return new SectorLayout(volInfo, Array.Empty<FileSectorExtent>(),
                 MergeSectorRanges(used, totalSectors),
                 ComplementSectorRanges(MergeSectorRanges(used, totalSectors), totalSectors),
                 totalSectors);
+        }
 
         // Iterative preorder walk over directory tables. ReadDirectoryEntries is
         // cycle-safe within one table (TODO #16); the visited set + depth cap here
@@ -2573,13 +2597,19 @@ public static class XisoReader
         {
             var (tableStart, tableSize, dirPath, depth) = stack.Pop();
             if (depth > Constants.MaxTocDepth)
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry at '{dirPath}': maximum directory depth {Constants.MaxTocDepth} " +
                     "exceeded (possible directory cycle).");
+            }
+
             if (!visitedTables.Add(tableStart))
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry at '{dirPath}': directory cycle detected — table at offset " +
                     $"{tableStart} was already visited.");
+            }
+
             CheckTableBounds(fs, fileLength, tableStart, tableSize, dirPath);
 
             var tableSector = (uint)((tableStart - discLseek) / Constants.SectorSize);
@@ -2619,7 +2649,7 @@ public static class XisoReader
         entries.Sort(static (a, b) =>
         {
             var c = a.StartSector.CompareTo(b.StartSector);
-            return c != 0 ? c : string.Compare(a.Path, b.Path, StringComparison.Ordinal);
+            return c != 0 ? c : string.CompareOrdinal(a.Path, b.Path);
         });
 
         var usedRanges = MergeSectorRanges(used, totalSectors);
@@ -2653,16 +2683,24 @@ public static class XisoReader
             var offset = stack.Pop();
             var absOffset = dirStart + offset;
             if (absOffset < dirStart || absOffset >= fs.Length)
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry at '{contextPath}': child offset {offset} (seek {absOffset}) " +
                     $"points outside the image (table at {dirStart}, length {fs.Length}).");
+            }
+
             if (!visited.Add(absOffset))
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry at '{contextPath}': directory cycle detected — entry at offset {absOffset} was already visited.");
+            }
+
             if (visited.Count > Constants.MaxTocEntriesPerTable)
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry at '{contextPath}': too many entries in one directory table " +
                     $"(>{Constants.MaxTocEntriesPerTable}, possible corrupt offset chain).");
+            }
 
             fs.Seek(absOffset, SeekOrigin.Begin);
 
@@ -2743,9 +2781,11 @@ public static class XisoReader
         _ = fs;
         if (tableStart < 0 || tableStart >= fileLength ||
             tableSize > (ulong)fileLength || tableStart > fileLength - tableSize)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry at '{dirPath}': directory table at offset {tableStart} " +
                 $"(size {tableSize}) points outside the image (length {fileLength}).");
+        }
     }
 
     private static void CheckFileBounds(Stream fs, long fileLength, long discLseek, EntryInfo entry,
@@ -2757,9 +2797,11 @@ public static class XisoReader
         var dataStart = discLseek + ((long)entry.StartSector * Constants.SectorSize);
         var dataEnd = dataStart + entry.FileSize;
         if (dataStart < 0 || dataEnd > fileLength)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry at '{entryPath}': file extent at sector {entry.StartSector} " +
                 $"(size {entry.FileSize}) points outside the image (length {fileLength}).");
+        }
     }
 
     private static IReadOnlyList<SectorRange> MergeSectorRanges(List<SectorRange> used, long totalSectors)
@@ -3110,8 +3152,11 @@ public static class XisoReader
         // Hardening (#16): a subdirectory cycle (table pointing back at an ancestor)
         // would otherwise recurse until the stack overflows.
         if (depth > Constants.MaxTocDepth)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry at '{internalPath}': maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
+        }
+
         Directory.CreateDirectory(destPath);
 
         var entries = ListDirectory(fs, imageName, internalPath);
@@ -3560,8 +3605,11 @@ public static class XisoReader
     {
         // Hardening (#16): bound subdirectory descent like CopyOutDirectory above.
         if (depth > Constants.MaxTocDepth)
+        {
             throw new XisoFormatException(
                 $"invalid TOC entry at '{currentPath}': maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
+        }
+
         var entries = ListDirectory(isoPath, currentPath);
 
         foreach (var entry in entries)
@@ -3615,16 +3663,24 @@ public static class XisoReader
             var offset = stack.Pop();
             var absOffset = dirStart + offset;
             if (absOffset < dirStart || absOffset >= fs.Length)
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry at '{contextPath}': child offset {offset} (seek {absOffset}) " +
                     $"points outside the image (table at {dirStart}, length {fs.Length}).");
+            }
+
             if (!visited.Add(absOffset))
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry at '{contextPath}': directory cycle detected — entry at offset {absOffset} was already visited.");
+            }
+
             if (visited.Count > Constants.MaxTocEntriesPerTable)
+            {
                 throw new XisoFormatException(
                     $"invalid TOC entry at '{contextPath}': too many entries in one directory table " +
                     $"(>{Constants.MaxTocEntriesPerTable}, possible corrupt offset chain).");
+            }
 
             fs.Seek(absOffset, SeekOrigin.Begin);
 

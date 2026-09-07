@@ -148,7 +148,7 @@ public sealed class RemapRule
         if (letter != 0 && !(letter == 1 && raw[0] == '!'))
             return false;
         return colon + 1 < raw.Length &&
-            (raw[colon + 1] == '/' || raw[colon + 1] == '\\');
+               (raw[colon + 1] == '/' || raw[colon + 1] == '\\');
     }
 
     /// <summary>

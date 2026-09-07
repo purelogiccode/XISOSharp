@@ -261,7 +261,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Drop handling failed");
             BugReporter.ReportException(ex, "Drop handling failed");
-            try { Vm.LogMessage($"[GUI] Drop failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Drop failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -307,11 +310,15 @@ public partial class MainWindow : Window
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                try { Vm.LogMessage($"[GUI] Drop skipped (cannot read folder): {dir} ({ex.Message})"); }
+                try
+                {
+                    Vm.LogMessage($"[GUI] Drop skipped (cannot read folder): {dir} ({ex.Message})");
+                }
                 catch
                 {
                     // ignored
                 }
+
                 return;
             }
 
@@ -332,7 +339,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "DropDirectory failed for {Dir}", dir);
             BugReporter.ReportException(ex, $"DropDirectory failed for {dir}");
-            try { Vm.LogMessage($"[GUI] Drop failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Drop failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -382,7 +392,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse extract image failed");
             BugReporter.ReportException(ex, "Browse extract image failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -404,7 +417,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse extract destination failed");
             BugReporter.ReportException(ex, "Browse extract destination failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -426,7 +442,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse create source failed");
             BugReporter.ReportException(ex, "Browse create source failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -445,7 +464,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Add rewrite images failed");
             BugReporter.ReportException(ex, "Add rewrite images failed");
-            try { Vm.LogMessage($"[GUI] Add images failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Add images failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -467,7 +489,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse rewrite output failed");
             BugReporter.ReportException(ex, "Browse rewrite output failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -489,7 +514,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse rewrite work directory failed");
             BugReporter.ReportException(ex, "Browse rewrite work directory failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -511,7 +539,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse rewrite report failed");
             BugReporter.ReportException(ex, "Browse rewrite report failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -533,7 +564,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse wipe image failed");
             BugReporter.ReportException(ex, "Browse wipe image failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -553,7 +587,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Add rebuild parts failed");
             BugReporter.ReportException(ex, "Add rebuild parts failed");
-            try { Vm.LogMessage($"[GUI] Add rebuild parts failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Add rebuild parts failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -575,7 +612,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse rebuild output failed");
             BugReporter.ReportException(ex, "Browse rebuild output failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -598,7 +638,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse rebuild sectors failed");
             BugReporter.ReportException(ex, "Browse rebuild sectors failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -620,7 +663,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse compress source file failed");
             BugReporter.ReportException(ex, "Browse compress source file failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -642,7 +688,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse compress source folder failed");
             BugReporter.ReportException(ex, "Browse compress source folder failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -664,7 +713,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse compress output failed");
             BugReporter.ReportException(ex, "Browse compress output failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -686,7 +738,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse decompress CSO failed");
             BugReporter.ReportException(ex, "Browse decompress CSO failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -708,7 +763,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse decompress output failed");
             BugReporter.ReportException(ex, "Browse decompress output failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -730,7 +788,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse validate source failed");
             BugReporter.ReportException(ex, "Browse validate source failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -752,7 +813,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse validate output failed");
             BugReporter.ReportException(ex, "Browse validate output failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -774,7 +838,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse validate report failed");
             BugReporter.ReportException(ex, "Browse validate report failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -793,7 +860,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Add checksum images failed");
             BugReporter.ReportException(ex, "Add checksum images failed");
-            try { Vm.LogMessage($"[GUI] Add images failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Add images failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -815,7 +885,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse batch directory failed");
             BugReporter.ReportException(ex, "Browse batch directory failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -837,7 +910,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse batch destination failed");
             BugReporter.ReportException(ex, "Browse batch destination failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored
@@ -859,7 +935,10 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse CLI path failed");
             BugReporter.ReportException(ex, "Browse CLI path failed");
-            try { Vm.LogMessage($"[GUI] Browse failed: {ex.Message}"); }
+            try
+            {
+                Vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
             catch
             {
                 // ignored

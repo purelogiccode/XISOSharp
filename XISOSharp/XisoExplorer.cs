@@ -102,8 +102,10 @@ public sealed class XisoExplorer
     {
         var path = Normalize(internalPath);
         if (string.Equals(path, "/", StringComparison.Ordinal))
+        {
             return new ExplorerNode("/", "/", IsDirectory: true, Size: 0,
                 Volume.RootDirSector, Attributes: 0);
+        }
 
         using var stream = XisoReader.OpenImageStream(IsoPath);
         var entry = XisoReader.GetEntryInfo(stream, IsoPath, path);

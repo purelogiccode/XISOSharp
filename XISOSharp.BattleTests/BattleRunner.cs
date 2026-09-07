@@ -1297,7 +1297,8 @@ internal static class BattleRunner
                 else
                 {
                     mis++;
-                    details.Add($"MISMATCH {p} C#:{(ce.IsDirectory ? "DIR" : ce.Size.ToString(CultureInfo.InvariantCulture))} exe:{(ee.IsDirectory ? "DIR" : ee.Size.ToString(CultureInfo.InvariantCulture))}");
+                    details.Add(
+                        $"MISMATCH {p} C#:{(ce.IsDirectory ? "DIR" : ce.Size.ToString(CultureInfo.InvariantCulture))} exe:{(ee.IsDirectory ? "DIR" : ee.Size.ToString(CultureInfo.InvariantCulture))}");
                 }
             }
             else

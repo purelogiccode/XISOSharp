@@ -59,7 +59,7 @@ public class XbeInfoTests : IDisposable
         WriteU32(span, 0x128, 0x0001102C); // entry point
 
         // Certificate at 0x400
-        var cert = 0x400;
+        const int cert = 0x400;
         WriteU32(span, cert + 0x00, 0x1D0); // size
         WriteU32(span, cert + 0x04, 0x3A2B1C00); // timestamp
         WriteU32(span, cert + 0x08, 0x4D530004); // title id

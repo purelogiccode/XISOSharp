@@ -32,6 +32,7 @@ public static class XisoRepairer
     /// directory's attribute byte unlocks exactly one more level down).
     /// </summary>
     private const int MaxRepairPasses = 5;
+
     /// <summary>
     /// Repairs the class-C issues of an XISO image in place.
     /// A <c>.old</c> backup of the pre-repair image is written first (replacing

@@ -54,7 +54,8 @@ internal static partial class BugReporter
             if (IsTestHost())
                 return; // never file real bug reports from unit-test runs
             var safeMessage = string.IsNullOrWhiteSpace(message) ? $"{kind} (no message)" : message.Trim();
-            var key = $"{kind}:{(safeMessage.Length > 200 ? safeMessage[..200] : safeMessage)}:{ex?.GetType().FullName}";
+            var key =
+                $"{kind}:{(safeMessage.Length > 200 ? safeMessage[..200] : safeMessage)}:{ex?.GetType().FullName}";
             lock (Gate)
             {
                 var now = DateTime.UtcNow;
@@ -97,10 +98,11 @@ internal static partial class BugReporter
     {
         try
         {
-            if (string.Equals(Environment.GetEnvironmentVariable("XISO_DISABLE_BUGREPORT"), "1", StringComparison.Ordinal))
+            if (string.Equals(Environment.GetEnvironmentVariable("XISO_DISABLE_BUGREPORT"), "1",
+                    StringComparison.Ordinal))
                 return true;
             var entry = Assembly.GetEntryAssembly()?.GetName().Name;
-            if (entry is not null && entry.Contains("test", StringComparison.OrdinalIgnoreCase))
+            if (entry?.Contains("test", StringComparison.OrdinalIgnoreCase) == true)
                 return true;
             if (AppDomain.CurrentDomain.FriendlyName.Contains("test", StringComparison.OrdinalIgnoreCase))
                 return true;
@@ -122,17 +124,49 @@ internal static partial class BugReporter
         string msg;
         string source;
         string stack;
-        try { type = ex.GetType().FullName ?? ex.GetType().Name; } catch { type = "Unknown"; }
-        try { msg = ex.Message; } catch { msg = "Unknown"; }
-        try { source = ex.Source ?? "(unknown)"; } catch { source = "Unknown"; }
-        try { stack = ex.StackTrace ?? "(no stack trace)"; } catch { stack = "Unknown"; }
+        try
+        {
+            type = ex.GetType().FullName ?? ex.GetType().Name;
+        }
+        catch
+        {
+            type = "Unknown";
+        }
+
+        try
+        {
+            msg = ex.Message;
+        }
+        catch
+        {
+            msg = "Unknown";
+        }
+
+        try
+        {
+            source = ex.Source ?? "(unknown)";
+        }
+        catch
+        {
+            source = "Unknown";
+        }
+
+        try
+        {
+            stack = ex.StackTrace ?? "(no stack trace)";
+        }
+        catch
+        {
+            stack = "Unknown";
+        }
 
         // Include inner exceptions (first level) for diagnosability.
         var inner = string.Empty;
         try
         {
             if (ex.InnerException is not null)
-                inner = $"\nInner Type: {ex.InnerException.GetType().FullName}\nInner Message: {ex.InnerException.Message}";
+                inner =
+                    $"\nInner Type: {ex.InnerException.GetType().FullName}\nInner Message: {ex.InnerException.Message}";
         }
         catch
         {
@@ -187,15 +221,19 @@ internal static partial class BugReporter
     /// previously produced by the anonymous type (camelCase).
     /// </summary>
     private sealed record BugReportPayload(
-        [property: JsonPropertyName("message")] string Message,
-        [property: JsonPropertyName("applicationName")] string AppName,
-        [property: JsonPropertyName("version")] string Version,
-        [property: JsonPropertyName("userInfo")] string? UserInfo,
-        [property: JsonPropertyName("environment")] string Environment,
-        [property: JsonPropertyName("stackTrace")] string StackTrace);
+        [property: JsonPropertyName("message")]
+        string Message,
+        [property: JsonPropertyName("applicationName")]
+        string AppName,
+        [property: JsonPropertyName("version")]
+        string Version,
+        [property: JsonPropertyName("userInfo")]
+        string? UserInfo,
+        [property: JsonPropertyName("environment")]
+        string Environment,
+        [property: JsonPropertyName("stackTrace")]
+        string StackTrace);
 
     [JsonSerializable(typeof(BugReportPayload))]
     private sealed partial class BugReportJsonContext : JsonSerializerContext;
 }
-
-

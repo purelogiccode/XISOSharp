@@ -16,7 +16,7 @@ internal static class EnvironmentInfo
         {
             var asm = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
             var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-                ?? asm.GetName().Version?.ToString();
+                       ?? asm.GetName().Version?.ToString();
             return string.IsNullOrWhiteSpace(info) ? "Unknown" : info;
         }
         catch
@@ -54,7 +54,7 @@ internal static class EnvironmentInfo
         try
         {
             bitness = $"{(Environment.Is64BitProcess ? 64 : 32)}-bit (process), " +
-                $"{(Environment.Is64BitOperatingSystem ? 64 : 32)}-bit (OS)";
+                      $"{(Environment.Is64BitOperatingSystem ? 64 : 32)}-bit (OS)";
         }
         catch
         {
