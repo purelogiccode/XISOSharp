@@ -111,11 +111,10 @@ Redump batch (zar of the XISO component); pass-through `removeUpdate` drops
 ## Security sectors
 
 ```bash
-XISOSharp.Cli --video --security-sectors <sectors.txt> <redump.iso>
 XISOSharp.Cli rebuild ... --security-sectors <sectors.txt> -o <redump.iso>
 ```
 
-`SecuritySectors.cs` parses `start-end` lines (`start-end` where `end-start==4095`, `4096`-sector ranges), sorted `int[]`. Overrides built-ins per XGD type, zeroes in Redump, skipped via `XboxPrng.SimulateSectors` in rebuild.
+`SecuritySectors.cs` parses `start-end` lines (`start-end` where `end-start==4095`, `4096`-sector ranges), sorted `int[]`. Rebuild-only (alias `--sectors`; rejected outside the `rebuild` verb), zeroed in Redump, skipped via `XboxPrng.SimulateSectors` in rebuild.
 
 ## Aliases
 
@@ -123,6 +122,7 @@ XISOSharp.Cli rebuild ... --security-sectors <sectors.txt> -o <redump.iso>
 XISOSharp.Cli --all <redump.iso>       # == --random --seed --trim --update --video --wipe (+ --xiso)
 XISOSharp.Cli --best <redump.iso>      # == --trim --wipe --xiso  (mirrors XboxKit -b / -twx)
 XISOSharp.Cli --compress <input.iso>   # == --petrify --update --video --zar (mirrors -c / -puvz)
+XISOSharp.Cli --zar --jobs 4 --policy auto-rename game1.iso game2.iso  # parallel ZAR pack + overwrite policy (skip|overwrite|auto-rename)
 ```
 
 `Program.cs:482` expands `allMode`/`bestMode`/`compressAlias` + `RunRedumpBatch:693` dispatches batch with `-o` single-file guard. Aliases match XboxKit `-a` (`-rstuvwx`) / `-b` / `-c`.
@@ -176,7 +176,7 @@ XISOSharp.Cli validate --validate-checksums game.redump.iso rebuilt.redump.iso
 | `XisoSkeleton` | `Petrify(skeletonPath, hashPath)`, `CollectFileEntries` |
 | `XisoZarchive` | `CreateZar` |
 | `SecuritySectors` | `Parse(string path)` → `int[]`, validation `4095` length |
-| CLI | `rebuild` verb `RunRebuildMode`, `--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`--all`/`--best`/`--compress` → `RunRedumpBatch`, `--security-sectors` threaded |
+| CLI | `rebuild` verb `RunRebuildMode` (`--security-sectors`/`--sectors` rebuild-only), `--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`--all`/`--best`/`--compress` → `RunRedumpBatch` (`--jobs` parallel ZAR pack, `--policy skip|overwrite|auto-rename`), `--security-sectors` threaded through rebuild only |
 
 ## Examples
 

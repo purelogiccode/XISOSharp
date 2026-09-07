@@ -32,6 +32,10 @@ Highlights:
 | Writer edge cases (empty dirs, large files, custom names) | `XisoWriterEdgeCaseTests.cs` |
 | AVL tree behavior | `AvlTreeTests.cs`, `AvlTreeEdgeCasesTests.cs`, `AvlNodeTests.cs` |
 | Audit | `AuditXisoTests.cs` |
+| Repair (class-C in-place, backup/dry-run, CISO/split refusals) | `XisoRepairTests.cs` |
+| Salvage rebuild (carry/drop, CISO, `--repair-out`, `-y`/`-n`) | `XisoSalvageTests.cs` |
+| Executable info (`GetXexInfo`/`GetXbeInfo`, explorer, CLI) | `XbeInfoTests.cs`, `XisoCsoExplorerTests.cs` |
+| Disc identity (`VolumeInfo.DiscFormat`, `-i`) | `XisoDiscFormatTests.cs` |
 | Validation | `XisoValidatorTests.cs` |
 | Boyer–Moore search | `BoyerMooreTests.cs`, `BoyerMooreEdgeCasesTests.cs` |
 | Encoding (Latin-1 round-trips) | `Latin1EncodingTests.cs` |
@@ -229,6 +233,12 @@ exports PDF reports (`PdfExporter`). Services:
 Its main page also has an **Explore** section: an in-process image browser
 (`TreeView` with lazy directory loading over `XisoExplorer` — no extraction)
 with per-node copy-out, SHA-256 display, and an XEX2 info panel.
+
+All three runners share one core implementation: the single shared
+`XISOSharp.ProcessRunner` (async drains, timeout, tree-kill) + `XISOSharp.ToolLocator`
+(override → sibling of the app → `PATH`, plus a `-v` probe) back the GUI
+(`XISOSharp.Cli`), the Tester (`extract-xiso`/`extract-xiso.exe`, extensionless
+accepted), and the battle harness — replacing the old per-app runners.
 
 It targets Windows only and is not part of CI.
 

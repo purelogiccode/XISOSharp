@@ -75,18 +75,20 @@ dotnet publish XISOSharp.Cli -c Release -r linux-x64 --self-contained
 ```
 
 `XISOSharp.Gui` is a dark-theme front-end that drives the `XISOSharp` CLI as a child
-process (extract/create/rewrite/rebuild/compress/decompress/validate/batch plus
+process via the shared core `ProcessRunner` + `ToolLocator` (override → sibling →
+`PATH` + `-v` probe; extract/create/rewrite/rebuild/compress/decompress/validate/batch plus
 list/tree/info/unpack/copy-out/checksum, live log, cancel, overwrite `-y`/`-n`
 switch). Files and folders can be **dragged onto the window**: a single image queues
 Extract, a single `.cso` queues Decompress, multiple images queue Rewrite, and a folder
 queues Batch (when it contains `*.iso`) or Create. Input==output mistakes are refused
 before the CLI runs. It finds the CLI next to itself, on `PATH`, or via the Settings tab
-(persisted to `%AppData%/XISOSharp/gui-settings.json`). Headless helpers:
+(persisted atomically to `%AppData%/XISOSharp/gui-settings.json`). Picker results marshal
+back via `Dispatcher.UIThread`, and commands gate on `CanExecute` while a run is active. Headless helpers:
 `XISOSharp.Gui --probe-cli [path]` and `XISOSharp.Gui --self-test [cliPath]`.
 
 ## Using the CLI
 
-The CLI binary is `XISOSharp.Cli(.exe)`. It is `extract-xiso`-compatible (`-c`/`-x`/`-l`/`-r`/`-d`/`-D`/`-m`/`-q`/`-Q`/`-s`/`-X`/`-h`/`-v`) plus XboxKit + xdvdfs verbs. Flags must precede positionals; `-h`/`-v` exit 0. `-v` still prints the `extract-xiso v2.7.1` baseline banner for compatibility.
+The CLI binary is `XISOSharp.Cli(.exe)`. It is `extract-xiso`-compatible (`-c`/`-x`/`-l`/`-r`/`-d`/`-D`/`-m`/`-q`/`-Q`/`-s`/`-X`/`-h`/`-v`) plus XboxKit + xdvdfs verbs. Flags must precede positionals; `-h`/`-v` exit 0. Help is `-h` ONLY — `--help` is treated as a filename. `-v` still prints the `extract-xiso v2.7.1` baseline banner for compatibility.
 
 ### Basics
 
@@ -115,11 +117,11 @@ XISOSharp.Cli -c --file-time 0 ./game_files det.iso  # deterministic: byte-ident
 
 # Copy-out / hash / XEX / XBE / batch
 XISOSharp.Cli --copy-out game.iso /media ./media_out
-XISOSharp.Cli --copy-in game.iso ./my-config.ini /config.ini  # patch one file in (keeps .old backup)
+XISOSharp.Cli --copy-in game.iso ./my-config.ini /config.ini  # patch one file in (keeps .old backup; host dirs rejected fast)
 XISOSharp.Cli --md5 game.iso                 # or --sha256
 XISOSharp.Cli --xex-info game360.iso /default.xex
 XISOSharp.Cli --xbe-info game.iso /default.xbe  # title ID/name, media, region
-XISOSharp.Cli --batch -d ./out ./isos        # all *.iso sorted
+XISOSharp.Cli --batch -d ./out ./isos        # all *.iso sorted (extract/list/tree/rewrite/audit only)
 XISOSharp.Cli --batch --batch-recursive -r ./isos
 
 # Resume an interrupted unpack (skip files already on disk, logged as "skip: <path>")
@@ -156,7 +158,7 @@ XISOSharp.Cli -c --prepend-sectors 16640 ./files redump.iso # XGD3
 XISOSharp.Cli -c --prepend-sectors 283392 ./files hybrid.iso # Hybrid 0x89D80000
 XISOSharp.Cli -r --skip-sectors 283392 game.iso             # rewrite offset image to bare
 
-# Validate lossless round-trip
+# Validate lossless round-trip (flavors imply --validate; mismatch exits 2)
 XISOSharp.Cli validate --validate-checksums game.redump.iso rebuilt.iso
 XISOSharp.Cli -r --validate --validate-strict --validate-report report.json game.iso
 ```
@@ -173,14 +175,15 @@ XISOSharp.Cli --trim -o trimmed.iso game.iso           # truncate after last ext
 XISOSharp.Cli --petrify game.iso                       # -> skeleton.iso + .hash (SHA-1 per file)
 XISOSharp.Cli --update game.redump.iso                 # XGD3 -> su20076000_00000000 (+ zeroes it in video)
 XISOSharp.Cli --zar -o game.zar game.iso               # ZArchive/zstd
+XISOSharp.Cli --zar --jobs 4 --policy auto-rename game1.iso game2.iso  # parallel + skip|overwrite|auto-rename
 
 # Aliases (mirrors xboxkit -a/-b/-c)
 XISOSharp.Cli --all game.redump.iso                    # --random --seed --trim --update --video --wipe
 XISOSharp.Cli --best game.redump.iso                   # --trim --wipe
 XISOSharp.Cli --compress game.iso                      # --petrify --update --video --zar
 
-# Security sectors (4096-sector ranges)
-XISOSharp.Cli --video --security-sectors sectors.txt game.redump.iso
+# Security sectors (rebuild only; 4096-sector ranges)
+XISOSharp.Cli --video game.redump.iso
 XISOSharp.Cli rebuild --security-sectors sectors.txt -o rebuilt.iso # or:
 
 # Rebuild lossless Redump from components
@@ -192,7 +195,7 @@ XISOSharp.Cli rebuild game.xiso video.iso --security-sectors sectors.txt -o rebu
 ### Packing & compression (xdvdfs parity)
 
 ```bash
-# Ordered remapping (wax captures, ! negation, xdvdfs.toml, --dry-run)
+# Ordered remapping (wax captures, ! negation, xdvdfs.toml, --dry-run, \: colon escaping)
 XISOSharp.Cli build-image ./src -m "bin:/" -m "assets/**:/assets/{1}" -O out.iso
 XISOSharp.Cli build-image -D -m "!secret/**" -m "**:/{0}" ./src      # dry-run
 XISOSharp.Cli build-image -f xdvdfs.toml ./src -O out.iso
@@ -207,13 +210,17 @@ XISOSharp.Cli cso game.iso game.cso --ciso-split 0              # single .cso (d
 XISOSharp.Cli decompress game.1.cso game.iso                    # also reads split .1.cso/.2.cso parts
 XISOSharp.Cli uncso game.cso                                    # decso alias
 
+# Plain-ISO split/join (FATX-friendly) + deterministic checksum
+XISOSharp.Cli split --size half game.iso                        # -> game.1.iso/game.2.iso
+XISOSharp.Cli join --output rejoined.iso game.1.iso             # joinsplit alias
+
 # Deterministic image checksum (SHA3-256 over sorted BTreeMap, xdvdfs compat)
 XISOSharp.Cli checksum game.iso
 XISOSharp.Cli checksum --silent game1.iso game2.iso            # hex only, multiple images
 XISOSharp.Cli --checksum game.iso --silent                     # flag form
 ```
 
-Exit codes: `0` success/`-v`/`-h`/`validate` pass, `1` usage/I/O, `2` validation failure (`--validate-strict`).
+Exit codes: `0` success/`-v`/`-h`/`validate` pass, `1` usage/I/O, `2` validation failure (`validate` command or `-r --validate` on mismatch).
 
 ## Using the Library
 
@@ -481,7 +488,8 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | ZArchive read/write/pack/extract library (`ZARSharp`, pure C#, zero packages, incl. RFC 8878 zstd encoder + decoder) | ✅ | ❌ | ❌ | ❌ |
 | `rebuild` from `.zar` sidecar (XboxKit roadmap "coming soon") | ✅ | ❌ | ❌ | ❌ |
 | `rebuild` lossless (L0/`l0Padding`+game+`l1Padding`+L1) | ✅ | ❌ | ✅ | ❌ |
-| `--security-sectors` `4096`-aligned `sectors.txt` | ✅ | ❌ | 🟡 `sectors.txt` sidecar | ❌ |
+| `--security-sectors` `4096`-aligned `sectors.txt` (rebuild only) | ✅ | ❌ | 🟡 `sectors.txt` sidecar | ❌ |
+| `--jobs` parallel `--zar` + `--policy` `skip\|overwrite\|auto-rename` | ✅ | ❌ | ❌ | ❌ |
 | Aliases `--all`/`--best`/`--compress` | ✅ | ❌ | ✅ | ❌ |
 | Wave tables `XISO_OFFSET`/`REDUMP_ISO_LENGTH`/`VIDEO_Lx`/`WAVE_PVD` | ✅ | ❌ | ✅ | ❌ |
 | `--skip-sectors` / `--prepend-sectors` arbitrary | ✅ | ❌ | 🟡 built-in tables | ❌ |
@@ -491,6 +499,7 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | CISO compress v2 LZ4 (byte-identical `lz4_flex` port, fixed `align 2`) + v1 DEFLATE `align` 0/1/2, threshold `+12` | ✅ | ❌ | ❌ | ✅ |
 | `--ciso-level` 0..9 / `--ciso-version 1\|2\|auto` / `--ciso-split` (default split `0xffbf6000`) | ✅ | ❌ | ❌ | ✅ |
 | Split CSO output `.1.cso`/`.2.cso`… + split input (`ciso::split` parity, golden-tested vs `xdvdfs-cli 0.8.3` incl. multi-part) | ✅ | ❌ | ❌ | ✅ |
+| Split plain ISO `split`/`join`/`joinsplit` (sector-aligned `.1.iso`…, FATX 4G cap) | ✅ | ❌ | ❌ | ❌ |
 | `wax` glob `*`/`**`/`?`/`[]`/`{a,b}` | ✅ | ❌ | ❌ | ✅ |
 | `xdvdfs.toml` `[map_rules]` | ✅ | ❌ | ❌ | ✅ |
 | `--dry-run` preview | ✅ | ❌ | ❌ | ✅ |
@@ -511,8 +520,8 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | `--pack` dir→create / iso→rewrite | ✅ | ❌ | — | ✅ |
 | Batch `--batch` sorted + `--batch-recursive` | ✅ | 🟡 explicit args only | ❌ | 🟡 `checksum` multi |
 | Input==output safety guard (refuse `-o` onto input/`.old`/split part) | ✅ | — (no `-o` flag) | ❌ | ❌ (open #36) |
-| Quiet `-q` / silent `-Q` | ✅ | ✅ | 🟡 | ❌ |
-| Help `-h` / banner `-v` `2.7.1 (01.11.14)` | ✅ | ✅ | 🟡 `-h` only | 🟡 `clap` |
+| Quiet `-q` / silent `-Q` (`checksum --silent` → hex only) | ✅ | ✅ | 🟡 | ❌ |
+| Help `-h` ONLY (`--help` is a filename) / banner `-v` `2.7.1 (01.11.14)` | ✅ | ✅ | 🟡 `-h` only | 🟡 `clap` |
 | Exit `0`/`1` + `2` for `validate --strict` | ✅ | 🟡 `0`/`1` only | ❌ | ❌ |
 | **Extras** | | | | |
 | Extraction to dir | ✅ | ✅ | ✅ | ✅ |

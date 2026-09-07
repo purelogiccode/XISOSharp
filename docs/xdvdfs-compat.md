@@ -16,7 +16,7 @@ Modern xdvdfs is a `no_std`-capable filesystem library (`xdvdfs-core` traits + `
 **CLI:**
 
 ```
-XISOSharp.Cli build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run]
+XISOSharp.Cli build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run] [--file-time <value>]
 XISOSharp.Cli build-image --dry-run -m "bin:/" -m "assets/**:/assets/{1}" ./src
 ```
 

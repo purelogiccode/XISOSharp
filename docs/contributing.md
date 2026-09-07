@@ -71,8 +71,9 @@ tool. Preserve that spirit:
 Good starting points (see [`ProposedEnhancements.md`](../ProposedEnhancements.md) for
 the tracked backlog):
 
-- Remaining `NOT DONE` enhancements and parity fixes (e.g. empty-entry `0x0000`
-  sentinel, reserved attribute-bit masking).
+- Open research epics only (repair/salvage are DONE): GOD/STFS/CON
+  (Xbox 360 Games-on-Demand containers) read/write and XRD Redump metadata
+  generation.
 - `docs/` improvements — accuracy passes, examples, screenshots.
 - Test coverage: sustain >85% line coverage on `XisoReader.cs`,
   `XisoWriter.cs`, `AvlTree.cs` (currently 95.9% / 86.6% / 100% — see

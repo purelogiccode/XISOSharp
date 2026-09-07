@@ -33,7 +33,7 @@ Everything lives in the `XISOSharp` namespace, except the internal data structur
 
 | Type | Purpose |
 |---|---|
-| [`XisoReader`](api-xisoreader.md) | Verify, extract, list, tree, rewrite, info, audit, hash, copy-out, copy-in, checksum, BlockDevice overloads |
+| [`XisoReader`](api-xisoreader.md) | Verify, extract, list, tree, rewrite, info, `ls`, audit, repair, salvage, hash, copy-out, copy-in, checksum, filetime, split/join, XEX/XBE info, BlockDevice overloads |
 | [`XisoWriter`](api-xisowriter.md) | Create and rewrite images + `build-image` remap (`CreateFromRemapTree`) |
 | [`XisoPatcher`](api-xisoreader.md#copyin) / [`DirectoryEntryTableWriter`](api-xisowriter.md#directoryentrytablewriter) | In-place file patching (`CopyIntoImage`) + single-table build/serialize primitive |
 | [`Logger`](api-utilities.md#logger) | Configurable text output with quiet/silent modes |

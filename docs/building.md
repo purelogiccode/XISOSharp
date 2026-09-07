@@ -53,7 +53,9 @@ The solution contains:
 > `publish-gui.ps1`. `XISOSharpTester` (WPF, Windows-only) is the in-process
 > regression rig for engine + reference-tool interop (see [Testing](testing.md#the-gui-regression-tester));
 > it runs from its build output (`dotnet run --project XISOSharpTester`) and is
-> intentionally not published single-file.
+> intentionally not published single-file. Both (plus the battle harness) share
+> the single `XISOSharp.ProcessRunner` + `XISOSharp.ToolLocator`
+> (override → sibling → `PATH` + `-v` probe) in the core library — no per-app runners.
 
 > [!NOTE]
 > The Core project packs a NuGet package only via an explicit

@@ -17,13 +17,14 @@ The `validate` command compares two existing ISO images and must be the **first*
 token on the command line (it does not start with `-`):
 
 ```bash
-XISOSharp.Cli validate <source.iso> <output.iso> [--validate-checksums] [--validate-report <file>]
+XISOSharp.Cli validate <source.iso> <output.iso> [--validate-checksums] [--validate-strict] [--validate-report <file>]
 ```
 
 | Flag | Effect |
 |---|---|
-| `--validate-checksums` | Additionally verify SHA-256 per file (reads all file data twice; slower). |
-| `--validate-report <file>` | Write the result as a JSON report. |
+| `--validate-checksums` | Additionally verify SHA-256 per file (reads all file data twice; slower). Implies `--validate`. |
+| `--validate-strict` | Retained for parity (mismatches exit 2 with or without it). Implies `--validate`. |
+| `--validate-report <file>` | Write the result as a JSON report. Implies `--validate`. |
 | `-q` / `-Q` | Apply as usual. |
 
 The source may be a Redump image (game partition auto-detected at its known offset) or
@@ -40,9 +41,13 @@ XISOSharp.Cli -r --validate [--validate-checksums] [--validate-strict] [--valida
 | Flag | Effect |
 |---|---|
 | `--validate` | Compare source (`.old`) and rewritten image after the rewrite. |
-| `--validate-checksums` | Also verify SHA-256 checksums. |
-| `--validate-strict` | Exit code 2 on any mismatch (otherwise mismatches are reported but the exit code stays 0). |
-| `--validate-report <file>` | Write a JSON report per ISO. |
+| `--validate-checksums` | Also verify SHA-256 checksums. Implies `--validate`. |
+| `--validate-strict` | Retained for parity (mismatches exit 2 with or without it). Implies `--validate`. |
+| `--validate-report <file>` | Write a JSON report per ISO. Implies `--validate`. |
+
+The flavor flags (`--validate-checksums`, `--validate-strict`, `--validate-report`)
+imply `--validate`, and all of them require `-r` (rewrite) or `validate` mode —
+used elsewhere they are rejected (exit 1). A mismatch exits 2.
 
 > [!NOTE]
 > `--skip-sectors` / `--prepend-sectors` cannot be combined with validation flags —
@@ -106,8 +111,8 @@ Each issue entry carries `type`, `path`, `sourceSize`, `outputSize`, `sourceHash
 | Code | Meaning |
 |---|---|
 | `0` | Validation passed. |
-| `2` | Validation failed (`validate` command, or `-r --validate-strict`). |
-| `1` | Error while reading/validating (invalid ISO, I/O error). |
+| `2` | Validation failed (`validate` command, or `-r --validate` on mismatch — with or without `--validate-strict`). |
+| `1` | Error while reading/validating (invalid ISO, I/O error) or validation flags used without `-r`/`validate`. |
 
 ## Examples
 

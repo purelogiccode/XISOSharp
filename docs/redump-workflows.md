@@ -66,11 +66,12 @@ XISOSharp.Cli --skip-sectors <N> -d ./out image.iso
 `N` is the number of 2048-byte sectors to skip from the start of the file before the
 XISO filesystem begins. The header must then be at `N × 2048 + 0x10000`.
 
-- Valid in **extract, list, tree, and rewrite** modes.
+- Valid in **extract, list, tree, rewrite (`-r`), `--unpack`, `--filetime`, and `--set-filetime`** modes.
 - When `N` is supplied, offset **probing is skipped** — the value is authoritative.
 - Negative values are rejected; `N = 0` checks only the RAW offset (probing is still
   skipped when the flag is supplied explicitly).
 - Combine with `-r` to rewrite an offset image into a bare optimized XISO.
+- Rejected with `-c` and with `-i`, `--ls`, `--xex-info`, `--xbe-info`, hashes, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, and `checksum`.
 
 > [!NOTE]
 > If the game partition happens to sit at a known offset, auto-detection already works
@@ -137,6 +138,7 @@ Quick taste:
 XISOSharp.Cli --all game.redump.iso                  # video+filler+seed+trim+update+wipe in one pass
 XISOSharp.Cli rebuild game.xiso video.iso filler.bin su20076000_00000000 -o game.redump.iso --security-sectors sectors.txt
 XISOSharp.Cli rebuild game.zar video.iso filler.bin su20076000_00000000 -o game.redump.iso   # .zar sidecar as <xiso>
+XISOSharp.Cli --zar --jobs 4 --policy auto-rename game1.iso game2.iso  # parallel ZAR pack
 XISOSharp.Cli --zar -o game.zar game.iso
 ```
 

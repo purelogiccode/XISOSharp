@@ -107,7 +107,8 @@ image in place, replacing the entry when it exists or adding it otherwise:
 XISOSharp.Cli --copy-in game.iso ./my-config.ini /config.ini
 ```
 
-A `game.iso.old` backup is kept unless `--no-backup` is passed. See
+A `game.iso.old` backup is kept unless `--no-backup` is passed. A host directory
+is rejected fast (nothing is written). See
 [CLI Reference](cli.md) and [CopyIn](api-xisoreader.md#copyin).
 
 **Why does rewrite/compress refuse with "is the same file as the input"?**
@@ -186,10 +187,10 @@ Only additively: new CLI flags and verbs (`-t`, `-i`, `-V`, `-o`, `--ls`,
 `--copy-out`, `--copy-in`, `--no-backup`, `--md5`, `--sha256`, `-X`,
 `--skip-sectors`, `--prepend-sectors`, `--skip-existing`,
 `--continue-on-error`, `--xex-info`, `--xbe-info`, `--filetime`,
-`--set-filetime`, `--repair`, `--dry-run`, `--salvage`, `--repair-out`,
-`validate`/`--validate*`, `split`/`join`, Redump verbs
-`--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`rebuild`
-and aliases, xdvdfs verbs `build-image`/`image-spec`/`compress`/`decompress`/`checksum`),
+`--set-filetime`, `--file-time`, `--repair`, `--dry-run`, `--salvage`, `--repair-out`,
+`validate`/`--validate*`, `split`/`join`/`joinsplit`, Redump verbs
+`--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`--jobs`/`--policy`/`rebuild`
+and aliases, xdvdfs verbs `build-image`/`image-spec`/`compress`/`cso`/`decompress`/`uncso`/`decso`/`checksum`/`--checksum`/`--silent`),
 the deep audit plus in-place repair and salvage rebuild (no reference tool
 does these), XBE/XEX executable parsing, friendly disc-layout identity, the
 input==output safety guard, misplaced-flag

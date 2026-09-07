@@ -36,7 +36,7 @@ XISOSharp.Cli join [--output <file>] <first.1.iso> [...]
 - Flags must precede positional arguments; the first non-flag token ends option parsing (except verbs above which are detected as first token).
 - Flags are matched exactly — combined shorts such as `-lr` are **not** supported.
 - An unknown flag is treated as a filename (it will then fail with an "open error"); a *known* flag in a filename slot fails fast with `must come before ISO filenames` (see [Misplaced flags](#misplaced-flags-upstream-61)).
-- `-h` prints help; `-v` prints the banner (`extract-xiso v2.7.1 (01.11.14)`); both exit 0.
+- `-h` prints help; `-v` prints the banner (`extract-xiso v2.7.1 (01.11.14)`); both exit 0. Help is `-h` ONLY — `--help` is treated as a filename (it will fail with an "open error"), never as help.
 - With no arguments at all, usage is printed and the tool exits 1.
 
 ## Modes
@@ -64,10 +64,10 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--dry-run` | With `--repair`, preview the fixes without changing anything (exit mirrors the audit: `1` when fixes would apply). Rejected without `--repair`. |
 | `--salvage <file>` | **Salvage** — rebuild a readable image from a corrupt one: carry every entry reachable without tripping a truncation/structural gate into `<file>` without its extension plus `.salvaged.iso` (CISO input allowed; source never modified). Prints `Carried:` / `Dropped:` / `Result: PASS|FAIL`. See [Salvage](api-xisoreader.md#salvage). |
 | `--repair-out <path>` | With `--salvage`, write the rebuilt image to `<path>` instead of the default (existing files follow the `-y`/`-n` convention). Rejected without `--salvage`. |
-| `--batch <dir>` | Process **all `.iso` files** in `<dir>` instead of explicit filenames. Sorted for deterministic order. Works with extract, list, tree, rewrite (`-r`), and audit (`-V`), and `checksum`; rejected with single-ISO modes and explicit filenames. |
-| `--batch-recursive` | With `--batch`, search subdirectories recursively. |
-| `--copy-out <iso> <path> <dest>` | Copy a single file **or an entire directory** out of an ISO to `<dest>`. Supports `--skip-existing` (resume). |
-| `--copy-in <iso> <host> <path>` | Copy a host file **into** an ISO, modifying it in place: replaces `<path>` when it exists, adds it as a new file otherwise. Writes an `<iso>.old` backup first unless `--no-backup`. See [CopyIn](api-xisoreader.md#copyin). |
+| `--batch <dir>` | Process **all `.iso` files** in `<dir>` instead of explicit filenames. Sorted for deterministic order. Works with extract, list, tree, rewrite (`-r`), and audit (`-V`) only; rejected with single-ISO modes, redump modes, and explicit filenames. |
+| `--batch-recursive` | With `--batch`, search subdirectories recursively. Rejected without `--batch`. |
+| `--copy-out <iso> <path> <dest>` | Copy a single file **or an entire directory** out of an ISO to `<dest>`. Supports `--skip-existing` (resume) and `--continue-on-error`. |
+| `--copy-in <iso> <host> <path>` | Copy a host file **into** an ISO, modifying it in place: replaces `<path>` when it exists, adds it as a new file otherwise. A host directory is rejected fast (`InvalidDataException`, nothing written). Writes an `<iso>.old` backup first unless `--no-backup`. See [CopyIn](api-xisoreader.md#copyin). |
 | `--no-backup` | With `--copy-in` or `--repair`, skip the `<iso>.old` backup (rejected without either). |
 | `-r` | **Rewrite** each ISO as an optimized ISO (see [Optimized-tag detection](#optimized-tag-detection)). Already-optimized images are skipped. |
 | `validate <src> <out>` | Standalone **validation** command — must be the **first** token. See [Validation](validation.md). |
@@ -79,26 +79,28 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--petrify` | **Redump:** skeleton — XISO with file extents zeroed + SHA-1 per file (`XisoSkeleton.Petrify`, `CollectFileEntries` sorted); writes skeleton + `*.hash`. See [Archival](archival.md#petrify). |
 | `--update` | **Redump:** extract system update `su20076000_00000000` from XGD3 video `L1` tail (`XisoRedump.TryExtractUpdate`, `FindUpdateOffset` `ABCDABCD`); warns on XGD1/2. See [Archival](archival.md#update). |
 | `--zar` | Create ZArchive/zstd (`XisoZarchive.CreateZar` → `ZARSharp.ZArchiveWriter`, L6 blocks + raw fallback; standalone `--zar <iso> [out.zar]` or Redump-batch zar of the XISO component). Load the result directly in Xenia canary. See [Archival](archival.md#zar). |
+| `--jobs <n>` | With a lone `--zar` over several inputs, pack up to `<n>` archives in parallel (default `1`). |
+| `--policy <p>` | `--zar` overwrite handling without prompting: `skip` \| `overwrite` \| `auto-rename`. |
 | `--all` | Alias: `--random --seed --trim --update --video --wipe` (→ `--xiso` as batch). Mirrors XboxKit `-a`. |
 | `--best` | Alias: `--trim --wipe` (XISO). Mirrors XboxKit `-b`. |
 | `--compress` | Alias: `--petrify --update --video --zar`. Mirrors XboxKit `-c`. Also see xdvdfs `compress`. |
-| `--security-sectors <file>` | External `sectors.txt` (`SecuritySectors.cs`, `4096`-sector `start-end` ranges, `4095` validated, sorted `int[]`) threaded through rebuild/video. Repeatable. |
+| `--security-sectors <file>` | Rebuild-only override of the security sector ranges (`start-end` lines, `4096` sectors each, `4095` validated, sorted `int[]`). Alias: `--sectors`. Rejected outside the `rebuild` verb. |
 | `rebuild <xiso\|game.zar> [video.iso] [filler\|seed] [su…] -o <redump.iso>` | **Rebuild** Redump ISO (`XisoRedump.RebuildRedump`): `L0`+`l0Padding`+game partition scan (filler/PRNG + security-sector zero-skip) + `l1Padding`+`L1` (optionally `l1Trimmed+updateFS+lastSector`). `<xiso>` accepts a `.zar` sidecar (single embedded XISO verbatim, else tree repacked). Positional alias `XISOSharp.Cli <input.xiso> [files...]` also accepted. See [Archival](archival.md#rebuild). |
-| `build-image [sourceDir] [output.iso] -m "host:image" [-f <toml>] [-O output] [-D\|--dry-run]` | **xdvdfs parity:** ordered `wax` remapping (`RemapFilesystem`, `WaxGlob` `*`/`**`/`?`/`[]`/`{a,b}` + `{0}` whole + `{n}` groups, `!negation` first-wins, suffix re-add), `xdvdfs.toml` `[map_rules]`, `--dry-run` via `DryRunRemap` → `CreateFromRemapTree` (`IsRemap` skips CWD). See [xdvdfs Compat](xdvdfs-compat.md#build-image). |
+| `build-image [sourceDir] [output.iso] -m "host:image" [-f <toml>] [-O output] [-D\|--dry-run] [--file-time <value>]` | **xdvdfs parity:** ordered `wax` remapping (`RemapFilesystem`, `WaxGlob` `*`/`**`/`?`/`[]`/`{a,b}` + `{0}` whole + `{n}` groups, `!negation` first-wins, suffix re-add), `xdvdfs.toml` `[map_rules]`, `--dry-run` via `DryRunRemap` → `CreateFromRemapTree` (`IsRemap` skips CWD). In `-m` rules the separator is the first unescaped `:` — write `\:` for a literal colon, `\\` for a backslash. See [xdvdfs Compat](xdvdfs-compat.md#build-image). |
 | `image-spec from -O <out> -m "host:image" ... [specPath]` | **xdvdfs parity:** TOML generation (`GenerateSpecText` preserve-order `[metadata] output` + `[map_rules]`), stdout when `specPath` omitted. See [xdvdfs Compat](xdvdfs-compat.md#image-spec). |
 | `compress\|cso <src> [out.cso] [--ciso-level 0..9] [--ciso-version 1\|2\|auto] [--ciso-split bytes]` | **CISO** compress: `CisoWriter.CompressToCso` — v2 (default) LZ4 sectors with fixed `align 2`, byte-identical to modern `xdvdfs compress` (pure-managed `lz4_flex` port); v1 BCL DEFLATE `0x80000000` with dynamic `align` 0/1/2; threshold `+12`. Use on `sourceDir` or `image.iso`. Output splits at `0xffbf6000` (~4 GiB) into `.1.cso`/`.2.cso`… parts (xdvdfs `SplitOutput` parity); `--ciso-split 0` writes a single `.cso`. See [Compression](compression.md). |
 | `decompress\|uncso\|decso <cso\|.1.cso> [out.iso]` | **CISO** decompress: `CisoReader.DecompressToIso` handles both versions, single files and split `.N.cso` parts. |
-| `checksum [--silent] <image> [images...]` / `--checksum <image> [--silent]` | **SHA3-256** image checksum (`XisoChecksum.ComputeImageChecksum`, `SortedDictionary Ordinal` `/path` UTF-8 + streamed data, `xdvdfs` compat). `.cso` / split `.1.cso` inputs are auto-detected by extension and read through `CisoBlockDevice` (`img.rs::open_image` parity), hashing the decompressed view — result identical to the source ISO. Prints `hex tab path` (silent → hex only). Also `flag` form `--checksum` supports multiple ISOs. See [xdvdfs Compat](xdvdfs-compat.md#checksum). |
+| `checksum [--silent] <image> [images...]` / `--checksum <image> [--silent]` | **SHA3-256** image checksum (`XisoChecksum.ComputeImageChecksum`, `SortedDictionary Ordinal` `/path` UTF-8 + streamed data, `xdvdfs` compat). `.cso` / split `.1.cso` inputs are auto-detected by extension and read through `CisoBlockDevice` (`img.rs::open_image` parity), hashing the decompressed view — result identical to the source ISO. Prints `hex tab path` (`--silent` → hex only). Also `flag` form `--checksum` supports multiple ISOs (`--silent` requires `--checksum` in flag form). See [xdvdfs Compat](xdvdfs-compat.md#checksum). |
 | `split [--size <bytes\|half>] [--output <base>] <image> [images...]` | **Split** a plain ISO into sector-aligned `<base>.1.iso`, `<base>.2.iso`, … parts (`XisoSplitter.Split`, TODO #17 / xdvdfs #97 — the plain-ISO counterpart to CSO `--ciso-split`). `--size` accepts bytes with `K`/`M`/`G` suffixes or `half`/`halves`; default 4G (FATX cap). Base defaults to the input stem. Existing parts are refused; partial parts are removed on failure/cancel. |
-| `join [--output <file>] <first.1.iso> [...]` | **Reassemble** split parts (`XisoSplitter.Join`, aliases: `joinsplit`). Output defaults to the part stem + `.iso` and must not exist; the result is validated as an XISO afterwards. |
+| `join\|joinsplit [--output <file>] <first.1.iso> [...]` | **Reassemble** split parts (`XisoSplitter.Join`). Output defaults to the part stem + `.iso` and must not exist; the result is validated as an XISO afterwards. |
 
 ## Options
 
 | Flag | Description |
 |---|---|
 | `-d <directory>` | Extract mode: output directory (created if missing). Rewrite mode: directory for the rewritten ISO. Ignored by list/tree. Tolerant of batch-script artifacts: trailing separators, UNC paths, spaces — see [Destination directory edge cases](#destination-directory-edge-cases--d). |
-| `-D` | Rewrite mode: delete the `.old` source file after a successful rewrite. |
-| `-m` | Disable automatic `.xbe` media-enable patching during create/rewrite (not recommended). |
+| `-D` | Rewrite mode: delete the `.old` source file after a successful rewrite. Also `build-image --dry-run` alias (`-D`/`--dry-run`/`--dryrun` preview host→image pairs without writing). |
+| `-m` | In create or rewrite mode, disable automatic `.xbe` media enable patching (not recommended). |
 | `-o <filename>` | Rewrite/rebuild/compress output filename (default: original name with `.iso`/`.cso` extension). For `rebuild` must be `-o <redump.iso>`; for `compress` optional positional. |
 | `-q` | Quiet — suppress all non-error output. |
 | `-Q` | Silent — suppress all output, including errors. |
@@ -106,7 +108,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `-X <glob_pattern>` | **Create mode only.** Exclude files/directories matching the glob pattern. Repeatable. See [Exclude patterns](#exclude-patterns). `WaxGlob` engine also supports `{0}`/`{n}` captures for `build-image`. |
 | `-y`, `--yes` | Always overwrite output files without prompting (`rebuild`, rewrite `-o`, `compress`, `decompress`, redump batch outputs). |
 | `-n`, `--no` | Never overwrite: refuse when an output file exists (prints `[ERROR] File already exists`, skips the operation). Cannot be combined with `-y`. |
-| `--skip-sectors N` | Treat the image as if the XISO filesystem starts `N` sectors (2048 bytes each) into the file — for Redump images with a video partition. Valid in extract, list, tree, rewrite, unpack, video, audit where noted. See [Redump & Disc Layouts](redump-workflows.md). |
+| `--skip-sectors N` | Treat the image as if the XISO filesystem starts `N` sectors (2048 bytes each) into the file — for Redump images with a video partition. Valid in extract, list, tree, rewrite (`-r`), `--unpack`, `--filetime`, and `--set-filetime` modes. Rejected with `-c` and with `-i`, `--ls`, `--xex-info`, `--xbe-info`, `--md5`/`--sha256`, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, and `checksum`. See [Redump & Disc Layouts](redump-workflows.md). |
 | `--prepend-sectors N` | Write the output image with `N` empty sectors before the XISO filesystem, reserving room for a video partition. Valid in create (`-c`) and rewrite (`-r`) modes. See [Redump & Disc Layouts](redump-workflows.md). |
 | `--file-time <value>` | Fixed FILETIME for the volume descriptor on create (`-c`), `--pack`, and `build-image` (values: ISO-8601, decimal raw, `0x` hex, `'now'`, `'0'`). `'0'` writes the xdvdfs deterministic timestamp so identical input produces byte-identical output. See [XisoWriter API](api-xisowriter.md#deterministic-output). |
 | `--filetime <image>` | Show the FILETIME volume-descriptor field (ISO-8601 + raw u64; `0` = 1601-01-01, xdvdfs compatible). See [FILETIME](api-xisoreader.md#filetime). |
@@ -265,14 +267,15 @@ For `build-image`, the same engine (`WaxGlob`) additionally supports **capture g
 ## Validation flags
 
 These integrate with `-r` or the standalone `validate` command — see
-[Validation](validation.md) for the full picture.
+[Validation](validation.md) for the full picture. They require `-r` (rewrite)
+or `validate` mode (mismatch exits 2); the flavor flags imply `--validate`.
 
 | Flag | Description |
 |---|---|
 | `--validate` | After a rewrite, compare the source and output file trees (counts, paths, sizes). |
-| `--validate-checksums` | Also verify SHA-256 checksums per file (slower). |
-| `--validate-strict` | Exit with code 2 on any mismatch. |
-| `--validate-report <file>` | Write the validation result as a JSON report. |
+| `--validate-checksums` | Also verify SHA-256 checksums per file (slower). Implies `--validate`. |
+| `--validate-strict` | Fail with exit code 2 on any mismatch (retained for parity; mismatches now exit 2 with or without it). Implies `--validate`. |
+| `--validate-report <file>` | Write the validation result as a JSON report. Implies `--validate`. |
 
 ## Mode combinations and restrictions
 
@@ -282,18 +285,26 @@ Enforced at parse time; violations print an error and exit 1:
 |---|---|
 | `--skip-sectors` with `-c` | Error |
 | `--prepend-sectors` without `-c` or `-r` | Error |
-| `--skip-sectors`/`--prepend-sectors` with `-i`, hash, `--copy-out`, `-V`, `validate`, or `--validate*` | Error |
+| `--skip-sectors`/`--prepend-sectors` with `-i`, `--ls`, `--xex-info`, `--xbe-info`, hash, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, or `checksum` | Error |
+| `--validate`/`--validate-checksums`/`--validate-strict`/`--validate-report` without `-r` or `validate` | Error |
 | `-X` without `-c` | Error |
 | `--skip-existing` without extract/`--unpack`/`--copy-out` (e.g. with `-l`, `-t`, `-r`, `-c`, redump verbs) | Error |
 | `--continue-on-error` without extract/`--unpack`/`--copy-out` | Error |
+| `--batch` without extract/list/tree/rewrite/audit (e.g. with `--copy-out`, `--copy-in`, `validate`, redump, `checksum`, `--filetime`) | Error |
+| `--batch-recursive` without `--batch` | Error |
+| `--no-backup` without `--copy-in` or `--repair` | Error |
+| `--dry-run` without `--repair` | Error |
+| `--repair-out` without `--salvage` | Error |
+| `--silent` without `--checksum` (flag form) | Error |
+| `--filetime`/`--set-filetime` with redump or `--batch` | Error |
 | `-c` with extra positional arguments | Usage error |
 | `-y` with `-n` | Error (`[ERROR] Cannot use both --no (-n) and --yes (-y)`) |
 | No positional arguments in a non-create/non-verb mode | Usage error |
-| `--ciso-level` / `--ciso-split` without `compress`/`cso` | Warn or error (level requires compress) |
-| `--security-sectors` without archival verbs (`--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`rebuild`/`--all`/`--best`/`--compress`) | Ignored (no effect) |
+| `--ciso-level` / `--ciso-version` / `--ciso-split` without `compress`/`cso` | Error (verb-only flags, parsed by `RunCompressMode`) |
+| `--security-sectors`/`--sectors` outside the `rebuild` verb | Error (`only supported by the rebuild verb`) |
 
 Flags that take arguments (`-c`, `-d`, `-o`, `-X`, `--skip-sectors`, `--prepend-sectors`,
-`--validate-report`, `--security-sectors`, `--ciso-level`, `--ciso-split`, `-f`, `-m`, `-O`) consume the next token. For `-c`, the optional `name` is consumed
+`--validate-report`, `--security-sectors`/`--sectors`, `--ciso-level`, `--ciso-version`, `--ciso-split`, `--jobs`, `--policy`, `--repair-out`, `-f`, `-m`/`--map`, `-O`/`--output`) consume the next token. For `-c`, the optional `name` is consumed
 only when the next token does not start with `-`.
 
 ## Exit codes
@@ -302,7 +313,7 @@ only when the next token does not start with `-`.
 |---|---|
 | `0` | Success (all modes); `-v`; `-h`; `validate` passed; auditing all images; extracting an image with no files (`ErrIsoNoFiles` is treated as success); create succeeded; checksum matched. |
 | `1` | Any error: usage, invalid flag values, mode conflicts, file open failures, per-ISO exceptions, invalid ISO, `validate` exceptions, CISO header errors. |
-| `2` | Validation failure: `validate` command when the conversion does not pass, or `-r --validate-strict` on mismatch. |
+| `2` | Validation failure: `validate` command when the conversion does not pass, or `-r --validate` on mismatch (`--validate-strict` retained for parity; mismatches exit 2 with or without it). |
 
 > [!NOTE]
 > `err` is a single accumulator across a batch: a later ISO can overwrite an earlier
@@ -431,8 +442,8 @@ XISOSharp.Cli rebuild x.iso video.iso filler.bin su20076000_00000000 -o rebuilt.
 XISOSharp.Cli rebuild x.iso video.iso --security-sectors sectors.txt -o rebuilt.redump.iso
 XISOSharp.Cli rebuild game.zar video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso   # .zar sidecar as <xiso>
 
-# With security sectors (4096-sector ranges)
-XISOSharp.Cli --video --security-sectors sectors.txt game.redump.iso
+# With security sectors (rebuild only; 4096-sector ranges)
+XISOSharp.Cli rebuild x.iso video.iso filler.bin su20076000_00000000 --security-sectors sectors.txt -o rebuilt.redump.iso
 
 # --- xdvdfs parity ---
 
@@ -446,9 +457,10 @@ XISOSharp.Cli image-spec from -O dist/image.iso -m "bin:/" -m "assets:/{0}" xdvd
 
 # CISO compress / decompress (DEFLATE v1 + LZ4 v2)
 XISOSharp.Cli compress ./game_dir game.cso --ciso-level 9
-XISOSharp.Cli cso game.iso game.cso
+XISOSharp.Cli cso game.iso game.cso --ciso-version 2 --ciso-split 0
 XISOSharp.Cli decompress game.cso game.iso
 XISOSharp.Cli uncso game.cso
+XISOSharp.Cli decso game.cso
 
 # SHA3-256 image checksum (deterministic, BTreeMap sorted)
 XISOSharp.Cli checksum game.iso
@@ -461,11 +473,11 @@ XISOSharp.Cli --checksum game.iso
 - The banner is `extract-xiso v2.7.1 (01.11.14) for <win|linux|macos|cross-platform> - written by in <in@fishtank.com>`.
 - `-v` prints the banner to stdout even under `-Q`; usage (`-h`) goes to stderr and is
   never suppressed by quiet modes.
-- Info/hash/copy-out/audit/validate/checksum dispatch happens **before** the batch loop, so those
+- Info/hash/copy-out/copy-in/audit/validate/checksum/filetime dispatch happens **before** the batch loop, so those
   modes ignore additional positional arguments beyond what they document.
-- Archival verbs (`--video`/`--random`/…/`rebuild`) dispatch via `RunRedumpBatch` with
-  shared `ExpandIsoFiles` + `securitySectors` handling.
-- xdvdfs verbs (`build-image`/`image-spec`/`compress`/`checksum`) are detected as first token and handled before `getopt` parsing.
+- Archival verbs (`--video`/`--random`/…/`--zar`/`--all`/`--best`/`--compress`) dispatch via `RunRedumpBatch` with
+  shared `ExpandIsoFiles` (`--jobs`/`--policy` thread through the `--zar` path); `rebuild` has its own parser with `--security-sectors`/`--sectors`.
+- xdvdfs verbs (`build-image`/`image-spec`/`compress`/`decompress`/`checksum`/`split`/`join`) are detected as first token and handled before `getopt` parsing.
 - Output progress uses carriage returns when writing to a terminal and newlines when
   stdout is redirected, so logs stay readable in CI.
 

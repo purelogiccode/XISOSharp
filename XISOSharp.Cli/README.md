@@ -30,20 +30,20 @@ XISOSharp.Cli [options] -c <dir> [name] [-c <dir> [name]] ...
 | `--xex-info <file> <path>` | Xbox 360 XEX2 header of an executable in the image |
 | `--xbe-info <file> <path>` | Original-Xbox XBEH header + certificate of an executable in the image |
 | `-V <file1.xiso> ...` | Deep-audit xiso(s): validate header, tree, sectors |
-| `--repair <file>` | Fix audit-flagged issues in place (`.old` backup; `--dry-run` previews) |
+| `--repair <file>` | Fix audit-flagged issues in place (`.old` backup; `--dry-run` previews; `--no-backup` skips backup) |
 | `--salvage <file>` | Rebuild reachable entries into a fresh audited `.iso` (`--repair-out` overrides output) |
 | `-r` | Rewrite xiso(s) as optimized xiso(s) |
-| `validate <src> <out>` | Validate conversion between two images (+ `--validate*` report/strict/checksums) |
-| `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum |
-| `split` / `join` | Split a plain ISO into `<base>.1.iso`… parts / reassemble them |
+| `validate <src> <out>` | Validate conversion between two images (+ `--validate*` report/strict/checksums; flavors imply `--validate`, require `-r`/`validate`, mismatch exits 2) |
+| `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum (`--silent` → hex only) |
+| `split` / `join`/`joinsplit` | Split a plain ISO into `<base>.1.iso`… parts / reassemble them |
 | `--filetime <image>` / `--set-filetime <image> <value>` | Show / set the FILETIME volume field |
-| `--batch <dir>` | Process all `.iso` files in `<dir>` (extract/list/tree/rewrite/audit) |
-| `compress` / `decompress` (`cso`/`uncso`) | CISO v2 LZ4 (default) / v1 DEFLATE round-trip, incl. split `.N.cso` |
-| `build-image` / `image-spec` | xdvdfs-parity ordered packing from globs / TOML spec |
-| `--video` / `--random` / `--seed` / `--wipe` / `--trim` / `--petrify` / `--update` / `--zar` | Redump archival verbs (+ `--all`/`--best`/`--compress` aliases) |
+| `--batch <dir>` | Process all `.iso` files in `<dir>` (extract/list/tree/rewrite/audit only) + `--batch-recursive` |
+| `compress` / `decompress` (`cso`/`uncso`/`decso`) | CISO v2 LZ4 (default) / v1 DEFLATE round-trip (`--ciso-level`/`--ciso-version`/`--ciso-split`), incl. split `.N.cso` |
+| `build-image` / `image-spec` | xdvdfs-parity ordered packing from globs (`\:` colon escaping) / TOML spec |
+| `--video` / `--random` / `--seed` / `--wipe` / `--trim` / `--petrify` / `--update` / `--zar` | Redump archival verbs (+ `--jobs`/`--policy` for `--zar`, `--all`/`--best`/`--compress` aliases; `--security-sectors` rebuild-only) |
 | `rebuild` | Rebuild a lossless Redump image from components |
 
-Full flag reference (every option, exit code, matrix): [CLI Reference](../docs/cli.md).
+Help is `-h` ONLY (`--help` is treated as a filename). Full flag reference (every option, exit code, matrix): [CLI Reference](../docs/cli.md).
 
 ### Options
 
@@ -72,7 +72,7 @@ These commands are not present in the original C tool:
 - **`--unpack` / `--batch`** — Whole-image unpack; sorted bulk processing
 - **`--pack`** — Directory → create, ISO → rewrite
 - **`--copy-out`** — Selective file/directory extraction
-- **`--copy-in`** — Patch a host file into an image in place
+- **`--copy-in`** — Patch a host file into an image in place (host directories rejected fast)
 - **`--md5` / `--sha256`** — Per-file hash computation
 - **`--xex-info` / `--xbe-info`** — Executable header parsing (no reference tool covers XBE)
 - **`--skip-existing` / `--continue-on-error`** — Resume and per-file robustness

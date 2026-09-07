@@ -150,9 +150,10 @@ XISOSharp.Cli --trim -o trimmed.iso game.iso
 XISOSharp.Cli --petrify game.iso                   # skeleton + .hash SHA-1
 XISOSharp.Cli --update game.redump.iso             # XGD3 su20076000_00000000
 XISOSharp.Cli --zar -o game.zar game.iso           # zstd
+XISOSharp.Cli --zar --jobs 4 --policy auto-rename game1.iso game2.iso  # parallel + skip|overwrite|auto-rename
 XISOSharp.Cli --all game.redump.iso                # all of the above + --video/--wipe
 
-# Lossless rebuild
+# Lossless rebuild (security sectors are rebuild-only)
 XISOSharp.Cli rebuild game.xiso video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso --security-sectors sectors.txt
 XISOSharp.Cli validate --validate-checksums game.redump.iso rebuilt.redump.iso
 ```
@@ -168,8 +169,8 @@ XISOSharp.Cli build-image -D -m "!secret/**" -m "**:/{0}" ./src   # --dry-run
 XISOSharp.Cli image-spec from -O dist/image.iso -m "bin:/" xdvdfs.toml
 
 # CISO compress/decompress (DEFLATE v1 + LZ4 v2, align 0/1/2)
-XISOSharp.Cli compress ./game_dir game.cso --ciso-level 9
-XISOSharp.Cli decompress game.cso game.iso
+XISOSharp.Cli compress ./game_dir game.cso --ciso-level 9 --ciso-version 2 --ciso-split 0
+XISOSharp.Cli decompress game.cso game.iso   # uncso/decso aliases; split .1.cso input accepted
 
 # Deterministic SHA3-256 image checksum (BTreeMap sorted, xdvdfs compat)
 XISOSharp.Cli checksum game.iso

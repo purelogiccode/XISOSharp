@@ -184,10 +184,15 @@ Windows path-length limits can bite with deep trees. Enable long paths
 Ensure the filesystem lands at an offset other tools probe: use one of the canonical
 values above so auto-detection works without flags.
 
-**`--skip-sectors` with `-V`, `-i`, hashes, or `--copy-out` is rejected.**
+**`--skip-sectors` with `-V`, `-i`, hashes, `--copy-out`, or others is rejected.**
 
-Those modes currently do not support offsets; the CLI rejects the combination with a
-clear error instead of producing wrong results.
+Those modes do not support offsets; the CLI rejects the combination with a
+clear error instead of producing wrong results. `--skip-sectors` is valid only
+in extract, list, tree, rewrite (`-r`), `--unpack`, `--filetime`, and
+`--set-filetime` — rejected with `-c` and with `-i`, `--ls`, `--xex-info`,
+`--xbe-info`, `--md5`/`--sha256`, `--copy-out`, `--copy-in`, `-V`,
+`validate`/`--validate*`, redump verbs, and `checksum`. `--prepend-sectors`
+is valid only in create (`-c`) and rewrite (`-r`).
 
 ## Build and test issues
 
