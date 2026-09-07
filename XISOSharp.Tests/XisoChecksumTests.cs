@@ -115,8 +115,9 @@ public class XisoChecksumTests : IDisposable
         Assert.NotNull(hash);
         Assert.Equal(32, hash.Length);
         Assert.Equal(64, hex.Length);
-        // SHA3-256 hex is lowercase
-        Assert.Equal(hex, hex.ToLowerInvariant());
+        // BUG-TEST-018: tautology-adjacent self-compare replaced with a real
+        // lowercase-hex shape check (stronger regex already covers this elsewhere).
+        Assert.Matches("^[0-9a-f]{64}$", hex);
     }
 
     [Fact]

@@ -1,5 +1,7 @@
 namespace XISOSharp.Tests;
 
+using XISOSharp.TestDataGenerator;
+
 /// <summary>
 /// Tests for <see cref="XisoReader.AuditXiso(string)"/>, verifying deep integrity
 /// auditing of XISO images.
@@ -7,8 +9,8 @@ namespace XISOSharp.Tests;
 [Collection("Sequential")]
 public class AuditXisoTests : IDisposable
 {
-    private static readonly string TestDataRoot = Path.GetFullPath(
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData"));
+    // Resolved via TestDataLocator (BUG-TEST-006): no fragile 4x ".." literal.
+    private static readonly string TestDataRoot = TestDataLocator.GetTestDataRoot(AppContext.BaseDirectory);
 
     private static readonly string SourceDir = Path.Combine(TestDataRoot, "source");
 

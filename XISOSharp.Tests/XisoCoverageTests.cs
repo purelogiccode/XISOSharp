@@ -111,18 +111,9 @@ public class XisoCoverageTests : IDisposable
         return (vol.RootDirSize, ((long)vol.RootDirSector * Constants.SectorSize) + vol.DiscLseek);
     }
 
-    private static bool IsNtfs(string path)
-    {
-        try
-        {
-            return string.Equals(new DriveInfo(Path.GetPathRoot(path)!).DriveFormat, "NTFS",
-                StringComparison.OrdinalIgnoreCase);
-        }
-        catch
-        {
-            return false;
-        }
-    }
+    // BUG-TEST-017: NTFS gating is discovery-time via [RequiresNtfsFact/Theory]
+    // (TEST-004 pattern) + SkipConditions.IsNtfsTempDrive — no private DriveInfo
+    // probe duplicate here.
 
     // ------------------------------------------------------------------
     // Multi-sector directory tables (sector-boundary advance + llCompat)
@@ -652,8 +643,9 @@ public class XisoCoverageTests : IDisposable
     [InlineData(0x18300000L)]
     public void GetVolumeInfo_DiscOffsetMagic_Detected(long discOffset)
     {
+        // RequiresNtfsTheory already skipped non-NTFS at discovery (BUG-TEST-017):
+        // SetLength stays metadata-only sparse here; no runtime probe needed.
         var dir = CreateTempDir("xiso_cov_bad");
-        Assert.True(IsNtfs(dir), "Requires NTFS temp drive.");
 
         var path = Path.Combine(dir, "offset.iso");
         // Every earlier probe must read (zeros) rather than throw, so all
@@ -687,8 +679,8 @@ public class XisoCoverageTests : IDisposable
     {
         // All probes read (zeros) but none match: the no-match return, not
         // the short-read catch. Sparse file (NTFS only), reads are tiny.
+        // RequiresNtfsFact already skipped non-NTFS at discovery (BUG-TEST-017).
         var dir = CreateTempDir("xiso_cov_bad");
-        Assert.True(IsNtfs(dir), "Requires NTFS temp drive.");
 
         var path = Path.Combine(dir, "zeros.iso");
         using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))

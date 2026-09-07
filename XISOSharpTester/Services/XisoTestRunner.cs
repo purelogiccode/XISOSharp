@@ -14,15 +14,15 @@ namespace XISOSharpTester.Services;
 /// <summary>
 /// Orchestrates batch testing of XISO disc images by running
 /// verify, list, extract, and rewrite comparisons against both
-/// the managed XISOSharp library and the native extract-xiso.exe
-/// tool (when available).
+/// the managed XISOSharp library and the native extract-xiso tool
+/// (extract-xiso.exe on Windows, extensionless elsewhere) when available.
 /// </summary>
 public static class XisoTestRunner
 {
     private static readonly Lock LoggerLock = new();
 
     /// <summary>
-    /// Gets the version string of the extract-xiso.exe executable,
+    /// Gets the version string of the extract-xiso tool executable,
     /// if it was successfully detected during the last run.
     /// </summary>
     public static string? XisoSharpVersion { get; private set; }
@@ -34,7 +34,8 @@ public static class XisoTestRunner
     /// </summary>
     /// <param name="files">The list of XISO entries to test.</param>
     /// <param name="xisoSharpExePath">
-    /// Path to extract-xiso.exe. If the file does not exist,
+    /// Path to the extract-xiso tool (any executable spelling resolved via
+    /// <c>XISOSharp.ToolLocator</c>). If the file does not exist,
     /// comparison tests against the native tool are skipped.
     /// </param>
     /// <param name="progress">Optional progress reporter invoked after each file.</param>
@@ -368,6 +369,29 @@ public static class XisoTestRunner
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var isoLength = TryGetIsoLength(entry.FilePath);
+            if (isoLength > 0)
+            {
+                // Staging holds two full extractions (C# + native); gate with margin (TST-013).
+                var required = isoLength * 2 + 100L * 1024 * 1024;
+                var skip = CheckTempSpace(required, entry.FilePath);
+                if (skip is not null)
+                {
+                    tSw.Stop();
+                    Log.Warning("Extract test skipped for {File}: {Reason}", entry.FileName, skip);
+                    BugReporter.ReportWarning($"Extract test skipped for {entry.FileName}: {skip}");
+                    Report(progress, entry.FileName, fileIndex + 1, totalFiles, "Extract", $"WARNING: {skip}");
+                    result.SubTests.Add(new SubTestResult
+                    {
+                        TestName = "Extract & Hash Compare",
+                        Status = TestStatus.Skipped,
+                        Detail = skip,
+                        ElapsedSeconds = tSw.Elapsed.TotalSeconds
+                    });
+                    return;
+                }
+            }
+
             var csTempDir = CreateTempSubDir("cs_extract");
             var exeTempDir = CreateTempSubDir("exe_extract");
             try
@@ -449,8 +473,8 @@ public static class XisoTestRunner
             }
             finally
             {
-                DeleteDirectorySafe(csTempDir);
-                DeleteDirectorySafe(exeTempDir);
+                DeleteDirectorySafe(csTempDir, progress, entry.FileName, fileIndex + 1, totalFiles, "Extract");
+                DeleteDirectorySafe(exeTempDir, progress, entry.FileName, fileIndex + 1, totalFiles, "Extract");
             }
         }
         catch (OperationCanceledException)
@@ -490,12 +514,35 @@ public static class XisoTestRunner
             {
                 TestName = "Rewrite Compare",
                 Status = TestStatus.Skipped,
-                Detail = "extract-xiso.exe not available."
+                Detail = "extract-xiso tool not available."
             });
             return;
         }
 
         var tSw = Stopwatch.StartNew();
+        var isoLength = TryGetIsoLength(entry.FilePath);
+        if (isoLength > 0)
+        {
+            // Rewrite stages an input copy plus a rebuilt ISO per side (TST-013).
+            var required = isoLength * 4 + 100L * 1024 * 1024;
+            var skip = CheckTempSpace(required, entry.FilePath);
+            if (skip is not null)
+            {
+                tSw.Stop();
+                Log.Warning("Rewrite test skipped for {File}: {Reason}", entry.FileName, skip);
+                BugReporter.ReportWarning($"Rewrite test skipped for {entry.FileName}: {skip}");
+                Report(progress, entry.FileName, fileIndex + 1, totalFiles, "Rewrite", $"WARNING: {skip}");
+                result.SubTests.Add(new SubTestResult
+                {
+                    TestName = "Rewrite Compare",
+                    Status = TestStatus.Skipped,
+                    Detail = skip,
+                    ElapsedSeconds = tSw.Elapsed.TotalSeconds
+                });
+                return;
+            }
+        }
+
         var csWorkDir = CreateTempSubDir("cs_rewrite");
         var exeWorkDir = CreateTempSubDir("exe_rewrite");
         try
@@ -643,8 +690,8 @@ public static class XisoTestRunner
         }
         finally
         {
-            DeleteDirectorySafe(csWorkDir);
-            DeleteDirectorySafe(exeWorkDir);
+            DeleteDirectorySafe(csWorkDir, progress, entry.FileName, fileIndex + 1, totalFiles, "Rewrite");
+            DeleteDirectorySafe(exeWorkDir, progress, entry.FileName, fileIndex + 1, totalFiles, "Rewrite");
         }
     }
 
@@ -873,16 +920,115 @@ public static class XisoTestRunner
         }
     }
 
-    private static void DeleteDirectorySafe(string path)
+    private static void DeleteDirectorySafe(string path, IProgress<TestProgress>? progress = null, string? file = null, int index = 0, int total = 0, string? test = null)
     {
         try
         {
-            if (Directory.Exists(path)) Directory.Delete(path, true);
+            if (Directory.Exists(path))
+                Directory.Delete(path, true);
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "DeleteDirectorySafe failed for {Path}", path);
-            /* best effort */
+            // Best-effort delete, but never silent (TST-013): report the leaked size
+            // so GB-scale temp leaks are visible in Serilog and the session log.
+            var leakedBytes = GetDirectorySizeSafe(path);
+            var sizeText = leakedBytes >= 0 ? FormatByteCount(leakedBytes) : "unknown size";
+            Log.Warning(ex, "Temp cleanup failed for {Path} ({Size} left behind); manual cleanup may be needed", path, sizeText);
+            BugReporter.ReportWarning($"Temp cleanup failed for {path} ({sizeText} left behind)");
+            if (progress is not null && !string.IsNullOrEmpty(file))
+            {
+                try
+                {
+                    progress.Report(new TestProgress(file, index, total, test ?? "Cleanup",
+                        $"WARNING: Could not delete temp dir {path} ({sizeText} left behind). Manual cleanup may be needed."));
+                }
+                catch (Exception reportEx)
+                {
+                    Log.Warning(reportEx, "Cleanup warning report failed for {Path}", path);
+                }
+            }
+        }
+    }
+
+    private static long GetDirectorySizeSafe(string path)
+    {
+        try
+        {
+            long total = 0;
+            foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    total += new FileInfo(file).Length;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+                {
+                    // Unstatable file: skip it, keep the best-effort total.
+                }
+            }
+
+            return total;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return -1;
+        }
+    }
+
+    private static string FormatByteCount(long bytes)
+    {
+        if (bytes < 0)
+            return "unknown size";
+        return bytes switch
+        {
+            < 1024 => $"{bytes} B",
+            < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+            < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
+            _ => $"{bytes / (1024.0 * 1024 * 1024):F2} GB"
+        };
+    }
+
+    /// <summary>
+    /// Checks the temp-drive free space against <paramref name="requiredBytes"/> before
+    /// large staging (TST-013). Returns a skip message when space is insufficient,
+    /// or <c>null</c> when staging may proceed (including when free space is unknown).
+    /// </summary>
+    private static string? CheckTempSpace(long requiredBytes, string isoPath)
+    {
+        try
+        {
+            var tempRoot = Path.GetPathRoot(Path.GetTempPath());
+            if (string.IsNullOrEmpty(tempRoot))
+                return null;
+
+            var drive = new DriveInfo(tempRoot);
+            if (!drive.IsReady)
+                return null;
+
+            var free = drive.AvailableFreeSpace;
+            if (free >= requiredBytes)
+                return null;
+
+            return $"Skipped: insufficient temp space on {drive.Name} for {Path.GetFileName(isoPath)} " +
+                   $"(need ~{FormatByteCount(requiredBytes)}, have {FormatByteCount(free)} free). " +
+                   $"Free space or set TMP/TEMP to a larger drive.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            Log.Warning(ex, "Temp space check failed; proceeding without a space gate");
+            return null;
+        }
+    }
+
+    private static long TryGetIsoLength(string isoPath)
+    {
+        try
+        {
+            return new FileInfo(isoPath).Length;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return 0;
         }
     }
 
@@ -890,10 +1036,35 @@ public static class XisoTestRunner
     {
         try
         {
-            var dir = Path.Combine(Path.GetTempPath(), "XISOSharpTester",
-                Guid.NewGuid().ToString("N").Substring(0, 8), name);
-            Directory.CreateDirectory(dir);
-            return dir;
+            var root = Path.Combine(Path.GetTempPath(), "XISOSharpTester");
+
+            // Full 128-bit GUID plus a retry loop on collision (TST-012): the old
+            // 8-char prefix was only 32 bits and never retried, so parallel runs
+            // could collide. Collisions are now astronomically unlikely, and a race
+            // still retries instead of reusing a foreign directory.
+            for (var attempt = 0; attempt < 10; attempt++)
+            {
+                var dir = Path.Combine(root, Guid.NewGuid().ToString("N"), name);
+                try
+                {
+                    if (!Directory.Exists(dir))
+                    {
+                        Directory.CreateDirectory(dir);
+                        return dir;
+                    }
+
+                    Log.Warning("Temp dir collision on attempt {Attempt}: {Dir}; retrying with a fresh GUID", attempt, dir);
+                }
+                catch (IOException ex) when (attempt < 9)
+                {
+                    // Parallel-harness create race: retry with a fresh GUID.
+                    Log.Warning(ex, "Temp dir create race on attempt {Attempt}: {Dir}; retrying", attempt, dir);
+                }
+            }
+
+            var fallback = Path.Combine(root, Guid.NewGuid().ToString("N"), name);
+            Directory.CreateDirectory(fallback);
+            return fallback;
         }
         catch (Exception ex)
         {

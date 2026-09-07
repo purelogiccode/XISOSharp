@@ -270,16 +270,33 @@ public class CliDestinationDirTests : IDisposable
     }
 
     [Fact]
-    public void Cli_Extract_LiteralDashDFile_StillTreatedAsFile()
+    public void Cli_Extract_BareDashDIsFlagErrorEvenWhenFileExists()
     {
-        // A file literally named like a flag keeps working: existence on disk
-        // wins over the misplaced-flag diagnostic, so this falls through to
-        // the normal (failing) image open instead of the flag error.
+        // CLI-025: no existence bypass — a bare "-d" in a positional slot is
+        // a misplaced-flag error even when a file with that name exists on
+        // disk (use ./-d or the absolute path for such files).
         var src = CreateSourceTree();
         var isoPath = CreateIso(src, "game.iso");
         File.WriteAllText(Path.Combine(_runDir, "-d"), "decoy, not an image");
 
         var rc = Program.Main([isoPath, "-d"]);
+
+        Assert.Equal(1, rc);
+        Assert.Contains("must come before", _errCapture.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cli_Extract_LiteralDashDFile_StillTreatedAsFile()
+    {
+        // The absolute spelling of a file literally named like a flag keeps
+        // working: it falls through to the normal (failing) image open
+        // instead of the flag error.
+        var src = CreateSourceTree();
+        var isoPath = CreateIso(src, "game.iso");
+        var decoy = Path.Combine(_runDir, "-d");
+        File.WriteAllText(decoy, "decoy, not an image");
+
+        var rc = Program.Main([isoPath, decoy]);
 
         Assert.Equal(1, rc);
         Assert.DoesNotContain("must come before", _errCapture.ToString(), StringComparison.Ordinal);

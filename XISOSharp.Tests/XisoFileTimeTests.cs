@@ -103,7 +103,10 @@ public class XisoFileTimeTests : IDisposable
 
         Assert.True(FileTimeHelper.TryParseFileTime("now", out var rNow, out var dNow));
         Assert.True(rNow > 0);
-        Assert.True((DateTimeOffset.UtcNow - dNow).Duration() < TimeSpan.FromSeconds(5));
+        // BUG-TEST-015: wall-clock assertion must survive debugger pauses and
+        // loaded CI agents — allow a generous window, not 5 seconds.
+        Assert.True((DateTimeOffset.UtcNow - dNow).Duration() < TimeSpan.FromMinutes(5),
+            $"wall-clock drift exceeded 5 minutes: now={DateTimeOffset.UtcNow:O} parsed={dNow:O}");
 
         // Hex parsing and ISO8601
         Assert.True(FileTimeHelper.TryParseFileTime("0x0", out var rh, out _));

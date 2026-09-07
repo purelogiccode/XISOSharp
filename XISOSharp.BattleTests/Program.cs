@@ -27,6 +27,13 @@ internal static class Program
         var isoFiles = new List<string>();
         isoFiles.AddRange(explicitIsos.Where(File.Exists));
 
+        // Missing explicit inputs (BUG-BTL-010): BattleRunner skips not-found files with
+        // no FileResult, so track them here and emit failed FileResults after the run.
+        var missingExplicit = explicitIsos.Where(static f => !File.Exists(f))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(static f => f, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         foreach (var dir in dirs)
         {
             if (!Directory.Exists(dir))
@@ -65,7 +72,8 @@ internal static class Program
         }
 
         // Fallback to TestData/source if no H: isos found and no explicit isos
-        if (isoFiles.Count == 0)
+        // (explicit missing inputs must not trigger a synthetic fallback that masks them).
+        if (isoFiles.Count == 0 && explicitIsos.Length == 0)
         {
             var fallback = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData", "output",
                 "source.iso");
@@ -129,7 +137,7 @@ internal static class Program
 
         isoFiles = isoFiles.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        if (isoFiles.Count == 0)
+        if (isoFiles.Count == 0 && missingExplicit.Count == 0)
         {
             Console.WriteLine("No ISO files to test. Use --dirs H:\\XBOXTest or pass explicit .iso paths.");
             PrintUsage();
@@ -139,6 +147,7 @@ internal static class Program
         Console.WriteLine($"\nTesting {isoFiles.Count} ISO file(s):");
         foreach (var f in isoFiles.Take(10)) Console.WriteLine($"  - {f}");
         if (isoFiles.Count > 10) Console.WriteLine($"  ... + {isoFiles.Count - 10} more");
+        foreach (var m in missingExplicit) Console.WriteLine($"  - {m} (NOT FOUND)");
         Console.WriteLine($"Native exe: {exePath} {(File.Exists(exePath) ? "(found)" : "(NOT FOUND)")}");
 
         // Limit for performance if many files (H:\ has 37) — allow --all to force all, otherwise sample first 10 or use --limit
@@ -189,15 +198,56 @@ internal static class Program
 
         sw.Stop();
 
+        AddMissingFileResults(session, missingExplicit);
+
         PrintSummary(session);
-        WriteReports(session, isoFiles, exePath);
+        WriteReports(session, isoFiles.Concat(missingExplicit).ToList(), exePath);
 
         return session.FailedSubTests > 0 || session.FailedFiles > 0 || session.ErrorSubTests > 0 ? 2 : 0;
     }
 
+    private static void AddMissingFileResults(BattleSessionResult session, IReadOnlyList<string> missing)
+    {
+        // Phantom ISOs (BUG-BTL-010) must fail the run instead of silent skip:
+        // BattleRunner skips not-found files with no FileResult, so synthesize one here.
+        foreach (var path in missing)
+        {
+            Console.WriteLine($"[MISSING] {path} ... FAIL (not found)");
+            string fileName;
+            try
+            {
+                fileName = Path.GetFileName(path);
+                if (string.IsNullOrEmpty(fileName))
+                {
+                    fileName = path;
+                }
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                fileName = path;
+            }
+
+            var result = new PerFileBattleResult
+            {
+                FilePath = path,
+                FileName = fileName,
+                FileSize = 0,
+                ElapsedSeconds = 0,
+            };
+            result.SubTests.Add(new SubBattleResult
+            {
+                TestName = "InputExists",
+                Status = BattleStatus.Failed,
+                Detail = $"File not found: {path}",
+                ElapsedSeconds = 0,
+            });
+            session.FileResults.Add(result);
+        }
+    }
+
     private static string FindExe(string[] args)
     {
-        // --exe <path> takes precedence
+        // Explicit override wins even when missing (surfaces the typo as NOT FOUND downstream).
         for (var i = 0; i < args.Length - 1; i++)
         {
             if (string.Equals(args[i], "--exe", StringComparison.OrdinalIgnoreCase) ||
@@ -207,21 +257,17 @@ internal static class Program
             }
         }
 
-        // Check H:\ style default + project local
-        var candidates = new[]
+        // Shared chain (BUG-BTL-002/BUG-X-005, mirrors Gui CliLocator coverage):
+        // sibling of the harness (OS-aware) then PATH. The -v probe runs later via
+        // BattleRunner (wrapper.GetVersion), same as Gui Resolve+Probe split.
+        var resolved = XISOSharp.ToolLocator.Resolve(null, "extract-xiso.exe", "extract-xiso");
+        if (resolved is not null)
         {
-            Path.Combine(AppContext.BaseDirectory, "extract-xiso.exe"),
-            @"C:\Users\HomePC\Dropbox\source\repos\CSharp_XISOSharp\XISOSharpTester\extract-xiso.exe",
-            Path.Combine(Directory.GetCurrentDirectory(), "XISOSharpTester", "extract-xiso.exe"),
-            Path.Combine(Directory.GetCurrentDirectory(), "extract-xiso.exe"),
-        };
-        foreach (var c in candidates)
-        {
-            if (File.Exists(c))
-                return c;
+            return resolved;
         }
 
-        return candidates[0];
+        var fallbackName = OperatingSystem.IsWindows() ? "extract-xiso.exe" : "extract-xiso";
+        return Path.Combine(AppContext.BaseDirectory, fallbackName);
     }
 
     private static string[] ParseDirs(string[] args)
@@ -347,8 +393,8 @@ internal static class Program
             if (a is "--recursive" or "--all" or "-h" or "--help") continue;
             if (a.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) && File.Exists(a))
                 isos.Add(Path.GetFullPath(a));
-            else if (a.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) && Path.IsPathRooted(a))
-                isos.Add(a); // will be warned as not found later
+            else if (a.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+                isos.Add(a); // missing input (rooted or relative): reported as a failed FileResult later (BUG-BTL-010)
         }
 
         return isos.ToArray();
@@ -466,7 +512,10 @@ internal static class Program
         {
             var outDir = Path.Combine(Directory.GetCurrentDirectory(), "BattleReports");
             Directory.CreateDirectory(outDir);
-            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+            // BTL-022: sub-second + PID component so concurrent runs never overwrite
+            // each other's reports (second-granularity stamps collide).
+            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", System.Globalization.CultureInfo.InvariantCulture)
+                + "_" + Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture);
             var txtPath = Path.Combine(outDir, $"battle_{stamp}.txt");
             var jsonPath = Path.Combine(outDir, $"battle_{stamp}.json");
 

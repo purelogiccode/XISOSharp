@@ -8,7 +8,9 @@ namespace XISOSharp.Benchmarks;
 public class BoyerMooreBenchmarks
 {
     private BoyerMoore _bm = null!;
-    private byte[] _haystack = null!;
+    private byte[] _tailHit = null!;
+    private byte[] _headHit = null!;
+    private byte[] _miss = null!;
 
     /// <summary>
     /// Gets or sets the haystack size in bytes for the current benchmark iteration.
@@ -16,32 +18,87 @@ public class BoyerMooreBenchmarks
     [Params(1024, 65536, 2097152)] public int HaystackSize;
 
     /// <summary>
-    /// Builds the searcher and fills a random haystack with the target pattern at the tail.
+    /// Builds the searcher once per haystack size (tables are read-only during search).
     /// </summary>
     [GlobalSetup]
     public void Setup()
     {
         _bm = new BoyerMoore(Constants.MediaEnable);
         _bm.Init();
-        _haystack = new byte[HaystackSize];
-        new Random(42).NextBytes(_haystack);
-        _haystack[^8] = 0xE8;
-        _haystack[^7] = 0xCA;
-        _haystack[^6] = 0xFD;
-        _haystack[^5] = 0xFF;
-        _haystack[^4] = 0xFF;
-        _haystack[^3] = 0x85;
-        _haystack[^2] = 0xC0;
-        _haystack[^1] = 0x7D;
     }
 
     /// <summary>
-    /// Searches the prepared haystack for the media-enable pattern.
+    /// Rebuilds fresh haystacks before each iteration (BUG-BEN-003): reusing one
+    /// buffer warms the branch predictor/cache and hides per-call cost, and a
+    /// single tail-hit never exercises early-hit/miss paths.
     /// </summary>
-    /// <returns>The index of the match, or -1 when not found.</returns>
-    [Benchmark]
-    public int SearchPattern()
+    [IterationSetup]
+    public void IterationSetup()
     {
-        return _bm.Search(_haystack);
+        var rng = new Random(42 + HaystackSize);
+        _tailHit = new byte[HaystackSize];
+        rng.NextBytes(_tailHit);
+        Constants.MediaEnable.CopyTo(_tailHit.AsSpan(_tailHit.Length - Constants.MediaEnableLength));
+
+        _headHit = new byte[HaystackSize];
+        rng.NextBytes(_headHit);
+        Constants.MediaEnable.CopyTo(_headHit.AsSpan(0));
+
+        // Miss buffer: fill with a byte absent from the pattern when possible so
+        // the pattern genuinely cannot occur; fall back to verifying absence.
+        _miss = new byte[HaystackSize];
+        Array.Fill(_miss, (byte)0x00);
+        if (Constants.MediaEnable.Contains((byte)0x00))
+        {
+            rng.NextBytes(_miss);
+            while (ContainsPattern(_miss))
+            {
+                rng.NextBytes(_miss);
+            }
+        }
+    }
+
+    private static bool ContainsPattern(byte[] haystack)
+    {
+        var pattern = Constants.MediaEnable;
+        for (var i = 0; i + pattern.Length <= haystack.Length; i++)
+        {
+            if (haystack.AsSpan(i, pattern.Length).SequenceEqual(pattern))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Searches a haystack with the pattern at the tail (worst-case scan).
+    /// </summary>
+    /// <returns>The index of the match.</returns>
+    [Benchmark(Baseline = true)]
+    public int SearchTailHit()
+    {
+        return _bm.Search(_tailHit);
+    }
+
+    /// <summary>
+    /// Searches a haystack with the pattern at offset zero (best-case early exit).
+    /// </summary>
+    /// <returns>The index of the match (0).</returns>
+    [Benchmark]
+    public int SearchHeadHit()
+    {
+        return _bm.Search(_headHit);
+    }
+
+    /// <summary>
+    /// Searches a haystack containing no occurrence (full-scan miss).
+    /// </summary>
+    /// <returns>-1 when not found.</returns>
+    [Benchmark]
+    public int SearchMiss()
+    {
+        return _bm.Search(_miss);
     }
 }

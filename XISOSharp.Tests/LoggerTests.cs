@@ -133,7 +133,9 @@ public class LoggerTests : IDisposable
     public void LogLine_WritesWithNewline()
     {
         Logger.LogLine("test");
-        Assert.Equal("test\r\n", _outCapture.ToString());
+        // BUG-TEST-016: StringWriter.NewLine is Environment.NewLine ("\n" on
+        // Linux) — never hardcode CRLF.
+        Assert.Equal("test" + Environment.NewLine, _outCapture.ToString());
     }
 
     /// <summary>

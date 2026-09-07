@@ -21,8 +21,6 @@ public sealed class XisoZarPipelineTests : IDisposable
     private readonly TextWriter _savedLoggerError;
     private readonly bool _savedQuiet;
     private readonly bool _savedRealQuiet;
-    private readonly string _savedCwd;
-    private readonly string _runDir;
 
     public XisoZarPipelineTests()
     {
@@ -39,22 +37,13 @@ public sealed class XisoZarPipelineTests : IDisposable
         Logger.Quiet = false;
         Logger.RealQuiet = false;
 
-        _savedCwd = Directory.GetCurrentDirectory();
-        _runDir = CreateTempDir("xiso_zp_rundir");
-        Directory.SetCurrentDirectory(_runDir);
+        // BUG-TEST-011: no process-CWD mutation here. All helpers take absolute
+        // paths, so there is no CWD to leak when the ctor throws and Dispose
+        // never runs. (Prior code did SetCurrentDirectory in the ctor.)
     }
 
     public void Dispose()
     {
-        try
-        {
-            Directory.SetCurrentDirectory(_savedCwd);
-        }
-        catch
-        {
-            // ignored
-        }
-
         Console.SetOut(_savedOut);
         Console.SetError(_savedErr);
         Logger.Out = _savedLoggerOut;

@@ -56,7 +56,13 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Update="extract-xiso.exe">
+        <!-- Bundled native tool (TST-007): copy either spelling when present; absence
+             falls back gracefully via the ToolLocator sibling/PATH chain. Conditions keep
+             the build warning-free when a spelling is absent. Windows behavior unchanged. -->
+        <None Update="extract-xiso.exe" Condition="Exists('extract-xiso.exe')">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="extract-xiso" Condition="Exists('extract-xiso')">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>

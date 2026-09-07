@@ -20,7 +20,7 @@ internal static class SelfTest
     /// <param name="log">Sink for PASS/FAIL lines.</param>
     /// <param name="e2ECliPath">Optional CLI path for the end-to-end runner check.</param>
     /// <returns>0 when all checks pass; otherwise 1.</returns>
-    internal static int Run(Action<string> log, string? e2ECliPath = null)
+    internal static async Task<int> RunAsync(Action<string> log, string? e2ECliPath = null)
     {
         var failures = 0;
         try
@@ -76,8 +76,8 @@ internal static class SelfTest
                 try
                 {
                     var lines = new List<string>();
-                    var exit = CliRunner.RunAsync(e2ECliPath, ["-v"], lines.Add, CancellationToken.None)
-                        .GetAwaiter().GetResult();
+                    var exit = await CliRunner.RunAsync(e2ECliPath, ["-v"], lines.Add, CancellationToken.None)
+                        .ConfigureAwait(false);
                     var ok = exit == 0 && lines.Count > 0;
                     log($"{(ok ? "PASS" : "FAIL")} runner-e2e (-v via CliRunner, exit {exit}, {lines.Count} line(s))");
                     if (!ok)

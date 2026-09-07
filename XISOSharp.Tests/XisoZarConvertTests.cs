@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using XISOSharp.TestDataGenerator;
 using ZARSharp;
 
 namespace XISOSharp.Tests;
@@ -106,18 +107,9 @@ public sealed class XisoZarConvertTests : IDisposable
 
     private static string SolutionRoot()
     {
-        var dir = AppContext.BaseDirectory;
-        while (dir is not null)
-        {
-            if (File.Exists(Path.Combine(dir, "CSharp_XISOSharp.sln")))
-            {
-                return dir;
-            }
-
-            dir = Path.GetDirectoryName(dir);
-        }
-
-        throw new InvalidOperationException("Solution root not found.");
+        // Centralized via TestDataLocator (BUG-TEST-006).
+        return TestDataLocator.GetSolutionRoot(AppContext.BaseDirectory)
+            ?? throw new InvalidOperationException("Solution root not found.");
     }
 
     [Fact]

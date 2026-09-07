@@ -23,7 +23,22 @@ namespace XISOSharp.BattleTests;
 /// </summary>
 internal static class ExtendedBattleRunner
 {
+    /// <summary>
+    /// Gate for the XD-Pack battle (BTL-024): unpacked trees at or below this size
+    /// are packed whole; larger trees fall back to a deterministic mini-tree (see
+    /// <c>PackMiniTreeMaxFiles</c>/<c>PackMiniTreeMaxTotalBytes</c>) so the check
+    /// stays fast on multi-GB game trees.
+    /// </summary>
     private const long PackGateBytes = 200L * 1024 * 1024;
+
+    /// <summary>Mini-tree fallback: at most this many files, chosen smallest-first.</summary>
+    private const int PackMiniTreeMaxFiles = 8;
+
+    /// <summary>Mini-tree fallback: only files at or below this size are eligible.</summary>
+    private const long PackMiniTreeMaxFileBytes = 8L * 1024 * 1024;
+
+    /// <summary>Mini-tree fallback: total-bytes cap so the fallback is bounded by count AND bytes.</summary>
+    private const long PackMiniTreeMaxTotalBytes = 64L * 1024 * 1024;
 
     public static PerFileBattleResult RunExtendedForIso(
         string path, XboxKitWrapper? xk, XdvdfsWrapper? xd, bool keepSandbox = false)
@@ -55,7 +70,73 @@ internal static class ExtendedBattleRunner
             var workInput = Path.Combine(sandbox, "input.iso");
             File.Copy(path, workInput);
 
-            var (isoOffset, xisoLength, isRedump) = GetPartition(workInput);
+            long isoOffset;
+            long xisoLength;
+            bool isRedump;
+            try
+            {
+                (isoOffset, xisoLength, isRedump) = GetPartition(workInput);
+            }
+            catch (XisoFormatException ex)
+            {
+                // BTL-020: a plain-invalid input fails the battle — it is not a
+                // harness error. (XisoFormatException derives from IOException,
+                // so it must be caught before the truncated-input arm below.)
+                result.SubTests.Add(new SubBattleResult
+                {
+                    TestName = "EXT-Partition",
+                    Status = BattleStatus.Failed,
+                    Detail = $"not a valid XISO/Redump image: {Trim(ex.Message)}",
+                    ElapsedSeconds = 0,
+                });
+                sw.Stop();
+                result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+                return result;
+            }
+            catch (XisoEmptyException ex)
+            {
+                // Empty image (no files): nothing to partition — Skipped, matching
+                // the empty-ISO handling in the extract-xiso parity battles.
+                result.SubTests.Add(new SubBattleResult
+                {
+                    TestName = "EXT-Partition",
+                    Status = BattleStatus.Skipped,
+                    Detail = $"empty image (no files): {Trim(ex.Message)}",
+                    ElapsedSeconds = 0,
+                });
+                sw.Stop();
+                result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+                return result;
+            }
+            catch (EndOfStreamException ex)
+            {
+                // BTL-020: truncated/short inputs are Skipped, not Error.
+                result.SubTests.Add(new SubBattleResult
+                {
+                    TestName = "EXT-Partition",
+                    Status = BattleStatus.Skipped,
+                    Detail = $"truncated input (short read): {Trim(ex.Message)}",
+                    ElapsedSeconds = 0,
+                });
+                sw.Stop();
+                result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+                return result;
+            }
+            catch (IOException ex)
+            {
+                // BTL-020: VerifyXiso reports too-short headers as IOException —
+                // a short/unreadable copy is Skipped, not a harness Error.
+                result.SubTests.Add(new SubBattleResult
+                {
+                    TestName = "EXT-Partition",
+                    Status = BattleStatus.Skipped,
+                    Detail = $"truncated/unreadable input: {Trim(ex.Message)}",
+                    ElapsedSeconds = 0,
+                });
+                sw.Stop();
+                result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
+                return result;
+            }
 
             // ---- XboxKit oracle side ----
             string? xkDir = null;
@@ -340,7 +421,10 @@ internal static class ExtendedBattleRunner
                 // all-0xFF empty-directory tables as entries and reads past EOF.
                 // Our collector carries the 0xFFFF sentinel fix (see
                 // XisoRangesEmptyDirTests), so C# succeeds where the oracle crashes.
-                if (so + se is { } oracleOut
+                // BTL-018: `so + se` is a string concat and never null — test real
+                // emptiness instead of the always-true `is { }` pattern.
+                var oracleOut = so + se;
+                if (!string.IsNullOrEmpty(oracleOut)
                     && oracleOut.Contains("CollectFileEntries", StringComparison.OrdinalIgnoreCase)
                     && oracleOut.Contains("EndOfStream", StringComparison.OrdinalIgnoreCase))
                 {
@@ -391,11 +475,31 @@ internal static class ExtendedBattleRunner
                 string zarLog = "";
                 if (!File.Exists(xkZar))
                 {
-                    // xboxkit resolves zarchive.exe next to the input, not next
-                    // to itself; stage it in the oracle workdir.
-                    var zaBeside = Path.Combine(AppContext.BaseDirectory, "zarchive.exe");
-                    if (File.Exists(zaBeside))
-                        File.Copy(zaBeside, Path.Combine(xkDir, "zarchive.exe"), true);
+                    // BTL-019: xboxkit resolves zarchive.exe next to the input, not
+                    // next to itself; stage it in the oracle workdir. Resolve via
+                    // the shared ToolLocator chain (sibling of the harness, then
+                    // PATH) instead of assuming the csproj copied it beside the
+                    // harness — Skip with a clear reason when absent.
+                    var zarFileName = ToolLocator.GetFileName("zarchive");
+                    var zarSource = ToolLocator.ResolveByBaseName(null, "zarchive");
+                    if (zarSource == null)
+                    {
+                        return Skip("XK-Zar",
+                            $"{zarFileName} not found (sibling of harness nor on PATH) — oracle unavailable");
+                    }
+
+                    try
+                    {
+                        File.Copy(zarSource, Path.Combine(xkDir, zarFileName), true);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                                   or ArgumentException or NotSupportedException
+                                                   or PathTooLongException)
+                    {
+                        return Skip("XK-Zar",
+                            $"could not stage {zarFileName} into oracle workdir: {ex.GetType().Name}: {Trim(ex.Message)}");
+                    }
+
                     // No -q here: a silent failure must leave its [ERROR] in the detail.
                     (var zc, var zso, var zse) = xk.Run(xkDir, "-y", "-z", xkXiso);
                     zarLog = $"exit {zc}: {Trim(zso + zse)}";
@@ -673,7 +777,11 @@ internal static class ExtendedBattleRunner
         return Timed("XD-Pack", () =>
         {
             // Pack from the smallest available unpacked tree (keeps this check fast).
-            var cands = Directory.GetDirectories(csDir, "unpack-*");
+            // BTL-024: enumerate in ordinal order so equal-size trees resolve to the
+            // same winner on every machine — the fallback must not depend on
+            // filesystem enumeration order.
+            var cands = Directory.GetDirectories(csDir, "unpack-*")
+                .OrderBy(d => d, StringComparer.Ordinal).ToList();
             string? tree = null;
             long best = long.MaxValue;
             foreach (var c in cands)
@@ -700,21 +808,35 @@ internal static class ExtendedBattleRunner
             {
                 // Full tree too big to pack twice: pack a mini-tree of small
                 // real game files (relative structure preserved) instead.
+                // BTL-024: fully deterministic selection — candidates sorted by
+                // (size, path) so ties resolve identically everywhere, capped by
+                // file count AND total bytes so the result cannot depend on game
+                // content ordering.
                 packSrc = Path.Combine(sandbox, "pack-src");
                 var small = Directory.GetFiles(tree, "*", SearchOption.AllDirectories)
                     .Select(f => new FileInfo(f))
-                    .Where(f => f.Length <= 8L * 1024 * 1024)
-                    .OrderBy(f => f.Length).Take(8).ToList();
-                if (small.Count == 0)
-                    return Skip("XD-Pack", $"smallest tree {best / 1048576} MB > gate and no small files");
+                    .Where(f => f.Length <= PackMiniTreeMaxFileBytes)
+                    .OrderBy(f => f.Length).ThenBy(f => f.FullName, StringComparer.Ordinal).ToList();
+                var picked = new List<FileInfo>(PackMiniTreeMaxFiles);
+                long pickedBytes = 0;
                 foreach (var f in small)
+                {
+                    if (picked.Count >= PackMiniTreeMaxFiles || pickedBytes + f.Length > PackMiniTreeMaxTotalBytes)
+                        break;
+                    picked.Add(f);
+                    pickedBytes += f.Length;
+                }
+
+                if (picked.Count == 0)
+                    return Skip("XD-Pack", $"smallest tree {best / 1048576} MB > gate and no small files");
+                foreach (var f in picked)
                 {
                     var dest = Path.Combine(packSrc, Path.GetRelativePath(tree, f.FullName));
                     Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                     File.Copy(f.FullName, dest);
                 }
 
-                packNote = $"mini-tree {small.Count} files";
+                packNote = $"mini-tree {picked.Count} files ({pickedBytes} bytes)";
             }
 
             var csPack = Path.Combine(csDir, "packed-cs.iso");
@@ -732,7 +854,9 @@ internal static class ExtendedBattleRunner
             (var code, _, var se) = xd.Pack(packSrc, xdPack);
             if (code != 0 || !File.Exists(xdPack))
                 return Fail($"xdvdfs pack exit {code}: {Trim(se)}");
-            // Layouts differ by design: content checksums must agree.
+            // BTL-024: layouts differ by design (allocator/order choices are not part
+            // of the format contract), so byte identity is not expected — the
+            // content checksums compared here are layout-insensitive by design.
             (var c1, var s1, _) = xd.Checksum(csPack);
             (var c2, var s2, _) = xd.Checksum(xdPack);
             if (c1 != 0 || c2 != 0)
@@ -846,6 +970,8 @@ internal static class ExtendedBattleRunner
 
     private static SubBattleResult CompareTrees(string csOut, string xdOut)
     {
+        // BTL-008: ordinal keys — case-only differences are mismatches, not
+        // the same file (HashDirectory is Ordinal; see HashUtil).
         var cs = HashUtil.HashDirectory(csOut);
         var xd = HashUtil.HashDirectory(xdOut);
         if (cs.Count != xd.Count)
@@ -853,14 +979,26 @@ internal static class ExtendedBattleRunner
         foreach (var kv in cs)
         {
             if (!xd.TryGetValue(kv.Key, out var xh))
-                return Fail($"unpack: only in C# tree: {kv.Key}");
+            {
+                var folded = xd.Keys.FirstOrDefault(k => string.Equals(k, kv.Key, StringComparison.OrdinalIgnoreCase));
+                return folded != null
+                    ? Fail($"unpack: case-collision {kv.Key} vs xd {folded}")
+                    : Fail($"unpack: only in C# tree: {kv.Key}");
+            }
+
             if (!string.Equals(xh, kv.Value, StringComparison.Ordinal))
                 return Fail($"unpack: content mismatch {kv.Key}");
         }
 
-        var xdOnly = xd.Keys.Except(cs.Keys, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+        var xdOnly = xd.Keys.Except(cs.Keys, StringComparer.Ordinal).FirstOrDefault();
         if (xdOnly != null)
-            return Fail($"unpack: only in xd tree: {xdOnly}");
+        {
+            var folded = cs.Keys.FirstOrDefault(k => string.Equals(k, xdOnly, StringComparison.OrdinalIgnoreCase));
+            return folded != null
+                ? Fail($"unpack: case-collision xd {xdOnly} vs C# {folded}")
+                : Fail($"unpack: only in xd tree: {xdOnly}");
+        }
+
         return Pass($"unpack trees identical ({cs.Count} files)");
     }
 
@@ -1036,8 +1174,45 @@ internal static class ExtendedBattleRunner
             // Volume probing unavailable (UNC etc.) — proceed and let I/O fail loudly.
         }
 
-        var dir = Path.Combine(baseDir, "ext_" + Guid.NewGuid().ToString("N")[..8]);
-        Directory.CreateDirectory(dir);
+        string dir;
+        // BTL-009: mkdir stays inside the guarded flow — a read-only or
+        // elevation-gated root (e.g. an ISO drive root) becomes a Skipped
+        // sandbox, never a harness Error.
+        try
+        {
+            // BTL-021: full 32-char GUID (8-char prefixes collide across parallel
+            // harnesses sharing one root) with a create-retry so a rare collision
+            // retries with a fresh GUID instead of reusing a foreign sandbox.
+            string? created = null;
+            for (var attempt = 0; attempt < 3 && created == null; attempt++)
+            {
+                var candidate = Path.Combine(baseDir, "ext_" + Guid.NewGuid().ToString("N"));
+                try
+                {
+                    Directory.CreateDirectory(candidate);
+                    created = candidate;
+                }
+                catch (IOException) when (attempt < 2)
+                {
+                    // Possible GUID collision or transient failure — retry fresh.
+                }
+            }
+
+            dir = created ?? throw new IOException(
+                $"Could not create a unique sandbox directory under {baseDir} after 3 attempts.");
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or NotSupportedException)
+        {
+            result.SubTests.Add(new SubBattleResult
+            {
+                TestName = "EXT-Sandbox",
+                Status = BattleStatus.Skipped,
+                    Detail = $"sandbox unavailable under {baseDir}: {ex.GetType().Name}: {Trim(ex.Message)}",
+                ElapsedSeconds = 0,
+            });
+            return null;
+        }
+
         return dir;
     }
 

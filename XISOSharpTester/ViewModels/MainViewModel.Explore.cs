@@ -166,19 +166,36 @@ internal partial class MainViewModel
 
     /// <summary>
     /// Wires the explore commands. Called from the main constructor.
+    /// Async handlers use <see cref="AsyncRelayCommand"/> so faults are observed
+    /// to the session log instead of escaping as unobserved Tasks (TST-003).
     /// </summary>
     private void InitExploreCommands()
     {
         BrowseExploreImageCommand = new RelayCommand(_ => BrowseExploreImage());
-        OpenExploreImageCommand = new RelayCommand(o => o = OpenExploreImageAsync());
-        RefreshExploreCommand = new RelayCommand(
-            o => o = OpenExploreImageAsync(refresh: true),
-            _ => _explorer is not null && !IsExplorerBusy);
+        OpenExploreImageCommand = new AsyncRelayCommand(_ => OpenExploreImageAsync(), null, ex => AddLog($"Explore open failed: {ex.Message}"));
+        RefreshExploreCommand = new AsyncRelayCommand(
+            _ => OpenExploreImageAsync(refresh: true),
+            _ => _explorer is not null && !IsExplorerBusy,
+            ex => AddLog($"Explore refresh failed: {ex.Message}"));
         CloseExploreImageCommand = new RelayCommand(
             _ => CloseExploreImage(),
             _ => _explorer is not null && !IsExplorerBusy);
-        CopyOutNodeCommand = new RelayCommand(o => o = CopyOutNodeAsync());
-        HashNodeCommand = new RelayCommand(o => o = HashNodeAsync());
+        CopyOutNodeCommand = new AsyncRelayCommand(_ => CopyOutNodeAsync(), null, ex => AddLog($"Explore copy-out failed: {ex.Message}"));
+        HashNodeCommand = new AsyncRelayCommand(_ => HashNodeAsync(), null, ex => AddLog($"Explore hash failed: {ex.Message}"));
+    }
+
+    /// <summary>
+    /// Raises explore <c>CanExecuteChanged</c> promptly (TST-008). Called from
+    /// <c>InvalidateCommands</c> (already on the UI thread).
+    /// </summary>
+    private void InvalidateExploreCommands()
+    {
+        (BrowseExploreImageCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (OpenExploreImageCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (RefreshExploreCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (CloseExploreImageCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (CopyOutNodeCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (HashNodeCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private void BrowseExploreImage()
@@ -266,8 +283,9 @@ internal partial class MainViewModel
 
     private IReadOnlyList<XisoNode> LoadExploreChildren(ExplorerTreeNode node)
     {
-        // Runs on the UI thread on first expand; directory listings are small
-        // table reads, keeping expansion synchronous like the other bindings.
+        // Invoked off the UI thread via ExplorerTreeNode's background load (TST-010);
+        // directory listings are table reads, safe here. The node marshals the
+        // resulting list back to the UI thread before touching its bound collection.
         return _explorer?.ListChildren(node.FullPath) ?? [];
     }
 
@@ -305,11 +323,13 @@ internal partial class MainViewModel
             node.StartSector, node.Attributes);
 
         if (!node.IsDirectory)
-            _ = LoadXexForSelectionAsync(node);
+            LoadXexForSelectionAsync(node);
     }
 
-    private async Task LoadXexForSelectionAsync(ExplorerTreeNode node)
+    private async void LoadXexForSelectionAsync(ExplorerTreeNode node)
     {
+        // async void by design (TST-003): selection-changed has no Task to observe,
+        // so faults are caught internally and logged; no unobserved Task escapes.
         var explorer = _explorer;
         if (explorer is null)
             return;
@@ -467,7 +487,18 @@ internal partial class MainViewModel
     private static void OnUi(Action action)
     {
         var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher?.CheckAccess() != false)
+        if (dispatcher is null)
+        {
+            // No dispatcher (unit tests, shutdown, design-time): execute synchronously
+            // on the calling thread. Callers only reach here from the UI/test thread in
+            // these contexts; pool-thread updates always marshal via Dispatcher.Invoke
+            // above when a dispatcher exists, so bound ObservableCollections are never
+            // mutated from a pool thread (TST-011).
+            action();
+            return;
+        }
+
+        if (dispatcher.CheckAccess())
             action();
         else
             dispatcher.Invoke(action);

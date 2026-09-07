@@ -16,7 +16,7 @@ A WPF desktop application for regression testing the XISOSharp C# implementation
   with lazy directory loading, volume summary, per-node details, per-node
   **Copy out** (files and directories), **SHA-256** display, and an **XEX2 info
   panel** for executables (`.iso` or `.cso` images)
-- **Side-by-side comparison** with the original `extract-xiso.exe` (included)
+- **Side-by-side comparison** with the original `extract-xiso` tool (bundled `extract-xiso.exe` on Windows; extensionless `extract-xiso` also accepted)
 
 ## Building
 
@@ -26,7 +26,7 @@ Open `CSharp_XISOSharp.sln` in Visual Studio, or run:
 dotnet build
 ```
 
-The tester automatically detects `extract-xiso.exe` from the output directory. If the exe is not present, comparison tests against the native tool are skipped and only standalone C# library tests run.
+The tester resolves `extract-xiso` via the shared `XISOSharp.ToolLocator` chain (explicit path, then a sibling of the app executable of either spelling, then `PATH`). A bundled Windows `extract-xiso.exe` is copied to the output when present, but absence falls back gracefully through the same chain. If no tool is found, comparison tests against the native tool are skipped and only standalone C# library tests run.
 
 ## License
 

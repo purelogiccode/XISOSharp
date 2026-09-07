@@ -11,8 +11,8 @@ namespace XISOSharp.Tests;
 /// </summary>
 internal static class TestDataFixture
 {
-    private static readonly string TestDataRoot = Path.GetFullPath(
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData"));
+    // Centralized via TestDataLocator (BUG-TEST-006): no fragile 4x ".." literal here.
+    private static readonly string TestDataRoot = TestDataLocator.GetTestDataRoot(AppContext.BaseDirectory);
 
     [ModuleInitializer]
     internal static void EnsureTestData()

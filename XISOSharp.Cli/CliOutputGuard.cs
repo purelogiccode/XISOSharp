@@ -18,9 +18,9 @@ internal static class CliOutputGuard
     /// positional slot (the main parser stops at the first non-flag token, so
     /// <c>game.iso -d ./new/</c> would otherwise be probed as a file named
     /// <c>-d</c>). Returns the error line, or <c>null</c> for anything that is
-    /// not an exact known-flag spelling. Callers still let a token through
-    /// when it exists on disk, so a file literally named like a flag keeps
-    /// working.
+    /// not an exact known-flag spelling. CLI-025: there is no existence
+    /// bypass — a file literally named like a flag stays reachable as
+    /// <c>./-y</c> or by absolute path.
     /// </summary>
     public static string? CheckMisplacedFlag(string? token)
     {
@@ -30,8 +30,9 @@ internal static class CliOutputGuard
                 return null;
 
             return $"Error: {token} must come before ISO filenames" +
-                   $" (e.g. -x {token} <value> game.iso);" +
-                   " a flag after the first filename is read as a filename\n";
+                    $" (e.g. -x {token} <value> game.iso);" +
+                    " a flag after the first filename is read as a filename" +
+                    " (use ./-flag if a file is really named this way)\n";
         }
         catch (Exception ex)
         {
@@ -51,7 +52,7 @@ internal static class CliOutputGuard
         "--validate", "--validate-checksums", "--validate-strict",
         "--validate-report", "--copy-out", "--copy-in", "--no-backup", "-r", "-q", "-Q", "-s", "-D",
         "-m", "-y", "--yes", "-n", "--no", "-d", "-o",
-        "-p", "--skip-sectors", "--prepend-sectors", "--batch",
+        "--skip-sectors", "--prepend-sectors", "--batch",
         "--batch-recursive", "--skip-existing", "--continue-on-error", "--pack", "--video",
         "--random", "--seed", "--wipe", "--trim", "--petrify", "--update",
         "--zar", "--all", "--best", "--compress", "--security-sectors",
@@ -90,7 +91,9 @@ internal static class CliOutputGuard
         {
             Log.Error(ex, "CheckRewriteOutput failed for {Input}", xisoPath);
             BugReporter.ReportException(ex, $"CheckRewriteOutput failed for {xisoPath}");
-            return null;
+            // CLI-024: fail closed — an unverifiable comparison must block the
+            // overwrite, not wave it through (null reads as safe).
+            return $"Error: could not verify rewrite output {outputName ?? "<none>"} against {xisoPath} ({ex.Message}); refusing to overwrite\n";
         }
     }
 
@@ -117,7 +120,8 @@ internal static class CliOutputGuard
         {
             Log.Error(ex, "CheckSingleInputOutput failed for {Input}", input);
             BugReporter.ReportException(ex, $"CheckSingleInputOutput failed for {input}");
-            return null;
+            // CLI-024: fail closed (see CheckRewriteOutput).
+            return $"Error: could not verify -o output {outputName ?? "<none>"} against {input} ({ex.Message}); refusing to overwrite\n";
         }
     }
 
@@ -152,7 +156,8 @@ internal static class CliOutputGuard
         {
             Log.Error(ex, "CheckRebuildOutput failed for {Output}", output);
             BugReporter.ReportException(ex, $"CheckRebuildOutput failed for {output}");
-            return null;
+            // CLI-024: fail closed (see CheckRewriteOutput).
+            return $"Error: could not verify rebuild output {output} against its inputs ({ex.Message}); refusing to overwrite\n";
         }
     }
 
@@ -177,7 +182,8 @@ internal static class CliOutputGuard
         {
             Log.Error(ex, "CheckImageOutput failed for {Source}", source);
             BugReporter.ReportException(ex, $"CheckImageOutput failed for {source}");
-            return null;
+            // CLI-024: fail closed (see CheckRewriteOutput).
+            return $"Error: could not verify output {output} against {source} ({ex.Message}); refusing to overwrite\n";
         }
     }
 }

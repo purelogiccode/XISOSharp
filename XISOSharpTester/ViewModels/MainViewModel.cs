@@ -24,7 +24,9 @@ namespace XISOSharpTester.ViewModels;
 internal partial class MainViewModel : INotifyPropertyChanged
 {
     /// <summary>
-    /// Initializes commands and auto-detects a sibling extract-xiso.exe.
+    /// Initializes commands and auto-detects the sibling extract-xiso tool
+    /// (OS-aware via <c>XISOSharp.ToolLocator</c>: <c>extract-xiso.exe</c> on
+    /// Windows, extensionless elsewhere).
     /// </summary>
     internal MainViewModel()
     {
@@ -32,26 +34,72 @@ internal partial class MainViewModel : INotifyPropertyChanged
         AddFilesCommand = new RelayCommand(_ => AddFiles());
         AddFolderCommand = new RelayCommand(_ => AddFolder());
         RemoveFileCommand = new RelayCommand(RemoveFile);
-        RunTestsCommand = new RelayCommand(o => o = RunTestsAsync(), _ => CanRunTests);
+        RunTestsCommand = new AsyncRelayCommand(_ => RunTestsAsync(), _ => CanRunTests, ex => AddLog($"Test run failed: {ex.Message}"));
         ExportPdfCommand = new RelayCommand(_ => ExportPdf(), _ => HasResults);
         CopyLogCommand = new RelayCommand(_ => CopyLog());
         CopyResultsCommand = new RelayCommand(_ => CopyResults(), _ => HasResults);
         AboutCommand = new RelayCommand(static _ => ShowAbout());
         ExitCommand = new RelayCommand(static _ => ExitApp());
 
+        Files.CollectionChanged += (_, _) => InvalidateCommands();
         InitExploreCommands();
         AutoDetectXisoSharp();
+    }
+
+    /// <summary>
+    /// Refreshes command enablement after file-list, busy, or result state changes
+    /// (TST-008). Safe from any thread: marshals to the UI dispatcher when needed
+    /// so <c>CanExecuteChanged</c> always fires on the UI thread, keeping
+    /// <c>IsEnabled</c> bindings and <c>CanExecute</c> consistent.
+    /// </summary>
+    private void InvalidateCommands()
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(InvalidateCommands);
+            return;
+        }
+
+        (RunTestsCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (ExportPdfCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (CopyLogCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (CopyResultsCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (BrowseXisoSharpCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (AddFilesCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (AddFolderCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (RemoveFileCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (AboutCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (ExitCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        InvalidateExploreCommands();
+        CommandManager.InvalidateRequerySuggested();
     }
 
     private void AutoDetectXisoSharp()
     {
         try
         {
-            var candidate = Path.Combine(AppContext.BaseDirectory, "extract-xiso.exe");
-            if (File.Exists(candidate))
+            // Shared lookup chain (BUG-X-005): explicit override (current textbox),
+            // then a sibling of the app executable, then PATH, OS-aware
+            // (extract-xiso.exe on Windows, extensionless elsewhere). The -v probe
+            // happens later via XisoSharpWrapper.GetVersionAsync when tests run,
+            // mirroring Gui CliLocator Resolve+Probe coverage. The browse dialog
+            // (TST-007) accepts either spelling via a widened filter; a bundled
+            // sibling of either name resolves through this same chain with graceful
+            // fallback when absent.
+            if (!string.IsNullOrWhiteSpace(XisoSharpPath) && File.Exists(XisoSharpPath))
             {
-                XisoSharpPath = candidate;
-                Log.Information("Auto-detected extract-xiso: {Path}", candidate);
+                return;
+            }
+
+            var resolved = XISOSharp.ToolLocator.Resolve(
+                string.IsNullOrWhiteSpace(XisoSharpPath) ? null : XisoSharpPath,
+                "extract-xiso.exe",
+                "extract-xiso");
+            if (resolved is not null)
+            {
+                XisoSharpPath = resolved;
+                Log.Information("Auto-detected extract-xiso: {Path}", resolved);
             }
         }
         catch (Exception ex)
@@ -64,7 +112,8 @@ internal partial class MainViewModel : INotifyPropertyChanged
     private string _xisoSharpPath = string.Empty;
 
     /// <summary>
-    /// Gets or sets the full path to extract-xiso.exe used for comparison tests.
+    /// Gets or sets the full path to the extract-xiso comparison tool
+    /// (<c>extract-xiso.exe</c> on Windows, extensionless <c>extract-xiso</c> elsewhere).
     /// </summary>
     public string XisoSharpPath
     {
@@ -75,6 +124,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsXisoSharpValid));
             OnPropertyChanged(nameof(CanRunTests));
+            InvalidateCommands();
         }
     }
 
@@ -153,6 +203,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanRunTests));
             OnPropertyChanged(nameof(ShowProgress));
             OnPropertyChanged(nameof(ShowResults));
+            InvalidateCommands();
         }
     }
 
@@ -246,7 +297,8 @@ internal partial class MainViewModel : INotifyPropertyChanged
     private TestSessionResult? _sessionResult;
 
     /// <summary>
-    /// Gets or sets the completed session result; setting it refreshes summary bindings.
+    /// Gets or sets the completed session result; setting it refreshes summary bindings
+    /// and syncs the stable <see cref="FileResults"/> view in place (TST-009).
     /// </summary>
     public TestSessionResult? SessionResult
     {
@@ -254,6 +306,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
         set
         {
             _sessionResult = value;
+            SyncFileResults();
             OnPropertyChanged();
             OnPropertyChanged(nameof(HasResults));
             OnPropertyChanged(nameof(SummaryPassed));
@@ -261,6 +314,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(SummarySkipped));
             OnPropertyChanged(nameof(SummaryText));
             OnPropertyChanged(nameof(ShowResults));
+            InvalidateCommands();
         }
     }
 
@@ -296,10 +350,55 @@ internal partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>Gets the per-file results snapshot for binding.</summary>
-    public ObservableCollection<PerFileResult> FileResults => SessionResult?.FileResults != null
-        ? new ObservableCollection<PerFileResult>(SessionResult.FileResults)
-        : [];
+    /// <summary>
+    /// Gets the stable per-file results view for binding (TST-009). The instance never
+    /// changes; <see cref="SessionResult"/> syncs its contents in place so selection
+    /// and virtualization survive, and no change notification fires when contents are unchanged.
+    /// </summary>
+    public ObservableCollection<PerFileResult> FileResults { get; } = [];
+
+    /// <summary>
+    /// Syncs <see cref="FileResults"/> in place with the current session contents.
+    /// Skips the update (no notifications) when contents already match.
+    /// Marshals to the UI thread so the bound collection is never mutated off-thread.
+    /// </summary>
+    private void SyncFileResults()
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(SyncFileResults);
+            return;
+        }
+
+        var source = _sessionResult?.FileResults;
+        if (source is null || source.Count == 0)
+        {
+            if (FileResults.Count != 0)
+                FileResults.Clear();
+            return;
+        }
+
+        if (FileResults.Count == source.Count)
+        {
+            var same = true;
+            for (var i = 0; i < source.Count; i++)
+            {
+                if (!ReferenceEquals(FileResults[i], source[i]))
+                {
+                    same = false;
+                    break;
+                }
+            }
+
+            if (same)
+                return;
+        }
+
+        FileResults.Clear();
+        foreach (var item in source)
+            FileResults.Add(item);
+    }
 
     private void BrowseXisoSharp()
     {
@@ -307,22 +406,22 @@ internal partial class MainViewModel : INotifyPropertyChanged
         {
             var dlg = new OpenFileDialog
             {
-                Title = "Select extract-xiso.exe",
-                Filter = "Executable files (*.exe)|*.exe|All files (*.*)|*.*",
+                Title = "Select extract-xiso tool",
+                Filter = "extract-xiso (extract-xiso.exe;extract-xiso)|extract-xiso.exe;extract-xiso|Executable files (*.exe)|*.exe|All files (*.*)|*.*",
                 FileName = "extract-xiso.exe"
             };
             if (dlg.ShowDialog() == true)
             {
                 XisoSharpPath = dlg.FileName;
-                AddLog($"extract-xiso.exe set to: {XisoSharpPath}");
-                Log.Information("extract-xiso.exe set to {Path}", XisoSharpPath);
+                AddLog($"extract-xiso set to: {XisoSharpPath}");
+                Log.Information("extract-xiso set to {Path}", XisoSharpPath);
             }
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Browse extract-xiso failed");
             BugReporter.ReportException(ex, "Browse extract-xiso failed");
-            AddLog($"Error selecting extract-xiso.exe: {ex.Message}");
+            AddLog($"Error selecting extract-xiso: {ex.Message}");
         }
     }
 
@@ -454,6 +553,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
             };
             FilesSummary = $"{Files.Count} file(s) \u2014 {sizeStr} total";
             OnPropertyChanged(nameof(CanRunTests));
+            InvalidateCommands();
         }
         catch (Exception ex)
         {
@@ -478,9 +578,9 @@ internal partial class MainViewModel : INotifyPropertyChanged
         var exePath = IsXisoSharpValid ? XisoSharpPath : string.Empty;
         if (!IsXisoSharpValid)
         {
-            AddLog("WARNING: extract-xiso.exe not selected. Comparison tests will be skipped.");
-            Log.Warning("Test run without extract-xiso.exe; comparison tests will be skipped");
-            BugReporter.ReportWarning("Test run without extract-xiso.exe; comparison tests will be skipped");
+            AddLog("WARNING: extract-xiso not selected. Comparison tests will be skipped.");
+            Log.Warning("Test run without extract-xiso; comparison tests will be skipped");
+            BugReporter.ReportWarning("Test run without extract-xiso; comparison tests will be skipped");
         }
         else
         {
@@ -491,47 +591,112 @@ internal partial class MainViewModel : INotifyPropertyChanged
         {
             // Non-blocking: InvokeAsync never blocks the worker, so a modal
             // dialog pumping a nested dispatcher frame cannot deadlock the run.
-            _ = Application.Current.Dispatcher.InvokeAsync(() =>
+            // Faults inside are caught so the discarded operation never faults
+            // (TST-003: no unobserved Task); null dispatcher (tests/shutdown)
+            // simply skips the UI update.
+            try
             {
-                FileProgress = $"File {p.FileIndex}/{p.TotalFiles}";
-                ProgressValue = p.TotalFiles > 0 ? (double)p.FileIndex / p.TotalFiles * 100 : 0;
-                ProgressText = p.StatusText;
-                CurrentTest = p.CurrentTest;
-                if (!string.IsNullOrEmpty(p.StatusText))
-                    AddLog(p.StatusText);
-            });
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher is null)
+                    return;
+
+                _ = dispatcher.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        FileProgress = $"File {p.FileIndex}/{p.TotalFiles}";
+                        ProgressValue = p.TotalFiles > 0 ? (double)p.FileIndex / p.TotalFiles * 100 : 0;
+                        ProgressText = p.StatusText;
+                        CurrentTest = p.CurrentTest;
+                        if (!string.IsNullOrEmpty(p.StatusText))
+                            AddLog(p.StatusText);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "Progress update failed");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Progress report failed");
+            }
         });
 
         try
         {
             var session = await XisoTestRunner.RunAsync(Files.ToList(), exePath, progress).ConfigureAwait(false);
-            SessionResult = session;
-
-            ProgressValue = 100;
-            ProgressText =
-                $"Completed: {session.PassedFiles} passed, {session.FailedFiles} failed, {session.SkippedFiles} skipped";
-            CurrentTest = "Done";
-            StatusText =
-                $"Completed: {session.PassedFiles} passed, {session.FailedFiles} failed, {session.SkippedFiles} skipped";
-
-            SummarySubText = $"Sub-tests: {session.PassedSubTests} passed, {session.FailedSubTests} failed, " +
-                             $"{session.SkippedSubTests} skipped | {session.TotalElapsedSeconds:N1}s";
-
-            OnPropertyChanged(nameof(FileResults));
+            OnUiAfterRun(session);
         }
         catch (Exception ex)
         {
-            AddLog($"FATAL ERROR: {ex.Message}");
             Log.Error(ex, "Test run failed");
             BugReporter.ReportException(ex, "Test run failed");
-            ProgressText = "Test run failed.";
-            StatusText = "Error: Test run failed.";
+            OnUiAfterFailure($"FATAL ERROR: {ex.Message}");
         }
         finally
         {
-            IsRunning = false;
-            CommandManager.InvalidateRequerySuggested();
+            OnUiAfterFinally();
         }
+    }
+
+    /// <summary>
+    /// Applies post-run UI state on the UI thread (TST-011: never mutate bound
+    /// collections/properties from the pool thread after <c>ConfigureAwait(false)</c>).
+    /// </summary>
+    private void OnUiAfterRun(TestSessionResult session)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(() => OnUiAfterRun(session));
+            return;
+        }
+
+        SessionResult = session;
+        ProgressValue = 100;
+        ProgressText =
+            $"Completed: {session.PassedFiles} passed, {session.FailedFiles} failed, {session.SkippedFiles} skipped";
+        CurrentTest = "Done";
+        StatusText =
+            $"Completed: {session.PassedFiles} passed, {session.FailedFiles} failed, {session.SkippedFiles} skipped";
+
+        SummarySubText = $"Sub-tests: {session.PassedSubTests} passed, {session.FailedSubTests} failed, " +
+                         $"{session.SkippedSubTests} skipped | {session.TotalElapsedSeconds:N1}s";
+
+        // FileResults syncs in place via SessionResult setter; no per-get allocation (TST-009).
+    }
+
+    /// <summary>
+    /// Applies failure UI state on the UI thread.
+    /// </summary>
+    private void OnUiAfterFailure(string fatalMessage)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(() => OnUiAfterFailure(fatalMessage));
+            return;
+        }
+
+        AddLog(fatalMessage);
+        ProgressText = "Test run failed.";
+        StatusText = "Error: Test run failed.";
+    }
+
+    /// <summary>
+    /// Clears the busy flag on the UI thread so bindings and <c>CanExecute</c> refresh there.
+    /// </summary>
+    private void OnUiAfterFinally()
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(OnUiAfterFinally);
+            return;
+        }
+
+        IsRunning = false;
     }
 
     private void ExportPdf()
@@ -642,6 +807,13 @@ internal partial class MainViewModel : INotifyPropertyChanged
 
     private void AddLog(string message)
     {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(() => AddLog(message));
+            return;
+        }
+
         try
         {
             var ts = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
@@ -731,11 +903,17 @@ public class LogEntry
 /// A generic command implementation for WPF that delegates
 /// its execution and can-execute logic to callbacks. Also
 /// wires the <c>CommandManager.RequerySuggested</c> event.
+/// Faults from <c>Execute</c> are caught and logged so no command
+/// ever propagates out of <see cref="ICommand.Execute"/> (TST-003).
+/// Call <see cref="RaiseCanExecuteChanged"/> when relevant state changes
+/// so buttons disable promptly instead of relying only on
+/// <c>RequerySuggested</c> (TST-008).
 /// </summary>
 public class RelayCommand : ICommand
 {
     private readonly Action<object?> _execute;
     private readonly Func<object?, bool>? _canExecute;
+    private EventHandler? _canExecuteChanged;
 
     /// <summary>
     /// Creates a new <see cref="RelayCommand"/>.
@@ -756,15 +934,41 @@ public class RelayCommand : ICommand
     /// </summary>
     public bool CanExecute(object? parameter)
     {
-        return _canExecute?.Invoke(parameter) ?? true;
+        try
+        {
+            return _canExecute?.Invoke(parameter) ?? true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "RelayCommand CanExecute failed");
+            return false;
+        }
     }
 
     /// <summary>
-    /// Invokes the execute delegate.
+    /// Invokes the execute delegate, observing faults to the log.
     /// </summary>
     public void Execute(object? parameter)
     {
-        _execute(parameter);
+        try
+        {
+            _execute(parameter);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Command execution failed");
+            BugReporter.ReportException(ex, "Command execution failed");
+        }
+    }
+
+    /// <summary>
+    /// Raises <see cref="CanExecuteChanged"/> synchronously and invalidates
+    /// <c>RequerySuggested</c> so WPF re-queries promptly.
+    /// </summary>
+    public void RaiseCanExecuteChanged()
+    {
+        _canExecuteChanged?.Invoke(this, EventArgs.Empty);
+        CommandManager.InvalidateRequerySuggested();
     }
 
     /// <summary>
@@ -773,7 +977,127 @@ public class RelayCommand : ICommand
     /// </summary>
     public event EventHandler? CanExecuteChanged
     {
-        add => CommandManager.RequerySuggested += value;
-        remove => CommandManager.RequerySuggested -= value;
+        add
+        {
+            _canExecuteChanged += value;
+            CommandManager.RequerySuggested += value;
+        }
+
+        remove
+        {
+            _canExecuteChanged -= value;
+            CommandManager.RequerySuggested -= value;
+        }
+    }
+}
+
+/// <summary>
+/// Async variant of <see cref="RelayCommand"/> for <c>Task</c>-returning handlers
+/// (TST-003). <see cref="ICommand.Execute"/> awaits the handler and observes
+/// faults via a top-level try/catch surfacing to Serilog, the bug reporter,
+/// and an optional fault callback (used to append to the session log), so no
+/// unobserved <c>Task</c> ever escapes. Supports manual
+/// <see cref="RaiseCanExecuteChanged"/> like <see cref="RelayCommand"/> (TST-008).
+/// </summary>
+public sealed class AsyncRelayCommand : ICommand
+{
+    private readonly Func<object?, Task> _executeAsync;
+    private readonly Func<object?, bool>? _canExecute;
+    private readonly Action<Exception>? _onFault;
+    private EventHandler? _canExecuteChanged;
+
+    /// <summary>
+    /// Creates a new <see cref="AsyncRelayCommand"/>.
+    /// </summary>
+    /// <param name="executeAsync">Async handler to await when executed.</param>
+    /// <param name="canExecute">Optional enablement predicate.</param>
+    /// <param name="onFault">Optional callback invoked on the UI thread when the handler faults.</param>
+    internal AsyncRelayCommand(Func<object?, Task> executeAsync, Func<object?, bool>? canExecute = null, Action<Exception>? onFault = null)
+    {
+        _executeAsync = executeAsync;
+        _canExecute = canExecute;
+        _onFault = onFault;
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="AsyncRelayCommand"/> from a parameterless async handler.
+    /// </summary>
+    /// <param name="executeAsync">Async handler to await when executed.</param>
+    /// <param name="canExecute">Optional enablement predicate.</param>
+    /// <param name="onFault">Optional callback invoked on the UI thread when the handler faults.</param>
+    internal AsyncRelayCommand(Func<Task> executeAsync, Func<object?, bool>? canExecute = null, Action<Exception>? onFault = null)
+        : this(_ => executeAsync(), canExecute, onFault)
+    {
+    }
+
+    /// <summary>
+    /// Determines whether the command can execute in its current state.
+    /// </summary>
+    public bool CanExecute(object? parameter)
+    {
+        try
+        {
+            return _canExecute?.Invoke(parameter) ?? true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "AsyncRelayCommand CanExecute failed");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Awaits the async handler, observing faults to the log (never unobserved).
+    /// Resumes on the UI context so <paramref name="onFault"/>-style logging is thread-safe.
+    /// </summary>
+    public async void Execute(object? parameter)
+    {
+        try
+        {
+            await _executeAsync(parameter);
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                _onFault?.Invoke(ex);
+            }
+            catch (Exception faultEx)
+            {
+                Log.Warning(faultEx, "Async command fault handler failed");
+            }
+
+            Log.Error(ex, "Async command failed");
+            BugReporter.ReportException(ex, "Async command failed");
+        }
+    }
+
+    /// <summary>
+    /// Raises <see cref="CanExecuteChanged"/> synchronously and invalidates
+    /// <c>RequerySuggested</c> so WPF re-queries promptly.
+    /// </summary>
+    public void RaiseCanExecuteChanged()
+    {
+        _canExecuteChanged?.Invoke(this, EventArgs.Empty);
+        CommandManager.InvalidateRequerySuggested();
+    }
+
+    /// <summary>
+    /// Occurs when changes in the UI state affect whether the command
+    /// should execute.
+    /// </summary>
+    public event EventHandler? CanExecuteChanged
+    {
+        add
+        {
+            _canExecuteChanged += value;
+            CommandManager.RequerySuggested += value;
+        }
+
+        remove
+        {
+            _canExecuteChanged -= value;
+            CommandManager.RequerySuggested -= value;
+        }
     }
 }

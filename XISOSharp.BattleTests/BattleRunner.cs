@@ -143,14 +143,29 @@ internal static class BattleRunner
             var csDetail = $"Valid RootSector={rootSector} RootSize={rootSize} Lseek=0x{lseek:X}";
             if (wrapper?.Available == true)
             {
-                (var code, _, _) = wrapper.ListFiles(path);
-                var nativeOk = code == 0;
+                // BTL-003: a native `-l` exit code is a LIST result, not a VERIFY
+                // result. The verdict rests on the C# VerifyXiso above; native
+                // output is informational only.
+                string nativeNote;
+                try
+                {
+                    (var code, _, var se) = wrapper.ListFiles(path);
+                    nativeNote = code == 0
+                        ? "native list exit 0 (listing only, not a verify)"
+                        : $"native list exit {code}: {se.Trim()} (listing only, not a verify)";
+                }
+                catch (Exception nex)
+                {
+                    nativeNote =
+                        $"native list error {nex.GetType().Name}: {(nex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim()} (listing only)";
+                }
+
                 sw.Stop();
                 return new SubBattleResult
                 {
                     TestName = "Verify",
-                    Status = nativeOk ? BattleStatus.Passed : BattleStatus.Failed,
-                    Detail = $"C#: {csDetail} | native: {(nativeOk ? "valid" : $"exit {code}")}",
+                    Status = BattleStatus.Passed,
+                    Detail = $"C#: {csDetail} | {nativeNote}",
                     ElapsedSeconds = sw.Elapsed.TotalSeconds
                 };
             }
@@ -179,19 +194,62 @@ internal static class BattleRunner
         {
             if (wrapper?.Available == true)
             {
-                (var code, _, _) = wrapper.ListFiles(path);
-                var bothFail = code != 0;
-                sw.Stop();
-                if (bothFail)
+                int code;
+                string nativeOut;
+                try
                 {
+                    (code, var so, var se) = wrapper.ListFiles(path);
+                    nativeOut = so + "\n" + se;
+                }
+                catch (Exception nex)
+                {
+                    sw.Stop();
                     return new SubBattleResult
                     {
                         TestName = "Verify",
-                        Status = BattleStatus.Passed,
-                        Detail = $"Both fail as expected: C#: {ex.Message} | native exit {code}",
+                        Status = BattleStatus.Failed,
+                        Detail = $"C# error: {(ex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim()} | native list error {nex.GetType().Name}: {(nex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim()}",
                         ElapsedSeconds = sw.Elapsed.TotalSeconds
                     };
                 }
+
+                sw.Stop();
+                if (code != 0)
+                {
+                    // BTL-004: both sides failing is not enough — the reasons
+                    // must agree, otherwise divergent corruptions are masked.
+                    var csKind = ClassifyVerifyFailure(ex);
+                    var nativeKind = ClassifyVerifyFailure(nativeOut);
+                    var csFirst = (ex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim();
+                    var nativeFirst = (nativeOut.Split('\n').FirstOrDefault(s => !string.IsNullOrWhiteSpace(s)) ?? string.Empty).Trim();
+                    if (string.Equals(csKind, nativeKind, StringComparison.Ordinal) &&
+                        !string.Equals(csKind, "other", StringComparison.Ordinal))
+                    {
+                        return new SubBattleResult
+                        {
+                            TestName = "Verify",
+                            Status = BattleStatus.Passed,
+                            Detail = $"Both fail as expected ({csKind}): C#: {csFirst} | native exit {code}: {nativeFirst}",
+                            ElapsedSeconds = sw.Elapsed.TotalSeconds
+                        };
+                    }
+
+                    return new SubBattleResult
+                    {
+                        TestName = "Verify",
+                        Status = BattleStatus.Failed,
+                        Detail = $"Divergent failures C#({csKind}): {csFirst} | native({nativeKind}) exit {code}: {nativeFirst}",
+                        ElapsedSeconds = sw.Elapsed.TotalSeconds
+                    };
+                }
+
+                return new SubBattleResult
+                {
+                    TestName = "Verify",
+                    Status = BattleStatus.Failed,
+                    Detail = $"Divergent: C# failed ({(ex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim()}) but native list exit 0",
+                    ElapsedSeconds = sw.Elapsed.TotalSeconds
+                };
             }
 
             sw.Stop();
@@ -203,6 +261,45 @@ internal static class BattleRunner
                 ElapsedSeconds = sw.Elapsed.TotalSeconds
             };
         }
+    }
+
+    private static string ClassifyVerifyFailure(Exception ex)
+    {
+        if (ex is XisoEmptyException)
+        {
+            return "empty";
+        }
+
+        return ClassifyVerifyFailure(ex.Message);
+    }
+
+    private static string ClassifyVerifyFailure(string message)
+    {
+        if (message.Contains("no files", StringComparison.OrdinalIgnoreCase))
+        {
+            return "empty";
+        }
+
+        if (message.Contains("invalid", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("does not appear", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("not a valid", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("no XISO header", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("corrupt", StringComparison.OrdinalIgnoreCase))
+        {
+            return "format";
+        }
+
+        if (message.Contains("truncat", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("short", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("end of stream", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("beyond end", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("exceeds", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("outside", StringComparison.OrdinalIgnoreCase))
+        {
+            return "truncated";
+        }
+
+        return "other";
     }
 
     private static SubBattleResult RunAudit(string path)
@@ -277,8 +374,9 @@ internal static class BattleRunner
         var sw = Stopwatch.StartNew();
         try
         {
-            var csOutput = CaptureCSharpList(path);
-            var csEntries = ParseListOutput(csOutput);
+            // BTL-014: prefer the structured TOC walk; the regex text parse
+            // stays only as a fallback for images GetSectorLayout cannot read.
+            var csEntries = TryGetStructuredEntries(path) ?? ParseListOutput(CaptureCSharpList(path));
             if (wrapper?.Available != true)
             {
                 sw.Stop();
@@ -447,18 +545,35 @@ internal static class BattleRunner
             {
                 if (fs.Length > Constants.OptimizedTagOffset + Constants.OptimizedTag.Length)
                 {
-                    fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
-                    Span<byte> buf = stackalloc byte[Constants.OptimizedTag.Length];
-                    fs.ReadExactly(buf);
-                    var tag = Encoding.ASCII.GetString(buf);
-                    if (string.Equals(tag, Constants.OptimizedTag, StringComparison.Ordinal))
+                    try
                     {
+                        fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
+                        Span<byte> buf = stackalloc byte[Constants.OptimizedTag.Length];
+                        fs.ReadExactly(buf);
+                        var tag = Encoding.ASCII.GetString(buf);
+                        if (string.Equals(tag, Constants.OptimizedTag, StringComparison.Ordinal))
+                        {
+                            sw.Stop();
+                            return new SubBattleResult
+                            {
+                                TestName = "Rewrite",
+                                Status = BattleStatus.Skipped,
+                                Detail = "Already optimized",
+                                ElapsedSeconds = sw.Elapsed.TotalSeconds
+                            };
+                        }
+                    }
+                    catch (EndOfStreamException)
+                    {
+                        // BTL-016: the Length check above can race a shrinking/truncated
+                        // file — a short tag read is truncated input (Skipped), not a
+                        // generic rewrite failure.
                         sw.Stop();
                         return new SubBattleResult
                         {
                             TestName = "Rewrite",
                             Status = BattleStatus.Skipped,
-                            Detail = "Already optimized",
+                            Detail = "Skipped: truncated input (short read at optimized-tag offset)",
                             ElapsedSeconds = sw.Elapsed.TotalSeconds
                         };
                     }
@@ -493,9 +608,7 @@ internal static class BattleRunner
                 };
             }
 
-            var csOut = Directory.GetFiles(csOutDir, "*.iso").FirstOrDefault()
-                        ?? Directory.GetFiles(csWork, "*.iso", SearchOption.AllDirectories)
-                            .FirstOrDefault(f => !f.EndsWith(".old", StringComparison.OrdinalIgnoreCase));
+            var csOut = FindRewriteOutput(csWork, csOutDir);
             var exeInput = Path.Combine(exeWork, Path.GetFileName(path));
             File.Copy(path, exeInput, true);
             var exeOutDir = Path.Combine(exeWork, "out");
@@ -513,7 +626,7 @@ internal static class BattleRunner
                 };
             }
 
-            var exeOut = Directory.GetFiles(exeOutDir, "*.iso").FirstOrDefault();
+            var exeOut = FindRewriteOutput(exeWork, exeOutDir);
             if (csOut == null || exeOut == null)
             {
                 sw.Stop();
@@ -556,7 +669,37 @@ internal static class BattleRunner
         }
     }
 
-    private static SubBattleResult RunCisoRoundTrip(string path)
+    /// <summary>
+    /// Locates a rewrite-battle output deterministically (BTL-015): both the C# and
+    /// native sides use this same rule — recursive <c>*.iso</c> search under
+    /// <paramref name="workDir"/> excluding rewrite backups (<c>*.old</c>),
+    /// preferring candidates under <paramref name="outDir"/> (so the staged input
+    /// copy at the work root is never picked), newest first with an ordinal path
+    /// tie-break so stale/wrong files are never picked.
+    /// </summary>
+    private static string? FindRewriteOutput(string workDir, string outDir)
+    {
+        var prefix = outDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        return Directory.GetFiles(workDir, "*.iso", SearchOption.AllDirectories)
+            .Where(f => !f.EndsWith(".old", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(f => f.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(f => new FileInfo(f).LastWriteTimeUtc)
+            .ThenBy(f => f, StringComparer.Ordinal)
+            .FirstOrDefault();
+    }
+
+    /// <summary>CISO compression level for the round-trip battle (fast; correctness, not ratio, is compared).</summary>
+    private const int CisoCompressionLevel = 1;
+
+    /// <summary>
+    /// Inputs larger than this skip SHA-256 verification in the CISO round-trip
+    /// (BTL-017): hashing a multi-GB image twice per battle is prohibitive.
+    /// Size equality is still checked; only the byte-hash compare is skipped.
+    /// </summary>
+    private const long CisoHashVerifyGateBytes = 2L * 1024 * 1024 * 1024;
+
+    private static SubBattleResult RunCisoRoundTrip(string path, int level = CisoCompressionLevel)
     {
         var sw = Stopwatch.StartNew();
         var tmp = CreateTempDir("ciso");
@@ -566,7 +709,7 @@ internal static class BattleRunner
             var dec = Path.Combine(tmp, "test.dec.iso");
             try
             {
-                CisoWriter.CompressToCso(path, cso, level: 1);
+                CisoWriter.CompressToCso(path, cso, level: level);
                 if (!CisoReader.IsCso(cso))
                 {
                     sw.Stop();
@@ -580,6 +723,33 @@ internal static class BattleRunner
                 }
 
                 CisoReader.DecompressToIso(cso, dec);
+                var inputBytes = new FileInfo(path).Length;
+                if (inputBytes > CisoHashVerifyGateBytes)
+                {
+                    // BTL-017: skip the double multi-GB hash above the gate — a
+                    // size match after the round-trip is the whole check here.
+                    var decBytes = new FileInfo(dec).Length;
+                    sw.Stop();
+                    if (decBytes != inputBytes)
+                    {
+                        return new SubBattleResult
+                        {
+                            TestName = "CISO",
+                            Status = BattleStatus.Failed,
+                            Detail = $"Round-trip size mismatch {inputBytes} vs {decBytes} (hash skipped above {CisoHashVerifyGateBytes} byte gate)",
+                            ElapsedSeconds = sw.Elapsed.TotalSeconds
+                        };
+                    }
+
+                    return new SubBattleResult
+                    {
+                        TestName = "CISO",
+                        Status = BattleStatus.Skipped,
+                        Detail = $"Skipped hash verification: input {inputBytes} bytes exceeds {CisoHashVerifyGateBytes} byte gate; round-trip size match \u2713 (level {level})",
+                        ElapsedSeconds = sw.Elapsed.TotalSeconds
+                    };
+                }
+
                 var origHash = HashUtil.ComputeSha256(path);
                 var decHash = HashUtil.ComputeSha256(dec);
                 var match = string.Equals(origHash, decHash, StringComparison.Ordinal);
@@ -668,7 +838,11 @@ internal static class BattleRunner
         var sw = Stopwatch.StartNew();
         try
         {
-            using var fbd = new FileBlockDevice(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read));
+            // BTL-023: path-based ctor — the device opens and owns its FileStream,
+            // so `using var fbd` disposes exactly one handle with no ambiguity
+            // (the stream-ctor overload defaults to ownership too, but leaves the
+            // caller holding a second reference to the same handle).
+            using var fbd = new FileBlockDevice(path, FileMode.Open, FileAccess.Read, FileShare.Read);
             if (fbd.Length != new FileInfo(path).Length)
             {
                 sw.Stop();
@@ -685,10 +859,18 @@ internal static class BattleRunner
             {
                 Span<byte> buf = stackalloc byte[20];
                 var n = fbd.Read(Constants.HeaderOffset, buf);
-                // Sanity check we can read header area
-                if (n != 20)
+                // BTL-013: a short read means a truncated/unreadable header —
+                // fail instead of passing with unchecked contents.
+                if (n != buf.Length)
                 {
-                    /* ignore */
+                    sw.Stop();
+                    return new SubBattleResult
+                    {
+                        TestName = "BlockDev",
+                        Status = BattleStatus.Failed,
+                        Detail = $"Short read at header offset: expected {buf.Length} got {n}",
+                        ElapsedSeconds = sw.Elapsed.TotalSeconds
+                    };
                 }
             }
 
@@ -745,6 +927,8 @@ internal static class BattleRunner
             var csIso = Path.Combine(tmp, "cs.iso");
             var exeIso = Path.Combine(tmp, "exe.iso");
 
+            // BTL-012: each create subtest records its own stopwatch.
+            var csSw = Stopwatch.StartNew();
             try
             {
                 var q = Logger.Quiet;
@@ -760,35 +944,39 @@ internal static class BattleRunner
             }
             catch (Exception ex)
             {
+                csSw.Stop();
                 sw.Stop();
                 result.SubTests.Add(new SubBattleResult
                 {
                     TestName = "Create-C#",
                     Status = BattleStatus.Failed,
                     Detail = ex.Message,
-                    ElapsedSeconds = sw.Elapsed.TotalSeconds
+                    ElapsedSeconds = csSw.Elapsed.TotalSeconds
                 });
                 result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
                 return result;
             }
 
+            csSw.Stop();
             result.SubTests.Add(new SubBattleResult
             {
                 TestName = "Create-C#",
                 Status = BattleStatus.Passed,
                 Detail = $"C# created {new FileInfo(csIso).Length} bytes",
-                ElapsedSeconds = 0
+                ElapsedSeconds = csSw.Elapsed.TotalSeconds
             });
 
+            var nativeSw = Stopwatch.StartNew();
             if (wrapper?.Available != true)
             {
+                nativeSw.Stop();
                 sw.Stop();
                 result.SubTests.Add(new SubBattleResult
                 {
                     TestName = "Create-Native",
                     Status = BattleStatus.Skipped,
                     Detail = "native not available",
-                    ElapsedSeconds = 0
+                    ElapsedSeconds = nativeSw.Elapsed.TotalSeconds
                 });
                 result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
                 return result;
@@ -797,65 +985,75 @@ internal static class BattleRunner
             (var code, var so, var se) = wrapper.Create(dir, exeIso);
             if (code != 0)
             {
+                // BTL-011: no process-wide CWD mutation. The implicit-name
+                // fallback runs with a per-process WorkingDirectory; every
+                // path handed to the oracle is absolute.
                 var work = Path.Combine(tmp, "exe_fallback");
                 Directory.CreateDirectory(work);
-                var current = Directory.GetCurrentDirectory();
                 try
                 {
-                    Directory.SetCurrentDirectory(work);
-                    (var c2, var o2, var e2) = wrapper.Create(dir);
+                    (var c2, var o2, var e2) = wrapper.RunInDirectory(work, "-c", dir);
                     code = c2;
                     so = o2;
                     se = e2;
                     if (code == 0)
                     {
                         var found = Directory.GetFiles(work, "*.iso").FirstOrDefault();
-                        if (found != null) File.Copy(found, exeIso, true);
+                        if (found != null)
+                        {
+                            File.Copy(found, exeIso, true);
+                        }
                     }
                 }
-                finally
+                catch (Exception fex)
                 {
-                    Directory.SetCurrentDirectory(current);
+                    code = 1;
+                    se = (se + "\nfallback: " + fex.Message).Trim();
                 }
             }
 
             if (code != 0 || !File.Exists(exeIso))
             {
+                nativeSw.Stop();
                 sw.Stop();
                 result.SubTests.Add(new SubBattleResult
                 {
                     TestName = "Create-Native",
                     Status = BattleStatus.Failed,
                     Detail = $"native create exit {code}: {se.Trim()} {so.Trim()}",
-                    ElapsedSeconds = 0
+                    ElapsedSeconds = nativeSw.Elapsed.TotalSeconds
                 });
                 result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
                 return result;
             }
 
+            nativeSw.Stop();
             result.SubTests.Add(new SubBattleResult
             {
                 TestName = "Create-Native",
                 Status = BattleStatus.Passed,
                 Detail = $"native created {new FileInfo(exeIso).Length} bytes",
-                ElapsedSeconds = 0
+                ElapsedSeconds = nativeSw.Elapsed.TotalSeconds
             });
 
-            var csList = ParseListOutput(CaptureCSharpList(csIso));
+            var listSw = Stopwatch.StartNew();
+            var csList = TryGetStructuredEntries(csIso) ?? ParseListOutput(CaptureCSharpList(csIso));
             var exeList = ParseListOutput(wrapper.ListFiles(exeIso).StdOut);
             var cmpList = CompareLists(csList, exeList);
+            listSw.Stop();
             result.SubTests.Add(new SubBattleResult
             {
                 TestName = "Create-List",
                 Status = cmpList.AllMatch ? BattleStatus.Passed : BattleStatus.Failed,
                 Detail = cmpList.Detail,
-                ElapsedSeconds = 0
+                ElapsedSeconds = listSw.Elapsed.TotalSeconds
             });
 
             var csExt = Path.Combine(tmp, "cs_ext2");
             Directory.CreateDirectory(csExt);
             var exeExt = Path.Combine(tmp, "exe_ext2");
             Directory.CreateDirectory(exeExt);
+            var extractSw = Stopwatch.StartNew();
             try
             {
                 var q = Logger.Quiet;
@@ -872,34 +1070,37 @@ internal static class BattleRunner
                 (var ec, _, var ese) = wrapper.ExtractFiles(exeIso, exeExt);
                 if (ec != 0)
                 {
+                    extractSw.Stop();
                     result.SubTests.Add(new SubBattleResult
                     {
                         TestName = "Create-Extract",
                         Status = BattleStatus.Failed,
                         Detail = $"native extract exit {ec}: {ese.Trim()}",
-                        ElapsedSeconds = 0
+                        ElapsedSeconds = extractSw.Elapsed.TotalSeconds
                     });
                 }
                 else
                 {
                     var cmpD = CompareDirs(csExt, exeExt);
+                    extractSw.Stop();
                     result.SubTests.Add(new SubBattleResult
                     {
                         TestName = "Create-Extract",
                         Status = cmpD.AllMatch ? BattleStatus.Passed : BattleStatus.Failed,
                         Detail = cmpD.Detail,
-                        ElapsedSeconds = 0
+                        ElapsedSeconds = extractSw.Elapsed.TotalSeconds
                     });
                 }
             }
             catch (Exception ex)
             {
+                extractSw.Stop();
                 result.SubTests.Add(new SubBattleResult
                 {
                     TestName = "Create-Extract",
                     Status = BattleStatus.Failed,
                     Detail = ex.Message,
-                    ElapsedSeconds = 0
+                    ElapsedSeconds = extractSw.Elapsed.TotalSeconds
                 });
             }
 
@@ -1258,12 +1459,60 @@ internal static class BattleRunner
 
     private sealed record ListEntry(string Path, bool IsDirectory, long Size);
 
+    private static string NormalizeListPath(string p)
+    {
+        var n = p.Replace('\\', '/');
+        if (n.Length == 0)
+        {
+            return n;
+        }
+
+        if (!n.StartsWith('/'))
+        {
+            n = "/" + n;
+        }
+
+        return n;
+    }
+
+    private static List<ListEntry>? TryGetStructuredEntries(string isoPath)
+    {
+        // BTL-014: preferred structured source — walk the TOC directly instead
+        // of scraping `List` text. Directory sizes map to 0 to match list
+        // output (`(0 bytes)` for dirs); the image root itself is not a row.
+        try
+        {
+            var layout = XisoReader.GetSectorLayout(isoPath);
+            var list = new List<ListEntry>(layout.Entries.Count);
+            foreach (var e in layout.Entries)
+            {
+                if (string.Equals(e.Path, "/", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                list.Add(new ListEntry(NormalizeListPath(e.Path), e.IsDirectory,
+                    e.IsDirectory ? 0L : e.FileSize));
+            }
+
+            list.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.Ordinal));
+            return list;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static List<ListEntry> ParseListOutput(string output)
     {
-        // Both XISOSharp and native extract-xiso print one entry per line:
+        // Fallback text parser for `List` output (TryGetStructuredEntries is
+        // preferred). Both sides print one entry per line:
         //   \path\to\file.ext (12345 bytes)      files
         //   \path\to\dir\ (0 bytes)              directories (trailing slash)
-        // Neither side prints StartSector in list mode, so parity compares path+size+kind.
+        // NOTE (sector-compare limitation): neither side prints StartSector in
+        // list mode, so parity compares path+size+kind only; layout differences
+        // are covered by Rewrite/CISO hashes, not here.
         var entries = new List<ListEntry>();
         var lineRegex = new Regex(@"^\s*(?<path>.*?)\s*\((?<size>\d+) bytes\)\s*$",
             RegexOptions.Multiline | RegexOptions.Compiled, TimeSpan.FromSeconds(30));
@@ -1275,10 +1524,10 @@ internal static class BattleRunner
             if (!long.TryParse(m.Groups["size"].Value, CultureInfo.InvariantCulture, out var s))
                 continue;
             var isDir = p.EndsWith('\\') || p.EndsWith('/');
-            entries.Add(new ListEntry(p.TrimEnd('\\', '/'), isDir, s));
+            entries.Add(new ListEntry(NormalizeListPath(p.TrimEnd('\\', '/')), isDir, s));
         }
 
-        entries.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
+        entries.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.Ordinal));
         return entries;
     }
 
@@ -1288,9 +1537,15 @@ internal static class BattleRunner
     {
         var details = new List<string>();
         if (cs.Count != exe.Count) details.Add($"count C#={cs.Count} exe={exe.Count}");
-        var csDict = cs.ToDictionary(e => e.Path, StringComparer.OrdinalIgnoreCase);
-        var exeDict = exe.ToDictionary(e => e.Path, StringComparer.OrdinalIgnoreCase);
-        int match = 0, mis = 0;
+        // BTL-008: ordinal (case-sensitive) keys. Entries differing only by
+        // case stay distinct and surface as CASE-COLLISION mismatches instead
+        // of collapsing (false pass) or throwing on duplicate keys.
+        var csDict = BuildListMap(cs, details, "C#");
+        var exeDict = BuildListMap(exe, details, "exe");
+        int match = 0;
+        int mis = details.Count;
+        var exeFold = new HashSet<string>(exeDict.Keys, StringComparer.OrdinalIgnoreCase);
+        var csFold = new HashSet<string>(csDict.Keys, StringComparer.OrdinalIgnoreCase);
         foreach ((var p, var ce) in csDict)
         {
             if (exeDict.TryGetValue(p, out var ee))
@@ -1309,12 +1564,19 @@ internal static class BattleRunner
             else
             {
                 mis++;
-                details.Add($"ONLY C# {p}");
+                if (exeFold.Contains(p))
+                    details.Add($"CASE-COLLISION ONLY C# {p} (case differs on exe side)");
+                else
+                    details.Add($"ONLY C# {p}");
             }
         }
 
-        foreach (var p in exeDict.Keys.Except(csDict.Keys, StringComparer.OrdinalIgnoreCase))
+        foreach (var p in exeDict.Keys)
         {
+            if (csDict.ContainsKey(p))
+                continue;
+            if (csFold.Contains(p))
+                continue; // already reported as CASE-COLLISION from the C# side
             mis++;
             details.Add($"ONLY exe {p}");
         }
@@ -1324,26 +1586,40 @@ internal static class BattleRunner
         return new ListCmp(all, string.Join("\n", details));
     }
 
+    private static Dictionary<string, ListEntry> BuildListMap(List<ListEntry> entries, List<string> details, string side)
+    {
+        var dict = new Dictionary<string, ListEntry>(StringComparer.Ordinal);
+        foreach (var e in entries)
+        {
+            if (!dict.TryAdd(e.Path, e))
+            {
+                details.Add($"DUPLICATE {side} {e.Path}");
+            }
+        }
+
+        return dict;
+    }
+
     private sealed record DirCmp(bool AllMatch, string Detail);
 
     private static DirCmp CompareDirs(string csDir, string exeDir)
     {
         var details = new List<string>();
         int match = 0, mis = 0;
-        var csFiles = Directory.GetFiles(csDir, "*", SearchOption.AllDirectories)
-            .Select(f => (Full: f, Rel: Path.GetRelativePath(csDir, f)))
-            .ToDictionary(x => x.Rel, StringComparer.OrdinalIgnoreCase);
-        var exeFiles = Directory.GetFiles(exeDir, "*", SearchOption.AllDirectories)
-            .Select(f => (Full: f, Rel: Path.GetRelativePath(exeDir, f)))
-            .ToDictionary(x => x.Rel, StringComparer.OrdinalIgnoreCase);
+        // BTL-008: ordinal relative paths; case-only differences are distinct
+        // entries reported as mismatches (see below), never collapsed.
+        var csFiles = BuildFileMap(csDir, details, "C#", ref mis);
+        var exeFiles = BuildFileMap(exeDir, details, "exe", ref mis);
+        var exeFold = new HashSet<string>(exeFiles.Keys, StringComparer.OrdinalIgnoreCase);
+        var csFold = new HashSet<string>(csFiles.Keys, StringComparer.OrdinalIgnoreCase);
         foreach ((var rel, var cs) in csFiles)
         {
             if (exeFiles.TryGetValue(rel, out var exe))
             {
                 try
                 {
-                    var ch = HashUtil.ComputeSha256(cs.Full);
-                    var eh = HashUtil.ComputeSha256(exe.Full);
+                    var ch = HashUtil.ComputeSha256(cs);
+                    var eh = HashUtil.ComputeSha256(exe);
                     if (string.Equals(ch, eh, StringComparison.Ordinal))
                     {
                         match++;
@@ -1364,12 +1640,19 @@ internal static class BattleRunner
             else
             {
                 mis++;
-                details.Add($"ONLY C# {rel}");
+                if (exeFold.Contains(rel))
+                    details.Add($"CASE-COLLISION ONLY C# {rel} (case differs on exe side)");
+                else
+                    details.Add($"ONLY C# {rel}");
             }
         }
 
-        foreach (var rel in exeFiles.Keys.Except(csFiles.Keys, StringComparer.OrdinalIgnoreCase))
+        foreach (var rel in exeFiles.Keys)
         {
+            if (csFiles.ContainsKey(rel))
+                continue;
+            if (csFold.Contains(rel))
+                continue; // already reported as CASE-COLLISION above
             mis++;
             details.Add($"ONLY exe {rel}");
         }
@@ -1383,6 +1666,22 @@ internal static class BattleRunner
         }
 
         return new DirCmp(all, string.Join("\n", details));
+    }
+
+    private static Dictionary<string, string> BuildFileMap(string root, List<string> details, string side, ref int mis)
+    {
+        var dict = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var full in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+        {
+            var rel = Path.GetRelativePath(root, full);
+            if (!dict.TryAdd(rel, full))
+            {
+                mis++;
+                details.Add($"DUPLICATE {side} {rel}");
+            }
+        }
+
+        return dict;
     }
 
     private static int CountFiles(string dir)
@@ -1399,10 +1698,23 @@ internal static class BattleRunner
 
     private static string CreateTempDir(string name)
     {
-        var dir = Path.Combine(Path.GetTempPath(), "XISOSharpBattle", Guid.NewGuid().ToString("N").Substring(0, 8),
-            name);
-        Directory.CreateDirectory(dir);
-        return dir;
+        // BTL-021: full 32-char GUID per temp root (8-char prefixes collide across
+        // parallel harnesses sharing %TEMP%\XISOSharpBattle) with a create-retry so
+        // a rare collision retries with a fresh GUID instead of reusing a foreign dir.
+        for (var attempt = 0; ; attempt++)
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "XISOSharpBattle", Guid.NewGuid().ToString("N"),
+                name);
+            try
+            {
+                Directory.CreateDirectory(dir);
+                return dir;
+            }
+            catch (IOException) when (attempt < 2)
+            {
+                // Possible GUID collision or transient failure — retry fresh.
+            }
+        }
     }
 
     private static void DeleteDir(string path)

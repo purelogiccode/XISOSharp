@@ -12,42 +12,56 @@ public class NumSectorsBenchmarks
 #pragma warning restore RCS1102
 {
     /// <summary>
-    /// Measures sector rounding for a single-byte input.
+    /// Gets or sets the input byte count. Instance state (not a compile-time
+    /// constant) so the JIT cannot constant-fold the call away (BUG-BEN-004).
     /// </summary>
-    /// <returns>The sector count for one byte.</returns>
-    [Benchmark]
-    public static uint NumSectors_Small()
+    [Params(1u, 2048u, 204800u, 204801u, uint.MaxValue)]
+    public uint ByteCount { get; set; }
+
+    private uint[] _batch = null!;
+
+    /// <summary>
+    /// Builds a batch of varying inputs around <see cref="ByteCount"/> so the
+    /// loop benchmark measures real arithmetic, not one folded constant.
+    /// </summary>
+    [GlobalSetup]
+    public void Setup()
     {
-        return Constants.NumSectors(1);
+        _batch = new uint[256];
+        for (var i = 0; i < _batch.Length; i++)
+        {
+            _batch[i] = unchecked(ByteCount + (uint)i);
+        }
     }
 
     /// <summary>
-    /// Measures sector rounding for a byte count that is an exact multiple of the sector size.
+    /// Measures sector rounding for the parameterized input.
+    /// Instance field input defeats constant folding; the returned value
+    /// defeats dead-code elimination.
     /// </summary>
-    /// <returns>The sector count for 100 sectors worth of bytes.</returns>
-    [Benchmark]
-    public static uint NumSectors_ExactMultiple()
+    /// <returns>The sector count.</returns>
+    [Benchmark(Baseline = true)]
+    public uint NumSectors_Param()
     {
-        return Constants.NumSectors(Constants.SectorSize * 100);
+        return Constants.NumSectors(ByteCount);
     }
 
     /// <summary>
-    /// Measures sector rounding for a byte count with a one-byte remainder past a sector boundary.
+    /// Measures sector rounding over a 256-entry batch with varying inputs and
+    /// accumulates the sum, lifting the single-op cost above timer resolution
+    /// (BUG-BEN-004: one integer op is pure call overhead otherwise).
     /// </summary>
-    /// <returns>The sector count including the partial trailing sector.</returns>
+    /// <returns>Sum of sector counts (prevents folding/elimination).</returns>
     [Benchmark]
-    public static uint NumSectors_WithRemainder()
+    public uint NumSectors_Batch256()
     {
-        return Constants.NumSectors((Constants.SectorSize * 100) + 1);
-    }
+        var sum = 0u;
+        var batch = _batch;
+        for (var i = 0; i < batch.Length; i++)
+        {
+            sum += Constants.NumSectors(batch[i]);
+        }
 
-    /// <summary>
-    /// Measures sector rounding for the maximum <see cref="uint"/> input.
-    /// </summary>
-    /// <returns>The sector count for <see cref="uint.MaxValue"/> bytes.</returns>
-    [Benchmark]
-    public static uint NumSectors_Large()
-    {
-        return Constants.NumSectors(uint.MaxValue);
+        return sum;
     }
 }

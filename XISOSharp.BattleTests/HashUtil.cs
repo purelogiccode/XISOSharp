@@ -24,7 +24,10 @@ internal static class HashUtil
     /// <summary>Computes hex SHA-256 of all files under a directory (sorted, relative paths included).</summary>
     public static IReadOnlyDictionary<string, string> HashDirectory(string root)
     {
-        var dict = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // BTL-008: ordinal (case-sensitive) keys — on Linux `A` vs `a` are
+        // distinct files; collapsing them hid files (false pass). Callers
+        // report case-only differences as mismatches.
+        var dict = new SortedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
         {
             var rel = Path.GetRelativePath(root, file);

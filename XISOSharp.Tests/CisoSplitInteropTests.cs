@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using XISOSharp.TestDataGenerator;
 
 namespace XISOSharp.Tests;
 
@@ -29,8 +30,8 @@ namespace XISOSharp.Tests;
 [Collection("Sequential")]
 public class CisoSplitInteropTests : IDisposable
 {
-    private static readonly string TestDataRoot = Path.GetFullPath(
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData"));
+    // Resolved via TestDataLocator (BUG-TEST-006): no fragile 4x ".." literal.
+    private static readonly string TestDataRoot = TestDataLocator.GetTestDataRoot(AppContext.BaseDirectory);
 
     private static readonly string SourceDir = Path.Combine(TestDataRoot, "source");
 
@@ -62,18 +63,9 @@ public class CisoSplitInteropTests : IDisposable
 
     private static string SolutionRoot()
     {
-        var dir = AppContext.BaseDirectory;
-        while (dir != null)
-        {
-            if (File.Exists(Path.Combine(dir, "CSharp_XISOSharp.sln")))
-            {
-                return dir;
-            }
-
-            dir = Path.GetDirectoryName(dir);
-        }
-
-        throw new InvalidOperationException("Solution root not found.");
+        // Centralized via TestDataLocator (BUG-TEST-006).
+        return TestDataLocator.GetSolutionRoot(AppContext.BaseDirectory)
+            ?? throw new InvalidOperationException("Solution root not found.");
     }
 
     private static string XdvdfsExePath()

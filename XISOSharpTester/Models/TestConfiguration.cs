@@ -7,7 +7,8 @@ namespace XISOSharpTester.Models;
 public class TestConfiguration
 {
     /// <summary>
-    /// Gets or sets the full path to the extract-xiso.exe binary
+    /// Gets or sets the full path to the extract-xiso tool binary
+    /// (extract-xiso.exe on Windows, extensionless elsewhere)
     /// used for comparison tests.
     /// </summary>
     public string XisoSharpExePath { get; set; } = string.Empty;

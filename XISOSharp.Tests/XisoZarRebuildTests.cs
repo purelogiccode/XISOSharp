@@ -45,9 +45,50 @@ public class XisoZarRebuildTests : IDisposable
         File.WriteAllText(Path.Combine(dir, "sub", "c.txt"), "nested");
     }
 
-    private static string[] ZarScratchDirs()
+    /// <summary>
+    /// Scopes <c>Path.GetTempPath()</c> to a per-test parent for the lifetime of
+    /// the scope (BUG-TEST-009). The ZAR pipeline hardcodes
+    /// <c>Path.GetTempPath()/XISOSharp_zar_*</c> for scratch, so a global
+    /// <c>%TEMP%</c> scan flakes under parallel runs/second harnesses. Pointing
+    /// <c>TMP</c>/<c>TEMP</c>/<c>TMPDIR</c> at a fresh parent isolates this test's
+    /// scratch dirs; assertions then scan only that parent.
+    /// Tests run in the Sequential collection, so process-wide env mutation is safe.
+    /// </summary>
+    private sealed class ScopedTempParent : IDisposable
     {
-        return Directory.GetDirectories(Path.GetTempPath(), "XISOSharp_zar_*");
+        public string Parent { get; }
+
+        private readonly string? _savedTmp;
+        private readonly string? _savedTemp;
+        private readonly string? _savedTmpDir;
+
+        public ScopedTempParent(List<string> track, string prefix)
+        {
+            var realTemp = Path.GetTempPath();
+            Parent = Path.Combine(realTemp, $"{prefix}_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(Parent);
+            track.Add(Parent);
+            _savedTmp = Environment.GetEnvironmentVariable("TMP");
+            _savedTemp = Environment.GetEnvironmentVariable("TEMP");
+            _savedTmpDir = Environment.GetEnvironmentVariable("TMPDIR");
+            Environment.SetEnvironmentVariable("TMP", Parent);
+            Environment.SetEnvironmentVariable("TEMP", Parent);
+            Environment.SetEnvironmentVariable("TMPDIR", Parent);
+        }
+
+        public string[] ZarScratchDirs()
+        {
+            return Directory.Exists(Parent)
+                ? Directory.GetDirectories(Parent, "XISOSharp_zar_*")
+                : [];
+        }
+
+        public void Dispose()
+        {
+            Environment.SetEnvironmentVariable("TMP", _savedTmp);
+            Environment.SetEnvironmentVariable("TEMP", _savedTemp);
+            Environment.SetEnvironmentVariable("TMPDIR", _savedTmpDir);
+        }
     }
 
     private sealed class LogCapture : IDisposable
@@ -92,7 +133,9 @@ public class XisoZarRebuildTests : IDisposable
         var fakeVideo = Path.Combine(work, "game.video.iso");
         File.WriteAllBytes(fakeVideo, new byte[2048]);
         var outRedump = Path.Combine(work, "game.redump.iso");
-        var before = ZarScratchDirs();
+        using var tempScope = new ScopedTempParent(_tempDirs, "xiso_zarrb_tmp");
+        var before = tempScope.ZarScratchDirs();
+        Assert.Empty(before);
 
         string log;
         bool ok;
@@ -105,7 +148,7 @@ public class XisoZarRebuildTests : IDisposable
         Assert.False(ok);
         Assert.Contains("Repacking 3 files", log, StringComparison.Ordinal);
         Assert.DoesNotContain("Invalid XISO", log, StringComparison.Ordinal);
-        Assert.Equal(before, ZarScratchDirs());
+        Assert.Empty(tempScope.ZarScratchDirs());
     }
 
     [Fact]
@@ -126,7 +169,8 @@ public class XisoZarRebuildTests : IDisposable
         var fakeVideo = Path.Combine(work, "game.video.iso");
         File.WriteAllBytes(fakeVideo, new byte[2048]);
         var outRedump = Path.Combine(work, "game.redump.iso");
-        var before = ZarScratchDirs();
+        using var tempScope = new ScopedTempParent(_tempDirs, "xiso_zarrb_tmp");
+        Assert.Empty(tempScope.ZarScratchDirs());
 
         string log;
         bool ok;
@@ -138,7 +182,7 @@ public class XisoZarRebuildTests : IDisposable
 
         Assert.False(ok);
         Assert.Contains("Using XISO image 'game.xiso'", log, StringComparison.Ordinal);
-        Assert.Equal(before, ZarScratchDirs());
+        Assert.Empty(tempScope.ZarScratchDirs());
     }
 
     [Fact]
@@ -214,7 +258,8 @@ public class XisoZarRebuildTests : IDisposable
         var fakeVideo = Path.Combine(work, "game.video.iso");
         File.WriteAllBytes(fakeVideo, new byte[2048]);
         var outRedump = Path.Combine(work, "game.redump.iso");
-        var before = ZarScratchDirs();
+        using var tempScope = new ScopedTempParent(_tempDirs, "xiso_zarrb_tmp");
+        Assert.Empty(tempScope.ZarScratchDirs());
 
         bool ok;
         using (var capture = new LogCapture())
@@ -224,7 +269,7 @@ public class XisoZarRebuildTests : IDisposable
         }
 
         Assert.False(ok);
-        Assert.Equal(before, ZarScratchDirs());
+        Assert.Empty(tempScope.ZarScratchDirs());
     }
 
     [Fact]
@@ -240,10 +285,11 @@ public class XisoZarRebuildTests : IDisposable
         File.WriteAllBytes(fakeVideo, new byte[2048]);
         using var cts = new CancellationTokenSource();
         cts.Cancel();
+        using var tempScope = new ScopedTempParent(_tempDirs, "xiso_zarrb_tmp");
 
         Assert.Throws<OperationCanceledException>(() =>
             XisoRedump.RebuildRedump(zar, fakeVideo, null, null,
                 Path.Combine(work, "game.redump.iso"), null, quiet: true, cancellationToken: cts.Token));
-        Assert.Empty(ZarScratchDirs());
+        Assert.Empty(tempScope.ZarScratchDirs());
     }
 }

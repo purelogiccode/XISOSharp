@@ -20,12 +20,12 @@ internal sealed class Program
     /// <param name="args"><c>--self-test</c>, <c>--probe-cli</c>, <c>--help</c>, or empty to launch the UI.</param>
     /// <returns>0 on success; 1 when the CLI probe fails or usage is invalid.</returns>
     [STAThread]
-    public static int Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
         AppLogging.Configure("XISOSharp.Gui");
         try
         {
-            return MainInner(args);
+            return await MainInnerAsync(args).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -39,7 +39,7 @@ internal sealed class Program
         }
     }
 
-    private static int MainInner(string[] args)
+    private static async Task<int> MainInnerAsync(string[] args)
     {
         // Headless helpers so the GUI wrapper is verifiable without a display:
         //   --probe-cli [path]  resolve the CLI and print its -v banner line
@@ -49,12 +49,12 @@ internal sealed class Program
         {
             if (string.Equals(args[0], "--self-test", StringComparison.OrdinalIgnoreCase))
             {
-                return SelfTest.Run(Console.WriteLine, args.Length > 1 ? args[1] : null);
+                return await SelfTest.RunAsync(Console.WriteLine, args.Length > 1 ? args[1] : null).ConfigureAwait(false);
             }
 
             if (string.Equals(args[0], "--probe-cli", StringComparison.OrdinalIgnoreCase))
             {
-                return ProbeCli(args.Length > 1 ? args[1] : null);
+                return await ProbeCliAsync(args.Length > 1 ? args[1] : null).ConfigureAwait(false);
             }
 
             if (string.Equals(args[0], "--help", StringComparison.OrdinalIgnoreCase) ||
@@ -79,7 +79,7 @@ internal sealed class Program
     /// </summary>
     /// <param name="overridePath">Optional explicit CLI path; otherwise auto-detection is used.</param>
     /// <returns>0 when the CLI is found and responds to <c>-v</c>; otherwise 1.</returns>
-    private static int ProbeCli(string? overridePath)
+    private static async Task<int> ProbeCliAsync(string? overridePath)
     {
         try
         {
@@ -92,7 +92,7 @@ internal sealed class Program
             }
 
             Console.WriteLine($"CLI: {resolved}");
-            var version = CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).GetAwaiter().GetResult();
+            var version = await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
             if (version is null)
             {
                 Console.WriteLine("CLI -v probe failed.");

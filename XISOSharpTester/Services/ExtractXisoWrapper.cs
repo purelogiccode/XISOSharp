@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using System.IO;
-using System.Text;
 using Serilog;
 using XISOSharpTester.Logging;
 
@@ -9,7 +7,8 @@ using XISOSharpTester.Logging;
 namespace XISOSharpTester.Services;
 
 /// <summary>
-/// Wraps the extract-xiso.exe command-line tool, providing
+/// Wraps the extract-xiso command-line tool (extract-xiso.exe on Windows,
+/// extensionless elsewhere), providing
 /// managed methods for listing, extracting, and rewriting
 /// XISO disc images. Implements <see cref="IDisposable"/>
 /// to allow deterministic cleanup.
@@ -22,9 +21,9 @@ public class XisoSharpWrapper : IDisposable
 
     /// <summary>
     /// Initializes a new instance of <see cref="XisoSharpWrapper"/>
-    /// with the path to the extract-xiso executable.
+    /// with the path to the extract-xiso executable (any OS spelling).
     /// </summary>
-    /// <param name="exePath">Full path to extract-xiso.exe.</param>
+    /// <param name="exePath">Full path to the extract-xiso tool executable.</param>
     public XisoSharpWrapper(string exePath)
     {
         _exePath = exePath;
@@ -49,7 +48,7 @@ public class XisoSharpWrapper : IDisposable
     }
 
     /// <summary>
-    /// Runs extract-xiso.exe with the specified arguments and
+    /// Runs the extract-xiso tool with the specified arguments and
     /// returns the captured result.
     /// </summary>
     /// <param name="args">Command-line arguments to pass.</param>
@@ -60,7 +59,7 @@ public class XisoSharpWrapper : IDisposable
     }
 
     /// <summary>
-    /// Runs extract-xiso.exe with the specified arguments and
+    /// Runs the extract-xiso tool with the specified arguments and
     /// returns the captured result, observing cancellation.
     /// </summary>
     /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
@@ -72,7 +71,7 @@ public class XisoSharpWrapper : IDisposable
     }
 
     /// <summary>
-    /// Runs extract-xiso.exe with the specified arguments and
+    /// Runs the extract-xiso tool with the specified arguments and
     /// returns the captured result asynchronously.
     /// </summary>
     /// <param name="args">Command-line arguments to pass.</param>
@@ -83,83 +82,18 @@ public class XisoSharpWrapper : IDisposable
         try
         {
             ArgumentNullException.ThrowIfNull(args);
-            var psi = new ProcessStartInfo
-            {
-                FileName = _exePath,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
-            foreach (var a in args)
-                psi.ArgumentList.Add(a);
-
             Log.Debug("Running extract-xiso: {Args}", string.Join(" ", args));
-            using var process = new Process { StartInfo = psi };
-            process.Start();
-
-            using var timeoutCts = new CancellationTokenSource(ProcessTimeout);
-            using var linkedCts =
-                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-            var ct = linkedCts.Token;
-
-            using (ct.Register(static state =>
-                   {
-                       var proc = (Process)state!;
-                       try
-                       {
-                           if (!proc.HasExited)
-                           {
-                               proc.Kill(entireProcessTree: true);
-                           }
-                       }
-                       catch (Exception ex) when (ex is InvalidOperationException
-                           or System.ComponentModel.Win32Exception
-                           or NotSupportedException
-                           or ObjectDisposedException)
-                       {
-                           // Already exited, disposed, or cannot kill — the wait below still completes.
-                       }
-                   }, process))
-            {
-                var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
-                var stderrTask = process.StandardError.ReadToEndAsync(ct);
-                try
-                {
-                    await process.WaitForExitAsync(ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    TryKill(process);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    throw new TimeoutException(
-                        $"extract-xiso timed out after {ProcessTimeout.TotalSeconds:N0} seconds: {string.Join(" ", args)}");
-                }
-
-                string stdout;
-                string stderr;
-                try
-                {
-                    stdout = await stdoutTask.ConfigureAwait(false);
-                    stderr = await stderrTask.ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    TryKill(process);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    throw new TimeoutException(
-                        $"extract-xiso timed out after {ProcessTimeout.TotalSeconds:N0} seconds: {string.Join(" ", args)}");
-                }
-
-                var exitCode = GetExitCodeSafe(process);
-                var result = new Result { ExitCode = exitCode, StdOut = stdout, StdErr = stderr };
-                if (result.ExitCode != 0)
-                    Log.Warning("extract-xiso exited with code {Exit}: {Args}", result.ExitCode,
-                        string.Join(" ", args));
-                return result;
-            }
+            // Thin delegate over the shared core runner (BUG-X-004): async drains,
+            // timeout, cancel, tree-kill, ArgumentList, and exit reporting live in
+            // XISOSharp.ProcessRunner so GUI and Tester stay identical.
+            var core = await XISOSharp.ProcessRunner
+                .RunAsync(_exePath, args, ProcessTimeout, cancellationToken)
+                .ConfigureAwait(false);
+            var result = new Result { ExitCode = core.ExitCode, StdOut = core.StandardOutput, StdErr = core.StandardError };
+            if (result.ExitCode != 0)
+                Log.Warning("extract-xiso exited with code {Exit}: {Args}", result.ExitCode,
+                    string.Join(" ", args));
+            return result;
         }
         catch (OperationCanceledException)
         {
@@ -177,38 +111,8 @@ public class XisoSharpWrapper : IDisposable
         }
     }
 
-    private static void TryKill(Process process)
-    {
-        try
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-            }
-        }
-        catch (Exception ex) when (ex is InvalidOperationException
-            or System.ComponentModel.Win32Exception
-            or NotSupportedException
-            or ObjectDisposedException)
-        {
-            // Best effort — already exited or cannot kill.
-        }
-    }
-
-    private static int GetExitCodeSafe(Process process)
-    {
-        try
-        {
-            return process.HasExited ? process.ExitCode : -1;
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
-        {
-            return -1;
-        }
-    }
-
     /// <summary>
-    /// Runs extract-xiso.exe with the specified arguments, appending
+    /// Runs the extract-xiso tool with the specified arguments, appending
     /// the quiet flag (<c>-Q</c>) to suppress output.
     /// </summary>
     /// <param name="args">Command-line arguments to pass.</param>
@@ -219,7 +123,7 @@ public class XisoSharpWrapper : IDisposable
     }
 
     /// <summary>
-    /// Runs extract-xiso.exe with the specified arguments, appending
+    /// Runs the extract-xiso tool with the specified arguments, appending
     /// the quiet flag (<c>-Q</c>) to suppress output, observing cancellation.
     /// </summary>
     /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
@@ -231,7 +135,7 @@ public class XisoSharpWrapper : IDisposable
     }
 
     /// <summary>
-    /// Runs extract-xiso.exe with the specified arguments, appending
+    /// Runs the extract-xiso tool with the specified arguments, appending
     /// the quiet flag (<c>-Q</c>) to suppress output, asynchronously.
     /// </summary>
     /// <param name="args">Command-line arguments to pass.</param>
@@ -351,7 +255,7 @@ public class XisoSharpWrapper : IDisposable
     }
 
     /// <summary>
-    /// Retrieves the version string of extract-xiso.exe by running
+    /// Retrieves the version string of the extract-xiso tool by running
     /// <c>extract-xiso -v</c> and parsing the first line of output.
     /// </summary>
     /// <returns>The version string, or <c>null</c> if unavailable.</returns>
@@ -361,7 +265,7 @@ public class XisoSharpWrapper : IDisposable
     }
 
     /// <summary>
-    /// Retrieves the version string of extract-xiso.exe, observing cancellation.
+    /// Retrieves the version string of the extract-xiso tool, observing cancellation.
     /// </summary>
     /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
     /// <returns>The version string, or <c>null</c> if unavailable.</returns>
@@ -371,7 +275,7 @@ public class XisoSharpWrapper : IDisposable
     }
 
     /// <summary>
-    /// Retrieves the version string of extract-xiso.exe asynchronously.
+    /// Retrieves the version string of the extract-xiso tool asynchronously.
     /// </summary>
     /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
     /// <returns>The version string, or <c>null</c> if unavailable.</returns>

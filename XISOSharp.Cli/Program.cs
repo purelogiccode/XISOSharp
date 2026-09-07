@@ -183,6 +183,32 @@ internal static class Program
             listMode || tree || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode ||
             hashMode || copyOut || copyIn || auditMode || validateMode;
 
+        // CLI-017: -d (path), -o (outputName) and -D (deleteOld) are consumed by
+        // a few modes only (extract/rewrite/redump/rebuild/compress/decompress).
+        // Every other dispatch must reject them instead of silently ignoring them.
+        bool RejectIgnoredOutputFlags(string modeName)
+        {
+            if (path != null)
+            {
+                Logger.LogErr($"Error: -d <dir> is not used with {modeName}\n");
+                return true;
+            }
+
+            if (outputName != null)
+            {
+                Logger.LogErr($"Error: -o <output> is not used with {modeName}\n");
+                return true;
+            }
+
+            if (deleteOld)
+            {
+                Logger.LogErr($"Error: -D is only used with -r (rewrite)\n");
+                return true;
+            }
+
+            return false;
+        }
+
         // Handle standalone verb commands early (don't start with '-')
         if (args.Length > 0 && string.Equals(args[0], "validate", StringComparison.OrdinalIgnoreCase))
         {
@@ -426,13 +452,17 @@ internal static class Program
                         validateFlag = true;
                         break;
                     case "--validate-checksums":
+                        // CLI-003: the flavor flags imply --validate so they
+                        // can never be set without effect (GUI-002 parity).
                         validateFlag = true;
                         validateChecksums = true;
                         break;
                     case "--validate-strict":
+                        validateFlag = true;
                         validateStrict = true;
                         break;
                     case "--validate-report":
+                        validateFlag = true;
                         if (i + 1 < args.Length)
                         {
                             validateReport = args[++i];
@@ -528,9 +558,6 @@ internal static class Program
                         }
 
                         break;
-                    case "-p":
-                        PrintUsage();
-                        return 1;
                     case "--skip-sectors":
                         if (i + 1 < args.Length &&
                             int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var skipVal) && skipVal >= 0)
@@ -824,12 +851,12 @@ internal static class Program
 
         // Upstream #61: `game.iso -d ./new/` silently probed `-d` as an image
         // ("open error: -d"). Flags must precede filenames, so name the mistake
-        // instead — unless the token exists on disk, in which case it really is
-        // a (bizarrely named) file and keeps working as before.
+        // instead. CLI-025: no existence bypass — a file literally named like a
+        // flag is still reachable as ./-y or by absolute path.
         for (var i = optind; i < args.Length; i++)
         {
             var misplaced = CliOutputGuard.CheckMisplacedFlag(args[i]);
-            if (misplaced != null && !File.Exists(args[i]) && !Directory.Exists(args[i]))
+            if (misplaced != null)
             {
                 Logger.LogErr(misplaced);
                 return 1;
@@ -885,12 +912,27 @@ internal static class Program
             return 1;
         }
 
+        // CLI-013: only the rebuild verb consumes --security-sectors; the
+        // redump batch entry point explicitly discards it. Reject it loudly
+        // everywhere the main parser accepts it instead of ignoring it.
+        if (securitySectorsPath != null)
+        {
+            Logger.LogErr("Error: --security-sectors/--sectors is only supported by the rebuild verb\n");
+            return 1;
+        }
+
         if ((skipSectors.HasValue || prependSectors.HasValue) &&
             (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || hashMode || copyOut ||
-             copyIn || auditMode || validateMode || validateFlag))
+             copyIn || auditMode || validateMode || validateFlag ||
+             // CLI-015: --skip-sectors is also ignored by the redump batch
+             // (RunRedumpBatch takes no offset) and by --checksum
+             // (ComputeImageChecksum takes no offset). --filetime/--set-filetime
+             // consume skipSectors, so they stay allowed.
+             videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode || zarMode ||
+             allMode || bestMode || compressAlias || checksumFlagMode))
         {
             Logger.LogErr(
-                "Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, and create (-c) modes\n");
+                "Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, filetime, set-filetime, and create (-c) modes\n");
             return 1;
         }
 
@@ -1022,9 +1064,32 @@ internal static class Program
             zarMode = true;
         }
 
+        // CLI-016: the -y/-n conflict must fire before the early-return
+        // dispatches below (--filetime/--set-filetime/--checksum), which
+        // previously swallowed it.
+        if (assumeYes && assumeNo)
+        {
+            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
+            return 1;
+        }
+
+        // CLI-003: --validate* is only consumed by -r (rewrite) and the
+        // validate verb. Anywhere else it was silently ignored.
+        if ((validateFlag || validateChecksums || validateStrict || validateReport != null) &&
+            !validateMode && !rewrite)
+        {
+            Logger.LogErr(
+                "Error: --validate/--validate-checksums/--validate-strict/--validate-report require -r (rewrite) or validate mode\n");
+            return 1;
+        }
+
         // --filetime / --set-filetime dispatch before batch expansion (positional value handling).
         if (filetimeMode)
         {
+            // CLI-012: exact arity. CLI-017: -d/-o/-D are ignored here.
+            if (RejectIgnoredOutputFlags("--filetime"))
+                return 1;
+
             if (optind >= args.Length)
             {
                 Logger.LogErr("Error: --filetime requires <iso>\n");
@@ -1059,6 +1124,10 @@ internal static class Program
 
         if (setFiletimeMode)
         {
+            // CLI-012: exact arity. CLI-017: -d/-o/-D are ignored here.
+            if (RejectIgnoredOutputFlags("--set-filetime"))
+                return 1;
+
             if (optind + 1 >= args.Length)
             {
                 Logger.LogErr(
@@ -1100,6 +1169,10 @@ internal static class Program
 
         if (checksumFlagMode)
         {
+            // CLI-017: -d/-o/-D are ignored here.
+            if (RejectIgnoredOutputFlags("--checksum"))
+                return 1;
+
             if (optind >= args.Length)
             {
                 Logger.LogErr("Error: --checksum requires <iso>\n");
@@ -1172,12 +1245,29 @@ internal static class Program
         // but rebuild already returned above.
         if (videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode || zarMode)
         {
+            // CLI-017: RunRedumpBatch consumes -o but ignores -d/-D.
+            if (path != null)
+            {
+                Logger.LogErr("Error: -d <dir> is not used with redump modes\n");
+                return 1;
+            }
+
+            if (deleteOld)
+            {
+                Logger.LogErr("Error: -D is only used with -r (rewrite)\n");
+                return 1;
+            }
+
             return RunRedumpBatch(isoFiles, videoMode, randomMode, seedMode, wipeMode, trimMode, petrifyMode,
                 updateMode, zarMode, securitySectorsPath, outputName, assumeYes, assumeNo, jobs, zarPolicy);
         }
 
         if (createList.Count > 0)
         {
+            // CLI-017: create carries its output in the -c name slot; -d/-o/-D are ignored.
+            if (RejectIgnoredOutputFlags("-c (create)"))
+                return 1;
+
             foreach ((var dir, var name) in createList)
             {
                 string? outputDir = null;
@@ -1232,9 +1322,19 @@ internal static class Program
 
         if (info)
         {
+            // CLI-012: at most <iso> [internal-path]. CLI-017: -d/-o/-D ignored.
+            if (RejectIgnoredOutputFlags("-i"))
+                return 1;
+
             if (optind >= args.Length)
             {
                 PrintUsage();
+                return 1;
+            }
+
+            if (optind + 2 < args.Length)
+            {
+                Logger.LogErr("Error: -i takes at most <iso> [internal-path] (extra arguments not allowed)\n");
                 return 1;
             }
 
@@ -1307,9 +1407,19 @@ internal static class Program
 
         if (lsMode)
         {
+            // CLI-012: at most <iso> [internal-path]. CLI-017: -d/-o/-D ignored.
+            if (RejectIgnoredOutputFlags("--ls"))
+                return 1;
+
             if (optind >= args.Length)
             {
                 PrintUsage();
+                return 1;
+            }
+
+            if (optind + 2 < args.Length)
+            {
+                Logger.LogErr("Error: --ls takes at most <iso> [internal-path] (extra arguments not allowed)\n");
                 return 1;
             }
 
@@ -1342,9 +1452,19 @@ internal static class Program
 
         if (xexInfoMode)
         {
+            // CLI-012: exactly <iso> <internal-path>. CLI-017: -d/-o/-D ignored.
+            if (RejectIgnoredOutputFlags("--xex-info"))
+                return 1;
+
             if (optind + 1 >= args.Length)
             {
                 PrintUsage();
+                return 1;
+            }
+
+            if (optind + 2 < args.Length)
+            {
+                Logger.LogErr("Error: --xex-info takes exactly <iso> <internal-path>\n");
                 return 1;
             }
 
@@ -1390,9 +1510,19 @@ internal static class Program
 
         if (xbeInfoMode)
         {
+            // CLI-012: exactly <iso> <internal-path>. CLI-017: -d/-o/-D ignored.
+            if (RejectIgnoredOutputFlags("--xbe-info"))
+                return 1;
+
             if (optind + 1 >= args.Length)
             {
                 PrintUsage();
+                return 1;
+            }
+
+            if (optind + 2 < args.Length)
+            {
+                Logger.LogErr("Error: --xbe-info takes exactly <iso> <internal-path>\n");
                 return 1;
             }
 
@@ -1434,6 +1564,10 @@ internal static class Program
 
         if (repairMode)
         {
+            // CLI-017: -d/-o/-D are ignored here (extras already rejected below).
+            if (RejectIgnoredOutputFlags("--repair"))
+                return 1;
+
             if (optind >= args.Length || optind + 1 < args.Length)
             {
                 PrintUsage();
@@ -1491,6 +1625,10 @@ internal static class Program
 
         if (salvageMode)
         {
+            // CLI-017: -d/-o/-D are ignored here (--repair-out carries the output).
+            if (RejectIgnoredOutputFlags("--salvage"))
+                return 1;
+
             if (optind >= args.Length || optind + 1 < args.Length)
             {
                 PrintUsage();
@@ -1562,14 +1700,28 @@ internal static class Program
 
         if (unpackMode)
         {
+            // CLI-017: --unpack takes its destination positionally; -o/-D are ignored.
+            if (RejectIgnoredOutputFlags("--unpack"))
+                return 1;
+
             return RunUnpackMode(args, optind, path, skipSectors, skipExisting, continueOnError);
         }
 
         if (hashMode)
         {
+            // CLI-012: at most <iso> [internal-path]. CLI-017: -d/-o/-D ignored.
+            if (RejectIgnoredOutputFlags("--md5/--sha256"))
+                return 1;
+
             if (optind >= args.Length)
             {
                 PrintUsage();
+                return 1;
+            }
+
+            if (optind + 2 < args.Length)
+            {
+                Logger.LogErr("Error: --md5/--sha256 takes at most <iso> [internal-path]\n");
                 return 1;
             }
 
@@ -1625,9 +1777,19 @@ internal static class Program
 
         if (copyOut)
         {
+            // CLI-012: exactly 3 positionals. CLI-017: -d/-o/-D are ignored here.
+            if (RejectIgnoredOutputFlags("--copy-out"))
+                return 1;
+
             if (optind + 2 >= args.Length)
             {
                 PrintUsage();
+                return 1;
+            }
+
+            if (optind + 3 < args.Length)
+            {
+                Logger.LogErr("Error: --copy-out takes exactly <iso> <internal-path> <dest>\n");
                 return 1;
             }
 
@@ -1667,9 +1829,19 @@ internal static class Program
 
         if (copyIn)
         {
+            // CLI-012: exactly 3 positionals. CLI-017: -d/-o/-D are ignored here.
+            if (RejectIgnoredOutputFlags("--copy-in"))
+                return 1;
+
             if (optind + 2 >= args.Length)
             {
                 PrintUsage();
+                return 1;
+            }
+
+            if (optind + 3 < args.Length)
+            {
+                Logger.LogErr("Error: --copy-in takes exactly <iso> <host-file> <internal-path>\n");
                 return 1;
             }
 
@@ -1714,6 +1886,10 @@ internal static class Program
 
         if (auditMode)
         {
+            // CLI-017: -d/-o/-D are ignored here.
+            if (RejectIgnoredOutputFlags("-V"))
+                return 1;
+
             if (isoFiles.Count == 0)
             {
                 PrintUsage();
@@ -1759,9 +1935,20 @@ internal static class Program
 
         if (validateMode)
         {
+            // CLI-012: exactly <src> <out> (-o would be silently dropped).
+            // CLI-017: -d/-o/-D are ignored here.
+            if (RejectIgnoredOutputFlags("validate"))
+                return 1;
+
             if (optind + 1 >= args.Length)
             {
                 PrintUsage();
+                return 1;
+            }
+
+            if (optind + 2 < args.Length)
+            {
+                Logger.LogErr("Error: validate takes exactly <src> <out>\n");
                 return 1;
             }
 
@@ -1788,6 +1975,30 @@ internal static class Program
             }
         }
 
+        // CLI-017: the final loop consumes -d only for extract and -o/-D only
+        // for rewrite (checked above). Pure extract ignores -o/-D; tree/list
+        // ignore all three. Placed after every early-return dispatch so the
+        // redump/create/info modes that own these flags are unaffected.
+        if (extract && !rewrite)
+        {
+            if (outputName != null)
+            {
+                Logger.LogErr("Error: -o <output> is only used with -r (rewrite), redump modes, and the rebuild/compress/decompress verbs\n");
+                return 1;
+            }
+
+            if (deleteOld)
+            {
+                Logger.LogErr("Error: -D is only used with -r (rewrite)\n");
+                return 1;
+            }
+        }
+        else if (!rewrite)
+        {
+            if (RejectIgnoredOutputFlags(tree ? "-t (tree)" : "-l (list)"))
+                return 1;
+        }
+
         for (var i = 0; i < isoFiles.Count; i++)
         {
             isos++;
@@ -1802,9 +2013,29 @@ internal static class Program
                 // Probed through the decompressed view so .cso input is detected too.
                 optimized = XisoReader.IsOptimizedImage(xisoPath);
             }
-            catch
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
             {
-                Logger.LogErr($"open error: {xisoPath} No such file or directory\n");
+                // CLI-011: report the actual failure instead of always
+                // claiming a missing file.
+                Logger.LogErr($"open error: {xisoPath}: No such file or directory\n");
+                err = 1;
+                continue;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Logger.LogErr($"open error: {xisoPath}: permission denied ({ex.Message})\n");
+                err = 1;
+                continue;
+            }
+            catch (Exception ex) when (ex is XisoFormatException or InvalidDataException)
+            {
+                Logger.LogErr($"open error: {xisoPath} is not a valid xbox iso image ({ex.Message})\n");
+                err = 1;
+                continue;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogErr($"open error: {xisoPath} ({ex.Message})\n");
                 err = 1;
                 continue;
             }
@@ -1868,7 +2099,10 @@ internal static class Program
                             Logger.Log($"[VALIDATE] Report written to {validateReport}\n");
                         }
 
-                        if (!valResult.Passed && validateStrict)
+                        // CLI-020: a failed validation is exit 2, matching the
+                        // standalone validate verb (non-strict used to log and
+                        // return 0). --validate-strict is retained for CLI parity.
+                        if (!valResult.Passed)
                         {
                             err = 2;
                         }
@@ -1951,6 +2185,13 @@ internal static class Program
         if (optind >= args.Length)
         {
             PrintUsage();
+            return 1;
+        }
+
+        // CLI-012: at most <iso> [dest].
+        if (optind + 2 < args.Length)
+        {
+            Logger.LogErr("Error: --unpack takes at most <iso> [dest] (extra arguments not allowed)\n");
             return 1;
         }
 
@@ -2092,7 +2333,9 @@ internal static class Program
             return 1;
         }
 
-        // If video path not provided, try to derive from xiso directory
+        // If video path not provided, try to derive from xiso directory.
+        // CLI-006: keep null when the derived candidate does not exist so the
+        // rebuild fails with a clear message instead of a phantom path.
         if (videoPath == null)
         {
             var dir = Path.GetDirectoryName(xisoPath) ?? ".";
@@ -2104,13 +2347,13 @@ internal static class Program
             {
                 videoPath = candidate;
             }
-            else
-            {
-                // Also try sibling redump video naming
-                candidate = Path.Combine(dir, baseName + ".video.iso");
-                // If still not found, keep null and let Rebuild fail with clear message
-                videoPath = candidate;
-            }
+        }
+
+        if (videoPath == null)
+        {
+            Logger.LogErr(
+                $"Error: no video partition found beside {xisoPath} (looked for <name>.video.iso); pass [video.iso] explicitly\n");
+            return 1;
         }
 
         var outRedump = outRebuild ?? DeriveRedumpPath(xisoPath);
@@ -2641,6 +2884,14 @@ internal static class Program
             return 1;
         }
 
+        // CLI-005: a positional output and -o together are ambiguous; the
+        // positional used to win and -o was silently dropped.
+        if (positionals.Count == 2 && output != null)
+        {
+            Logger.LogErr("Error: compress takes either [output.cso] or -o <output>, not both\n");
+            return 1;
+        }
+
         if (assumeYes && assumeNo)
         {
             Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
@@ -2747,6 +2998,14 @@ internal static class Program
         {
             Logger.LogErr("Error: decompress requires <cso> [output.iso]\n");
             PrintUsage();
+            return 1;
+        }
+
+        // CLI-005: a positional output and -o together are ambiguous; the
+        // positional used to win and -o was silently dropped.
+        if (positionals.Count == 2 && output != null)
+        {
+            Logger.LogErr("Error: decompress takes either [output.iso] or -o <output>, not both\n");
             return 1;
         }
 
@@ -3283,6 +3542,14 @@ internal static class Program
         _ = securitySectorsPath;
         // Single-output guard
         var singleModeCount = new[] { video, random, seed, wipe, trim, petrify, update, zar }.Count(b => b) == 1;
+        // CLI-014: -o with several redump modes used to skip the single-input
+        // guard below and then be ignored per-file. Fail loudly instead.
+        if (outputName != null && !singleModeCount)
+        {
+            Logger.LogErr("Error: -o <output> requires exactly one redump mode and a single input file\n");
+            return 1;
+        }
+
         if (outputName != null && isoFiles.Count != 1 && singleModeCount)
         {
             Logger.LogErr("Error: -o <output> can only be used with a single input file\n");
@@ -4124,7 +4391,6 @@ internal static class Program
     private static void PrintUsage()
     {
         Console.Error.Write(Constants.Banner + """
-                                                 Usage:
                                                  Usage:
 
                                                     XISOSharp.Cli [options] [-[lrx]] <file1.xiso> [file2.xiso] ...

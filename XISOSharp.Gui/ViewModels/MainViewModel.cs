@@ -1,3 +1,4 @@
+using System.Text;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -14,7 +15,12 @@ namespace XISOSharp.Gui.ViewModels;
 /// </summary>
 internal sealed partial class MainViewModel : ObservableObject
 {
-    private const int MaxLogLines = 400;
+    // Bounded log: keeps the UI responsive while retaining batch-run evidence.
+    // 5000 lines (~500 KB) stays smooth in the Avalonia TextBox; truncation
+    // drops from the head only so the most recent errors remain visible.
+    private const int MaxLogLines = 5000;
+    private readonly Queue<string> _logLines = new();
+    private readonly Lock _runningCtsLock = new();
     private CancellationTokenSource? _runningCts;
 
     // Settings
@@ -34,12 +40,29 @@ internal sealed partial class MainViewModel : ObservableObject
     /// <summary>Gets or sets whether a CLI job is currently running.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
+    [NotifyCanExecuteChangedFor(nameof(RunExtractCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunListCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunTreeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunInfoCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunUnpackCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunCopyOutCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunCreateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunRewriteCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunWipeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunTrimCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunRebuildCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunCompressCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunDecompressCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunValidateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunChecksumCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunBatchCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CancelRunCommand))]
     public partial bool IsRunning { get; set; }
 
     /// <summary>Gets whether a new job can start (i.e. none is running).</summary>
     public bool CanRun => !IsRunning;
 
-    /// <summary>Gets or sets the streamed CLI output log (capped at 400 lines).</summary>
+    /// <summary>Gets or sets the streamed CLI output log (capped, head-truncated).</summary>
     [ObservableProperty]
     public partial string LogText { get; set; } = string.Empty;
 
@@ -50,6 +73,12 @@ internal sealed partial class MainViewModel : ObservableObject
     // Extract tab
     /// <summary>Gets or sets the extract/list/tree/unpack image path.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunExtractCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunListCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunTreeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunInfoCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunUnpackCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunCopyOutCommand))]
     public partial string ExImage { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the optional extract/unpack destination directory.</summary>
@@ -62,15 +91,18 @@ internal sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets or sets the in-image source path for copy-out.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunCopyOutCommand))]
     public partial string ExCopyPath { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the on-disk destination for copy-out.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunCopyOutCommand))]
     public partial string ExCopyDest { get; set; } = string.Empty;
 
     // Create tab
     /// <summary>Gets or sets the source directory to pack into a new image.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunCreateCommand))]
     public partial string CrSource { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the optional output name for the created image.</summary>
@@ -92,6 +124,7 @@ internal sealed partial class MainViewModel : ObservableObject
     // Rewrite tab (+ wipe/trim helpers)
     /// <summary>Gets or sets the newline-separated image list for rewrite.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunRewriteCommand))]
     public partial string RwImages { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the optional rewrite <c>-o</c> output path.</summary>
@@ -128,6 +161,8 @@ internal sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets or sets the wipe/trim source image path.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunWipeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunTrimCommand))]
     public partial string WpImage { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the optional wipe/trim output path.</summary>
@@ -137,10 +172,12 @@ internal sealed partial class MainViewModel : ObservableObject
     // Rebuild tab
     /// <summary>Gets or sets the newline-separated Redump component paths for rebuild.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunRebuildCommand))]
     public partial string RbParts { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the rebuild output Redump ISO path.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunRebuildCommand))]
     public partial string RbOutput { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the optional rebuild <c>--security-sectors</c> file path.</summary>
@@ -150,6 +187,7 @@ internal sealed partial class MainViewModel : ObservableObject
     // Compress tab
     /// <summary>Gets or sets the compress source image or directory.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunCompressCommand))]
     public partial string CpSource { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the optional compress output path.</summary>
@@ -171,6 +209,7 @@ internal sealed partial class MainViewModel : ObservableObject
     // Decompress tab
     /// <summary>Gets or sets the source CSO path for decompression.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunDecompressCommand))]
     public partial string DcCso { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the optional decompressed ISO output path.</summary>
@@ -180,10 +219,13 @@ internal sealed partial class MainViewModel : ObservableObject
     // Validate tab (+ checksum group)
     /// <summary>Gets or sets the validate source ISO path.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunValidateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunChecksumCommand))]
     public partial string VaSource { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the validate output ISO path.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunValidateCommand))]
     public partial string VaOutput { get; set; } = string.Empty;
 
     /// <summary>Gets or sets whether validate passes <c>--validate-checksums</c>.</summary>
@@ -196,6 +238,7 @@ internal sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets or sets the newline-separated image list for checksum (falls back to validate source).</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunChecksumCommand))]
     public partial string CsImages { get; set; } = string.Empty;
 
     /// <summary>Gets or sets whether checksum passes <c>--silent</c>.</summary>
@@ -205,6 +248,7 @@ internal sealed partial class MainViewModel : ObservableObject
     // Batch tab
     /// <summary>Gets or sets the batch scan directory.</summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunBatchCommand))]
     public partial string BaDir { get; set; } = string.Empty;
 
     /// <summary>Gets or sets whether batch scans recursively.</summary>
@@ -262,7 +306,8 @@ internal sealed partial class MainViewModel : ObservableObject
             CliPath = resolved;
             AppendLog($"[GUI] Using CLI: {resolved}");
             var version = await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
-            CliStatus = version is null ? $"Found but -v failed: {resolved}" : $"Ready — {version}";
+            var status = version is null ? $"Found but -v failed: {resolved}" : $"Ready — {version}";
+            SetOnUi(() => CliStatus = status);
             AppendLog(version is null ? "[GUI] CLI -v probe failed." : $"[GUI] {version}");
             if (version is null)
             {
@@ -303,6 +348,7 @@ internal sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ClearLog()
     {
+        _logLines.Clear();
         LogText = string.Empty;
     }
 
@@ -312,12 +358,18 @@ internal sealed partial class MainViewModel : ObservableObject
         AppendLog(line);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanCancelRun))]
     private void CancelRun()
     {
+        CancellationTokenSource? snapshot;
+        lock (_runningCtsLock)
+        {
+            snapshot = _runningCts;
+        }
+
         try
         {
-            _runningCts?.Cancel();
+            snapshot?.Cancel();
         }
         catch (ObjectDisposedException)
         {
@@ -325,42 +377,128 @@ internal sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    private bool CanCancelRun()
+    {
+        return IsRunning;
+    }
+
+    private bool CanRunExtract()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
+    }
+
+    private bool CanRunList()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
+    }
+
+    private bool CanRunTree()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
+    }
+
+    private bool CanRunInfo()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
+    }
+
+    private bool CanRunUnpack()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
+    }
+
+    private bool CanRunCopyOut()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage)
+            && !string.IsNullOrWhiteSpace(ExCopyPath) && !string.IsNullOrWhiteSpace(ExCopyDest);
+    }
+
+    private bool CanRunCreate()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(CrSource);
+    }
+
+    private bool CanRunRewrite()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(RwImages);
+    }
+
+    private bool CanRunWipe()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(WpImage);
+    }
+
+    private bool CanRunTrim()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(WpImage);
+    }
+
+    private bool CanRunRebuild()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(RbParts) && !string.IsNullOrWhiteSpace(RbOutput);
+    }
+
+    private bool CanRunCompress()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(CpSource);
+    }
+
+    private bool CanRunDecompress()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(DcCso);
+    }
+
+    private bool CanRunValidate()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(VaSource) && !string.IsNullOrWhiteSpace(VaOutput);
+    }
+
+    private bool CanRunChecksum()
+    {
+        return !IsRunning && (!string.IsNullOrWhiteSpace(CsImages) || !string.IsNullOrWhiteSpace(VaSource));
+    }
+
+    private bool CanRunBatch()
+    {
+        return !IsRunning && !string.IsNullOrWhiteSpace(BaDir);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunExtract))]
     private Task RunExtractAsync()
     {
         return GuardedAsync(() => RunSingleImageAsync("extract", ExImage,
             CliCommands.Extract(RequireOne(ExImage, "image"), NullIfEmpty(ExDest), OverwriteExisting)));
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunList))]
     private Task RunListAsync()
     {
         return GuardedAsync(() => RunSingleImageAsync("list", ExImage,
             CliCommands.List(RequireOne(ExImage, "image"))));
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunTree))]
     private Task RunTreeAsync()
     {
         return GuardedAsync(() => RunSingleImageAsync("tree", ExImage,
             CliCommands.Tree(RequireOne(ExImage, "image"))));
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunInfo))]
     private Task RunInfoAsync()
     {
         return GuardedAsync(() => RunSingleImageAsync("info", ExImage,
             CliCommands.Info(RequireValue(ExImage, "image"), NullIfEmpty(ExInfoPath))));
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunUnpack))]
     private Task RunUnpackAsync()
     {
         return GuardedAsync(() => RunSingleImageAsync("unpack", ExImage,
             CliCommands.Unpack(RequireValue(ExImage, "image"), NullIfEmpty(ExDest))));
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunCopyOut))]
     private Task RunCopyOutAsync()
     {
         return GuardedAsync(() => RunJobAsync("copy-out",
@@ -368,7 +506,7 @@ internal sealed partial class MainViewModel : ObservableObject
                 RequireValue(ExCopyDest, "destination"))));
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunCreate))]
     private Task RunCreateAsync()
     {
         return GuardedAsync(() =>
@@ -380,21 +518,20 @@ internal sealed partial class MainViewModel : ObservableObject
         });
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunRewrite))]
     private Task RunRewriteAsync()
     {
         return GuardedAsync(() =>
         {
             var images = RequireLines(RwImages, "image");
-            ThrowIfSameOutput(NullIfEmpty(RwOutput),
-                images.Concat(images.Select(i => i + ".old")), "Rewrite output");
+            ThrowIfRewriteCollision(NullIfEmpty(RwOutput), images);
             return RunJobAsync("rewrite", CliCommands.Rewrite(images, NullIfEmpty(RwOutput), NullIfEmpty(RwWorkDir),
                 RwDeleteOld, RwDisableXbePatch, RwValidate, RwChecksums, RwStrict, NullIfEmpty(RwReport),
                 OverwriteExisting));
         });
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunWipe))]
     private Task RunWipeAsync()
     {
         return GuardedAsync(() =>
@@ -406,7 +543,7 @@ internal sealed partial class MainViewModel : ObservableObject
         });
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunTrim))]
     private Task RunTrimAsync()
     {
         return GuardedAsync(() =>
@@ -418,7 +555,7 @@ internal sealed partial class MainViewModel : ObservableObject
         });
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunRebuild))]
     private Task RunRebuildAsync()
     {
         return GuardedAsync(() =>
@@ -432,32 +569,32 @@ internal sealed partial class MainViewModel : ObservableObject
         });
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunCompress))]
     private Task RunCompressAsync()
     {
         return GuardedAsync(() =>
         {
             var source = RequireValue(CpSource, "source directory or image");
-            ThrowIfSameOutput(NullIfEmpty(CpOutput), [source], "Compress output");
+            ThrowIfCompressCollision(source, NullIfEmpty(CpOutput), NullIfEmpty(CpSplit));
             return RunJobAsync("compress", CliCommands.Compress(source, NullIfEmpty(CpOutput),
                 Math.Clamp(CpLevel, 0, 9), string.Equals(CpVersion, "1", StringComparison.Ordinal) ? 1 : 2,
                 NullIfEmpty(CpSplit), OverwriteExisting));
         });
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunDecompress))]
     private Task RunDecompressAsync()
     {
         return GuardedAsync(() =>
         {
             var cso = RequireValue(DcCso, "CSO file");
-            ThrowIfSameOutput(NullIfEmpty(DcOutput), [cso], "Decompress output");
+            ThrowIfDecompressCollision(cso, NullIfEmpty(DcOutput));
             return RunJobAsync("decompress",
                 CliCommands.Decompress(cso, NullIfEmpty(DcOutput), OverwriteExisting));
         });
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunValidate))]
     private Task RunValidateAsync()
     {
         return GuardedAsync(() =>
@@ -468,7 +605,7 @@ internal sealed partial class MainViewModel : ObservableObject
         });
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunChecksum))]
     private Task RunChecksumAsync()
     {
         return GuardedAsync(() =>
@@ -478,7 +615,7 @@ internal sealed partial class MainViewModel : ObservableObject
         });
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunBatch))]
     private Task RunBatchAsync()
     {
         return GuardedAsync(() =>
@@ -520,20 +657,199 @@ internal sealed partial class MainViewModel : ObservableObject
     /// Warn-before-run mirror of the CLI input==output guards (#15): refuses to
     /// start a job whose output would overwrite one of its inputs. Thrown before
     /// any CLI process spawns; <see cref="GuardedAsync"/> logs the message.
-    /// A <c>null</c> output means "derive/default", which never collides.
+    /// Fail-closed like <c>CliOutputGuard</c>: an unverifiable comparison blocks
+    /// the run instead of waving it through.
     /// </summary>
     private static void ThrowIfSameOutput(string? output, IEnumerable<string> inputs, string what)
     {
-        if (string.IsNullOrWhiteSpace(output))
-            return;
-
-        foreach (var input in inputs)
+        try
         {
-            if (XisoPaths.AreSamePath(output, input))
+            if (string.IsNullOrWhiteSpace(output))
+            {
+                return;
+            }
+
+            foreach (var input in inputs)
+            {
+                if (XisoPaths.AreSamePath(output, input))
+                {
+                    throw new InvalidOperationException(
+                        $"{what} is the same file as the input ({input}); choose another output.");
+                }
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"{what} could not be verified against its inputs ({ex.Message}); refusing to overwrite.");
+        }
+    }
+
+    /// <summary>
+    /// Rewrite guard mirroring <c>CliOutputGuard.CheckRewriteOutput</c> per input:
+    /// an <c>-o</c> pointing at any input or at the <c>.old</c> backup about to
+    /// hold it is refused. A <c>null</c> output means in-place rewrite rules.
+    /// </summary>
+    private static void ThrowIfRewriteCollision(string? output, IReadOnlyList<string> images)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(output))
+            {
+                return;
+            }
+
+            var trimmed = output.Trim();
+            foreach (var raw in images)
+            {
+                var input = raw.Trim();
+                if (XisoPaths.AreSamePath(trimmed, input))
+                {
+                    throw new InvalidOperationException(
+                        $"Rewrite output is the same file as the input ({input}); omit -o to rewrite in place.");
+                }
+
+                if (XisoPaths.AreSamePath(trimmed, input + ".old"))
+                {
+                    throw new InvalidOperationException(
+                        $"Rewrite output would overwrite the {input}.old backup; choose another name.");
+                }
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Rewrite output could not be verified ({ex.Message}); refusing to overwrite.");
+        }
+    }
+
+    /// <summary>
+    /// Compress guard mirroring the CLI compress path: the (explicit or derived)
+    /// base output must not equal the source, and when splitting the derived
+    /// first-part probe (<c>.1.cso</c>) must not equal the source either.
+    /// </summary>
+    private static void ThrowIfCompressCollision(string source, string? output, string? splitBytes)
+    {
+        try
+        {
+            var src = source.Trim();
+            string outputBase;
+            if (string.IsNullOrWhiteSpace(output))
+            {
+                bool isDir;
+                try
+                {
+                    isDir = Directory.Exists(src);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    throw new InvalidOperationException(
+                        $"Could not verify compress output against {src} ({ex.Message}); refusing to overwrite.");
+                }
+
+                try
+                {
+                    outputBase = CisoWriter.DeriveDefaultCsoPath(src, isDir);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Could not verify compress output against {src} ({ex.Message}); refusing to overwrite.");
+                }
+            }
+            else
+            {
+                outputBase = output.Trim();
+            }
+
+            if (XisoPaths.AreSamePath(src, outputBase))
             {
                 throw new InvalidOperationException(
-                    $"{what} is the same file as the input ({input}); choose another output.");
+                    $"Compress output is the same file as the input ({src}); choose another output.");
             }
+
+            var splitting = !string.IsNullOrWhiteSpace(splitBytes)
+                && !string.Equals(splitBytes.Trim(), "0", StringComparison.Ordinal);
+            if (splitting)
+            {
+                string firstPart;
+                try
+                {
+                    firstPart = Path.ChangeExtension(outputBase, "1.cso");
+                }
+                catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+                {
+                    throw new InvalidOperationException(
+                        $"Could not verify compress split output {outputBase} ({ex.Message}); refusing to overwrite.");
+                }
+
+                if (firstPart is not null && XisoPaths.AreSamePath(src, firstPart))
+                {
+                    throw new InvalidOperationException(
+                        $"Compress output part {firstPart} is the same file as the input ({src}); choose another output.");
+                }
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Compress output could not be verified ({ex.Message}); refusing to overwrite.");
+        }
+    }
+
+    /// <summary>
+    /// Decompress guard mirroring the CLI decompress path: the (explicit or
+    /// derived) <c>.iso</c> output must not equal the source CSO.
+    /// </summary>
+    private static void ThrowIfDecompressCollision(string cso, string? output)
+    {
+        try
+        {
+            var src = cso.Trim();
+            string probe;
+            if (string.IsNullOrWhiteSpace(output))
+            {
+                try
+                {
+                    probe = CisoReader.DeriveDefaultIsoPath(src);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Could not verify decompress output against {src} ({ex.Message}); refusing to overwrite.");
+                }
+            }
+            else
+            {
+                probe = output.Trim();
+            }
+
+            if (XisoPaths.AreSamePath(src, probe))
+            {
+                throw new InvalidOperationException(
+                    $"Decompress output is the same file as the input ({src}); choose another output.");
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Decompress output could not be verified ({ex.Message}); refusing to overwrite.");
         }
     }
 
@@ -572,14 +888,19 @@ internal sealed partial class MainViewModel : ObservableObject
 
         IsRunning = true;
         LastExit = string.Empty;
-        using var cts = new CancellationTokenSource();
-        _runningCts = cts;
+        var cts = new CancellationTokenSource();
+        lock (_runningCtsLock)
+        {
+            _runningCts = cts;
+        }
+
         try
         {
             AppendLog($"$ XISOSharp.Cli {Quote(args)}");
             Log.Information("Starting {Title}: XISOSharp.Cli {Args}", title, Quote(args));
             var exit = await CliRunner.RunAsync(cli, args, AppendLog, cts.Token).ConfigureAwait(false);
-            LastExit = $"Exit code: {exit}";
+            var exitText = $"Exit code: {exit}";
+            SetOnUi(() => LastExit = exitText);
             AppendLog($"[GUI] {title} finished with exit code {exit}.");
             if (exit != 0)
             {
@@ -599,8 +920,16 @@ internal sealed partial class MainViewModel : ObservableObject
         }
         finally
         {
-            _runningCts = null;
-            IsRunning = false;
+            lock (_runningCtsLock)
+            {
+                if (ReferenceEquals(_runningCts, cts))
+                {
+                    _runningCts = null;
+                }
+            }
+
+            cts.Dispose();
+            SetOnUi(() => IsRunning = false);
         }
     }
 
@@ -615,31 +944,83 @@ internal sealed partial class MainViewModel : ObservableObject
             // Serilog must never break UI logging.
         }
 
-        if (Dispatcher.UIThread.CheckAccess())
+        SetOnUi(() => AppendLogCore(line));
+    }
+
+    /// <summary>
+    /// Runs <paramref name="update"/> on the Avalonia UI thread. Observable
+    /// properties must only change on the UI thread — several flows above
+    /// hop to the pool with <c>ConfigureAwait(false)</c>, so every UI-bound
+    /// set after an await goes through here.
+    /// </summary>
+    private static void SetOnUi(Action update)
+    {
+        try
         {
-            AppendLogCore(line);
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                update();
+            }
+            else
+            {
+                Dispatcher.UIThread.Post(update);
+            }
         }
-        else
+        catch
         {
-            Dispatcher.UIThread.Post(() => AppendLogCore(line));
+            // Dispatcher gone (shutdown) — dropping a UI refresh is safe.
         }
     }
 
     private void AppendLogCore(string line)
     {
-        var lines = LogText.Split('\n').ToList();
-        lines.Add(line);
-        while (lines.Count > MaxLogLines)
+        foreach (var part in line.Split('\n'))
         {
-            lines.RemoveAt(0);
+            var text = part.Length > 0 && part[^1] == '\r' ? part[..^1] : part;
+            _logLines.Enqueue(text);
         }
 
-        LogText = string.Join('\n', lines);
+        while (_logLines.Count > MaxLogLines)
+        {
+            _logLines.Dequeue();
+        }
+
+        var sb = new StringBuilder();
+        foreach (var queued in _logLines)
+        {
+            if (sb.Length > 0)
+            {
+                sb.Append('\n');
+            }
+
+            sb.Append(queued);
+        }
+
+        LogText = sb.ToString();
     }
 
     private static string Quote(IReadOnlyList<string> args)
     {
-        return string.Join(" ", args.Select(a => a.Contains(' ', StringComparison.Ordinal) ? $"\"{a}\"" : a));
+        return string.Join(" ", args.Select(QuoteOne));
+    }
+
+    private static string QuoteOne(string arg)
+    {
+        if (arg.Length == 0)
+        {
+            return "\"\"";
+        }
+
+        var needsQuotes = arg.Contains(' ', StringComparison.Ordinal) || arg.Contains('\t', StringComparison.Ordinal)
+            || arg.Contains('"', StringComparison.Ordinal) || arg.Contains('\n', StringComparison.Ordinal)
+            || arg.Contains('\r', StringComparison.Ordinal);
+        if (!needsQuotes)
+        {
+            return arg;
+        }
+
+        var escaped = arg.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
+        return $"\"{escaped}\"";
     }
 
     private static List<string> RequireOne(string value, string what)

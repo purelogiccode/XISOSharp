@@ -33,8 +33,7 @@ internal static class Program
             }
         }
 
-        root ??= Path.GetFullPath(
-            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData"));
+        root ??= TestDataLocator.GetTestDataRoot(AppContext.BaseDirectory);
 
         try
         {

@@ -30,6 +30,8 @@ internal sealed class GuiSettings
 
     /// <summary>
     /// Loads settings from the per-user JSON file, returning defaults when missing or unreadable.
+    /// A corrupt JSON file is moved aside to a timestamped backup so user edits
+    /// are preserved for recovery instead of being silently discarded.
     /// </summary>
     /// <returns>The loaded or default settings.</returns>
     internal static GuiSettings Load()
@@ -47,7 +49,12 @@ internal sealed class GuiSettings
         {
             return new GuiSettings();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
+        catch (JsonException ex)
+        {
+            BackUpCorruptFile(ex);
+            return new GuiSettings();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                                        or NotSupportedException)
         {
             Log.Warning(ex, "GUI settings load failed; using defaults");
@@ -62,28 +69,64 @@ internal sealed class GuiSettings
         }
     }
 
-    /// <summary>
-    /// Saves settings to the per-user JSON file; failures are ignored (best-effort).
-    /// </summary>
-    internal void Save()
+    private static void BackUpCorruptFile(JsonException ex)
     {
         try
         {
             var path = SettingsPath;
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+            var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmssfff", System.Globalization.CultureInfo.InvariantCulture);
+            var backup = $"{path}.corrupt-{stamp}.bak";
+            try
+            {
+                File.Move(path, backup);
+            }
+            catch (IOException)
+            {
+                File.Copy(path, backup, overwrite: false);
+            }
+
+            Log.Warning(ex, "GUI settings file was corrupt; moved aside to {Backup}; using defaults", backup);
+            BugReporter.ReportWarning($"GUI settings file was corrupt; backed up to {backup}; using defaults.");
+        }
+        catch (Exception backupEx)
+        {
+            Log.Warning(backupEx, "GUI settings corrupt-file backup failed; using defaults");
+            BugReporter.ReportWarning($"GUI settings corrupt-file backup failed; using defaults: {backupEx.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Saves settings to the per-user JSON file atomically (temp file + rename).
+    /// Failures are surfaced to the caller (which logs them); nothing is swallowed.
+    /// </summary>
+    internal void Save()
+    {
+        var path = SettingsPath;
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var tmp = Path.Combine(
+            Path.GetDirectoryName(path)!,
+            $"gui-settings.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.WriteAllText(tmp, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+            File.Move(tmp, path, overwrite: true);
             Log.Information("GUI settings saved to {Path}", path);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        catch
         {
-            Log.Warning(ex, "GUI settings save failed (best-effort)");
-            BugReporter.ReportWarning($"GUI settings save failed: {ex.Message}");
-            // Settings are best-effort; the GUI keeps running with in-memory values.
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "GUI settings save failed");
-            BugReporter.ReportException(ex, "GUI settings save failed");
+            try
+            {
+                if (File.Exists(tmp))
+                {
+                    File.Delete(tmp);
+                }
+            }
+            catch
+            {
+                // ignored
+            }
+
+            throw;
         }
     }
 }

@@ -26,6 +26,13 @@ public static class TestDataWriter
     /// <summary>
     /// Ensures the TestData fixture exists at <paramref name="testDataRoot"/>,
     /// creating any missing source files and rebuilding the derived ISO.
+    /// Sources are canonicalized on every call (BUG-TEST-005): an existing file
+    /// whose bytes differ from the canonical content is rewritten even when
+    /// <paramref name="force"/> is <c>false</c>, so a stale incremental tree
+    /// converges to the same bytes as a clean checkout before the ISO — always
+    /// rebuilt from those sources — is packed. The ISO is packed with
+    /// <c>fileTime: 0</c> so its bytes are deterministic across runs/hosts
+    /// (snapshot tests pack with fileTime 0 as well).
     /// </summary>
     /// <param name="testDataRoot">Path of the TestData root directory (created if missing).</param>
     /// <param name="force">
@@ -34,6 +41,17 @@ public static class TestDataWriter
     /// </param>
     /// <returns>Human-readable descriptions of every action taken.</returns>
     public static IReadOnlyList<string> EnsureTestData(string testDataRoot, bool force = false)
+    {
+        // Serialized on a static gate so concurrent EnsureTestData calls (parallel
+        // test hosts, Generator + tests sharing TestData/) cannot interleave their
+        // source-write windows or their Logger save/set/restore windows (BUG-TEST-005).
+        lock (Gate)
+        {
+            return EnsureTestDataCore(testDataRoot, force);
+        }
+    }
+
+    private static IReadOnlyList<string> EnsureTestDataCore(string testDataRoot, bool force)
     {
         var actions = new List<string>();
 
@@ -68,9 +86,7 @@ public static class TestDataWriter
             force);
 
         // The ISO is a derived artifact: always rebuild so it matches the current writer.
-        // Serialized on a static gate so concurrent EnsureTestData calls cannot
-        // interleave their Logger save/set/restore windows.
-        lock (Gate)
+        // Sources above were canonicalized, so the rebuild is deterministic.
         {
             var isoPath = Path.Combine(outputDir, IsoFileName);
             if (File.Exists(isoPath))
@@ -84,10 +100,19 @@ public static class TestDataWriter
             Logger.RealQuiet = true;
             try
             {
-                var rc = XisoWriter.CreateXiso(sourceDir, outputDir, null, null, out var createdIsoPath, null, null);
+                var rc = XisoWriter.CreateXiso(sourceDir, outputDir, null, null, out var createdIsoPath, null, null,
+                    fileTime: 0UL);
                 if (rc != 0)
                 {
                     throw new InvalidOperationException($"TestData fixture: CreateXiso failed with code {rc}");
+                }
+
+                var produced = createdIsoPath ?? isoPath;
+                if (!string.Equals(produced, isoPath, StringComparison.OrdinalIgnoreCase) && File.Exists(produced))
+                {
+                    // Tolerate writer naming drift: adopt whatever was produced.
+                    File.Move(produced, isoPath, overwrite: true);
+                    actions.Add($"renamed '{produced}' to '{isoPath}'");
                 }
 
                 if (!File.Exists(isoPath))
@@ -112,6 +137,25 @@ public static class TestDataWriter
     {
         if (!force && File.Exists(path))
         {
+            // Heal stale incremental trees: keep the file only when its bytes
+            // already match the canonical content (BUG-TEST-005).
+            string existing;
+            try
+            {
+                existing = File.ReadAllText(path);
+            }
+            catch
+            {
+                existing = string.Empty;
+            }
+
+            if (string.Equals(existing, content, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            File.WriteAllText(path, content);
+            actions.Add($"healed '{path}'");
             return;
         }
 
@@ -121,13 +165,31 @@ public static class TestDataWriter
 
     private static void WriteBinary(List<string> actions, string path, Action<byte[]> fill, int length, bool force)
     {
+        var data = new byte[length];
+        fill(data);
         if (!force && File.Exists(path))
         {
+            // Heal stale incremental trees (BUG-TEST-005): compare bytes.
+            byte[] existing;
+            try
+            {
+                existing = File.ReadAllBytes(path);
+            }
+            catch
+            {
+                existing = [];
+            }
+
+            if (existing.Length == data.Length && existing.AsSpan().SequenceEqual(data))
+            {
+                return;
+            }
+
+            File.WriteAllBytes(path, data);
+            actions.Add($"healed '{path}' ({length} bytes)");
             return;
         }
 
-        var data = new byte[length];
-        fill(data);
         File.WriteAllBytes(path, data);
         actions.Add($"{(force ? "rewrote" : "created")} '{path}' ({length} bytes)");
     }

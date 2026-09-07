@@ -314,7 +314,7 @@
             </StackPanel>
             <TextBlock Text="{Binding CliStatus}" Margin="0,8,0,0" TextWrapping="Wrap" />
             <TextBlock Classes="hint" Margin="0,8,0,0"
-                       Text="Resolution order: this setting, then XISOSharp.Cli next to the GUI executable, then PATH. Settings persist to %AppData%/XISOSharp/gui-settings.json." />
+                       Text="Resolution order: this setting, then XISOSharp.Cli next to the GUI executable, then PATH. Settings persist per-user under the OS application-data folder: XISOSharp/gui-settings.json (Windows %AppData%, Linux/macOS ~/.config)." />
             <TextBlock Classes="section" Text="Defaults" />
             <CheckBox Content="Overwrite existing outputs by default (-y, else -n)" IsChecked="{Binding OverwriteExisting}" />
             <TextBlock Classes="hint" Margin="0,4,0,0"

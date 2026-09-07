@@ -20,6 +20,20 @@ internal sealed class ExtractXisoWrapper : IDisposable
     /// <summary>Runs the exe with args, returns exit code and stdout/stderr.</summary>
     public (int ExitCode, string StdOut, string StdErr) Run(params string[] args)
     {
+        return RunCore(null, args);
+    }
+
+    /// <summary>
+    /// Runs the exe with a per-process working directory (BTL-011: no
+    /// process-wide <c>Directory.SetCurrentDirectory</c> mutation).
+    /// </summary>
+    public (int ExitCode, string StdOut, string StdErr) RunInDirectory(string workingDirectory, params string[] args)
+    {
+        return RunCore(workingDirectory, args);
+    }
+
+    private (int ExitCode, string StdOut, string StdErr) RunCore(string? workingDirectory, string[] args)
+    {
         var psi = new ProcessStartInfo
         {
             FileName = _exePath,
@@ -30,6 +44,11 @@ internal sealed class ExtractXisoWrapper : IDisposable
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
         };
+        if (!string.IsNullOrEmpty(workingDirectory))
+        {
+            psi.WorkingDirectory = workingDirectory;
+        }
+
         foreach (var a in args) psi.ArgumentList.Add(a);
 
         using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start extract-xiso.exe");

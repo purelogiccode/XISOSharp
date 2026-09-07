@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
+using XISOSharp.TestDataGenerator;
 
 namespace XISOSharp.Tests;
 
@@ -11,8 +12,8 @@ namespace XISOSharp.Tests;
 [Collection("Sequential")]
 public class CisoTests : IDisposable
 {
-    private static readonly string TestDataRoot = Path.GetFullPath(
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "TestData"));
+    // Resolved via TestDataLocator (BUG-TEST-006): no fragile 4x ".." literal.
+    private static readonly string TestDataRoot = TestDataLocator.GetTestDataRoot(AppContext.BaseDirectory);
 
     private static readonly string SourceDir = Path.Combine(TestDataRoot, "source");
 
@@ -20,24 +21,48 @@ public class CisoTests : IDisposable
 
     public void Dispose()
     {
+        // BUG-TEST-008: delete each tracked dir once; distinguish expected
+        // cleanup failures instead of swallowing everything in a bare catch.
         foreach (var dir in _tempDirs)
         {
             try
             {
-                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                if (Directory.Exists(dir))
+                {
+                    Directory.Delete(dir, true);
+                }
             }
-            catch
+            catch (DirectoryNotFoundException)
             {
-                /* best effort */
+                // Already removed by the test itself.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Best-effort cleanup.
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup (locked file).
             }
 
             try
             {
-                if (File.Exists(dir)) File.Delete(dir);
+                if (File.Exists(dir))
+                {
+                    File.Delete(dir);
+                }
             }
-            catch
+            catch (DirectoryNotFoundException)
             {
-                /* best effort */
+                // Already removed.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Best-effort cleanup.
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup.
             }
         }
     }
@@ -58,7 +83,8 @@ public class CisoTests : IDisposable
         Assert.Equal(0, rc);
         Assert.NotNull(outPath);
         Assert.True(File.Exists(outPath));
-        _tempDirs.Add(Path.GetDirectoryName(outPath)!);
+        // BUG-TEST-008: outPath already lives under outDir (tracked above);
+        // do not double-track its directory.
         return outPath;
     }
 
