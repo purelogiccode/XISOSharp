@@ -10,9 +10,13 @@
     <AssemblyName>XISOSharp.BattleTests</AssemblyName>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <!-- No AOT here by design: the oracle harness shells out to native exes
-             and uses reflection-heavy comparison helpers. AOT-compat remains a
-             library-surface claim (see XISOSharp.csproj), not a harness one. -->
+         and uses reflection-heavy comparison helpers. AOT-compat remains a
+         library-surface claim (see XISOSharp.csproj), not a harness one. -->
     <PublishAot>false</PublishAot>
+    <!-- The harness writes battle reports/logs/pids next to the sources.
+         Keep that churn out of the SDK globs and IDE scans so builds and
+         file watching stay fast. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);BattleReports\**;*.log;*.pid</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,9 +35,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <!-- xboxkit -z shells out to zarchive.exe beside itself; without it the
-             XK-Zar battle is skipped. Same binary ZARSharp interop tests use.
-             Conditioned so clean clones without the sibling CSharp_ZARSharp
-             checkout still restore/build (battle Skips with a clear reason). -->
+         XK-Zar battle is skipped. Same binary ZARSharp interop tests use.
+         Conditioned so clean clones without the sibling CSharp_ZARSharp
+         checkout still restore/build (battle Skips with a clear reason). -->
     <None Include="..\..\CSharp_ZARSharp\References\ZArchive-0.1.2\zarchive.exe" Link="zarchive.exe"
           CopyToOutputDirectory="PreserveNewest"
           Condition="Exists('..\..\CSharp_ZARSharp\References\ZArchive-0.1.2\zarchive.exe')" />

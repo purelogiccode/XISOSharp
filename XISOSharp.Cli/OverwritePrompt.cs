@@ -52,6 +52,22 @@ internal static class OverwritePrompt
             if (assumeYes)
                 return true;
 
+            // CLI-026: never block on redirected input. A host that pipes stdin
+            // without closing it (unit-test hosts, CI runners, GUIs that shell
+            // out) would otherwise leave ReadLine blocked forever the moment an
+            // output collision needed a prompt — observed as a full test-suite
+            // hang (xunit.v3 test run wedged at the split-overwrite prompt).
+            // Interactive consoles (IsInputRedirected == false) still prompt.
+            // An injected reader (tests, embedded hosts) overrides the guard:
+            // its I/O is fully controlled and cannot wedge the host.
+            if (input is null && Console.IsInputRedirected)
+            {
+                output.WriteLine(
+                    $"[ERROR] Cannot prompt to overwrite {path}: standard input is redirected; pass -y/--yes to overwrite or -n/--no to refuse\n");
+                Log.Warning("Overwrite prompt refused (stdin redirected): {Path}", path);
+                return false;
+            }
+
             input ??= Console.In;
             output.WriteLine($"[WARNING] File already exists: {path}");
             output.WriteLine("Would you like to overwrite? (Y/N)");

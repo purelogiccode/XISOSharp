@@ -17,6 +17,13 @@ public static class TestDataWriter
     /// <summary>Name of the prebuilt ISO written under <c>output</c>.</summary>
     public const string IsoFileName = "source.iso";
 
+    /// <summary>
+    /// Cross-process fixture gate (BUG-TEST-007). Session-local so it does not
+    /// collide across users; a fixed name is fine — worst case two different
+    /// TestData roots merely serialize against each other.
+    /// </summary>
+    private const string MutexName = @"Local\XISOSharp.TestData.Fixture";
+
 #if NET9_0_OR_GREATER
     private static readonly Lock Gate = new();
 #else
@@ -42,12 +49,39 @@ public static class TestDataWriter
     /// <returns>Human-readable descriptions of every action taken.</returns>
     public static IReadOnlyList<string> EnsureTestData(string testDataRoot, bool force = false)
     {
-        // Serialized on a static gate so concurrent EnsureTestData calls (parallel
-        // test hosts, Generator + tests sharing TestData/) cannot interleave their
-        // source-write windows or their Logger save/set/restore windows (BUG-TEST-005).
-        lock (Gate)
+        // BUG-TEST-007: the static gate below only serializes threads inside one
+        // process. Concurrent test hosts — parallel TFM runs (`dotnet test` builds
+        // and runs net8/9/10), a Rider session overlapping a CLI run, and the
+        // Generator tool — share one TestData/ tree, and a delete/rewrite landing
+        // mid-rebuild in another process left the fixture half-written or threw
+        // IOException out of the tests' ModuleInitializer (TypeInitializationException
+        // failed every test in the host: 1274/1279 observed). Serialize across
+        // processes with a named mutex, and ride out transient file locks
+        // (Dropbox sync, AV scanners, indexer) with bounded retries.
+        using Mutex mutex = new(false, MutexName);
+        try
         {
-            return EnsureTestDataCore(testDataRoot, force);
+            if (!mutex.WaitOne(TimeSpan.FromMinutes(5)))
+            {
+                throw new TimeoutException("Timed out waiting for the TestData fixture mutex (another host holds it).");
+            }
+        }
+        catch (AbandonedMutexException)
+        {
+            // Previous holder died mid-rebuild; we now own the mutex. The
+            // canonicalize pass below repairs whatever partial state it left.
+        }
+
+        try
+        {
+            lock (Gate)
+            {
+                return EnsureTestDataCore(testDataRoot, force);
+            }
+        }
+        finally
+        {
+            mutex.ReleaseMutex();
         }
     }
 
@@ -89,48 +123,90 @@ public static class TestDataWriter
         // Sources above were canonicalized, so the rebuild is deterministic.
         {
             string isoPath = Path.Combine(outputDir, IsoFileName);
-            if (File.Exists(isoPath))
+
+            // The rebuild writes/deletes several files in sequence; a transient
+            // external lock (Dropbox sync, AV, indexer) landing anywhere in the
+            // window must not fail the whole suite's ModuleInitializer.
+            for (int attempt = 1;; attempt++)
             {
-                File.Delete(isoPath);
-            }
-
-            bool wasQuiet = Logger.Quiet;
-            bool wasRealQuiet = Logger.RealQuiet;
-            Logger.Quiet = true;
-            Logger.RealQuiet = true;
-            try
-            {
-                int rc = XisoWriter.CreateXiso(sourceDir, outputDir, null, null, out string? createdIsoPath, null, null,
-                    fileTime: 0UL);
-                if (rc != 0)
+                try
                 {
-                    throw new InvalidOperationException($"TestData fixture: CreateXiso failed with code {rc}");
+                    DeleteWithRetry(isoPath);
+                    RebuildIso(actions, sourceDir, outputDir, isoPath);
+                    break;
                 }
-
-                string produced = createdIsoPath ?? isoPath;
-                if (!string.Equals(produced, isoPath, StringComparison.OrdinalIgnoreCase) && File.Exists(produced))
+                catch (Exception ex) when (attempt < 3 && ex is IOException or UnauthorizedAccessException)
                 {
-                    // Tolerate writer naming drift: adopt whatever was produced.
-                    File.Move(produced, isoPath, overwrite: true);
-                    actions.Add($"renamed '{produced}' to '{isoPath}'");
+                    Thread.Sleep(200 * attempt);
                 }
-
-                if (!File.Exists(isoPath))
-                {
-                    throw new InvalidOperationException(
-                        $"TestData fixture: expected ISO at '{isoPath}' but writer produced '{createdIsoPath}'");
-                }
-
-                actions.Add($"rebuilt '{isoPath}'");
-            }
-            finally
-            {
-                Logger.Quiet = wasQuiet;
-                Logger.RealQuiet = wasRealQuiet;
             }
         }
 
         return actions;
+    }
+
+    private static void RebuildIso(List<string> actions, string sourceDir, string outputDir, string isoPath)
+    {
+        bool wasQuiet = Logger.Quiet;
+        bool wasRealQuiet = Logger.RealQuiet;
+        Logger.Quiet = true;
+        Logger.RealQuiet = true;
+        try
+        {
+            int rc = XisoWriter.CreateXiso(sourceDir, outputDir, null, null, out string? createdIsoPath, null, null,
+                fileTime: 0UL);
+            if (rc != 0)
+            {
+                throw new InvalidOperationException($"TestData fixture: CreateXiso failed with code {rc}");
+            }
+
+            string produced = createdIsoPath ?? isoPath;
+            if (!string.Equals(produced, isoPath, StringComparison.OrdinalIgnoreCase) && File.Exists(produced))
+            {
+                // Tolerate writer naming drift: adopt whatever was produced.
+                File.Move(produced, isoPath, overwrite: true);
+                actions.Add($"renamed '{produced}' to '{isoPath}'");
+            }
+
+            if (!File.Exists(isoPath))
+            {
+                throw new InvalidOperationException(
+                    $"TestData fixture: expected ISO at '{isoPath}' but writer produced '{createdIsoPath}'");
+            }
+
+            actions.Add($"rebuilt '{isoPath}'");
+        }
+        finally
+        {
+            Logger.Quiet = wasQuiet;
+            Logger.RealQuiet = wasRealQuiet;
+        }
+    }
+
+    /// <summary>
+    /// Deletes <paramref name="path"/> with bounded retries: fixtures live under
+    /// user-visible directories (this repo ships inside Dropbox), where sync
+    /// engines and scanners hold freshly-written files open for a few hundred
+    /// milliseconds. Unbounded blocking would be worse than a retry budget.
+    /// </summary>
+    private static void DeleteWithRetry(string path)
+    {
+        for (int attempt = 1;; attempt++)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+
+                return;
+            }
+            catch (Exception ex) when (attempt < 5 && ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(100 * attempt);
+            }
+        }
     }
 
     private static void WriteText(List<string> actions, string path, string content, bool force)
@@ -154,12 +230,12 @@ public static class TestDataWriter
                 return;
             }
 
-            File.WriteAllText(path, content);
+            WriteAllTextWithRetry(path, content);
             actions.Add($"healed '{path}'");
             return;
         }
 
-        File.WriteAllText(path, content);
+        WriteAllTextWithRetry(path, content);
         actions.Add($"{(force ? "rewrote" : "created")} '{path}'");
     }
 
@@ -185,12 +261,44 @@ public static class TestDataWriter
                 return;
             }
 
-            File.WriteAllBytes(path, data);
+            WriteAllBytesWithRetry(path, data);
             actions.Add($"healed '{path}' ({length} bytes)");
             return;
         }
 
-        File.WriteAllBytes(path, data);
+        WriteAllBytesWithRetry(path, data);
         actions.Add($"{(force ? "rewrote" : "created")} '{path}' ({length} bytes)");
+    }
+
+    private static void WriteAllTextWithRetry(string path, string content)
+    {
+        for (int attempt = 1;; attempt++)
+        {
+            try
+            {
+                File.WriteAllText(path, content);
+                return;
+            }
+            catch (Exception ex) when (attempt < 5 && ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(100 * attempt);
+            }
+        }
+    }
+
+    private static void WriteAllBytesWithRetry(string path, byte[] data)
+    {
+        for (int attempt = 1;; attempt++)
+        {
+            try
+            {
+                File.WriteAllBytes(path, data);
+                return;
+            }
+            catch (Exception ex) when (attempt < 5 && ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(100 * attempt);
+            }
+        }
     }
 }
