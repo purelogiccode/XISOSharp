@@ -410,7 +410,7 @@ internal sealed partial class MainViewModel : ObservableObject
     private bool CanRunCopyOut()
     {
         return !IsRunning && !string.IsNullOrWhiteSpace(ExImage)
-            && !string.IsNullOrWhiteSpace(ExCopyPath) && !string.IsNullOrWhiteSpace(ExCopyDest);
+                          && !string.IsNullOrWhiteSpace(ExCopyPath) && !string.IsNullOrWhiteSpace(ExCopyDest);
     }
 
     private bool CanRunCreate()
@@ -777,7 +777,7 @@ internal sealed partial class MainViewModel : ObservableObject
             }
 
             var splitting = !string.IsNullOrWhiteSpace(splitBytes)
-                && !string.Equals(splitBytes.Trim(), "0", StringComparison.Ordinal);
+                            && !string.Equals(splitBytes.Trim(), "0", StringComparison.Ordinal);
             if (splitting)
             {
                 string firstPart;
@@ -1012,14 +1012,16 @@ internal sealed partial class MainViewModel : ObservableObject
         }
 
         var needsQuotes = arg.Contains(' ', StringComparison.Ordinal) || arg.Contains('\t', StringComparison.Ordinal)
-            || arg.Contains('"', StringComparison.Ordinal) || arg.Contains('\n', StringComparison.Ordinal)
-            || arg.Contains('\r', StringComparison.Ordinal);
+                                                                      || arg.Contains('"', StringComparison.Ordinal) ||
+                                                                      arg.Contains('\n', StringComparison.Ordinal)
+                                                                      || arg.Contains('\r', StringComparison.Ordinal);
         if (!needsQuotes)
         {
             return arg;
         }
 
-        var escaped = arg.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
+        var escaped = arg.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
         return $"\"{escaped}\"";
     }
 

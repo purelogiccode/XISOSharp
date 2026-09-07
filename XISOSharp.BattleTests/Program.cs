@@ -515,7 +515,7 @@ internal static class Program
             // BTL-022: sub-second + PID component so concurrent runs never overwrite
             // each other's reports (second-granularity stamps collide).
             var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", System.Globalization.CultureInfo.InvariantCulture)
-                + "_" + Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        + "_" + Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture);
             var txtPath = Path.Combine(outDir, $"battle_{stamp}.txt");
             var jsonPath = Path.Combine(outDir, $"battle_{stamp}.json");
 

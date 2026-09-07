@@ -1,64 +1,64 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <!-- Cover all library TFMs: `dotnet test` runs the suite on net8/9/10. -->
-        <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-        <AssemblyName>XISOSharp.Tests</AssemblyName>
-        <RootNamespace>XISOSharp.Tests</RootNamespace>
-        <IsPackable>false</IsPackable>
-    </PropertyGroup>
+  <PropertyGroup>
+    <!-- Cover all library TFMs: `dotnet test` runs the suite on net8/9/10. -->
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <AssemblyName>XISOSharp.Tests</AssemblyName>
+    <RootNamespace>XISOSharp.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="coverlet.collector">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="Meziantou.Analyzer">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" />
-        <!-- Version stamp derived from git tags, same as the other projects. -->
-        <PackageReference Include="MinVer" PrivateAssets="all">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="Roslynator.Analyzers">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="Roslynator.Formatting.Analyzers">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <!-- xunit 2.9.3 pairs with the universal xunit.runner.visualstudio 4.x,
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Meziantou.Analyzer">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- Version stamp derived from git tags, same as the other projects. -->
+    <PackageReference Include="MinVer" PrivateAssets="all">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Roslynator.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Roslynator.Formatting.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <!-- xunit 2.9.3 pairs with the universal xunit.runner.visualstudio 4.x,
              which runs xUnit.net v1/v2/v3 tests on net8+ (verified: full suite
              passes on net8.0/net9.0/net10.0). Do not "align" to an older 2.x
              runner without re-verifying test discovery on all TFMs. -->
-        <PackageReference Include="xunit" />
-        <PackageReference Include="xunit.runner.visualstudio">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-    </ItemGroup>
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 
-    <ItemGroup>
-        <Using Include="Xunit" />
-    </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
-        <ProjectReference Include="..\XISOSharp.Cli\XISOSharp.Cli.csproj" />
-        <!-- TestDataWriter lives in the Generator project (single owner); Tests
+  <ItemGroup>
+    <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
+    <ProjectReference Include="..\XISOSharp.Cli\XISOSharp.Cli.csproj" />
+    <!-- TestDataWriter lives in the Generator project (single owner); Tests
              references the project instead of linked-compiling the file, so new
              Generator sources always propagate. -->
-        <ProjectReference Include="..\XISOSharp.TestDataGenerator\XISOSharp.TestDataGenerator.csproj" />
-        <!-- ZARSharp resolves transitively via XISOSharp lib (ProjectReference when
+    <ProjectReference Include="..\XISOSharp.TestDataGenerator\XISOSharp.TestDataGenerator.csproj" />
+    <!-- ZARSharp resolves transitively via XISOSharp lib (ProjectReference when
              sibling checkout exists, NuGet fallback otherwise). No direct
              out-of-repo reference here. -->
-    </ItemGroup>
+  </ItemGroup>
 
 </Project>

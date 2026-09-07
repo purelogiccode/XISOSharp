@@ -89,10 +89,14 @@ public class XisoSharpWrapper : IDisposable
             var core = await XISOSharp.ProcessRunner
                 .RunAsync(_exePath, args, ProcessTimeout, cancellationToken)
                 .ConfigureAwait(false);
-            var result = new Result { ExitCode = core.ExitCode, StdOut = core.StandardOutput, StdErr = core.StandardError };
+            var result = new Result
+                { ExitCode = core.ExitCode, StdOut = core.StandardOutput, StdErr = core.StandardError };
             if (result.ExitCode != 0)
+            {
                 Log.Warning("extract-xiso exited with code {Exit}: {Args}", result.ExitCode,
                     string.Join(" ", args));
+            }
+
             return result;
         }
         catch (OperationCanceledException)

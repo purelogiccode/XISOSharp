@@ -67,8 +67,11 @@ public sealed class MemoryBlockDevice : IBlockDevice
         // Growth doubling below is long math, but the array length is int: reject
         // unserviceable requests instead of wrapping to a negative size.
         if (needed > Array.MaxLength)
+        {
             throw new InvalidOperationException(
                 $"MemoryBlockDevice cannot grow to {needed} bytes (exceeds maximum array length {Array.MaxLength}).");
+        }
+
         var newSize = Math.Max(needed, _data.Length == 0 ? 4096 : _data.Length * 2);
         while (newSize < needed) newSize *= 2;
         if (newSize > Array.MaxLength) newSize = needed;

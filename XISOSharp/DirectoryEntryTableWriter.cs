@@ -39,7 +39,11 @@ public static class DirectoryEntryTableWriter
     /// encoder falls back to directory/archive. Pass the source entry's
     /// attributes when rewriting so RO/HID/SYS survive (BUG-LIB-034).
     /// </param>
-    public sealed record DirectoryTableEntry(string Name, bool IsDirectory, uint StartSector, uint FileSize,
+    public sealed record DirectoryTableEntry(
+        string Name,
+        bool IsDirectory,
+        uint StartSector,
+        uint FileSize,
         byte Attributes = 0);
 
     /// <summary>
@@ -166,7 +170,9 @@ public static class DirectoryEntryTableWriter
         // (fresh pack) carry 0 and keep the historical directory/archive default.
         var attributes = node.Attributes != 0
             ? node.Attributes
-            : node.Subdirectory != null ? Constants.AttributeDir : Constants.AttributeArc;
+            : node.Subdirectory != null
+                ? Constants.AttributeDir
+                : Constants.AttributeArc;
         var lOffset = (ushort)(node.Left != null ? node.Left.Offset / Constants.DwordSize : 0);
         var rOffset = (ushort)(node.Right != null ? node.Right.Offset / Constants.DwordSize : 0);
 

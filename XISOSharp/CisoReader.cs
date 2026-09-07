@@ -125,8 +125,11 @@ public static class CisoReader
         var totalBlocks = (long)((uncompressedSize + blockSize - 1) / blockSize);
         var indexLen = totalBlocks + 1;
         if (indexLen > int.MaxValue)
+        {
             throw new InvalidDataException(
                 $"CISO index too large ({indexLen} entries) for claimed size {uncompressedSize}");
+        }
+
         var indexCount = (int)indexLen;
         if ((long)indexCount * 4 > source.Length - HeaderSize)
             throw new InvalidDataException("CISO index table exceeds file size");

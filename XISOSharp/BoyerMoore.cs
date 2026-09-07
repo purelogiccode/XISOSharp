@@ -154,8 +154,10 @@ public class BoyerMoore
     public int Search(byte[] text, int startIndex, int length)
     {
         if (_bcTable is null || _gsTable is null)
+        {
             throw new InvalidOperationException(
                 $"{nameof(BoyerMoore)} is not initialized. Call {nameof(Init)} before {nameof(Search)}.");
+        }
 
         int j;
 

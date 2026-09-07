@@ -32,7 +32,8 @@ internal sealed class BattleSessionResult
     public int PassedSubTests => FileResults.Sum(r => r.SubTests.Count(s => s.Status == BattleStatus.Passed));
 
     /// <summary>Failed sub-tests (includes errors).</summary>
-    public int FailedSubTests => FileResults.Sum(r => r.SubTests.Count(s => s.Status == BattleStatus.Failed || s.Status == BattleStatus.Error));
+    public int FailedSubTests => FileResults.Sum(r =>
+        r.SubTests.Count(s => s.Status == BattleStatus.Failed || s.Status == BattleStatus.Error));
 
     /// <summary>Error sub-tests.</summary>
     public int ErrorSubTests => FileResults.Sum(r => r.SubTests.Count(s => s.Status == BattleStatus.Error));

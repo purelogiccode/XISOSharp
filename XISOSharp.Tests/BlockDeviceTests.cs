@@ -205,8 +205,7 @@ public class BlockDeviceTests : IDisposable
     [Fact]
     public void MemoryBlockDevice_Ctor_HugeCapacity_ThrowsArgumentOutOfRange()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => new MemoryBlockDevice((long)Array.MaxLength + 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new MemoryBlockDevice((long)Array.MaxLength + 1));
     }
 
     [Fact]
@@ -603,7 +602,7 @@ public class BlockDeviceTests : IDisposable
     {
         var bytes = new byte[64 * Constants.SectorSize];
         var magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
-        var header = Constants.HeaderOffset;
+        const int header = Constants.HeaderOffset;
         magic.CopyTo(bytes.AsSpan(header, magic.Length));
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(header + 20, 4), rootSector);
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(header + 24, 4), rootSize);

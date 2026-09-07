@@ -172,7 +172,8 @@ internal partial class MainViewModel
     private void InitExploreCommands()
     {
         BrowseExploreImageCommand = new RelayCommand(_ => BrowseExploreImage());
-        OpenExploreImageCommand = new AsyncRelayCommand(_ => OpenExploreImageAsync(), null, ex => AddLog($"Explore open failed: {ex.Message}"));
+        OpenExploreImageCommand = new AsyncRelayCommand(_ => OpenExploreImageAsync(), null,
+            ex => AddLog($"Explore open failed: {ex.Message}"));
         RefreshExploreCommand = new AsyncRelayCommand(
             _ => OpenExploreImageAsync(refresh: true),
             _ => _explorer is not null && !IsExplorerBusy,
@@ -180,8 +181,10 @@ internal partial class MainViewModel
         CloseExploreImageCommand = new RelayCommand(
             _ => CloseExploreImage(),
             _ => _explorer is not null && !IsExplorerBusy);
-        CopyOutNodeCommand = new AsyncRelayCommand(_ => CopyOutNodeAsync(), null, ex => AddLog($"Explore copy-out failed: {ex.Message}"));
-        HashNodeCommand = new AsyncRelayCommand(_ => HashNodeAsync(), null, ex => AddLog($"Explore hash failed: {ex.Message}"));
+        CopyOutNodeCommand = new AsyncRelayCommand(_ => CopyOutNodeAsync(), null,
+            ex => AddLog($"Explore copy-out failed: {ex.Message}"));
+        HashNodeCommand =
+            new AsyncRelayCommand(_ => HashNodeAsync(), null, ex => AddLog($"Explore hash failed: {ex.Message}"));
     }
 
     /// <summary>

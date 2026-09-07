@@ -169,7 +169,7 @@ public static class XisoRedump
     /// Mirrors <c>ExtractVideo.ExtractSU</c>. Returns false if the video file does not
     /// exist or its size is not XGD3.
     /// </summary>
-    public static bool TryExtractUpdate(string videoPath, string? outputUpdatePath,         bool wipe = true,
+    public static bool TryExtractUpdate(string videoPath, string? outputUpdatePath, bool wipe = true,
         bool quiet = false)
     {
         if (!File.Exists(videoPath)) return false;

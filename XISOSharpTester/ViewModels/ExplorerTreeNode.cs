@@ -192,7 +192,8 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
         MarshalExpandResult(dispatcher, loaded, null);
     }
 
-    private void MarshalExpandResult(System.Windows.Threading.Dispatcher dispatcher, IReadOnlyList<XISOSharp.ExplorerNode>? loaded, string? error)
+    private void MarshalExpandResult(System.Windows.Threading.Dispatcher dispatcher,
+        IReadOnlyList<XISOSharp.ExplorerNode>? loaded, string? error)
     {
         try
         {

@@ -49,7 +49,8 @@ internal sealed class Program
         {
             if (string.Equals(args[0], "--self-test", StringComparison.OrdinalIgnoreCase))
             {
-                return await SelfTest.RunAsync(Console.WriteLine, args.Length > 1 ? args[1] : null).ConfigureAwait(false);
+                return await SelfTest.RunAsync(Console.WriteLine, args.Length > 1 ? args[1] : null)
+                    .ConfigureAwait(false);
             }
 
             if (string.Equals(args[0], "--probe-cli", StringComparison.OrdinalIgnoreCase))

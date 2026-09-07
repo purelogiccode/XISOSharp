@@ -65,7 +65,7 @@ public class CisoSplitInteropTests : IDisposable
     {
         // Centralized via TestDataLocator (BUG-TEST-006).
         return TestDataLocator.GetSolutionRoot(AppContext.BaseDirectory)
-            ?? throw new InvalidOperationException("Solution root not found.");
+               ?? throw new InvalidOperationException("Solution root not found.");
     }
 
     private static string XdvdfsExePath()

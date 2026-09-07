@@ -202,7 +202,7 @@ internal static class Program
 
             if (deleteOld)
             {
-                Logger.LogErr($"Error: -D is only used with -r (rewrite)\n");
+                Logger.LogErr("Error: -D is only used with -r (rewrite)\n");
                 return true;
             }
 
@@ -1005,8 +1005,10 @@ internal static class Program
         // require exactly one. (--md5/--sha256 double-selection is rejected
         // during parsing since both share hashMode.)
         var classicModes = new[]
-            { listMode, tree, info, lsMode, xexInfoMode, xbeInfoMode, repairMode, salvageMode, hashMode, copyOut,
-                copyIn, auditMode, validateMode }.Count(b => b);
+        {
+            listMode, tree, info, lsMode, xexInfoMode, xbeInfoMode, repairMode, salvageMode, hashMode, copyOut,
+            copyIn, auditMode, validateMode
+        }.Count(b => b);
         if (classicModes > 1)
         {
             Logger.LogErr(
@@ -1983,7 +1985,8 @@ internal static class Program
         {
             if (outputName != null)
             {
-                Logger.LogErr("Error: -o <output> is only used with -r (rewrite), redump modes, and the rebuild/compress/decompress verbs\n");
+                Logger.LogErr(
+                    "Error: -o <output> is only used with -r (rewrite), redump modes, and the rebuild/compress/decompress verbs\n");
                 return 1;
             }
 
@@ -3142,7 +3145,7 @@ internal static class Program
             if (halves)
             {
                 var cut = (((length + 1) / 2) + Constants.SectorSize - 1) / Constants.SectorSize *
-                    Constants.SectorSize;
+                          Constants.SectorSize;
                 chunk = cut <= 0 || cut >= length ? length : cut;
             }
             else

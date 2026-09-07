@@ -393,7 +393,7 @@ public partial class MainWindow : Window
             var picked = await PickSingleFileAsync([ImageFilter], "Select image").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.ExImage = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.ExImage = picked);
             }
         }
         catch (Exception ex)
@@ -419,7 +419,7 @@ public partial class MainWindow : Window
             var picked = await PickFolderAsync("Select destination directory").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.ExDest = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.ExDest = picked);
             }
         }
         catch (Exception ex)
@@ -445,7 +445,7 @@ public partial class MainWindow : Window
             var picked = await PickFolderAsync("Select source directory").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.CrSource = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.CrSource = picked);
             }
         }
         catch (Exception ex)
@@ -471,7 +471,7 @@ public partial class MainWindow : Window
             var picked = await PickFilesAsync([ImageFilter], "Add images", allowMultiple: true).ConfigureAwait(false);
             if (picked.Count != 0)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.RwImages = AppendLines(vm.RwImages, picked); });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.RwImages = AppendLines(vm.RwImages, picked));
             }
         }
         catch (Exception ex)
@@ -497,7 +497,7 @@ public partial class MainWindow : Window
             var picked = await PickSaveAsync("Rewrite output", "rewritten.iso").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.RwOutput = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.RwOutput = picked);
             }
         }
         catch (Exception ex)
@@ -523,7 +523,7 @@ public partial class MainWindow : Window
             var picked = await PickFolderAsync("Select work directory").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.RwWorkDir = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.RwWorkDir = picked);
             }
         }
         catch (Exception ex)
@@ -549,7 +549,7 @@ public partial class MainWindow : Window
             var picked = await PickSaveAsync("Validation report", "report.json").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.RwReport = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.RwReport = picked);
             }
         }
         catch (Exception ex)
@@ -575,7 +575,7 @@ public partial class MainWindow : Window
             var picked = await PickSingleFileAsync([IsoFilter], "Select image").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.WpImage = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.WpImage = picked);
             }
         }
         catch (Exception ex)
@@ -602,7 +602,7 @@ public partial class MainWindow : Window
                 .ConfigureAwait(false);
             if (picked.Count != 0)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.RbParts = AppendLines(vm.RbParts, picked); });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.RbParts = AppendLines(vm.RbParts, picked));
             }
         }
         catch (Exception ex)
@@ -628,7 +628,7 @@ public partial class MainWindow : Window
             var picked = await PickSaveAsync("Redump output", "redump.iso").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.RbOutput = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.RbOutput = picked);
             }
         }
         catch (Exception ex)
@@ -655,7 +655,7 @@ public partial class MainWindow : Window
                 .ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.RbSectors = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.RbSectors = picked);
             }
         }
         catch (Exception ex)
@@ -681,7 +681,7 @@ public partial class MainWindow : Window
             var picked = await PickSingleFileAsync([IsoFilter], "Select source image").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.CpSource = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.CpSource = picked);
             }
         }
         catch (Exception ex)
@@ -707,7 +707,7 @@ public partial class MainWindow : Window
             var picked = await PickFolderAsync("Select source directory").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.CpSource = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.CpSource = picked);
             }
         }
         catch (Exception ex)
@@ -733,7 +733,7 @@ public partial class MainWindow : Window
             var picked = await PickSaveAsync("CSO output", "game.cso").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.CpOutput = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.CpOutput = picked);
             }
         }
         catch (Exception ex)
@@ -759,7 +759,7 @@ public partial class MainWindow : Window
             var picked = await PickSingleFileAsync([CsoFilter], "Select CSO").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.DcCso = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.DcCso = picked);
             }
         }
         catch (Exception ex)
@@ -785,7 +785,7 @@ public partial class MainWindow : Window
             var picked = await PickSaveAsync("ISO output", "game.iso").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.DcOutput = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.DcOutput = picked);
             }
         }
         catch (Exception ex)
@@ -811,7 +811,7 @@ public partial class MainWindow : Window
             var picked = await PickSingleFileAsync([IsoFilter], "Select source ISO").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.VaSource = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.VaSource = picked);
             }
         }
         catch (Exception ex)
@@ -837,7 +837,7 @@ public partial class MainWindow : Window
             var picked = await PickSingleFileAsync([IsoFilter], "Select output ISO").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.VaOutput = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.VaOutput = picked);
             }
         }
         catch (Exception ex)
@@ -863,7 +863,7 @@ public partial class MainWindow : Window
             var picked = await PickSaveAsync("Validation report", "report.json").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.VaReport = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.VaReport = picked);
             }
         }
         catch (Exception ex)
@@ -889,7 +889,7 @@ public partial class MainWindow : Window
             var picked = await PickFilesAsync([ImageFilter], "Add images", allowMultiple: true).ConfigureAwait(false);
             if (picked.Count != 0)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.CsImages = AppendLines(vm.CsImages, picked); });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.CsImages = AppendLines(vm.CsImages, picked));
             }
         }
         catch (Exception ex)
@@ -915,7 +915,7 @@ public partial class MainWindow : Window
             var picked = await PickFolderAsync("Select batch directory").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.BaDir = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.BaDir = picked);
             }
         }
         catch (Exception ex)
@@ -941,7 +941,7 @@ public partial class MainWindow : Window
             var picked = await PickFolderAsync("Select destination directory").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.BaDest = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.BaDest = picked);
             }
         }
         catch (Exception ex)
@@ -967,7 +967,7 @@ public partial class MainWindow : Window
             var picked = await PickSingleFileAsync([], "Select XISOSharp executable").ConfigureAwait(false);
             if (picked is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => { vm.CliPath = picked; });
+                await Dispatcher.UIThread.InvokeAsync(() => vm.CliPath = picked);
             }
         }
         catch (Exception ex)

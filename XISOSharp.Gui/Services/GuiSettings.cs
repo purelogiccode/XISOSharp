@@ -74,7 +74,8 @@ internal sealed class GuiSettings
         try
         {
             var path = SettingsPath;
-            var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmssfff", System.Globalization.CultureInfo.InvariantCulture);
+            var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmssfff",
+                System.Globalization.CultureInfo.InvariantCulture);
             var backup = $"{path}.corrupt-{stamp}.bak";
             try
             {

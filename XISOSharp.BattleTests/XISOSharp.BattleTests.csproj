@@ -1,65 +1,65 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <OutputType>Exe</OutputType>
-        <!-- Dev/test harness, never packed. -->
-        <IsPackable>false</IsPackable>
-        <TargetFramework>net10.0</TargetFramework>
-        <!-- ImplicitUsings/Nullable inherited from Directory.Build.props. -->
-        <RootNamespace>XISOSharp.BattleTests</RootNamespace>
-        <AssemblyName>XISOSharp.BattleTests</AssemblyName>
-        <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
-        <!-- No AOT here by design: the oracle harness shells out to native exes
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Dev/test harness, never packed. -->
+    <IsPackable>false</IsPackable>
+    <TargetFramework>net10.0</TargetFramework>
+    <!-- ImplicitUsings/Nullable inherited from Directory.Build.props. -->
+    <RootNamespace>XISOSharp.BattleTests</RootNamespace>
+    <AssemblyName>XISOSharp.BattleTests</AssemblyName>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <!-- No AOT here by design: the oracle harness shells out to native exes
              and uses reflection-heavy comparison helpers. AOT-compat remains a
              library-surface claim (see XISOSharp.csproj), not a harness one. -->
-        <PublishAot>false</PublishAot>
-    </PropertyGroup>
+    <PublishAot>false</PublishAot>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
-        <ProjectReference Include="..\XISOSharp.Cli\XISOSharp.Cli.csproj" />
-    </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
+    <ProjectReference Include="..\XISOSharp.Cli\XISOSharp.Cli.csproj" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <None Update="extract-xiso.exe">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-        <None Update="xboxkit.exe">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-        <None Update="xdvdfs.exe">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-        <!-- xboxkit -z shells out to zarchive.exe beside itself; without it the
+  <ItemGroup>
+    <None Update="extract-xiso.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="xboxkit.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="xdvdfs.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- xboxkit -z shells out to zarchive.exe beside itself; without it the
              XK-Zar battle is skipped. Same binary ZARSharp interop tests use.
              Conditioned so clean clones without the sibling CSharp_ZARSharp
              checkout still restore/build (battle Skips with a clear reason). -->
-        <None Include="..\..\CSharp_ZARSharp\References\ZArchive-0.1.2\zarchive.exe" Link="zarchive.exe"
-              CopyToOutputDirectory="PreserveNewest"
-              Condition="Exists('..\..\CSharp_ZARSharp\References\ZArchive-0.1.2\zarchive.exe')" />
-    </ItemGroup>
+    <None Include="..\..\CSharp_ZARSharp\References\ZArchive-0.1.2\zarchive.exe" Link="zarchive.exe"
+          CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('..\..\CSharp_ZARSharp\References\ZArchive-0.1.2\zarchive.exe')" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Meziantou.Analyzer">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <!-- Version stamp derived from git tags, same as the other projects. -->
-        <PackageReference Include="MinVer" PrivateAssets="all">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="Roslynator.Analyzers">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="Roslynator.Formatting.Analyzers">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-    </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Meziantou.Analyzer">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <!-- Version stamp derived from git tags, same as the other projects. -->
+    <PackageReference Include="MinVer" PrivateAssets="all">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Roslynator.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Roslynator.Formatting.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 
 </Project>

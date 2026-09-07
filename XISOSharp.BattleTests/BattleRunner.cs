@@ -208,7 +208,8 @@ internal static class BattleRunner
                     {
                         TestName = "Verify",
                         Status = BattleStatus.Failed,
-                        Detail = $"C# error: {(ex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim()} | native list error {nex.GetType().Name}: {(nex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim()}",
+                        Detail =
+                            $"C# error: {(ex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim()} | native list error {nex.GetType().Name}: {(nex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim()}",
                         ElapsedSeconds = sw.Elapsed.TotalSeconds
                     };
                 }
@@ -221,7 +222,8 @@ internal static class BattleRunner
                     var csKind = ClassifyVerifyFailure(ex);
                     var nativeKind = ClassifyVerifyFailure(nativeOut);
                     var csFirst = (ex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim();
-                    var nativeFirst = (nativeOut.Split('\n').FirstOrDefault(s => !string.IsNullOrWhiteSpace(s)) ?? string.Empty).Trim();
+                    var nativeFirst = (nativeOut.Split('\n').FirstOrDefault(s => !string.IsNullOrWhiteSpace(s)) ??
+                                       string.Empty).Trim();
                     if (string.Equals(csKind, nativeKind, StringComparison.Ordinal) &&
                         !string.Equals(csKind, "other", StringComparison.Ordinal))
                     {
@@ -229,7 +231,8 @@ internal static class BattleRunner
                         {
                             TestName = "Verify",
                             Status = BattleStatus.Passed,
-                            Detail = $"Both fail as expected ({csKind}): C#: {csFirst} | native exit {code}: {nativeFirst}",
+                            Detail =
+                                $"Both fail as expected ({csKind}): C#: {csFirst} | native exit {code}: {nativeFirst}",
                             ElapsedSeconds = sw.Elapsed.TotalSeconds
                         };
                     }
@@ -238,7 +241,8 @@ internal static class BattleRunner
                     {
                         TestName = "Verify",
                         Status = BattleStatus.Failed,
-                        Detail = $"Divergent failures C#({csKind}): {csFirst} | native({nativeKind}) exit {code}: {nativeFirst}",
+                        Detail =
+                            $"Divergent failures C#({csKind}): {csFirst} | native({nativeKind}) exit {code}: {nativeFirst}",
                         ElapsedSeconds = sw.Elapsed.TotalSeconds
                     };
                 }
@@ -247,7 +251,8 @@ internal static class BattleRunner
                 {
                     TestName = "Verify",
                     Status = BattleStatus.Failed,
-                    Detail = $"Divergent: C# failed ({(ex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim()}) but native list exit 0",
+                    Detail =
+                        $"Divergent: C# failed ({(ex.Message.Split('\n').FirstOrDefault() ?? string.Empty).Trim()}) but native list exit 0",
                     ElapsedSeconds = sw.Elapsed.TotalSeconds
                 };
             }
@@ -680,7 +685,7 @@ internal static class BattleRunner
     private static string? FindRewriteOutput(string workDir, string outDir)
     {
         var prefix = outDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-            + Path.DirectorySeparatorChar;
+                     + Path.DirectorySeparatorChar;
         return Directory.GetFiles(workDir, "*.iso", SearchOption.AllDirectories)
             .Where(f => !f.EndsWith(".old", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(f => f.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
@@ -736,7 +741,8 @@ internal static class BattleRunner
                         {
                             TestName = "CISO",
                             Status = BattleStatus.Failed,
-                            Detail = $"Round-trip size mismatch {inputBytes} vs {decBytes} (hash skipped above {CisoHashVerifyGateBytes} byte gate)",
+                            Detail =
+                                $"Round-trip size mismatch {inputBytes} vs {decBytes} (hash skipped above {CisoHashVerifyGateBytes} byte gate)",
                             ElapsedSeconds = sw.Elapsed.TotalSeconds
                         };
                     }
@@ -745,7 +751,8 @@ internal static class BattleRunner
                     {
                         TestName = "CISO",
                         Status = BattleStatus.Skipped,
-                        Detail = $"Skipped hash verification: input {inputBytes} bytes exceeds {CisoHashVerifyGateBytes} byte gate; round-trip size match \u2713 (level {level})",
+                        Detail =
+                            $"Skipped hash verification: input {inputBytes} bytes exceeds {CisoHashVerifyGateBytes} byte gate; round-trip size match \u2713 (level {level})",
                         ElapsedSeconds = sw.Elapsed.TotalSeconds
                     };
                 }
@@ -1495,7 +1502,7 @@ internal static class BattleRunner
                     e.IsDirectory ? 0L : e.FileSize));
             }
 
-            list.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.Ordinal));
+            list.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path));
             return list;
         }
         catch
@@ -1527,7 +1534,7 @@ internal static class BattleRunner
             entries.Add(new ListEntry(NormalizeListPath(p.TrimEnd('\\', '/')), isDir, s));
         }
 
-        entries.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.Ordinal));
+        entries.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path));
         return entries;
     }
 
@@ -1586,7 +1593,8 @@ internal static class BattleRunner
         return new ListCmp(all, string.Join("\n", details));
     }
 
-    private static Dictionary<string, ListEntry> BuildListMap(List<ListEntry> entries, List<string> details, string side)
+    private static Dictionary<string, ListEntry> BuildListMap(List<ListEntry> entries, List<string> details,
+        string side)
     {
         var dict = new Dictionary<string, ListEntry>(StringComparer.Ordinal);
         foreach (var e in entries)
@@ -1701,7 +1709,7 @@ internal static class BattleRunner
         // BTL-021: full 32-char GUID per temp root (8-char prefixes collide across
         // parallel harnesses sharing %TEMP%\XISOSharpBattle) with a create-retry so
         // a rare collision retries with a fresh GUID instead of reusing a foreign dir.
-        for (var attempt = 0; ; attempt++)
+        for (var attempt = 0;; attempt++)
         {
             var dir = Path.Combine(Path.GetTempPath(), "XISOSharpBattle", Guid.NewGuid().ToString("N"),
                 name);

@@ -30,9 +30,9 @@ internal static class CliOutputGuard
                 return null;
 
             return $"Error: {token} must come before ISO filenames" +
-                    $" (e.g. -x {token} <value> game.iso);" +
-                    " a flag after the first filename is read as a filename" +
-                    " (use ./-flag if a file is really named this way)\n";
+                   $" (e.g. -x {token} <value> game.iso);" +
+                   " a flag after the first filename is read as a filename" +
+                   " (use ./-flag if a file is really named this way)\n";
         }
         catch (Exception ex)
         {
@@ -93,7 +93,8 @@ internal static class CliOutputGuard
             BugReporter.ReportException(ex, $"CheckRewriteOutput failed for {xisoPath}");
             // CLI-024: fail closed — an unverifiable comparison must block the
             // overwrite, not wave it through (null reads as safe).
-            return $"Error: could not verify rewrite output {outputName ?? "<none>"} against {xisoPath} ({ex.Message}); refusing to overwrite\n";
+            return
+                $"Error: could not verify rewrite output {outputName ?? "<none>"} against {xisoPath} ({ex.Message}); refusing to overwrite\n";
         }
     }
 
@@ -121,7 +122,8 @@ internal static class CliOutputGuard
             Log.Error(ex, "CheckSingleInputOutput failed for {Input}", input);
             BugReporter.ReportException(ex, $"CheckSingleInputOutput failed for {input}");
             // CLI-024: fail closed (see CheckRewriteOutput).
-            return $"Error: could not verify -o output {outputName ?? "<none>"} against {input} ({ex.Message}); refusing to overwrite\n";
+            return
+                $"Error: could not verify -o output {outputName ?? "<none>"} against {input} ({ex.Message}); refusing to overwrite\n";
         }
     }
 
@@ -157,7 +159,8 @@ internal static class CliOutputGuard
             Log.Error(ex, "CheckRebuildOutput failed for {Output}", output);
             BugReporter.ReportException(ex, $"CheckRebuildOutput failed for {output}");
             // CLI-024: fail closed (see CheckRewriteOutput).
-            return $"Error: could not verify rebuild output {output} against its inputs ({ex.Message}); refusing to overwrite\n";
+            return
+                $"Error: could not verify rebuild output {output} against its inputs ({ex.Message}); refusing to overwrite\n";
         }
     }
 

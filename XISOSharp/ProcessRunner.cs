@@ -195,7 +195,7 @@ public static class ProcessRunner
             }
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception
-                                        or NotSupportedException or ObjectDisposedException)
+                                       or NotSupportedException or ObjectDisposedException)
         {
             // Best effort — already exited or cannot kill.
         }

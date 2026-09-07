@@ -1,96 +1,96 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-        <!-- WinExe is intentional on this cross-platform target: it suppresses the
+  <PropertyGroup>
+    <!-- WinExe is intentional on this cross-platform target: it suppresses the
              console window on Windows; on Linux/macOS OutputType is ignored and the
              app runs from the desktop file/terminal as usual. -->
-        <OutputType>WinExe</OutputType>
-        <!-- Tool ships as a published single-file binary, never as NuGet, so no
+    <OutputType>WinExe</OutputType>
+    <!-- Tool ships as a published single-file binary, never as NuGet, so no
              EnablePackageValidation here — package compat gates apply to the
              library (the only packable project) only. -->
-        <IsPackable>false</IsPackable>
-        <TargetFramework>net10.0</TargetFramework>
-        <!-- ImplicitUsings/Nullable inherited from Directory.Build.props. -->
-        <AssemblyName>XISOSharp.Gui</AssemblyName>
-        <RootNamespace>XISOSharp.Gui</RootNamespace>
-        <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-        <ApplicationManifest>app.manifest</ApplicationManifest>
-        <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-        <!-- Single RID source of truth (matches publish-gui.ps1 defaults and
+    <IsPackable>false</IsPackable>
+    <TargetFramework>net10.0</TargetFramework>
+    <!-- ImplicitUsings/Nullable inherited from Directory.Build.props. -->
+    <AssemblyName>XISOSharp.Gui</AssemblyName>
+    <RootNamespace>XISOSharp.Gui</RootNamespace>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Single RID source of truth (matches publish-gui.ps1 defaults and
              docs/building.md): win-x64, win-arm64, linux-x64, linux-arm64,
              osx-x64, osx-arm64. XboxKit parity, no 32-bit RID. -->
-        <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
 
-        <!-- Distribution defaults: every self-contained `dotnet publish -r` for a
+    <!-- Distribution defaults: every self-contained `dotnet publish -r` for a
          listed RID yields a single-file binary with no runtime to install.
          NOTE: PublishTrimmed stays false — Avalonia relies on XAML/reflection
          and does not survive trimming. -->
-        <PublishSingleFile>true</PublishSingleFile>
-        <PublishTrimmed>false</PublishTrimmed>
-        <!-- Surface single-file incompatibilities at build time, not just publish.
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <!-- Surface single-file incompatibilities at build time, not just publish.
              (No EnableTrimAnalyzer: the app intentionally ships untrimmed, so trim
              analysis would flag the entire Avalonia closure by design.) -->
-        <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
-    </PropertyGroup>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <AvaloniaResource Include="Assets\**" />
-    </ItemGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Roslynator.Analyzers">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="Roslynator.Formatting.Analyzers">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
-        <PackageReference Include="Serilog" />
-        <PackageReference Include="Serilog.Sinks.Console" />
-        <PackageReference Include="Serilog.Sinks.Debug" />
-        <PackageReference Include="Serilog.Sinks.File" />
-        <PackageReference Include="Avalonia" />
-        <PackageReference Include="Avalonia.Desktop" />
-        <PackageReference Include="Avalonia.Themes.Fluent" />
-        <PackageReference Include="Avalonia.Fonts.Inter" />
-        <!-- DevTools only: no 12.x build of Avalonia.Diagnostics is published yet
+  <ItemGroup>
+    <PackageReference Include="Roslynator.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Roslynator.Formatting.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.Debug" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <!-- DevTools only: no 12.x build of Avalonia.Diagnostics is published yet
              (latest is 11.x), so keep it Debug-only and out of the Release closure
              entirely. Upgrade to 12.x when available. -->
-        <PackageReference Include="Avalonia.Diagnostics" Condition="'$(Configuration)' == 'Debug'" />
-        <PackageReference Include="CommunityToolkit.Mvvm" />
-    </ItemGroup>
+    <PackageReference Include="Avalonia.Diagnostics" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
 
-    <!-- Version stamps (Version/InformationalVersion/FileVersion) derived from git tags, same as the library and CLI. -->
-    <ItemGroup>
-        <PackageReference Include="MinVer" PrivateAssets="all">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-    </ItemGroup>
+  <!-- Version stamps (Version/InformationalVersion/FileVersion) derived from git tags, same as the library and CLI. -->
+  <ItemGroup>
+    <PackageReference Include="MinVer" PrivateAssets="all">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Meziantou.Analyzer">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-    </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Meziantou.Analyzer">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 
-    <!-- BUG-X-001: single source of truth for logging lives in XISOSharp.Cli/Logging
+  <!-- BUG-X-001: single source of truth for logging lives in XISOSharp.Cli/Logging
          (trim-safe source-gen payload kept intact). These linked items compile the same
          sources into the GUI under the GUI namespace (LOGGING_NS_GUI); do not copy them. -->
-    <PropertyGroup>
-        <DefineConstants>$(DefineConstants);LOGGING_NS_GUI</DefineConstants>
-    </PropertyGroup>
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);LOGGING_NS_GUI</DefineConstants>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <Compile Include="..\XISOSharp.Cli\Logging\AppLogging.cs" Link="Logging\AppLogging.cs" />
-        <Compile Include="..\XISOSharp.Cli\Logging\BugReporter.cs" Link="Logging\BugReporter.cs" />
-        <Compile Include="..\XISOSharp.Cli\Logging\BugReportSink.cs" Link="Logging\BugReportSink.cs" />
-        <Compile Include="..\XISOSharp.Cli\Logging\EnvironmentInfo.cs" Link="Logging\EnvironmentInfo.cs" />
-    </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\XISOSharp.Cli\Logging\AppLogging.cs" Link="Logging\AppLogging.cs" />
+    <Compile Include="..\XISOSharp.Cli\Logging\BugReporter.cs" Link="Logging\BugReporter.cs" />
+    <Compile Include="..\XISOSharp.Cli\Logging\BugReportSink.cs" Link="Logging\BugReportSink.cs" />
+    <Compile Include="..\XISOSharp.Cli\Logging\EnvironmentInfo.cs" Link="Logging\EnvironmentInfo.cs" />
+  </ItemGroup>
 
 </Project>

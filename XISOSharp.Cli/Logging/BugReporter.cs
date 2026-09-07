@@ -180,7 +180,10 @@ internal static partial class BugReporter
         {
             if (string.Equals(Environment.GetEnvironmentVariable("XISO_DISABLE_BUGREPORT"), "1",
                     StringComparison.Ordinal))
+            {
                 return true;
+            }
+
             var entry = Assembly.GetEntryAssembly()?.GetName().Name;
             if (entry?.Contains("test", StringComparison.OrdinalIgnoreCase) == true)
                 return true;
@@ -245,8 +248,10 @@ internal static partial class BugReporter
         try
         {
             if (ex.InnerException is not null)
+            {
                 inner =
                     $"\nInner Type: {ex.InnerException.GetType().FullName}\nInner Message: {ex.InnerException.Message}";
+            }
         }
         catch
         {

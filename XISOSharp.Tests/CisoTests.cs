@@ -398,7 +398,7 @@ public class CisoTests : IDisposable
         var uncompressedSize = BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(8, 8));
         var blockSize = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(16, 4));
         var totalBlocks = (uncompressedSize + blockSize - 1) / blockSize;
-        var payloadStart = 24 + ((long)totalBlocks + 1) * 4;
+        var payloadStart = 24 + (((long)totalBlocks + 1) * 4);
         Assert.True(bytes.Length > payloadStart + 2048, "test CSO too small to truncate mid-payload");
 
         var cut = bytes[..(int)(payloadStart + 100)];

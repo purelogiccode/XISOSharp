@@ -248,14 +248,14 @@ public class XisoRangesTests : IDisposable
     {
         var bytes = new byte[64 * Constants.SectorSize];
         var magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
-        var header = Constants.HeaderOffset;
+        const int header = Constants.HeaderOffset;
         magic.CopyTo(bytes.AsSpan(header, magic.Length));
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(header + 20, 4), 33);
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(header + 24, 4), (uint)Constants.SectorSize);
         magic.CopyTo(bytes.AsSpan(header + 20 + 4 + 4 + Constants.FileTimeSize + Constants.UnusedSize,
             magic.Length));
 
-        var table = 33 * Constants.SectorSize;
+        const int table = 33 * Constants.SectorSize;
         WriteTableEntry(bytes, table, 0, 5, 34, 100, Constants.AttributeArc, "a.txt");
         WriteTableEntry(bytes, table + 20, 0xFFFF, 0, 35, 100, Constants.AttributeArc, "b.txt");
 

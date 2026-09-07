@@ -167,6 +167,7 @@ public class UnpackImageTests : IDisposable
     private sealed class CancelOnFirstFile(CancellationTokenSource cts) : IProgress<ProgressInfo>
     {
         private readonly CancellationTokenSource _cts = cts;
+
         public void Report(ProgressInfo info)
         {
             if (info.Type == ProgressInfoType.FileAdded)

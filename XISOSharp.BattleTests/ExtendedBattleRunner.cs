@@ -1207,7 +1207,7 @@ internal static class ExtendedBattleRunner
             {
                 TestName = "EXT-Sandbox",
                 Status = BattleStatus.Skipped,
-                    Detail = $"sandbox unavailable under {baseDir}: {ex.GetType().Name}: {Trim(ex.Message)}",
+                Detail = $"sandbox unavailable under {baseDir}: {ex.GetType().Name}: {Trim(ex.Message)}",
                 ElapsedSeconds = 0,
             });
             return null;

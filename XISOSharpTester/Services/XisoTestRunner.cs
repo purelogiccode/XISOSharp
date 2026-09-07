@@ -199,7 +199,7 @@ public static class XisoTestRunner
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using var fs = File.OpenRead(entry.FilePath);
+            await using var fs = File.OpenRead(entry.FilePath);
             (var rootDirSector, var rootDirSize, var discLseek) = XisoReader.VerifyXiso(fs, entry.FileName);
             tSw.Stop();
 
@@ -373,7 +373,7 @@ public static class XisoTestRunner
             if (isoLength > 0)
             {
                 // Staging holds two full extractions (C# + native); gate with margin (TST-013).
-                var required = isoLength * 2 + 100L * 1024 * 1024;
+                var required = (isoLength * 2) + (100L * 1024 * 1024);
                 var skip = CheckTempSpace(required, entry.FilePath);
                 if (skip is not null)
                 {
@@ -524,7 +524,7 @@ public static class XisoTestRunner
         if (isoLength > 0)
         {
             // Rewrite stages an input copy plus a rebuilt ISO per side (TST-013).
-            var required = isoLength * 4 + 100L * 1024 * 1024;
+            var required = (isoLength * 4) + (100L * 1024 * 1024);
             var skip = CheckTempSpace(required, entry.FilePath);
             if (skip is not null)
             {
@@ -553,7 +553,7 @@ public static class XisoTestRunner
             File.Copy(entry.FilePath, csInput, true);
 
             // Check if already optimized (tag at offset 31337)
-            using (var fs = File.OpenRead(csInput))
+            await using (var fs = File.OpenRead(csInput))
             {
                 if (fs.Length > Constants.OptimizedTagOffset + Constants.OptimizedTag.Length)
                 {
@@ -920,7 +920,8 @@ public static class XisoTestRunner
         }
     }
 
-    private static void DeleteDirectorySafe(string path, IProgress<TestProgress>? progress = null, string? file = null, int index = 0, int total = 0, string? test = null)
+    private static void DeleteDirectorySafe(string path, IProgress<TestProgress>? progress = null, string? file = null,
+        int index = 0, int total = 0, string? test = null)
     {
         try
         {
@@ -933,7 +934,8 @@ public static class XisoTestRunner
             // so GB-scale temp leaks are visible in Serilog and the session log.
             var leakedBytes = GetDirectorySizeSafe(path);
             var sizeText = leakedBytes >= 0 ? FormatByteCount(leakedBytes) : "unknown size";
-            Log.Warning(ex, "Temp cleanup failed for {Path} ({Size} left behind); manual cleanup may be needed", path, sizeText);
+            Log.Warning(ex, "Temp cleanup failed for {Path} ({Size} left behind); manual cleanup may be needed", path,
+                sizeText);
             BugReporter.ReportWarning($"Temp cleanup failed for {path} ({sizeText} left behind)");
             if (progress is not null && !string.IsNullOrEmpty(file))
             {
@@ -961,7 +963,8 @@ public static class XisoTestRunner
                 {
                     total += new FileInfo(file).Length;
                 }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+                                               or NotSupportedException)
                 {
                     // Unstatable file: skip it, keep the best-effort total.
                 }
@@ -969,7 +972,8 @@ public static class XisoTestRunner
 
             return total;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+                                       or NotSupportedException)
         {
             return -1;
         }
@@ -1011,7 +1015,7 @@ public static class XisoTestRunner
 
             return $"Skipped: insufficient temp space on {drive.Name} for {Path.GetFileName(isoPath)} " +
                    $"(need ~{FormatByteCount(requiredBytes)}, have {FormatByteCount(free)} free). " +
-                   $"Free space or set TMP/TEMP to a larger drive.";
+                   "Free space or set TMP/TEMP to a larger drive.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -1026,7 +1030,8 @@ public static class XisoTestRunner
         {
             return new FileInfo(isoPath).Length;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+                                       or NotSupportedException)
         {
             return 0;
         }
@@ -1053,7 +1058,8 @@ public static class XisoTestRunner
                         return dir;
                     }
 
-                    Log.Warning("Temp dir collision on attempt {Attempt}: {Dir}; retrying with a fresh GUID", attempt, dir);
+                    Log.Warning("Temp dir collision on attempt {Attempt}: {Dir}; retrying with a fresh GUID", attempt,
+                        dir);
                 }
                 catch (IOException ex) when (attempt < 9)
                 {

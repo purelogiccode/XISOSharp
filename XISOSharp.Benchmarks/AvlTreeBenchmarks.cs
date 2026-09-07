@@ -11,7 +11,9 @@ public class AvlTreeBenchmarks
 {
     private AvlNode? _root;
     private readonly string[] _filenames = Enumerable.Range(0, 1000).Select(static i => $"file_{i:D4}.dat").ToArray();
-    private readonly string[] _extraFilenames = Enumerable.Range(0, 1000).Select(static i => $"bench_{i:D4}.dat").ToArray();
+
+    private readonly string[] _extraFilenames =
+        Enumerable.Range(0, 1000).Select(static i => $"bench_{i:D4}.dat").ToArray();
 
     /// <summary>
     /// Rebuilds the 1000-node tree before each iteration.

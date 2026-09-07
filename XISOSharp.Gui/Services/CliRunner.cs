@@ -45,7 +45,7 @@ internal static class CliRunner
                 .RunAsync(cliPath, args, timeout: null, cancellationToken: ct, onLine: onLine)
                 .ConfigureAwait(false);
             if (result.ExitCode == -1 && !string.IsNullOrWhiteSpace(result.StandardError)
-                && string.IsNullOrWhiteSpace(result.StandardOutput))
+                                      && string.IsNullOrWhiteSpace(result.StandardOutput))
             {
                 // Shared runner reports failed start as -1 without streaming; keep the GUI message.
                 onLine($"[GUI] Failed to start CLI: {result.StandardError.Trim()}");

@@ -34,7 +34,8 @@ internal partial class MainViewModel : INotifyPropertyChanged
         AddFilesCommand = new RelayCommand(_ => AddFiles());
         AddFolderCommand = new RelayCommand(_ => AddFolder());
         RemoveFileCommand = new RelayCommand(RemoveFile);
-        RunTestsCommand = new AsyncRelayCommand(_ => RunTestsAsync(), _ => CanRunTests, ex => AddLog($"Test run failed: {ex.Message}"));
+        RunTestsCommand = new AsyncRelayCommand(_ => RunTestsAsync(), _ => CanRunTests,
+            ex => AddLog($"Test run failed: {ex.Message}"));
         ExportPdfCommand = new RelayCommand(_ => ExportPdf(), _ => HasResults);
         CopyLogCommand = new RelayCommand(_ => CopyLog());
         CopyResultsCommand = new RelayCommand(_ => CopyResults(), _ => HasResults);
@@ -55,7 +56,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     private void InvalidateCommands()
     {
         var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is not null && !dispatcher.CheckAccess())
+        if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(InvalidateCommands);
             return;
@@ -365,7 +366,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     private void SyncFileResults()
     {
         var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is not null && !dispatcher.CheckAccess())
+        if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(SyncFileResults);
             return;
@@ -407,7 +408,8 @@ internal partial class MainViewModel : INotifyPropertyChanged
             var dlg = new OpenFileDialog
             {
                 Title = "Select extract-xiso tool",
-                Filter = "extract-xiso (extract-xiso.exe;extract-xiso)|extract-xiso.exe;extract-xiso|Executable files (*.exe)|*.exe|All files (*.*)|*.*",
+                Filter =
+                    "extract-xiso (extract-xiso.exe;extract-xiso)|extract-xiso.exe;extract-xiso|Executable files (*.exe)|*.exe|All files (*.*)|*.*",
                 FileName = "extract-xiso.exe"
             };
             if (dlg.ShowDialog() == true)
@@ -647,7 +649,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     private void OnUiAfterRun(TestSessionResult session)
     {
         var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is not null && !dispatcher.CheckAccess())
+        if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(() => OnUiAfterRun(session));
             return;
@@ -673,7 +675,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     private void OnUiAfterFailure(string fatalMessage)
     {
         var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is not null && !dispatcher.CheckAccess())
+        if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(() => OnUiAfterFailure(fatalMessage));
             return;
@@ -690,7 +692,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     private void OnUiAfterFinally()
     {
         var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is not null && !dispatcher.CheckAccess())
+        if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(OnUiAfterFinally);
             return;
@@ -808,7 +810,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     private void AddLog(string message)
     {
         var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is not null && !dispatcher.CheckAccess())
+        if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(() => AddLog(message));
             return;
@@ -1012,7 +1014,8 @@ public sealed class AsyncRelayCommand : ICommand
     /// <param name="executeAsync">Async handler to await when executed.</param>
     /// <param name="canExecute">Optional enablement predicate.</param>
     /// <param name="onFault">Optional callback invoked on the UI thread when the handler faults.</param>
-    internal AsyncRelayCommand(Func<object?, Task> executeAsync, Func<object?, bool>? canExecute = null, Action<Exception>? onFault = null)
+    internal AsyncRelayCommand(Func<object?, Task> executeAsync, Func<object?, bool>? canExecute = null,
+        Action<Exception>? onFault = null)
     {
         _executeAsync = executeAsync;
         _canExecute = canExecute;
@@ -1025,7 +1028,8 @@ public sealed class AsyncRelayCommand : ICommand
     /// <param name="executeAsync">Async handler to await when executed.</param>
     /// <param name="canExecute">Optional enablement predicate.</param>
     /// <param name="onFault">Optional callback invoked on the UI thread when the handler faults.</param>
-    internal AsyncRelayCommand(Func<Task> executeAsync, Func<object?, bool>? canExecute = null, Action<Exception>? onFault = null)
+    internal AsyncRelayCommand(Func<Task> executeAsync, Func<object?, bool>? canExecute = null,
+        Action<Exception>? onFault = null)
         : this(_ => executeAsync(), canExecute, onFault)
     {
     }
