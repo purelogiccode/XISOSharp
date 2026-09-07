@@ -203,10 +203,7 @@ public class BlockDeviceTests : IDisposable
     }
 
     [Fact]
-    public void MemoryBlockDevice_Ctor_HugeCapacity_ThrowsArgumentOutOfRange()
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new MemoryBlockDevice((long)Array.MaxLength + 1));
-    }
+    public void MemoryBlockDevice_Ctor_HugeCapacity_ThrowsArgumentOutOfRange() => Assert.Throws<ArgumentOutOfRangeException>(() => new MemoryBlockDevice((long)Array.MaxLength + 1));
 
     [Fact]
     public void MemoryBlockDevice_Write_BeyondMaxLength_ThrowsInvalidOperation()

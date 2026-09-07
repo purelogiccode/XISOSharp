@@ -81,10 +81,8 @@ public static class CisoReader
     /// <param name="ct">Cancellation token.</param>
     /// <returns>0 on success, 1 on error; throws on invalid arguments.</returns>
     public static async Task<int> DecompressToIsoAsync(string csoPath, string? outputIsoPath = null,
-        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
-    {
-        return await Task.Run(() => DecompressToIso(csoPath, outputIsoPath, progress, ct), ct).ConfigureAwait(false);
-    }
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default) =>
+        await Task.Run(() => DecompressToIso(csoPath, outputIsoPath, progress, ct), ct).ConfigureAwait(false);
 
     /// <summary>
     /// Decompresses a CISO stream to an output stream. Both must be seekable.
@@ -289,10 +287,7 @@ public static class CisoReader
     /// <param name="csoFs">Open CISO file stream (seekable, readable).</param>
     /// <param name="offset">Byte offset in the uncompressed image.</param>
     /// <param name="buffer">Destination buffer to fill.</param>
-    public static void ReadFromCso(FileStream csoFs, long offset, Span<byte> buffer)
-    {
-        ReadFromCsoCore(csoFs, offset, buffer);
-    }
+    public static void ReadFromCso(FileStream csoFs, long offset, Span<byte> buffer) => ReadFromCsoCore(csoFs, offset, buffer);
 
     private static void ReadFromCsoCore(Stream csoFs, long offset, Span<byte> buffer)
     {

@@ -145,10 +145,7 @@ public sealed class SectorAllocator
     /// <summary>
     /// Allocates a contiguous run big enough for <paramref name="byteCount"/> bytes.
     /// </summary>
-    public uint AllocateForBytes(ulong byteCount)
-    {
-        return AllocateContiguous(RequiredSectors(byteCount));
-    }
+    public uint AllocateForBytes(ulong byteCount) => AllocateContiguous(RequiredSectors(byteCount));
 
     /// <summary>
     /// Records an externally placed region (volume header, existing image extents when

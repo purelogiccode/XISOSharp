@@ -150,10 +150,7 @@ public class AvlTreeTests
     /// when called on a null root.
     /// </summary>
     [Fact]
-    public void AvlFetch_EmptyTree_ReturnsNull()
-    {
-        Assert.Null(AvlTree.AvlFetch(null, "anything"));
-    }
+    public void AvlFetch_EmptyTree_ReturnsNull() => Assert.Null(AvlTree.AvlFetch(null, "anything"));
 
     /// <summary>
     /// Verifies that inserting 100 nodes with sequential filenames

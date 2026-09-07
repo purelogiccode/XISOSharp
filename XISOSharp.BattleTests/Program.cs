@@ -260,7 +260,7 @@ internal static class Program
         // Shared chain (BUG-BTL-002/BUG-X-005, mirrors Gui CliLocator coverage):
         // sibling of the harness (OS-aware) then PATH. The -v probe runs later via
         // BattleRunner (wrapper.GetVersion), same as Gui Resolve+Probe split.
-        var resolved = XISOSharp.ToolLocator.Resolve(null, "extract-xiso.exe", "extract-xiso");
+        var resolved = ToolLocator.Resolve(null, "extract-xiso.exe", "extract-xiso");
         if (resolved is not null)
         {
             return resolved;
@@ -443,16 +443,13 @@ internal static class Program
         return here;
     }
 
-    private static string Symbol(BattleStatus s)
-    {
-        return s switch
+    private static string Symbol(BattleStatus s) =>
+        s switch
         {
             BattleStatus.Passed => "\u2713", BattleStatus.Failed => "\u2717", BattleStatus.Skipped => "-", _ => "?"
         };
-    }
 
-    private static void PrintUsage()
-    {
+    private static void PrintUsage() =>
         Console.WriteLine("""
 
                           Usage: XISOSharp.BattleTests [options] [*.iso ...]
@@ -485,7 +482,6 @@ internal static class Program
                             Advanced self-tests: Remap, WaxGlob, Ranges, XgdTables, SecuritySectors, Prng, Ops, GlobMatcher
 
                           """);
-    }
 
     private static void PrintSummary(BattleSessionResult s)
     {

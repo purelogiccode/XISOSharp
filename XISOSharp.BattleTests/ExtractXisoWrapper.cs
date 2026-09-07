@@ -18,19 +18,13 @@ internal sealed class ExtractXisoWrapper : IDisposable
     }
 
     /// <summary>Runs the exe with args, returns exit code and stdout/stderr.</summary>
-    public (int ExitCode, string StdOut, string StdErr) Run(params string[] args)
-    {
-        return RunCore(null, args);
-    }
+    public (int ExitCode, string StdOut, string StdErr) Run(params string[] args) => RunCore(null, args);
 
     /// <summary>
     /// Runs the exe with a per-process working directory (BTL-011: no
     /// process-wide <c>Directory.SetCurrentDirectory</c> mutation).
     /// </summary>
-    public (int ExitCode, string StdOut, string StdErr) RunInDirectory(string workingDirectory, params string[] args)
-    {
-        return RunCore(workingDirectory, args);
-    }
+    public (int ExitCode, string StdOut, string StdErr) RunInDirectory(string workingDirectory, params string[] args) => RunCore(workingDirectory, args);
 
     private (int ExitCode, string StdOut, string StdErr) RunCore(string? workingDirectory, string[] args)
     {
@@ -94,22 +88,13 @@ internal sealed class ExtractXisoWrapper : IDisposable
     }
 
     /// <summary>Lists files via <c>-l</c>.</summary>
-    public (int ExitCode, string StdOut, string StdErr) ListFiles(string isoPath)
-    {
-        return Run("-l", isoPath);
-    }
+    public (int ExitCode, string StdOut, string StdErr) ListFiles(string isoPath) => Run("-l", isoPath);
 
     /// <summary>Extracts via <c>-x -d &lt;out&gt;</c>.</summary>
-    public (int ExitCode, string StdOut, string StdErr) ExtractFiles(string isoPath, string outDir)
-    {
-        return Run("-x", "-d", outDir, isoPath);
-    }
+    public (int ExitCode, string StdOut, string StdErr) ExtractFiles(string isoPath, string outDir) => Run("-x", "-d", outDir, isoPath);
 
     /// <summary>Rewrites via <c>-r -d &lt;out&gt;</c>.</summary>
-    public (int ExitCode, string StdOut, string StdErr) Rewrite(string isoPath, string outDir)
-    {
-        return Run("-r", "-d", outDir, isoPath);
-    }
+    public (int ExitCode, string StdOut, string StdErr) Rewrite(string isoPath, string outDir) => Run("-r", "-d", outDir, isoPath);
 
     /// <summary>Creates via <c>-c &lt;dir&gt; [name]</c>.</summary>
     public (int ExitCode, string StdOut, string StdErr) Create(string dir, string? outName = null)

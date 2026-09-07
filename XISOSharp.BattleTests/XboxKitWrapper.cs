@@ -75,16 +75,10 @@ internal sealed class XboxKitWrapper : IDisposable
     }
 
     /// <summary>Full lossless split (<c>-a</c> = -rstuvwx): xiso + video + filler + seed/update.</summary>
-    public (int ExitCode, string StdOut, string StdErr) SplitAll(string workDir, string isoPath)
-    {
-        return Run(workDir, "-y", "-q", "-a", isoPath);
-    }
+    public (int ExitCode, string StdOut, string StdErr) SplitAll(string workDir, string isoPath) => Run(workDir, "-y", "-q", "-a", isoPath);
 
     /// <summary>Best-effort trim/wipe split (<c>-b</c> = -twx).</summary>
-    public (int ExitCode, string StdOut, string StdErr) SplitBest(string workDir, string isoPath)
-    {
-        return Run(workDir, "-y", "-q", "-b", isoPath);
-    }
+    public (int ExitCode, string StdOut, string StdErr) SplitBest(string workDir, string isoPath) => Run(workDir, "-y", "-q", "-b", isoPath);
 
     /// <summary>Rebuild mode: <c>xboxkit &lt;input.xiso&gt; [files...]</c>.</summary>
     public (int ExitCode, string StdOut, string StdErr) Rebuild(string workDir, params string[] parts)

@@ -278,10 +278,7 @@ public class WaxGlobTests
     }
 
     [Fact]
-    public void Constructor_Null_Throws()
-    {
-        Assert.Throws<ArgumentNullException>(() => new WaxGlob(null!));
-    }
+    public void Constructor_Null_Throws() => Assert.Throws<ArgumentNullException>(() => new WaxGlob(null!));
 
     [Fact]
     public void RegexPattern_Exposed()

@@ -116,18 +116,14 @@ public sealed class ExtractFileException : ExtractErrorException
 
     /// <summary>Destination create/open failed (the xdvdfs #187 shape: bad name, denied, missing drive).</summary>
     internal static ExtractFileException ForCreate(string internalPath, string destPath, uint startSector,
-        long fileSize, Exception inner)
-    {
-        return new ExtractFileException(ExtractError.ErrFileWrite, internalPath, destPath, startSector, fileSize,
+        long fileSize, Exception inner) =>
+        new(ExtractError.ErrFileWrite, internalPath, destPath, startSector, fileSize,
             $"could not create output file: {inner.Message}", innerException: inner);
-    }
 
     /// <summary>Destination directory could not be created; the subtree is skipped under continue-on-error.</summary>
-    internal static ExtractFileException ForDirectory(string internalPath, string destPath, Exception inner)
-    {
-        return new ExtractFileException(ExtractError.ErrFileWrite, internalPath, destPath, 0, 0,
+    internal static ExtractFileException ForDirectory(string internalPath, string destPath, Exception inner) =>
+        new(ExtractError.ErrFileWrite, internalPath, destPath, 0, 0,
             $"could not create output directory: {inner.Message}", innerException: inner);
-    }
 
     /// <summary>
     /// Directory table is structurally corrupt (TODO #16): cycle, child offset
@@ -135,29 +131,23 @@ public sealed class ExtractFileException : ExtractErrorException
     /// bad subtree is skipped under <c>UnpackOptions.ContinueOnError</c>.
     /// </summary>
     internal static ExtractFileException ForToc(string internalPath, string destPath, uint startSector,
-        long tableSize, Exception inner)
-    {
-        return new ExtractFileException(ExtractError.ErrInvalidToc, internalPath, destPath, startSector, tableSize,
+        long tableSize, Exception inner) =>
+        new(ExtractError.ErrInvalidToc, internalPath, destPath, startSector, tableSize,
             inner.Message, innerException: inner);
-    }
 
     /// <summary>Write failed mid-copy (disk full, device removed).</summary>
     internal static ExtractFileException ForWrite(string internalPath, string destPath, uint startSector,
-        long fileSize, long bytesRead, Exception inner)
-    {
-        return new ExtractFileException(ExtractError.ErrFileWrite, internalPath, destPath, startSector, fileSize,
+        long fileSize, long bytesRead, Exception inner) =>
+        new(ExtractError.ErrFileWrite, internalPath, destPath, startSector, fileSize,
             $"write failed: {inner.Message}", bytesRead, inner);
-    }
 
     /// <summary>
     /// Image data ends before the reported size: truncated download, torn
     /// image, or an entry pointing past end of image.
     /// </summary>
     internal static ExtractFileException ForTruncated(string internalPath, string destPath, uint startSector,
-        long fileSize, long bytesRead)
-    {
-        return new ExtractFileException(ExtractError.ErrFileTruncated, internalPath, destPath, startSector, fileSize,
+        long fileSize, long bytesRead) =>
+        new(ExtractError.ErrFileTruncated, internalPath, destPath, startSector, fileSize,
             "image data ends before the reported file size", bytesRead);
-    }
 }
 #pragma warning restore RCS1194

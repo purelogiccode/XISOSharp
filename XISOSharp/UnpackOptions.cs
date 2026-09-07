@@ -41,10 +41,7 @@ public sealed class UnpackOptions
     internal List<ExtractFileException> Failures { get; } = [];
 
     /// <summary>Records a per-file failure for the end-of-run summary.</summary>
-    internal void RecordFailure(ExtractFileException failure)
-    {
-        Failures.Add(failure);
-    }
+    internal void RecordFailure(ExtractFileException failure) => Failures.Add(failure);
 
     /// <summary>
     /// Throws an <see cref="ExtractErrorException"/> with code
@@ -71,10 +68,7 @@ public sealed class UnpackOptions
     /// (<paramref name="fileSize"/> bytes). Unresolvable destinations are never
     /// skipped: the write is attempted and fails with its natural error.
     /// </summary>
-    public bool ShouldSkip(string destPath, long fileSize)
-    {
-        return ShouldSkip(destPath, fileSize, LocalFilesystem.Instance);
-    }
+    public bool ShouldSkip(string destPath, long fileSize) => ShouldSkip(destPath, fileSize, LocalFilesystem.Instance);
 
     /// <summary>
     /// Filesystem-aware <see cref="ShouldSkip(string, long)"/>: probes

@@ -160,12 +160,10 @@ public static class CisoWriter
     /// <summary>Asynchronous variant of <see cref="CompressToCso"/>.</summary>
     public static async Task<int> CompressToCsoAsync(string sourcePath, string? outputCsoPath = null, int level = 6,
         long? splitBytes = null, byte version = VersionLz4,
-        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
-    {
-        return await Task.Run(() => CompressToCso(sourcePath, outputCsoPath, level, splitBytes, version, progress, ct),
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default) =>
+        await Task.Run(() => CompressToCso(sourcePath, outputCsoPath, level, splitBytes, version, progress, ct),
                 ct)
             .ConfigureAwait(false);
-    }
 
     /// <summary>
     /// Compresses a seekable source stream (uncompressed ISO) to a seekable destination stream (CISO).
@@ -377,9 +375,8 @@ public static class CisoWriter
         return ms.ToArray();
     }
 
-    private static CompressionLevel MapLevel(int level)
-    {
-        return level switch
+    private static CompressionLevel MapLevel(int level) =>
+        level switch
         {
             0 => CompressionLevel.NoCompression,
             1 or 2 => CompressionLevel.Fastest,
@@ -387,7 +384,6 @@ public static class CisoWriter
             8 or 9 => CompressionLevel.SmallestSize,
             _ => CompressionLevel.Optimal
         };
-    }
 
     /// <summary>
     /// Derives the default <c>.cso</c> output path for <paramref name="sourcePath"/>

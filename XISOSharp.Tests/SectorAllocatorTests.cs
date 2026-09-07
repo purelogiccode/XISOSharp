@@ -67,10 +67,7 @@ public class SectorAllocatorTests : IDisposable
     [InlineData(2049UL, 2u)]
     [InlineData(4096UL, 2u)]
     [InlineData(4097UL, 3u)]
-    public void RequiredSectors_RoundsUp(ulong bytes, uint expected)
-    {
-        Assert.Equal(expected, SectorAllocator.RequiredSectors(bytes));
-    }
+    public void RequiredSectors_RoundsUp(ulong bytes, uint expected) => Assert.Equal(expected, SectorAllocator.RequiredSectors(bytes));
 
     [Fact]
     public void AllocateContiguous_StartsAtRootSectorAndBumps()
@@ -283,10 +280,7 @@ public class SectorAllocatorTests : IDisposable
     }
 
     [Fact]
-    public void FromLayout_Null_Throws()
-    {
-        Assert.Throws<ArgumentNullException>(() => SectorAllocator.FromLayout(null!));
-    }
+    public void FromLayout_Null_Throws() => Assert.Throws<ArgumentNullException>(() => SectorAllocator.FromLayout(null!));
 
     [Fact]
     public void Writer_AllocationsDoNotOverlap()

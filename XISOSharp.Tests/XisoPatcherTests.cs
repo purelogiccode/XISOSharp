@@ -64,10 +64,7 @@ public class XisoPatcherTests : IDisposable
         return dest;
     }
 
-    private static void AssertAllFf(byte[] bytes)
-    {
-        Assert.All(bytes, static b => Assert.Equal(Constants.PadByte, b));
-    }
+    private static void AssertAllFf(byte[] bytes) => Assert.All(bytes, static b => Assert.Equal(Constants.PadByte, b));
 
     private static byte[] ReadSectors(string isoPath, long discLseek, uint startSector, uint sectors)
     {

@@ -154,29 +154,25 @@ public class XisoReaderTests : IDisposable
     /// Verifies that VerifyXiso throws a FileNotFoundException for a path that does not exist.
     /// </summary>
     [Fact]
-    public void VerifyXiso_NonExistentFile_Throws()
-    {
+    public void VerifyXiso_NonExistentFile_Throws() =>
         Assert.Throws<FileNotFoundException>(static () =>
         {
             using var fs = new FileStream(NonExistentPath,
                 new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
             XisoReader.VerifyXiso(fs, "missing.iso");
         });
-    }
 
     /// <summary>
     /// Verifies that VerifyXiso throws an IOException when given a file that is not a valid XISO image.
     /// </summary>
     [Fact]
-    public void VerifyXiso_InvalidFileNotIso_Throws()
-    {
+    public void VerifyXiso_InvalidFileNotIso_Throws() =>
         Assert.Throws<IOException>(static () =>
         {
             using var fs = new FileStream(InvalidFilePath,
                 new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
             XisoReader.VerifyXiso(fs, "binary.bin");
         });
-    }
 
     /// <summary>
     /// Verifies that VerifyXiso throws an IOException when given a large file containing only random data.
@@ -283,20 +279,15 @@ public class XisoReaderTests : IDisposable
     /// Verifies that DecodeXiso throws an IOException when given a small non-ISO binary file.
     /// </summary>
     [Fact]
-    public void DecodeXiso_SmallFile_Throws()
-    {
-        Assert.Throws<IOException>(() => XisoReader.DecodeXiso(InvalidFilePath, null, ExtractMode.List, out _, true));
-    }
+    public void DecodeXiso_SmallFile_Throws() => Assert.Throws<IOException>(() => XisoReader.DecodeXiso(InvalidFilePath, null, ExtractMode.List, out _, true));
 
     /// <summary>
     /// Verifies that DecodeXiso throws a FileNotFoundException for a path that does not exist.
     /// </summary>
     [Fact]
-    public void DecodeXiso_NonExistentFile_Throws()
-    {
+    public void DecodeXiso_NonExistentFile_Throws() =>
         Assert.Throws<FileNotFoundException>(() =>
             XisoReader.DecodeXiso(NonExistentPath, null, ExtractMode.List, out _, true));
-    }
 
     /// <summary>
     /// Verifies that the ExtractErrorException message contains the error code name when constructed with ErrEndOfSector.

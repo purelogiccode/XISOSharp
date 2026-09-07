@@ -56,9 +56,8 @@ public static class XgdTables
     ];
 
     /// <summary>Maps Redump ISO type (0..8) to XGD type (0..3).</summary>
-    public static int GetXgdType(int redumpIsoType)
-    {
-        return redumpIsoType switch
+    public static int GetXgdType(int redumpIsoType) =>
+        redumpIsoType switch
         {
             0 or 1 => 0,
             2 or 3 or 4 or 5 => 1,
@@ -66,7 +65,6 @@ public static class XgdTables
             7 or 8 => 3,
             _ => 0,
         };
-    }
 
     /// <summary>Gets video type index for a Redump ISO, or -1 if unknown. Mirrors XGD.GetVideoType.</summary>
     public static int GetVideoType(FileStream? isoFs, int redumpIsoType)
@@ -144,9 +142,8 @@ public static class XgdTables
     /// <summary>Gets the Redump ISO length for the given video type.</summary>
     /// <param name="videoType">Video type index.</param>
     /// <returns>Redump ISO byte length, or 0 if unknown.</returns>
-    public static long GetRedumpLength(int videoType)
-    {
-        return videoType switch
+    public static long GetRedumpLength(int videoType) =>
+        videoType switch
         {
             0 => RedumpIsoLength[0],
             1 => RedumpIsoLength[1],
@@ -159,14 +156,12 @@ public static class XgdTables
             18 => RedumpIsoLength[8],
             _ => 0,
         };
-    }
 
     /// <summary>Maps a video type index to its corresponding XISO type.</summary>
     /// <param name="videoType">Video type index.</param>
     /// <returns>XISO type (0=XGD1, 1=XGD2, 2=Hybrid, 3=XGD3).</returns>
-    public static int GetXisoTypeFromVideo(int videoType)
-    {
-        return videoType switch
+    public static int GetXisoTypeFromVideo(int videoType) =>
+        videoType switch
         {
             0 or 1 => 0,
             2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11 or 12 or 13 or 14 => 1,
@@ -174,23 +169,13 @@ public static class XgdTables
             16 or 17 or 18 => 3,
             _ => 0,
         };
-    }
 
     /// <summary>Finds Redump ISO type by exact file size, or -1 if not a known Redump size.</summary>
-    public static int GetRedumpIsoTypeBySize(long size)
-    {
-        return Array.IndexOf(RedumpIsoLength, size);
-    }
+    public static int GetRedumpIsoTypeBySize(long size) => Array.IndexOf(RedumpIsoLength, size);
 
     /// <summary>Finds video type by exact file size, or -1 if not a known video size.</summary>
-    public static int GetVideoTypeBySize(long size)
-    {
-        return Array.IndexOf(VideoLength, size);
-    }
+    public static int GetVideoTypeBySize(long size) => Array.IndexOf(VideoLength, size);
 
     /// <summary>Finds XISO type by exact file size, or -1 if not a known XISO size.</summary>
-    public static int GetXisoTypeBySize(long size)
-    {
-        return Array.IndexOf(XisoLength, size);
-    }
+    public static int GetXisoTypeBySize(long size) => Array.IndexOf(XisoLength, size);
 }

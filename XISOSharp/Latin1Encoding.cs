@@ -119,16 +119,10 @@ internal static class Latin1Encoding
         }
 
         /// <inheritdoc/>
-        public override int GetCharCount(byte[] bytes, int index, int count)
-        {
-            return count;
-        }
+        public override int GetCharCount(byte[] bytes, int index, int count) => count;
 
         /// <inheritdoc/>
-        public override int GetCharCount(ReadOnlySpan<byte> bytes)
-        {
-            return bytes.Length;
-        }
+        public override int GetCharCount(ReadOnlySpan<byte> bytes) => bytes.Length;
 
         /// <inheritdoc/>
         public override int GetChars(byte[] bytes, int byteIndex, int byteCount, char[] chars, int charIndex)
@@ -172,15 +166,9 @@ internal static class Latin1Encoding
         }
 
         /// <inheritdoc/>
-        public override int GetMaxByteCount(int charCount)
-        {
-            return charCount;
-        }
+        public override int GetMaxByteCount(int charCount) => charCount;
 
         /// <inheritdoc/>
-        public override int GetMaxCharCount(int byteCount)
-        {
-            return byteCount;
-        }
+        public override int GetMaxCharCount(int byteCount) => byteCount;
     }
 }

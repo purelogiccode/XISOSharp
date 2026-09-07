@@ -104,30 +104,15 @@ public class XisoStreamApiTests : IDisposable
             set => throw new NotSupportedException();
         }
 
-        public override void Flush()
-        {
-            _inner.Flush();
-        }
+        public override void Flush() => _inner.Flush();
 
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            return _inner.Read(buffer, offset, count);
-        }
+        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
 
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            throw new NotSupportedException();
-        }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
-        public override void SetLength(long value)
-        {
-            throw new NotSupportedException();
-        }
+        public override void SetLength(long value) => throw new NotSupportedException();
 
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            throw new NotSupportedException();
-        }
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     [Fact]
@@ -215,11 +200,9 @@ public class XisoStreamApiTests : IDisposable
     }
 
     [Fact]
-    public void DecodeXiso_NullStream_ThrowsArgumentNullException()
-    {
+    public void DecodeXiso_NullStream_ThrowsArgumentNullException() =>
         Assert.Throws<ArgumentNullException>(() =>
             XisoReader.DecodeXiso(null!, "game.iso", null, ExtractMode.List, out _, false));
-    }
 
     [Fact]
     public void DecodeXiso_NonSeekableStream_ThrowsArgumentException()

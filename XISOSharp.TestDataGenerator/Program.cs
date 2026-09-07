@@ -55,8 +55,7 @@ internal static class Program
     /// <summary>
     /// Prints generator usage, including the fixture layout and supported flags.
     /// </summary>
-    private static void PrintUsage()
-    {
+    private static void PrintUsage() =>
         Console.WriteLine("""
                           Usage: XISOSharp.TestDataGenerator [path] [--force]
 
@@ -69,5 +68,4 @@ internal static class Program
                                      (default: <repo root>\TestData)
                             --force  Rewrite existing source files with the canonical content
                           """);
-    }
 }

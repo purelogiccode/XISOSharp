@@ -40,10 +40,7 @@ public class UnpackResumeTests : IDisposable
         return dir;
     }
 
-    private static UnpackOptions Skip()
-    {
-        return new UnpackOptions { SkipExisting = true };
-    }
+    private static UnpackOptions Skip() => new() { SkipExisting = true };
 
     private static readonly DateTime PinnedTime = new(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
@@ -102,10 +99,7 @@ public class UnpackResumeTests : IDisposable
             _onReport = onReport;
         }
 
-        public void Report(ProgressInfo value)
-        {
-            _onReport(value);
-        }
+        public void Report(ProgressInfo value) => _onReport(value);
     }
 
     [Fact]

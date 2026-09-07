@@ -77,28 +77,19 @@ public class BoyerMooreBenchmarks
     /// </summary>
     /// <returns>The index of the match.</returns>
     [Benchmark(Baseline = true)]
-    public int SearchTailHit()
-    {
-        return _bm.Search(_tailHit);
-    }
+    public int SearchTailHit() => _bm.Search(_tailHit);
 
     /// <summary>
     /// Searches a haystack with the pattern at offset zero (best-case early exit).
     /// </summary>
     /// <returns>The index of the match (0).</returns>
     [Benchmark]
-    public int SearchHeadHit()
-    {
-        return _bm.Search(_headHit);
-    }
+    public int SearchHeadHit() => _bm.Search(_headHit);
 
     /// <summary>
     /// Searches a haystack containing no occurrence (full-scan miss).
     /// </summary>
     /// <returns>-1 when not found.</returns>
     [Benchmark]
-    public int SearchMiss()
-    {
-        return _bm.Search(_miss);
-    }
+    public int SearchMiss() => _bm.Search(_miss);
 }

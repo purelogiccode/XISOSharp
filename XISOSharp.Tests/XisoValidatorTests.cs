@@ -308,8 +308,5 @@ public class XisoValidatorTests : IDisposable
     }
 
     [Fact]
-    public void Cli_Create_WithSkipSectors_ReturnsOne()
-    {
-        Assert.Equal(1, Program.Main(["-c", SourceDir, "--skip-sectors", "1"]));
-    }
+    public void Cli_Create_WithSkipSectors_ReturnsOne() => Assert.Equal(1, Program.Main(["-c", SourceDir, "--skip-sectors", "1"]));
 }

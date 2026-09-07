@@ -119,14 +119,12 @@ public class XisoCoverageTests : IDisposable
     // Multi-sector directory tables (sector-boundary advance + llCompat)
     // ------------------------------------------------------------------
 
-    private string CreateManyFileIso(int count = 150)
-    {
-        return CreateIso(src =>
+    private string CreateManyFileIso(int count = 150) =>
+        CreateIso(src =>
         {
             for (var i = 0; i < count; i++)
                 File.WriteAllText(Path.Combine(src, $"file{i:000}.txt"), $"content {i}\n");
         }, "many.iso");
-    }
 
     [Fact]
     public void ManyFileDir_Extract_CoversAllFiles()
@@ -381,10 +379,7 @@ public class XisoCoverageTests : IDisposable
     // Block-device overloads (MemoryBlockDevice doubles)
     // ------------------------------------------------------------------
 
-    private string CreateIsoBytes(Action<string> populate, string isoName)
-    {
-        return CreateIso(populate, isoName);
-    }
+    private string CreateIsoBytes(Action<string> populate, string isoName) => CreateIso(populate, isoName);
 
     [Fact]
     public void VerifyXiso_Device_SkipZeroValid()
@@ -706,10 +701,7 @@ public class XisoCoverageTests : IDisposable
     }
 
     [Fact]
-    public void EmptyRoot_ListDirectory_ReturnsEmpty()
-    {
-        Assert.Empty(XisoReader.ListDirectory(CreateEmptyIso(), "/"));
-    }
+    public void EmptyRoot_ListDirectory_ReturnsEmpty() => Assert.Empty(XisoReader.ListDirectory(CreateEmptyIso(), "/"));
 
     [Fact]
     public void EmptyRoot_GetSectorLayout_ReturnsHeaderOnly()
@@ -1130,10 +1122,7 @@ public class XisoCoverageTests : IDisposable
     }
 
     [Fact]
-    public void ComputeDirectoryHashes_HeaderCorrupt_ReturnsEmpty()
-    {
-        Assert.Empty(XisoReader.ComputeDirectoryHashes(CreateHeaderCorruptIso(), "/", HashAlgorithmName.SHA256));
-    }
+    public void ComputeDirectoryHashes_HeaderCorrupt_ReturnsEmpty() => Assert.Empty(XisoReader.ComputeDirectoryHashes(CreateHeaderCorruptIso(), "/", HashAlgorithmName.SHA256));
 
     [Fact]
     public void GetXexInfo_NonXex_ReturnsNull()
@@ -1191,10 +1180,7 @@ public class XisoCoverageTests : IDisposable
     }
 
     [Fact]
-    public void ZeroRoot_ListDirectory_ReturnsEmpty()
-    {
-        Assert.Empty(XisoReader.ListDirectory(CreateZeroRootIso(), "/"));
-    }
+    public void ZeroRoot_ListDirectory_ReturnsEmpty() => Assert.Empty(XisoReader.ListDirectory(CreateZeroRootIso(), "/"));
 
     [Fact]
     public void ZeroRoot_GetSectorLayout_ReturnsHeaderOnly()

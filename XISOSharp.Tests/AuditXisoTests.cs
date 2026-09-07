@@ -1,6 +1,6 @@
 namespace XISOSharp.Tests;
 
-using XISOSharp.TestDataGenerator;
+using TestDataGenerator;
 
 /// <summary>
 /// Tests for <see cref="XisoReader.AuditXiso(string)"/>, verifying deep integrity

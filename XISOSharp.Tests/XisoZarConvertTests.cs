@@ -105,12 +105,10 @@ public sealed class XisoZarConvertTests : IDisposable
         return data;
     }
 
-    private static string SolutionRoot()
-    {
+    private static string SolutionRoot() =>
         // Centralized via TestDataLocator (BUG-TEST-006).
-        return TestDataLocator.GetSolutionRoot(AppContext.BaseDirectory)
-               ?? throw new InvalidOperationException("Solution root not found.");
-    }
+        TestDataLocator.GetSolutionRoot(AppContext.BaseDirectory)
+        ?? throw new InvalidOperationException("Solution root not found.");
 
     [Fact]
     public void Convert_RoundTrip_ExtractMatchesSource()

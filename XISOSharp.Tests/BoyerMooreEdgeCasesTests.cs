@@ -249,27 +249,18 @@ public class BoyerMooreEdgeCasesTests
     /// Verifies that a null pattern is rejected at construction.
     /// </summary>
     [Fact]
-    public void Constructor_NullPattern_Throws()
-    {
-        Assert.Throws<ArgumentNullException>(() => new BoyerMoore(null!));
-    }
+    public void Constructor_NullPattern_Throws() => Assert.Throws<ArgumentNullException>(() => new BoyerMoore(null!));
 
     /// <summary>
     /// Verifies that a non-positive alphabet size is rejected at construction.
     /// </summary>
     [Fact]
-    public void Constructor_ZeroAlphabet_Throws()
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new BoyerMoore([0x41], 0));
-    }
+    public void Constructor_ZeroAlphabet_Throws() => Assert.Throws<ArgumentOutOfRangeException>(() => new BoyerMoore([0x41], 0));
 
     /// <summary>
     /// Verifies that a pattern byte outside a custom alphabet fails fast with a
     /// named error instead of IndexOutOfRangeException from Init (BUG-LIB-033).
     /// </summary>
     [Fact]
-    public void Constructor_PatternByteOutsideAlphabet_Throws()
-    {
-        Assert.Throws<ArgumentException>(() => new BoyerMoore([0x10, 0x20], 16));
-    }
+    public void Constructor_PatternByteOutsideAlphabet_Throws() => Assert.Throws<ArgumentException>(() => new BoyerMoore([0x10, 0x20], 16));
 }

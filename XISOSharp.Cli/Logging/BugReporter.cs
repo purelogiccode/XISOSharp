@@ -52,25 +52,17 @@ internal static partial class BugReporter
     internal static string ApplicationName { get; set; } = "XISOSharp.Cli";
 #endif
 
-    internal static void ReportWarning(string message)
-    {
+    internal static void ReportWarning(string message) =>
         // BUG-X-002: Warning-level routine events (user-error probes, non-zero exits,
         // missing files) are operational noise, not crashes. Never file a bug report
         // for them and never consume the 8/min throttle budget reserved for real
         // crashes (ReportError/ReportException). Kept as a sink so existing call
         // sites need no edits; visible in the debugger log only.
         Debug.WriteLine($"BugReporter warning suppressed (no report filed): {message}");
-    }
 
-    internal static void ReportError(string message, Exception? ex = null)
-    {
-        Report(ex, message, "Error");
-    }
+    internal static void ReportError(string message, Exception? ex = null) => Report(ex, message, "Error");
 
-    internal static void ReportException(Exception ex, string context)
-    {
-        Report(ex, context, "Exception");
-    }
+    internal static void ReportException(Exception ex, string context) => Report(ex, context, "Exception");
 
     private static void Report(Exception? ex, string message, string kind)
     {

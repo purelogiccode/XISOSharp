@@ -1,4 +1,3 @@
-using System.IO;
 using System.Security.Cryptography;
 using Serilog;
 using XISOSharpTester.Logging;

@@ -404,9 +404,9 @@ public class XisoRangesTests : IDisposable
         fs.Seek(headerOffset + 20, SeekOrigin.Begin);
         Span<byte> buf = stackalloc byte[4];
         fs.ReadExactly(buf);
-        var rootOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(buf);
+        var rootOffset = BinaryPrimitives.ReadUInt32LittleEndian(buf);
         fs.ReadExactly(buf);
-        var rootSize = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(buf);
+        var rootSize = BinaryPrimitives.ReadUInt32LittleEndian(buf);
 
         var sysSectors = new List<uint>();
         var fileSectors = new List<uint>();

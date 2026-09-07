@@ -225,16 +225,10 @@ public class XisoRepairTests : IDisposable
     }
 
     [Fact]
-    public void Repair_MissingFile_Throws()
-    {
-        Assert.Throws<FileNotFoundException>(() => XisoReader.Repair("no_such_file.iso"));
-    }
+    public void Repair_MissingFile_Throws() => Assert.Throws<FileNotFoundException>(() => XisoReader.Repair("no_such_file.iso"));
 
     [Fact]
-    public void Repair_NullPath_Throws()
-    {
-        Assert.Throws<ArgumentException>(() => XisoReader.Repair(""));
-    }
+    public void Repair_NullPath_Throws() => Assert.Throws<ArgumentException>(() => XisoReader.Repair(""));
 
     [Fact]
     public void Repair_Cso_Refused()
@@ -418,10 +412,7 @@ public class XisoRepairTests : IDisposable
     }
 
     [Fact]
-    public void Cli_Repair_MissingFile_ReturnsOne()
-    {
-        Assert.Equal(1, Program.Main(["--repair", "no_such_file.iso"]));
-    }
+    public void Cli_Repair_MissingFile_ReturnsOne() => Assert.Equal(1, Program.Main(["--repair", "no_such_file.iso"]));
 
     [Fact]
     public void Cli_DryRun_WithoutRepair_ReturnsOne()

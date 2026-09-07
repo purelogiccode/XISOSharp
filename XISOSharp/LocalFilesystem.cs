@@ -65,21 +65,16 @@ public sealed class LocalFilesystem(string? root = null) : IFilesystem
     }
 
     /// <inheritdoc/>
-    public Stream CreateFile(string path)
-    {
-        return new FileStream(
+    public Stream CreateFile(string path) =>
+        new FileStream(
             Resolve(path),
             new FileStreamOptions
             {
                 Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
             });
-    }
 
     /// <inheritdoc/>
-    public void CreateDirectory(string path)
-    {
-        Directory.CreateDirectory(Resolve(path));
-    }
+    public void CreateDirectory(string path) => Directory.CreateDirectory(Resolve(path));
 
     /// <inheritdoc/>
     public bool FileExists(string path)

@@ -414,11 +414,9 @@ public static class XisoPatcher
         WipeRange(fs, fs.Position, spanBytes - data.Length);
     }
 
-    private static void WipeSectors(FileStream fs, long discLseek, uint startSector, uint sectors)
-    {
+    private static void WipeSectors(FileStream fs, long discLseek, uint startSector, uint sectors) =>
         WipeRange(fs, discLseek + ((long)startSector * Constants.SectorSize),
             (long)sectors * Constants.SectorSize);
-    }
 
     private static void WipeRange(FileStream fs, long absStart, long length)
     {
@@ -544,8 +542,5 @@ public static class XisoPatcher
         }
     }
 
-    private static string JoinPath(string dir, string name)
-    {
-        return dir.Equals("/", StringComparison.Ordinal) ? "/" + name : dir + "/" + name;
-    }
+    private static string JoinPath(string dir, string name) => dir.Equals("/", StringComparison.Ordinal) ? "/" + name : dir + "/" + name;
 }

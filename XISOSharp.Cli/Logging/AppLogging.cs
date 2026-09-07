@@ -79,8 +79,8 @@ internal static class AppLogging
         // Serilog adds file/debug/bug-report coverage for the same text.
         // Qualified (not bare `Logger`) so this shared source compiles under the
         // CLI, GUI, and Tester logging namespaces alike (BUG-X-001).
-        XISOSharp.Logger.ForwardInfo = msg => Log.Information("{Message}", msg.TrimEnd('\r', '\n'));
-        XISOSharp.Logger.ForwardError = msg =>
+        Logger.ForwardInfo = msg => Log.Information("{Message}", msg.TrimEnd('\r', '\n'));
+        Logger.ForwardError = msg =>
         {
             var text = msg.TrimEnd('\r', '\n');
             if (msg.StartsWith("warning:", StringComparison.OrdinalIgnoreCase) ||

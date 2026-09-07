@@ -35,10 +35,7 @@ public class ConstantsTests
     /// Verifies that <see cref="Constants.NumSectors"/> returns zero when the byte count is zero.
     /// </summary>
     [Fact]
-    public void NumSectors_Zero()
-    {
-        Assert.Equal(0u, Constants.NumSectors(0));
-    }
+    public void NumSectors_Zero() => Assert.Equal(0u, Constants.NumSectors(0));
 
     /// <summary>
     /// Verifies that <see cref="Constants.NumSectors"/> correctly handles a large

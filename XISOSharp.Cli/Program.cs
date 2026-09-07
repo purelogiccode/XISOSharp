@@ -175,40 +175,6 @@ internal static class Program
 
         var optind = 0;
 
-        // CLI-001/CLI-002: the classic operational modes are mutually exclusive.
-        // (-x/extract is the default, not a mode; -r/-c/rewrite/create, --unpack,
-        // --checksum/--filetime/--set-filetime and the redump modes keep their own
-        // guards below.)
-        bool ClassicModeSelected() =>
-            listMode || tree || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode ||
-            hashMode || copyOut || copyIn || auditMode || validateMode;
-
-        // CLI-017: -d (path), -o (outputName) and -D (deleteOld) are consumed by
-        // a few modes only (extract/rewrite/redump/rebuild/compress/decompress).
-        // Every other dispatch must reject them instead of silently ignoring them.
-        bool RejectIgnoredOutputFlags(string modeName)
-        {
-            if (path != null)
-            {
-                Logger.LogErr($"Error: -d <dir> is not used with {modeName}\n");
-                return true;
-            }
-
-            if (outputName != null)
-            {
-                Logger.LogErr($"Error: -o <output> is not used with {modeName}\n");
-                return true;
-            }
-
-            if (deleteOld)
-            {
-                Logger.LogErr("Error: -D is only used with -r (rewrite)\n");
-                return true;
-            }
-
-            return false;
-        }
-
         // Handle standalone verb commands early (don't start with '-')
         if (args.Length > 0 && string.Equals(args[0], "validate", StringComparison.OrdinalIgnoreCase))
         {
@@ -2176,6 +2142,42 @@ internal static class Program
             Logger.Log("\nWARNING:  Warning(s) were issued during execution--review stderr!\n");
 
         return err;
+
+        // CLI-001/CLI-002: the classic operational modes are mutually exclusive.
+        // (-x/extract is the default, not a mode; -r/-c/rewrite/create, --unpack,
+        // --checksum/--filetime/--set-filetime and the redump modes keep their own
+        // guards below.)
+        bool ClassicModeSelected()
+        {
+            return listMode || tree || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode ||
+                   hashMode || copyOut || copyIn || auditMode || validateMode;
+        }
+
+        // CLI-017: -d (path), -o (outputName) and -D (deleteOld) are consumed by
+        // a few modes only (extract/rewrite/redump/rebuild/compress/decompress).
+        // Every other dispatch must reject them instead of silently ignoring them.
+        bool RejectIgnoredOutputFlags(string modeName)
+        {
+            if (path != null)
+            {
+                Logger.LogErr($"Error: -d <dir> is not used with {modeName}\n");
+                return true;
+            }
+
+            if (outputName != null)
+            {
+                Logger.LogErr($"Error: -o <output> is not used with {modeName}\n");
+                return true;
+            }
+
+            if (deleteOld)
+            {
+                Logger.LogErr("Error: -D is only used with -r (rewrite)\n");
+                return true;
+            }
+
+            return false;
+        }
     }
 
     /// <summary>
@@ -4321,20 +4323,17 @@ internal static class Program
     }
 
     /// <summary>Formats the XEX encryption type as a name.</summary>
-    private static string FormatXexEncryption(ushort encryption)
-    {
-        return encryption switch
+    private static string FormatXexEncryption(ushort encryption) =>
+        encryption switch
         {
             0 => "None",
             1 => "Normal",
             _ => "Unknown"
         };
-    }
 
     /// <summary>Formats the XEX compression type as a name.</summary>
-    private static string FormatXexCompression(ushort compression)
-    {
-        return compression switch
+    private static string FormatXexCompression(ushort compression) =>
+        compression switch
         {
             0 => "None",
             1 => "Basic",
@@ -4342,7 +4341,6 @@ internal static class Program
             3 => "Delta",
             _ => "Unknown"
         };
-    }
 
     /// <summary>
     /// Formats the XBE allowed-media bitmask as a comma-separated list of names.
@@ -4391,8 +4389,7 @@ internal static class Program
     /// <summary>
     /// Prints the usage/help text to standard error.
     /// </summary>
-    private static void PrintUsage()
-    {
+    private static void PrintUsage() =>
         Console.Error.Write(Constants.Banner + """
                                                  Usage:
 
@@ -4572,5 +4569,4 @@ internal static class Program
                                                     --validate-report <file>  Write JSON validation report to file.
 
                                                """);
-    }
 }

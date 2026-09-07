@@ -47,10 +47,7 @@ public class XisoLegacyInteropTests : IDisposable
         return dir;
     }
 
-    private static bool ReferenceAvailable()
-    {
-        return OperatingSystem.IsWindows() && File.Exists(ExtractXisoExe);
-    }
+    private static bool ReferenceAvailable() => OperatingSystem.IsWindows() && File.Exists(ExtractXisoExe);
 
     /// <summary>
     /// Creates a legacy-layout image with the reference tool inside

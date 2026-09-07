@@ -98,15 +98,9 @@ public class XisoSalvageTests : IDisposable
         return (vol.RootDirSector, vol.RootDirSize, ((long)vol.RootDirSector * Constants.SectorSize) + vol.DiscLseek);
     }
 
-    private static string Sha256(string path)
-    {
-        return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
-    }
+    private static string Sha256(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
 
-    private static List<string> Sorted(IReadOnlyList<string> paths)
-    {
-        return paths.OrderBy(static p => p, StringComparer.Ordinal).ToList();
-    }
+    private static List<string> Sorted(IReadOnlyList<string> paths) => paths.OrderBy(static p => p, StringComparer.Ordinal).ToList();
 
     [Fact]
     public void DefaultOutputPath_ReplacesExtensionWithSalvagedIso()
@@ -366,17 +360,12 @@ public class XisoSalvageTests : IDisposable
     }
 
     [Fact]
-    public void Salvage_MissingFile_ThrowsNotFound()
-    {
+    public void Salvage_MissingFile_ThrowsNotFound() =>
         Assert.Throws<FileNotFoundException>(() =>
             XisoReader.Salvage(Path.Combine(CreateTempDir("xiso_salv_bad"), "no_such.iso")));
-    }
 
     [Fact]
-    public void Salvage_EmptyPath_ThrowsArgument()
-    {
-        Assert.Throws<ArgumentException>(() => XisoReader.Salvage(""));
-    }
+    public void Salvage_EmptyPath_ThrowsArgument() => Assert.Throws<ArgumentException>(() => XisoReader.Salvage(""));
 
     [Fact]
     public void Salvage_RootBeyondLength_ThrowsFormat()
@@ -509,16 +498,10 @@ public class XisoSalvageTests : IDisposable
     }
 
     [Fact]
-    public void SalvageCli_MissingOperand_UsageError()
-    {
-        Assert.Equal(1, Program.Main(["--salvage"]));
-    }
+    public void SalvageCli_MissingOperand_UsageError() => Assert.Equal(1, Program.Main(["--salvage"]));
 
     [Fact]
-    public void SalvageCli_MissingFile_Fails()
-    {
-        Assert.Equal(1, Program.Main(["--salvage", Path.Combine(CreateTempDir("xiso_salv_cli"), "no.iso")]));
-    }
+    public void SalvageCli_MissingFile_Fails() => Assert.Equal(1, Program.Main(["--salvage", Path.Combine(CreateTempDir("xiso_salv_cli"), "no.iso")]));
 
     [Fact]
     public void SalvageCli_ExistingOutput_AssumeNoRefusesAssumeYesOverwrites()

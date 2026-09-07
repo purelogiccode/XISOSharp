@@ -17,19 +17,13 @@ internal static class CisoSplitFile
     /// mirroring Rust <c>Path::with_extension(format!("{n}.cso"))</c>:
     /// <c>game.cso</c> → <c>game.1.cso</c>, <c>game</c> → <c>game.1.cso</c>, <c>a.b.cso</c> → <c>a.b.1.cso</c>.
     /// </summary>
-    public static string PartPath(string outputCsoPath, long partIndex)
-    {
-        return Path.ChangeExtension(outputCsoPath, $"{partIndex + 1}.cso");
-    }
+    public static string PartPath(string outputCsoPath, long partIndex) => Path.ChangeExtension(outputCsoPath, $"{partIndex + 1}.cso");
 
     /// <summary>
     /// Returns true when <paramref name="path"/> refers to the first part of a split CSO
     /// (<c>*.1.cso</c>), matching the detection in <c>xdvdfs-cli/src/img.rs::open_image</c>.
     /// </summary>
-    public static bool IsSplitPath(string path)
-    {
-        return path.EndsWith(".1.cso", StringComparison.OrdinalIgnoreCase);
-    }
+    public static bool IsSplitPath(string path) => path.EndsWith(".1.cso", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Opens every existing part for a split path such as <c>game.1.cso</c>.</summary>
     public static List<FileStream> OpenParts(string firstPartPath)

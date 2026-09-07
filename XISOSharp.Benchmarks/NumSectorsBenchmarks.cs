@@ -41,10 +41,7 @@ public class NumSectorsBenchmarks
     /// </summary>
     /// <returns>The sector count.</returns>
     [Benchmark(Baseline = true)]
-    public uint NumSectors_Param()
-    {
-        return Constants.NumSectors(ByteCount);
-    }
+    public uint NumSectors_Param() => Constants.NumSectors(ByteCount);
 
     /// <summary>
     /// Measures sector rounding over a 256-entry batch with varying inputs and

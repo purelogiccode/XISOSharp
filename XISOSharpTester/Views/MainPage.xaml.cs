@@ -79,9 +79,8 @@ public class StatusIconConverter : IValueConverter
     /// and "?" for any unknown value.
     /// </summary>
     [SuppressMessage("ReSharper", "NullnessAnnotationConflictWithJetBrainsAnnotations")]
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        return value is TestStatus status
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is TestStatus status
             ? status switch
             {
                 TestStatus.Passed => "\u2713",
@@ -90,14 +89,10 @@ public class StatusIconConverter : IValueConverter
                 _ => "?"
             }
             : "?";
-    }
 
     /// <summary>
     /// Not supported. Throws <see cref="NotSupportedException"/>.
     /// </summary>
     [SuppressMessage("ReSharper", "NullnessAnnotationConflictWithJetBrainsAnnotations")]
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        throw new NotSupportedException();
-    }
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }

@@ -963,13 +963,11 @@ public static class XisoWriter
         ProgressCallback? progressCallback = null,
         CancellationToken cancellationToken = default,
         IProgress<ProgressInfo>? progress = null,
-        ulong? fileTime = null)
-    {
-        return await Task.Run(() => PackFromDirectory(
+        ulong? fileTime = null) =>
+        await Task.Run(() => PackFromDirectory(
                 sourceDirectory, outputIsoPath, excludePatterns, progressCallback, cancellationToken, progress,
                 fileTime),
             cancellationToken).ConfigureAwait(false);
-    }
 
     /// <summary>
     /// Creates an XISO from a pre-built remap AVL tree (used by <c>build-image</c>).
@@ -1284,17 +1282,12 @@ public static class XisoWriter
     /// </summary>
     /// <param name="avl">Node whose entry size is being calculated.</param>
     /// <param name="outSize">Running total size of the directory table; updated in place.</param>
-    internal static void CalculateDirectorySize(AvlNode avl, ref uint outSize)
-    {
+    internal static void CalculateDirectorySize(AvlNode avl, ref uint outSize) =>
         // Shared table-layout primitive (TODO #3): identical offsets to SerializeTable.
         DirectoryEntryTableWriter.PlaceEntry(avl, ref outSize);
-    }
 
     /// <summary>Local helper for sector count calculation (ceiling division).</summary>
-    private static uint NumSectors(uint size)
-    {
-        return (size / Constants.SectorSize) + (size % Constants.SectorSize != 0 ? 1u : 0u);
-    }
+    private static uint NumSectors(uint size) => (size / Constants.SectorSize) + (size % Constants.SectorSize != 0 ? 1u : 0u);
 
     /// <summary>
     /// Traversal callback that assigns sector positions to directory entries
@@ -1440,16 +1433,14 @@ public static class XisoWriter
         int? prependSectors = null,
         IReadOnlyList<string>? excludePatterns = null,
         IProgress<ProgressInfo>? progress = null,
-        ulong? fileTime = null)
-    {
-        return await Task.Run(() =>
+        ulong? fileTime = null) =>
+        await Task.Run(() =>
         {
             var result = CreateXiso(rootDirectory, outputDirectory, inRoot, sourceStream,
                 out var outPath, inName, progressCallback, cancellationToken, prependSectors, excludePatterns,
                 progress, fileTime);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
-    }
 
     /// <summary>
     /// Validates that the output ISO path does not collide with the source directory.

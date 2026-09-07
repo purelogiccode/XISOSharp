@@ -157,10 +157,7 @@ public static class RemapFilesystem
         return sb.ToString();
     }
 
-    private static string EscapeTomlString(string s)
-    {
-        return s.Replace("\\", @"\\").Replace("\"", "\\\"");
-    }
+    private static string EscapeTomlString(string s) => s.Replace("\\", @"\\").Replace("\"", "\\\"");
 
     /// <summary>
     /// Dry-run: returns ordered host→image mappings without building an image.

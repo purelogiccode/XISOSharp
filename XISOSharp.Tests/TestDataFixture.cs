@@ -15,8 +15,5 @@ internal static class TestDataFixture
     private static readonly string TestDataRoot = TestDataLocator.GetTestDataRoot(AppContext.BaseDirectory);
 
     [ModuleInitializer]
-    internal static void EnsureTestData()
-    {
-        TestDataWriter.EnsureTestData(TestDataRoot);
-    }
+    internal static void EnsureTestData() => TestDataWriter.EnsureTestData(TestDataRoot);
 }

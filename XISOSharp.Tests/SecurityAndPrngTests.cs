@@ -41,11 +41,9 @@ public class SecurityAndPrngTests : IDisposable
         }
     }
 
-    private static long RedumpLengthForTest(long maxStartSectors = 6000000)
-    {
+    private static long RedumpLengthForTest(long maxStartSectors = 6000000) =>
         // redumpLength = (maxStart+4096)*SectorSize so that maxStart is high enough
-        return (maxStartSectors + 4096) * Constants.SectorSize;
-    }
+        (maxStartSectors + 4096) * Constants.SectorSize;
 
     // -----------------------------------------------------------------
     // SecuritySectors.ParseLines

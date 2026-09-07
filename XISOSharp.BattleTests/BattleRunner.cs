@@ -106,13 +106,11 @@ internal static class BattleRunner
         return session;
     }
 
-    private static string Symbol(BattleStatus s)
-    {
-        return s switch
+    private static string Symbol(BattleStatus s) =>
+        s switch
         {
             BattleStatus.Passed => "\u2713", BattleStatus.Failed => "\u2717", BattleStatus.Skipped => "-", _ => "?"
         };
-    }
 
     private static PerFileBattleResult TestSingleFile(string path, ExtractXisoWrapper? wrapper)
     {

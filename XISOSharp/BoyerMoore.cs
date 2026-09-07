@@ -197,10 +197,7 @@ public class BoyerMoore
     /// <exception cref="InvalidOperationException">
     /// Thrown when <see cref="Init"/> has not been called (or after <see cref="Done"/>).
     /// </exception>
-    public int Search(byte[] text)
-    {
-        return Search(text, 0, text.Length);
-    }
+    public int Search(byte[] text) => Search(text, 0, text.Length);
 
     /// <summary>
     /// Releases the shift tables. The instance must be re-initialized with

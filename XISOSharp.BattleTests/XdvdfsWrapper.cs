@@ -74,40 +74,22 @@ internal sealed class XdvdfsWrapper : IDisposable
     }
 
     /// <summary>Deterministic content checksum (<c>checksum -s</c> prints <c>&lt;hex&gt;\t&lt;path&gt;</c>).</summary>
-    public (int ExitCode, string StdOut, string StdErr) Checksum(string imagePath)
-    {
-        return Run("checksum", "-s", imagePath);
-    }
+    public (int ExitCode, string StdOut, string StdErr) Checksum(string imagePath) => Run("checksum", "-s", imagePath);
 
     /// <summary>Unpacks an entire image to a directory.</summary>
-    public (int ExitCode, string StdOut, string StdErr) Unpack(string imagePath, string outDir)
-    {
-        return Run("unpack", imagePath, outDir);
-    }
+    public (int ExitCode, string StdOut, string StdErr) Unpack(string imagePath, string outDir) => Run("unpack", imagePath, outDir);
 
     /// <summary>Packs an image from a directory (or source ISO).</summary>
-    public (int ExitCode, string StdOut, string StdErr) Pack(string sourcePath, string imagePath)
-    {
-        return Run("pack", sourcePath, imagePath);
-    }
+    public (int ExitCode, string StdOut, string StdErr) Pack(string sourcePath, string imagePath) => Run("pack", sourcePath, imagePath);
 
     /// <summary>Copies a file or directory out of the image.</summary>
-    public (int ExitCode, string StdOut, string StdErr) CopyOut(string imagePath, string srcPath, string destPath)
-    {
-        return Run("copy-out", imagePath, srcPath, destPath);
-    }
+    public (int ExitCode, string StdOut, string StdErr) CopyOut(string imagePath, string srcPath, string destPath) => Run("copy-out", imagePath, srcPath, destPath);
 
     /// <summary>MD5 of a file (or every entry when <paramref name="innerPath"/> is null).</summary>
-    public (int ExitCode, string StdOut, string StdErr) Md5(string imagePath, string? innerPath = null)
-    {
-        return innerPath == null ? Run("md5", imagePath) : Run("md5", imagePath, innerPath);
-    }
+    public (int ExitCode, string StdOut, string StdErr) Md5(string imagePath, string? innerPath = null) => innerPath == null ? Run("md5", imagePath) : Run("md5", imagePath, innerPath);
 
     /// <summary>Recursive listing (<c>/path (N bytes)</c> lines + totals).</summary>
-    public (int ExitCode, string StdOut, string StdErr) Tree(string imagePath)
-    {
-        return Run("tree", imagePath);
-    }
+    public (int ExitCode, string StdOut, string StdErr) Tree(string imagePath) => Run("tree", imagePath);
 
     /// <summary>Version line for reports.</summary>
     public string GetVersion()

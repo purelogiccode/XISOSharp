@@ -36,10 +36,7 @@ public sealed class XboxPrng
     }
 
     /// <summary>Write <paramref name="count"/> PRNG sectors to <paramref name="fs"/>.</summary>
-    public void WriteSectors(FileStream fs, long count)
-    {
-        WriteSectors((Stream)fs, count);
-    }
+    public void WriteSectors(FileStream fs, long count) => WriteSectors((Stream)fs, count);
 
     /// <summary>Writes <paramref name="count"/> PRNG sectors to <paramref name="output"/>.</summary>
     /// <param name="output">Destination stream to write filler sectors to.</param>
@@ -170,10 +167,7 @@ public sealed class XboxPrng
     }
 
     /// <summary>Brute-force seed from the first 4096 bytes (2 sectors). Mirrors <c>TryGetSeed</c>.</summary>
-    public static bool TryGetSeed(byte[] sector, out uint outSeed)
-    {
-        return TryGetSeed(sector, out outSeed, CancellationToken.None);
-    }
+    public static bool TryGetSeed(byte[] sector, out uint outSeed) => TryGetSeed(sector, out outSeed, CancellationToken.None);
 
     /// <summary>
     /// Brute-force seed from the first 4096 bytes (2 sectors), honoring

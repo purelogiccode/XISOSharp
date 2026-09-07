@@ -15,19 +15,13 @@ internal static class CliCommands
     /// </summary>
     /// <param name="overwrite"><c>true</c> for <c>-y</c> (overwrite); <c>false</c> for <c>-n</c> (refuse).</param>
     /// <returns><c>"-y"</c> or <c>"-n"</c>.</returns>
-    internal static string OverwriteFlag(bool overwrite)
-    {
-        return overwrite ? "-y" : "-n";
-    }
+    internal static string OverwriteFlag(bool overwrite) => overwrite ? "-y" : "-n";
 
     /// <summary>
     /// Builds the <c>-v</c> version argv.
     /// </summary>
     /// <returns>The version argument list.</returns>
-    internal static string[] Version()
-    {
-        return ["-v"];
-    }
+    internal static string[] Version() => ["-v"];
 
     /// <summary>
     /// Builds the extract argv (<c>-d</c> destination, <c>-x</c> images, overwrite flag).
@@ -56,20 +50,14 @@ internal static class CliCommands
     /// </summary>
     /// <param name="images">Image paths to list.</param>
     /// <returns>The list argument list.</returns>
-    internal static string[] List(IReadOnlyList<string> images)
-    {
-        return ["-l", .. images];
-    }
+    internal static string[] List(IReadOnlyList<string> images) => ["-l", .. images];
 
     /// <summary>
     /// Builds the tree argv (<c>-t</c> plus images).
     /// </summary>
     /// <param name="images">Image paths to show as a tree.</param>
     /// <returns>The tree argument list.</returns>
-    internal static string[] Tree(IReadOnlyList<string> images)
-    {
-        return ["-t", .. images];
-    }
+    internal static string[] Tree(IReadOnlyList<string> images) => ["-t", .. images];
 
     /// <summary>
     /// Builds the info argv (<c>-i</c> image plus optional in-image path).
@@ -112,10 +100,7 @@ internal static class CliCommands
     /// <param name="imagePath">Path of the file inside the image.</param>
     /// <param name="dest">Destination path on disk.</param>
     /// <returns>The copy-out argument list.</returns>
-    internal static string[] CopyOut(string image, string imagePath, string dest)
-    {
-        return ["--copy-out", image, imagePath, dest];
-    }
+    internal static string[] CopyOut(string image, string imagePath, string dest) => ["--copy-out", image, imagePath, dest];
 
     /// <summary>
     /// Builds the create argv (<c>-c</c> source, optional name, <c>-X</c> excludes, <c>-s</c>/<c>-m</c>).

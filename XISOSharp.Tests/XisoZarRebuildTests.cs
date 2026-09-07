@@ -76,12 +76,10 @@ public class XisoZarRebuildTests : IDisposable
             Environment.SetEnvironmentVariable("TMPDIR", Parent);
         }
 
-        public string[] ZarScratchDirs()
-        {
-            return Directory.Exists(Parent)
+        public string[] ZarScratchDirs() =>
+            Directory.Exists(Parent)
                 ? Directory.GetDirectories(Parent, "XISOSharp_zar_*")
                 : [];
-        }
 
         public void Dispose()
         {

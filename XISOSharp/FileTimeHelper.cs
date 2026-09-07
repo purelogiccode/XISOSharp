@@ -30,40 +30,28 @@ public static class FileTimeHelper
     /// exceeds the 53-bit mantissa), so the same "now" differed between paths.
     /// Uses the precise integer <see cref="ToFileTimeRaw"/> instead.
     /// </remarks>
-    public static void WriteFileTimeNow(Span<byte> destination)
-    {
-        WriteFileTime(destination, ToFileTimeRaw(DateTimeOffset.UtcNow));
-    }
+    public static void WriteFileTimeNow(Span<byte> destination) => WriteFileTime(destination, ToFileTimeRaw(DateTimeOffset.UtcNow));
 
     /// <summary>
     /// Writes a raw 64-bit FILETIME value into <paramref name="destination"/> little-endian.
     /// </summary>
     /// <param name="destination">Span of at least 8 bytes.</param>
     /// <param name="fileTime">Raw FILETIME (little-endian on disk).</param>
-    public static void WriteFileTime(Span<byte> destination, ulong fileTime)
-    {
-        BinaryPrimitives.WriteUInt64LittleEndian(destination, fileTime);
-    }
+    public static void WriteFileTime(Span<byte> destination, ulong fileTime) => BinaryPrimitives.WriteUInt64LittleEndian(destination, fileTime);
 
     /// <summary>
     /// Writes a <see cref="DateTimeOffset"/> as FILETIME into <paramref name="destination"/> little-endian.
     /// </summary>
     /// <param name="destination">Span of at least 8 bytes.</param>
     /// <param name="dateTime">UTC time to encode (offset is normalized to UTC).</param>
-    public static void WriteFileTime(Span<byte> destination, DateTimeOffset dateTime)
-    {
-        WriteFileTime(destination, ToFileTimeRaw(dateTime));
-    }
+    public static void WriteFileTime(Span<byte> destination, DateTimeOffset dateTime) => WriteFileTime(destination, ToFileTimeRaw(dateTime));
 
     /// <summary>
     /// Reads a raw little-endian FILETIME from <paramref name="source"/>.
     /// </summary>
     /// <param name="source">Span of at least 8 bytes (little-endian).</param>
     /// <returns>Raw 64-bit FILETIME.</returns>
-    public static ulong ReadFileTimeRaw(ReadOnlySpan<byte> source)
-    {
-        return BinaryPrimitives.ReadUInt64LittleEndian(source);
-    }
+    public static ulong ReadFileTimeRaw(ReadOnlySpan<byte> source) => BinaryPrimitives.ReadUInt64LittleEndian(source);
 
     /// <summary>
     /// Converts a <see cref="DateTimeOffset"/> to a raw Windows FILETIME.

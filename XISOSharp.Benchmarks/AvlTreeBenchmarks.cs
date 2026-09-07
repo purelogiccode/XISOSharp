@@ -64,40 +64,28 @@ public class AvlTreeBenchmarks
     /// Returns the node so the lookup cannot be eliminated (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public AvlNode? FetchExistingFile()
-    {
-        return AvlTree.AvlFetch(_root, "file_0500.dat");
-    }
+    public AvlNode? FetchExistingFile() => AvlTree.AvlFetch(_root, "file_0500.dat");
 
     /// <summary>
     /// Measures fetching a file name known to be absent from the tree.
     /// Returns the (null) result so the lookup cannot be eliminated (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public AvlNode? FetchMissingFile()
-    {
-        return AvlTree.AvlFetch(_root, "nonexistent.dat");
-    }
+    public AvlNode? FetchMissingFile() => AvlTree.AvlFetch(_root, "nonexistent.dat");
 
     /// <summary>
     /// Measures a prefix-order depth-first traversal of the tree.
     /// Returns the traversal result so it cannot be eliminated (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public int TraversePrefix()
-    {
-        return AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Prefix, 0);
-    }
+    public int TraversePrefix() => AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Prefix, 0);
 
     /// <summary>
     /// Measures an infix-order depth-first traversal of the tree.
     /// Returns the traversal result so it cannot be eliminated (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public int TraverseInfix()
-    {
-        return AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Infix, 0);
-    }
+    public int TraverseInfix() => AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Infix, 0);
 
     /// <summary>
     /// Measures key comparisons between adjacent file names. Accumulates into a returned
@@ -116,8 +104,5 @@ public class AvlTreeBenchmarks
         return sum;
     }
 
-    private static int CountCallback(AvlNode node, object? context, int depth)
-    {
-        return 0;
-    }
+    private static int CountCallback(AvlNode node, object? context, int depth) => 0;
 }

@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.IO;
 using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Input;
@@ -284,13 +283,11 @@ internal partial class MainViewModel
         }
     }
 
-    private IReadOnlyList<XisoNode> LoadExploreChildren(ExplorerTreeNode node)
-    {
+    private IReadOnlyList<XisoNode> LoadExploreChildren(ExplorerTreeNode node) =>
         // Invoked off the UI thread via ExplorerTreeNode's background load (TST-010);
         // directory listings are table reads, safe here. The node marshals the
         // resulting list back to the UI thread before touching its bound collection.
-        return _explorer?.ListChildren(node.FullPath) ?? [];
-    }
+        _explorer?.ListChildren(node.FullPath) ?? [];
 
     private void CloseExploreImage()
     {

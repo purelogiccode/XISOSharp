@@ -667,12 +667,10 @@ public static class XisoRedump
     }
 
     private static List<string> ExtractZarTree(ZARSharp.ZArchiveReader reader, string outputDir,
-        CancellationToken cancellationToken)
-    {
+        CancellationToken cancellationToken) =>
         // Shared engine: same walk, same files, same errors as before.
-        return ZARSharp.Pipeline.ZarPackEngine
+        ZARSharp.Pipeline.ZarPackEngine
             .ExtractOpen(reader, outputDir, outputDir, null, null, cancellationToken).ToList();
-    }
 
     private static bool HasXisoMagic(string path)
     {

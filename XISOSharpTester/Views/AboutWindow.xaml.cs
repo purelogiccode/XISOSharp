@@ -41,10 +41,7 @@ internal partial class AboutWindow
         }
     }
 
-    private void CloseButton_Click(object sender, RoutedEventArgs e)
-    {
-        Close();
-    }
+    private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
     {

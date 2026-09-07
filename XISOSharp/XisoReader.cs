@@ -34,10 +34,7 @@ public static class XisoReader
     /// True when <paramref name="path"/> has a <c>.cso</c> extension; covers split
     /// <c>*.1.cso</c> part sets (mirroring <c>xdvdfs-cli/src/img.rs::open_image</c>).
     /// </summary>
-    internal static bool IsCsoPath(string path)
-    {
-        return Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
-    }
+    internal static bool IsCsoPath(string path) => Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Opens an image for reading: <c>.cso</c> paths (single or split parts) are routed
@@ -1097,11 +1094,9 @@ public static class XisoReader
         string? outputName = null,
         int? skipSectors = null,
         int? prependSectors = null,
-        IProgress<ProgressInfo>? progress = null)
-    {
-        return DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken,
+        IProgress<ProgressInfo>? progress = null) =>
+        DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken,
             outputName, skipSectors, prependSectors, progress);
-    }
 
     /// <summary>
     /// Extracts files from an XISO image to a directory.
@@ -1133,11 +1128,9 @@ public static class XisoReader
         CancellationToken cancellationToken = default,
         int? skipSectors = null,
         UnpackOptions? options = null,
-        IProgress<ProgressInfo>? progress = null)
-    {
-        return DecodeXiso(xisoPath, outputPath, ExtractMode.Extract, out _, llCompat, cancellationToken,
+        IProgress<ProgressInfo>? progress = null) =>
+        DecodeXiso(xisoPath, outputPath, ExtractMode.Extract, out _, llCompat, cancellationToken,
             skipSectors: skipSectors, progress: progress, unpackOptions: options);
-    }
 
     /// <summary>
     /// Stream-based <c>Extract</c>: extracts an already-open image
@@ -1161,11 +1154,9 @@ public static class XisoReader
         CancellationToken cancellationToken = default,
         int? skipSectors = null,
         UnpackOptions? options = null,
-        IProgress<ProgressInfo>? progress = null)
-    {
-        return DecodeXiso(imageStream, imageName, outputPath, ExtractMode.Extract, out _, llCompat,
+        IProgress<ProgressInfo>? progress = null) =>
+        DecodeXiso(imageStream, imageName, outputPath, ExtractMode.Extract, out _, llCompat,
             cancellationToken, skipSectors: skipSectors, progress: progress, unpackOptions: options);
-    }
 
     /// <summary>
     /// Unpacks an entire XISO image to a directory.
@@ -1401,10 +1392,7 @@ public static class XisoReader
     /// at byte offset 31337 (shifted by the skip offset when reading offset images),
     /// meaning it uses the optimized directory layout.
     /// </summary>
-    private static bool IsOptimized(string isoPath, int? skipSectors = null)
-    {
-        return IsOptimizedImage(isoPath, skipSectors);
-    }
+    private static bool IsOptimized(string isoPath, int? skipSectors = null) => IsOptimizedImage(isoPath, skipSectors);
 
     /// <summary>
     /// Lists files in an XISO image without extracting.
@@ -1424,11 +1412,9 @@ public static class XisoReader
         string xisoPath,
         bool llCompat,
         CancellationToken cancellationToken = default,
-        int? skipSectors = null)
-    {
-        return DecodeXiso(xisoPath, null, ExtractMode.List, out _, llCompat, cancellationToken,
+        int? skipSectors = null) =>
+        DecodeXiso(xisoPath, null, ExtractMode.List, out _, llCompat, cancellationToken,
             skipSectors: skipSectors);
-    }
 
     /// <summary>
     /// Stream-based <c>List</c>: lists files of an already-open image.
@@ -1439,11 +1425,9 @@ public static class XisoReader
         string imageName,
         bool llCompat,
         CancellationToken cancellationToken = default,
-        int? skipSectors = null)
-    {
-        return DecodeXiso(imageStream, imageName, null, ExtractMode.List, out _, llCompat,
+        int? skipSectors = null) =>
+        DecodeXiso(imageStream, imageName, null, ExtractMode.List, out _, llCompat,
             cancellationToken, skipSectors: skipSectors);
-    }
 
     /// <summary>
     /// Recursively lists all files in an XISO image in a tree format,
@@ -1464,11 +1448,9 @@ public static class XisoReader
         string xisoPath,
         bool llCompat,
         CancellationToken cancellationToken = default,
-        int? skipSectors = null)
-    {
-        return DecodeXiso(xisoPath, null, ExtractMode.Tree, out _, llCompat, cancellationToken,
+        int? skipSectors = null) =>
+        DecodeXiso(xisoPath, null, ExtractMode.Tree, out _, llCompat, cancellationToken,
             skipSectors: skipSectors);
-    }
 
     /// <summary>
     /// Stream-based <c>Tree</c>: tree-lists an already-open image.
@@ -1479,11 +1461,9 @@ public static class XisoReader
         string imageName,
         bool llCompat,
         CancellationToken cancellationToken = default,
-        int? skipSectors = null)
-    {
-        return DecodeXiso(imageStream, imageName, null, ExtractMode.Tree, out _, llCompat,
+        int? skipSectors = null) =>
+        DecodeXiso(imageStream, imageName, null, ExtractMode.Tree, out _, llCompat,
             cancellationToken, skipSectors: skipSectors);
-    }
 
     /// <summary>
     /// Main entry point for processing an XISO image. Verifies the image, then
@@ -1876,15 +1856,13 @@ public static class XisoReader
         int? skipSectors = null,
         int? prependSectors = null,
         IProgress<ProgressInfo>? progress = null,
-        UnpackOptions? unpackOptions = null)
-    {
-        return await Task.Run(() =>
+        UnpackOptions? unpackOptions = null) =>
+        await Task.Run(() =>
         {
             var result = DecodeXiso(xisoPath, outputPath, mode, out var outPath, llCompat, cancellationToken,
                 outputName, skipSectors, prependSectors, progress, unpackOptions);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
-    }
 
     /// <summary>
     /// Stream-based <c>DecodeXisoAsync</c>: runs the stream
@@ -1903,15 +1881,13 @@ public static class XisoReader
         int? skipSectors = null,
         int? prependSectors = null,
         IProgress<ProgressInfo>? progress = null,
-        UnpackOptions? unpackOptions = null)
-    {
-        return await Task.Run(() =>
+        UnpackOptions? unpackOptions = null) =>
+        await Task.Run(() =>
         {
             var result = DecodeXiso(imageStream, imageName, outputPath, mode, out var outPath, llCompat,
                 cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
-    }
 
     /// <summary>
     /// Reads the XISO volume descriptor and returns metadata about the image
@@ -2086,10 +2062,8 @@ public static class XisoReader
     /// Block-device overload of <see cref="GetFileTime(string,int?)"/>.
     /// </summary>
     public static DateTimeOffset GetFileTime(IBlockDevice dev, string isoName = "memory",
-        int? skipSectors = null)
-    {
-        return FileTimeHelper.FromFileTimeRaw(GetFileTimeRaw(dev, isoName, skipSectors));
-    }
+        int? skipSectors = null) =>
+        FileTimeHelper.FromFileTimeRaw(GetFileTimeRaw(dev, isoName, skipSectors));
 
     /// <summary>
     /// Overwrites the 8-byte FILETIME header field in an existing XISO image.
@@ -2122,10 +2096,7 @@ public static class XisoReader
     /// <param name="isoPath">Path to the XISO file.</param>
     /// <param name="dateTime">UTC time to write (offset normalized).</param>
     /// <param name="skipSectors">Optional skip sectors for Redump images.</param>
-    public static void SetFileTime(string isoPath, DateTimeOffset dateTime, int? skipSectors = null)
-    {
-        SetFileTime(isoPath, FileTimeHelper.ToFileTimeRaw(dateTime), skipSectors);
-    }
+    public static void SetFileTime(string isoPath, DateTimeOffset dateTime, int? skipSectors = null) => SetFileTime(isoPath, FileTimeHelper.ToFileTimeRaw(dateTime), skipSectors);
 
     /// <summary>
     /// Probes the header magic at known disc offsets (or the skip offset when provided)
@@ -2486,10 +2457,7 @@ public static class XisoReader
     /// <exception cref="XisoFormatException">Thrown when the ISO is not a valid XISO image.</exception>
     /// <exception cref="InvalidDataException">Thrown when the path does not exist in the ISO.</exception>
     /// <exception cref="IOException">Thrown on read errors.</exception>
-    public static IReadOnlyList<string> ListDirectoryFlat(string isoPath, string internalPath = "/")
-    {
-        return ListDirectory(isoPath, internalPath).Select(static e => e.Name).ToArray();
-    }
+    public static IReadOnlyList<string> ListDirectoryFlat(string isoPath, string internalPath = "/") => ListDirectory(isoPath, internalPath).Select(static e => e.Name).ToArray();
 
     /// <summary>
     /// Returns metadata about all entries in the specified directory within an XISO image.
@@ -3024,10 +2992,8 @@ public static class XisoReader
     /// </exception>
     /// <exception cref="IOException">Thrown on read/write errors.</exception>
     public static void CopyIn(string isoPath, string hostFile, string internalPath,
-        bool createBackup = true)
-    {
+        bool createBackup = true) =>
         XisoPatcher.CopyIntoImage(isoPath, hostFile, internalPath, createBackup);
-    }
 
     /// <summary>
     /// Repairs the class-C issues of an XISO image in place (TODO #26, Phase 1;
@@ -3049,10 +3015,7 @@ public static class XisoReader
     /// The image is a CISO container or a split part; neither is patch-stable.
     /// </exception>
     /// <exception cref="IOException">Thrown on read/write errors.</exception>
-    public static RepairResult Repair(string isoPath, bool createBackup = true, bool dryRun = false)
-    {
-        return XisoRepairer.RepairInPlace(isoPath, createBackup, dryRun);
-    }
+    public static RepairResult Repair(string isoPath, bool createBackup = true, bool dryRun = false) => XisoRepairer.RepairInPlace(isoPath, createBackup, dryRun);
 
     /// <summary>
     /// Rebuilds a readable image from a corrupt one (TODO #26, Phase 2;
@@ -3074,10 +3037,7 @@ public static class XisoReader
     /// Not a valid XISO image, or the tree root itself is unreachable.
     /// </exception>
     /// <exception cref="IOException">Thrown on read/write errors.</exception>
-    public static SalvageResult Salvage(string sourcePath, string? outputPath = null)
-    {
-        return XisoSalvager.Salvage(sourcePath, outputPath);
-    }
+    public static SalvageResult Salvage(string sourcePath, string? outputPath = null) => XisoSalvager.Salvage(sourcePath, outputPath);
 
     /// <summary>
     /// Splits an XISO image into sector-aligned parts of at most
@@ -3091,10 +3051,8 @@ public static class XisoReader
     /// <param name="progress">Optional <see cref="ProgressInfoType.FileProgress"/> reports.</param>
     /// <returns>Paths of the parts written, in join order.</returns>
     public static IReadOnlyList<string> SplitXiso(string isoPath, string outputBase, long partSizeBytes,
-        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
-    {
-        return XisoSplitter.Split(isoPath, outputBase, partSizeBytes, cancellationToken, progress);
-    }
+        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null) =>
+        XisoSplitter.Split(isoPath, outputBase, partSizeBytes, cancellationToken, progress);
 
     /// <summary>
     /// Splits an XISO image into two sector-aligned halves (TODO #17, xdvdfs
@@ -3106,10 +3064,8 @@ public static class XisoReader
     /// <param name="progress">Optional <see cref="ProgressInfoType.FileProgress"/> reports.</param>
     /// <returns>Paths of the parts written, in join order.</returns>
     public static IReadOnlyList<string> SplitXisoHalves(string isoPath, string outputBase,
-        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
-    {
-        return XisoSplitter.SplitHalves(isoPath, outputBase, cancellationToken, progress);
-    }
+        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null) =>
+        XisoSplitter.SplitHalves(isoPath, outputBase, cancellationToken, progress);
 
     /// <summary>
     /// Reassembles a split image into <paramref name="outputPath"/> (TODO #17,
@@ -3121,10 +3077,8 @@ public static class XisoReader
     /// <param name="progress">Optional <see cref="ProgressInfoType.FileProgress"/> reports.</param>
     /// <returns><paramref name="outputPath"/>.</returns>
     public static string JoinSplitXiso(string firstPartPath, string outputPath,
-        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
-    {
-        return XisoSplitter.Join(firstPartPath, outputPath, cancellationToken, progress);
-    }
+        CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null) =>
+        XisoSplitter.Join(firstPartPath, outputPath, cancellationToken, progress);
 
     private static void CopyOutFile(Stream fs, EntryInfo entry, string internalPath, string destPath,
         VolumeInfo volInfo, UnpackOptions? options = null, CancellationToken cancellationToken = default,

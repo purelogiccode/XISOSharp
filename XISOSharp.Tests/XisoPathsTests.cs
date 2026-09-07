@@ -102,10 +102,7 @@ public sealed class XisoPathsTests : IDisposable
     [InlineData("a.iso", null)]
     [InlineData("", "a.iso")]
     [InlineData("   ", "a.iso")]
-    public void AreSamePath_MissingSide_ReturnsFalse(string? a, string? b)
-    {
-        Assert.False(XisoPaths.AreSamePath(a, b));
-    }
+    public void AreSamePath_MissingSide_ReturnsFalse(string? a, string? b) => Assert.False(XisoPaths.AreSamePath(a, b));
 
     [Fact]
     public void IsWithinDirectory_DirectChild_Matches()
@@ -140,63 +137,38 @@ public sealed class XisoPathsTests : IDisposable
     }
 
     [Fact]
-    public void TrimTrailingSeparators_RootSlash_Survives()
-    {
-        Assert.Equal("/", XisoPaths.TrimTrailingSeparators("/"));
-    }
+    public void TrimTrailingSeparators_RootSlash_Survives() => Assert.Equal("/", XisoPaths.TrimTrailingSeparators("/"));
 
     [Fact]
-    public void TrimTrailingSeparators_Empty_StaysEmpty()
-    {
-        Assert.Equal("", XisoPaths.TrimTrailingSeparators(""));
-    }
+    public void TrimTrailingSeparators_Empty_StaysEmpty() => Assert.Equal("", XisoPaths.TrimTrailingSeparators(""));
 
     [Theory]
     [InlineData("out/", "out")]
     [InlineData("out//", "out")]
-    public void TrimTrailingSeparators_Relative_Strips(string input, string expected)
-    {
-        Assert.Equal(expected, XisoPaths.TrimTrailingSeparators(input));
-    }
+    public void TrimTrailingSeparators_Relative_Strips(string input, string expected) => Assert.Equal(expected, XisoPaths.TrimTrailingSeparators(input));
 
     [WindowsOnlyFact]
-    public void TrimTrailingSeparators_DriveRoot_Survives()
-    {
-        Assert.Equal(@"C:\", XisoPaths.TrimTrailingSeparators(@"C:\"));
-    }
+    public void TrimTrailingSeparators_DriveRoot_Survives() => Assert.Equal(@"C:\", XisoPaths.TrimTrailingSeparators(@"C:\"));
 
     [WindowsOnlyTheory]
     [InlineData(@"C:\out\", @"C:\out")]
     [InlineData(@"C:\out\\", @"C:\out")]
     [InlineData(@"C:\out\/", @"C:\out")]
-    public void TrimTrailingSeparators_DriveSubdir_Strips(string input, string expected)
-    {
-        Assert.Equal(expected, XisoPaths.TrimTrailingSeparators(input));
-    }
+    public void TrimTrailingSeparators_DriveSubdir_Strips(string input, string expected) => Assert.Equal(expected, XisoPaths.TrimTrailingSeparators(input));
 
     [WindowsOnlyFact]
-    public void TrimTrailingSeparators_UncRoot_Survives()
-    {
-        Assert.Equal(@"\\server\share\", XisoPaths.TrimTrailingSeparators(@"\\server\share\"));
-    }
+    public void TrimTrailingSeparators_UncRoot_Survives() => Assert.Equal(@"\\server\share\", XisoPaths.TrimTrailingSeparators(@"\\server\share\"));
 
     [WindowsOnlyFact]
-    public void TrimTrailingSeparators_UncSubdir_Strips()
-    {
+    public void TrimTrailingSeparators_UncSubdir_Strips() =>
         Assert.Equal(@"\\server\share\dir",
             XisoPaths.TrimTrailingSeparators(@"\\server\share\dir\"));
-    }
 
     [WindowsOnlyFact]
-    public void AreSamePath_Unc_TrailingSeparator_Match()
-    {
-        Assert.True(XisoPaths.AreSamePath(@"\\server\share\dir", @"\\server\share\dir\"));
-    }
+    public void AreSamePath_Unc_TrailingSeparator_Match() => Assert.True(XisoPaths.AreSamePath(@"\\server\share\dir", @"\\server\share\dir\"));
 
     [WindowsOnlyFact]
-    public void IsWithinDirectory_Unc_TrailingSeparator_Matches()
-    {
+    public void IsWithinDirectory_Unc_TrailingSeparator_Matches() =>
         Assert.True(XisoPaths.IsWithinDirectory(
             @"\\server\share\dir\out.iso", @"\\server\share\dir\"));
-    }
 }

@@ -242,22 +242,17 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
     }
 
     /// <summary>Formats a byte count for tree/detail display.</summary>
-    internal static string FormatSize(long size)
-    {
-        return size switch
+    internal static string FormatSize(long size) =>
+        size switch
         {
             < 1024 => $"{size.ToString(CultureInfo.InvariantCulture)} B",
             < 1024 * 1024 => $"{size / 1024.0:F1} KB",
             < 1024L * 1024 * 1024 => $"{size / (1024.0 * 1024):F1} MB",
             _ => $"{size / (1024.0 * 1024 * 1024):F2} GB"
         };
-    }
 
     /// <summary>Occurs when a bound property value changes.</summary>
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    private void OnPropertyChanged([CallerMemberName] string? name = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-    }
+    private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }

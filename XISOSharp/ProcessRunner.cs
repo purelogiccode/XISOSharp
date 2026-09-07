@@ -96,7 +96,7 @@ public static class ProcessRunner
 
             // Static callback with state avoids capturing the outer `using var process`
             // (disposed-capture analyzer) and guarantees unregistration before dispose.
-            using (effectiveToken.Register(static state =>
+            await using (effectiveToken.Register(static state =>
                    {
                        var proc = (Process)state!;
                        try

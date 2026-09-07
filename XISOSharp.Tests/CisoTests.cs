@@ -88,15 +88,9 @@ public class CisoTests : IDisposable
         return outPath;
     }
 
-    private static byte[] ComputeSha256(string path)
-    {
-        return SHA256.HashData(File.ReadAllBytes(path));
-    }
+    private static byte[] ComputeSha256(string path) => SHA256.HashData(File.ReadAllBytes(path));
 
-    private static byte[] ComputeSha256Bytes(byte[] data)
-    {
-        return SHA256.HashData(data);
-    }
+    private static byte[] ComputeSha256Bytes(byte[] data) => SHA256.HashData(data);
 
     [Fact]
     public void CompressToCso_FromIsoFile_ProducesCsoAndIsCsoTrue()
@@ -449,8 +443,8 @@ public class CisoTests : IDisposable
         if (bytes.Length > 32)
         {
             // Read total blocks to find index offset
-            var uncompressedSize = System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(8, 8));
-            var blockSize = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(16, 4));
+            var uncompressedSize = BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(8, 8));
+            var blockSize = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(16, 4));
             var totalBlocks = (long)((uncompressedSize + blockSize - 1) / blockSize);
             var indexLen = totalBlocks + 1;
             // index starts at 24
@@ -459,9 +453,9 @@ public class CisoTests : IDisposable
             {
                 // Set second entry to 0x00000000 (plain bit clear, offset 0) while first is plain with high offset -> next < offset will trigger
                 // Simpler: copy first entry's value minus 1 into second entry
-                var first = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(24, 4));
+                var first = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(24, 4));
                 var second = first - 1;
-                System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(28, 4), second);
+                BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(28, 4), second);
             }
         }
 
@@ -568,16 +562,16 @@ public class CisoTests : IDisposable
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
         Span<byte> header = stackalloc byte[24];
         fs.ReadExactly(header);
-        var magic = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(header[..4]);
+        var magic = BinaryPrimitives.ReadUInt32LittleEndian(header[..4]);
         Assert.Equal(CisoReader.Magic, magic);
-        var uncompressedSize = System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(header[8..16]);
+        var uncompressedSize = BinaryPrimitives.ReadUInt64LittleEndian(header[8..16]);
         var totalBlocks = (long)((uncompressedSize + CisoWriter.BlockSize - 1) / CisoWriter.BlockSize);
         var index = new uint[totalBlocks + 1];
         Span<byte> le = stackalloc byte[4];
         for (var i = 0; i < index.Length; i++)
         {
             fs.ReadExactly(le);
-            index[i] = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(le);
+            index[i] = BinaryPrimitives.ReadUInt32LittleEndian(le);
         }
 
         return (header[20], header[21], index);
@@ -681,24 +675,24 @@ public class CisoTests : IDisposable
         const int dataStart = 24 + (4 * 2); // header + 2 index entries
         var cso = new MemoryStream();
         var header = new byte[24];
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(0, 4), CisoReader.Magic);
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(4, 4), CisoReader.HeaderSize);
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(header.AsSpan(8, 8), 2048ul);
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(16, 4), 2048u);
+        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(0, 4), CisoReader.Magic);
+        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(4, 4), CisoReader.HeaderSize);
+        BinaryPrimitives.WriteUInt64LittleEndian(header.AsSpan(8, 8), 2048ul);
+        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(16, 4), 2048u);
         header[20] = CisoWriter.VersionLz4;
         header[21] = 2;
         cso.Write(header);
 
         // Index: compressed-flagged entry pointing at the payload, final entry after it.
         var index = new byte[8];
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(
+        BinaryPrimitives.WriteUInt32LittleEndian(
             index.AsSpan(0, 4), (dataStart >> 2) | 0x80000000u);
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(
+        BinaryPrimitives.WriteUInt32LittleEndian(
             index.AsSpan(4, 4), (dataStart + 4 + 2048) >> 2);
         cso.Write(index);
 
         var payload = new byte[4 + 2048];
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(0, 4), 0x80000000u | 2048u);
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(0, 4), 0x80000000u | 2048u);
         pattern.CopyTo(payload.AsSpan(4));
         cso.Write(payload);
 

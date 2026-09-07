@@ -7,10 +7,7 @@ namespace XISOSharp.Tests;
 public class XgdTablesTests
 {
     [Fact]
-    public void XisoOffset_ArrayLengthIsFour()
-    {
-        Assert.Equal(4, XgdTables.XisoOffset.Length);
-    }
+    public void XisoOffset_ArrayLengthIsFour() => Assert.Equal(4, XgdTables.XisoOffset.Length);
 
     [Fact]
     public void XisoOffset_ValuesMatchExpected()

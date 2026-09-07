@@ -298,12 +298,10 @@ public class XisoFilesystemTests : IDisposable
         return hashes;
     }
 
-    private static HashSet<string> DiskDirectories(string root)
-    {
-        return Directory.GetDirectories(root, "*", SearchOption.AllDirectories)
+    private static HashSet<string> DiskDirectories(string root) =>
+        Directory.GetDirectories(root, "*", SearchOption.AllDirectories)
             .Select(d => NormalizeRel(Path.GetRelativePath(root, d)))
             .ToHashSet(StringComparer.Ordinal);
-    }
 
     [Fact]
     public void UnpackImage_MemoryFilesystem_MatchesDiskUnpack()

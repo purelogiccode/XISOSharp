@@ -358,15 +358,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private static bool IsImage(string path)
-    {
-        return ImageExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
-    }
+    private static bool IsImage(string path) => ImageExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
-    private static bool IsCso(string path)
-    {
-        return CsoExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
-    }
+    private static bool IsCso(string path) => CsoExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
     private static string AppendDistinctLines(string current, IEnumerable<string> added)
     {

@@ -353,10 +353,7 @@ internal sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Logs a GUI-originated message (e.g. drag-and-drop routing).</summary>
-    internal void LogMessage(string line)
-    {
-        AppendLog(line);
-    }
+    internal void LogMessage(string line) => AppendLog(line);
 
     [RelayCommand(CanExecute = nameof(CanCancelRun))]
     private void CancelRun()
@@ -377,151 +374,86 @@ internal sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    private bool CanCancelRun()
-    {
-        return IsRunning;
-    }
+    private bool CanCancelRun() => IsRunning;
 
-    private bool CanRunExtract()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
-    }
+    private bool CanRunExtract() => !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
 
-    private bool CanRunList()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
-    }
+    private bool CanRunList() => !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
 
-    private bool CanRunTree()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
-    }
+    private bool CanRunTree() => !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
 
-    private bool CanRunInfo()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
-    }
+    private bool CanRunInfo() => !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
 
-    private bool CanRunUnpack()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
-    }
+    private bool CanRunUnpack() => !IsRunning && !string.IsNullOrWhiteSpace(ExImage);
 
-    private bool CanRunCopyOut()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(ExImage)
-                          && !string.IsNullOrWhiteSpace(ExCopyPath) && !string.IsNullOrWhiteSpace(ExCopyDest);
-    }
+    private bool CanRunCopyOut() =>
+        !IsRunning && !string.IsNullOrWhiteSpace(ExImage)
+                   && !string.IsNullOrWhiteSpace(ExCopyPath) && !string.IsNullOrWhiteSpace(ExCopyDest);
 
-    private bool CanRunCreate()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(CrSource);
-    }
+    private bool CanRunCreate() => !IsRunning && !string.IsNullOrWhiteSpace(CrSource);
 
-    private bool CanRunRewrite()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(RwImages);
-    }
+    private bool CanRunRewrite() => !IsRunning && !string.IsNullOrWhiteSpace(RwImages);
 
-    private bool CanRunWipe()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(WpImage);
-    }
+    private bool CanRunWipe() => !IsRunning && !string.IsNullOrWhiteSpace(WpImage);
 
-    private bool CanRunTrim()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(WpImage);
-    }
+    private bool CanRunTrim() => !IsRunning && !string.IsNullOrWhiteSpace(WpImage);
 
-    private bool CanRunRebuild()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(RbParts) && !string.IsNullOrWhiteSpace(RbOutput);
-    }
+    private bool CanRunRebuild() => !IsRunning && !string.IsNullOrWhiteSpace(RbParts) && !string.IsNullOrWhiteSpace(RbOutput);
 
-    private bool CanRunCompress()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(CpSource);
-    }
+    private bool CanRunCompress() => !IsRunning && !string.IsNullOrWhiteSpace(CpSource);
 
-    private bool CanRunDecompress()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(DcCso);
-    }
+    private bool CanRunDecompress() => !IsRunning && !string.IsNullOrWhiteSpace(DcCso);
 
-    private bool CanRunValidate()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(VaSource) && !string.IsNullOrWhiteSpace(VaOutput);
-    }
+    private bool CanRunValidate() => !IsRunning && !string.IsNullOrWhiteSpace(VaSource) && !string.IsNullOrWhiteSpace(VaOutput);
 
-    private bool CanRunChecksum()
-    {
-        return !IsRunning && (!string.IsNullOrWhiteSpace(CsImages) || !string.IsNullOrWhiteSpace(VaSource));
-    }
+    private bool CanRunChecksum() => !IsRunning && (!string.IsNullOrWhiteSpace(CsImages) || !string.IsNullOrWhiteSpace(VaSource));
 
-    private bool CanRunBatch()
-    {
-        return !IsRunning && !string.IsNullOrWhiteSpace(BaDir);
-    }
+    private bool CanRunBatch() => !IsRunning && !string.IsNullOrWhiteSpace(BaDir);
 
     [RelayCommand(CanExecute = nameof(CanRunExtract))]
-    private Task RunExtractAsync()
-    {
-        return GuardedAsync(() => RunSingleImageAsync("extract", ExImage,
+    private Task RunExtractAsync() =>
+        GuardedAsync(() => RunSingleImageAsync("extract", ExImage,
             CliCommands.Extract(RequireOne(ExImage, "image"), NullIfEmpty(ExDest), OverwriteExisting)));
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunList))]
-    private Task RunListAsync()
-    {
-        return GuardedAsync(() => RunSingleImageAsync("list", ExImage,
+    private Task RunListAsync() =>
+        GuardedAsync(() => RunSingleImageAsync("list", ExImage,
             CliCommands.List(RequireOne(ExImage, "image"))));
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunTree))]
-    private Task RunTreeAsync()
-    {
-        return GuardedAsync(() => RunSingleImageAsync("tree", ExImage,
+    private Task RunTreeAsync() =>
+        GuardedAsync(() => RunSingleImageAsync("tree", ExImage,
             CliCommands.Tree(RequireOne(ExImage, "image"))));
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunInfo))]
-    private Task RunInfoAsync()
-    {
-        return GuardedAsync(() => RunSingleImageAsync("info", ExImage,
+    private Task RunInfoAsync() =>
+        GuardedAsync(() => RunSingleImageAsync("info", ExImage,
             CliCommands.Info(RequireValue(ExImage, "image"), NullIfEmpty(ExInfoPath))));
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunUnpack))]
-    private Task RunUnpackAsync()
-    {
-        return GuardedAsync(() => RunSingleImageAsync("unpack", ExImage,
+    private Task RunUnpackAsync() =>
+        GuardedAsync(() => RunSingleImageAsync("unpack", ExImage,
             CliCommands.Unpack(RequireValue(ExImage, "image"), NullIfEmpty(ExDest))));
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunCopyOut))]
-    private Task RunCopyOutAsync()
-    {
-        return GuardedAsync(() => RunJobAsync("copy-out",
+    private Task RunCopyOutAsync() =>
+        GuardedAsync(() => RunJobAsync("copy-out",
             CliCommands.CopyOut(RequireValue(ExImage, "image"), RequireValue(ExCopyPath, "in-image path"),
                 RequireValue(ExCopyDest, "destination"))));
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunCreate))]
-    private Task RunCreateAsync()
-    {
-        return GuardedAsync(() =>
+    private Task RunCreateAsync() =>
+        GuardedAsync(() =>
         {
             var source = RequireValue(CrSource, "source directory");
             var excludes = SplitLines(CrExcludes);
             return RunJobAsync("create", CliCommands.Create(source, NullIfEmpty(CrName), excludes,
                 CrSkipSystemUpdate, CrDisableXbePatch, OverwriteExisting));
         });
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunRewrite))]
-    private Task RunRewriteAsync()
-    {
-        return GuardedAsync(() =>
+    private Task RunRewriteAsync() =>
+        GuardedAsync(() =>
         {
             var images = RequireLines(RwImages, "image");
             ThrowIfRewriteCollision(NullIfEmpty(RwOutput), images);
@@ -529,36 +461,30 @@ internal sealed partial class MainViewModel : ObservableObject
                 RwDeleteOld, RwDisableXbePatch, RwValidate, RwChecksums, RwStrict, NullIfEmpty(RwReport),
                 OverwriteExisting));
         });
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunWipe))]
-    private Task RunWipeAsync()
-    {
-        return GuardedAsync(() =>
+    private Task RunWipeAsync() =>
+        GuardedAsync(() =>
         {
             var image = RequireValue(WpImage, "image");
             ThrowIfSameOutput(NullIfEmpty(WpOutput), [image], "Wipe output");
             return RunJobAsync("wipe",
                 CliCommands.Wipe(image, NullIfEmpty(WpOutput), OverwriteExisting));
         });
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunTrim))]
-    private Task RunTrimAsync()
-    {
-        return GuardedAsync(() =>
+    private Task RunTrimAsync() =>
+        GuardedAsync(() =>
         {
             var image = RequireValue(WpImage, "image");
             ThrowIfSameOutput(NullIfEmpty(WpOutput), [image], "Trim output");
             return RunJobAsync("trim",
                 CliCommands.Trim(image, NullIfEmpty(WpOutput), OverwriteExisting));
         });
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunRebuild))]
-    private Task RunRebuildAsync()
-    {
-        return GuardedAsync(() =>
+    private Task RunRebuildAsync() =>
+        GuardedAsync(() =>
         {
             var parts = RequireLines(RbParts, "component");
             var output = RequireValue(RbOutput, "output Redump ISO");
@@ -567,12 +493,10 @@ internal sealed partial class MainViewModel : ObservableObject
             return RunJobAsync("rebuild",
                 CliCommands.Rebuild(parts, output, NullIfEmpty(RbSectors), OverwriteExisting));
         });
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunCompress))]
-    private Task RunCompressAsync()
-    {
-        return GuardedAsync(() =>
+    private Task RunCompressAsync() =>
+        GuardedAsync(() =>
         {
             var source = RequireValue(CpSource, "source directory or image");
             ThrowIfCompressCollision(source, NullIfEmpty(CpOutput), NullIfEmpty(CpSplit));
@@ -580,45 +504,37 @@ internal sealed partial class MainViewModel : ObservableObject
                 Math.Clamp(CpLevel, 0, 9), string.Equals(CpVersion, "1", StringComparison.Ordinal) ? 1 : 2,
                 NullIfEmpty(CpSplit), OverwriteExisting));
         });
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunDecompress))]
-    private Task RunDecompressAsync()
-    {
-        return GuardedAsync(() =>
+    private Task RunDecompressAsync() =>
+        GuardedAsync(() =>
         {
             var cso = RequireValue(DcCso, "CSO file");
             ThrowIfDecompressCollision(cso, NullIfEmpty(DcOutput));
             return RunJobAsync("decompress",
                 CliCommands.Decompress(cso, NullIfEmpty(DcOutput), OverwriteExisting));
         });
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunValidate))]
-    private Task RunValidateAsync()
-    {
-        return GuardedAsync(() =>
+    private Task RunValidateAsync() =>
+        GuardedAsync(() =>
         {
             var source = RequireValue(VaSource, "source ISO");
             var output = RequireValue(VaOutput, "output ISO");
             return RunJobAsync("validate", CliCommands.Validate(source, output, VaChecksums, NullIfEmpty(VaReport)));
         });
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunChecksum))]
-    private Task RunChecksumAsync()
-    {
-        return GuardedAsync(() =>
+    private Task RunChecksumAsync() =>
+        GuardedAsync(() =>
         {
             var images = RequireLines(string.IsNullOrWhiteSpace(CsImages) ? VaSource : CsImages, "image");
             return RunJobAsync("checksum", CliCommands.Checksum(images, CsSilent));
         });
-    }
 
     [RelayCommand(CanExecute = nameof(CanRunBatch))]
-    private Task RunBatchAsync()
-    {
-        return GuardedAsync(() =>
+    private Task RunBatchAsync() =>
+        GuardedAsync(() =>
         {
             var dir = RequireValue(BaDir, "batch directory");
             var modeFlag = BaMode switch
@@ -632,7 +548,6 @@ internal sealed partial class MainViewModel : ObservableObject
             return RunJobAsync("batch",
                 CliCommands.Batch(dir, BaRecursive, modeFlag, NullIfEmpty(BaDest), OverwriteExisting));
         });
-    }
 
     private async Task GuardedAsync(Func<Task> run)
     {
@@ -999,10 +914,7 @@ internal sealed partial class MainViewModel : ObservableObject
         LogText = sb.ToString();
     }
 
-    private static string Quote(IReadOnlyList<string> args)
-    {
-        return string.Join(" ", args.Select(QuoteOne));
-    }
+    private static string Quote(IReadOnlyList<string> args) => string.Join(" ", args.Select(QuoteOne));
 
     private static string QuoteOne(string arg)
     {
@@ -1020,15 +932,12 @@ internal sealed partial class MainViewModel : ObservableObject
             return arg;
         }
 
-        var escaped = arg.Replace("\\", "\\\\", StringComparison.Ordinal)
+        var escaped = arg.Replace("\\", @"\\", StringComparison.Ordinal)
             .Replace("\"", "\\\"", StringComparison.Ordinal);
         return $"\"{escaped}\"";
     }
 
-    private static List<string> RequireOne(string value, string what)
-    {
-        return [RequireValue(value, what)];
-    }
+    private static List<string> RequireOne(string value, string what) => [RequireValue(value, what)];
 
     private static string RequireValue(string value, string what)
     {
@@ -1051,16 +960,11 @@ internal sealed partial class MainViewModel : ObservableObject
         return lines;
     }
 
-    private static List<string> SplitLines(string value)
-    {
-        return value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+    private static List<string> SplitLines(string value) =>
+        value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
             .Select(line => line.Trim())
             .Where(line => line.Length > 0)
             .ToList();
-    }
 
-    private static string? NullIfEmpty(string value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
+    private static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

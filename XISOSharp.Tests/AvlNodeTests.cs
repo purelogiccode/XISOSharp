@@ -84,20 +84,14 @@ public class AvlNodeTests
     /// is not null.
     /// </summary>
     [Fact]
-    public void EmptySubdirectory_IsNotNull()
-    {
-        Assert.NotNull(AvlNode.EmptySubdirectory);
-    }
+    public void EmptySubdirectory_IsNotNull() => Assert.NotNull(AvlNode.EmptySubdirectory);
 
     /// <summary>
     /// Verifies that <see cref="AvlNode.EmptySubdirectory"/>
     /// always returns the same singleton instance.
     /// </summary>
     [Fact]
-    public void EmptySubdirectory_IsSingleton()
-    {
-        Assert.Same(AvlNode.EmptySubdirectory, AvlNode.EmptySubdirectory);
-    }
+    public void EmptySubdirectory_IsSingleton() => Assert.Same(AvlNode.EmptySubdirectory, AvlNode.EmptySubdirectory);
 
     /// <summary>
     /// Verifies that <see cref="AvlNode.EmptySubdirectory"/>
@@ -119,10 +113,7 @@ public class AvlNodeTests
     /// constructed <see cref="AvlNode"/>.
     /// </summary>
     [Fact]
-    public void EmptySubdirectory_IsDistinctFromNewNode()
-    {
-        Assert.NotSame(new AvlNode(), AvlNode.EmptySubdirectory);
-    }
+    public void EmptySubdirectory_IsDistinctFromNewNode() => Assert.NotSame(new AvlNode(), AvlNode.EmptySubdirectory);
 
     /// <summary>
     /// Verifies that the <see cref="AvlNode.Skew"/> property

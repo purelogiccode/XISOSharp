@@ -222,9 +222,7 @@ public sealed class XisoExplorer
         return path;
     }
 
-    private static ExplorerNode FromEntry(EntryInfo entry, string fullPath)
-    {
-        return new ExplorerNode(entry.Name, fullPath, entry.IsDirectory, entry.FileSize,
+    private static ExplorerNode FromEntry(EntryInfo entry, string fullPath) =>
+        new(entry.Name, fullPath, entry.IsDirectory, entry.FileSize,
             entry.StartSector, entry.Attributes);
-    }
 }

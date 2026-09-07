@@ -113,20 +113,14 @@ internal sealed class CisoSplitInputStream : Stream
     /// <summary>Not supported; the split input stream is read-only.</summary>
     /// <param name="value">Unused.</param>
     /// <exception cref="NotSupportedException">Always thrown.</exception>
-    public override void SetLength(long value)
-    {
-        throw new NotSupportedException();
-    }
+    public override void SetLength(long value) => throw new NotSupportedException();
 
     /// <summary>Not supported; the split input stream is read-only.</summary>
     /// <param name="buffer">Unused.</param>
     /// <param name="offset">Unused.</param>
     /// <param name="count">Unused.</param>
     /// <exception cref="NotSupportedException">Always thrown.</exception>
-    public override void Write(byte[] buffer, int offset, int count)
-    {
-        throw new NotSupportedException();
-    }
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 
     /// <summary>Gets a value indicating whether reading is supported (always <c>true</c>).</summary>
     public override bool CanRead => true;

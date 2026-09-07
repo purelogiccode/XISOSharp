@@ -39,10 +39,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
     }
 
     [Fact]
-    public void BuildTable_Empty_ReturnsNull()
-    {
-        Assert.Null(DirectoryEntryTableWriter.BuildTable([]));
-    }
+    public void BuildTable_Empty_ReturnsNull() => Assert.Null(DirectoryEntryTableWriter.BuildTable([]));
 
     [Fact]
     public void BuildTable_InsertsAllEntries_SearchableByName()
@@ -76,12 +73,10 @@ public class DirectoryEntryTableWriterTests : IDisposable
     [InlineData("bad/name")]
     [InlineData("bad\\name")]
     [InlineData("")]
-    public void BuildTable_InvalidNames_Throw(string name)
-    {
+    public void BuildTable_InvalidNames_Throw(string name) =>
         Assert.Throws<InvalidOperationException>(() =>
             DirectoryEntryTableWriter.BuildTable(
                 [new DirectoryEntryTableWriter.DirectoryTableEntry(name, false, 10, 100)]));
-    }
 
     [Fact]
     public void BuildTable_TooLongName_Throws()
@@ -274,8 +269,5 @@ public class DirectoryEntryTableWriterTests : IDisposable
         }
     }
 
-    private static string JoinPath(string dir, string name)
-    {
-        return dir.Equals("/", StringComparison.Ordinal) ? "/" + name : dir + "/" + name;
-    }
+    private static string JoinPath(string dir, string name) => dir.Equals("/", StringComparison.Ordinal) ? "/" + name : dir + "/" + name;
 }

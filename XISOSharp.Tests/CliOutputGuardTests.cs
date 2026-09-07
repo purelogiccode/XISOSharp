@@ -9,16 +9,10 @@ namespace XISOSharp.Tests;
 public sealed class CliOutputGuardTests
 {
     [Fact]
-    public void CheckRewriteOutput_NullOutput_Allows()
-    {
-        Assert.Null(CliOutputGuard.CheckRewriteOutput("game.iso", null));
-    }
+    public void CheckRewriteOutput_NullOutput_Allows() => Assert.Null(CliOutputGuard.CheckRewriteOutput("game.iso", null));
 
     [Fact]
-    public void CheckRewriteOutput_DistinctOutput_Allows()
-    {
-        Assert.Null(CliOutputGuard.CheckRewriteOutput("game.iso", "rewritten.iso"));
-    }
+    public void CheckRewriteOutput_DistinctOutput_Allows() => Assert.Null(CliOutputGuard.CheckRewriteOutput("game.iso", "rewritten.iso"));
 
     [Fact]
     public void CheckRewriteOutput_SameAsInput_Refuses()
@@ -45,10 +39,7 @@ public sealed class CliOutputGuardTests
     }
 
     [Fact]
-    public void CheckSingleInputOutput_Null_Allows()
-    {
-        Assert.Null(CliOutputGuard.CheckSingleInputOutput("game.iso", null));
-    }
+    public void CheckSingleInputOutput_Null_Allows() => Assert.Null(CliOutputGuard.CheckSingleInputOutput("game.iso", null));
 
     [Fact]
     public void CheckRebuildOutput_OutputEqualsPart_RefusesAndNamesIt()
@@ -69,11 +60,9 @@ public sealed class CliOutputGuardTests
     }
 
     [Fact]
-    public void CheckRebuildOutput_Distinct_Allows()
-    {
+    public void CheckRebuildOutput_Distinct_Allows() =>
         Assert.Null(CliOutputGuard.CheckRebuildOutput("redump.iso", "sectors.txt",
             "game.xiso", "game.video.iso", null, null));
-    }
 
     [Fact]
     public void CheckImageOutput_Same_Refuses()
@@ -84,10 +73,7 @@ public sealed class CliOutputGuardTests
     }
 
     [Fact]
-    public void CheckImageOutput_Distinct_Allows()
-    {
-        Assert.Null(CliOutputGuard.CheckImageOutput("game.iso", "game.cso"));
-    }
+    public void CheckImageOutput_Distinct_Allows() => Assert.Null(CliOutputGuard.CheckImageOutput("game.iso", "game.cso"));
 
     [Theory]
     [InlineData("-d")]
@@ -111,8 +97,5 @@ public sealed class CliOutputGuardTests
     [InlineData("-")]
     [InlineData("")]
     [InlineData(null)]
-    public void CheckMisplacedFlag_NotAFlag_Allows(string? token)
-    {
-        Assert.Null(CliOutputGuard.CheckMisplacedFlag(token));
-    }
+    public void CheckMisplacedFlag_NotAFlag_Allows(string? token) => Assert.Null(CliOutputGuard.CheckMisplacedFlag(token));
 }

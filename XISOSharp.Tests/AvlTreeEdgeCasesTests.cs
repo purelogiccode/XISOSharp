@@ -15,20 +15,14 @@ public class AvlTreeEdgeCasesTests
     /// when passed a null root.
     /// </summary>
     [Fact]
-    public void FreeTree_NullRoot_DoesNotThrow()
-    {
-        AvlTree.FreeTree(null);
-    }
+    public void FreeTree_NullRoot_DoesNotThrow() => AvlTree.FreeTree(null);
 
     /// <summary>
     /// Verifies that <see cref="AvlTree.FreeTree"/> does not throw
     /// when passed the <see cref="AvlNode.EmptySubdirectory"/> sentinel.
     /// </summary>
     [Fact]
-    public void FreeTree_EmptySubdirectory_DoesNotThrow()
-    {
-        AvlTree.FreeTree(AvlNode.EmptySubdirectory);
-    }
+    public void FreeTree_EmptySubdirectory_DoesNotThrow() => AvlTree.FreeTree(AvlNode.EmptySubdirectory);
 
     /// <summary>
     /// Verifies that <see cref="AvlTree.FreeTree"/> clears the

@@ -50,10 +50,7 @@ public sealed class BlockDeviceStream : Stream
     }
 
     /// <inheritdoc/>
-    public override int Read(byte[] buffer, int offset, int count)
-    {
-        return Read(buffer.AsSpan(offset, count));
-    }
+    public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
 
     /// <inheritdoc/>
     public override int Read(Span<byte> buffer)
@@ -86,16 +83,10 @@ public sealed class BlockDeviceStream : Stream
     }
 
     /// <inheritdoc/>
-    public override void SetLength(long value)
-    {
-        throw new NotSupportedException("Block device stream is read-only.");
-    }
+    public override void SetLength(long value) => throw new NotSupportedException("Block device stream is read-only.");
 
     /// <inheritdoc/>
-    public override void Write(byte[] buffer, int offset, int count)
-    {
-        throw new NotSupportedException("Block device stream is read-only.");
-    }
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException("Block device stream is read-only.");
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)

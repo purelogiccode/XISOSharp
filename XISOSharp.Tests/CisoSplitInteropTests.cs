@@ -61,22 +61,14 @@ public class CisoSplitInteropTests : IDisposable
         }
     }
 
-    private static string SolutionRoot()
-    {
+    private static string SolutionRoot() =>
         // Centralized via TestDataLocator (BUG-TEST-006).
-        return TestDataLocator.GetSolutionRoot(AppContext.BaseDirectory)
-               ?? throw new InvalidOperationException("Solution root not found.");
-    }
+        TestDataLocator.GetSolutionRoot(AppContext.BaseDirectory)
+        ?? throw new InvalidOperationException("Solution root not found.");
 
-    private static string XdvdfsExePath()
-    {
-        return Path.Combine(SolutionRoot(), "References", "xdvdfs-0.8.3", "xdvdfs.exe");
-    }
+    private static string XdvdfsExePath() => Path.Combine(SolutionRoot(), "References", "xdvdfs-0.8.3", "xdvdfs.exe");
 
-    private static bool ReferenceAvailable()
-    {
-        return OperatingSystem.IsWindows() && File.Exists(XdvdfsExePath());
-    }
+    private static bool ReferenceAvailable() => OperatingSystem.IsWindows() && File.Exists(XdvdfsExePath());
 
     private static string RunXdvdfs(string[] arguments, string workDir)
     {
@@ -139,15 +131,9 @@ public class CisoSplitInteropTests : IDisposable
         return outPath;
     }
 
-    private static byte[] ComputeSha256(string path)
-    {
-        return SHA256.HashData(File.ReadAllBytes(path));
-    }
+    private static byte[] ComputeSha256(string path) => SHA256.HashData(File.ReadAllBytes(path));
 
-    private static string Md5Hex(byte[] data)
-    {
-        return Convert.ToHexString(MD5.HashData(data)).ToLowerInvariant();
-    }
+    private static string Md5Hex(byte[] data) => Convert.ToHexString(MD5.HashData(data)).ToLowerInvariant();
 
     private static Dictionary<string, string> ParseMd5Listing(string stdout)
     {
@@ -164,10 +150,7 @@ public class CisoSplitInteropTests : IDisposable
         return map;
     }
 
-    private static string StockMd5(string imagePath, string workDir)
-    {
-        return RunXdvdfs(["md5", imagePath], workDir);
-    }
+    private static string StockMd5(string imagePath, string workDir) => RunXdvdfs(["md5", imagePath], workDir);
 
     /// <summary>
     /// Keeps only entries that are files on disk: directory dirtab bytes are

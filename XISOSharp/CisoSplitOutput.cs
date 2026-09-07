@@ -54,10 +54,7 @@ internal sealed class CisoSplitOutput : Stream
     /// <param name="buffer">Source array.</param>
     /// <param name="offset">Offset in <paramref name="buffer"/> to read from.</param>
     /// <param name="count">Number of bytes to write.</param>
-    public override void Write(byte[] buffer, int offset, int count)
-    {
-        Write(buffer.AsSpan(offset, count));
-    }
+    public override void Write(byte[] buffer, int offset, int count) => Write(buffer.AsSpan(offset, count));
 
     /// <summary>Writes bytes at the current global <see cref="Position"/>, splitting across parts as needed.</summary>
     /// <param name="buffer">Source span.</param>
@@ -111,10 +108,7 @@ internal sealed class CisoSplitOutput : Stream
     /// <summary>Not supported; parts grow on demand via writes and seeks.</summary>
     /// <param name="value">Unused.</param>
     /// <exception cref="NotSupportedException">Always thrown.</exception>
-    public override void SetLength(long value)
-    {
-        throw new NotSupportedException();
-    }
+    public override void SetLength(long value) => throw new NotSupportedException();
 
     /// <summary>Not supported; the split output stream is write-only.</summary>
     /// <param name="buffer">Unused.</param>
@@ -122,10 +116,7 @@ internal sealed class CisoSplitOutput : Stream
     /// <param name="count">Unused.</param>
     /// <returns>Never returns.</returns>
     /// <exception cref="NotSupportedException">Always thrown.</exception>
-    public override int Read(byte[] buffer, int offset, int count)
-    {
-        throw new NotSupportedException();
-    }
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 
     /// <summary>Gets a value indicating whether reading is supported (always <c>false</c>).</summary>
     public override bool CanRead => false;

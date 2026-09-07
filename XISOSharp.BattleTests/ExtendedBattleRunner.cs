@@ -248,9 +248,8 @@ internal static class ExtendedBattleRunner
     // XboxKit comparisons
     // ------------------------------------------------------------------
 
-    private static SubBattleResult XkVideo(string workInput, string csDir, string? xkDir)
-    {
-        return Timed("XK-Video", () =>
+    private static SubBattleResult XkVideo(string workInput, string csDir, string? xkDir) =>
+        Timed("XK-Video", () =>
         {
             var csVideo = Path.Combine(csDir, "input.video.iso");
             string? xkVideo = xkDir == null ? null : Path.Combine(xkDir, "input.video.iso");
@@ -266,12 +265,10 @@ internal static class ExtendedBattleRunner
 
             return CompareFiles("video", csOk ? csVideo : null, xkVideo);
         });
-    }
 
     private static SubBattleResult XkXisoSplit(string workInput, string csDir, string? xkDir, long isoOffset,
-        long xisoLength)
-    {
-        return Timed("XK-Xiso", () =>
+        long xisoLength) =>
+        Timed("XK-Xiso", () =>
         {
             var csXiso = Path.Combine(csDir, "input.xiso");
             try
@@ -313,12 +310,10 @@ internal static class ExtendedBattleRunner
             return Fail(
                 $"{r.Detail} [sizes: cs={csLen} xk={xkLen} — differs by {(csLen == xkLen ? "content only (wipe)" : "trim point")}]");
         });
-    }
 
     private static SubBattleResult XkFiller(string workInput, string csDir, string? xkDir, long isoOffset,
-        long xisoLength)
-    {
-        return Timed("XK-Filler", () =>
+        long xisoLength) =>
+        Timed("XK-Filler", () =>
         {
             var csFiller = Path.Combine(csDir, "input.filler");
             bool csOk;
@@ -334,11 +329,9 @@ internal static class ExtendedBattleRunner
             string? xkFiller = xkDir == null ? null : Path.Combine(xkDir, "input.filler");
             return CompareFiles("filler", csOk ? csFiller : null, xkFiller);
         });
-    }
 
-    private static SubBattleResult XkSeed(string workInput, string csDir, string? xkDir, long isoOffset)
-    {
-        return Timed("XK-Seed", () =>
+    private static SubBattleResult XkSeed(string workInput, string csDir, string? xkDir, long isoOffset) =>
+        Timed("XK-Seed", () =>
         {
             var csSeed = Path.Combine(csDir, "input.seed");
             bool csOk;
@@ -355,11 +348,9 @@ internal static class ExtendedBattleRunner
             return CompareFiles("seed", csOk ? csSeed : null, xkSeed, bothMissingOk: true,
                 bothMissingNote: "N/A (not XGD1)");
         });
-    }
 
-    private static SubBattleResult XkUpdate(string csDir, string? xkDir)
-    {
-        return Timed("XK-Update", () =>
+    private static SubBattleResult XkUpdate(string csDir, string? xkDir) =>
+        Timed("XK-Update", () =>
         {
             // Update comes from the video partition (XGD3 only).
             var csVideo = Path.Combine(csDir, "input.video.iso");
@@ -383,11 +374,9 @@ internal static class ExtendedBattleRunner
                 : Directory.GetFiles(xkDir, "su20076000_00000000", SearchOption.AllDirectories).FirstOrDefault();
             return CompareFiles("update", csUpdate, xkUpdate, bothMissingOk: true, bothMissingNote: "N/A (not XGD3)");
         });
-    }
 
-    private static SubBattleResult XkPetrify(string csDir, XboxKitWrapper? xk)
-    {
-        return Timed("XK-Petrify", () =>
+    private static SubBattleResult XkPetrify(string csDir, XboxKitWrapper? xk) =>
+        Timed("XK-Petrify", () =>
         {
             var csXiso = Path.Combine(csDir, "input.xiso");
             if (!File.Exists(csXiso))
@@ -437,12 +426,10 @@ internal static class ExtendedBattleRunner
 
             return CompareFiles("skeleton", csOk ? csSkel : null, xkSkel);
         });
-    }
 
     private static SubBattleResult XkZar(string workInput, string csDir, string? xkDir, long isoOffset,
-        XboxKitWrapper? xk)
-    {
-        return Timed("XK-Zar", () =>
+        XboxKitWrapper? xk) =>
+        Timed("XK-Zar", () =>
         {
             var csZar = Path.Combine(csDir, "input.zar");
             bool csOk;
@@ -540,11 +527,9 @@ internal static class ExtendedBattleRunner
             Del(xkTree);
             return r;
         });
-    }
 
-    private static SubBattleResult XkRebuildOurs(string workInput, string csDir, string? xkDir)
-    {
-        return Timed("XK-RebuildCs", () =>
+    private static SubBattleResult XkRebuildOurs(string workInput, string csDir, string? xkDir) =>
+        Timed("XK-RebuildCs", () =>
         {
             if (xkDir == null)
                 return Skip("XK-RebuildCs", "no xk split parts");
@@ -577,11 +562,9 @@ internal static class ExtendedBattleRunner
             Del(rebuilt); // 1x ISO freed right after compare
             return r;
         });
-    }
 
-    private static SubBattleResult XkRebuildTheirs(string workInput, string csDir, string? xkDir, XboxKitWrapper? xk)
-    {
-        return Timed("XK-RebuildXk", () =>
+    private static SubBattleResult XkRebuildTheirs(string workInput, string csDir, string? xkDir, XboxKitWrapper? xk) =>
+        Timed("XK-RebuildXk", () =>
         {
             if (xk?.Available != true || xkDir == null)
                 return Skip("XK-RebuildXk", "xboxkit unavailable");
@@ -629,15 +612,13 @@ internal static class ExtendedBattleRunner
             Del(rbDir); // staged parts (filler = 1x ISO) are single-use
             return rr;
         });
-    }
 
     // ------------------------------------------------------------------
     // xdvdfs comparisons (plain XISOs only)
     // ------------------------------------------------------------------
 
-    private static SubBattleResult XdChecksum(string xiso, string tag, XdvdfsWrapper xd)
-    {
-        return Timed($"XD-Checksum[{tag}]", () =>
+    private static SubBattleResult XdChecksum(string xiso, string tag, XdvdfsWrapper xd) =>
+        Timed($"XD-Checksum[{tag}]", () =>
         {
             string csHex;
             try
@@ -657,11 +638,9 @@ internal static class ExtendedBattleRunner
                 ? Pass($"checksum {csHex[..16]}… match")
                 : Fail($"checksum mismatch C#={csHex} xd={xdHex}");
         });
-    }
 
-    private static SubBattleResult XdUnpack(string xiso, string tag, string sandbox, string csDir, XdvdfsWrapper xd)
-    {
-        return Timed($"XD-Unpack[{tag}]", () =>
+    private static SubBattleResult XdUnpack(string xiso, string tag, string sandbox, string csDir, XdvdfsWrapper xd) =>
+        Timed($"XD-Unpack[{tag}]", () =>
         {
             var csOut = Path.Combine(csDir, $"unpack-{tag}");
             var xdOut = Path.Combine(sandbox, $"xd-unpack-{tag}");
@@ -681,11 +660,9 @@ internal static class ExtendedBattleRunner
                 return Fail($"xdvdfs unpack exit {code}: {Trim(se)}");
             return CompareTrees(csOut, xdOut);
         });
-    }
 
-    private static SubBattleResult XdTree(string xiso, string tag, XdvdfsWrapper xd)
-    {
-        return Timed($"XD-Tree[{tag}]", () =>
+    private static SubBattleResult XdTree(string xiso, string tag, XdvdfsWrapper xd) =>
+        Timed($"XD-Tree[{tag}]", () =>
         {
             string csText;
             try
@@ -713,11 +690,9 @@ internal static class ExtendedBattleRunner
             return Fail(
                 $"tree mismatch C#={csSet.Count} xd={xdSet.Count} ONLY cs [{string.Join(";", onlyCs)}] ONLY xd [{string.Join(";", onlyXd)}]");
         });
-    }
 
-    private static SubBattleResult XdCopyOutMd5(string xiso, string tag, string sandbox, string csDir, XdvdfsWrapper xd)
-    {
-        return Timed($"XD-CopyOut+Md5[{tag}]", () =>
+    private static SubBattleResult XdCopyOutMd5(string xiso, string tag, string sandbox, string csDir, XdvdfsWrapper xd) =>
+        Timed($"XD-CopyOut+Md5[{tag}]", () =>
         {
             // First file entry from our own listing.
             string? inner;
@@ -770,11 +745,9 @@ internal static class ExtendedBattleRunner
                 ? Pass($"copy-out + md5 match ({inner}, {csMd5[..12]}…)")
                 : Fail($"md5 mismatch {inner} C#={csMd5} xd={xdMd5}");
         });
-    }
 
-    private static SubBattleResult XdPack(string sandbox, string csDir, XdvdfsWrapper xd)
-    {
-        return Timed("XD-Pack", () =>
+    private static SubBattleResult XdPack(string sandbox, string csDir, XdvdfsWrapper xd) =>
+        Timed("XD-Pack", () =>
         {
             // Pack from the smallest available unpacked tree (keeps this check fast).
             // BTL-024: enumerate in ordinal order so equal-size trees resolve to the
@@ -867,7 +840,6 @@ internal static class ExtendedBattleRunner
                 ? Pass($"pack content checksum match ({h1[..16]}…, {packNote})")
                 : Fail($"pack content mismatch cs={h1} xd={h2}");
         });
-    }
 
     // ------------------------------------------------------------------
     // helpers
@@ -918,32 +890,26 @@ internal static class ExtendedBattleRunner
         };
     }
 
-    private static SubBattleResult Pass(string detail)
-    {
-        return new SubBattleResult
+    private static SubBattleResult Pass(string detail) =>
+        new()
         {
             TestName = "", Status = BattleStatus.Passed, Detail = detail, ElapsedSeconds = 0,
         };
-    }
 
-    private static SubBattleResult Fail(string detail, string? extra = null)
-    {
-        return new SubBattleResult
+    private static SubBattleResult Fail(string detail, string? extra = null) =>
+        new()
         {
             TestName = "",
             Status = BattleStatus.Failed,
             Detail = extra is null ? detail : $"{detail} | {extra}",
             ElapsedSeconds = 0,
         };
-    }
 
-    private static SubBattleResult Skip(string name, string detail)
-    {
-        return new SubBattleResult
+    private static SubBattleResult Skip(string name, string detail) =>
+        new()
         {
             TestName = name, Status = BattleStatus.Skipped, Detail = detail, ElapsedSeconds = 0,
         };
-    }
 
     private static SubBattleResult CompareFiles(
         string what, string? csPath, string? xkPath, bool bothMissingOk = false, string? bothMissingNote = null)
@@ -1089,10 +1055,7 @@ internal static class ExtendedBattleRunner
         return "";
     }
 
-    private static bool IsHexDigit(char c)
-    {
-        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-    }
+    private static bool IsHexDigit(char c) => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 
     private static string? FirstFileEntry(string xiso)
     {
@@ -1216,10 +1179,7 @@ internal static class ExtendedBattleRunner
         return dir;
     }
 
-    private static string CreateSandboxFallback()
-    {
-        return Path.Combine(Path.GetTempPath(), "XISOSharpBattle");
-    }
+    private static string CreateSandboxFallback() => Path.Combine(Path.GetTempPath(), "XISOSharpBattle");
 
     private static string Mb(string? p)
     {
@@ -1246,10 +1206,7 @@ internal static class ExtendedBattleRunner
         }
     }
 
-    private static string Exists(string p)
-    {
-        return File.Exists(p) ? "yes" : "no";
-    }
+    private static string Exists(string p) => File.Exists(p) ? "yes" : "no";
 
     private static string Trim(string s)
     {

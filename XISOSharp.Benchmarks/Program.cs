@@ -12,8 +12,5 @@ internal static class Program
     /// Runs the BenchmarkDotNet switcher over this assembly.
     /// </summary>
     /// <param name="args">BenchmarkDotNet filter and option arguments.</param>
-    private static void Main(string[] args)
-    {
-        BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
-    }
+    private static void Main(string[] args) => BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
 }

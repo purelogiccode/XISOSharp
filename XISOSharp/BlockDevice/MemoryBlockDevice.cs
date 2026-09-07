@@ -87,10 +87,7 @@ public sealed class MemoryBlockDevice : IBlockDevice
     }
 
     /// <summary>Returns a span over the written bytes (read-only).</summary>
-    public ReadOnlySpan<byte> AsSpan()
-    {
-        return _data.AsSpan(0, (int)Length);
-    }
+    public ReadOnlySpan<byte> AsSpan() => _data.AsSpan(0, (int)Length);
 
     /// <inheritdoc/>
     public void Dispose()

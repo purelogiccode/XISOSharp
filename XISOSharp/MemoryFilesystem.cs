@@ -41,10 +41,7 @@ public sealed class MemoryFilesystem : IFilesystem
     }
 
     /// <summary>Normalizes a destination path to the dictionary key form (no slashes at either end).</summary>
-    private static string Normalize(string path)
-    {
-        return path.Replace('\\', '/').Trim('/');
-    }
+    private static string Normalize(string path) => path.Replace('\\', '/').Trim('/');
 
     /// <summary>Materializes every parent directory of <paramref name="key"/>.</summary>
     private void MaterializeParents(string key)
@@ -83,26 +80,17 @@ public sealed class MemoryFilesystem : IFilesystem
     }
 
     /// <inheritdoc/>
-    public bool FileExists(string path)
-    {
-        return _files.ContainsKey(Normalize(path));
-    }
+    public bool FileExists(string path) => _files.ContainsKey(Normalize(path));
 
     /// <inheritdoc/>
-    public long FileLength(string path)
-    {
-        return _files.TryGetValue(Normalize(path), out var bytes) ? bytes.LongLength : -1;
-    }
+    public long FileLength(string path) => _files.TryGetValue(Normalize(path), out var bytes) ? bytes.LongLength : -1;
 
     /// <summary>
     /// Returns a snapshot of the bytes stored at <paramref name="path"/>
     /// (committed when the unpack closed the file's stream).
     /// </summary>
     /// <exception cref="KeyNotFoundException">Thrown when no file exists at <paramref name="path"/>.</exception>
-    public byte[] ReadAllBytes(string path)
-    {
-        return _files[Normalize(path)];
-    }
+    public byte[] ReadAllBytes(string path) => _files[Normalize(path)];
 
     /// <summary>Snapshot of stored file paths (destination-root-relative, forward slashes).</summary>
     public ReadOnlyCollection<string> FileNames => new([.. _files.Keys]);
