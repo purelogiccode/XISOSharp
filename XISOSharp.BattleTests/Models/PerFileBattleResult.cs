@@ -18,9 +18,9 @@ internal sealed class PerFileBattleResult
     /// <summary>Sub-tests.</summary>
     public List<SubBattleResult> SubTests { get; } = [];
 
-    /// <summary>True if all sub-tests passed or skipped (no failures).</summary>
-    public bool AllPassed => SubTests.All(s => s.Status != BattleStatus.Failed);
+    /// <summary>True if all sub-tests passed or skipped (no failures or errors).</summary>
+    public bool AllPassed => SubTests.All(s => s.Status != BattleStatus.Failed && s.Status != BattleStatus.Error);
 
-    /// <summary>True if any failed.</summary>
-    public bool HasFailures => SubTests.Any(s => s.Status == BattleStatus.Failed);
+    /// <summary>True if any failed or errored.</summary>
+    public bool HasFailures => SubTests.Any(s => s.Status == BattleStatus.Failed || s.Status == BattleStatus.Error);
 }

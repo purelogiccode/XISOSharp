@@ -217,24 +217,25 @@ public class XisoSnapshotTests : IDisposable
     }
 
     /// <summary>
-    /// Regenerates <c>Fixtures/test_fixture.iso</c> from <see cref="BuildSnapshotTree"/>.
-    /// Runs only when <c>XISO_UPDATE_FIXTURE=1</c> is set; otherwise a no-op.
-    /// After regenerating, inspect the diff and commit the binary.
+    /// Validates that a fresh <see cref="BuildSnapshotTree"/> pack matches the
+    /// checked-in <c>Fixtures/test_fixture.iso</c> reference. Runs only when
+    /// <c>XISO_UPDATE_FIXTURE=1</c> is set (otherwise skipped at discovery);
+    /// it validates against a temp copy and never overwrites the fixture binary.
+    /// After a legitimate writer change, regenerate the binary out of band,
+    /// inspect the diff and commit it.
     /// </summary>
-    [Fact]
+    [RequiresUpdateFixtureFact]
     public void RegenerateFixtureIso_WhenRequested()
     {
-        if (!string.Equals(Environment.GetEnvironmentVariable("XISO_UPDATE_FIXTURE"), "1",
-                StringComparison.Ordinal))
-        {
-            return;
-        }
-
         var src = CreateTempDir("xiso_snap_src");
         BuildSnapshotTree(src);
         var created = CreateSnapshotIso(src, CreateTempDir("xiso_snap_out"));
 
-        Directory.CreateDirectory(Path.GetDirectoryName(FixtureIsoPath)!);
-        File.Copy(created, FixtureIsoPath, overwrite: true);
+        var tempCopy = Path.Combine(CreateTempDir("xiso_snap_regen"), "test_fixture.iso");
+        File.Copy(created, tempCopy);
+
+        var expected = File.ReadAllBytes(FixtureIsoPath);
+        var actual = File.ReadAllBytes(tempCopy);
+        Assert.Equal(expected, actual);
     }
 }

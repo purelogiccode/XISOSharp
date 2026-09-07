@@ -41,19 +41,23 @@ internal static class CliOutputGuard
         }
     }
 
+    // CLI-023: covers every main-parser flag spelling (--xbe-info, --repair,
+    // --salvage, --repair-out, --file-time included). -O/--output are verb-only
+    // spellings, deliberately absent: warning about them here would misadvise.
     private static readonly HashSet<string> MisplacedFlags = new(StringComparer.Ordinal)
     {
         "-v", "-h", "-c", "-x", "--unpack", "-X", "-l", "-t", "-i",
-        "--ls", "--xex-info", "--md5", "--sha256", "-V", "validate",
+        "--ls", "--xex-info", "--xbe-info", "--md5", "--sha256", "-V", "validate",
         "--validate", "--validate-checksums", "--validate-strict",
         "--validate-report", "--copy-out", "--copy-in", "--no-backup", "-r", "-q", "-Q", "-s", "-D",
-        "-m", "-y", "--yes", "-n", "--no", "-d", "-o", "-O", "--output",
+        "-m", "-y", "--yes", "-n", "--no", "-d", "-o",
         "-p", "--skip-sectors", "--prepend-sectors", "--batch",
         "--batch-recursive", "--skip-existing", "--continue-on-error", "--pack", "--video",
         "--random", "--seed", "--wipe", "--trim", "--petrify", "--update",
         "--zar", "--all", "--best", "--compress", "--security-sectors",
-        "--sectors", "--checksum", "--filetime", "--get-filetime",
+        "--sectors", "--checksum", "--filetime", "--get-filetime", "--file-time",
         "--set-filetime", "--silent", "--dry-run", "--jobs", "--policy",
+        "--repair", "--salvage", "--repair-out",
     };
 
     /// <summary>

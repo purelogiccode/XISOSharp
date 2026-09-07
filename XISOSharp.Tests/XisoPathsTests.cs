@@ -3,6 +3,7 @@ namespace XISOSharp.Tests;
 /// <summary>
 /// Tests for <see cref="XisoPaths"/> (TODO #15, xdvdfs #36).
 /// </summary>
+[Collection("Sequential")]
 public sealed class XisoPathsTests : IDisposable
 {
     private readonly List<string> _tempDirs = [];
@@ -158,61 +159,43 @@ public sealed class XisoPathsTests : IDisposable
         Assert.Equal(expected, XisoPaths.TrimTrailingSeparators(input));
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void TrimTrailingSeparators_DriveRoot_Survives()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         Assert.Equal(@"C:\", XisoPaths.TrimTrailingSeparators(@"C:\"));
     }
 
-    [Theory]
+    [WindowsOnlyTheory]
     [InlineData(@"C:\out\", @"C:\out")]
     [InlineData(@"C:\out\\", @"C:\out")]
     [InlineData(@"C:\out\/", @"C:\out")]
     public void TrimTrailingSeparators_DriveSubdir_Strips(string input, string expected)
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         Assert.Equal(expected, XisoPaths.TrimTrailingSeparators(input));
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void TrimTrailingSeparators_UncRoot_Survives()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         Assert.Equal(@"\\server\share\", XisoPaths.TrimTrailingSeparators(@"\\server\share\"));
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void TrimTrailingSeparators_UncSubdir_Strips()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         Assert.Equal(@"\\server\share\dir",
             XisoPaths.TrimTrailingSeparators(@"\\server\share\dir\"));
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void AreSamePath_Unc_TrailingSeparator_Match()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         Assert.True(XisoPaths.AreSamePath(@"\\server\share\dir", @"\\server\share\dir\"));
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void IsWithinDirectory_Unc_TrailingSeparator_Matches()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         Assert.True(XisoPaths.IsWithinDirectory(
             @"\\server\share\dir\out.iso", @"\\server\share\dir\"));
     }

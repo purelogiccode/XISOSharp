@@ -6,13 +6,22 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+#if LOGGING_NS_GUI
+namespace XISOSharp.Gui.Logging;
+#elif LOGGING_NS_TESTER
+namespace XISOSharpTester.Logging;
+#else
 namespace XISOSharp.Cli.Logging;
+#endif
 
 /// <summary>
-/// Forwards warning-and-above reports to the PureLogicCode bug-report API.
+/// Forwards error-and-above reports to the PureLogicCode bug-report API.
 /// See <c>InstructionsToSendBugs.md</c> (AspNet_BugReportEmailService repo).
 /// Every report embeds the required Environment / Error / Exception sections.
-/// Fire-and-forget: never throws, throttled to stay under the 10 req/min limit.
+/// Fire-and-forget (see <see cref="Flush"/> for synchronous shutdown): never throws,
+/// throttled to stay under the 10 req/min limit. Warning-level routine events are
+/// never filed (BUG-X-002). Shared single source of truth compiled into the CLI,
+/// GUI, and Tester via linked items with per-host namespaces (BUG-X-001).
 /// </summary>
 internal static partial class BugReporter
 {
@@ -33,12 +42,24 @@ internal static partial class BugReporter
 #endif
     private static readonly Queue<DateTime> RecentSends = new();
     private static readonly Dictionary<string, DateTime> LastByKey = new(StringComparer.Ordinal);
+    private static readonly HashSet<Task> PendingSends = new();
 
+#if LOGGING_NS_GUI
+    internal static string ApplicationName { get; set; } = "XISOSharp.Gui";
+#elif LOGGING_NS_TESTER
+    internal static string ApplicationName { get; set; } = "XISOSharpTester";
+#else
     internal static string ApplicationName { get; set; } = "XISOSharp.Cli";
+#endif
 
     internal static void ReportWarning(string message)
     {
-        Report(null, message, "Warning");
+        // BUG-X-002: Warning-level routine events (user-error probes, non-zero exits,
+        // missing files) are operational noise, not crashes. Never file a bug report
+        // for them and never consume the 8/min throttle budget reserved for real
+        // crashes (ReportError/ReportException). Kept as a sink so existing call
+        // sites need no edits; visible in the debugger log only.
+        Debug.WriteLine($"BugReporter warning suppressed (no report filed): {message}");
     }
 
     internal static void ReportError(string message, Exception? ex = null)
@@ -80,7 +101,8 @@ internal static partial class BugReporter
             var fullMessage = $"{kind}: {safeMessage}\n\n{envBlock}\n\n{errorBlock}\n\n{exceptionBlock}";
             var stackTrace = ex is null ? $"{kind}: {safeMessage}" : ex.ToString();
 
-            _ = Task.Run(async () =>
+            // BUG-X-003: track the in-flight send so Flush can wait for delivery.
+            var sendTask = Task.Run(async () =>
             {
                 try
                 {
@@ -91,10 +113,64 @@ internal static partial class BugReporter
                     Debug.WriteLine($"BugReporter send failed: {sendEx.Message}");
                 }
             });
+            lock (Gate)
+            {
+                _ = PendingSends.Add(sendTask);
+            }
+
+            _ = sendTask.ContinueWith(
+                static t =>
+                {
+                    lock (Gate)
+                    {
+                        _ = PendingSends.Remove(t);
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
         }
         catch (Exception reportEx)
         {
             Debug.WriteLine($"BugReporter failed: {reportEx.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Synchronously waits for pending bug-report sends to finish, up to
+    /// <paramref name="timeout"/> (BUG-X-003). Short-lived hosts call this on their
+    /// shutdown path so crash reports are delivered instead of being lost when the
+    /// process exits. Never throws; returns <c>true</c> when nothing remained pending
+    /// (delivered), <c>false</c> on timeout.
+    /// </summary>
+    /// <param name="timeout">Maximum time to wait for delivery.</param>
+    /// <returns><c>true</c> if all pending sends completed; otherwise <c>false</c>.</returns>
+    internal static bool Flush(TimeSpan timeout)
+    {
+        try
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (true)
+            {
+                Task[] snapshot;
+                lock (Gate)
+                {
+                    if (PendingSends.Count == 0)
+                        return true;
+                    snapshot = new Task[PendingSends.Count];
+                    PendingSends.CopyTo(snapshot);
+                }
+
+                var remaining = deadline - DateTime.UtcNow;
+                if (remaining <= TimeSpan.Zero)
+                    return false;
+                if (!Task.WaitAll(snapshot, remaining))
+                    return false;
+            }
+        }
+        catch
+        {
+            return false;
         }
     }
 

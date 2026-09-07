@@ -235,12 +235,10 @@ public class XisoCorruptionResilienceTests : IDisposable
     /// enumeration, so the content is never read. Uses a sparse file (NTFS
     /// only; instant and allocation-free there).
     /// </summary>
-    [Fact]
+    [RequiresNtfsFact]
     public void CreateXiso_FileOver4GB_ThrowsFileTooLarge()
     {
-        var drive = new DriveInfo(Path.GetPathRoot(Path.GetTempPath())!);
-        if (!string.Equals(drive.DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase))
-            return; // SetLength(5 GB) would physically allocate on non-NTFS.
+        Assert.True(SkipConditions.IsNtfsTempDrive(), "Requires NTFS temp drive.");
 
         var src = CreateTempDir("xiso_corrupt_src");
         var bigPath = Path.Combine(src, "huge.bin");

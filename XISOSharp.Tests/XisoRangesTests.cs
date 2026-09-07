@@ -431,17 +431,9 @@ public class XisoRangesTests : IDisposable
         var src = CreateSourceDir(_ => { });
         var iso = CreateIso(src);
 
-        // Current XisoRanges.GetFileEntries does not handle the EmptySubdirectory sentinel
-        // gracefully and throws EndOfStreamException for empty ISOs (root table is all 0xFF).
-        // Accept either empty list or that exception as correct empty-directory handling.
-        try
-        {
-            var entries = XisoRanges.GetFileEntries(iso);
-            Assert.Empty(entries);
-        }
-        catch (EndOfStreamException)
-        {
-            Assert.True(true);
-        }
+        // XisoRanges.CollectFileEntries treats the all-0xFF table as the
+        // empty-directory sentinel at the table start and returns no entries.
+        var entries = XisoRanges.GetFileEntries(iso);
+        Assert.Empty(entries);
     }
 }

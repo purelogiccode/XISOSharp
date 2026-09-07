@@ -13,11 +13,19 @@ namespace XISOSharp.Tests;
 public class XisoSymlinkTests : IDisposable
 {
     private readonly List<string> _tempDirs = [];
+    private readonly bool _savedQuiet;
+    private readonly bool _savedRealQuiet;
+
+    public XisoSymlinkTests()
+    {
+        _savedQuiet = Logger.Quiet;
+        _savedRealQuiet = Logger.RealQuiet;
+    }
 
     public void Dispose()
     {
-        Logger.Quiet = false;
-        Logger.RealQuiet = false;
+        Logger.Quiet = _savedQuiet;
+        Logger.RealQuiet = _savedRealQuiet;
         foreach (var dir in _tempDirs)
         {
             try
@@ -104,15 +112,15 @@ public class XisoSymlinkTests : IDisposable
         return result;
     }
 
-    [Fact]
+    [RequiresSymlinkFact(SymlinkKind.DirLink)]
     public void RemapWalk_CyclicDirectoryLink_TerminatesAndSkipsLink()
     {
         var root = CreateTempDir("xiso_link");
         Directory.CreateDirectory(Path.Combine(root, "sub"));
         File.WriteAllText(Path.Combine(root, "sub", "real.txt"), "real");
         // Cyclic: sub/loop -> root. Pre-fix this looped the walker forever.
-        if (!TryCreateDirLink(Path.Combine(root, "sub", "loop"), root))
-            return;
+        Assert.True(TryCreateDirLink(Path.Combine(root, "sub", "loop"), root),
+            "Symlink privilege unavailable for 'DirLink'.");
 
         var pairs = RemapFilesystem.DryRunRemap(root, CatchAllRule());
 
@@ -120,13 +128,13 @@ public class XisoSymlinkTests : IDisposable
         Assert.DoesNotContain(pairs, p => p.HostPath.Contains("loop", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [RequiresSymlinkFact(SymlinkKind.FileLink)]
     public void RemapWalk_FileSymlink_IsFollowed()
     {
         var root = CreateTempDir("xiso_link");
         File.WriteAllText(Path.Combine(root, "orig.txt"), "data");
-        if (!TryCreateFileLink(Path.Combine(root, "alias.txt"), Path.Combine(root, "orig.txt")))
-            return;
+        Assert.True(TryCreateFileLink(Path.Combine(root, "alias.txt"), Path.Combine(root, "orig.txt")),
+            "Symlink privilege unavailable for 'FileLink'.");
 
         var pairs = RemapFilesystem.DryRunRemap(root, CatchAllRule());
 
@@ -136,7 +144,7 @@ public class XisoSymlinkTests : IDisposable
         Assert.Equal("/alias.txt", alias.ImagePath);
     }
 
-    [Fact]
+    [RequiresSymlinkFact(SymlinkKind.DirLink)]
     public void BuildImage_CyclicDirectoryLink_TerminatesAndSkipsLink()
     {
         // Exercises the second (build-side) walker via the public BuildImage API.
@@ -144,8 +152,8 @@ public class XisoSymlinkTests : IDisposable
         Directory.CreateDirectory(Path.Combine(root, "sub"));
         File.WriteAllText(Path.Combine(root, "a.txt"), "hello");
         File.WriteAllText(Path.Combine(root, "sub", "b.bin"), "data");
-        if (!TryCreateDirLink(Path.Combine(root, "sub", "loop"), root))
-            return;
+        Assert.True(TryCreateDirLink(Path.Combine(root, "sub", "loop"), root),
+            "Symlink privilege unavailable for 'DirLink'.");
 
         var isoPath = Path.Combine(CreateTempDir("xiso_link_out"), "remap.iso");
         var rc = RemapFilesystem.BuildImage(root, isoPath, CatchAllRule());
@@ -160,7 +168,7 @@ public class XisoSymlinkTests : IDisposable
         Assert.DoesNotContain(files, f => f.Contains("loop", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [RequiresSymlinkFact(SymlinkKind.DirLink)]
     public void Pack_CyclicDirectoryLink_TerminatesAndSkipsLink()
     {
         var root = CreateTempDir("xiso_link");
@@ -168,8 +176,8 @@ public class XisoSymlinkTests : IDisposable
         File.WriteAllText(Path.Combine(root, "a.txt"), "hello");
         File.WriteAllText(Path.Combine(root, "sub", "b.bin"), "data");
         // Cyclic: sub/loop -> root. Pre-fix this recursed until stack overflow.
-        if (!TryCreateDirLink(Path.Combine(root, "sub", "loop"), root))
-            return;
+        Assert.True(TryCreateDirLink(Path.Combine(root, "sub", "loop"), root),
+            "Symlink privilege unavailable for 'DirLink'.");
 
         var isoPath = Path.Combine(CreateTempDir("xiso_link_out"), "packed.iso");
         var rc = XisoWriter.PackFromDirectory(root, isoPath);
@@ -184,15 +192,15 @@ public class XisoSymlinkTests : IDisposable
         Assert.DoesNotContain(files, f => f.Contains("loop", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [RequiresSymlinkFact(SymlinkKind.FileLink)]
     public void Pack_FileSymlink_WarnsAndPacksTarget()
     {
         // BUG-LIB-026: a file link packs its target's bytes under the link
         // name (no link representation exists) — and warns that it did so.
         var root = CreateTempDir("xiso_link");
         File.WriteAllText(Path.Combine(root, "orig.txt"), "data");
-        if (!TryCreateFileLink(Path.Combine(root, "alias.txt"), Path.Combine(root, "orig.txt")))
-            return; // No symlink privilege: nothing to harden against here.
+        Assert.True(TryCreateFileLink(Path.Combine(root, "alias.txt"), Path.Combine(root, "orig.txt")),
+            "Symlink privilege unavailable for 'FileLink'.");
 
         var capture = new StringWriter();
         var saved = Logger.Error;

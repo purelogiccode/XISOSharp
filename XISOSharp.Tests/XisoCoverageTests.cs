@@ -17,6 +17,20 @@ namespace XISOSharp.Tests;
 public class XisoCoverageTests : IDisposable
 {
     private readonly List<string> _tempDirs = [];
+    private readonly TextWriter _savedOut;
+    private readonly TextWriter _savedError;
+    private readonly bool _savedQuiet;
+    private readonly bool _savedRealQuiet;
+    private readonly bool _savedRemoveSystemUpdate;
+
+    public XisoCoverageTests()
+    {
+        _savedOut = Logger.Out;
+        _savedError = Logger.Error;
+        _savedQuiet = Logger.Quiet;
+        _savedRealQuiet = Logger.RealQuiet;
+        _savedRemoveSystemUpdate = Logger.RemoveSystemUpdate;
+    }
 
     public void Dispose()
     {
@@ -33,7 +47,11 @@ public class XisoCoverageTests : IDisposable
             }
         }
 
-        Logger.Out = Console.Out;
+        Logger.Out = _savedOut;
+        Logger.Error = _savedError;
+        Logger.Quiet = _savedQuiet;
+        Logger.RealQuiet = _savedRealQuiet;
+        Logger.RemoveSystemUpdate = _savedRemoveSystemUpdate;
     }
 
     private string CreateTempDir(string prefix)
@@ -627,7 +645,7 @@ public class XisoCoverageTests : IDisposable
     // SetLength is metadata-only there, reads are tiny 20-byte probes)
     // ------------------------------------------------------------------
 
-    [Theory]
+    [RequiresNtfsTheory]
     [InlineData(0x0FD90000L)]
     [InlineData(0x02080000L)]
     [InlineData(0x89D80000L)]
@@ -635,8 +653,7 @@ public class XisoCoverageTests : IDisposable
     public void GetVolumeInfo_DiscOffsetMagic_Detected(long discOffset)
     {
         var dir = CreateTempDir("xiso_cov_bad");
-        if (!IsNtfs(dir))
-            return;
+        Assert.True(IsNtfs(dir), "Requires NTFS temp drive.");
 
         var path = Path.Combine(dir, "offset.iso");
         // Every earlier probe must read (zeros) rather than throw, so all
@@ -665,14 +682,13 @@ public class XisoCoverageTests : IDisposable
         Assert.False(XisoReader.GetVolumeInfo(path).IsValid);
     }
 
-    [Fact]
+    [RequiresNtfsFact]
     public void GetVolumeInfo_BigZeros_ReturnsNotValid()
     {
         // All probes read (zeros) but none match: the no-match return, not
         // the short-read catch. Sparse file (NTFS only), reads are tiny.
         var dir = CreateTempDir("xiso_cov_bad");
-        if (!IsNtfs(dir))
-            return;
+        Assert.True(IsNtfs(dir), "Requires NTFS temp drive.");
 
         var path = Path.Combine(dir, "zeros.iso");
         using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))

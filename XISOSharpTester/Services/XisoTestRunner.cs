@@ -19,6 +19,8 @@ namespace XISOSharpTester.Services;
 /// </summary>
 public static class XisoTestRunner
 {
+    private static readonly Lock LoggerLock = new();
+
     /// <summary>
     /// Gets the version string of the extract-xiso.exe executable,
     /// if it was successfully detected during the last run.
@@ -36,11 +38,13 @@ public static class XisoTestRunner
     /// comparison tests against the native tool are skipped.
     /// </param>
     /// <param name="progress">Optional progress reporter invoked after each file.</param>
+    /// <param name="cancellationToken">Cancels the session between files and inside sub-tests.</param>
     /// <returns>A <see cref="TestSessionResult"/> aggregating all per-file results.</returns>
     public static async Task<TestSessionResult> RunAsync(
         IList<XisoFileEntry> files,
         string xisoSharpExePath,
-        IProgress<TestProgress>? progress = null)
+        IProgress<TestProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -55,7 +59,11 @@ public static class XisoTestRunner
             {
                 try
                 {
-                    XisoSharpVersion = wrapper.GetVersion();
+                    XisoSharpVersion = await wrapper.GetVersionAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -66,6 +74,7 @@ public static class XisoTestRunner
 
             for (var i = 0; i < files.Count; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var file = files[i];
                 var fileIndex = i;
                 var currentWrapper = wrapper;
@@ -73,7 +82,8 @@ public static class XisoTestRunner
                     "Starting", $"Testing {file.FileName}..."));
 
                 var result = await Task
-                    .Run(() => TestSingleFile(file, currentWrapper, progress, fileIndex, files.Count))
+                    .Run(() => TestSingleFile(file, currentWrapper, progress, fileIndex, files.Count,
+                        cancellationToken), cancellationToken)
                     .ConfigureAwait(false);
                 session.FileResults.Add(result);
             }
@@ -85,6 +95,10 @@ public static class XisoTestRunner
                 session.PassedFiles, session.FailedFiles, session.SkippedFiles);
             return session;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Log.Error(ex, "Test session failed");
@@ -93,12 +107,13 @@ public static class XisoTestRunner
         }
     }
 
-    private static PerFileResult TestSingleFile(
+    private static async Task<PerFileResult> TestSingleFile(
         XisoFileEntry entry,
         XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
         int fileIndex,
-        int totalFiles)
+        int totalFiles,
+        CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
         var result = new PerFileResult
@@ -109,6 +124,7 @@ public static class XisoTestRunner
         try
         {
             ArgumentNullException.ThrowIfNull(entry);
+            cancellationToken.ThrowIfCancellationRequested();
             var path = entry.FilePath;
 
             if (!File.Exists(path))
@@ -123,16 +139,20 @@ public static class XisoTestRunner
             }
 
             // Test 1: Verify XISO header
-            RunVerifyTest(entry, wrapper, progress, fileIndex, totalFiles, result);
+            await RunVerifyTest(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
+                .ConfigureAwait(false);
 
             // Test 2: List files comparison
-            RunListTest(entry, wrapper, progress, fileIndex, totalFiles, result);
+            await RunListTest(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
+                .ConfigureAwait(false);
 
             // Test 3: Extract all files & hash comparison
-            RunExtractTest(entry, wrapper, progress, fileIndex, totalFiles, result);
+            await RunExtractTest(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
+                .ConfigureAwait(false);
 
             // Test 4: Rewrite comparison
-            RunRewriteTest(entry, wrapper, progress, fileIndex, totalFiles, result);
+            await RunRewriteTest(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
+                .ConfigureAwait(false);
 
             result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
             Log.Information("[{Status}] {File} ({Time:N1}s)",
@@ -141,6 +161,10 @@ public static class XisoTestRunner
                 BugReporter.ReportWarning($"Test failures for {entry.FileName}");
 
             return result;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -158,13 +182,14 @@ public static class XisoTestRunner
         }
     }
 
-    private static void RunVerifyTest(
+    private static async Task RunVerifyTest(
         XisoFileEntry entry,
         XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
         int fileIndex,
         int totalFiles,
-        PerFileResult result)
+        PerFileResult result,
+        CancellationToken cancellationToken = default)
     {
         Report(progress, entry.FileName, fileIndex + 1, totalFiles, "Verify",
             "Validating XISO header...");
@@ -172,6 +197,7 @@ public static class XisoTestRunner
         var tSw = Stopwatch.StartNew();
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             using var fs = File.OpenRead(entry.FilePath);
             (var rootDirSector, var rootDirSize, var discLseek) = XisoReader.VerifyXiso(fs, entry.FileName);
             tSw.Stop();
@@ -180,7 +206,8 @@ public static class XisoTestRunner
 
             if (wrapper is { Available: true })
             {
-                var exeResult = wrapper.ListFiles(entry.FilePath);
+                var exeResult = await wrapper.ListFilesAsync(entry.FilePath, cancellationToken)
+                    .ConfigureAwait(false);
                 var exeValid = exeResult.ExitCode == 0;
                 var exeDetail = exeValid ? "extract-xiso: valid" : $"extract-xiso: exit code {exeResult.ExitCode}";
 
@@ -214,6 +241,10 @@ public static class XisoTestRunner
                 ElapsedSeconds = tSw.Elapsed.TotalSeconds
             });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             tSw.Stop();
@@ -229,13 +260,14 @@ public static class XisoTestRunner
         }
     }
 
-    private static void RunListTest(
+    private static async Task RunListTest(
         XisoFileEntry entry,
         XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
         int fileIndex,
         int totalFiles,
-        PerFileResult result)
+        PerFileResult result,
+        CancellationToken cancellationToken = default)
     {
         Report(progress, entry.FileName, fileIndex + 1, totalFiles, "List",
             "Comparing file listing...");
@@ -243,13 +275,15 @@ public static class XisoTestRunner
         var tSw = Stopwatch.StartNew();
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Get C# listing
-            var csOutput = CaptureCSharpListOutput(entry.FilePath);
+            var csOutput = CaptureCSharpListOutput(entry.FilePath, cancellationToken);
             var csEntries = ParseListOutput(csOutput);
 
             if (wrapper is { Available: true })
             {
-                var exeResult = wrapper.ListFiles(entry.FilePath);
+                var exeResult = await wrapper.ListFilesAsync(entry.FilePath, cancellationToken)
+                    .ConfigureAwait(false);
                 if (exeResult.ExitCode == 0)
                 {
                     var exeEntries = ParseListOutput(exeResult.StdOut);
@@ -299,6 +333,10 @@ public static class XisoTestRunner
                 });
             }
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             tSw.Stop();
@@ -314,13 +352,14 @@ public static class XisoTestRunner
         }
     }
 
-    private static void RunExtractTest(
+    private static async Task RunExtractTest(
         XisoFileEntry entry,
         XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
         int fileIndex,
         int totalFiles,
-        PerFileResult result)
+        PerFileResult result,
+        CancellationToken cancellationToken = default)
     {
         Report(progress, entry.FileName, fileIndex + 1, totalFiles, "Extract",
             "Extracting and comparing file hashes...");
@@ -328,22 +367,30 @@ public static class XisoTestRunner
         var tSw = Stopwatch.StartNew();
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var csTempDir = CreateTempSubDir("cs_extract");
             var exeTempDir = CreateTempSubDir("exe_extract");
             try
             {
                 try
                 {
-                    var saveQuiet = Logger.Quiet;
-                    Logger.Quiet = true;
-                    try
+                    lock (LoggerLock)
                     {
-                        XisoReader.Extract(entry.FilePath, csTempDir, false);
+                        var saveQuiet = Logger.Quiet;
+                        Logger.Quiet = true;
+                        try
+                        {
+                            XisoReader.Extract(entry.FilePath, csTempDir, false, cancellationToken);
+                        }
+                        finally
+                        {
+                            Logger.Quiet = saveQuiet;
+                        }
                     }
-                    finally
-                    {
-                        Logger.Quiet = saveQuiet;
-                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (ExtractErrorException ex) when (ex.ErrorCode == ExtractError.ErrIsoNoFiles)
                 {
@@ -361,7 +408,8 @@ public static class XisoTestRunner
                 // extract-xiso extraction
                 if (wrapper is { Available: true })
                 {
-                    var exeResult = wrapper.ExtractFiles(entry.FilePath, exeTempDir);
+                    var exeResult = await wrapper.ExtractFilesAsync(entry.FilePath, exeTempDir, cancellationToken)
+                        .ConfigureAwait(false);
                     if (exeResult.ExitCode != 0)
                     {
                         tSw.Stop();
@@ -405,6 +453,10 @@ public static class XisoTestRunner
                 DeleteDirectorySafe(exeTempDir);
             }
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             tSw.Stop();
@@ -420,13 +472,14 @@ public static class XisoTestRunner
         }
     }
 
-    private static void RunRewriteTest(
+    private static async Task RunRewriteTest(
         XisoFileEntry entry,
         XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
         int fileIndex,
         int totalFiles,
-        PerFileResult result)
+        PerFileResult result,
+        CancellationToken cancellationToken = default)
     {
         Report(progress, entry.FileName, fileIndex + 1, totalFiles, "Rewrite",
             "Rewriting and comparing ISO hashes...");
@@ -447,6 +500,7 @@ public static class XisoTestRunner
         var exeWorkDir = CreateTempSubDir("exe_rewrite");
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // C# rewrite
             var csInput = Path.Combine(csWorkDir, entry.FileName);
             File.Copy(entry.FilePath, csInput, true);
@@ -478,28 +532,35 @@ public static class XisoTestRunner
             var csOutDir = Path.Combine(csWorkDir, "cs_out");
             Directory.CreateDirectory(csOutDir);
 
-            var saveQuiet = Logger.Quiet;
-            Logger.Quiet = true;
-            try
+            lock (LoggerLock)
             {
-                XisoReader.Rewrite(csInput, csOutDir, out _);
-            }
-            catch (ExtractErrorException ex) when (
-                ex.ErrorCode is ExtractError.ErrIsoRewritten or ExtractError.ErrIsoNoFiles)
-            {
-                tSw.Stop();
-                result.SubTests.Add(new SubTestResult
+                var saveQuiet = Logger.Quiet;
+                Logger.Quiet = true;
+                try
                 {
-                    TestName = "Rewrite Compare",
-                    Status = TestStatus.Skipped,
-                    Detail = $"Skipped: {ex.Message}",
-                    ElapsedSeconds = tSw.Elapsed.TotalSeconds
-                });
-                return;
-            }
-            finally
-            {
-                Logger.Quiet = saveQuiet;
+                    XisoReader.Rewrite(csInput, csOutDir, out _, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (ExtractErrorException ex) when (
+                    ex.ErrorCode is ExtractError.ErrIsoRewritten or ExtractError.ErrIsoNoFiles)
+                {
+                    tSw.Stop();
+                    result.SubTests.Add(new SubTestResult
+                    {
+                        TestName = "Rewrite Compare",
+                        Status = TestStatus.Skipped,
+                        Detail = $"Skipped: {ex.Message}",
+                        ElapsedSeconds = tSw.Elapsed.TotalSeconds
+                    });
+                    return;
+                }
+                finally
+                {
+                    Logger.Quiet = saveQuiet;
+                }
             }
 
             // Find the C# output ISO
@@ -515,7 +576,8 @@ public static class XisoTestRunner
             var exeOutDir = Path.Combine(exeWorkDir, "exe_out");
             Directory.CreateDirectory(exeOutDir);
 
-            var exeResult = wrapper.Rewrite(exeInput, exeOutDir);
+            var exeResult = await wrapper.RewriteAsync(exeInput, exeOutDir, cancellationToken)
+                .ConfigureAwait(false);
             if (exeResult.ExitCode != 0)
             {
                 tSw.Stop();
@@ -562,6 +624,10 @@ public static class XisoTestRunner
                 ElapsedSeconds = tSw.Elapsed.TotalSeconds
             });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             tSw.Stop();
@@ -582,39 +648,40 @@ public static class XisoTestRunner
         }
     }
 
-    private static string CaptureCSharpListOutput(string isoPath)
+    private static string CaptureCSharpListOutput(string isoPath, CancellationToken cancellationToken = default)
     {
-        var saveQuiet = Logger.Quiet;
-        var originalOut = Console.Out;
-        try
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (LoggerLock)
         {
+            var saveOut = Logger.Out;
+            var saveQuiet = Logger.Quiet;
+            using var sw = new StringWriter(CultureInfo.InvariantCulture);
+            Logger.Out = sw;
             Logger.Quiet = false;
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-            XisoReader.List(isoPath, false);
-            sw.Flush();
-            return sw.ToString();
-        }
-        catch (ExtractErrorException)
-        {
-            return string.Empty;
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "CaptureCSharpListOutput failed for {Iso}", isoPath);
-            BugReporter.ReportException(ex, $"CaptureCSharpListOutput failed for {isoPath}");
-            return string.Empty;
-        }
-        finally
-        {
-            Logger.Quiet = saveQuiet;
             try
             {
-                Console.SetOut(originalOut);
+                XisoReader.List(isoPath, false, cancellationToken);
+                sw.Flush();
+                return sw.ToString();
+            }
+            catch (ExtractErrorException)
+            {
+                return string.Empty;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Restoring console output failed");
+                Log.Error(ex, "CaptureCSharpListOutput failed for {Iso}", isoPath);
+                BugReporter.ReportException(ex, $"CaptureCSharpListOutput failed for {isoPath}");
+                return string.Empty;
+            }
+            finally
+            {
+                Logger.Out = saveOut;
+                Logger.Quiet = saveQuiet;
             }
         }
     }

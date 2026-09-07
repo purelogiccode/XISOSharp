@@ -192,7 +192,7 @@ internal static class Program
         PrintSummary(session);
         WriteReports(session, isoFiles, exePath);
 
-        return session.FailedSubTests > 0 || session.FailedFiles > 0 ? 2 : 0;
+        return session.FailedSubTests > 0 || session.FailedFiles > 0 || session.ErrorSubTests > 0 ? 2 : 0;
     }
 
     private static string FindExe(string[] args)

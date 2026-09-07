@@ -11,6 +11,7 @@ public class AvlTreeBenchmarks
 {
     private AvlNode? _root;
     private readonly string[] _filenames = Enumerable.Range(0, 1000).Select(static i => $"file_{i:D4}.dat").ToArray();
+    private readonly string[] _extraFilenames = Enumerable.Range(0, 1000).Select(static i => $"bench_{i:D4}.dat").ToArray();
 
     /// <summary>
     /// Rebuilds the 1000-node tree before each iteration.
@@ -36,64 +37,81 @@ public class AvlTreeBenchmarks
     }
 
     /// <summary>
-    /// Measures inserting 1000 files into an empty tree.
+    /// Measures inserting 1000 additional files into the <see cref="Setup"/>-built tree
+    /// (BUG-BEN-001). The new nodes hang off <c>_root</c>, so <see cref="Cleanup"/> frees
+    /// everything — nothing leaks per iteration. Returns the insert count so the JIT
+    /// cannot fold the loop (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public void Insert1000Files()
+    public int Insert1000Files()
     {
-        AvlNode? root = null;
-        foreach (var name in _filenames)
+        var inserted = 0;
+        foreach (var name in _extraFilenames)
         {
-            AvlTree.AvlInsert(ref root, new AvlNode { Filename = name, FileSize = 4096 });
+            if (AvlTree.AvlInsert(ref _root, new AvlNode { Filename = name, FileSize = 4096 }) != AvlResult.AvlError)
+            {
+                inserted++;
+            }
         }
+
+        return inserted;
     }
 
     /// <summary>
     /// Measures fetching a file name known to exist in the tree.
+    /// Returns the node so the lookup cannot be eliminated (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public void FetchExistingFile()
+    public AvlNode? FetchExistingFile()
     {
-        AvlTree.AvlFetch(_root, "file_0500.dat");
+        return AvlTree.AvlFetch(_root, "file_0500.dat");
     }
 
     /// <summary>
     /// Measures fetching a file name known to be absent from the tree.
+    /// Returns the (null) result so the lookup cannot be eliminated (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public void FetchMissingFile()
+    public AvlNode? FetchMissingFile()
     {
-        AvlTree.AvlFetch(_root, "nonexistent.dat");
+        return AvlTree.AvlFetch(_root, "nonexistent.dat");
     }
 
     /// <summary>
     /// Measures a prefix-order depth-first traversal of the tree.
+    /// Returns the traversal result so it cannot be eliminated (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public void TraversePrefix()
+    public int TraversePrefix()
     {
-        AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Prefix, 0);
+        return AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Prefix, 0);
     }
 
     /// <summary>
     /// Measures an infix-order depth-first traversal of the tree.
+    /// Returns the traversal result so it cannot be eliminated (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public void TraverseInfix()
+    public int TraverseInfix()
     {
-        AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Infix, 0);
+        return AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Infix, 0);
     }
 
     /// <summary>
-    /// Measures 1000 key comparisons between two adjacent file names.
+    /// Measures key comparisons between adjacent file names. Accumulates into a returned
+    /// sum over varying keys so neither the JIT nor BenchmarkDotNet can fold the
+    /// constant-operand loop (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public static void CompareKeys()
+    public int CompareKeys()
     {
-        for (var i = 0; i < 1000; i++)
+        var sum = 0;
+        for (var i = 0; i + 1 < _filenames.Length; i++)
         {
-            AvlTree.AvlCompareKey("file_0500.dat", "file_0501.dat");
+            sum += AvlTree.AvlCompareKey(_filenames[i], _filenames[i + 1]);
         }
+
+        return sum;
     }
 
     private static int CountCallback(AvlNode node, object? context, int depth)

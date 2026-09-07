@@ -18,6 +18,10 @@ public class CliDestinationDirTests : IDisposable
     private readonly StringWriter _errCapture = new();
     private readonly TextWriter _savedOut;
     private readonly TextWriter _savedErr;
+    private readonly TextWriter _savedLoggerOut;
+    private readonly TextWriter _savedLoggerError;
+    private readonly bool _savedQuiet;
+    private readonly bool _savedRealQuiet;
     private readonly string _savedCwd;
     private readonly string _runDir;
 
@@ -25,6 +29,10 @@ public class CliDestinationDirTests : IDisposable
     {
         _savedOut = Console.Out;
         _savedErr = Console.Error;
+        _savedLoggerOut = Logger.Out;
+        _savedLoggerError = Logger.Error;
+        _savedQuiet = Logger.Quiet;
+        _savedRealQuiet = Logger.RealQuiet;
         Console.SetOut(_outCapture);
         Console.SetError(_errCapture);
         Logger.Out = _outCapture;
@@ -52,10 +60,10 @@ public class CliDestinationDirTests : IDisposable
 
         Console.SetOut(_savedOut);
         Console.SetError(_savedErr);
-        Logger.Out = _savedOut;
-        Logger.Error = _savedErr;
-        Logger.Quiet = false;
-        Logger.RealQuiet = false;
+        Logger.Out = _savedLoggerOut;
+        Logger.Error = _savedLoggerError;
+        Logger.Quiet = _savedQuiet;
+        Logger.RealQuiet = _savedRealQuiet;
         _outCapture.Dispose();
         _errCapture.Dispose();
 
@@ -193,12 +201,9 @@ public class CliDestinationDirTests : IDisposable
         Assert.Equal(cwd, Directory.GetCurrentDirectory());
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void Extract_UnreachableUnc_FailsCleanly()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         var src = CreateSourceTree();
         var isoPath = CreateIso(src, "game.iso");
         var cwd = Directory.GetCurrentDirectory();
@@ -208,12 +213,9 @@ public class CliDestinationDirTests : IDisposable
         Assert.Equal(cwd, Directory.GetCurrentDirectory());
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void Extract_DevicePathPrefix_MatchesControl()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         var src = CreateSourceTree();
         var isoPath = CreateIso(src, "game.iso");
         var control = CreateTempDir("xiso_d_control4");
@@ -255,12 +257,9 @@ public class CliDestinationDirTests : IDisposable
         Assert.False(Directory.Exists(dest));
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void Cli_Extract_UnreachableUnc_ExitOne()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         var src = CreateSourceTree();
         var isoPath = CreateIso(src, "game.iso");
 

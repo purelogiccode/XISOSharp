@@ -86,21 +86,44 @@ public class CisoSplitInteropTests : IDisposable
         return OperatingSystem.IsWindows() && File.Exists(XdvdfsExePath());
     }
 
-    private static string RunXdvdfs(string arguments, string workDir)
+    private static string RunXdvdfs(string[] arguments, string workDir)
     {
-        var psi = new ProcessStartInfo(XdvdfsExePath(), arguments)
+        var psi = new ProcessStartInfo
         {
+            FileName = XdvdfsExePath(),
             WorkingDirectory = workDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        using var proc = Process.Start(psi)!;
-        var stdout = proc.StandardOutput.ReadToEnd();
-        Assert.True(proc.WaitForExit(120000), "xdvdfs.exe timed out.");
-        var stderr = proc.StandardError.ReadToEnd();
-        Assert.True(proc.ExitCode == 0, $"xdvdfs.exe failed: {stderr}");
+        foreach (var arg in arguments)
+        {
+            psi.ArgumentList.Add(arg);
+        }
+
+        using var proc = Process.Start(psi);
+        Assert.NotNull(proc);
+        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+        var stderrTask = proc.StandardError.ReadToEndAsync();
+        if (!proc.WaitForExit(120000))
+        {
+            try
+            {
+                proc.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Best effort kill after timeout.
+            }
+
+            proc.WaitForExit(5000);
+            Assert.Fail("xdvdfs.exe timed out and was killed.");
+        }
+
+        var stdout = stdoutTask.GetAwaiter().GetResult();
+        var stderr = stderrTask.GetAwaiter().GetResult();
+        Assert.True(proc.ExitCode == 0, $"xdvdfs.exe failed (exit {proc.ExitCode}): {stderr}");
         return stdout;
     }
 
@@ -151,7 +174,7 @@ public class CisoSplitInteropTests : IDisposable
 
     private static string StockMd5(string imagePath, string workDir)
     {
-        return RunXdvdfs($"md5 \"{imagePath}\"", workDir);
+        return RunXdvdfs(["md5", imagePath], workDir);
     }
 
     /// <summary>
@@ -174,20 +197,17 @@ public class CisoSplitInteropTests : IDisposable
         return files;
     }
 
-    [Fact]
+    [RequiresOracleFact(OracleKind.Xdvdfs)]
     public void RustCompressIso_OurReaderDecompressesIdenticalContent()
     {
-        if (!ReferenceAvailable())
-        {
-            return; // reference binary not present; covered by self round-trip tests
-        }
+        Assert.True(ReferenceAvailable(), "Missing reference oracle 'Xdvdfs'.");
 
         var isoPath = CreateTempIso();
         var workDir = CreateTempDir();
 
         // Note: the reference SplitOutput derives part names from the file name only
         // and creates them relative to the process working directory.
-        RunXdvdfs($"compress \"{isoPath}\" \"{Path.Combine(workDir, "rust.cso")}\"", workDir);
+        RunXdvdfs(["compress", isoPath, Path.Combine(workDir, "rust.cso")], workDir);
 
         var part1 = Path.Combine(workDir, "rust.1.cso");
         Assert.True(File.Exists(part1), "expected the reference writer to emit rust.1.cso");
@@ -207,13 +227,10 @@ public class CisoSplitInteropTests : IDisposable
         Assert.Equal(new FileInfo(decPath).Length, dev.Length);
     }
 
-    [Fact]
+    [RequiresOracleFact(OracleKind.Xdvdfs)]
     public void RustCompressDir_OurReaderRoundTripsContent()
     {
-        if (!ReferenceAvailable())
-        {
-            return; // reference binary not present; covered by self round-trip tests
-        }
+        Assert.True(ReferenceAvailable(), "Missing reference oracle 'Xdvdfs'.");
 
         var srcDir = CreateTempDir();
         Directory.CreateDirectory(Path.Combine(srcDir, "sub"));
@@ -222,7 +239,7 @@ public class CisoSplitInteropTests : IDisposable
         File.WriteAllBytes(Path.Combine(srcDir, "sub", "blob.bin"), blob);
 
         var workDir = CreateTempDir();
-        RunXdvdfs($"compress \"{srcDir}\" \"{Path.Combine(workDir, "rustdir.cso")}\"", workDir);
+        RunXdvdfs(["compress", srcDir, Path.Combine(workDir, "rustdir.cso")], workDir);
 
         var part1 = Path.Combine(workDir, "rustdir.1.cso");
         Assert.True(File.Exists(part1), "expected the reference writer to emit rustdir.1.cso");
@@ -239,13 +256,10 @@ public class CisoSplitInteropTests : IDisposable
         Assert.Equal(expected, got);
     }
 
-    [Fact]
+    [RequiresOracleFact(OracleKind.Xdvdfs)]
     public void OurSingleCso_StockReadsIdenticalContent()
     {
-        if (!ReferenceAvailable())
-        {
-            return; // reference binary not present; covered by self round-trip tests
-        }
+        Assert.True(ReferenceAvailable(), "Missing reference oracle 'Xdvdfs'.");
 
         var isoPath = CreateTempIso();
         var workDir = CreateTempDir();

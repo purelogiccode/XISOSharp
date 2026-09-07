@@ -28,9 +28,9 @@ internal static class SelfTest
             Log.Information("GUI self-test started");
 
             Check("extract", CliCommands.Extract(["a.iso"], "out", overwrite: false),
-                ["-d", "out", "-x", "a.iso", "-n"]);
+                ["-d", "out", "-x", "-n", "a.iso"]);
             Check("extract-nodest", CliCommands.Extract(["a.iso", "b.cso"], null, overwrite: true),
-                ["-x", "a.iso", "b.cso", "-y"]);
+                ["-x", "-y", "a.iso", "b.cso"]);
             Check("list", CliCommands.List(["a.iso"]), ["-l", "a.iso"]);
             Check("tree", CliCommands.Tree(["a.iso"]), ["-t", "a.iso"]);
             Check("info", CliCommands.Info("a.iso", "/default.xbe"), ["-i", "a.iso", "/default.xbe"]);
@@ -46,11 +46,11 @@ internal static class SelfTest
                     overwrite: false),
                 [
                     "-r", "-o", "b.iso", "-D", "--validate", "--validate-strict", "--validate-report", "r.json",
-                    "a.iso",
-                    "-n"
+                    "-n",
+                    "a.iso"
                 ]);
-            Check("wipe", CliCommands.Wipe("a.iso", null, overwrite: true), ["--wipe", "a.iso", "-y"]);
-            Check("trim", CliCommands.Trim("a.iso", "t.iso", overwrite: false), ["--trim", "a.iso", "t.iso", "-n"]);
+            Check("wipe", CliCommands.Wipe("a.iso", null, overwrite: true), ["--wipe", "-y", "a.iso"]);
+            Check("trim", CliCommands.Trim("a.iso", "t.iso", overwrite: false), ["--trim", "-n", "a.iso", "t.iso"]);
             Check("rebuild", CliCommands.Rebuild(["x.iso", "v.iso"], "r.iso", "s.txt", overwrite: true),
                 ["rebuild", "x.iso", "v.iso", "-o", "r.iso", "--security-sectors", "s.txt", "-y"]);
             Check("compress", CliCommands.Compress("a.iso", null, 9, 2, "0", overwrite: false),

@@ -489,7 +489,9 @@ internal partial class MainViewModel : INotifyPropertyChanged
 
         var progress = new Progress<TestProgress>(p =>
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            // Non-blocking: InvokeAsync never blocks the worker, so a modal
+            // dialog pumping a nested dispatcher frame cannot deadlock the run.
+            _ = Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 FileProgress = $"File {p.FileIndex}/{p.TotalFiles}";
                 ProgressValue = p.TotalFiles > 0 ? (double)p.FileIndex / p.TotalFiles * 100 : 0;

@@ -21,9 +21,30 @@ public class XisoReaderTests : IDisposable
         Path.Combine(Path.GetTempPath(), $"non_existent_{Guid.NewGuid()}.iso");
 
     private string _tempDir = "";
+    private readonly bool _savedQuiet;
+    private readonly bool _savedRealQuiet;
+    private readonly bool _savedWarned;
+    private readonly long _savedTotalBytes;
+    private readonly int _savedTotalFiles;
+    private readonly long _savedTotalBytesAllIsos;
+    private readonly int _savedTotalFilesAllIsos;
+    private readonly bool _savedRemoveSystemUpdate;
+    private readonly bool _savedMediaEnable;
+    private readonly long _savedXboxDiscLseek;
 
     public XisoReaderTests()
     {
+        _savedQuiet = Logger.Quiet;
+        _savedRealQuiet = Logger.RealQuiet;
+        _savedWarned = Logger.Warned;
+        _savedTotalBytes = Logger.TotalBytes;
+        _savedTotalFiles = Logger.TotalFiles;
+        _savedTotalBytesAllIsos = Logger.TotalBytesAllIsos;
+        _savedTotalFilesAllIsos = Logger.TotalFilesAllIsos;
+        _savedRemoveSystemUpdate = Logger.RemoveSystemUpdate;
+        _savedMediaEnable = Logger.MediaEnable;
+        _savedXboxDiscLseek = Logger.XboxDiscLseek;
+
         Logger.Quiet = true;
         Logger.RealQuiet = true;
         Logger.Warned = false;
@@ -38,8 +59,16 @@ public class XisoReaderTests : IDisposable
 
     public void Dispose()
     {
-        Logger.Quiet = false;
-        Logger.RealQuiet = false;
+        Logger.Quiet = _savedQuiet;
+        Logger.RealQuiet = _savedRealQuiet;
+        Logger.Warned = _savedWarned;
+        Logger.TotalBytes = _savedTotalBytes;
+        Logger.TotalFiles = _savedTotalFiles;
+        Logger.TotalBytesAllIsos = _savedTotalBytesAllIsos;
+        Logger.TotalFilesAllIsos = _savedTotalFilesAllIsos;
+        Logger.RemoveSystemUpdate = _savedRemoveSystemUpdate;
+        Logger.MediaEnable = _savedMediaEnable;
+        Logger.XboxDiscLseek = _savedXboxDiscLseek;
 
         if (!string.IsNullOrEmpty(_tempDir) && Directory.Exists(_tempDir))
         {

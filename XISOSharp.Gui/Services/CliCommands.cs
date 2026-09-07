@@ -46,8 +46,8 @@ internal static class CliCommands
         }
 
         args.Add("-x");
-        args.AddRange(images);
         args.Add(OverwriteFlag(overwrite));
+        args.AddRange(images);
         return [.. args];
     }
 
@@ -233,8 +233,8 @@ internal static class CliCommands
             args.Add(validateReport);
         }
 
-        args.AddRange(images);
         args.Add(OverwriteFlag(overwrite));
+        args.AddRange(images);
         return [.. args];
     }
 
@@ -247,13 +247,12 @@ internal static class CliCommands
     /// <returns>The wipe argument list.</returns>
     internal static string[] Wipe(string image, string? output, bool overwrite)
     {
-        var args = new List<string> { "--wipe", image };
+        var args = new List<string> { "--wipe", OverwriteFlag(overwrite), image };
         if (!string.IsNullOrWhiteSpace(output))
         {
             args.Add(output);
         }
 
-        args.Add(OverwriteFlag(overwrite));
         return [.. args];
     }
 
@@ -266,13 +265,12 @@ internal static class CliCommands
     /// <returns>The trim argument list.</returns>
     internal static string[] Trim(string image, string? output, bool overwrite)
     {
-        var args = new List<string> { "--trim", image };
+        var args = new List<string> { "--trim", OverwriteFlag(overwrite), image };
         if (!string.IsNullOrWhiteSpace(output))
         {
             args.Add(output);
         }
 
-        args.Add(OverwriteFlag(overwrite));
         return [.. args];
     }
 

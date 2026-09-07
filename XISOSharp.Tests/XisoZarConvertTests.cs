@@ -264,15 +264,12 @@ public sealed class XisoZarConvertTests : IDisposable
         }
     }
 
-    [Fact]
+    [RequiresOracleFact(OracleKind.Zarchive)]
     public void Interop_ReferenceExeExtractsOurZar()
     {
         // zarchive.exe moved with ZARSharp to the sibling CSharp_ZARSharp repo.
         var exe = Path.Combine(SolutionRoot(), "..", "CSharp_ZARSharp", "References", "ZArchive-0.1.2", "zarchive.exe");
-        if (!File.Exists(exe))
-        {
-            return; // reference binary not present; covered by round-trip tests
-        }
+        Assert.True(File.Exists(exe), "Missing reference oracle 'Zarchive'.");
 
         var src = CreateSourceDir(PopulateRich);
         var expected = SnapshotFiles(src);
@@ -283,15 +280,38 @@ public sealed class XisoZarConvertTests : IDisposable
         Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
 
         var outDir = Path.Combine(work, "exedra");
-        var psi = new ProcessStartInfo(exe, $"\"{zar}\" \"{outDir}\"")
+        var psi = new ProcessStartInfo
         {
+            FileName = exe,
             RedirectStandardOutput = true,
+            RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        using var proc = Process.Start(psi)!;
-        proc.WaitForExit(120000);
-        Assert.True(proc.ExitCode == 0, $"zarchive.exe failed: {proc.StandardOutput.ReadToEnd()}");
+        psi.ArgumentList.Add(zar);
+        psi.ArgumentList.Add(outDir);
+        using var proc = Process.Start(psi);
+        Assert.NotNull(proc);
+        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+        var stderrTask = proc.StandardError.ReadToEndAsync();
+        if (!proc.WaitForExit(120000))
+        {
+            try
+            {
+                proc.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Best effort kill after timeout.
+            }
+
+            proc.WaitForExit(5000);
+            Assert.Fail("zarchive.exe timed out and was killed.");
+        }
+
+        var stdout = stdoutTask.GetAwaiter().GetResult();
+        var stderr = stderrTask.GetAwaiter().GetResult();
+        Assert.True(proc.ExitCode == 0, $"zarchive.exe failed (exit {proc.ExitCode}): {stderr}{stdout}");
         AssertSnapshotsEqual(expected, SnapshotFiles(outDir));
     }
 }

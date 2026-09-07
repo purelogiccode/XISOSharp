@@ -3,17 +3,38 @@ namespace XISOSharp.Tests;
 /// <summary>
 /// Tests for the Logger utility class, verifying output routing, suppression flags, and field management.
 /// </summary>
+[Collection("Sequential")]
 public class LoggerTests : IDisposable
 {
     private readonly StringWriter _outCapture;
     private readonly StringWriter _errorCapture;
     private readonly TextWriter _originalOut;
     private readonly TextWriter _originalError;
+    private readonly bool _savedQuiet;
+    private readonly bool _savedRealQuiet;
+    private readonly bool _savedWarned;
+    private readonly long _savedTotalBytes;
+    private readonly int _savedTotalFiles;
+    private readonly long _savedTotalBytesAllIsos;
+    private readonly int _savedTotalFilesAllIsos;
+    private readonly bool _savedRemoveSystemUpdate;
+    private readonly bool _savedMediaEnable;
+    private readonly long _savedXboxDiscLseek;
 
     public LoggerTests()
     {
         _originalOut = Logger.Out;
         _originalError = Logger.Error;
+        _savedQuiet = Logger.Quiet;
+        _savedRealQuiet = Logger.RealQuiet;
+        _savedWarned = Logger.Warned;
+        _savedTotalBytes = Logger.TotalBytes;
+        _savedTotalFiles = Logger.TotalFiles;
+        _savedTotalBytesAllIsos = Logger.TotalBytesAllIsos;
+        _savedTotalFilesAllIsos = Logger.TotalFilesAllIsos;
+        _savedRemoveSystemUpdate = Logger.RemoveSystemUpdate;
+        _savedMediaEnable = Logger.MediaEnable;
+        _savedXboxDiscLseek = Logger.XboxDiscLseek;
 
         _outCapture = new StringWriter();
         _errorCapture = new StringWriter();
@@ -37,6 +58,16 @@ public class LoggerTests : IDisposable
     {
         Logger.Out = _originalOut;
         Logger.Error = _originalError;
+        Logger.Quiet = _savedQuiet;
+        Logger.RealQuiet = _savedRealQuiet;
+        Logger.Warned = _savedWarned;
+        Logger.TotalBytes = _savedTotalBytes;
+        Logger.TotalFiles = _savedTotalFiles;
+        Logger.TotalBytesAllIsos = _savedTotalBytesAllIsos;
+        Logger.TotalFilesAllIsos = _savedTotalFilesAllIsos;
+        Logger.RemoveSystemUpdate = _savedRemoveSystemUpdate;
+        Logger.MediaEnable = _savedMediaEnable;
+        Logger.XboxDiscLseek = _savedXboxDiscLseek;
         _outCapture.Dispose();
         _errorCapture.Dispose();
     }

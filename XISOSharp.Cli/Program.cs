@@ -82,6 +82,17 @@ internal static class Program
         }
         finally
         {
+            // X-003: deliver pending bug-report sends before the process exits;
+            // a short-lived CLI would otherwise drop crash reports every time.
+            try
+            {
+                BugReporter.Flush(TimeSpan.FromSeconds(2));
+            }
+            catch
+            {
+                // Reporting must never fail the CLI.
+            }
+
             AppLogging.CloseAndFlush();
         }
     }
@@ -96,6 +107,7 @@ internal static class Program
 
         var extract = true;
         var rewrite = false;
+        var listMode = false;
         var tree = false;
         var info = false;
         var lsMode = false;
@@ -162,6 +174,14 @@ internal static class Program
         string? securitySectorsPath = null;
 
         var optind = 0;
+
+        // CLI-001/CLI-002: the classic operational modes are mutually exclusive.
+        // (-x/extract is the default, not a mode; -r/-c/rewrite/create, --unpack,
+        // --checksum/--filetime/--set-filetime and the redump modes keep their own
+        // guards below.)
+        bool ClassicModeSelected() =>
+            listMode || tree || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode ||
+            hashMode || copyOut || copyIn || auditMode || validateMode;
 
         // Handle standalone verb commands early (don't start with '-')
         if (args.Length > 0 && string.Equals(args[0], "validate", StringComparison.OrdinalIgnoreCase))
@@ -240,7 +260,22 @@ internal static class Program
                         createList.Add((dir, name));
                         break;
                     }
-                    case "-x": xSeen = true; break;
+                    case "-x":
+                    {
+                        // CLI-002: -x is order-independent. It is the default, so a
+                        // repeat is harmless, but after any operational mode (or
+                        // -r/-c) it is a conflict, not a silent no-op.
+                        if (xSeen)
+                            break;
+                        if (rewrite || !extract || createList.Count > 0 || ClassicModeSelected())
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        xSeen = true;
+                        break;
+                    }
                     case "--unpack":
                         if (xSeen || rewrite || createList.Count > 0)
                         {
@@ -271,6 +306,7 @@ internal static class Program
                         }
 
                         extract = false;
+                        listMode = true;
                         break;
                     case "-t":
                         if (xSeen || rewrite || createList.Count > 0)
@@ -343,7 +379,9 @@ internal static class Program
                         salvageMode = true;
                         break;
                     case "--md5":
-                        if (xSeen || rewrite || createList.Count > 0)
+                        // CLI-001: --md5/--sha256 share hashMode; a second hash
+                        // selection would silently overwrite the first.
+                        if (hashMode || xSeen || rewrite || createList.Count > 0)
                         {
                             PrintUsage();
                             return 1;
@@ -354,7 +392,7 @@ internal static class Program
                         hashAlgo = "MD5";
                         break;
                     case "--sha256":
-                        if (xSeen || rewrite || createList.Count > 0)
+                        if (hashMode || xSeen || rewrite || createList.Count > 0)
                         {
                             PrintUsage();
                             return 1;
@@ -921,6 +959,19 @@ internal static class Program
             return 1;
         }
 
+        // CLI-001: the classic operational modes stack silently (last flag wins);
+        // require exactly one. (--md5/--sha256 double-selection is rejected
+        // during parsing since both share hashMode.)
+        var classicModes = new[]
+            { listMode, tree, info, lsMode, xexInfoMode, xbeInfoMode, repairMode, salvageMode, hashMode, copyOut,
+                copyIn, auditMode, validateMode }.Count(b => b);
+        if (classicModes > 1)
+        {
+            Logger.LogErr(
+                "Error: -l/-t/-i/--ls/--xex-info/--xbe-info/--repair/--salvage/--md5/--sha256/-V/validate/--copy-out/--copy-in cannot be combined with other modes\n");
+            return 1;
+        }
+
         // XboxKit redump modes are mutually exclusive with other operational modes
         var anyRedumpMode = videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode ||
                             zarMode || allMode || bestMode || compressAlias;
@@ -1104,6 +1155,14 @@ internal static class Program
         if (assumeYes && assumeNo)
         {
             Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
+            return 1;
+        }
+
+        // CLI-010: a shared -o across a rewrite batch would clobber every input
+        // into the same file (mirrors the RunRedumpBatch single-output guard).
+        if (rewrite && outputName != null && isoFiles.Count != 1)
+        {
+            Logger.LogErr("Error: -o <output> can only be used with a single input file\n");
             return 1;
         }
 
@@ -1843,7 +1902,8 @@ internal static class Program
                 }
                 catch (ExtractErrorException ex) when (ex.ErrorCode == ExtractError.ErrIsoNoFiles)
                 {
-                    err = 0;
+                    // CLI-009: an empty ISO is not a failure — but it must not
+                    // clear a previous file's failure either. Leave err untouched.
                 }
                 catch (UnauthorizedAccessException ex)
                 {
@@ -1965,7 +2025,7 @@ internal static class Program
 
                 secPath = args[++i];
             }
-            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-q", StringComparison.Ordinal))
             {
                 Logger.Quiet = true;
             }
@@ -2163,7 +2223,7 @@ internal static class Program
                 Console.Write(Constants.Banner);
                 return 0;
             }
-            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-q", StringComparison.Ordinal))
             {
                 Logger.Quiet = true;
             }
@@ -2542,7 +2602,7 @@ internal static class Program
             {
                 assumeNo = true;
             }
-            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-q", StringComparison.Ordinal))
             {
                 Logger.Quiet = true;
             }
@@ -2651,7 +2711,7 @@ internal static class Program
             {
                 assumeNo = true;
             }
-            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-q", StringComparison.Ordinal))
             {
                 Logger.Quiet = true;
             }
@@ -2742,7 +2802,7 @@ internal static class Program
             {
                 silent = true;
             }
-            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-q", StringComparison.Ordinal))
             {
                 Logger.Quiet = true;
             }
@@ -2803,10 +2863,59 @@ internal static class Program
         return exit;
     }
 
+    /// <summary>
+    /// CLI-008: the part paths a split of <paramref name="iso"/> would write
+    /// (same layout math as <see cref="XisoSplitter"/>), filtered to the ones
+    /// that already exist. Empty when the source cannot be probed — the split
+    /// call itself then reports the real error and nothing is deleted.
+    /// </summary>
+    private static List<string> FindExistingSplitParts(string iso, string splitBase, long partSize, bool halves)
+    {
+        var existing = new List<string>();
+        try
+        {
+            if (!File.Exists(iso) || !XisoReader.GetVolumeInfo(iso).IsValid)
+                return existing;
+            var length = new FileInfo(iso).Length;
+            if (length <= 0)
+                return existing;
+            long chunk;
+            if (halves)
+            {
+                var cut = (((length + 1) / 2) + Constants.SectorSize - 1) / Constants.SectorSize *
+                    Constants.SectorSize;
+                chunk = cut <= 0 || cut >= length ? length : cut;
+            }
+            else
+            {
+                chunk = (partSize / Constants.SectorSize) * Constants.SectorSize;
+                if (chunk <= 0)
+                    return existing;
+            }
+
+            var partCount = (int)Math.Min((long)int.MaxValue, ((length - 1) / chunk) + 1);
+            for (var i = 0; i < partCount; i++)
+            {
+                var part = XisoSplitter.PartPath(splitBase, i);
+                if (File.Exists(part))
+                    existing.Add(part);
+            }
+        }
+        catch
+        {
+            // Probing must never fail the command; Split reports real errors.
+            existing.Clear();
+        }
+
+        return existing;
+    }
+
     private static int RunSplitMode(string[] args, int optind)
     {
         string? sizeText = null;
         string? outputBase = null;
+        var assumeYes = false;
+        var assumeNo = false;
         var positionals = new List<string>();
 
         for (var i = optind; i < args.Length; i++)
@@ -2835,7 +2944,17 @@ internal static class Program
 
                 outputBase = args[i];
             }
-            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeYes = true;
+            }
+            else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeNo = true;
+            }
+            else if (string.Equals(a, "-q", StringComparison.Ordinal))
             {
                 Logger.Quiet = true;
             }
@@ -2905,6 +3024,44 @@ internal static class Program
                 var splitBase = outputBase
                                 ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(iso)) ?? "",
                                     Path.GetFileNameWithoutExtension(iso));
+                // CLI-008: prompt before clobbering existing parts (-y deletes the
+                // confirmed colliders first, -n/refusal skips the image).
+                var collisions = FindExistingSplitParts(iso, splitBase, partSize, halves);
+                var refused = false;
+                foreach (var collider in collisions)
+                {
+                    if (!OverwritePrompt.ConfirmOverwrite(collider, assumeYes, assumeNo))
+                    {
+                        Logger.LogErr($"Error splitting {iso}: not overwriting existing {collider}\n");
+                        exit = 1;
+                        refused = true;
+                        break;
+                    }
+                }
+
+                if (!refused && collisions.Count > 0)
+                {
+                    // The source probed valid inside FindExistingSplitParts, so
+                    // removing the confirmed colliders cannot strand a bad split.
+                    foreach (var collider in collisions)
+                    {
+                        try
+                        {
+                            File.Delete(collider);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogErr($"Error splitting {iso}: cannot remove {collider}: {ex.Message}\n");
+                            exit = 1;
+                            refused = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (refused)
+                    continue;
+
                 var parts = halves
                     ? XisoReader.SplitXisoHalves(iso, splitBase)
                     : XisoReader.SplitXiso(iso, splitBase, partSize);
@@ -2924,6 +3081,8 @@ internal static class Program
     private static int RunJoinMode(string[] args, int optind)
     {
         string? outputPath = null;
+        var assumeYes = false;
+        var assumeNo = false;
         var positionals = new List<string>();
 
         for (var i = optind; i < args.Length; i++)
@@ -2941,7 +3100,17 @@ internal static class Program
 
                 outputPath = args[i];
             }
-            else if (string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeYes = true;
+            }
+            else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeNo = true;
+            }
+            else if (string.Equals(a, "-q", StringComparison.Ordinal))
             {
                 Logger.Quiet = true;
             }
@@ -2991,8 +3160,46 @@ internal static class Program
         {
             try
             {
+                // CLI-007: require the .1.iso suffix instead of slicing blindly
+                // (short/foreign names threw ArgumentOutOfRangeException).
+                if (!XisoSplitter.IsSplitPath(first))
+                {
+                    Logger.LogErr($"Error joining {first}: expected the first split part (*.1.iso)\n");
+                    exit = 1;
+                    continue;
+                }
+
                 var joined = outputPath
                              ?? Path.ChangeExtension(first[..^".1.iso".Length], ".iso");
+                // CLI-008: prompt before clobbering an existing output.
+                if (File.Exists(joined))
+                {
+                    if (!File.Exists(first))
+                    {
+                        Logger.LogErr($"Error joining {first}: split part not found\n");
+                        exit = 1;
+                        continue;
+                    }
+
+                    if (!OverwritePrompt.ConfirmOverwrite(joined, assumeYes, assumeNo))
+                    {
+                        Logger.LogErr($"Error joining {first}: not overwriting existing {joined}\n");
+                        exit = 1;
+                        continue;
+                    }
+
+                    try
+                    {
+                        File.Delete(joined);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogErr($"Error joining {first}: cannot remove {joined}: {ex.Message}\n");
+                        exit = 1;
+                        continue;
+                    }
+                }
+
                 XisoReader.JoinSplitXiso(first, joined);
                 Logger.Log($"join: {joined}\n");
             }

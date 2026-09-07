@@ -17,6 +17,10 @@ public sealed class XisoZarPipelineTests : IDisposable
     private readonly StringWriter _errCapture = new();
     private readonly TextWriter _savedOut;
     private readonly TextWriter _savedErr;
+    private readonly TextWriter _savedLoggerOut;
+    private readonly TextWriter _savedLoggerError;
+    private readonly bool _savedQuiet;
+    private readonly bool _savedRealQuiet;
     private readonly string _savedCwd;
     private readonly string _runDir;
 
@@ -24,6 +28,10 @@ public sealed class XisoZarPipelineTests : IDisposable
     {
         _savedOut = Console.Out;
         _savedErr = Console.Error;
+        _savedLoggerOut = Logger.Out;
+        _savedLoggerError = Logger.Error;
+        _savedQuiet = Logger.Quiet;
+        _savedRealQuiet = Logger.RealQuiet;
         Console.SetOut(_outCapture);
         Console.SetError(_errCapture);
         Logger.Out = _outCapture;
@@ -49,10 +57,10 @@ public sealed class XisoZarPipelineTests : IDisposable
 
         Console.SetOut(_savedOut);
         Console.SetError(_savedErr);
-        Logger.Out = _savedOut;
-        Logger.Error = _savedErr;
-        Logger.Quiet = false;
-        Logger.RealQuiet = false;
+        Logger.Out = _savedLoggerOut;
+        Logger.Error = _savedLoggerError;
+        Logger.Quiet = _savedQuiet;
+        Logger.RealQuiet = _savedRealQuiet;
         _outCapture.Dispose();
         _errCapture.Dispose();
 

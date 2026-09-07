@@ -9,11 +9,19 @@ namespace XISOSharp.Tests;
 public class XisoFileTimeTests : IDisposable
 {
     private readonly List<string> _tempDirs = [];
+    private readonly bool _savedQuiet;
+    private readonly bool _savedRealQuiet;
+
+    public XisoFileTimeTests()
+    {
+        _savedQuiet = Logger.Quiet;
+        _savedRealQuiet = Logger.RealQuiet;
+    }
 
     public void Dispose()
     {
-        Logger.Quiet = false;
-        Logger.RealQuiet = false;
+        Logger.Quiet = _savedQuiet;
+        Logger.RealQuiet = _savedRealQuiet;
         foreach (var dir in _tempDirs)
         {
             try

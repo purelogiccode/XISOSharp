@@ -126,7 +126,7 @@ internal static class BattleRunner
         result.SubTests.Add(RunExtract(path, wrapper));
         result.SubTests.Add(RunRewrite(path, wrapper));
         result.SubTests.Add(RunCisoRoundTrip(path));
-        result.SubTests.Add(RunChecksum(path));
+        result.SubTests.Add(RunChecksum(path, wrapper));
         result.SubTests.Add(RunBlockDevice(path));
 
         result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
@@ -610,40 +610,45 @@ internal static class BattleRunner
         }
     }
 
-    private static SubBattleResult RunChecksum(string path)
+    private static SubBattleResult RunChecksum(string path, ExtractXisoWrapper? wrapper)
     {
         var sw = Stopwatch.StartNew();
         try
         {
-            var h1 = XisoChecksum.ComputeImageChecksumHex(path);
-            var h2 = XisoChecksum.ComputeImageChecksumHex(path);
+            var csHex = XisoChecksum.ComputeImageChecksumHex(path);
             sw.Stop();
-            if (h1.Length != 64)
+            if (csHex.Length != 64)
             {
                 return new SubBattleResult
                 {
                     TestName = "Checksum",
                     Status = BattleStatus.Failed,
-                    Detail = $"Invalid hex length {h1.Length}",
+                    Detail = $"Invalid hex length {csHex.Length}",
                     ElapsedSeconds = sw.Elapsed.TotalSeconds
                 };
             }
 
-            return string.Equals(h1, h2, StringComparison.Ordinal)
-                ? new SubBattleResult
+            if (wrapper?.Available != true)
+            {
+                return new SubBattleResult
                 {
                     TestName = "Checksum",
-                    Status = BattleStatus.Passed,
-                    Detail = $"{h1} \u2713 deterministic",
-                    ElapsedSeconds = sw.Elapsed.TotalSeconds
-                }
-                : new SubBattleResult
-                {
-                    TestName = "Checksum",
-                    Status = BattleStatus.Failed,
-                    Detail = $"{h1} != {h2}",
+                    Status = BattleStatus.Skipped,
+                    Detail = $"No native checksum oracle (native not available); C#={csHex}",
                     ElapsedSeconds = sw.Elapsed.TotalSeconds
                 };
+            }
+
+            // extract-xiso v2.7.1 exposes no checksum oracle (List/Extract/Rewrite/Create
+            // only), so native parity output is unavailable for this path. Report Skipped
+            // explicitly rather than a vacuous self-consistency pass.
+            return new SubBattleResult
+            {
+                TestName = "Checksum",
+                Status = BattleStatus.Skipped,
+                Detail = $"No native checksum oracle for extract-xiso; C#={csHex}",
+                ElapsedSeconds = sw.Elapsed.TotalSeconds
+            };
         }
         catch (Exception ex)
         {
@@ -1075,8 +1080,8 @@ internal static class BattleRunner
             return new SubBattleResult
             {
                 TestName = "Security",
-                Status = BattleStatus.Passed,
-                Detail = ok ? "ParseLines ok" : "ParseLines threw (expected for some)",
+                Status = ok ? BattleStatus.Passed : BattleStatus.Failed,
+                Detail = ok ? "ParseLines ok" : "ParseLines threw",
                 ElapsedSeconds = sw.Elapsed.TotalSeconds
             };
         }

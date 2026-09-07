@@ -40,9 +40,37 @@ internal sealed class XboxKitWrapper : IDisposable
         foreach (var a in args) psi.ArgumentList.Add(a);
 
         using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start xboxkit.exe");
-        var stdout = proc.StandardOutput.ReadToEnd();
-        var stderr = proc.StandardError.ReadToEnd();
+        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+        var stderrTask = proc.StandardError.ReadToEndAsync();
+        const int timeoutMs = 600_000;
+        if (!proc.WaitForExit(timeoutMs))
+        {
+            try
+            {
+                proc.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // Process already exited between WaitForExit and Kill.
+            }
+            catch (NotSupportedException)
+            {
+                try
+                {
+                    proc.Kill();
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+
+            proc.WaitForExit(5000);
+            throw new TimeoutException($"xboxkit.exe timed out after {timeoutMs} ms.");
+        }
+
         proc.WaitForExit();
+        var stdout = stdoutTask.GetAwaiter().GetResult();
+        var stderr = stderrTask.GetAwaiter().GetResult();
         return (proc.ExitCode, stdout, stderr);
     }
 

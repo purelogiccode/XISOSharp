@@ -24,10 +24,10 @@ public class TestSessionResult
     public int PassedFiles => FileResults.Count(static r => r.AllPassed);
 
     /// <summary>
-    /// Gets the number of files with at least one failed sub-test
-    /// or no passing sub-tests at all.
+    /// Gets the number of files with at least one failed sub-test.
+    /// All-skipped files are reported via <see cref="SkippedFiles"/>, not here.
     /// </summary>
-    public int FailedFiles => FileResults.Count(static r => r.Failed > 0 || r.Passed == 0);
+    public int FailedFiles => FileResults.Count(static r => r.Failed > 0 || (r.Passed == 0 && r.Skipped == 0));
 
     /// <summary>
     /// Gets the number of files that were fully skipped (no passing

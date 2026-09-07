@@ -44,14 +44,8 @@ public class XisoExceptionTests
     [Fact]
     public void XisoFormatException_CanBeCaughtAsIOException()
     {
-        try
-        {
-            throw new XisoFormatException("test");
-        }
-        catch (IOException)
-        {
-            // Expected
-        }
+        static void ThrowFormat() => throw new XisoFormatException("test");
+        Assert.ThrowsAny<IOException>(ThrowFormat);
     }
 
     #endregion
@@ -101,14 +95,8 @@ public class XisoExceptionTests
     [Fact]
     public void XisoEmptyException_CanBeCaughtAsExtractErrorException()
     {
-        try
-        {
-            throw new XisoEmptyException();
-        }
-        catch (ExtractErrorException)
-        {
-            // Expected
-        }
+        static void ThrowEmpty() => throw new XisoEmptyException();
+        Assert.ThrowsAny<ExtractErrorException>(ThrowEmpty);
     }
 
     [Fact]
@@ -188,14 +176,8 @@ public class XisoExceptionTests
     [Fact]
     public void XisoFileTooLargeException_CanBeCaughtAsIOException()
     {
-        try
-        {
-            throw new XisoFileTooLargeException("f", 1);
-        }
-        catch (IOException)
-        {
-            // Expected
-        }
+        static void ThrowTooLarge() => throw new XisoFileTooLargeException("f", 1);
+        Assert.ThrowsAny<IOException>(ThrowTooLarge);
     }
 
     #endregion

@@ -1,11 +1,17 @@
 using System.Globalization;
 using Serilog;
 
+#if LOGGING_NS_GUI
+namespace XISOSharp.Gui.Logging;
+#elif LOGGING_NS_TESTER
+namespace XISOSharpTester.Logging;
+#else
 namespace XISOSharp.Cli.Logging;
+#endif
 
 /// <summary>
 /// Single Serilog bootstrap for the CLI. Configures file/debug/console sinks plus
-/// the <see cref="BugReportSink"/> (Warning+ -&gt; bug-report API), bridges the
+/// the <see cref="BugReportSink"/> (Error+ -&gt; bug-report API), bridges the
 /// shared <c>XISOSharp.Logger</c> through Serilog, and installs global crash handlers.
 /// </summary>
 internal static class AppLogging
@@ -71,8 +77,10 @@ internal static class AppLogging
         // Route every XISOSharp.Logger write through Serilog as well.
         // Console output is preserved (Logger still writes to Out/Error);
         // Serilog adds file/debug/bug-report coverage for the same text.
-        Logger.ForwardInfo = msg => Log.Information("{Message}", msg.TrimEnd('\r', '\n'));
-        Logger.ForwardError = msg =>
+        // Qualified (not bare `Logger`) so this shared source compiles under the
+        // CLI, GUI, and Tester logging namespaces alike (BUG-X-001).
+        XISOSharp.Logger.ForwardInfo = msg => Log.Information("{Message}", msg.TrimEnd('\r', '\n'));
+        XISOSharp.Logger.ForwardError = msg =>
         {
             var text = msg.TrimEnd('\r', '\n');
             if (msg.StartsWith("warning:", StringComparison.OrdinalIgnoreCase) ||

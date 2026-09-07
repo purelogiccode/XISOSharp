@@ -67,4 +67,26 @@
         <Resource Include="Images\exit.png" />
     </ItemGroup>
 
+    <!-- BUG-X-001: single source of truth for logging lives in XISOSharp.Cli/Logging
+         (trim-safe source-gen payload kept intact). These linked items compile the same
+         sources into the Tester under the Tester namespace (LOGGING_NS_TESTER); do not copy them. -->
+    <PropertyGroup>
+        <DefineConstants>$(DefineConstants);LOGGING_NS_TESTER</DefineConstants>
+    </PropertyGroup>
+
+    <!-- The WPF markup-pass (wpftmp) implicit set lacks System.IO/System.Net.Http,
+         which the linked logging sources need (File/Path, HttpClient). Explicit
+         Usings apply to both passes; duplicates with main-pass implicits are benign. -->
+    <ItemGroup>
+        <Using Include="System.IO" />
+        <Using Include="System.Net.Http" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\XISOSharp.Cli\Logging\AppLogging.cs" Link="Logging\AppLogging.cs" />
+        <Compile Include="..\XISOSharp.Cli\Logging\BugReporter.cs" Link="Logging\BugReporter.cs" />
+        <Compile Include="..\XISOSharp.Cli\Logging\BugReportSink.cs" Link="Logging\BugReportSink.cs" />
+        <Compile Include="..\XISOSharp.Cli\Logging\EnvironmentInfo.cs" Link="Logging\EnvironmentInfo.cs" />
+    </ItemGroup>
+
 </Project>

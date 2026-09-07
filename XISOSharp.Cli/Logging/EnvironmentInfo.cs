@@ -3,7 +3,13 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 
+#if LOGGING_NS_GUI
+namespace XISOSharp.Gui.Logging;
+#elif LOGGING_NS_TESTER
+namespace XISOSharpTester.Logging;
+#else
 namespace XISOSharp.Cli.Logging;
+#endif
 
 /// <summary>
 /// Collects the environment block required on every bug report.

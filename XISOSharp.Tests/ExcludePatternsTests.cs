@@ -8,12 +8,22 @@ namespace XISOSharp.Tests;
 public class ExcludePatternsTests : IDisposable
 {
     private readonly List<string> _tempDirs = [];
+    private readonly bool _savedQuiet;
+    private readonly bool _savedRealQuiet;
+    private readonly bool _savedRemoveSystemUpdate;
+
+    public ExcludePatternsTests()
+    {
+        _savedQuiet = Logger.Quiet;
+        _savedRealQuiet = Logger.RealQuiet;
+        _savedRemoveSystemUpdate = Logger.RemoveSystemUpdate;
+    }
 
     public void Dispose()
     {
-        Logger.Quiet = false;
-        Logger.RealQuiet = false;
-        Logger.RemoveSystemUpdate = false;
+        Logger.Quiet = _savedQuiet;
+        Logger.RealQuiet = _savedRealQuiet;
+        Logger.RemoveSystemUpdate = _savedRemoveSystemUpdate;
 
         foreach (var dir in _tempDirs)
         {

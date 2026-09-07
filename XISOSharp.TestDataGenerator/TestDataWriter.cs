@@ -17,6 +17,12 @@ public static class TestDataWriter
     /// <summary>Name of the prebuilt ISO written under <c>output</c>.</summary>
     public const string IsoFileName = "source.iso";
 
+#if NET9_0_OR_GREATER
+    private static readonly Lock Gate = new();
+#else
+    private static readonly object Gate = new();
+#endif
+
     /// <summary>
     /// Ensures the TestData fixture exists at <paramref name="testDataRoot"/>,
     /// creating any missing source files and rebuilding the derived ISO.
@@ -61,37 +67,42 @@ public static class TestDataWriter
             Constants.SectorSize,
             force);
 
-        // The ISO is a derived artifact: always rebuild so it matches the current writer
-        var isoPath = Path.Combine(outputDir, IsoFileName);
-        if (File.Exists(isoPath))
+        // The ISO is a derived artifact: always rebuild so it matches the current writer.
+        // Serialized on a static gate so concurrent EnsureTestData calls cannot
+        // interleave their Logger save/set/restore windows.
+        lock (Gate)
         {
-            File.Delete(isoPath);
-        }
-
-        var wasQuiet = Logger.Quiet;
-        var wasRealQuiet = Logger.RealQuiet;
-        Logger.Quiet = true;
-        Logger.RealQuiet = true;
-        try
-        {
-            var rc = XisoWriter.CreateXiso(sourceDir, outputDir, null, null, out var createdIsoPath, null, null);
-            if (rc != 0)
+            var isoPath = Path.Combine(outputDir, IsoFileName);
+            if (File.Exists(isoPath))
             {
-                throw new InvalidOperationException($"TestData fixture: CreateXiso failed with code {rc}");
+                File.Delete(isoPath);
             }
 
-            if (!File.Exists(isoPath))
+            var wasQuiet = Logger.Quiet;
+            var wasRealQuiet = Logger.RealQuiet;
+            Logger.Quiet = true;
+            Logger.RealQuiet = true;
+            try
             {
-                throw new InvalidOperationException(
-                    $"TestData fixture: expected ISO at '{isoPath}' but writer produced '{createdIsoPath}'");
-            }
+                var rc = XisoWriter.CreateXiso(sourceDir, outputDir, null, null, out var createdIsoPath, null, null);
+                if (rc != 0)
+                {
+                    throw new InvalidOperationException($"TestData fixture: CreateXiso failed with code {rc}");
+                }
 
-            actions.Add($"rebuilt '{isoPath}'");
-        }
-        finally
-        {
-            Logger.Quiet = wasQuiet;
-            Logger.RealQuiet = wasRealQuiet;
+                if (!File.Exists(isoPath))
+                {
+                    throw new InvalidOperationException(
+                        $"TestData fixture: expected ISO at '{isoPath}' but writer produced '{createdIsoPath}'");
+                }
+
+                actions.Add($"rebuilt '{isoPath}'");
+            }
+            finally
+            {
+                Logger.Quiet = wasQuiet;
+                Logger.RealQuiet = wasRealQuiet;
+            }
         }
 
         return actions;

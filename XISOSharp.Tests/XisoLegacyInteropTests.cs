@@ -72,10 +72,27 @@ public class XisoLegacyInteropTests : IDisposable
 
         using var proc = Process.Start(psi);
         Assert.NotNull(proc);
-        proc.StandardOutput.ReadToEnd();
-        proc.StandardError.ReadToEnd();
-        Assert.True(proc.WaitForExit(120000), "extract-xiso -c timed out");
-        Assert.Equal(0, proc.ExitCode);
+        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+        var stderrTask = proc.StandardError.ReadToEndAsync();
+        if (!proc.WaitForExit(120000))
+        {
+            try
+            {
+                proc.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Best effort kill after timeout.
+            }
+
+            proc.WaitForExit(5000);
+            Assert.Fail("extract-xiso -c timed out and was killed.");
+        }
+
+        var stdout = stdoutTask.GetAwaiter().GetResult();
+        var stderr = stderrTask.GetAwaiter().GetResult();
+        Assert.True(proc.ExitCode == 0, $"extract-xiso -c failed (exit {proc.ExitCode}): {stderr}{stdout}");
+        _ = stdout;
 
         // NOTE: extract-xiso writes the image under exactly <name> (no
         // extension) in its working directory.
@@ -98,11 +115,10 @@ public class XisoLegacyInteropTests : IDisposable
         return CreateLegacyIso(src, workDir, "legacy");
     }
 
-    [Fact]
+    [RequiresOracleFact(OracleKind.ExtractXiso)]
     public void Legacy_ExtractLlCompat_RoundTrips()
     {
-        if (!ReferenceAvailable())
-            return;
+        Assert.True(ReferenceAvailable(), "Missing reference oracle 'ExtractXiso'.");
 
         var isoPath = CreateLegacyTree();
         var dest = CreateTempDir("xiso_leg_dest");
@@ -114,21 +130,19 @@ public class XisoLegacyInteropTests : IDisposable
             Assert.Equal($"content {i}\n", File.ReadAllText(Path.Combine(dest, $"file{i:000}.txt")));
     }
 
-    [Fact]
+    [RequiresOracleFact(OracleKind.ExtractXiso)]
     public void Legacy_List_Succeeds()
     {
-        if (!ReferenceAvailable())
-            return;
+        Assert.True(ReferenceAvailable(), "Missing reference oracle 'ExtractXiso'.");
 
         var isoPath = CreateLegacyTree();
         Assert.Equal(0, XisoReader.List(isoPath, true));
     }
 
-    [Fact]
+    [RequiresOracleFact(OracleKind.ExtractXiso)]
     public void Legacy_Rewrite_ThenExtract_PreservesContent()
     {
-        if (!ReferenceAvailable())
-            return;
+        Assert.True(ReferenceAvailable(), "Missing reference oracle 'ExtractXiso'.");
 
         var isoPath = CreateLegacyTree();
         var rewriteDir = CreateTempDir("xiso_leg_rw");
