@@ -183,6 +183,49 @@ public class XisoValidatorTests : IDisposable
     }
 
     [Fact]
+    public void LogResult_ChecksumsVerified_LogsMatch()
+    {
+        // BUG-LIB-018: a verified-clean result must say MATCH, not stay silent.
+        var isoPath = CreateIsoFromSource();
+        var result = XisoValidator.ValidateConversion(isoPath, isoPath, verifyChecksums: true);
+
+        var capture = new StringWriter();
+        var saved = Logger.Out;
+        Logger.Out = capture;
+        try
+        {
+            XisoValidator.LogResult(result, isoPath, isoPath, checksumsVerified: true);
+        }
+        finally
+        {
+            Logger.Out = saved;
+        }
+
+        Assert.Contains("Checksums: MATCH", capture.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LogResult_ChecksumsNotVerified_LogsSkipped()
+    {
+        var isoPath = CreateIsoFromSource();
+        var result = XisoValidator.ValidateConversion(isoPath, isoPath);
+
+        var capture = new StringWriter();
+        var saved = Logger.Out;
+        Logger.Out = capture;
+        try
+        {
+            XisoValidator.LogResult(result, isoPath, isoPath);
+        }
+        finally
+        {
+            Logger.Out = saved;
+        }
+
+        Assert.Contains("Checksums: SKIPPED", capture.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WriteReport_CreatesValidJson()
     {
         var isoPath = CreateIsoFromSource();

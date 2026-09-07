@@ -11,7 +11,26 @@ namespace XISOSharp;
 /// </summary>
 public static class XisoWriter
 {
-    [ThreadStatic] private static BoyerMoore? _bm;
+    // NOTE: no [ThreadStatic] scratch state (BUG-LIB-010). The XBE media-enable
+    // searcher is a method local in WriteTreeFile below, so pooled-thread reuse
+    // and Task.Run-based callers can never observe a stale instance.
+
+    /// <summary>
+    /// Byte length to pack for a host file. <see cref="FileInfo.Length"/>
+    /// reports the link itself (0 on Windows) for a file symlink rather than
+    /// its target, while the packer streams the target's bytes — resolve to
+    /// the final target so size and content agree (BUG-LIB-026).
+    /// </summary>
+    internal static long PackedFileLength(FileInfo fi)
+    {
+        if ((fi.Attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint &&
+            fi.ResolveLinkTarget(returnFinalTarget: true) is FileInfo target)
+        {
+            return target.Length;
+        }
+
+        return fi.Length;
+    }
 
     /// <summary>
     /// Serializes concurrent create/rewrite operations in the process (TODO #22).
@@ -82,6 +101,14 @@ public static class XisoWriter
     /// current time is written for new images, or the source timestamp is preserved
     /// in rewrite mode.
     /// </param>
+    /// <param name="sourceDiscLseek">
+    /// Disc lseek offset of <paramref name="sourceStream"/> (from
+    /// <c>XisoReader.VerifyXiso</c>), used in rewrite mode to locate the source
+    /// volume timestamp and file payloads. Passed explicitly — never read back
+    /// from the <c>Logger.XboxDiscLseek</c> legacy mirror — so concurrent
+    /// rewrites of images with different offsets cannot cross-read each other's
+    /// value (BUG-LIB-013).
+    /// </param>
     /// <returns>0 on success, 1 on error.</returns>
     /// <remarks>
     /// Concurrent calls from multiple threads are safe but run one at a time
@@ -100,13 +127,14 @@ public static class XisoWriter
         int? prependSectors = null,
         IReadOnlyList<string>? excludePatterns = null,
         IProgress<ProgressInfo>? progress = null,
-        ulong? fileTime = null)
+        ulong? fileTime = null,
+        long sourceDiscLseek = 0)
     {
         lock (CreateLock)
         {
             return CreateXisoCore(rootDirectory, outputDirectory, inRoot, sourceStream,
                 out outIsoPath, inName, progressCallback, cancellationToken, prependSectors,
-                excludePatterns, progress, fileTime);
+                excludePatterns, progress, fileTime, sourceDiscLseek);
         }
     }
 
@@ -126,7 +154,8 @@ public static class XisoWriter
         int? prependSectors = null,
         IReadOnlyList<string>? excludePatterns = null,
         IProgress<ProgressInfo>? progress = null,
-        ulong? fileTime = null)
+        ulong? fileTime = null,
+        long sourceDiscLseek = 0)
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
@@ -171,14 +200,9 @@ public static class XisoWriter
         {
             Directory.SetCurrentDirectory(rootDirectory);
 
-            var dir = rootDirectory;
-            var last = dir.Length - 1;
-            if (last >= 0 && dir[last] == Path.DirectorySeparatorChar)
-            {
-                dir = dir[..last];
-            }
+            var dir = rootDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-            var slashPos = dir.LastIndexOf(Constants.PathChar) + 1;
+            var slashPos = dir.LastIndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) + 1;
             isoDir = dir[slashPos..];
             isoName = inName ?? isoDir;
         }
@@ -358,7 +382,7 @@ public static class XisoWriter
                 else
                 {
                     sourceStream.Seek(Constants.HeaderOffset + Constants.HeaderDataLength +
-                                      Constants.SectorOffsetSize + Constants.DirTableSize + Logger.XboxDiscLseek,
+                                      Constants.SectorOffsetSize + Constants.DirTableSize + sourceDiscLseek,
                         SeekOrigin.Begin);
                     Span<byte> ftBuf = stackalloc byte[8];
                     sourceStream.ReadExactly(ftBuf);
@@ -400,7 +424,8 @@ public static class XisoWriter
                 StructuredProgress = progress,
                 FinalBytes = finalTotal,
                 CancellationToken = cancellationToken,
-                PrependOffset = prependOffset
+                PrependOffset = prependOffset,
+                SourceDiscLseek = sourceDiscLseek
             };
 
             AvlTree.AvlTraverseDepthFirst(root, WriteTreeCallback, wtContext,
@@ -488,10 +513,12 @@ public static class XisoWriter
                 ProgressCallback = ctx.ProgressCallback,
                 StructuredProgress = ctx.StructuredProgress,
                 FinalBytes = ctx.FinalBytes,
+                CancellationToken = ctx.CancellationToken,
                 Path = ctx.Path != null
                     ? ctx.Path + avl.Filename + Constants.PathCharStr
                     : Constants.PathCharStr,
-                PrependOffset = ctx.PrependOffset
+                PrependOffset = ctx.PrependOffset,
+                SourceDiscLseek = ctx.SourceDiscLseek
             };
 
             ctx.StructuredProgress?.Report(new ProgressInfo(
@@ -618,7 +645,7 @@ public static class XisoWriter
         else
         {
             srcStream = ctx.SourceStream;
-            srcStream.Seek(((long)avl.OldStartSector * Constants.SectorSize) + Logger.XboxDiscLseek,
+            srcStream.Seek(((long)avl.OldStartSector * Constants.SectorSize) + ctx.SourceDiscLseek,
                 SeekOrigin.Begin);
         }
 
@@ -629,6 +656,7 @@ public static class XisoWriter
 
             var written = 0;
             var bytes = avl.FileSize;
+            BoyerMoore? bm = null;
 
             while (bytes > 0)
             {
@@ -643,15 +671,15 @@ public static class XisoWriter
                     avl.Filename.Length >= 4 &&
                     string.Equals(avl.Filename[^4..], ".xbe", StringComparison.OrdinalIgnoreCase))
                 {
-                    _bm ??= new BoyerMoore(Constants.MediaEnable);
-                    _bm.Init();
+                    bm ??= new BoyerMoore(Constants.MediaEnable);
+                    bm.Init();
 
                     buf[written + n] = 0;
                     var searchEnd = written + n;
                     var searchPos = 0;
                     while (searchPos < searchEnd)
                     {
-                        var found = _bm.Search(buf, searchPos, searchEnd - searchPos);
+                        var found = bm.Search(buf, searchPos, searchEnd - searchPos);
                         if (found < 0) break;
 
                         buf[found + Constants.MediaEnableBytePos] = Constants.MediaEnableByte;
@@ -697,8 +725,7 @@ public static class XisoWriter
                     $"WARNING: File {avl.Filename} is truncated. Reported size: {originalSize} bytes, wrote size: {avl.FileSize} bytes!\n");
             }
 
-            Logger.TotalFiles++;
-            Logger.TotalBytes += avl.FileSize;
+            Logger.RecordFileWritten(avl.FileSize);
             ctx.ProgressCallback?.Invoke(Logger.TotalBytes, ctx.FinalBytes);
             ctx.StructuredProgress?.Report(new ProgressInfo(
                 ProgressInfoType.FileAdded,
@@ -802,17 +829,34 @@ public static class XisoWriter
                 {
                     emptyDir = false;
                     var fi = new FileInfo(entryPath);
-                    if (fi.Length > uint.MaxValue)
+                    var packedLength = PackedFileLength(fi);
+                    if (packedLength > uint.MaxValue)
                     {
-                        throw new XisoFileTooLargeException(entryName, fi.Length);
+                        throw new XisoFileTooLargeException(entryName, packedLength);
                     }
 
-                    avl.FileSize = (uint)fi.Length;
-                    Logger.TotalBytes += avl.FileSize;
-                    Logger.TotalFiles++;
+                    // XISO has no link representation: a file symlink packs its
+                    // target's bytes under the link name — say so (BUG-LIB-026).
+                    if ((fi.Attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
+                    {
+                        Logger.LogErr(
+                            $"warning: packing symlink as target content (links are not preserved): {entryRelPath}.\n");
+                    }
+
+                    avl.FileSize = (uint)packedLength;
+                    Logger.RecordFileWritten(avl.FileSize);
                 }
 
-                AvlTree.AvlInsert(ref outRoot, avl);
+                // XISO names are case-insensitive: a host directory holding
+                // both cases (Linux) cannot round-trip, so fail the run naming
+                // the collision instead of silently dropping one (BUG-LIB-023).
+                // InvalidDataException (not IOException) so the per-entry
+                // skip handler below lets it through to the err=1 path.
+                if (AvlTree.AvlInsert(ref outRoot, avl) == AvlResult.AvlError)
+                {
+                    throw new InvalidDataException(
+                        $"Cannot pack '{entryRelPath}': a case-insensitive duplicate of '{avl.Filename}' is already in the image.");
+                }
             }
             catch (UnauthorizedAccessException)
             {
@@ -1194,8 +1238,7 @@ public static class XisoWriter
         }
         else if (avl.Subdirectory == null)
         {
-            Logger.TotalFiles++;
-            Logger.TotalBytes += avl.FileSize;
+            Logger.RecordFileWritten(avl.FileSize);
         }
 
         return 0;
@@ -1424,7 +1467,7 @@ public static class XisoWriter
         var trimmedOutput = fullOutput.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
         // Direct equality (e.g. -c src -o src or --pack src src)
-        if (string.Equals(fullSource, trimmedOutput, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(fullSource, trimmedOutput, XisoPaths.PathComparison))
         {
             throw new ArgumentException(
                 "Output ISO path must not be the same as source directory; use -o <file> or --pack <dir> <out.iso>");
@@ -1432,7 +1475,7 @@ public static class XisoWriter
 
         // Inside with same leaf name (e.g. src/src.iso where src leaf is "src")
         if (trimmedOutput.Length > fullSource.Length &&
-            trimmedOutput.StartsWith(fullSource, StringComparison.OrdinalIgnoreCase) &&
+            trimmedOutput.StartsWith(fullSource, XisoPaths.PathComparison) &&
             (trimmedOutput[fullSource.Length] == Path.DirectorySeparatorChar ||
              trimmedOutput[fullSource.Length] == Path.AltDirectorySeparatorChar))
         {
@@ -1440,7 +1483,7 @@ public static class XisoWriter
             if (!string.IsNullOrEmpty(sourceLeaf))
             {
                 var outFileNameNoExt = Path.GetFileNameWithoutExtension(trimmedOutput);
-                if (string.Equals(outFileNameNoExt, sourceLeaf, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(outFileNameNoExt, sourceLeaf, XisoPaths.PathComparison))
                 {
                     throw new ArgumentException(
                         "Output ISO path must not be the same as source directory; use -o <file> or --pack <dir> <out.iso>");

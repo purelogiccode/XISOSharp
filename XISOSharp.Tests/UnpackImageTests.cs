@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
 
@@ -163,10 +164,70 @@ public class UnpackImageTests : IDisposable
         Assert.Throws<ArgumentOutOfRangeException>(() => XisoReader.UnpackImage(isoPath, skipSectors: -1));
     }
 
+    private sealed class CancelOnFirstFile(CancellationTokenSource cts) : IProgress<ProgressInfo>
+    {
+        private readonly CancellationTokenSource _cts = cts;
+        public void Report(ProgressInfo info)
+        {
+            if (info.Type == ProgressInfoType.FileAdded)
+                _cts.Cancel();
+        }
+    }
+
+    [Fact]
+    public void Rewrite_CancelDuringWritePhase_Aborts()
+    {
+        // BUG-LIB-022: the rewrite write phase observes the token — cancelling
+        // on the first written file aborts the run instead of finishing it.
+        var src = CreateSourceTree();
+        var isoPath = CreateIso(src, "game.iso");
+        var outDir = CreateTempDir();
+        using var cts = new CancellationTokenSource();
+        var progress = new CancelOnFirstFile(cts);
+
+        Assert.ThrowsAny<OperationCanceledException>(() =>
+            XisoReader.DecodeXiso(isoPath, outDir, ExtractMode.Rewrite, out _, true,
+                cancellationToken: cts.Token, progress: progress));
+    }
+
     [Fact]
     public void UnpackImage_MissingFile_Throws()
     {
         Assert.Throws<FileNotFoundException>(() => XisoReader.UnpackImage("no_such_file.iso"));
+    }
+
+    [Fact]
+    public void Rewrite_PrependedImage_IgnoresStaleGlobalLseek()
+    {
+        // BUG-LIB-013: the writer must use the rewrite's own disc lseek (passed
+        // explicitly), never the Logger.XboxDiscLseek legacy mirror. Poison the
+        // global: a prepended image (nonzero lseek) must still rewrite byte-true.
+        var src = CreateSourceTree();
+        var isoDir = CreateTempDir();
+        var createResult = XisoWriter.CreateXiso(src, isoDir, null, null, out _, "prepended.iso", null,
+            prependSectors: 64);
+        Assert.Equal(0, createResult);
+        var isoPath = Path.Combine(isoDir, "prepended.iso");
+
+        var savedLseek = Logger.XboxDiscLseek;
+        Logger.XboxDiscLseek = 0x0BAD_F00D;
+        try
+        {
+            var outDir = CreateTempDir();
+            var rc = XisoReader.DecodeXiso(isoPath, outDir, ExtractMode.Rewrite, out var rewritten, true,
+                skipSectors: 64);
+            Assert.Equal(0, rc);
+            Assert.NotNull(rewritten);
+
+            Assert.True(XisoReader.AuditXiso(rewritten).IsValid);
+            var dest = CreateTempDir();
+            Assert.Equal(0, XisoReader.UnpackImage(rewritten, dest));
+            Assert.Equal(HashTree(src), HashTree(dest));
+        }
+        finally
+        {
+            Logger.XboxDiscLseek = savedLseek;
+        }
     }
 
     [Fact]

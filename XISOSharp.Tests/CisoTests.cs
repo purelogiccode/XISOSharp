@@ -358,6 +358,30 @@ public class CisoTests : IDisposable
     }
 
     [Fact]
+    public void DecompressStream_TruncatedPayload_ThrowsInsteadOfZeroPadding()
+    {
+        // BUG-LIB-009: cutting the payload mid-stream must throw, never emit a
+        // zero-tailed image sized to the (false) claimed length.
+        var isoPath = CreateTempIso();
+        var csoDir = CreateTempDir();
+        var csoPath = Path.Combine(csoDir, "truncpay.cso");
+        var rc = CisoWriter.CompressToCso(isoPath, csoPath, level: 6);
+        Assert.Equal(0, rc);
+
+        var bytes = File.ReadAllBytes(csoPath);
+        var uncompressedSize = BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(8, 8));
+        var blockSize = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(16, 4));
+        var totalBlocks = (uncompressedSize + blockSize - 1) / blockSize;
+        var payloadStart = 24 + ((long)totalBlocks + 1) * 4;
+        Assert.True(bytes.Length > payloadStart + 2048, "test CSO too small to truncate mid-payload");
+
+        var cut = bytes[..(int)(payloadStart + 100)];
+        using var src = new MemoryStream(cut, writable: false);
+        using var dst = new MemoryStream();
+        Assert.ThrowsAny<Exception>(() => CisoReader.DecompressStream(src, dst));
+    }
+
+    [Fact]
     public void DecompressStream_InvalidMagic_ThrowsInvalidDataException()
     {
         var bad = new MemoryStream();
@@ -694,6 +718,21 @@ public class CisoTests : IDisposable
         }
 
         return parts;
+    }
+
+    [Fact]
+    public void CompressToCso_WithSplit_ExistingPart_ThrowsIOException()
+    {
+        // BUG-LIB-027: split compress refuses existing parts like XisoSplitter
+        // instead of silently clobbering them.
+        var isoPath = CreateTempIso();
+        var csoDir = CreateTempDir();
+        var csoPath = Path.Combine(csoDir, "clash.cso");
+        File.WriteAllText(Path.Combine(csoDir, "clash.1.cso"), "stale");
+
+        Assert.Throws<IOException>(() =>
+            CisoWriter.CompressToCso(isoPath, csoPath, level: 9, splitBytes: 16384));
+        Assert.Equal("stale", File.ReadAllText(Path.Combine(csoDir, "clash.1.cso")));
     }
 
     [Fact]

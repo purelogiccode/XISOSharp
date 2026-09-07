@@ -8,7 +8,13 @@ namespace XISOSharp;
 /// </summary>
 public static class XisoPaths
 {
-    private static readonly StringComparison PathComparison =
+    /// <summary>
+    /// Case sensitivity for path comparisons: insensitive where the OS
+    /// filesystem conventionally is (Windows/macOS), sensitive elsewhere.
+    /// Shared by the pack/split collision guards so they agree with
+    /// <see cref="AreSamePath"/> on every platform (BUG-LIB-025).
+    /// </summary>
+    internal static StringComparison PathComparison { get; } =
         OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;

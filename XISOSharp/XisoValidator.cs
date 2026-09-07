@@ -240,7 +240,13 @@ public static class XisoValidator
     /// <param name="result">The validation result to display.</param>
     /// <param name="sourcePath">Path to the source ISO (for display).</param>
     /// <param name="outputPath">Path to the output ISO (for display).</param>
-    public static void LogResult(ValidationResult result, string sourcePath, string outputPath)
+    /// <param name="checksumsVerified">
+    /// Whether SHA-256 checksums were compared (the <c>verifyChecksums</c> argument
+    /// of <see cref="ValidateConversion"/>). Without it a clean result reports
+    /// <c>SKIPPED</c>, not <c>MATCH</c>.
+    /// </param>
+    public static void LogResult(
+        ValidationResult result, string sourcePath, string outputPath, bool checksumsVerified = false)
     {
         var sourceName = Path.GetFileName(sourcePath);
         var outputName = Path.GetFileName(outputPath);
@@ -282,10 +288,13 @@ public static class XisoValidator
         {
             Logger.Log($"[VALIDATE] Checksums: FAIL — {checksumIssues.Count} checksum difference(s) (SHA-256)\n");
         }
-        else if (result.Issues.Any(static i => i.Type == ValidationIssueType.ChecksumMismatch) ||
-                 result.SourceFileCount == 0)
+        else if (!checksumsVerified || result.SourceFileCount == 0)
         {
             Logger.Log("[VALIDATE] Checksums: SKIPPED\n");
+        }
+        else
+        {
+            Logger.Log("[VALIDATE] Checksums: MATCH\n");
         }
 
         // Detailed issues

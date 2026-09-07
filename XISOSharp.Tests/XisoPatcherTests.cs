@@ -111,6 +111,29 @@ public class XisoPatcherTests : IDisposable
     }
 
     [Fact]
+    public void CopyIn_SecondRun_KeepsFirstBackup()
+    {
+        // BUG-LIB-027: a repeat patch must not destroy the previous `.old` —
+        // the backup keeps the true pre-patch original.
+        var src = CreateTempDir("xiso_patch_src");
+        PopulateMixed(src);
+        var iso = CreateIso(src);
+        var original = File.ReadAllBytes(iso);
+
+        var hostA = Path.Combine(CreateTempDir("xiso_patch_host"), "a.bin");
+        File.WriteAllBytes(hostA, new byte[100]);
+        XisoPatcher.CopyIntoImage(iso, hostA, "/file2.txt");
+        Assert.Equal(original, File.ReadAllBytes(iso + ".old"));
+
+        var hostB = Path.Combine(CreateTempDir("xiso_patch_host"), "b.bin");
+        File.WriteAllBytes(hostB, new byte[200]);
+        XisoPatcher.CopyIntoImage(iso, hostB, "/file2.txt");
+
+        Assert.Equal(original, File.ReadAllBytes(iso + ".old"));
+        Assert.Equal((uint)200, XisoReader.GetEntryInfo(iso, "/file2.txt")!.FileSize);
+    }
+
+    [Fact]
     public void Replace_SmallerFile_UpdatesContentAndSize()
     {
         var src = CreateTempDir("xiso_patch_src");
@@ -307,21 +330,24 @@ public class XisoPatcherTests : IDisposable
     }
 
     [Fact]
-    public void Backup_IsRefreshed_OnSecondPatch()
+    public void Backup_KeepsFirstSnapshot_OnSecondPatch()
     {
+        // BUG-LIB-027: a repeat patch must not destroy the previous `.old` —
+        // the backup keeps the true pre-patch original.
         var src = CreateTempDir("xiso_patch_src");
         PopulateMixed(src);
         var iso = CreateIso(src);
+        var before = File.ReadAllBytes(iso);
 
         var hostDir = CreateTempDir("xiso_patch_host");
         File.WriteAllText(Path.Combine(hostDir, "a.bin"), "first");
         XisoPatcher.CopyIntoImage(iso, Path.Combine(hostDir, "a.bin"), "/file1.txt");
-        var afterFirst = File.ReadAllBytes(iso);
+        Assert.Equal(before, File.ReadAllBytes(iso + ".old"));
 
         File.WriteAllText(Path.Combine(hostDir, "b.bin"), "second!!");
         XisoPatcher.CopyIntoImage(iso, Path.Combine(hostDir, "b.bin"), "/file1.txt");
 
-        Assert.Equal(afterFirst, File.ReadAllBytes(iso + ".old"));
+        Assert.Equal(before, File.ReadAllBytes(iso + ".old"));
         Assert.Equal("second!!", File.ReadAllText(CopyOutToTemp(iso, "/file1.txt")));
     }
 

@@ -73,6 +73,29 @@ public class LoggerTests : IDisposable
     }
 
     /// <summary>
+    /// Verifies that Log produces no output when RealQuiet mode is enabled
+    /// (RealQuiet suppresses info as well as errors).
+    /// </summary>
+    [Fact]
+    public void Log_SuppressedWhenRealQuiet()
+    {
+        Logger.RealQuiet = true;
+        Logger.Log("should not appear");
+        Assert.Equal("", _outCapture.ToString());
+    }
+
+    /// <summary>
+    /// Verifies that LogLine produces no output when RealQuiet mode is enabled.
+    /// </summary>
+    [Fact]
+    public void LogLine_SuppressedWhenRealQuiet()
+    {
+        Logger.RealQuiet = true;
+        Logger.LogLine("should not appear");
+        Assert.Equal("", _outCapture.ToString());
+    }
+
+    /// <summary>
     /// Verifies that LogLine writes the message followed by a newline to the output stream.
     /// </summary>
     [Fact]

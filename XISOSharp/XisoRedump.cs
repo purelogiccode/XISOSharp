@@ -75,7 +75,7 @@ public static class XisoRedump
     /// <summary>
     /// Extracts the video partition (L0 head + L1 tail) from a Redump ISO.
     /// Mirrors <c>XGD.ExtractVideo</c>. Returns false when <paramref name="redumpPath"/>
-    /// is not a known Redump size or its wave cannot be determined.
+    /// does not exist, is not a known Redump size, or its wave cannot be determined.
     /// </summary>
     public static bool TryExtractVideo(string redumpPath, string? outputVideoPath, out string? outPath,
         bool quiet = false, CancellationToken cancellationToken = default)
@@ -83,6 +83,7 @@ public static class XisoRedump
         outPath = null;
         cancellationToken.ThrowIfCancellationRequested();
 
+        if (!File.Exists(redumpPath)) return false;
         var isoSize = new FileInfo(redumpPath).Length;
         var redumpIsoType = XgdTables.GetRedumpIsoTypeBySize(isoSize);
         if (redumpIsoType < 0)
@@ -165,11 +166,13 @@ public static class XisoRedump
     /// <summary>
     /// Extracts the XGD3 system-update file <c>su20076000_00000000</c> from a video partition.
     /// When <paramref name="wipe"/> is true, the update range inside <paramref name="videoPath"/> is zeroed.
-    /// Mirrors <c>ExtractVideo.ExtractSU</c>. Returns false if the video size is not XGD3.
+    /// Mirrors <c>ExtractVideo.ExtractSU</c>. Returns false if the video file does not
+    /// exist or its size is not XGD3.
     /// </summary>
-    public static bool TryExtractUpdate(string videoPath, string? outputUpdatePath, bool wipe = true,
+    public static bool TryExtractUpdate(string videoPath, string? outputUpdatePath,         bool wipe = true,
         bool quiet = false)
     {
+        if (!File.Exists(videoPath)) return false;
         var videoLen = new FileInfo(videoPath).Length;
         var videoType = XgdTables.GetVideoTypeBySize(videoLen);
         if (videoType != 16 && videoType != 17 && videoType != 18)

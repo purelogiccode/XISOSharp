@@ -25,15 +25,43 @@ public sealed class LocalFilesystem(string? root = null) : IFilesystem
     public string? Root { get; } = root;
 
     /// <summary>
-    /// Normalizes an <see cref="IFilesystem"/> path (forward slashes, root
-    /// relative) to a host path under <see cref="Root"/>.
+    /// Normalizes an <see cref="IFilesystem"/> path to a host path.
     /// </summary>
+    /// <remarks>
+    /// With no <see cref="Root"/> (the shared cwd-relative instance),
+    /// fully-qualified host paths pass through untouched, so absolute
+    /// destinations (e.g. the resume-cache probes in <c>CopyOutFile</c>) hit
+    /// the intended file instead of a cwd-relative lookalike (BUG-LIB-020).
+    /// With a <see cref="Root"/>, everything — including <c>/</c>-led
+    /// image-internal paths — resolves underneath it, and anything escaping
+    /// via a rooted second argument (<c>C:\evil</c> on Windows survives
+    /// <c>TrimStart</c> and would discard the root in <c>Path.Combine</c>)
+    /// or a <c>..</c> climb throws instead (BUG-LIB-019).
+    /// </remarks>
+    /// <exception cref="UnauthorizedAccessException">
+    /// The path escapes <see cref="Root"/>.
+    /// </exception>
     private string Resolve(string path)
     {
+        if (Root is null)
+        {
+            // Cwd-relative legacy resolution (absolute paths included).
+            return Path.GetFullPath(path);
+        }
+
         var normalized = path.Replace('\\', Path.DirectorySeparatorChar)
             .Replace('/', Path.DirectorySeparatorChar)
             .TrimStart(Path.DirectorySeparatorChar);
-        return Root is null ? normalized : Path.Combine(Root, normalized);
+        var full = Path.GetFullPath(Path.Combine(Root, normalized));
+
+        var rootFull = Path.GetFullPath(Root);
+        if (!XisoPaths.AreSamePath(full, rootFull) && !XisoPaths.IsWithinDirectory(full, rootFull))
+        {
+            throw new UnauthorizedAccessException(
+                $"Path '{path}' escapes the destination root '{Root}'.");
+        }
+
+        return full;
     }
 
     /// <inheritdoc/>

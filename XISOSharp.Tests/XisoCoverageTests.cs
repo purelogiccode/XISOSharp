@@ -209,7 +209,9 @@ public class XisoCoverageTests : IDisposable
 
         var ex = Assert.Throws<XisoFormatException>(() =>
             XisoReader.UnpackImage(bad, CreateTempDir("xiso_cov_dest")));
-        Assert.Contains("lies outside the directory table", ex.Message, StringComparison.Ordinal);
+        // Either the pad-rounding guard or the entry-position guard must name
+        // the outside-table failure (both are "invalid TOC entry" errors).
+        Assert.Contains("outside the directory table", ex.Message, StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------------
@@ -457,6 +459,26 @@ public class XisoCoverageTests : IDisposable
     }
 
     [Fact]
+    public void Extract_LargeTable_PadOffsetsDoNotWrap()
+    {
+        // BUG-LIB-028: past ~64K DWORDs of table, sector-pad rounding used to
+        // wrap through (ushort) and mis-walk valid images. A 3500-file table
+        // forces pads beyond that range: it must pack, audit, and extract whole.
+        const int fileCount = 3500;
+        var isoPath = CreateIso(src =>
+        {
+            for (var i = 0; i < fileCount; i++)
+                File.WriteAllText(Path.Combine(src, $"f{i:0000}.txt"), "x");
+        }, "big.iso");
+
+        Assert.True(XisoReader.AuditXiso(isoPath).IsValid);
+
+        var dest = CreateTempDir("xiso_cov_bigdest");
+        Assert.Equal(0, XisoReader.UnpackImage(isoPath, dest));
+        Assert.Equal(fileCount, Directory.GetFiles(dest, "*", SearchOption.AllDirectories).Length);
+    }
+
+    [Fact]
     public void VerifyXiso_Device_EmptyRoot_ThrowsEmpty()
     {
         var isoPath = CreateIsoBytes(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
@@ -485,6 +507,26 @@ public class XisoCoverageTests : IDisposable
         using var dev = new MemoryBlockDevice(File.ReadAllBytes(isoPath));
         var result = XisoReader.AuditXiso(dev, "game.iso");
         Assert.True(result.IsValid);
+        // Deep walk, not header-only (BUG-LIB-012): the file must be counted.
+        Assert.True(result.FilesChecked > 0);
+        Assert.Empty(result.Issues);
+    }
+
+    [Fact]
+    public void AuditXiso_Device_CorruptTree_ReturnsInvalid()
+    {
+        // Same valid image, but the root entry name gets a path separator:
+        // header probes pass, so only a real tree walk can fail this.
+        var isoPath = CreateIsoBytes(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+        var bytes = File.ReadAllBytes(isoPath);
+        var rootSector = BinaryPrimitives.ReadUInt32LittleEndian(
+            bytes.AsSpan(Constants.HeaderOffset + Constants.HeaderDataLength));
+        var rootAbs = (long)rootSector * Constants.SectorSize;
+        bytes[rootAbs + 14] = (byte)'/';
+        using var dev = new MemoryBlockDevice(bytes);
+        var result = XisoReader.AuditXiso(dev, "game.iso");
+        Assert.False(result.IsValid);
+        Assert.NotEmpty(result.Issues);
     }
 
     [Fact]

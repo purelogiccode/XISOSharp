@@ -1712,7 +1712,7 @@ internal static class Program
             try
             {
                 var result = XisoValidator.ValidateConversion(sourcePath, outputPath, validateChecksums);
-                XisoValidator.LogResult(result, sourcePath, outputPath);
+                XisoValidator.LogResult(result, sourcePath, outputPath, validateChecksums);
 
                 if (validateReport != null)
                 {
@@ -1801,7 +1801,7 @@ internal static class Program
                     {
                         Logger.Log("\n");
                         var valResult = XisoValidator.ValidateConversion(oldPath, newIsoPath, validateChecksums);
-                        XisoValidator.LogResult(valResult, oldPath, newIsoPath);
+                        XisoValidator.LogResult(valResult, oldPath, newIsoPath, validateChecksums);
 
                         if (validateReport != null)
                         {

@@ -183,4 +183,36 @@ public class XisoSymlinkTests : IDisposable
         Assert.Contains("sub/b.bin", files);
         Assert.DoesNotContain(files, f => f.Contains("loop", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Pack_FileSymlink_WarnsAndPacksTarget()
+    {
+        // BUG-LIB-026: a file link packs its target's bytes under the link
+        // name (no link representation exists) — and warns that it did so.
+        var root = CreateTempDir("xiso_link");
+        File.WriteAllText(Path.Combine(root, "orig.txt"), "data");
+        if (!TryCreateFileLink(Path.Combine(root, "alias.txt"), Path.Combine(root, "orig.txt")))
+            return; // No symlink privilege: nothing to harden against here.
+
+        var capture = new StringWriter();
+        var saved = Logger.Error;
+        Logger.Error = capture;
+        string isoPath;
+        try
+        {
+            isoPath = Path.Combine(CreateTempDir("xiso_link_out"), "packed.iso");
+            Assert.Equal(0, XisoWriter.PackFromDirectory(root, isoPath));
+        }
+        finally
+        {
+            Logger.Error = saved;
+        }
+
+        Assert.Contains("packing symlink", capture.ToString(), StringComparison.OrdinalIgnoreCase);
+
+        var dest = Path.Combine(CreateTempDir("xiso_link_ext"), "out");
+        Directory.CreateDirectory(dest);
+        Assert.Equal(0, XisoReader.Extract(isoPath, dest, false));
+        Assert.Equal("data", File.ReadAllText(Path.Combine(dest, "alias.txt")));
+    }
 }

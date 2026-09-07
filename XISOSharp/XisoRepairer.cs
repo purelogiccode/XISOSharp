@@ -111,8 +111,11 @@ public static class XisoRepairer
 
             if (createBackup && backupPath == null)
             {
+                // Keep the first backup: overwriting a previous `.old` would
+                // destroy the true pre-repair original (BUG-LIB-027).
                 backupPath = isoPath + ".old";
-                File.Copy(isoPath, backupPath, overwrite: true);
+                if (!File.Exists(backupPath))
+                    File.Copy(isoPath, backupPath);
             }
 
             using var fs = new FileStream(

@@ -24,6 +24,10 @@ public static class CisoReader
     /// <summary>
     /// Returns true if <paramref name="path"/> is a CISO/CSO file (checks magic + header size).
     /// Accepts single files and the first part of a split image (<c>*.1.cso</c>).
+    /// A probe, not a verdict: ordinary I/O failures (missing file, access denied,
+    /// truncated header) report <c>false</c> so callers fall through to the plain
+    /// ISO path, whose open then raises the accurate error. Only unexpected
+    /// (non-I/O) failures propagate.
     /// </summary>
     public static bool IsCso(string path)
     {
@@ -40,7 +44,7 @@ public static class CisoReader
             return magic == Magic && hsize == HeaderSize &&
                    (ver == CisoWriter.VersionDeflate || ver == CisoWriter.VersionLz4);
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return false;
         }
@@ -230,6 +234,16 @@ public static class CisoReader
 
             progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded, Path: $"/sector/{sector}", Sector: sector,
                 Size: BlockSize));
+        }
+
+        // The loop above must emit exactly the claimed size: sector decoders
+        // either produce their full block or throw, so any shortfall here is a
+        // truncated payload. Fail loudly instead of zero-padding it into a
+        // corrupt-but-plausible image (BUG-LIB-009).
+        if (written != (long)uncompressedSize)
+        {
+            throw new InvalidDataException(
+                $"CISO payload truncated: decoded {written} of {uncompressedSize} claimed bytes");
         }
 
         // Truncate/ensure dest length equals uncompressedSize

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
@@ -15,9 +16,17 @@ namespace XISOSharp;
 /// </summary>
 public static class XisoReader
 {
-    [ThreadStatic] private static byte[]? _copyBuffer;
+    /// <summary>
+    /// Rents a scratch copy buffer. Rented per operation from
+    /// <see cref="ArrayPool{T}.Shared"/> (and returned cleared) instead of a
+    /// <c>[ThreadStatic]</c> slot, so pooled-thread reuse and
+    /// <c>Task.Run</c>-based callers never pin a 2 MB buffer per thread
+    /// (BUG-LIB-010). Chunking stays identical, so progress sequences are unchanged.
+    /// </summary>
+    private static byte[] RentCopyBuffer() => ArrayPool<byte>.Shared.Rent(Constants.ReadWriteBufferSize);
 
-    private static byte[] CopyBuffer => _copyBuffer ??= new byte[Constants.ReadWriteBufferSize];
+    private static void ReturnCopyBuffer(byte[] buffer) =>
+        ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
 
     private static readonly byte[] HeaderDataBytes = Encoding.ASCII.GetBytes(Constants.HeaderData);
 
@@ -300,20 +309,25 @@ public static class XisoReader
     }
 
     /// <summary>
-    /// Audits a block-device image (memory, CISO, or offset-wrapped).
+    /// Audits a block-device image (memory, CISO, or offset-wrapped) with the same
+    /// deep walk as <see cref="AuditXiso(string)"/>: header, optimized tag, full
+    /// directory-tree traversal, sector bounds, cycles, and filenames. Never throws
+    /// for corrupt content — failures surface as an invalid <see cref="AuditResult"/>.
     /// </summary>
+    /// <param name="dev">Block device to audit. Left open.</param>
+    /// <param name="isoName">Display name for error messages.</param>
     public static AuditResult AuditXiso(IBlockDevice dev, string isoName = "memory")
     {
-        // Implement via temp file fallback by reading via block device -> use GetVolumeInfo path
-        // For simplicity, validate via VerifyXiso then walk via reading directory sectors through dev
         try
         {
-            _ = VerifyXiso(dev, isoName);
-            // For block device, we reuse FileStream-based AuditWalk by materializing to MemoryBlockDevice?
-            // Instead, perform minimal audit: check that root directory is readable and entry chain is plausible.
-            // Full tree walk via block device would require porting AuditWalk to IBlockDevice.
-            // As pragmatic parity, consider valid if header passes.
-            // This suffices for MemoryBlockDevice unit tests (golden blobs).
+            var (rootDirSector, _, discLseek) = VerifyXiso(dev, isoName);
+            using var stream = new BlockDeviceStream(dev, leaveOpen: true);
+            return AuditStream(stream, stream.Length, rootDirSector, discLseek);
+        }
+        catch (XisoEmptyException)
+        {
+            // Parity with AuditXiso(string): an empty (header-only, no files)
+            // image is valid with nothing checked.
             return new AuditResult(true, 0, 0, []);
         }
         catch (Exception ex)
@@ -412,7 +426,9 @@ public static class XisoReader
         dir.AvlNode = null;
         dir.Filename = "";
 
-        ushort lOffset = 0;
+        // Running table offset in DWORDs (widened to long: the old (ushort)
+        // narrowing wrapped sector-padded offsets past 64K DWORDs — BUG-LIB-028).
+        long lOffset = 0;
 
         while (true)
         {
@@ -462,9 +478,22 @@ public static class XisoReader
                     goto end_traverse;
                 }
 
-                lOffset = (ushort)((lOffset * Constants.DwordSize) +
-                                   (Constants.SectorSize - ((lOffset * Constants.DwordSize) % Constants.SectorSize)));
-                fs.Seek(dirStart + lOffset, SeekOrigin.Begin);
+                // Sector-pad rounding in full precision (BUG-LIB-028): bounds-check
+                // before seeking so a corrupt offset fails here with its own name
+                // instead of wrapping (old (ushort) cast) into a mis-walk.
+                var padded = (lOffset * Constants.DwordSize) +
+                             (Constants.SectorSize - ((lOffset * Constants.DwordSize) % Constants.SectorSize));
+                var padSeek = dirStart + padded;
+                if (padSeek < dirStart || padSeek >= fs.Length ||
+                    (tableSize != long.MaxValue && padSeek >= dirStart + tableSize))
+                {
+                    throw new XisoFormatException(
+                        $"invalid TOC entry at '{path}': padded table offset {padded} points outside the directory table " +
+                        $"(table at {dirStart}, size {tableSize}, image length {fs.Length}).");
+                }
+
+                lOffset = padded;
+                fs.Seek(padSeek, SeekOrigin.Begin);
                 continue;
             }
             else if (tmp == Constants.EmptyDirectorySentinel)
@@ -501,10 +530,21 @@ public static class XisoReader
                         goto end_traverse;
                     }
 
-                    lOffset = (ushort)((lOffset * Constants.DwordSize) +
-                                       (Constants.SectorSize -
-                                        ((lOffset * Constants.DwordSize) % Constants.SectorSize)));
-                    fs.Seek(dirStart + lOffset, SeekOrigin.Begin);
+                    // Same full-precision pad rounding as above (BUG-LIB-028).
+                    var paddedZero = (lOffset * Constants.DwordSize) +
+                                     (Constants.SectorSize -
+                                      ((lOffset * Constants.DwordSize) % Constants.SectorSize));
+                    var padSeekZero = dirStart + paddedZero;
+                    if (padSeekZero < dirStart || padSeekZero >= fs.Length ||
+                        (tableSize != long.MaxValue && padSeekZero >= dirStart + tableSize))
+                    {
+                        throw new XisoFormatException(
+                            $"invalid TOC entry at '{path}': padded table offset {paddedZero} points outside the directory table " +
+                            $"(table at {dirStart}, size {tableSize}, image length {fs.Length}).");
+                    }
+
+                    lOffset = paddedZero;
+                    fs.Seek(padSeekZero, SeekOrigin.Begin);
                     continue;
                 }
                 else
@@ -541,14 +581,23 @@ public static class XisoReader
                 filename.Contains('/') || filename.Contains('\\'))
             {
                 Logger.LogErr($"filename '{filename}' contains invalid character(s), aborting.\n");
-                throw new InvalidOperationException($"Filename '{filename}' contains invalid character(s).");
+                throw new XisoFormatException($"Filename '{filename}' contains invalid character(s).");
             }
 
             if (mode == ExtractMode.GenerateAvl)
             {
                 var avl = new AvlNode { Filename = filename, FileSize = fileSize, OldStartSector = startSector };
                 dir.AvlNode = avl;
-                AvlTree.AvlInsert(ref avlRoot, avl);
+
+                // XISO names are case-insensitive: a tree holding both cases
+                // cannot round-trip, so fail loudly instead of dropping one
+                // (BUG-LIB-023). The shared empty-directory sentinel inserts
+                // above stay best-effort by design (idempotent re-insert).
+                if (AvlTree.AvlInsert(ref avlRoot, avl) == AvlResult.AvlError)
+                {
+                    throw new XisoFormatException(
+                        $"invalid TOC entry at '{path}': duplicate filename '{filename}' (names are case-insensitive).");
+                }
             }
 
             if (lOffset != 0)
@@ -761,10 +810,7 @@ public static class XisoReader
 
                     if (fileOk)
                     {
-                        Logger.TotalFiles++;
-                        Logger.TotalFilesAllIsos++;
-                        Logger.TotalBytes += fileSize;
-                        Logger.TotalBytesAllIsos += fileSize;
+                        Logger.RecordIsoFileWritten(fileSize);
                     }
                 }
             }
@@ -936,9 +982,10 @@ public static class XisoReader
                 {
                     // Scenario-tuned copy (#8): small files finish in one chunk,
                     // large files stream per chunk with byte-level progress. The
-                    // shared thread-static buffer keeps chunking (and therefore
+                    // rented pooled buffer keeps chunking (and therefore
                     // the percent log sequence) identical to the old inline loop.
                     var progressPath = string.Concat(path, filename).Replace('\\', '/');
+                    var copyBuffer = RentCopyBuffer();
                     try
                     {
                         XisoFileCopier.CopyExact(
@@ -952,7 +999,7 @@ public static class XisoReader
                                 outFile.Write(buffer, 0, count);
                                 totalSize += (uint)count;
                             },
-                            CopyBuffer,
+                            copyBuffer,
                             copied =>
                             {
                                 var percent = (uint)(copied * 100.0 / fileSize);
@@ -968,6 +1015,10 @@ public static class XisoReader
                     {
                         throw ExtractFileException.ForTruncated(internalPath, filename, startSector, fileSize,
                             totalSize);
+                    }
+                    finally
+                    {
+                        ReturnCopyBuffer(copyBuffer);
                     }
                 }
             }
@@ -1715,10 +1766,11 @@ public static class XisoReader
                     AvlNode? avlRoot = null;
                     TraverseXiso(fs, null, ((long)rootDirSect * Constants.SectorSize) + discLseek,
                         buf, ExtractMode.GenerateAvl, ref avlRoot, llCompat, discLseek,
-                        tableSize: rootDirSize);
+                        cancellationToken: cancellationToken, tableSize: rootDirSize);
 
                     XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null,
-                        prependSectors: prependSectors, progress: progress);
+                        cancellationToken, prependSectors: prependSectors, progress: progress,
+                        sourceDiscLseek: discLseek);
                 }
                 else
                 {
@@ -2160,20 +2212,15 @@ public static class XisoReader
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public static AuditResult AuditXiso(string isoPath)
     {
-        var issues = new List<string>();
-        var filesChecked = 0;
-        var dirsChecked = 0;
-
         var volInfo = GetVolumeInfo(isoPath);
         if (!volInfo.IsValid)
         {
-            issues.Add("Header magic not found at any known disc offset.");
-            return new AuditResult(false, 0, 0, issues);
+            return new AuditResult(false, 0, 0, ["Header magic not found at any known disc offset."]);
         }
 
         if (volInfo is { RootDirSector: 0, RootDirSize: 0 })
         {
-            return new AuditResult(true, 0, 0, issues);
+            return new AuditResult(true, 0, 0, []);
         }
 
         using var fs = new FileStream(
@@ -2182,12 +2229,26 @@ public static class XisoReader
             {
                 Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
             });
+        return AuditStream(fs, fs.Length, volInfo.RootDirSector, volInfo.DiscLseek);
+    }
+
+    /// <summary>
+    /// Shared deep-audit core: optimized-tag probe, root-bounds check, then the
+    /// full <see cref="AuditWalk"/> tree traversal. Callers supply any seekable
+    /// read stream (file or <see cref="BlockDeviceStream"/>).
+    /// </summary>
+    private static AuditResult AuditStream(
+        Stream stream, long length, uint rootDirSector, long discLseek)
+    {
+        var issues = new List<string>();
+        var filesChecked = 0;
+        var dirsChecked = 0;
 
         try
         {
-            fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
+            stream.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
             Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];
-            ReadExact(fs, tagBuf);
+            ReadExact(stream, tagBuf);
             var tag = Encoding.ASCII.GetString(tagBuf);
             if (!tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin], StringComparison.Ordinal))
             {
@@ -2199,27 +2260,25 @@ public static class XisoReader
             issues.Add("Could not read optimized tag (file too short).");
         }
 
-        var fileLength = fs.Length;
-        var discLseek = volInfo.DiscLseek;
-        var rootDirStart = ((long)volInfo.RootDirSector * Constants.SectorSize) + discLseek;
+        var rootDirStart = ((long)rootDirSector * Constants.SectorSize) + discLseek;
 
-        if (rootDirStart >= fileLength)
+        if (rootDirStart >= length)
         {
             issues.Add(
-                $"Root directory sector {volInfo.RootDirSector} (offset {rootDirStart}) exceeds file length {fileLength}.");
+                $"Root directory sector {rootDirSector} (offset {rootDirStart}) exceeds file length {length}.");
             return new AuditResult(false, 0, 0, issues);
         }
 
         var visited = new HashSet<long>();
 
-        AuditWalk(fs, rootDirStart, rootDirStart, "/", fileLength, discLseek, issues, visited, ref filesChecked,
+        AuditWalk(stream, rootDirStart, rootDirStart, "/", length, discLseek, issues, visited, ref filesChecked,
             ref dirsChecked);
 
         return new AuditResult(issues.Count == 0, filesChecked, dirsChecked, issues);
     }
 
     private static void AuditWalk(
-        FileStream fs,
+        Stream fs,
         long dirStart,
         long tableStart,
         string path,
@@ -3098,9 +3157,10 @@ public static class XisoReader
             {
                 fs.Seek(((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek, SeekOrigin.Begin);
 
-                // Shared copier (#8): reuses the thread-static buffer instead of
+                // Shared copier (#8): rents a pooled buffer instead of
                 // allocating 2 MB per file, and reports byte-level progress.
                 var totalRead = 0L;
+                var copyBuffer = RentCopyBuffer();
                 try
                 {
                     XisoFileCopier.CopyExact(
@@ -3112,7 +3172,7 @@ public static class XisoReader
                             outFile.Write(buffer, 0, count);
                             totalRead += count;
                         },
-                        CopyBuffer,
+                        copyBuffer,
                         copied => progress?.Report(new ProgressInfo(ProgressInfoType.FileProgress,
                             Count: entry.FileSize,
                             Path: internalPath.Replace('\\', '/'),
@@ -3123,6 +3183,10 @@ public static class XisoReader
                 {
                     throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
                         entry.FileSize, totalRead);
+                }
+                finally
+                {
+                    ReturnCopyBuffer(copyBuffer);
                 }
             }
 
@@ -3165,6 +3229,19 @@ public static class XisoReader
         {
             cancellationToken.ThrowIfCancellationRequested();
             var entryDestPath = Path.Combine(destPath, entry.Name);
+
+            // Belt over ReadDirectoryEntries' separator rejection (BUG-LIB-021):
+            // a hostile name must never resolve outside the destination, even
+            // if a future reader relaxes the check above.
+            var entryDestFull = Path.GetFullPath(entryDestPath);
+            var destFull = Path.GetFullPath(destPath);
+            if (!XisoPaths.AreSamePath(entryDestFull, destFull) &&
+                !XisoPaths.IsWithinDirectory(entryDestFull, destFull))
+            {
+                throw new XisoFormatException(
+                    $"invalid TOC entry at '{internalPath}': entry '{entry.Name}' escapes the destination directory.");
+            }
+
             var entryInternalPath = internalPath.TrimEnd('/') + "/" + entry.Name;
 
             try
@@ -3245,6 +3322,7 @@ public static class XisoReader
         fs.Seek(((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek, SeekOrigin.Begin);
 
         // Shared copier (#8): same bytes, same truncation error, no per-call buffer.
+        var hashBuffer = RentCopyBuffer();
         try
         {
             XisoFileCopier.CopyExact(
@@ -3252,11 +3330,15 @@ public static class XisoReader
                 entry.FileSize,
                 // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
                 (buffer, count) => hasher.TransformBlock(buffer, 0, count, buffer, 0),
-                CopyBuffer);
+                hashBuffer);
         }
         catch (TruncatedCopyException)
         {
             throw new IOException($"Unexpected end of file data at sector {entry.StartSector}");
+        }
+        finally
+        {
+            ReturnCopyBuffer(hashBuffer);
         }
 
         hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
@@ -3735,6 +3817,15 @@ public static class XisoReader
             var nameBuf = new byte[filenameLength];
             ReadExact(fs, nameBuf);
             var filename = Latin1Encoding.Instance.GetString(nameBuf);
+
+            // Parity with TraverseXiso (BUG-LIB-021): separator-bearing names
+            // abort the walk instead of flowing into Path.Combine, where they
+            // would create directories outside the destination.
+            if (filename.Contains('/') || filename.Contains('\\'))
+            {
+                throw new XisoFormatException(
+                    $"invalid TOC entry at '{contextPath}': filename '{filename}' contains a path separator.");
+            }
 
             // Skip "." and ".." entries
             if (string.Equals(filename, ".", StringComparison.Ordinal) ||

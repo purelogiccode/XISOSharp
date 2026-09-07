@@ -321,6 +321,14 @@ public static class RemapFilesystem
                     {
                         len = new FileInfo(fullEntry).Length;
                     }
+
+                    // XISO has no link representation: a file symlink packs its
+                    // target's bytes under the link name — say so (BUG-LIB-026).
+                    if (!isDir && (attr & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
+                    {
+                        Logger.LogErr(
+                            $"warning: packing symlink as target content (links are not preserved): {entryRel}.\n");
+                    }
                 }
                 catch
                 {
@@ -502,17 +510,22 @@ public static class RemapFilesystem
                 var fi = new FileInfo(hostFull);
                 if (!fi.Exists)
                     continue;
-                if (fi.Length > uint.MaxValue)
-                    throw new XisoFileTooLargeException(fileName, fi.Length);
+                var packedLength = XisoWriter.PackedFileLength(fi);
+                if (packedLength > uint.MaxValue)
+                    throw new XisoFileTooLargeException(fileName, packedLength);
 
                 var fileNode = new AvlNode
                 {
-                    Filename = fileName, FileSize = (uint)fi.Length, Subdirectory = null, HostPath = fi.FullName
+                    Filename = fileName, FileSize = (uint)packedLength, Subdirectory = null, HostPath = fi.FullName
                 };
                 var tmp = parentNode.Subdirectory;
-                AvlTree.AvlInsert(ref tmp, fileNode);
+                if (AvlTree.AvlInsert(ref tmp, fileNode) == AvlResult.AvlError)
+                {
+                    throw new IOException(
+                        $"Cannot map '{fileName}': a case-insensitive duplicate is already mapped into the image.");
+                }
+
                 parentNode.Subdirectory = tmp;
-                // If duplicate due to case-insensitive, we already checked, but insert may still fail if race.
             }
         }
 
@@ -651,6 +664,14 @@ public static class RemapFilesystem
                     }
 
                     if (!isDir) len = new FileInfo(fullEntry).Length;
+
+                    // XISO has no link representation: a file symlink packs its
+                    // target's bytes under the link name — say so (BUG-LIB-026).
+                    if (!isDir && (attr & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
+                    {
+                        Logger.LogErr(
+                            $"warning: packing symlink as target content (links are not preserved): {entryRel}.\n");
+                    }
                 }
                 catch
                 {

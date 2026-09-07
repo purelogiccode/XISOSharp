@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
+using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
 
@@ -258,7 +259,7 @@ public class XisoCorruptionResilienceTests : IDisposable
     // ------------------------------------------------------------------
 
     [Fact]
-    public void Extract_FilenameWithSlash_ThrowsInvalidOperation()
+    public void Extract_FilenameWithSlash_ThrowsXisoFormat()
     {
         var isoPath = CreateIso(src =>
         {
@@ -274,7 +275,7 @@ public class XisoCorruptionResilienceTests : IDisposable
         File.WriteAllBytes(bad, img);
 
         var dest = CreateTempDir("xiso_corrupt_dest");
-        var ex = Assert.Throws<InvalidOperationException>(() => XisoReader.UnpackImage(bad, dest));
+        var ex = Assert.Throws<XisoFormatException>(() => XisoReader.UnpackImage(bad, dest));
         Assert.Contains("invalid character", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -297,6 +298,72 @@ public class XisoCorruptionResilienceTests : IDisposable
         var result = XisoReader.AuditXiso(bad);
         Assert.False(result.IsValid);
         Assert.Contains(result.Issues, static i => i.Contains("path separator", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ListDirectory_FilenameWithSlash_ThrowsXisoFormat()
+    {
+        // BUG-LIB-021: the listing walk rejects separator names exactly like
+        // TraverseXiso instead of handing them to Path.Combine.
+        var isoPath = CreateIso(src =>
+        {
+            File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
+            File.WriteAllText(Path.Combine(src, "b.txt"), "world");
+        }, "game.iso");
+        var (rootSize, rootAbs) = RootLayout(isoPath);
+
+        var img = File.ReadAllBytes(isoPath);
+        var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
+        img[header + 14] = (byte)'/';
+        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        File.WriteAllBytes(bad, img);
+
+        var ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad, "/"));
+        Assert.Contains("path separator", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Rewrite_CaseDuplicateNames_ThrowsXisoFormat()
+    {
+        // BUG-LIB-023: names colliding case-insensitively cannot round-trip,
+        // so rewrite fails naming the duplicate instead of dropping a file.
+        var isoPath = CreateIso(src =>
+        {
+            File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
+            File.WriteAllText(Path.Combine(src, "b.txt"), "world");
+        }, "game.iso");
+        var (rootSize, rootAbs) = RootLayout(isoPath);
+
+        var img = File.ReadAllBytes(isoPath);
+        var header = FindEntryHeader(img, rootAbs, rootSize, "b.txt");
+        // Same letters, different case: still "b.txt" case-insensitively,
+        // so the rewrite tree build must refuse the duplicate.
+        "A.TXT"u8.CopyTo(img.AsSpan((int)header + 14));
+        img[(int)header + 13] = (byte)"A.TXT".Length;
+        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        File.WriteAllBytes(bad, img);
+
+        var outDir = CreateTempDir("xiso_corrupt_dest");
+        var ex = Assert.Throws<XisoFormatException>(() =>
+            XisoReader.DecodeXiso(bad, outDir, ExtractMode.Rewrite, out _, true));
+        Assert.Contains("duplicate filename", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Create_CaseDuplicateNames_FailsWithoutDropping()
+    {
+        // BUG-LIB-023 (writer side): a case-sensitive host holding both cases
+        // fails the run instead of packing one file and dropping the other.
+        var src = CreateTempDir("xiso_corrupt_casesrc");
+        File.WriteAllText(Path.Combine(src, "File.txt"), "upper");
+        if (File.Exists(Path.Combine(src, "file.txt")))
+            return; // Case-insensitive filesystem: both names are one file.
+        File.WriteAllText(Path.Combine(src, "file.txt"), "lower");
+
+        var dir = CreateTempDir("xiso_corrupt_caseiso");
+        var rc = XisoWriter.CreateXiso(src, dir, null, null, out var created, "case.iso", null);
+        Assert.Equal(1, rc);
+        Assert.True(created == null || !File.Exists(created));
     }
 
     [Fact]

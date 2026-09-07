@@ -33,8 +33,18 @@ internal sealed class CisoSplitOutput : Stream
     {
         if (_parts.TryGetValue(partIndex, out var part)) return part;
 
+        // CreateNew, not Create: refusing existing parts matches XisoSplitter
+        // instead of silently clobbering them (BUG-LIB-027).
         var path = CisoSplitFile.PartPath(_outputPath, partIndex);
-        part = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+        try
+        {
+            part = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536);
+        }
+        catch (IOException ex)
+        {
+            throw new IOException($"Split part already exists: {path}", ex);
+        }
+
         _parts[partIndex] = part;
         _partPaths.Add(path);
         return part;

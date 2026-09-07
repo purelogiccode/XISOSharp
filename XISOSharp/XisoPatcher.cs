@@ -97,7 +97,13 @@ public static class XisoPatcher
             siblings = ReadSiblingEntries(isoPath, layout, canonicalParent);
 
         if (createBackup)
-            File.Copy(isoPath, isoPath + ".old", overwrite: true);
+        {
+            // Keep the first backup: overwriting a previous `.old` would
+            // destroy the true pre-patch original (BUG-LIB-027).
+            var backupPath = isoPath + ".old";
+            if (!File.Exists(backupPath))
+                File.Copy(isoPath, backupPath);
+        }
 
         using var fs = new FileStream(
             isoPath,

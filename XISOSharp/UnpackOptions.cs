@@ -102,5 +102,11 @@ public sealed class UnpackOptions
         {
             return false;
         }
+        catch (ArgumentException)
+        {
+            // Unresolvable spelling (illegal characters): fail open to the
+            // write path, which reports the natural error.
+            return false;
+        }
     }
 }

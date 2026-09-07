@@ -101,12 +101,15 @@ public class XisoRedumpAndSkeletonTests : IDisposable
     }
 
     [Fact]
-    public void TryExtractVideo_MissingFile_ThrowsFileNotFoundException()
+    public void TryExtractVideo_MissingFile_ReturnsFalse()
     {
         var outDir = CreateTempDir();
         var missing = Path.Combine(outDir, "missing.iso");
 
-        Assert.Throws<FileNotFoundException>(() => XisoRedump.TryExtractVideo(missing, null, out _, quiet: true));
+        var ok = XisoRedump.TryExtractVideo(missing, null, out var outPath, quiet: true);
+
+        Assert.False(ok);
+        Assert.Null(outPath);
     }
 
     [Fact]
@@ -164,12 +167,12 @@ public class XisoRedumpAndSkeletonTests : IDisposable
     }
 
     [Fact]
-    public void TryExtractUpdate_MissingFile_ThrowsFileNotFoundException()
+    public void TryExtractUpdate_MissingFile_ReturnsFalse()
     {
         var outDir = CreateTempDir();
         var missing = Path.Combine(outDir, "missing.video.iso");
 
-        Assert.Throws<FileNotFoundException>(() => XisoRedump.TryExtractUpdate(missing, null, true, true));
+        Assert.False(XisoRedump.TryExtractUpdate(missing, null, true, true));
     }
 
     [Fact]

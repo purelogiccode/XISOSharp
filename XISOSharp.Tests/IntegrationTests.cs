@@ -41,6 +41,27 @@ public class IntegrationTests : IDisposable
     }
 
     [Fact]
+    public void CreateXiso_TrailingSeparator_NamesIsoLikeBareDirectory()
+    {
+        // BUG-LIB-024: trailing separators strip before leaf parsing, so
+        // "source/" and "source" produce the same output name. The alt
+        // separator only counts where the OS treats it as one (Windows).
+        var seps = new List<char> { Path.DirectorySeparatorChar };
+        if (OperatingSystem.IsWindows() && Path.AltDirectorySeparatorChar != Path.DirectorySeparatorChar)
+            seps.Add(Path.AltDirectorySeparatorChar);
+
+        foreach (var sep in seps)
+        {
+            var outputDir = CreateTempDir();
+            var result = XisoWriter.CreateXiso(SourceDir + sep, outputDir, null, null, out var outPath, null, null);
+
+            Assert.Equal(0, result);
+            Assert.NotNull(outPath);
+            Assert.Equal("source.iso", Path.GetFileName(outPath));
+        }
+    }
+
+    [Fact]
     public void CreateXiso_FromDirectory_ProducesValidIso()
     {
         var outputDir = CreateTempDir();
@@ -496,6 +517,30 @@ public class IntegrationTests : IDisposable
         Assert.NotNull(hash1);
         Assert.NotNull(hash2);
         Assert.Equal(hash1, hash2);
+    }
+
+    [Fact]
+    public void ComputeFileHash_ParallelCalls_Agree()
+    {
+        // BUG-LIB-010: the copy scratch buffer is rented per call, so
+        // concurrent hashes (e.g. under Task.Run) must never share state.
+        var outputDir = CreateTempDir();
+
+        var createResult = XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out var isoPath, null, null);
+        Assert.Equal(0, createResult);
+        Assert.NotNull(isoPath);
+
+        var expected = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA256);
+        Assert.NotNull(expected);
+
+        var results = new byte[8][];
+        Parallel.For(0, results.Length, i =>
+            results[i] = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA256)!);
+
+        foreach (var actual in results)
+        {
+            Assert.Equal(expected, actual);
+        }
     }
 
     [Fact]

@@ -179,7 +179,7 @@ public static class XisoSplitter
         var outputFull = Path.GetFullPath(outputPath);
         foreach (var part in parts)
         {
-            if (string.Equals(Path.GetFullPath(part), outputFull, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(Path.GetFullPath(part), outputFull, XisoPaths.PathComparison))
             {
                 throw new ArgumentException($"Output must not be one of the parts: {outputPath}",
                     nameof(outputPath));
@@ -274,8 +274,17 @@ public static class XisoSplitter
     {
         cancellationToken.ThrowIfCancellationRequested();
         // Overflow-safe ceil(length / alignedPartSize); length is positive here
-        // (ValidateImage rejects non-images, including empty files).
-        var partCount = (int)(((length - 1) / alignedPartSize) + 1);
+        // (ValidateImage rejects non-images, including empty files). A part
+        // count past int range (tiny part size, huge image) is rejected with a
+        // named IOException instead of wrapping negative into List<> (BUG-LIB-029).
+        var partCountLong = ((length - 1) / alignedPartSize) + 1;
+        if (partCountLong > int.MaxValue)
+        {
+            throw new IOException(
+                $"Split would produce {partCountLong:N0} parts: part size {alignedPartSize:N0} bytes is too small for a {length:N0}-byte image.");
+        }
+
+        var partCount = (int)partCountLong;
         var parts = new List<string>(partCount);
         for (var i = 0; i < partCount; i++)
         {

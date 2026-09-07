@@ -244,8 +244,7 @@ public static class XisoOperations
             else
             {
                 long bytesToRead;
-                if (bytesToWipe > 0) bytesToRead = bytesToWipe;
-                else if (bytesUntilEndOfExtent > 0) bytesToRead = bytesUntilEndOfExtent;
+                if (bytesUntilEndOfExtent > 0) bytesToRead = bytesUntilEndOfExtent;
                 else bytesToRead = xisoLength - numBytes;
 
                 // Check if skeleton vs bone distinction needed: for wipe we always copy bones too.

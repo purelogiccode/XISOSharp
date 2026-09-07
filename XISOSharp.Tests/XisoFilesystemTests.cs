@@ -156,6 +156,25 @@ public class XisoFilesystemTests : IDisposable
         }
     }
 
+    [Fact]
+    public void LocalFilesystem_EscapeAttempts_StayInsideRoot()
+    {
+        // BUG-LIB-019: ".." climbs and rooted spellings must never resolve
+        // outside the destination root.
+        var root = CreateTempDir("xiso_fs_root");
+        var fs = new LocalFilesystem(root);
+
+        Assert.False(fs.FileExists("../evil.bin"));
+        Assert.Equal(-1, fs.FileLength("../evil.bin"));
+
+        Assert.Throws<UnauthorizedAccessException>(() => fs.CreateDirectory("../evil"));
+        Assert.Throws<UnauthorizedAccessException>(() => fs.CreateFile("../evil.bin"));
+
+        var parent = Path.GetDirectoryName(root)!;
+        Assert.False(File.Exists(Path.Combine(parent, "evil.bin")));
+        Assert.False(Directory.Exists(Path.Combine(parent, "evil")));
+    }
+
     // ------------------------------------------------------------------
     // MemoryFilesystem
     // ------------------------------------------------------------------
