@@ -82,16 +82,18 @@ internal static class AppLogging
         Logger.ForwardInfo = msg => Log.Information("{Message}", msg.TrimEnd('\r', '\n'));
         Logger.ForwardError = msg =>
         {
+            // BUG-X-004: every Logger.LogErr write is user-facing feedback —
+            // usage/validation refusals (invalid flag combinations, misplaced
+            // flags), missing-file probes, and non-zero CLI exits. Filing each
+            // one as a bug report flooded the API with 32 expected-behaviour
+            // reports in a single session. They are exactly the "routine
+            // operational noise" BUG-X-002 already excludes, so log them as
+            // Warning: the file log keeps them, while the BugReportSink
+            // (Error+) stays reserved for real crashes, which reach the
+            // reporter through the unhandled-exception handlers and explicit
+            // ReportException call sites instead.
             string text = msg.TrimEnd('\r', '\n');
-            if (msg.StartsWith("warning:", StringComparison.OrdinalIgnoreCase) ||
-                msg.StartsWith("[WARNING]", StringComparison.OrdinalIgnoreCase))
-            {
-                Log.Warning("{Message}", text);
-            }
-            else
-            {
-                Log.Error("{Message}", text);
-            }
+            Log.Warning("{Message}", text);
         };
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>

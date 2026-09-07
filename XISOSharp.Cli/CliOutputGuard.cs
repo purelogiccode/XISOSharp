@@ -47,7 +47,7 @@ internal static class CliOutputGuard
     // spellings, deliberately absent: warning about them here would misadvise.
     private static readonly HashSet<string> MisplacedFlags = new(StringComparer.Ordinal)
     {
-        "-v", "-h", "-c", "-x", "--unpack", "-X", "-l", "-t", "-i",
+        "-v", "-h", "--help", "-c", "-x", "--unpack", "-X", "-l", "-t", "-i",
         "--ls", "--xex-info", "--xbe-info", "--md5", "--sha256", "-V", "validate",
         "--validate", "--validate-checksums", "--validate-strict",
         "--validate-report", "--copy-out", "--copy-in", "--no-backup", "-r", "-q", "-Q", "-s", "-D",

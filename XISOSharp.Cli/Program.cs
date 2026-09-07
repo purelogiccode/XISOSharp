@@ -232,6 +232,7 @@ internal static class Program
                         Console.Write(Constants.Banner);
                         return 0;
                     case "-h":
+                    case "--help":
                         PrintUsage();
                         return 0;
                     case "-c":
@@ -4516,7 +4517,7 @@ internal static class Program
                                                     -d <directory>      In extract mode, expand xiso in <directory>.
                                                                         In rewrite mode, rewrite xiso in <directory>.
                                                     -D                  In rewrite mode, delete old xiso after processing.
-                                                    -h                  Print this help text and exit.
+                                                    -h, --help         Print this help text and exit.
                                                     -n, --no            Never overwrite: refuse when an output file
                                                                           exists (rebuild, rewrite -o, compress,
                                                                           decompress, redump batch outputs).

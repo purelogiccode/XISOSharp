@@ -79,6 +79,7 @@ public sealed class CliOutputGuardTests
     [InlineData("-d")]
     [InlineData("-o")]
     [InlineData("-x")]
+    [InlineData("--help")]
     [InlineData("--skip-existing")]
     [InlineData("--continue-on-error")]
     [InlineData("--batch")]
