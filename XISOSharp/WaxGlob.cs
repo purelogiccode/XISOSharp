@@ -21,7 +21,7 @@ public sealed class WaxGlob
     {
         ArgumentNullException.ThrowIfNull(pattern);
         Pattern = pattern;
-        var regexStr = BuildRegex(pattern);
+        string regexStr = BuildRegex(pattern);
         _regex = new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
             TimeSpan.FromSeconds(2));
     }
@@ -38,13 +38,13 @@ public sealed class WaxGlob
     /// </summary>
     public IReadOnlyList<string>? GetCaptures(string candidate)
     {
-        var m = _regex.Match(candidate);
+        Match m = _regex.Match(candidate);
         if (!m.Success) return null;
-        var list = new List<string>(m.Groups.Count);
+        List<string> list = new(m.Groups.Count);
         // Groups[0] is whole match
-        for (var i = 0; i < m.Groups.Count; i++)
+        for (int i = 0; i < m.Groups.Count; i++)
         {
-            var g = m.Groups[i];
+            Group g = m.Groups[i];
             list.Add(g.Success ? g.Value : string.Empty);
         }
 
@@ -56,7 +56,7 @@ public sealed class WaxGlob
     /// </summary>
     public string GetCapture(string candidate, int index)
     {
-        var caps = GetCaptures(candidate);
+        IReadOnlyList<string>? caps = GetCaptures(candidate);
         if (caps == null) return string.Empty;
         if (index < 0 || index >= caps.Count) return string.Empty;
         return caps[index];
@@ -74,7 +74,7 @@ public sealed class WaxGlob
         if (string.IsNullOrEmpty(pattern))
             return "^$";
 
-        var trimmed = pattern.TrimStart('/');
+        string trimmed = pattern.TrimStart('/');
         // Also trim leading "./"
         while (trimmed.StartsWith("./", StringComparison.Ordinal))
             trimmed = trimmed[2..];
@@ -87,13 +87,13 @@ public sealed class WaxGlob
         if (string.IsNullOrEmpty(trimmed))
             return "^$";
 
-        var segments = trimmed.Split('/');
-        var count = segments.Length;
-        var sb = new StringBuilder("^");
+        string[] segments = trimmed.Split('/');
+        int count = segments.Length;
+        StringBuilder sb = new("^");
 
-        for (var i = 0; i < count; i++)
+        for (int i = 0; i < count; i++)
         {
-            var seg = segments[i];
+            string seg = segments[i];
             if (string.Equals(seg, "**", StringComparison.OrdinalIgnoreCase))
             {
                 if (count == 1)
@@ -140,7 +140,7 @@ public sealed class WaxGlob
                     $"Invalid glob pattern '{pattern}': tree wildcard '**' must be alone as a path component.");
             }
 
-            var segRegex = FragmentToRegex(seg, capturing: true);
+            string segRegex = FragmentToRegex(seg, capturing: true);
             sb.Append(segRegex);
         }
 
@@ -155,11 +155,11 @@ public sealed class WaxGlob
     /// </summary>
     private static string FragmentToRegex(string fragment, bool capturing)
     {
-        var sb = new StringBuilder();
-        var i = 0;
+        StringBuilder sb = new();
+        int i = 0;
         while (i < fragment.Length)
         {
-            var c = fragment[i];
+            char c = fragment[i];
             switch (c)
             {
                 case '*':
@@ -179,7 +179,7 @@ public sealed class WaxGlob
                     i++;
                     break;
                 case '[':
-                    if (TryParseCharClass(fragment, i, out var cc, out var end))
+                    if (TryParseCharClass(fragment, i, out string cc, out int end))
                     {
                         sb.Append(cc);
                         i = end;
@@ -193,20 +193,20 @@ public sealed class WaxGlob
                     break;
                 case '{':
                 {
-                    var braceEnd = FindMatchingBrace(fragment, i);
+                    int braceEnd = FindMatchingBrace(fragment, i);
                     if (braceEnd == -1)
                         throw new ArgumentException($"Unclosed '{{' in glob fragment '{fragment}'");
-                    var inner = fragment.Substring(i + 1, braceEnd - i - 1);
-                    var opts = SplitAlternatives(inner);
-                    var optRegexes = new List<string>(opts.Count);
-                    foreach (var opt in opts)
+                    string inner = fragment.Substring(i + 1, braceEnd - i - 1);
+                    List<string> opts = SplitAlternatives(inner);
+                    List<string> optRegexes = new(opts.Count);
+                    foreach (string opt in opts)
                     {
                         // Inside alternative, inner patterns are non-capturing per wax spec
-                        var optRegex = FragmentToRegex(opt, capturing: false);
+                        string optRegex = FragmentToRegex(opt, capturing: false);
                         optRegexes.Add(optRegex);
                     }
 
-                    var combined = string.Join("|", optRegexes);
+                    string combined = string.Join("|", optRegexes);
                     if (capturing)
                     {
                         sb.Append('(');
@@ -226,7 +226,7 @@ public sealed class WaxGlob
                     break;
                 case '<':
                 {
-                    var angleEnd = fragment.IndexOf('>', i);
+                    int angleEnd = fragment.IndexOf('>', i);
                     if (angleEnd == -1)
                     {
                         sb.Append(Regex.Escape("<"));
@@ -234,12 +234,12 @@ public sealed class WaxGlob
                         break;
                     }
 
-                    var repContent = fragment.Substring(i + 1, angleEnd - i - 1);
-                    var colon = repContent.IndexOf(':');
-                    var subGlob = colon >= 0 ? repContent.Substring(0, colon) : repContent;
-                    var bound = colon >= 0 ? repContent.Substring(colon + 1) : string.Empty;
-                    var subRegex = FragmentToRegex(subGlob, capturing: false);
-                    var quant = BoundToQuantifier(bound, colon >= 0);
+                    string repContent = fragment.Substring(i + 1, angleEnd - i - 1);
+                    int colon = repContent.IndexOf(':');
+                    string subGlob = colon >= 0 ? repContent.Substring(0, colon) : repContent;
+                    string bound = colon >= 0 ? repContent.Substring(colon + 1) : string.Empty;
+                    string subRegex = FragmentToRegex(subGlob, capturing: false);
+                    string quant = BoundToQuantifier(bound, colon >= 0);
                     if (capturing)
                     {
                         sb.Append('(');
@@ -289,31 +289,31 @@ public sealed class WaxGlob
         }
 
         // bound may be "0," , "1,4" , "3" , etc.
-        var parts = bound.Split(',', 2);
-        var lowerStr = parts[0].Trim();
-        var upperStr = parts.Length > 1 ? parts[1].Trim() : null!;
-        var hasLower = !string.IsNullOrEmpty(lowerStr);
-        var hasUpper = parts.Length > 1 && !string.IsNullOrEmpty(upperStr);
-        var hasComma = parts.Length > 1;
+        string[] parts = bound.Split(',', 2);
+        string lowerStr = parts[0].Trim();
+        string upperStr = parts.Length > 1 ? parts[1].Trim() : null!;
+        bool hasLower = !string.IsNullOrEmpty(lowerStr);
+        bool hasUpper = parts.Length > 1 && !string.IsNullOrEmpty(upperStr);
+        bool hasComma = parts.Length > 1;
 
         if (!hasLower && !hasUpper && !hasComma)
         {
             // single value without comma? e.g., "3"
-            if (int.TryParse(lowerStr, System.Globalization.CultureInfo.InvariantCulture, out var v)) return $"{{{v}}}";
+            if (int.TryParse(lowerStr, System.Globalization.CultureInfo.InvariantCulture, out int v)) return $"{{{v}}}";
             return "+";
         }
 
         if (hasLower && hasComma && !hasUpper)
         {
-            if (int.TryParse(lowerStr, System.Globalization.CultureInfo.InvariantCulture, out var lower))
+            if (int.TryParse(lowerStr, System.Globalization.CultureInfo.InvariantCulture, out int lower))
                 return lower == 0 ? "*" : $"{{{lower},}}";
             return "*";
         }
 
         if (hasLower && hasUpper)
         {
-            if (int.TryParse(lowerStr, System.Globalization.CultureInfo.InvariantCulture, out var lower) &&
-                int.TryParse(upperStr, System.Globalization.CultureInfo.InvariantCulture, out var upper))
+            if (int.TryParse(lowerStr, System.Globalization.CultureInfo.InvariantCulture, out int lower) &&
+                int.TryParse(upperStr, System.Globalization.CultureInfo.InvariantCulture, out int upper))
             {
                 return $"{{{lower},{upper}}}";
             }
@@ -323,14 +323,14 @@ public sealed class WaxGlob
 
         if (!hasLower && hasUpper)
         {
-            if (int.TryParse(upperStr, System.Globalization.CultureInfo.InvariantCulture, out var upper))
+            if (int.TryParse(upperStr, System.Globalization.CultureInfo.InvariantCulture, out int upper))
                 return $"{{0,{upper}}}";
             return "*";
         }
 
         if (hasLower && !hasComma)
         {
-            if (int.TryParse(lowerStr, System.Globalization.CultureInfo.InvariantCulture, out var v)) return $"{{{v}}}";
+            if (int.TryParse(lowerStr, System.Globalization.CultureInfo.InvariantCulture, out int v)) return $"{{{v}}}";
         }
 
         return "+";
@@ -338,10 +338,10 @@ public sealed class WaxGlob
 
     private static int FindMatchingBrace(string s, int start)
     {
-        var depth = 0;
-        for (var i = start; i < s.Length; i++)
+        int depth = 0;
+        for (int i = start; i < s.Length; i++)
         {
-            var c = s[i];
+            char c = s[i];
             if (c == '\\' && i + 1 < s.Length)
             {
                 i++; // skip escaped
@@ -364,12 +364,12 @@ public sealed class WaxGlob
 
     private static List<string> SplitAlternatives(string inner)
     {
-        var result = new List<string>();
-        var sb = new StringBuilder();
-        var depth = 0;
-        for (var i = 0; i < inner.Length; i++)
+        List<string> result = new();
+        StringBuilder sb = new();
+        int depth = 0;
+        for (int i = 0; i < inner.Length; i++)
         {
-            var c = inner[i];
+            char c = inner[i];
             if (c == '\\' && i + 1 < inner.Length)
             {
                 sb.Append(c);
@@ -402,19 +402,19 @@ public sealed class WaxGlob
 
     private static bool TryParseCharClass(string glob, int start, out string charClass, out int end)
     {
-        var i = start + 1;
-        var negate = false;
+        int i = start + 1;
+        bool negate = false;
         if (i < glob.Length && (glob[i] == '!' || glob[i] == '^'))
         {
             negate = true;
             i++;
         }
 
-        var content = new StringBuilder();
-        var closed = false;
+        StringBuilder content = new();
+        bool closed = false;
         while (i < glob.Length)
         {
-            var c = glob[i];
+            char c = glob[i];
             if (c == ']' && content.Length > 0)
             {
                 closed = true;

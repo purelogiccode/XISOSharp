@@ -49,7 +49,7 @@ internal static partial class BugReporter
 #elif LOGGING_NS_TESTER
     internal static string ApplicationName { get; set; } = "XISOSharpTester";
 #else
-    internal static string ApplicationName { get; set; } = "XISOSharp.Cli";
+    internal static string ApplicationName { get; set; } = "XISOSharp";
 #endif
 
     internal static void ReportWarning(string message) =>
@@ -70,31 +70,31 @@ internal static partial class BugReporter
         {
             if (IsTestHost())
                 return; // never file real bug reports from unit-test runs
-            var safeMessage = string.IsNullOrWhiteSpace(message) ? $"{kind} (no message)" : message.Trim();
-            var key =
+            string safeMessage = string.IsNullOrWhiteSpace(message) ? $"{kind} (no message)" : message.Trim();
+            string key =
                 $"{kind}:{(safeMessage.Length > 200 ? safeMessage[..200] : safeMessage)}:{ex?.GetType().FullName}";
             lock (Gate)
             {
-                var now = DateTime.UtcNow;
+                DateTime now = DateTime.UtcNow;
                 while (RecentSends.Count > 0 && (now - RecentSends.Peek()) > TimeSpan.FromMinutes(1))
                     _ = RecentSends.Dequeue();
                 if (RecentSends.Count >= 8)
                     return; // over throttle budget — drop, stay under 10 req/min
-                if (LastByKey.TryGetValue(key, out var last) && (now - last) < TimeSpan.FromMinutes(1))
+                if (LastByKey.TryGetValue(key, out DateTime last) && (now - last) < TimeSpan.FromMinutes(1))
                     return; // same report already sent recently
                 RecentSends.Enqueue(now);
                 LastByKey[key] = now;
             }
 
-            var envBlock = EnvironmentInfo.Collect(ApplicationName);
-            var errorBlock = "=== Error Details ===\n" + safeMessage;
-            var exceptionBlock = BuildExceptionBlock(ex);
+            string envBlock = EnvironmentInfo.Collect(ApplicationName);
+            string errorBlock = "=== Error Details ===\n" + safeMessage;
+            string exceptionBlock = BuildExceptionBlock(ex);
 
-            var fullMessage = $"{kind}: {safeMessage}\n\n{envBlock}\n\n{errorBlock}\n\n{exceptionBlock}";
-            var stackTrace = ex is null ? $"{kind}: {safeMessage}" : ex.ToString();
+            string fullMessage = $"{kind}: {safeMessage}\n\n{envBlock}\n\n{errorBlock}\n\n{exceptionBlock}";
+            string stackTrace = ex is null ? $"{kind}: {safeMessage}" : ex.ToString();
 
             // BUG-X-003: track the in-flight send so Flush can wait for delivery.
-            var sendTask = Task.Run(async () =>
+            Task sendTask = Task.Run(async () =>
             {
                 try
                 {
@@ -141,7 +141,7 @@ internal static partial class BugReporter
     {
         try
         {
-            var deadline = DateTime.UtcNow + timeout;
+            DateTime deadline = DateTime.UtcNow + timeout;
             while (true)
             {
                 Task[] snapshot;
@@ -153,7 +153,7 @@ internal static partial class BugReporter
                     PendingSends.CopyTo(snapshot);
                 }
 
-                var remaining = deadline - DateTime.UtcNow;
+                TimeSpan remaining = deadline - DateTime.UtcNow;
                 if (remaining <= TimeSpan.Zero)
                     return false;
                 if (!Task.WaitAll(snapshot, remaining))
@@ -176,7 +176,7 @@ internal static partial class BugReporter
                 return true;
             }
 
-            var entry = Assembly.GetEntryAssembly()?.GetName().Name;
+            string? entry = Assembly.GetEntryAssembly()?.GetName().Name;
             if (entry?.Contains("test", StringComparison.OrdinalIgnoreCase) == true)
                 return true;
             if (AppDomain.CurrentDomain.FriendlyName.Contains("test", StringComparison.OrdinalIgnoreCase))
@@ -236,7 +236,7 @@ internal static partial class BugReporter
         }
 
         // Include inner exceptions (first level) for diagnosability.
-        var inner = string.Empty;
+        string inner = string.Empty;
         try
         {
             if (ex.InnerException is not null)
@@ -255,7 +255,7 @@ internal static partial class BugReporter
 
     private static async Task SendAsync(string fullMessage, string stackTrace)
     {
-        var version = EnvironmentInfo.ApplicationVersion();
+        string version = EnvironmentInfo.ApplicationVersion();
         string environment;
         try
         {
@@ -266,7 +266,7 @@ internal static partial class BugReporter
             environment = "Unknown";
         }
 
-        var payload = new BugReportPayload(
+        BugReportPayload payload = new(
             Truncate(fullMessage, MaxMessage),
             Truncate(ApplicationName, MaxAppName),
             Truncate(version, MaxVersion),
@@ -274,14 +274,14 @@ internal static partial class BugReporter
             Truncate(environment, MaxEnvironment),
             Truncate(stackTrace, MaxStackTrace));
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint);
+        using HttpRequestMessage request = new(HttpMethod.Post, Endpoint);
         request.Headers.Add("X-API-KEY", ApiKey);
         request.Content = new StringContent(
             JsonSerializer.Serialize(payload, BugReportJsonContext.Default.BugReportPayload),
             Encoding.UTF8);
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
 
-        using var response = await Http.SendAsync(request).ConfigureAwait(false);
+        using HttpResponseMessage response = await Http.SendAsync(request).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         _ = Assembly.GetExecutingAssembly();
     }

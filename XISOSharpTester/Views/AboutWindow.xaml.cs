@@ -21,7 +21,7 @@ internal partial class AboutWindow
         {
             InitializeComponent();
 
-            var version = Assembly.GetExecutingAssembly().GetName().Version;
+            Version? version = Assembly.GetExecutingAssembly().GetName().Version;
             AppVersionTextBlock.Text = $"Version: {version?.ToString() ?? "Unknown"}";
 
             DescriptionTextBlock.Text =

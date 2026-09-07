@@ -16,7 +16,7 @@ public class SecurityAndPrngTests : IDisposable
     {
         Logger.Quiet = false;
         Logger.RealQuiet = false;
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -28,7 +28,7 @@ public class SecurityAndPrngTests : IDisposable
             }
         }
 
-        foreach (var file in _tempFiles)
+        foreach (string file in _tempFiles)
         {
             try
             {
@@ -53,12 +53,12 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseLines_ValidXgd1_16Ranges_Succeeds()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest(100000);
-        var lines = Enumerable.Range(0, 16).Select(i => $"{i * 5000}-{(i * 5000) + 4095}");
-        var result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 0, quiet: true);
+        long redumpLength = RedumpLengthForTest(100000);
+        IEnumerable<string> lines = Enumerable.Range(0, 16).Select(i => $"{i * 5000}-{(i * 5000) + 4095}");
+        int[]? result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 0, quiet: true);
         Assert.NotNull(result);
         Assert.Equal(16, result.Length);
-        for (var i = 0; i < 16; i++)
+        for (int i = 0; i < 16; i++)
             Assert.Equal(i * 5000, result[i]);
     }
 
@@ -66,9 +66,9 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseLines_ValidXgd2_OneRange_Succeeds()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var lines = new[] { "1000-5095" };
-        var result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
+        long redumpLength = RedumpLengthForTest();
+        string[] lines = new[] { "1000-5095" };
+        int[]? result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
         Assert.NotNull(result);
         Assert.Single(result);
         Assert.Equal(1000, result[0]);
@@ -78,9 +78,9 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseLines_ValidXgd2_TwoRanges_OnlyFirstKept()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var lines = new[] { "1000-5095", "2000-6095" };
-        var result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
+        long redumpLength = RedumpLengthForTest();
+        string[] lines = new[] { "1000-5095", "2000-6095" };
+        int[]? result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
         // Per implementation, for xgdType !=0 only first range is kept, but lineCount validation expects 1 or 2
         Assert.NotNull(result);
         Assert.Single(result);
@@ -91,9 +91,9 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseLines_EmptyLines_AreIgnored()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var lines = new[] { "", "  ", "1000-5095", "", "  " };
-        var result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
+        long redumpLength = RedumpLengthForTest();
+        string[] lines = new[] { "", "  ", "1000-5095", "", "  " };
+        int[]? result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
         Assert.NotNull(result);
         Assert.Single(result);
     }
@@ -102,9 +102,9 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseLines_InvalidFormat_MissingDash_ReturnsNull()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var lines = new[] { "1000:5095" };
-        var result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
+        long redumpLength = RedumpLengthForTest();
+        string[] lines = new[] { "1000:5095" };
+        int[]? result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
         Assert.Null(result);
     }
 
@@ -112,9 +112,9 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseLines_InvalidFormat_NonNumeric_ReturnsNull()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var lines = new[] { "abc-def" };
-        var result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
+        long redumpLength = RedumpLengthForTest();
+        string[] lines = new[] { "abc-def" };
+        int[]? result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
         Assert.Null(result);
     }
 
@@ -122,12 +122,12 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseLines_InvalidLength_WrongGap_ReturnsNull()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var lines = new[] { "1000-5094" }; // gap 4094 not 4095
-        var result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
+        long redumpLength = RedumpLengthForTest();
+        string[] lines = new[] { "1000-5094" }; // gap 4094 not 4095
+        int[]? result = SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true);
         Assert.Null(result);
 
-        var lines2 = new[] { "1000-5096" }; // gap 4096
+        string[] lines2 = new[] { "1000-5096" }; // gap 4096
         Assert.Null(SecuritySectors.ParseLines(lines2, redumpLength, xgdType: 2, quiet: true));
     }
 
@@ -135,8 +135,8 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseLines_OutOfBounds_NegativeStart_ReturnsNull()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var lines = new[] { "-1-4094" };
+        long redumpLength = RedumpLengthForTest();
+        string[] lines = new[] { "-1-4094" };
         Assert.Null(SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true));
     }
 
@@ -146,7 +146,7 @@ public class SecurityAndPrngTests : IDisposable
         Logger.Quiet = true;
         // small redump length so maxStart is small
         const long redumpLength = (5000 + 4096) * Constants.SectorSize; // maxStart = 5000
-        var lines = new[] { "6000-10095" }; // start 6000 > maxStart 5000
+        string[] lines = new[] { "6000-10095" }; // start 6000 > maxStart 5000
         Assert.Null(SecuritySectors.ParseLines(lines, redumpLength, xgdType: 2, quiet: true));
     }
 
@@ -154,11 +154,11 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseLines_WrongCount_Xgd1_Not16_ReturnsNull()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var lines15 = Enumerable.Range(0, 15).Select(i => $"{i * 5000}-{(i * 5000) + 4095}");
+        long redumpLength = RedumpLengthForTest();
+        IEnumerable<string> lines15 = Enumerable.Range(0, 15).Select(i => $"{i * 5000}-{(i * 5000) + 4095}");
         Assert.Null(SecuritySectors.ParseLines(lines15, redumpLength, xgdType: 0, quiet: true));
 
-        var lines17 = Enumerable.Range(0, 17).Select(i => $"{i * 5000}-{(i * 5000) + 4095}");
+        IEnumerable<string> lines17 = Enumerable.Range(0, 17).Select(i => $"{i * 5000}-{(i * 5000) + 4095}");
         Assert.Null(SecuritySectors.ParseLines(lines17, redumpLength, xgdType: 0, quiet: true));
     }
 
@@ -166,11 +166,11 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseLines_WrongCount_Xgd2_Not1Or2_ReturnsNull()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var lines0 = Array.Empty<string>();
+        long redumpLength = RedumpLengthForTest();
+        string[] lines0 = Array.Empty<string>();
         Assert.Null(SecuritySectors.ParseLines(lines0, redumpLength, xgdType: 2, quiet: true));
 
-        var lines3 = new[] { "1000-5095", "2000-6095", "3000-7095" };
+        string[] lines3 = new[] { "1000-5095", "2000-6095", "3000-7095" };
         Assert.Null(SecuritySectors.ParseLines(lines3, redumpLength, xgdType: 2, quiet: true));
     }
 
@@ -182,13 +182,13 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseFile_ValidFile_Succeeds()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest(100000);
-        var lines = Enumerable.Range(0, 16).Select(i => $"{i * 5000}-{(i * 5000) + 4095}");
-        var tmp = Path.Combine(Path.GetTempPath(), $"sectors_{Guid.NewGuid():N}.txt");
+        long redumpLength = RedumpLengthForTest(100000);
+        IEnumerable<string> lines = Enumerable.Range(0, 16).Select(i => $"{i * 5000}-{(i * 5000) + 4095}");
+        string tmp = Path.Combine(Path.GetTempPath(), $"sectors_{Guid.NewGuid():N}.txt");
         File.WriteAllLines(tmp, lines, Encoding.UTF8);
         _tempFiles.Add(tmp);
 
-        var result = SecuritySectors.ParseFile(tmp, redumpLength, xgdType: 0, quiet: true);
+        int[]? result = SecuritySectors.ParseFile(tmp, redumpLength, xgdType: 0, quiet: true);
         Assert.NotNull(result);
         Assert.Equal(16, result.Length);
     }
@@ -197,9 +197,9 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseFile_MissingFile_ReturnsNull()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var missing = Path.Combine(Path.GetTempPath(), $"missing_{Guid.NewGuid():N}.txt");
-        var result = SecuritySectors.ParseFile(missing, redumpLength, xgdType: 2, quiet: true);
+        long redumpLength = RedumpLengthForTest();
+        string missing = Path.Combine(Path.GetTempPath(), $"missing_{Guid.NewGuid():N}.txt");
+        int[]? result = SecuritySectors.ParseFile(missing, redumpLength, xgdType: 2, quiet: true);
         Assert.Null(result);
     }
 
@@ -207,11 +207,11 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseFile_InvalidContent_ReturnsNull()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var tmp = Path.Combine(Path.GetTempPath(), $"sectors_bad_{Guid.NewGuid():N}.txt");
+        long redumpLength = RedumpLengthForTest();
+        string tmp = Path.Combine(Path.GetTempPath(), $"sectors_bad_{Guid.NewGuid():N}.txt");
         File.WriteAllText(tmp, "not-a-range\n", Encoding.UTF8);
         _tempFiles.Add(tmp);
-        var result = SecuritySectors.ParseFile(tmp, redumpLength, xgdType: 2, quiet: true);
+        int[]? result = SecuritySectors.ParseFile(tmp, redumpLength, xgdType: 2, quiet: true);
         Assert.Null(result);
     }
 
@@ -219,11 +219,11 @@ public class SecurityAndPrngTests : IDisposable
     public void ParseFile_Xgd2_TwoRanges_Succeeds()
     {
         Logger.Quiet = true;
-        var redumpLength = RedumpLengthForTest();
-        var tmp = Path.Combine(Path.GetTempPath(), $"sectors2_{Guid.NewGuid():N}.txt");
+        long redumpLength = RedumpLengthForTest();
+        string tmp = Path.Combine(Path.GetTempPath(), $"sectors2_{Guid.NewGuid():N}.txt");
         File.WriteAllLines(tmp, Contents, Encoding.UTF8);
         _tempFiles.Add(tmp);
-        var result = SecuritySectors.ParseFile(tmp, redumpLength, xgdType: 1, quiet: true);
+        int[]? result = SecuritySectors.ParseFile(tmp, redumpLength, xgdType: 1, quiet: true);
         Assert.NotNull(result);
         Assert.Single(result); // only first kept per logic
         Assert.Equal(1000, result[0]);
@@ -236,8 +236,8 @@ public class SecurityAndPrngTests : IDisposable
     [Fact]
     public void XboxPrng_WriteSectors_WritesCorrectByteCount()
     {
-        var prng = new XboxPrng(0);
-        using var ms = new MemoryStream();
+        XboxPrng prng = new(0);
+        using MemoryStream ms = new();
         prng.WriteSectors(ms, 2);
         Assert.Equal(2 * Constants.SectorSize, ms.Length);
     }
@@ -245,10 +245,10 @@ public class SecurityAndPrngTests : IDisposable
     [Fact]
     public void XboxPrng_WriteSectors_SameSeed_SameOutput()
     {
-        var prng1 = new XboxPrng(12345);
-        var prng2 = new XboxPrng(12345);
-        using var ms1 = new MemoryStream();
-        using var ms2 = new MemoryStream();
+        XboxPrng prng1 = new(12345);
+        XboxPrng prng2 = new(12345);
+        using MemoryStream ms1 = new();
+        using MemoryStream ms2 = new();
         prng1.WriteSectors(ms1, 3);
         prng2.WriteSectors(ms2, 3);
         Assert.Equal(ms1.ToArray(), ms2.ToArray());
@@ -257,10 +257,10 @@ public class SecurityAndPrngTests : IDisposable
     [Fact]
     public void XboxPrng_WriteSectors_DifferentSeeds_DifferentOutput()
     {
-        var prng1 = new XboxPrng(0);
-        var prng2 = new XboxPrng(1);
-        using var ms1 = new MemoryStream();
-        using var ms2 = new MemoryStream();
+        XboxPrng prng1 = new(0);
+        XboxPrng prng2 = new(1);
+        using MemoryStream ms1 = new();
+        using MemoryStream ms2 = new();
         prng1.WriteSectors(ms1, 2);
         prng2.WriteSectors(ms2, 2);
         Assert.NotEqual(ms1.ToArray(), ms2.ToArray());
@@ -269,20 +269,20 @@ public class SecurityAndPrngTests : IDisposable
     [Fact]
     public void XboxPrng_SimulateSectors_AdvancesState()
     {
-        var prngA = new XboxPrng(42);
-        var prngB = new XboxPrng(42);
+        XboxPrng prngA = new(42);
+        XboxPrng prngB = new(42);
 
         // prngA: simulate 5 sectors then write 1
         prngA.SimulateSectors(5);
-        using var msA = new MemoryStream();
+        using MemoryStream msA = new();
         prngA.WriteSectors(msA, 1);
-        var afterSimulate = msA.ToArray();
+        byte[] afterSimulate = msA.ToArray();
 
         // prngB: write 6 sectors, discard first 5
-        using var msB = new MemoryStream();
+        using MemoryStream msB = new();
         prngB.WriteSectors(msB, 6);
-        var all = msB.ToArray();
-        var lastSector = all.Skip(5 * Constants.SectorSize).Take(Constants.SectorSize).ToArray();
+        byte[] all = msB.ToArray();
+        byte[] lastSector = all.Skip(5 * Constants.SectorSize).Take(Constants.SectorSize).ToArray();
 
         Assert.Equal(lastSector, afterSimulate);
     }
@@ -290,11 +290,11 @@ public class SecurityAndPrngTests : IDisposable
     [Fact]
     public void XboxPrng_SimulateSectors_Zero_DoesNotAdvance()
     {
-        var prng1 = new XboxPrng(7);
-        var prng2 = new XboxPrng(7);
+        XboxPrng prng1 = new(7);
+        XboxPrng prng2 = new(7);
         prng1.SimulateSectors(0);
-        using var ms1 = new MemoryStream();
-        using var ms2 = new MemoryStream();
+        using MemoryStream ms1 = new();
+        using MemoryStream ms2 = new();
         prng1.WriteSectors(ms1, 1);
         prng2.WriteSectors(ms2, 1);
         Assert.Equal(ms1.ToArray(), ms2.ToArray());
@@ -303,18 +303,18 @@ public class SecurityAndPrngTests : IDisposable
     [Fact]
     public void XboxPrng_WriteSectors_ToFileStream_WritesCorrectly()
     {
-        var prng = new XboxPrng(99);
-        var tmp = Path.Combine(Path.GetTempPath(), $"prng_{Guid.NewGuid():N}.bin");
+        XboxPrng prng = new(99);
+        string tmp = Path.Combine(Path.GetTempPath(), $"prng_{Guid.NewGuid():N}.bin");
         _tempFiles.Add(tmp);
-        using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+        using (FileStream fs = new(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
         {
             prng.WriteSectors(fs, 1);
         }
 
         Assert.Equal(Constants.SectorSize, new FileInfo(tmp).Length);
         // Write via MemoryStream and compare
-        var prng2 = new XboxPrng(99);
-        using var ms = new MemoryStream();
+        XboxPrng prng2 = new(99);
+        using MemoryStream ms = new();
         prng2.WriteSectors(ms, 1);
         Assert.Equal(ms.ToArray(), File.ReadAllBytes(tmp));
     }
@@ -323,12 +323,12 @@ public class SecurityAndPrngTests : IDisposable
     public void XboxPrng_TryGetSeed_RecoversSeedZero()
     {
         const uint seed = 0;
-        var prng = new XboxPrng(seed);
-        using var ms = new MemoryStream();
+        XboxPrng prng = new(seed);
+        using MemoryStream ms = new();
         prng.WriteSectors(ms, 2);
-        var sectors = ms.ToArray();
+        byte[] sectors = ms.ToArray();
         // TryGetSeed expects first 4096 bytes (2 sectors)
-        var ok = XboxPrng.TryGetSeed(sectors, out var recovered);
+        bool ok = XboxPrng.TryGetSeed(sectors, out uint recovered);
         Assert.True(ok);
         Assert.Equal(seed, recovered);
     }
@@ -337,11 +337,11 @@ public class SecurityAndPrngTests : IDisposable
     public void XboxPrng_TryGetSeed_RecoversSeed42()
     {
         const uint seed = 42;
-        var prng = new XboxPrng(seed);
-        using var ms = new MemoryStream();
+        XboxPrng prng = new(seed);
+        using MemoryStream ms = new();
         prng.WriteSectors(ms, 2);
-        var sectors = ms.ToArray();
-        var ok = XboxPrng.TryGetSeed(sectors, out var recovered);
+        byte[] sectors = ms.ToArray();
+        bool ok = XboxPrng.TryGetSeed(sectors, out uint recovered);
         Assert.True(ok);
         Assert.Equal(seed, recovered);
     }
@@ -351,11 +351,11 @@ public class SecurityAndPrngTests : IDisposable
     {
         // Test a seed that uses different FixedSeed index (seed & 7)
         const uint seed = 7; // last entry in FixedSeeds
-        var prng = new XboxPrng(seed);
-        using var ms = new MemoryStream();
+        XboxPrng prng = new(seed);
+        using MemoryStream ms = new();
         prng.WriteSectors(ms, 2);
-        var sectors = ms.ToArray();
-        var ok = XboxPrng.TryGetSeed(sectors, out var recovered);
+        byte[] sectors = ms.ToArray();
+        bool ok = XboxPrng.TryGetSeed(sectors, out uint recovered);
         Assert.True(ok);
         Assert.Equal(seed, recovered);
     }
@@ -363,11 +363,11 @@ public class SecurityAndPrngTests : IDisposable
     [Fact]
     public void XboxPrng_TryGetSeed_InvalidData_ReturnsFalse()
     {
-        var random = new byte[Constants.SectorSize * 2];
+        byte[] random = new byte[Constants.SectorSize * 2];
         new Random(123).NextBytes(random);
         // It's astronomically unlikely that random data matches any seed's PRNG output for 4096 bytes.
         // Should return false.
-        var ok = XboxPrng.TryGetSeed(random, out _);
+        bool ok = XboxPrng.TryGetSeed(random, out _);
         Assert.False(ok);
     }
 
@@ -376,9 +376,9 @@ public class SecurityAndPrngTests : IDisposable
     {
         // BUG-LIB-041: the search previously took no token and could burn CPU
         // for hours without any way to stop it.
-        using var cts = new CancellationTokenSource();
+        using CancellationTokenSource cts = new();
         cts.Cancel();
-        var random = new byte[Constants.SectorSize * 2];
+        byte[] random = new byte[Constants.SectorSize * 2];
         new Random(123).NextBytes(random);
 
         Assert.False(XboxPrng.TryGetSeed(random, out _, cts.Token));
@@ -387,28 +387,28 @@ public class SecurityAndPrngTests : IDisposable
     [Fact]
     public void XboxPrng_ExtractSeed_InvalidPath_Throws()
     {
-        var missing = Path.Combine(Path.GetTempPath(), $"missing_{Guid.NewGuid():N}.iso");
+        string missing = Path.Combine(Path.GetTempPath(), $"missing_{Guid.NewGuid():N}.iso");
         Assert.Throws<FileNotFoundException>(() => XboxPrng.ExtractSeed(missing, 0, quiet: true));
     }
 
     [Fact]
     public void XboxPrng_ExtractSeed_InvalidIso_ReturnsNull()
     {
-        var tmp = Path.Combine(Path.GetTempPath(), $"notxiso_{Guid.NewGuid():N}.bin");
+        string tmp = Path.Combine(Path.GetTempPath(), $"notxiso_{Guid.NewGuid():N}.bin");
         File.WriteAllBytes(tmp, new byte[Constants.SectorSize * 4]);
         _tempFiles.Add(tmp);
-        using var fs = new FileStream(tmp, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var result = XboxPrng.ExtractSeed(fs, 0, quiet: true);
+        using FileStream fs = new(tmp, FileMode.Open, FileAccess.Read, FileShare.Read);
+        uint? result = XboxPrng.ExtractSeed(fs, 0, quiet: true);
         Assert.Null(result);
     }
 
     [Fact]
     public void XboxPrng_ExtractSeed_StringPath_InvalidIso_ReturnsNull()
     {
-        var tmp = Path.Combine(Path.GetTempPath(), $"notxiso2_{Guid.NewGuid():N}.bin");
+        string tmp = Path.Combine(Path.GetTempPath(), $"notxiso2_{Guid.NewGuid():N}.bin");
         File.WriteAllBytes(tmp, new byte[Constants.SectorSize * 4]);
         _tempFiles.Add(tmp);
-        var result = XboxPrng.ExtractSeed(tmp, 0, quiet: true);
+        uint? result = XboxPrng.ExtractSeed(tmp, 0, quiet: true);
         Assert.Null(result);
     }
 }

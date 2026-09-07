@@ -74,13 +74,13 @@ The site is rendered with **Docsify** — a fixed **left sidebar** is provided b
 
 ```bash
 # Extract an ISO to a directory
-XISOSharp.Cli -d output_dir game.iso
+XISOSharp -d output_dir game.iso
 
 # Create an ISO from a directory
-XISOSharp.Cli -c source_dir
+XISOSharp -c source_dir
 
 # List contents
-XISOSharp.Cli -l game.iso
+XISOSharp -l game.iso
 ```
 
 ```csharp

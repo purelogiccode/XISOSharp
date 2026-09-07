@@ -1,3 +1,5 @@
+using XISOSharp.Models;
+
 namespace XISOSharp.Tests;
 
 using TestDataGenerator;
@@ -18,7 +20,7 @@ public class AuditXisoTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -33,7 +35,7 @@ public class AuditXisoTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_audit_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_audit_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -42,11 +44,11 @@ public class AuditXisoTests : IDisposable
     [Fact]
     public void AuditXiso_ValidIso_ReturnsValid()
     {
-        var outputDir = CreateTempDir();
-        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        var result = XisoReader.AuditXiso(isoPath);
+        AuditResult result = XisoReader.AuditXiso(isoPath);
 
         Assert.True(result.IsValid, $"Audit failed: {string.Join("; ", result.Issues)}");
         Assert.True(result.FilesChecked > 0);
@@ -57,11 +59,11 @@ public class AuditXisoTests : IDisposable
     [Fact]
     public void AuditXiso_ValidIso_CountsFilesCorrectly()
     {
-        var outputDir = CreateTempDir();
-        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        var result = XisoReader.AuditXiso(isoPath);
+        AuditResult result = XisoReader.AuditXiso(isoPath);
 
         // Test source has: file1.txt, file2.txt, binary.bin, test.xbe, subdir/subfile.txt, subdir/nested/deep.txt
         Assert.True(result.FilesChecked >= 5, $"Expected at least 5 files, got {result.FilesChecked}");
@@ -71,10 +73,10 @@ public class AuditXisoTests : IDisposable
     [Fact]
     public void AuditXiso_InvalidFile_ReturnsNotValid()
     {
-        var tempFile = Path.Combine(CreateTempDir(), "not_an_iso.bin");
+        string tempFile = Path.Combine(CreateTempDir(), "not_an_iso.bin");
         File.WriteAllBytes(tempFile, new byte[1024]);
 
-        var result = XisoReader.AuditXiso(tempFile);
+        AuditResult result = XisoReader.AuditXiso(tempFile);
 
         Assert.False(result.IsValid);
         Assert.NotEmpty(result.Issues);
@@ -83,17 +85,17 @@ public class AuditXisoTests : IDisposable
     [Fact]
     public void AuditXiso_TruncatedFile_ReportsIssues()
     {
-        var outputDir = CreateTempDir();
-        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
         // Truncate the file to half its size
-        var truncatedPath = Path.Combine(CreateTempDir(), "truncated.iso");
-        var originalBytes = File.ReadAllBytes(isoPath);
-        var halfLen = originalBytes.Length / 2;
+        string truncatedPath = Path.Combine(CreateTempDir(), "truncated.iso");
+        byte[] originalBytes = File.ReadAllBytes(isoPath);
+        int halfLen = originalBytes.Length / 2;
         File.WriteAllBytes(truncatedPath, originalBytes[..halfLen]);
 
-        var result = XisoReader.AuditXiso(truncatedPath);
+        AuditResult result = XisoReader.AuditXiso(truncatedPath);
 
         // Should either be invalid or have issues
         Assert.False(result is { IsValid: true, Issues.Count: 0 },
@@ -103,12 +105,12 @@ public class AuditXisoTests : IDisposable
     [Fact]
     public void AuditXiso_RandomData_ReturnsNotValid()
     {
-        var tempFile = Path.Combine(CreateTempDir(), "random.bin");
-        var data = new byte[4096];
+        string tempFile = Path.Combine(CreateTempDir(), "random.bin");
+        byte[] data = new byte[4096];
         new Random(42).NextBytes(data);
         File.WriteAllBytes(tempFile, data);
 
-        var result = XisoReader.AuditXiso(tempFile);
+        AuditResult result = XisoReader.AuditXiso(tempFile);
 
         Assert.False(result.IsValid);
         Assert.NotEmpty(result.Issues);
@@ -117,10 +119,10 @@ public class AuditXisoTests : IDisposable
     [Fact]
     public void AuditXiso_EmptyFile_ReturnsNotValid()
     {
-        var tempFile = Path.Combine(CreateTempDir(), "empty.bin");
+        string tempFile = Path.Combine(CreateTempDir(), "empty.bin");
         File.WriteAllBytes(tempFile, []);
 
-        var result = XisoReader.AuditXiso(tempFile);
+        AuditResult result = XisoReader.AuditXiso(tempFile);
 
         Assert.False(result.IsValid);
     }
@@ -128,23 +130,23 @@ public class AuditXisoTests : IDisposable
     [Fact]
     public void AuditXiso_NonExistentFile_ThrowsFileNotFoundException()
     {
-        var nonExistent = Path.Combine(CreateTempDir(), "no_such_file.iso");
+        string nonExistent = Path.Combine(CreateTempDir(), "no_such_file.iso");
         Assert.Throws<FileNotFoundException>(() => XisoReader.AuditXiso(nonExistent));
     }
 
     [Fact]
     public void AuditXiso_CreatedThenRewritten_ReturnsValid()
     {
-        var createDir = CreateTempDir();
-        var rewriteDir = CreateTempDir();
+        string createDir = CreateTempDir();
+        string rewriteDir = CreateTempDir();
 
-        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Rewrite(isoPath, rewriteDir, out var rewrittenPath);
+        XisoReader.Rewrite(isoPath, rewriteDir, out string? rewrittenPath);
         Assert.NotNull(rewrittenPath);
 
-        var result = XisoReader.AuditXiso(rewrittenPath);
+        AuditResult result = XisoReader.AuditXiso(rewrittenPath);
 
         Assert.True(result.IsValid, $"Audit of rewritten ISO failed: {string.Join("; ", result.Issues)}");
     }
@@ -152,11 +154,11 @@ public class AuditXisoTests : IDisposable
     [Fact]
     public void AuditXiso_FilesChecked_MatchesCount()
     {
-        var outputDir = CreateTempDir();
-        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        var result = XisoReader.AuditXiso(isoPath);
+        AuditResult result = XisoReader.AuditXiso(isoPath);
 
         // Verify consistency: if valid, files + dirs should be > 0
         if (result.IsValid)
@@ -169,15 +171,15 @@ public class AuditXisoTests : IDisposable
     [Fact]
     public void AuditXiso_EmptyIso_ReturnsValidWithZeroCounts()
     {
-        var srcDir = CreateTempDir();
+        string srcDir = CreateTempDir();
         // Create an ISO from a directory with only an empty_dir (no files)
         // The empty_dir will be represented as EmptySubdirectory
 
-        var outputDir = CreateTempDir();
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        var result = XisoReader.AuditXiso(isoPath);
+        AuditResult result = XisoReader.AuditXiso(isoPath);
 
         // Empty ISO should still be structurally valid
         Assert.True(result.IsValid, $"Empty ISO audit failed: {string.Join("; ", result.Issues)}");
@@ -186,20 +188,20 @@ public class AuditXisoTests : IDisposable
     [Fact]
     public void AuditXiso_AfterExtractAndRecreate_PreservesValidity()
     {
-        var createDir = CreateTempDir();
-        var extractDir = CreateTempDir();
-        var recreateDir = CreateTempDir();
+        string createDir = CreateTempDir();
+        string extractDir = CreateTempDir();
+        string recreateDir = CreateTempDir();
 
         // Create → Extract → Recreate → Audit
-        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out var isoPath1, null, null);
+        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out string? isoPath1, null, null);
         Assert.NotNull(isoPath1);
 
         XisoReader.Extract(isoPath1, extractDir, false);
 
-        XisoWriter.CreateXiso(extractDir, recreateDir, null, null, out var isoPath2, null, null);
+        XisoWriter.CreateXiso(extractDir, recreateDir, null, null, out string? isoPath2, null, null);
         Assert.NotNull(isoPath2);
 
-        var result = XisoReader.AuditXiso(isoPath2);
+        AuditResult result = XisoReader.AuditXiso(isoPath2);
 
         Assert.True(result.IsValid, $"Recreated ISO audit failed: {string.Join("; ", result.Issues)}");
     }

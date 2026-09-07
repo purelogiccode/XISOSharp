@@ -19,7 +19,7 @@ public sealed class XisoRangesEmptyDirTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var f in _tempFiles)
+        foreach (string f in _tempFiles)
         {
             if (File.Exists(f))
                 File.Delete(f);
@@ -34,11 +34,11 @@ public sealed class XisoRangesEmptyDirTests : IDisposable
     /// </summary>
     private string CreateImageWithEmptySubdirectory()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"xiso_empty_dir_{Guid.NewGuid():N}.iso");
+        string path = Path.Combine(Path.GetTempPath(), $"xiso_empty_dir_{Guid.NewGuid():N}.iso");
         const int tableBytes = 32;
         Span<byte> buf = stackalloc byte[tableBytes];
 
-        using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        using (FileStream fs = new(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
             // Header: magic + root sector (1) + root size (32). The file must span
             // the optional second header sector (0x10800): GetXisoRanges probes it
@@ -76,9 +76,9 @@ public sealed class XisoRangesEmptyDirTests : IDisposable
     [Fact]
     public void GetFileEntries_EmptySubdirectory_NoGarbageEntries()
     {
-        var path = CreateImageWithEmptySubdirectory();
-        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var entries = XisoRanges.GetFileEntries(fs, 0);
+        string path = CreateImageWithEmptySubdirectory();
+        using FileStream fs = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        List<(string Path, long Offset, uint Size)> entries = XisoRanges.GetFileEntries(fs, 0);
 
         // "D" is a directory, so there are no regular files; the all-0xFF table
         // must not contribute an entry. The old bug produced one entry whose
@@ -89,19 +89,19 @@ public sealed class XisoRangesEmptyDirTests : IDisposable
     [Fact]
     public void GetFileEntries_EmptySubdirectory_AllOffsetsInBounds()
     {
-        var path = CreateImageWithEmptySubdirectory();
-        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var entries = XisoRanges.GetFileEntries(fs, 0);
+        string path = CreateImageWithEmptySubdirectory();
+        using FileStream fs = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        List<(string Path, long Offset, uint Size)> entries = XisoRanges.GetFileEntries(fs, 0);
         Assert.All(entries, e => Assert.InRange(e.Offset, 0, fs.Length));
     }
 
     [Fact]
     public void Petrify_ImageWithEmptySubdirectory_Succeeds()
     {
-        var path = CreateImageWithEmptySubdirectory();
-        var skel = Path.ChangeExtension(path, ".skeleton.xiso");
+        string path = CreateImageWithEmptySubdirectory();
+        string skel = Path.ChangeExtension(path, ".skeleton.xiso");
         _tempFiles.Add(skel);
-        var hash = Path.ChangeExtension(path, ".hash");
+        string hash = Path.ChangeExtension(path, ".hash");
         _tempFiles.Add(hash);
 
         Assert.True(XisoSkeleton.Petrify(path, skel, hash, 0, true));

@@ -35,7 +35,7 @@ public class BoyerMooreBenchmarks
     [IterationSetup]
     public void IterationSetup()
     {
-        var rng = new Random(42 + HaystackSize);
+        Random rng = new(42 + HaystackSize);
         _tailHit = new byte[HaystackSize];
         rng.NextBytes(_tailHit);
         Constants.MediaEnable.CopyTo(_tailHit.AsSpan(_tailHit.Length - Constants.MediaEnableLength));
@@ -60,8 +60,8 @@ public class BoyerMooreBenchmarks
 
     private static bool ContainsPattern(byte[] haystack)
     {
-        var pattern = Constants.MediaEnable;
-        for (var i = 0; i + pattern.Length <= haystack.Length; i++)
+        byte[] pattern = Constants.MediaEnable;
+        for (int i = 0; i + pattern.Length <= haystack.Length; i++)
         {
             if (haystack.AsSpan(i, pattern.Length).SequenceEqual(pattern))
             {

@@ -32,7 +32,7 @@ internal static class CliCommands
     /// <returns>The extract argument list.</returns>
     internal static string[] Extract(IReadOnlyList<string> images, string? destDir, bool overwrite)
     {
-        var args = new List<string>();
+        List<string> args = new();
         if (!string.IsNullOrWhiteSpace(destDir))
         {
             args.Add("-d");
@@ -67,7 +67,7 @@ internal static class CliCommands
     /// <returns>The info argument list.</returns>
     internal static string[] Info(string image, string? path)
     {
-        var args = new List<string> { "-i", image };
+        List<string> args = new() { "-i", image };
         if (!string.IsNullOrWhiteSpace(path))
         {
             args.Add(path);
@@ -84,7 +84,7 @@ internal static class CliCommands
     /// <returns>The unpack argument list.</returns>
     internal static string[] Unpack(string image, string? destDir)
     {
-        var args = new List<string> { "--unpack", image };
+        List<string> args = new() { "--unpack", image };
         if (!string.IsNullOrWhiteSpace(destDir))
         {
             args.Add(destDir);
@@ -120,13 +120,13 @@ internal static class CliCommands
         bool disableXbePatch,
         bool overwrite)
     {
-        var args = new List<string> { "-c", sourceDir };
+        List<string> args = new() { "-c", sourceDir };
         if (!string.IsNullOrWhiteSpace(name))
         {
             args.Add(name);
         }
 
-        foreach (var exclude in excludes)
+        foreach (string exclude in excludes)
         {
             if (!string.IsNullOrWhiteSpace(exclude))
             {
@@ -175,7 +175,7 @@ internal static class CliCommands
         string? validateReport,
         bool overwrite)
     {
-        var args = new List<string> { "-r" };
+        List<string> args = new() { "-r" };
         if (!string.IsNullOrWhiteSpace(workDir))
         {
             args.Add("-d");
@@ -232,7 +232,7 @@ internal static class CliCommands
     /// <returns>The wipe argument list.</returns>
     internal static string[] Wipe(string image, string? output, bool overwrite)
     {
-        var args = new List<string> { "--wipe", OverwriteFlag(overwrite), image };
+        List<string> args = new() { "--wipe", OverwriteFlag(overwrite), image };
         if (!string.IsNullOrWhiteSpace(output))
         {
             args.Add(output);
@@ -250,7 +250,7 @@ internal static class CliCommands
     /// <returns>The trim argument list.</returns>
     internal static string[] Trim(string image, string? output, bool overwrite)
     {
-        var args = new List<string> { "--trim", OverwriteFlag(overwrite), image };
+        List<string> args = new() { "--trim", OverwriteFlag(overwrite), image };
         if (!string.IsNullOrWhiteSpace(output))
         {
             args.Add(output);
@@ -273,7 +273,7 @@ internal static class CliCommands
         string? securitySectors,
         bool overwrite)
     {
-        var args = new List<string> { "rebuild" };
+        List<string> args = new() { "rebuild" };
         args.AddRange(parts);
         args.Add("-o");
         args.Add(output);
@@ -305,7 +305,7 @@ internal static class CliCommands
         string? splitBytes,
         bool overwrite)
     {
-        var args = new List<string>
+        List<string> args = new()
         {
             "compress",
             "--ciso-level",
@@ -338,7 +338,7 @@ internal static class CliCommands
     /// <returns>The decompress argument list.</returns>
     internal static string[] Decompress(string cso, string? output, bool overwrite)
     {
-        var args = new List<string> { "decompress", cso };
+        List<string> args = new() { "decompress", cso };
         if (!string.IsNullOrWhiteSpace(output))
         {
             args.Add(output);
@@ -358,7 +358,7 @@ internal static class CliCommands
     /// <returns>The validate argument list.</returns>
     internal static string[] Validate(string source, string output, bool checksums, string? report)
     {
-        var args = new List<string> { "validate" };
+        List<string> args = new() { "validate" };
         if (checksums)
         {
             args.Add("--validate-checksums");
@@ -383,7 +383,7 @@ internal static class CliCommands
     /// <returns>The checksum argument list.</returns>
     internal static string[] Checksum(IReadOnlyList<string> images, bool silent)
     {
-        var args = new List<string> { "checksum" };
+        List<string> args = new() { "checksum" };
         args.AddRange(images);
         if (silent)
         {
@@ -410,7 +410,7 @@ internal static class CliCommands
         bool overwrite)
     {
         ArgumentException.ThrowIfNullOrEmpty(modeFlag);
-        var args = new List<string> { "--batch", dir };
+        List<string> args = new() { "--batch", dir };
         if (recursive)
         {
             args.Add("--batch-recursive");

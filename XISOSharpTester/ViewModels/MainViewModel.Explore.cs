@@ -3,9 +3,11 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Serilog;
 using XISOSharp;
+using XISOSharp.Models;
 using XISOSharpTester.Logging;
 using XisoNode = XISOSharp.ExplorerNode;
 
@@ -204,7 +206,7 @@ internal partial class MainViewModel
     {
         try
         {
-            var dlg = new OpenFileDialog
+            OpenFileDialog dlg = new()
             {
                 Title = "Select XISO image to explore",
                 Filter = "XISO images (*.iso;*.cso)|*.iso;*.cso|All files (*.*)|*.*"
@@ -229,7 +231,7 @@ internal partial class MainViewModel
         if (IsExplorerBusy)
             return;
 
-        var path = refresh && _explorer is not null
+        string path = refresh && _explorer is not null
             ? _explorer.IsoPath
             : ExploreImagePath.Trim();
         if (string.IsNullOrEmpty(path))
@@ -242,9 +244,9 @@ internal partial class MainViewModel
         ExplorerStatusText = $"Opening {Path.GetFileName(path)}...";
         try
         {
-            var (explorer, roots) = await Task.Run(() =>
+            (XisoExplorer explorer, IReadOnlyList<XisoNode> roots) = await Task.Run(() =>
             {
-                var opened = new XisoExplorer(path);
+                XisoExplorer opened = new(path);
                 return (opened, opened.ListChildren("/"));
             }).ConfigureAwait(false);
 
@@ -253,11 +255,11 @@ internal partial class MainViewModel
                 _explorer = explorer;
                 ExploreImagePath = path;
                 ExplorerRoots.Clear();
-                foreach (var node in roots)
+                foreach (XisoNode node in roots)
                     ExplorerRoots.Add(new ExplorerTreeNode(node, LoadExploreChildren));
                 SetSelectedExplorerNode(null);
                 ExplorerHashText = string.Empty;
-                var vol = explorer.Volume;
+                VolumeInfo vol = explorer.Volume;
                 ExploreVolumeText = string.Format(CultureInfo.InvariantCulture,
                     "Volume: valid XISO — {0:N0} bytes ({1:N0} sectors), root table @ sector {2} ({3:N0} bytes), disc lseek {4}.",
                     vol.FileLength, vol.TotalSectors, vol.RootDirSector, vol.RootDirSize, vol.DiscLseek);
@@ -328,50 +330,58 @@ internal partial class MainViewModel
 
     private async void LoadXexForSelectionAsync(ExplorerTreeNode node)
     {
-        // async void by design (TST-003): selection-changed has no Task to observe,
-        // so faults are caught internally and logged; no unobserved Task escapes.
-        var explorer = _explorer;
-        if (explorer is null)
-            return;
-
         try
         {
-            var xex = await Task.Run(() => explorer.GetXexInfo(node.FullPath)).ConfigureAwait(false);
-            OnUi(() =>
+            // async void by design (TST-003): selection-changed has no Task to observe,
+            // so faults are caught internally and logged; no unobserved Task escapes.
+            XisoExplorer? explorer = _explorer;
+            if (explorer is null)
+                return;
+
+            try
             {
-                if (!ReferenceEquals(SelectedExplorerNode, node))
-                    return;
-
-                if (xex is null)
+                XexInfo? xex = await Task.Run(() => explorer.GetXexInfo(node.FullPath)).ConfigureAwait(false);
+                OnUi(() =>
                 {
-                    ShowExplorerXex = false;
-                    return;
-                }
+                    if (!ReferenceEquals(SelectedExplorerNode, node))
+                        return;
 
-                ExplorerXexText = string.Format(CultureInfo.InvariantCulture,
-                    "XEX2 executable\nModule flags: 0x{0:X}\nEntry point: 0x{1:X8}\nImage base: 0x{2:X8}\n" +
-                    "Image size: 0x{3:X}  Load address: 0x{4:X8}\nRegion: 0x{5:X}  Media types: 0x{6:X}\n" +
-                    "Media ID: 0x{7:X8}  Title ID: 0x{8:X8}  Version: {9}\nPlatform: {10}  Disc: {11}/{12}\n" +
-                    "Encryption: {13}  Compression: {14}",
-                    xex.ModuleFlags, xex.EntryPoint, xex.ImageBaseAddress,
-                    xex.ImageSize, xex.LoadAddress, xex.Region, xex.AllowedMediaTypes,
-                    xex.MediaId, xex.TitleId, xex.Version,
-                    xex.Platform, xex.DiscNumber, xex.DiscCount,
-                    xex.EncryptionType, xex.CompressionType);
-                ShowExplorerXex = true;
-            });
+                    if (xex is null)
+                    {
+                        ShowExplorerXex = false;
+                        return;
+                    }
+
+                    ExplorerXexText = string.Format(CultureInfo.InvariantCulture,
+                        "XEX2 executable\nModule flags: 0x{0:X}\nEntry point: 0x{1:X8}\nImage base: 0x{2:X8}\n" +
+                        "Image size: 0x{3:X}  Load address: 0x{4:X8}\nRegion: 0x{5:X}  Media types: 0x{6:X}\n" +
+                        "Media ID: 0x{7:X8}  Title ID: 0x{8:X8}  Version: {9}\nPlatform: {10}  Disc: {11}/{12}\n" +
+                        "Encryption: {13}  Compression: {14}",
+                        xex.ModuleFlags, xex.EntryPoint, xex.ImageBaseAddress,
+                        xex.ImageSize, xex.LoadAddress, xex.Region, xex.AllowedMediaTypes,
+                        xex.MediaId, xex.TitleId, xex.Version,
+                        xex.Platform, xex.DiscNumber, xex.DiscCount,
+                        xex.EncryptionType, xex.CompressionType);
+                    ShowExplorerXex = true;
+                });
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Explore XEX probe failed for {Path}", node.FullPath);
+                BugReporter.ReportException(ex, $"Explore XEX probe failed for {node.FullPath}");
+            }
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Explore XEX probe failed for {Path}", node.FullPath);
-            BugReporter.ReportException(ex, $"Explore XEX probe failed for {node.FullPath}");
+            Log.Error(ex, "Error in method LoadXexForSelectionAsync");
+            BugReporter.ReportException(ex, "Error in method LoadXexForSelectionAsync");
         }
     }
 
     private async Task CopyOutNodeAsync()
     {
-        var node = SelectedExplorerNode;
-        var explorer = _explorer;
+        ExplorerTreeNode? node = SelectedExplorerNode;
+        XisoExplorer? explorer = _explorer;
         if (node?.IsDummy != false || explorer is null)
         {
             AddLog("Select a file or directory in the explore tree first.");
@@ -386,14 +396,14 @@ internal partial class MainViewModel
         {
             if (node.IsDirectory)
             {
-                var folder = new OpenFolderDialog { Title = $"Copy '{node.Name}' to folder" };
+                OpenFolderDialog folder = new() { Title = $"Copy '{node.Name}' to folder" };
                 if (folder.ShowDialog() != true)
                     return;
                 destPath = Path.Combine(folder.FolderName, node.Name);
             }
             else
             {
-                var save = new SaveFileDialog { Title = $"Copy '{node.Name}' out", FileName = node.Name };
+                SaveFileDialog save = new() { Title = $"Copy '{node.Name}' out", FileName = node.Name };
                 if (save.ShowDialog() != true)
                     return;
                 destPath = save.FileName;
@@ -437,8 +447,8 @@ internal partial class MainViewModel
 
     private async Task HashNodeAsync()
     {
-        var node = SelectedExplorerNode;
-        var explorer = _explorer;
+        ExplorerTreeNode? node = SelectedExplorerNode;
+        XisoExplorer? explorer = _explorer;
         if (node?.IsDummy != false || explorer is null)
         {
             AddLog("Select a file or directory in the explore tree first.");
@@ -458,7 +468,7 @@ internal partial class MainViewModel
         ExplorerStatusText = $"Hashing {node.FullPath}...";
         try
         {
-            var hex = await Task.Run(() => explorer.ComputeHashHex(node.FullPath, HashAlgorithmName.SHA256))
+            string? hex = await Task.Run(() => explorer.ComputeHashHex(node.FullPath, HashAlgorithmName.SHA256))
                 .ConfigureAwait(false);
             OnUi(() =>
             {
@@ -486,7 +496,7 @@ internal partial class MainViewModel
 
     private static void OnUi(Action action)
     {
-        var dispatcher = Application.Current?.Dispatcher;
+        Dispatcher? dispatcher = Application.Current?.Dispatcher;
         if (dispatcher is null)
         {
             // No dispatcher (unit tests, shutdown, design-time): execute synchronously

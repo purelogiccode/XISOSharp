@@ -21,7 +21,7 @@ public class XisoFilesystemTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -36,7 +36,7 @@ public class XisoFilesystemTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -74,11 +74,11 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void LocalFilesystem_CreateFile_WritesUnderRoot()
     {
-        var root = CreateTempDir("xiso_fs_root");
-        var fs = new LocalFilesystem(root);
+        string root = CreateTempDir("xiso_fs_root");
+        LocalFilesystem fs = new(root);
         fs.CreateDirectory("sub");
 
-        using (var s = fs.CreateFile("sub/a.bin"))
+        using (Stream s = fs.CreateFile("sub/a.bin"))
         {
             s.Write([1, 2, 3, 4]);
         }
@@ -89,8 +89,8 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void LocalFilesystem_CreateFile_MissingDirectory_Throws()
     {
-        var root = CreateTempDir("xiso_fs_root");
-        var fs = new LocalFilesystem(root);
+        string root = CreateTempDir("xiso_fs_root");
+        LocalFilesystem fs = new(root);
 
         Assert.Throws<DirectoryNotFoundException>(() => fs.CreateFile("no/such/dir/f.bin"));
     }
@@ -98,9 +98,9 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void LocalFilesystem_ExistsAndLength_MissingReturnsMinusOne()
     {
-        var root = CreateTempDir("xiso_fs_root");
-        var fs = new LocalFilesystem(root);
-        var path = Path.Combine(root, "f.bin");
+        string root = CreateTempDir("xiso_fs_root");
+        LocalFilesystem fs = new(root);
+        string path = Path.Combine(root, "f.bin");
         File.WriteAllBytes(path, "\t\t\t"u8.ToArray());
 
         Assert.True(fs.FileExists("f.bin"));
@@ -113,17 +113,17 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void LocalFilesystem_LeadingSlashAndSeparators_NormalizedToSameFile()
     {
-        var root = CreateTempDir("xiso_fs_root");
-        var fs = new LocalFilesystem(root);
+        string root = CreateTempDir("xiso_fs_root");
+        LocalFilesystem fs = new(root);
         fs.CreateDirectory("/d1");
 
-        using (var s = fs.CreateFile("/d1/f.txt"))
+        using (Stream s = fs.CreateFile("/d1/f.txt"))
         {
             s.Write([1, 1]);
         }
 
         // Re-creating via the other spelling truncates the same file.
-        using (var s = fs.CreateFile("d1\\f.txt"))
+        using (Stream s = fs.CreateFile("d1\\f.txt"))
         {
             s.Write([2]);
         }
@@ -135,14 +135,14 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void LocalFilesystem_NullRoot_ResolvesAgainstCurrentDirectory()
     {
-        var cwd = CreateTempDir("xiso_fs_cwd");
-        var previous = Directory.GetCurrentDirectory();
+        string cwd = CreateTempDir("xiso_fs_cwd");
+        string previous = Directory.GetCurrentDirectory();
         try
         {
             Directory.SetCurrentDirectory(cwd);
-            var fs = LocalFilesystem.Instance;
+            LocalFilesystem fs = LocalFilesystem.Instance;
 
-            using (var s = fs.CreateFile("rel.bin"))
+            using (Stream s = fs.CreateFile("rel.bin"))
             {
                 s.Write([7]);
             }
@@ -161,8 +161,8 @@ public class XisoFilesystemTests : IDisposable
     {
         // BUG-LIB-019: ".." climbs and rooted spellings must never resolve
         // outside the destination root.
-        var root = CreateTempDir("xiso_fs_root");
-        var fs = new LocalFilesystem(root);
+        string root = CreateTempDir("xiso_fs_root");
+        LocalFilesystem fs = new(root);
 
         Assert.False(fs.FileExists("../evil.bin"));
         Assert.Equal(-1, fs.FileLength("../evil.bin"));
@@ -170,7 +170,7 @@ public class XisoFilesystemTests : IDisposable
         Assert.Throws<UnauthorizedAccessException>(() => fs.CreateDirectory("../evil"));
         Assert.Throws<UnauthorizedAccessException>(() => fs.CreateFile("../evil.bin"));
 
-        var parent = Path.GetDirectoryName(root)!;
+        string parent = Path.GetDirectoryName(root)!;
         Assert.False(File.Exists(Path.Combine(parent, "evil.bin")));
         Assert.False(Directory.Exists(Path.Combine(parent, "evil")));
     }
@@ -182,9 +182,9 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void MemoryFilesystem_CommitsOnDispose_RecreateReplaces()
     {
-        var fs = new MemoryFilesystem();
+        MemoryFilesystem fs = new();
 
-        using (var s = fs.CreateFile("a.bin"))
+        using (Stream s = fs.CreateFile("a.bin"))
         {
             s.Write([1, 2, 3, 4, 5]);
         }
@@ -192,7 +192,7 @@ public class XisoFilesystemTests : IDisposable
         Assert.Equal([1, 2, 3, 4, 5], fs.ReadAllBytes("a.bin"));
         Assert.Equal(5, fs.FileLength("a.bin"));
 
-        using (var s = fs.CreateFile("a.bin"))
+        using (Stream s = fs.CreateFile("a.bin"))
         {
             s.Write([9]);
         }
@@ -204,9 +204,9 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void MemoryFilesystem_AutoCreatesParents_AndTracksDirectories()
     {
-        var fs = new MemoryFilesystem();
+        MemoryFilesystem fs = new();
 
-        using (var s = fs.CreateFile("/x/y/z.bin"))
+        using (Stream s = fs.CreateFile("/x/y/z.bin"))
         {
             s.Write([1]);
         }
@@ -220,7 +220,7 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void MemoryFilesystem_EmptyFile_LengthZero()
     {
-        var fs = new MemoryFilesystem();
+        MemoryFilesystem fs = new();
         using (fs.CreateFile("empty.bin"))
         {
         }
@@ -233,7 +233,7 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void MemoryFilesystem_MissingFile_MinusOne()
     {
-        var fs = new MemoryFilesystem();
+        MemoryFilesystem fs = new();
         Assert.False(fs.FileExists("nope.bin"));
         Assert.Equal(-1, fs.FileLength("nope.bin"));
     }
@@ -241,7 +241,7 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void MemoryFilesystem_CreateFileAtRoot_Throws()
     {
-        var fs = new MemoryFilesystem();
+        MemoryFilesystem fs = new();
         Assert.Throws<ArgumentException>(() => fs.CreateFile("/"));
     }
 
@@ -252,30 +252,30 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void ShouldSkip_FilesystemOverload_MatchesMemorySemantics()
     {
-        var fs = new MemoryFilesystem();
-        using (var s = fs.CreateFile("a.bin"))
+        MemoryFilesystem fs = new();
+        using (Stream s = fs.CreateFile("a.bin"))
         {
             s.Write(new byte[10]);
         }
 
-        var skip = new UnpackOptions { SkipExisting = true };
+        UnpackOptions skip = new() { SkipExisting = true };
         Assert.True(skip.ShouldSkip("a.bin", 10, fs));
         Assert.False(skip.ShouldSkip("a.bin", 11, fs));
         Assert.False(skip.ShouldSkip("missing.bin", 10, fs));
         Assert.False(skip.ShouldSkip("", 10, fs));
 
-        var noSkip = new UnpackOptions();
+        UnpackOptions noSkip = new();
         Assert.False(noSkip.ShouldSkip("a.bin", 10, fs));
     }
 
     [Fact]
     public void ShouldSkip_LegacyOverload_StillProbesDisk()
     {
-        var dir = CreateTempDir("xiso_fs_skip");
-        var path = Path.Combine(dir, "on_disk.bin");
+        string dir = CreateTempDir("xiso_fs_skip");
+        string path = Path.Combine(dir, "on_disk.bin");
         File.WriteAllBytes(path, new byte[4]);
 
-        var skip = new UnpackOptions { SkipExisting = true };
+        UnpackOptions skip = new() { SkipExisting = true };
         Assert.True(skip.ShouldSkip(path, 4));
         Assert.False(skip.ShouldSkip(path, 5));
         Assert.False(skip.ShouldSkip(Path.Combine(dir, "nope.bin"), 4));
@@ -289,8 +289,8 @@ public class XisoFilesystemTests : IDisposable
 
     private static Dictionary<string, byte[]> HashDiskTree(string root)
     {
-        var hashes = new Dictionary<string, byte[]>(StringComparer.Ordinal);
-        foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+        Dictionary<string, byte[]> hashes = new(StringComparer.Ordinal);
+        foreach (string file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
         {
             hashes[NormalizeRel(Path.GetRelativePath(root, file))] = SHA256.HashData(File.ReadAllBytes(file));
         }
@@ -308,19 +308,19 @@ public class XisoFilesystemTests : IDisposable
     {
         Assert.True(File.Exists(FixtureIsoPath), $"Reference fixture missing: {FixtureIsoPath}");
 
-        var memory = new MemoryFilesystem();
+        MemoryFilesystem memory = new();
         Assert.Equal(0, XisoReader.UnpackImage(FixtureIsoPath, memory));
 
-        var diskDir = CreateTempDir("xiso_fs_disk");
+        string diskDir = CreateTempDir("xiso_fs_disk");
         Assert.Equal(0, XisoReader.Extract(FixtureIsoPath, diskDir, false));
 
-        var expectedFiles = HashDiskTree(diskDir);
+        Dictionary<string, byte[]> expectedFiles = HashDiskTree(diskDir);
         Assert.NotEmpty(expectedFiles);
         Assert.Equal(
             expectedFiles.Keys.OrderBy(static k => k, StringComparer.Ordinal),
             memory.FileNames.OrderBy(static k => k, StringComparer.Ordinal),
             StringComparer.Ordinal);
-        foreach (var (name, hash) in expectedFiles)
+        foreach ((string name, byte[] hash) in expectedFiles)
         {
             Assert.True(SHA256.HashData(memory.ReadAllBytes(name)).SequenceEqual(hash),
                 $"content mismatch in memory filesystem: {name}");
@@ -333,11 +333,11 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void UnpackImage_StreamOverload_MatchesPathOverload()
     {
-        var byPath = new MemoryFilesystem();
+        MemoryFilesystem byPath = new();
         Assert.Equal(0, XisoReader.UnpackImage(FixtureIsoPath, byPath));
 
-        var byStream = new MemoryFilesystem();
-        using (var stream = File.OpenRead(FixtureIsoPath))
+        MemoryFilesystem byStream = new();
+        using (FileStream stream = File.OpenRead(FixtureIsoPath))
         {
             Assert.Equal(0, XisoReader.UnpackImage(stream, "test_fixture.iso", byStream));
         }
@@ -345,7 +345,7 @@ public class XisoFilesystemTests : IDisposable
         Assert.Equal(
             byPath.FileNames.OrderBy(static k => k, StringComparer.Ordinal),
             byStream.FileNames.OrderBy(static k => k, StringComparer.Ordinal));
-        foreach (var name in byPath.FileNames)
+        foreach (string name in byPath.FileNames)
         {
             Assert.True(byPath.ReadAllBytes(name).SequenceEqual(byStream.ReadAllBytes(name)),
                 $"stream overload content mismatch: {name}");
@@ -355,13 +355,13 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void UnpackImage_LocalFilesystem_MatchesLegacyUnpack_AndNeverChangesCwd()
     {
-        var cwdBefore = Directory.GetCurrentDirectory();
+        string cwdBefore = Directory.GetCurrentDirectory();
 
-        var root = CreateTempDir("xiso_fs_local_root");
+        string root = CreateTempDir("xiso_fs_local_root");
         Assert.Equal(0, XisoReader.UnpackImage(FixtureIsoPath, new LocalFilesystem(root)));
         Assert.Equal(cwdBefore, Directory.GetCurrentDirectory());
 
-        var legacy = CreateTempDir("xiso_fs_local_legacy");
+        string legacy = CreateTempDir("xiso_fs_local_legacy");
         Assert.Equal(0, XisoReader.Extract(FixtureIsoPath, legacy, false));
 
         Assert.Equal(
@@ -372,9 +372,9 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void UnpackImage_MemoryFilesystem_ReportsProgress()
     {
-        var memory = new MemoryFilesystem();
-        var added = new List<ProgressInfo>();
-        var chunks = new List<ProgressInfo>();
+        MemoryFilesystem memory = new();
+        List<ProgressInfo> added = new();
+        List<ProgressInfo> chunks = new();
 
         Assert.Equal(0, XisoReader.UnpackImage(FixtureIsoPath, memory, progress: new InlineProgress(info =>
         {
@@ -393,12 +393,12 @@ public class XisoFilesystemTests : IDisposable
 
         // Every nonzero file reports per-chunk progress ending at its full size;
         // zero-byte files emit no chunk events.
-        var lastPerPath = new Dictionary<string, ProgressInfo>(StringComparer.OrdinalIgnoreCase);
-        foreach (var chunk in chunks)
+        Dictionary<string, ProgressInfo> lastPerPath = new(StringComparer.OrdinalIgnoreCase);
+        foreach (ProgressInfo chunk in chunks)
         {
             Assert.NotNull(chunk.Path);
             Assert.True(chunk.Size <= chunk.Count, $"progress overshoot for {chunk.Path}");
-            if (lastPerPath.TryGetValue(chunk.Path!, out var previous))
+            if (lastPerPath.TryGetValue(chunk.Path!, out ProgressInfo previous))
             {
                 Assert.True(chunk.Size > previous.Size, $"non-monotonic progress for {chunk.Path}");
             }
@@ -406,9 +406,9 @@ public class XisoFilesystemTests : IDisposable
             lastPerPath[chunk.Path!] = chunk;
         }
 
-        foreach (var name in memory.FileNames.Where(n => memory.FileLength(n) > 0))
+        foreach (string name in memory.FileNames.Where(n => memory.FileLength(n) > 0))
         {
-            var internalPath = "/" + name;
+            string internalPath = "/" + name;
             Assert.True(lastPerPath.ContainsKey(internalPath), $"no FileProgress events for {internalPath}");
             Assert.Equal(memory.FileLength(name), lastPerPath[internalPath].Count);
             Assert.Equal(memory.FileLength(name), lastPerPath[internalPath].Size);
@@ -420,26 +420,26 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void UnpackImage_MemoryFilesystem_SkipExisting_Resumes()
     {
-        var memory = new MemoryFilesystem();
+        MemoryFilesystem memory = new();
         Assert.Equal(0, XisoReader.UnpackImage(FixtureIsoPath, memory));
-        var fullNames = memory.FileNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> fullNames = memory.FileNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // Same-size placeholders stay untouched; the whole tree re-lists.
-        var resumed = new MemoryFilesystem();
-        using (var s = resumed.CreateFile("readme.txt"))
+        MemoryFilesystem resumed = new();
+        using (Stream s = resumed.CreateFile("readme.txt"))
         {
             s.Write(new byte[(int)memory.FileLength("readme.txt")]);
         }
 
-        var options = new UnpackOptions { SkipExisting = true };
+        UnpackOptions options = new() { SkipExisting = true };
         Assert.Equal(0, XisoReader.UnpackImage(FixtureIsoPath, resumed, options: options));
         Assert.Equal(fullNames.OrderBy(static k => k, StringComparer.Ordinal),
             resumed.FileNames.OrderBy(static k => k, StringComparer.Ordinal));
         Assert.Equal(new byte[(int)memory.FileLength("readme.txt")], resumed.ReadAllBytes("readme.txt"));
 
         // Without SkipExisting the placeholder is overwritten with real content.
-        var rewritten = new MemoryFilesystem();
-        using (var s = rewritten.CreateFile("readme.txt"))
+        MemoryFilesystem rewritten = new();
+        using (Stream s = rewritten.CreateFile("readme.txt"))
         {
             s.Write(new byte[(int)memory.FileLength("readme.txt")]);
         }
@@ -451,16 +451,16 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void UnpackImage_MemoryFilesystem_ContinueOnError_RecordsFailureAndContinues()
     {
-        var inner = new MemoryFilesystem();
-        var failing = new ThrowingFilesystem(inner, "/readme.txt");
+        MemoryFilesystem inner = new();
+        ThrowingFilesystem failing = new(inner, "/readme.txt");
 
-        var ex = Assert.Throws<ExtractErrorException>(() =>
+        ExtractErrorException ex = Assert.Throws<ExtractErrorException>(() =>
             XisoReader.UnpackImage(FixtureIsoPath, failing,
                 options: new UnpackOptions { ContinueOnError = true }));
         Assert.Contains("readme.txt", ex.Message, StringComparison.Ordinal);
 
         // Every other file still landed in the inner filesystem.
-        var healthy = new MemoryFilesystem();
+        MemoryFilesystem healthy = new();
         Assert.Equal(0, XisoReader.UnpackImage(FixtureIsoPath, healthy));
         Assert.Equal(
             healthy.FileNames.Where(static n => !n.Equals("readme.txt", StringComparison.OrdinalIgnoreCase))
@@ -471,17 +471,17 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void UnpackImage_MemoryFilesystem_TruncatedImage_ThrowsNamedError()
     {
-        var full = File.ReadAllBytes(FixtureIsoPath);
+        byte[] full = File.ReadAllBytes(FixtureIsoPath);
         Assert.True(full.Length > 1024 * 1024);
-        var truncatedPath = CreateTempDir("xiso_fs_trunc");
-        var truncated = Path.Combine(truncatedPath, "cut.iso");
+        string truncatedPath = CreateTempDir("xiso_fs_trunc");
+        string truncated = Path.Combine(truncatedPath, "cut.iso");
         File.WriteAllBytes(truncated, full.AsSpan(0, 700 * 1024).ToArray());
 
-        var memory = new MemoryFilesystem();
+        MemoryFilesystem memory = new();
         // The walk hits the truncated image's first out-of-range pointer — the
         // $SystemUpdate table lives past the cut — and fails with a named
         // structural error before silently unpacking garbage.
-        var ex = Assert.Throws<XisoFormatException>(() => XisoReader.UnpackImage(truncated, memory));
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.UnpackImage(truncated, memory));
         Assert.Contains("invalid TOC entry", ex.Message, StringComparison.Ordinal);
         Assert.Contains("/$SystemUpdate", ex.Message, StringComparison.Ordinal);
     }
@@ -489,9 +489,9 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void UnpackImage_MemoryFilesystem_Cancellation_StopsMidRun()
     {
-        using var cts = new CancellationTokenSource();
-        var cancelled = false;
-        var memory = new MemoryFilesystem();
+        using CancellationTokenSource cts = new();
+        bool cancelled = false;
+        MemoryFilesystem memory = new();
 
         Assert.Throws<OperationCanceledException>(() => XisoReader.UnpackImage(FixtureIsoPath, memory,
             cancellationToken: cts.Token,
@@ -512,14 +512,14 @@ public class XisoFilesystemTests : IDisposable
     [Fact]
     public void UnpackImage_MemoryFilesystem_EmptyImage_ThrowsXisoEmpty()
     {
-        var src = CreateTempDir("xiso_fs_empty_src");
+        string src = CreateTempDir("xiso_fs_empty_src");
         File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
-        var outDir = CreateTempDir("xiso_fs_empty_out");
-        Assert.Equal(0, XisoWriter.CreateXiso(src, outDir, null, null, out var isoPath, null, null));
+        string outDir = CreateTempDir("xiso_fs_empty_out");
+        Assert.Equal(0, XisoWriter.CreateXiso(src, outDir, null, null, out string? isoPath, null, null));
 
-        var img = File.ReadAllBytes(isoPath!);
+        byte[] img = File.ReadAllBytes(isoPath!);
         Array.Clear(img, Constants.HeaderOffset + Constants.HeaderDataLength, 8);
-        var bad = Path.Combine(outDir, "empty.iso");
+        string bad = Path.Combine(outDir, "empty.iso");
         File.WriteAllBytes(bad, img);
 
         Assert.Throws<XisoEmptyException>(() => XisoReader.UnpackImage(bad, new MemoryFilesystem()));
@@ -539,7 +539,7 @@ public class XisoFilesystemTests : IDisposable
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             XisoReader.UnpackImage(FixtureIsoPath, new MemoryFilesystem(), skipSectors: -1));
-        using var stream = File.OpenRead(FixtureIsoPath);
+        using FileStream stream = File.OpenRead(FixtureIsoPath);
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             XisoReader.UnpackImage(stream, "test_fixture.iso", new MemoryFilesystem(), skipSectors: -1));
     }

@@ -28,11 +28,11 @@ internal static class CisoSplitFile
     /// <summary>Opens every existing part for a split path such as <c>game.1.cso</c>.</summary>
     public static List<FileStream> OpenParts(string firstPartPath)
     {
-        var baseName = firstPartPath[..^PartSuffixLength];
-        var parts = new List<FileStream>();
-        for (var i = 0;; i++)
+        string baseName = firstPartPath[..^PartSuffixLength];
+        List<FileStream> parts = new();
+        for (int i = 0;; i++)
         {
-            var partPath = PartPath(baseName, i);
+            string partPath = PartPath(baseName, i);
             if (!File.Exists(partPath)) break;
             parts.Add(new FileStream(partPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536));
         }

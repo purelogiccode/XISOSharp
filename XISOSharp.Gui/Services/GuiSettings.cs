@@ -21,7 +21,7 @@ internal sealed class GuiSettings
     {
         get
         {
-            var dir = Path.Combine(
+            string dir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "XISOSharp");
             return Path.Combine(dir, "gui-settings.json");
@@ -38,7 +38,7 @@ internal sealed class GuiSettings
     {
         try
         {
-            var json = File.ReadAllText(SettingsPath);
+            string json = File.ReadAllText(SettingsPath);
             return JsonSerializer.Deserialize<GuiSettings>(json) ?? new GuiSettings();
         }
         catch (FileNotFoundException)
@@ -73,10 +73,10 @@ internal sealed class GuiSettings
     {
         try
         {
-            var path = SettingsPath;
-            var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmssfff",
+            string path = SettingsPath;
+            string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmssfff",
                 System.Globalization.CultureInfo.InvariantCulture);
-            var backup = $"{path}.corrupt-{stamp}.bak";
+            string backup = $"{path}.corrupt-{stamp}.bak";
             try
             {
                 File.Move(path, backup);
@@ -102,9 +102,9 @@ internal sealed class GuiSettings
     /// </summary>
     internal void Save()
     {
-        var path = SettingsPath;
+        string path = SettingsPath;
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var tmp = Path.Combine(
+        string tmp = Path.Combine(
             Path.GetDirectoryName(path)!,
             $"gui-settings.{Guid.NewGuid():N}.tmp");
         try

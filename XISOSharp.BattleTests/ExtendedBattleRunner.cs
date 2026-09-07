@@ -43,12 +43,12 @@ internal static class ExtendedBattleRunner
     public static PerFileBattleResult RunExtendedForIso(
         string path, XboxKitWrapper? xk, XdvdfsWrapper? xd, bool keepSandbox = false)
     {
-        var sw = Stopwatch.StartNew();
-        var fi = new FileInfo(path);
-        var result = new PerFileBattleResult { FilePath = path, FileName = "EXT:" + fi.Name, FileSize = fi.Length };
+        Stopwatch sw = Stopwatch.StartNew();
+        FileInfo fi = new(path);
+        PerFileBattleResult result = new() { FilePath = path, FileName = "EXT:" + fi.Name, FileSize = fi.Length };
 
-        var saveQuiet = Logger.Quiet;
-        var saveRealQuiet = Logger.RealQuiet;
+        bool saveQuiet = Logger.Quiet;
+        bool saveRealQuiet = Logger.RealQuiet;
         Logger.Quiet = true;
         Logger.RealQuiet = true;
         string? sandbox = null;
@@ -67,7 +67,7 @@ internal static class ExtendedBattleRunner
                 return result;
             }
 
-            var workInput = Path.Combine(sandbox, "input.iso");
+            string workInput = Path.Combine(sandbox, "input.iso");
             File.Copy(path, workInput);
 
             long isoOffset;
@@ -144,12 +144,12 @@ internal static class ExtendedBattleRunner
             {
                 xkDir = Path.Combine(sandbox, "xk");
                 Directory.CreateDirectory(xkDir);
-                var xkInput = Path.Combine(xkDir, "input.iso");
+                string xkInput = Path.Combine(xkDir, "input.iso");
                 File.Copy(workInput, xkInput);
                 xk.SplitAll(xkDir, xkInput);
             }
 
-            var csDir = Path.Combine(sandbox, "cs");
+            string csDir = Path.Combine(sandbox, "cs");
             Directory.CreateDirectory(csDir);
 
             if (isRedump)
@@ -178,8 +178,8 @@ internal static class ExtendedBattleRunner
             }
 
             // ---- xdvdfs oracle side (plain XISOs only) ----
-            var plainXisos = new List<(string Tag, string Path)>();
-            var xkSplit = xkDir == null ? null : Path.Combine(xkDir, "input.xiso");
+            List<(string Tag, string Path)> plainXisos = new();
+            string? xkSplit = xkDir == null ? null : Path.Combine(xkDir, "input.xiso");
             if (xkSplit != null && File.Exists(xkSplit))
                 plainXisos.Add(("split", xkSplit));
             if (!isRedump)
@@ -187,7 +187,7 @@ internal static class ExtendedBattleRunner
 
             if (xd?.Available == true && plainXisos.Count > 0)
             {
-                foreach (var (tag, xiso) in plainXisos)
+                foreach ((string tag, string xiso) in plainXisos)
                 {
                     result.SubTests.Add(XdChecksum(xiso, tag, xd));
                     result.SubTests.Add(XdUnpack(xiso, tag, sandbox, csDir, xd));
@@ -251,7 +251,7 @@ internal static class ExtendedBattleRunner
     private static SubBattleResult XkVideo(string workInput, string csDir, string? xkDir) =>
         Timed("XK-Video", () =>
         {
-            var csVideo = Path.Combine(csDir, "input.video.iso");
+            string csVideo = Path.Combine(csDir, "input.video.iso");
             string? xkVideo = xkDir == null ? null : Path.Combine(xkDir, "input.video.iso");
             bool csOk;
             try
@@ -270,11 +270,11 @@ internal static class ExtendedBattleRunner
         long xisoLength) =>
         Timed("XK-Xiso", () =>
         {
-            var csXiso = Path.Combine(csDir, "input.xiso");
+            string csXiso = Path.Combine(csDir, "input.xiso");
             try
             {
-                using var src = new FileStream(workInput, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-                using var dst = new FileStream(csXiso, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+                using FileStream src = new(workInput, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+                using FileStream dst = new(csXiso, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
                 src.Seek(isoOffset, SeekOrigin.Begin);
                 CopyExact(src, dst, xisoLength);
             }
@@ -290,7 +290,7 @@ internal static class ExtendedBattleRunner
             // xboxkit -a ships the game partition wiped (-w) and trimmed (-t), not
             // raw, so compare like-for-like: our wipe+trim of the raw split must
             // be byte-identical to xk's .xiso. (Raw filler parity is XK-Filler.)
-            var csWt = Path.Combine(csDir, "input.wiped.xiso");
+            string csWt = Path.Combine(csDir, "input.wiped.xiso");
             try
             {
                 if (!XisoOperations.WipeAndTrim(csXiso, csWt, 0, true))
@@ -301,9 +301,9 @@ internal static class ExtendedBattleRunner
                 return Fail($"C# WipeAndTrim threw {ex.GetType().Name}: {Trim(ex.Message)}");
             }
 
-            var r = CompareFiles("xiso (wipe+trim)", csWt, xkXiso);
-            var csLen = new FileInfo(csWt).Length;
-            var xkLen = new FileInfo(xkXiso).Length;
+            SubBattleResult r = CompareFiles("xiso (wipe+trim)", csWt, xkXiso);
+            long csLen = new FileInfo(csWt).Length;
+            long xkLen = new FileInfo(xkXiso).Length;
             Del(csWt); // 1x ISO size freed immediately after compare
             if (r.Status == BattleStatus.Passed)
                 return r;
@@ -315,7 +315,7 @@ internal static class ExtendedBattleRunner
         long xisoLength) =>
         Timed("XK-Filler", () =>
         {
-            var csFiller = Path.Combine(csDir, "input.filler");
+            string csFiller = Path.Combine(csDir, "input.filler");
             bool csOk;
             try
             {
@@ -333,7 +333,7 @@ internal static class ExtendedBattleRunner
     private static SubBattleResult XkSeed(string workInput, string csDir, string? xkDir, long isoOffset) =>
         Timed("XK-Seed", () =>
         {
-            var csSeed = Path.Combine(csDir, "input.seed");
+            string csSeed = Path.Combine(csDir, "input.seed");
             bool csOk;
             try
             {
@@ -353,7 +353,7 @@ internal static class ExtendedBattleRunner
         Timed("XK-Update", () =>
         {
             // Update comes from the video partition (XGD3 only).
-            var csVideo = Path.Combine(csDir, "input.video.iso");
+            string csVideo = Path.Combine(csDir, "input.video.iso");
             string? csUpdate = null;
             if (File.Exists(csVideo))
             {
@@ -378,10 +378,10 @@ internal static class ExtendedBattleRunner
     private static SubBattleResult XkPetrify(string csDir, XboxKitWrapper? xk) =>
         Timed("XK-Petrify", () =>
         {
-            var csXiso = Path.Combine(csDir, "input.xiso");
+            string csXiso = Path.Combine(csDir, "input.xiso");
             if (!File.Exists(csXiso))
                 return Fail("no C# raw split to petrify");
-            var csSkel = Path.Combine(csDir, "input.skeleton.xiso");
+            string csSkel = Path.Combine(csDir, "input.skeleton.xiso");
             bool csOk;
             try
             {
@@ -396,13 +396,13 @@ internal static class ExtendedBattleRunner
                 return CompareFiles("skeleton", csOk ? csSkel : null, null);
 
             // Same-input oracle: xk -p on a copy of OUR raw split.
-            var pkDir = Path.Combine(csDir, "pk");
+            string pkDir = Path.Combine(csDir, "pk");
             Directory.CreateDirectory(pkDir);
-            var pkInput = Path.Combine(pkDir, "input.xiso");
+            string pkInput = Path.Combine(pkDir, "input.xiso");
             File.Copy(csXiso, pkInput);
-            (var code, var so, var se) = xk.Run(pkDir, "-y", "-q", "-p", pkInput);
-            var xkSkel = Path.Combine(pkDir, "input.skeleton.xiso");
-            var hasSkel = File.Exists(xkSkel) && new FileInfo(xkSkel).Length > 0;
+            (int code, string so, string se) = xk.Run(pkDir, "-y", "-q", "-p", pkInput);
+            string xkSkel = Path.Combine(pkDir, "input.skeleton.xiso");
+            bool hasSkel = File.Exists(xkSkel) && new FileInfo(xkSkel).Length > 0;
             Del(pkDir); // the 1x-ISO copy + oracle skeleton are single-use
             if (!hasSkel)
             {
@@ -412,7 +412,7 @@ internal static class ExtendedBattleRunner
                 // XisoRangesEmptyDirTests), so C# succeeds where the oracle crashes.
                 // BTL-018: `so + se` is a string concat and never null — test real
                 // emptiness instead of the always-true `is { }` pattern.
-                var oracleOut = so + se;
+                string oracleOut = so + se;
                 if (!string.IsNullOrEmpty(oracleOut)
                     && oracleOut.Contains("CollectFileEntries", StringComparison.OrdinalIgnoreCase)
                     && oracleOut.Contains("EndOfStream", StringComparison.OrdinalIgnoreCase))
@@ -431,7 +431,7 @@ internal static class ExtendedBattleRunner
         XboxKitWrapper? xk) =>
         Timed("XK-Zar", () =>
         {
-            var csZar = Path.Combine(csDir, "input.zar");
+            string csZar = Path.Combine(csDir, "input.zar");
             bool csOk;
             try
             {
@@ -455,7 +455,7 @@ internal static class ExtendedBattleRunner
                 // -z consumes a plain .xiso (the redump copy is not accepted);
                 // pack from the oracle's own -a split. zarchive.exe beside
                 // xboxkit.exe is required (copied by the csproj).
-                var xkXiso = Path.Combine(xkDir, "input.xiso");
+                string xkXiso = Path.Combine(xkDir, "input.xiso");
                 if (!File.Exists(xkXiso))
                     return Skip("XK-Zar", "no xk .xiso split for -z");
                 xkZar = Path.Combine(xkDir, "input.zar");
@@ -467,8 +467,8 @@ internal static class ExtendedBattleRunner
                     // the shared ToolLocator chain (sibling of the harness, then
                     // PATH) instead of assuming the csproj copied it beside the
                     // harness — Skip with a clear reason when absent.
-                    var zarFileName = ToolLocator.GetFileName("zarchive");
-                    var zarSource = ToolLocator.ResolveByBaseName(null, "zarchive");
+                    string zarFileName = ToolLocator.GetFileName("zarchive");
+                    string? zarSource = ToolLocator.ResolveByBaseName(null, "zarchive");
                     if (zarSource == null)
                     {
                         return Skip("XK-Zar",
@@ -488,7 +488,7 @@ internal static class ExtendedBattleRunner
                     }
 
                     // No -q here: a silent failure must leave its [ERROR] in the detail.
-                    (var zc, var zso, var zse) = xk.Run(xkDir, "-y", "-z", xkXiso);
+                    (int zc, string zso, string zse) = xk.Run(xkDir, "-y", "-z", xkXiso);
                     zarLog = $"exit {zc}: {Trim(zso + zse)}";
                     xkZar = Directory.GetFiles(xkDir, "*.zar", SearchOption.TopDirectoryOnly).FirstOrDefault();
                 }
@@ -508,8 +508,8 @@ internal static class ExtendedBattleRunner
 
             // ZAR bytes may legitimately differ (zstd build skew): compare the
             // extracted game-file trees instead.
-            var csTree = Path.Combine(csDir, "zar-cs");
-            var xkTree = Path.Combine(xkDir, "zar-xk");
+            string csTree = Path.Combine(csDir, "zar-cs");
+            string xkTree = Path.Combine(xkDir, "zar-xk");
             try
             {
                 ZARSharp.ZArchiveTool.Extract(csZar, csTree);
@@ -522,7 +522,7 @@ internal static class ExtendedBattleRunner
                 return Fail($"zar extract threw {ex.GetType().Name}: {Trim(ex.Message)}");
             }
 
-            var r = CompareTrees(csTree, xkTree);
+            SubBattleResult r = CompareTrees(csTree, xkTree);
             Del(csTree); // extracted game trees are the largest artifacts
             Del(xkTree);
             return r;
@@ -533,19 +533,19 @@ internal static class ExtendedBattleRunner
         {
             if (xkDir == null)
                 return Skip("XK-RebuildCs", "no xk split parts");
-            var xiso = Path.Combine(xkDir, "input.xiso");
-            var video = Path.Combine(xkDir, "input.video.iso");
-            var filler = Path.Combine(xkDir, "input.filler");
-            var seed = Path.Combine(xkDir, "input.seed");
-            var fillerOrSeed = File.Exists(filler) ? filler : File.Exists(seed) ? seed : null;
-            var update = Directory.GetFiles(xkDir, "su20076000_00000000", SearchOption.AllDirectories).FirstOrDefault();
+            string xiso = Path.Combine(xkDir, "input.xiso");
+            string video = Path.Combine(xkDir, "input.video.iso");
+            string filler = Path.Combine(xkDir, "input.filler");
+            string seed = Path.Combine(xkDir, "input.seed");
+            string? fillerOrSeed = File.Exists(filler) ? filler : File.Exists(seed) ? seed : null;
+            string? update = Directory.GetFiles(xkDir, "su20076000_00000000", SearchOption.AllDirectories).FirstOrDefault();
             if (!File.Exists(xiso) || !File.Exists(video) || fillerOrSeed == null)
             {
                 return Fail(
                     $"xk split incomplete (xiso={Exists(xiso)} video={Exists(video)} filler/seed={fillerOrSeed != null})");
             }
 
-            var rebuilt = Path.Combine(csDir, "rebuilt.iso");
+            string rebuilt = Path.Combine(csDir, "rebuilt.iso");
             bool ok;
             try
             {
@@ -558,7 +558,7 @@ internal static class ExtendedBattleRunner
 
             if (!ok)
                 return Fail("C# RebuildRedump returned false");
-            var r = CompareFiles("rebuilt redump", rebuilt, workInput);
+            SubBattleResult r = CompareFiles("rebuilt redump", rebuilt, workInput);
             Del(rebuilt); // 1x ISO freed right after compare
             return r;
         });
@@ -569,11 +569,11 @@ internal static class ExtendedBattleRunner
             if (xk?.Available != true || xkDir == null)
                 return Skip("XK-RebuildXk", "xboxkit unavailable");
             // Stage OUR parts for xk rebuild mode: xboxkit <input.xiso> [files...]
-            var rbDir = Path.Combine(csDir, "rbx");
+            string rbDir = Path.Combine(csDir, "rbx");
             Directory.CreateDirectory(rbDir);
-            foreach (var f in Directory.GetFiles(csDir))
+            foreach (string f in Directory.GetFiles(csDir))
             {
-                var n = Path.GetFileName(f);
+                string n = Path.GetFileName(f);
                 if (string.Equals(n, "input.video.iso", StringComparison.Ordinal) ||
                     string.Equals(n, "input.filler", StringComparison.Ordinal) ||
                     string.Equals(n, "input.seed", StringComparison.Ordinal) ||
@@ -585,20 +585,20 @@ internal static class ExtendedBattleRunner
             }
 
             // Our cs split names: ensure an .xiso exists for rebuild input.
-            var rbXiso = Path.Combine(rbDir, "input.xiso");
+            string rbXiso = Path.Combine(rbDir, "input.xiso");
             if (!File.Exists(rbXiso))
                 return Skip("XK-RebuildXk", "no C# xiso split staged");
-            var parts = Directory.GetFiles(rbDir).Where(f => !f.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)
-                                                             || f.EndsWith(".video.iso",
-                                                                 StringComparison.OrdinalIgnoreCase)).ToList();
-            var before = Directory.GetFiles(rbDir, "*.iso", SearchOption.AllDirectories)
+            List<string> parts = Directory.GetFiles(rbDir).Where(f => !f.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)
+                                                                      || f.EndsWith(".video.iso",
+                                                                          StringComparison.OrdinalIgnoreCase)).ToList();
+            HashSet<string> before = Directory.GetFiles(rbDir, "*.iso", SearchOption.AllDirectories)
                 .Select(f => f.ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
             xk.Rebuild(rbDir,
                 new[] { rbXiso }.Concat(parts.Where(f => !string.Equals(f, rbXiso, StringComparison.Ordinal)))
                     .ToArray());
-            var after = Directory.GetFiles(rbDir, "*.iso", SearchOption.AllDirectories)
+            List<string> after = Directory.GetFiles(rbDir, "*.iso", SearchOption.AllDirectories)
                 .Where(f => !before.Contains(f.ToLowerInvariant())).ToList();
-            var rebuilt =
+            string? rebuilt =
                 after.FirstOrDefault(f => Path.GetFileName(f).Contains("redump", StringComparison.OrdinalIgnoreCase))
                 ?? after.FirstOrDefault();
             if (rebuilt == null)
@@ -608,7 +608,7 @@ internal static class ExtendedBattleRunner
                     $"xk rebuild produced no new ISO (files: {string.Join(",", Directory.GetFiles(rbDir).Select(Path.GetFileName))})");
             }
 
-            var rr = CompareFiles("xk-rebuilt redump", rebuilt, workInput);
+            SubBattleResult rr = CompareFiles("xk-rebuilt redump", rebuilt, workInput);
             Del(rbDir); // staged parts (filler = 1x ISO) are single-use
             return rr;
         });
@@ -630,8 +630,8 @@ internal static class ExtendedBattleRunner
                 return Fail($"C# threw {ex.GetType().Name}: {Trim(ex.Message)}");
             }
 
-            (var code, var so, var se) = xd.Checksum(xiso);
-            var xdHex = ParseHexToken(so);
+            (int code, string so, string se) = xd.Checksum(xiso);
+            string xdHex = ParseHexToken(so);
             if (xdHex.Length == 0)
                 return Fail($"xdvdfs checksum unparseable (exit {code}): {Trim(so + se)}");
             return string.Equals(csHex, xdHex, StringComparison.OrdinalIgnoreCase)
@@ -642,11 +642,11 @@ internal static class ExtendedBattleRunner
     private static SubBattleResult XdUnpack(string xiso, string tag, string sandbox, string csDir, XdvdfsWrapper xd) =>
         Timed($"XD-Unpack[{tag}]", () =>
         {
-            var csOut = Path.Combine(csDir, $"unpack-{tag}");
-            var xdOut = Path.Combine(sandbox, $"xd-unpack-{tag}");
+            string csOut = Path.Combine(csDir, $"unpack-{tag}");
+            string xdOut = Path.Combine(sandbox, $"xd-unpack-{tag}");
             try
             {
-                var rc = XisoReader.UnpackImage(xiso, csOut);
+                int rc = XisoReader.UnpackImage(xiso, csOut);
                 if (rc != 0)
                     return Fail($"C# UnpackImage rc={rc}");
             }
@@ -655,7 +655,7 @@ internal static class ExtendedBattleRunner
                 return Fail($"C# threw {ex.GetType().Name}: {Trim(ex.Message)}");
             }
 
-            (var code, _, var se) = xd.Unpack(xiso, xdOut);
+            (int code, _, string se) = xd.Unpack(xiso, xdOut);
             if (code != 0 || !Directory.Exists(xdOut))
                 return Fail($"xdvdfs unpack exit {code}: {Trim(se)}");
             return CompareTrees(csOut, xdOut);
@@ -674,19 +674,19 @@ internal static class ExtendedBattleRunner
                 return Fail($"C# threw {ex.GetType().Name}: {Trim(ex.Message)}");
             }
 
-            (var code, var so, var se) = xd.Tree(xiso);
+            (int code, string so, string se) = xd.Tree(xiso);
             if (code != 0)
                 return Fail($"xdvdfs tree exit {code}: {Trim(se)}");
             // Our Tree roots entries at the image name (`\input\...` for
             // `input.iso`, `\input.xiso\...` for splits); xdvdfs lists
             // image-internal paths (`/...`). Strip the root on compare.
-            var root = ListingRootPrefix(xiso);
-            var csSet = NormaliseListing(csText, root);
-            var xdSet = NormaliseListing(so, root);
+            string root = ListingRootPrefix(xiso);
+            HashSet<string> csSet = NormaliseListing(csText, root);
+            HashSet<string> xdSet = NormaliseListing(so, root);
             if (csSet.SetEquals(xdSet))
                 return Pass($"{csSet.Count} entries match");
-            var onlyCs = csSet.Where(e => !xdSet.Contains(e)).Take(3).ToList();
-            var onlyXd = xdSet.Where(e => !csSet.Contains(e)).Take(3).ToList();
+            List<string> onlyCs = csSet.Where(e => !xdSet.Contains(e)).Take(3).ToList();
+            List<string> onlyXd = xdSet.Where(e => !csSet.Contains(e)).Take(3).ToList();
             return Fail(
                 $"tree mismatch C#={csSet.Count} xd={xdSet.Count} ONLY cs [{string.Join(";", onlyCs)}] ONLY xd [{string.Join(";", onlyXd)}]");
         });
@@ -708,7 +708,7 @@ internal static class ExtendedBattleRunner
             if (inner == null)
                 return Skip($"XD-CopyOut+Md5[{tag}]", "image has no files");
 
-            var csOut = Path.Combine(csDir, $"copyout-{tag}.bin");
+            string csOut = Path.Combine(csDir, $"copyout-{tag}.bin");
             try
             {
                 XisoReader.CopyOut(xiso, inner, csOut);
@@ -718,18 +718,18 @@ internal static class ExtendedBattleRunner
                 return Fail($"C# CopyOut threw {ex.GetType().Name}: {Trim(ex.Message)}");
             }
 
-            var xdOut = Path.Combine(sandbox, $"xd-copyout-{tag}.bin");
-            (var xcode, _, var xse) = xd.CopyOut(xiso, inner, xdOut);
+            string xdOut = Path.Combine(sandbox, $"xd-copyout-{tag}.bin");
+            (int xcode, _, string xse) = xd.CopyOut(xiso, inner, xdOut);
             if (xcode != 0 || !File.Exists(xdOut))
                 return Fail($"xdvdfs copy-out exit {xcode}: {Trim(xse)}");
-            var r = CompareFiles($"copy-out {inner}", csOut, xdOut);
+            SubBattleResult r = CompareFiles($"copy-out {inner}", csOut, xdOut);
             if (r.Status != BattleStatus.Passed)
                 return r;
 
             string csMd5;
             try
             {
-                var bytes = XisoReader.ComputeFileHash(xiso, inner, HashAlgorithmName.MD5);
+                byte[]? bytes = XisoReader.ComputeFileHash(xiso, inner, HashAlgorithmName.MD5);
                 csMd5 = bytes == null ? "" : Convert.ToHexString(bytes).ToLowerInvariant();
             }
             catch (Exception ex)
@@ -737,8 +737,8 @@ internal static class ExtendedBattleRunner
                 return Fail($"C# ComputeFileHash threw {ex.GetType().Name}: {Trim(ex.Message)}");
             }
 
-            (var mcode, var mso, var mse) = xd.Md5(xiso, inner);
-            var xdMd5 = ParseHexToken(mso);
+            (int mcode, string mso, string mse) = xd.Md5(xiso, inner);
+            string xdMd5 = ParseHexToken(mso);
             if (xdMd5.Length != 32)
                 return Fail($"xdvdfs md5 unparseable (exit {mcode}): {Trim(mso + mse)}");
             return string.Equals(csMd5, xdMd5, StringComparison.OrdinalIgnoreCase)
@@ -753,13 +753,13 @@ internal static class ExtendedBattleRunner
             // BTL-024: enumerate in ordinal order so equal-size trees resolve to the
             // same winner on every machine — the fallback must not depend on
             // filesystem enumeration order.
-            var cands = Directory.GetDirectories(csDir, "unpack-*")
+            List<string> cands = Directory.GetDirectories(csDir, "unpack-*")
                 .OrderBy(d => d, StringComparer.Ordinal).ToList();
             string? tree = null;
             long best = long.MaxValue;
-            foreach (var c in cands)
+            foreach (string c in cands)
             {
-                var bytes = Directory.GetFiles(c, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length);
+                long bytes = Directory.GetFiles(c, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length);
                 if (bytes < best)
                 {
                     best = bytes;
@@ -786,13 +786,13 @@ internal static class ExtendedBattleRunner
                 // file count AND total bytes so the result cannot depend on game
                 // content ordering.
                 packSrc = Path.Combine(sandbox, "pack-src");
-                var small = Directory.GetFiles(tree, "*", SearchOption.AllDirectories)
+                List<FileInfo> small = Directory.GetFiles(tree, "*", SearchOption.AllDirectories)
                     .Select(f => new FileInfo(f))
                     .Where(f => f.Length <= PackMiniTreeMaxFileBytes)
                     .OrderBy(f => f.Length).ThenBy(f => f.FullName, StringComparer.Ordinal).ToList();
-                var picked = new List<FileInfo>(PackMiniTreeMaxFiles);
+                List<FileInfo> picked = new(PackMiniTreeMaxFiles);
                 long pickedBytes = 0;
-                foreach (var f in small)
+                foreach (FileInfo f in small)
                 {
                     if (picked.Count >= PackMiniTreeMaxFiles || pickedBytes + f.Length > PackMiniTreeMaxTotalBytes)
                         break;
@@ -802,9 +802,9 @@ internal static class ExtendedBattleRunner
 
                 if (picked.Count == 0)
                     return Skip("XD-Pack", $"smallest tree {best / 1048576} MB > gate and no small files");
-                foreach (var f in picked)
+                foreach (FileInfo f in picked)
                 {
-                    var dest = Path.Combine(packSrc, Path.GetRelativePath(tree, f.FullName));
+                    string dest = Path.Combine(packSrc, Path.GetRelativePath(tree, f.FullName));
                     Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                     File.Copy(f.FullName, dest);
                 }
@@ -812,8 +812,8 @@ internal static class ExtendedBattleRunner
                 packNote = $"mini-tree {picked.Count} files ({pickedBytes} bytes)";
             }
 
-            var csPack = Path.Combine(csDir, "packed-cs.iso");
-            var xdPack = Path.Combine(sandbox, "packed-xd.iso");
+            string csPack = Path.Combine(csDir, "packed-cs.iso");
+            string xdPack = Path.Combine(sandbox, "packed-xd.iso");
             try
             {
                 if (XisoWriter.PackFromDirectory(packSrc, csPack) != 0)
@@ -824,18 +824,18 @@ internal static class ExtendedBattleRunner
                 return Fail($"C# threw {ex.GetType().Name}: {Trim(ex.Message)}");
             }
 
-            (var code, _, var se) = xd.Pack(packSrc, xdPack);
+            (int code, _, string se) = xd.Pack(packSrc, xdPack);
             if (code != 0 || !File.Exists(xdPack))
                 return Fail($"xdvdfs pack exit {code}: {Trim(se)}");
             // BTL-024: layouts differ by design (allocator/order choices are not part
             // of the format contract), so byte identity is not expected — the
             // content checksums compared here are layout-insensitive by design.
-            (var c1, var s1, _) = xd.Checksum(csPack);
-            (var c2, var s2, _) = xd.Checksum(xdPack);
+            (int c1, string s1, _) = xd.Checksum(csPack);
+            (int c2, string s2, _) = xd.Checksum(xdPack);
             if (c1 != 0 || c2 != 0)
                 return Fail($"xdvdfs checksum on packs failed ({c1},{c2}): {Trim(s1 + s2)}");
-            var h1 = ParseHexToken(s1);
-            var h2 = ParseHexToken(s2);
+            string h1 = ParseHexToken(s1);
+            string h2 = ParseHexToken(s2);
             return h1.Length > 0 && string.Equals(h1, h2, StringComparison.OrdinalIgnoreCase)
                 ? Pass($"pack content checksum match ({h1[..16]}…, {packNote})")
                 : Fail($"pack content mismatch cs={h1} xd={h2}");
@@ -847,19 +847,19 @@ internal static class ExtendedBattleRunner
 
     private static (long IsoOffset, long XisoLength, bool IsRedump) GetPartition(string isoPath)
     {
-        var size = new FileInfo(isoPath).Length;
-        var redumpType = XgdTables.GetRedumpIsoTypeBySize(size);
+        long size = new FileInfo(isoPath).Length;
+        int redumpType = XgdTables.GetRedumpIsoTypeBySize(size);
         if (redumpType < 0)
         {
-            using var fs = File.OpenRead(isoPath);
-            var (_, _, lseek) = XisoReader.VerifyXiso(fs, "input.iso");
+            using FileStream fs = File.OpenRead(isoPath);
+            (_, _, long lseek) = XisoReader.VerifyXiso(fs, "input.iso");
             return (lseek, size - lseek, false);
         }
 
-        using (var fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
+        using (FileStream fs = new(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
         {
-            var videoType = XgdTables.GetVideoType(fs, redumpType);
-            var xsType = videoType >= 0 ? XgdTables.GetXisoTypeFromVideo(videoType) : -1;
+            int videoType = XgdTables.GetVideoType(fs, redumpType);
+            int xsType = videoType >= 0 ? XgdTables.GetXisoTypeFromVideo(videoType) : -1;
             if (xsType < 0 || xsType >= XgdTables.XisoOffset.Length)
                 xsType = XgdTables.GetXgdType(redumpType);
             return (XgdTables.XisoOffset[xsType], XgdTables.XisoLength[xsType], true);
@@ -868,7 +868,7 @@ internal static class ExtendedBattleRunner
 
     private static SubBattleResult Timed(string name, Func<SubBattleResult> body)
     {
-        var sw = Stopwatch.StartNew();
+        Stopwatch sw = Stopwatch.StartNew();
         SubBattleResult r;
         try
         {
@@ -914,8 +914,8 @@ internal static class ExtendedBattleRunner
     private static SubBattleResult CompareFiles(
         string what, string? csPath, string? xkPath, bool bothMissingOk = false, string? bothMissingNote = null)
     {
-        var csExists = csPath != null && File.Exists(csPath);
-        var xkExists = xkPath != null && File.Exists(xkPath);
+        bool csExists = csPath != null && File.Exists(csPath);
+        bool xkExists = xkPath != null && File.Exists(xkPath);
         if (!csExists && !xkExists)
         {
             return bothMissingOk
@@ -927,8 +927,8 @@ internal static class ExtendedBattleRunner
             return Fail($"{what}: C# produced nothing, oracle has {Mb(xkPath)}");
         if (!xkExists)
             return Fail($"{what}: oracle produced nothing, C# has {Mb(csPath)}");
-        var csHash = HashUtil.ComputeSha256(csPath!);
-        var xkHash = HashUtil.ComputeSha256(xkPath!);
+        string csHash = HashUtil.ComputeSha256(csPath!);
+        string xkHash = HashUtil.ComputeSha256(xkPath!);
         return string.Equals(csHash, xkHash, StringComparison.Ordinal)
             ? Pass($"{what} SHA match ({Mb(csPath)})")
             : Fail($"{what} SHA mismatch C#={csHash[..16]}…({Mb(csPath)}) oracle={xkHash[..16]}…({Mb(xkPath)})");
@@ -938,15 +938,15 @@ internal static class ExtendedBattleRunner
     {
         // BTL-008: ordinal keys — case-only differences are mismatches, not
         // the same file (HashDirectory is Ordinal; see HashUtil).
-        var cs = HashUtil.HashDirectory(csOut);
-        var xd = HashUtil.HashDirectory(xdOut);
+        IReadOnlyDictionary<string, string> cs = HashUtil.HashDirectory(csOut);
+        IReadOnlyDictionary<string, string> xd = HashUtil.HashDirectory(xdOut);
         if (cs.Count != xd.Count)
             return Fail($"unpack tree count C#={cs.Count} xd={xd.Count}");
-        foreach (var kv in cs)
+        foreach (KeyValuePair<string, string> kv in cs)
         {
-            if (!xd.TryGetValue(kv.Key, out var xh))
+            if (!xd.TryGetValue(kv.Key, out string? xh))
             {
-                var folded = xd.Keys.FirstOrDefault(k => string.Equals(k, kv.Key, StringComparison.OrdinalIgnoreCase));
+                string? folded = xd.Keys.FirstOrDefault(k => string.Equals(k, kv.Key, StringComparison.OrdinalIgnoreCase));
                 return folded != null
                     ? Fail($"unpack: case-collision {kv.Key} vs xd {folded}")
                     : Fail($"unpack: only in C# tree: {kv.Key}");
@@ -956,10 +956,10 @@ internal static class ExtendedBattleRunner
                 return Fail($"unpack: content mismatch {kv.Key}");
         }
 
-        var xdOnly = xd.Keys.Except(cs.Keys, StringComparer.Ordinal).FirstOrDefault();
+        string? xdOnly = xd.Keys.Except(cs.Keys, StringComparer.Ordinal).FirstOrDefault();
         if (xdOnly != null)
         {
-            var folded = cs.Keys.FirstOrDefault(k => string.Equals(k, xdOnly, StringComparison.OrdinalIgnoreCase));
+            string? folded = cs.Keys.FirstOrDefault(k => string.Equals(k, xdOnly, StringComparison.OrdinalIgnoreCase));
             return folded != null
                 ? Fail($"unpack: case-collision xd {xdOnly} vs C# {folded}")
                 : Fail($"unpack: only in xd tree: {xdOnly}");
@@ -970,13 +970,13 @@ internal static class ExtendedBattleRunner
 
     private static string CaptureTree(string xiso)
     {
-        var saveQuiet = Logger.Quiet;
-        var saveOut = Logger.Out;
-        var origOut = Console.Out;
+        bool saveQuiet = Logger.Quiet;
+        TextWriter saveOut = Logger.Out;
+        TextWriter origOut = Console.Out;
         try
         {
             Logger.Quiet = false;
-            using var sw = new StringWriter();
+            using StringWriter sw = new();
             Logger.Out = sw;
             Console.SetOut(sw);
             XisoReader.Tree(xiso, false);
@@ -999,8 +999,8 @@ internal static class ExtendedBattleRunner
     /// </summary>
     private static string ListingRootPrefix(string xisoPath)
     {
-        var fn = Path.GetFileName(xisoPath);
-        var root = fn.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) ? fn[..^".iso".Length] : fn;
+        string fn = Path.GetFileName(xisoPath);
+        string root = fn.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) ? fn[..^".iso".Length] : fn;
         return "/" + root + "/";
     }
 
@@ -1008,18 +1008,18 @@ internal static class ExtendedBattleRunner
     {
         // Ours: `\a.txt (7 bytes)` rooted at the image name; xdvdfs: `/a.txt (7 bytes)`
         // image-internal paths + `N files, M bytes` totals.
-        var set = new HashSet<string>(StringComparer.Ordinal);
+        HashSet<string> set = new(StringComparer.Ordinal);
         const string suffix = " bytes)";
-        foreach (var raw in text.Split('\n'))
+        foreach (string raw in text.Split('\n'))
         {
-            var line = raw.Trim().Replace('\\', '/');
-            var open = line.LastIndexOf(" (", StringComparison.Ordinal);
+            string line = raw.Trim().Replace('\\', '/');
+            int open = line.LastIndexOf(" (", StringComparison.Ordinal);
             if (open < 0 || !line.EndsWith(suffix, StringComparison.Ordinal))
                 continue;
-            var size = line.Substring(open + 2, line.Length - open - 2 - suffix.Length);
+            string size = line.Substring(open + 2, line.Length - open - 2 - suffix.Length);
             if (size.Length == 0 || !size.All(char.IsAsciiDigit))
                 continue;
-            var p = line[..open];
+            string p = line[..open];
             if (p.EndsWith('/'))
                 p = p[..^1];
             if (!p.StartsWith('/'))
@@ -1043,10 +1043,10 @@ internal static class ExtendedBattleRunner
     /// <summary>First hex token (32-128 chars) of <paramref name="text"/>, or empty.</summary>
     private static string ParseHexToken(string text)
     {
-        foreach (var raw in text.Split('\n'))
+        foreach (string raw in text.Split('\n'))
         {
-            var line = raw.Trim();
-            var i = 0;
+            string line = raw.Trim();
+            int i = 0;
             while (i < line.Length && IsHexDigit(line[i])) i++;
             if (i is >= 32 and <= 128 && (i == line.Length || char.IsWhiteSpace(line[i])))
                 return line[..i];
@@ -1059,11 +1059,11 @@ internal static class ExtendedBattleRunner
 
     private static string? FirstFileEntry(string xiso)
     {
-        var set = NormaliseListing(CaptureTree(xiso), ListingRootPrefix(xiso))
+        List<string> set = NormaliseListing(CaptureTree(xiso), ListingRootPrefix(xiso))
             .OrderBy(s => s, StringComparer.Ordinal).ToList();
-        foreach (var e in set)
+        foreach (string e in set)
         {
-            var parts = e.Split('|');
+            string[] parts = e.Split('|');
             // entries are path|size; dirs show size 0 but so can empty files — prefer size>0.
             if (parts.Length == 2 && !string.Equals(parts[1], "0", StringComparison.Ordinal))
                 return parts[0].Length == 0 ? "/" : parts[0];
@@ -1074,14 +1074,14 @@ internal static class ExtendedBattleRunner
 
     private static void CopyExact(FileStream src, FileStream dst, long bytes)
     {
-        var buf = new byte[65536];
+        byte[] buf = new byte[65536];
         while (bytes > 0)
         {
-            var want = (int)Math.Min(buf.Length, bytes);
-            var read = 0;
+            int want = (int)Math.Min(buf.Length, bytes);
+            int read = 0;
             while (read < want)
             {
-                var n = src.Read(buf, read, want - read);
+                int n = src.Read(buf, read, want - read);
                 if (n <= 0)
                     throw new IOException($"short read splitting partition ({bytes} bytes left)");
                 read += n;
@@ -1103,22 +1103,22 @@ internal static class ExtendedBattleRunner
     private static string? CreateSandbox(string sourcePath, long isoSize, PerFileBattleResult result)
     {
         string baseDir;
-        var env = Environment.GetEnvironmentVariable("XISO_BATTLE_SANDBOX");
+        string? env = Environment.GetEnvironmentVariable("XISO_BATTLE_SANDBOX");
         if (!string.IsNullOrWhiteSpace(env))
         {
             baseDir = env;
         }
         else
         {
-            var full = Path.GetFullPath(sourcePath);
-            var root = Path.GetPathRoot(full) ?? "";
+            string full = Path.GetFullPath(sourcePath);
+            string root = Path.GetPathRoot(full) ?? "";
             baseDir = root.Length > 0 ? Path.Combine(root, "XISOSharpBattle") : CreateSandboxFallback();
         }
 
         try
         {
-            var drive = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(baseDir)) ?? baseDir);
-            var needed = isoSize * 4;
+            DriveInfo drive = new(Path.GetPathRoot(Path.GetFullPath(baseDir)) ?? baseDir);
+            long needed = isoSize * 4;
             if (drive.AvailableFreeSpace < needed)
             {
                 result.SubTests.Add(new SubBattleResult
@@ -1147,9 +1147,9 @@ internal static class ExtendedBattleRunner
             // harnesses sharing one root) with a create-retry so a rare collision
             // retries with a fresh GUID instead of reusing a foreign sandbox.
             string? created = null;
-            for (var attempt = 0; attempt < 3 && created == null; attempt++)
+            for (int attempt = 0; attempt < 3 && created == null; attempt++)
             {
-                var candidate = Path.Combine(baseDir, "ext_" + Guid.NewGuid().ToString("N"));
+                string candidate = Path.Combine(baseDir, "ext_" + Guid.NewGuid().ToString("N"));
                 try
                 {
                     Directory.CreateDirectory(candidate);

@@ -11,10 +11,10 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Constructor_ZeroLengthPattern_ReturnsZeroOnEmptySearch()
     {
-        var bm = new BoyerMoore([]);
+        BoyerMoore bm = new([]);
         bm.Init();
 
-        var result = bm.Search("ABC"u8.ToArray());
+        int result = bm.Search("ABC"u8.ToArray());
         Assert.Equal(0, result);
     }
 
@@ -24,7 +24,7 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Constructor_ZeroLengthPattern_InitThenDone_DoesNotThrow()
     {
-        var bm = new BoyerMoore([]);
+        BoyerMoore bm = new([]);
         bm.Init();
         bm.Done();
     }
@@ -35,7 +35,7 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_BeforeInit_Throws_WhenTablesNeeded()
     {
-        var bm = new BoyerMoore("AB"u8.ToArray());
+        BoyerMoore bm = new("AB"u8.ToArray());
         Assert.Throws<InvalidOperationException>(() => bm.Search("BA"u8.ToArray()));
     }
 
@@ -45,7 +45,7 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_AfterDone_Throws_WhenTablesNeeded()
     {
-        var bm = new BoyerMoore("AB"u8.ToArray());
+        BoyerMoore bm = new("AB"u8.ToArray());
         bm.Init();
         bm.Done();
         Assert.Throws<InvalidOperationException>(() => bm.Search("BA"u8.ToArray()));
@@ -57,7 +57,7 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_WithNullText_Throws_NullReferenceException()
     {
-        var bm = new BoyerMoore([0x41]);
+        BoyerMoore bm = new([0x41]);
         bm.Init();
         Assert.Throws<NullReferenceException>(() => bm.Search(null!));
     }
@@ -68,7 +68,7 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_WithNullText_Overload_Throws_NullReferenceException()
     {
-        var bm = new BoyerMoore([0x41]);
+        BoyerMoore bm = new([0x41]);
         bm.Init();
         Assert.Throws<NullReferenceException>(() => bm.Search(null!, 0, 1));
     }
@@ -79,7 +79,7 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_Overload_NegativeStartIndex_Throws_IndexOutOfRangeException()
     {
-        var bm = new BoyerMoore([0x41]);
+        BoyerMoore bm = new([0x41]);
         bm.Init();
         Assert.Throws<IndexOutOfRangeException>(() => bm.Search([0x41], -1, 1));
     }
@@ -90,10 +90,10 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_Overload_NegativeLength_ReturnsNegative()
     {
-        var bm = new BoyerMoore([0x41]);
+        BoyerMoore bm = new([0x41]);
         bm.Init();
 
-        var result = bm.Search([0x41], 0, -1);
+        int result = bm.Search([0x41], 0, -1);
         Assert.Equal(-1, result);
     }
 
@@ -103,7 +103,7 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_Overload_StartBeyondTextLength_Throws()
     {
-        var bm = new BoyerMoore([0x41]);
+        BoyerMoore bm = new([0x41]);
         bm.Init();
 
         Assert.Throws<IndexOutOfRangeException>(() => bm.Search("AB"u8.ToArray(), 2, 1));
@@ -115,10 +115,10 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_Overload_LengthZero_ReturnsNegative()
     {
-        var bm = new BoyerMoore([0x41]);
+        BoyerMoore bm = new([0x41]);
         bm.Init();
 
-        var result = bm.Search("AB"u8.ToArray(), 0, 0);
+        int result = bm.Search("AB"u8.ToArray(), 0, 0);
         Assert.Equal(-1, result);
     }
 
@@ -128,10 +128,10 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_EmptyText_ReturnsNegative()
     {
-        var bm = new BoyerMoore([0x41]);
+        BoyerMoore bm = new([0x41]);
         bm.Init();
 
-        var result = bm.Search([]);
+        int result = bm.Search([]);
         Assert.Equal(-1, result);
     }
 
@@ -141,11 +141,11 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Init_CalledTwice_DoesNotThrow()
     {
-        var bm = new BoyerMoore("AB"u8.ToArray());
+        BoyerMoore bm = new("AB"u8.ToArray());
         bm.Init();
         bm.Init();
 
-        var result = bm.Search("\0AB\0"u8.ToArray());
+        int result = bm.Search("\0AB\0"u8.ToArray());
         Assert.Equal(1, result);
     }
 
@@ -155,7 +155,7 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Reinit_AfterDone_Works()
     {
-        var bm = new BoyerMoore("AB"u8.ToArray());
+        BoyerMoore bm = new("AB"u8.ToArray());
         bm.Init();
         Assert.Equal(0, bm.Search("AB"u8.ToArray()));
         bm.Done();
@@ -171,10 +171,10 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Constructor_CustomAlphabetSize_Works()
     {
-        var bm = new BoyerMoore([0x10, 0x20], 128);
+        BoyerMoore bm = new([0x10, 0x20], 128);
         bm.Init();
 
-        var result = bm.Search([0x10, 0x20, 0x30]);
+        int result = bm.Search([0x10, 0x20, 0x30]);
         Assert.Equal(0, result);
     }
 
@@ -184,10 +184,10 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Constructor_CustomAlphabetSize_16()
     {
-        var bm = new BoyerMoore([0x05, 0x0A], 16);
+        BoyerMoore bm = new([0x05, 0x0A], 16);
         bm.Init();
 
-        var result = bm.Search([0x01, 0x05, 0x0A]);
+        int result = bm.Search([0x01, 0x05, 0x0A]);
         Assert.Equal(1, result);
     }
 
@@ -197,10 +197,10 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_PatternLongerThanTextOverload_ReturnsNegative()
     {
-        var bm = new BoyerMoore("ABCD"u8.ToArray());
+        BoyerMoore bm = new("ABCD"u8.ToArray());
         bm.Init();
 
-        var result = bm.Search("AB"u8.ToArray(), 0, 2);
+        int result = bm.Search("AB"u8.ToArray(), 0, 2);
         Assert.Equal(-1, result);
     }
 
@@ -210,7 +210,7 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_SingleBytePattern_NoMatch_ReturnsNegative()
     {
-        var bm = new BoyerMoore([0x41]);
+        BoyerMoore bm = new([0x41]);
         bm.Init();
 
         Assert.Equal(-1, bm.Search("BCD"u8.ToArray()));
@@ -222,12 +222,12 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_Overload_MatchesOnlyWithinRange()
     {
-        var bm = new BoyerMoore([0x42]);
+        BoyerMoore bm = new([0x42]);
         bm.Init();
 
-        var text = "BBBB"u8.ToArray();
+        byte[] text = "BBBB"u8.ToArray();
 
-        var result = bm.Search(text, 2, 2);
+        int result = bm.Search(text, 2, 2);
         Assert.Equal(2, result);
     }
 
@@ -237,11 +237,11 @@ public class BoyerMooreEdgeCasesTests
     [Fact]
     public void Search_Overload_PatternEarlier_OutOfRange_ReturnsNegative()
     {
-        var bm = new BoyerMoore("AA"u8.ToArray());
+        BoyerMoore bm = new("AA"u8.ToArray());
         bm.Init();
 
-        var text = "AAB"u8.ToArray();
-        var result = bm.Search(text, 1, 2);
+        byte[] text = "AAB"u8.ToArray();
+        int result = bm.Search(text, 1, 2);
         Assert.Equal(-1, result);
     }
 

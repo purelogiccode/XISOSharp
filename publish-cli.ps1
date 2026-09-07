@@ -4,6 +4,9 @@
 
 .DESCRIPTION
     Publishes XISOSharp.Cli for each requested RID into publish/<rid>/.
+    The published single-file binary is named XISOSharp(.exe) (renamed by the
+    csproj RenamePublishedExeToXisoSharp target; the build AssemblyName stays
+    XISOSharp.Cli to avoid colliding with the XISOSharp library DLL).
     PublishSingleFile/PublishTrimmed come from XISOSharp.Cli.csproj; this script
     just loops RIDs and enforces --self-contained. Requires the .NET SDK pinned
     in global.json (cross-OS/arm64 publishes work from any host).
@@ -14,7 +17,7 @@
 
 .EXAMPLE
     ./publish-cli.ps1 -Rid win-x64,win-x86 -Zip
-    Publishes 32/64-bit Windows and zips each output dir as XISOSharp.Cli-<rid>.zip.
+    Publishes 32/64-bit Windows and zips each output dir as XISOSharp-<rid>.zip.
 #>
 [CmdletBinding()]
 param(
@@ -44,16 +47,16 @@ foreach ($r in $Rid) {
         throw "dotnet publish failed for RID $r (exit $LASTEXITCODE)."
     }
 
-    $exe = if ($r.StartsWith('win-')) { 'XISOSharp.Cli.exe' } else { 'XISOSharp.Cli' }
+    $exe = if ($r.StartsWith('win-')) { 'XISOSharp.exe' } else { 'XISOSharp' }
     $bin = Join-Path $outDir $exe
     if (-not (Test-Path -LiteralPath $bin)) {
-        throw "Expected binary missing after publish: $bin"
+        throw "Expected binary missing after publish: $bin (expected the published single-file exe to be renamed to XISOSharp(.exe) by the csproj RenamePublishedExeToXisoSharp target)"
     }
     $sizeMB = ((Get-Item -LiteralPath $bin).Length / 1MB).ToString('0.0')
     Write-Host "  OK: $bin ($sizeMB MB)" -ForegroundColor Green
 
     if ($Zip) {
-        $zipPath = Join-Path $OutputRoot "XISOSharp.Cli-$r.zip"
+        $zipPath = Join-Path $OutputRoot "XISOSharp-$r.zip"
         if (Test-Path -LiteralPath $zipPath) {
             Remove-Item -LiteralPath $zipPath -Force
         }

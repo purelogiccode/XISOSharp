@@ -32,7 +32,7 @@ internal sealed class CisoSplitInputStream : Stream
 
         _parts = [.. parts];
         _starts = new long[_parts.Length];
-        for (var i = 1; i < _parts.Length; i++)
+        for (int i = 1; i < _parts.Length; i++)
             _starts[i] = _parts[i - 1].Length;
         Length = _parts[^1].Length;
     }
@@ -56,11 +56,11 @@ internal sealed class CisoSplitInputStream : Stream
     public override int Read(Span<byte> buffer)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        var total = 0;
+        int total = 0;
         while (total < buffer.Length && Position < Length)
         {
-            var partIndex = _parts.Length - 1;
-            for (var i = 1; i < _parts.Length; i++)
+            int partIndex = _parts.Length - 1;
+            for (int i = 1; i < _parts.Length; i++)
             {
                 if (_starts[i] > Position)
                 {
@@ -69,13 +69,13 @@ internal sealed class CisoSplitInputStream : Stream
                 }
             }
 
-            var part = _parts[partIndex];
-            var available = part.Length - Position;
+            FileStream part = _parts[partIndex];
+            long available = part.Length - Position;
             if (available <= 0) break;
 
-            var toRead = (int)Math.Min(buffer.Length - total, available);
+            int toRead = (int)Math.Min(buffer.Length - total, available);
             part.Seek(Position, SeekOrigin.Begin);
-            var n = part.Read(buffer.Slice(total, toRead));
+            int n = part.Read(buffer.Slice(total, toRead));
             if (n <= 0) break;
 
             Position += n;
@@ -93,7 +93,7 @@ internal sealed class CisoSplitInputStream : Stream
     public override long Seek(long offset, SeekOrigin origin)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        var target = origin switch
+        long target = origin switch
         {
             SeekOrigin.Begin => offset,
             SeekOrigin.Current => Position + offset,
@@ -144,7 +144,7 @@ internal sealed class CisoSplitInputStream : Stream
         _disposed = true;
         if (disposing)
         {
-            foreach (var part in _parts) part.Dispose();
+            foreach (FileStream part in _parts) part.Dispose();
         }
 
         base.Dispose(disposing);

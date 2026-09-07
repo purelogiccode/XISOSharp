@@ -22,7 +22,7 @@ public class AvlTreeBenchmarks
     public void Setup()
     {
         _root = null;
-        foreach (var name in _filenames)
+        foreach (string name in _filenames)
         {
             AvlTree.AvlInsert(ref _root, new AvlNode { Filename = name, FileSize = 4096 });
         }
@@ -47,8 +47,8 @@ public class AvlTreeBenchmarks
     [Benchmark]
     public int Insert1000Files()
     {
-        var inserted = 0;
-        foreach (var name in _extraFilenames)
+        int inserted = 0;
+        foreach (string name in _extraFilenames)
         {
             if (AvlTree.AvlInsert(ref _root, new AvlNode { Filename = name, FileSize = 4096 }) != AvlResult.AvlError)
             {
@@ -95,8 +95,8 @@ public class AvlTreeBenchmarks
     [Benchmark]
     public int CompareKeys()
     {
-        var sum = 0;
-        for (var i = 0; i + 1 < _filenames.Length; i++)
+        int sum = 0;
+        for (int i = 0; i + 1 < _filenames.Length; i++)
         {
             sum += AvlTree.AvlCompareKey(_filenames[i], _filenames[i + 1]);
         }

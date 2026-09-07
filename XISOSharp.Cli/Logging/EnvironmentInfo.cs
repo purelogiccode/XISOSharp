@@ -20,9 +20,9 @@ internal static class EnvironmentInfo
     {
         try
         {
-            var asm = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-            var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-                       ?? asm.GetName().Version?.ToString();
+            Assembly asm = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+            string? info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                           ?? asm.GetName().Version?.ToString();
             return string.IsNullOrWhiteSpace(info) ? "Unknown" : info;
         }
         catch
@@ -87,7 +87,7 @@ internal static class EnvironmentInfo
             tempPath = "Unknown";
         }
 
-        var sb = new StringBuilder();
+        StringBuilder sb = new();
         sb.AppendLine("=== Environment Details ===");
         sb.Append("Date: ").AppendLine(DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture));
         sb.Append("Application Name: ").AppendLine(applicationName);

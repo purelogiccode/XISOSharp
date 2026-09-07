@@ -1,3 +1,5 @@
+using XISOSharp.Models;
+
 namespace XISOSharp.Tests;
 
 /// <summary>
@@ -14,7 +16,7 @@ public class ListDirectoryFlatTests : IDisposable
         Logger.Quiet = false;
         Logger.RealQuiet = false;
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -29,7 +31,7 @@ public class ListDirectoryFlatTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_ls_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_ls_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -37,7 +39,7 @@ public class ListDirectoryFlatTests : IDisposable
 
     private string CreateSourceTree()
     {
-        var root = Path.Combine(Path.GetTempPath(), $"xiso_ls_src_{Guid.NewGuid():N}");
+        string root = Path.Combine(Path.GetTempPath(), $"xiso_ls_src_{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(root, "media", "sub"));
         Directory.CreateDirectory(Path.Combine(root, "empty"));
 
@@ -50,9 +52,9 @@ public class ListDirectoryFlatTests : IDisposable
 
     private string CreateIso(string srcDir)
     {
-        var outputDir = CreateTempDir();
+        string outputDir = CreateTempDir();
 
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        int result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         return isoPath;
@@ -61,9 +63,9 @@ public class ListDirectoryFlatTests : IDisposable
     [Fact]
     public void ListDirectoryFlat_Root_ReturnsTopLevelNames()
     {
-        var isoPath = CreateIso(CreateSourceTree());
+        string isoPath = CreateIso(CreateSourceTree());
 
-        var names = XisoReader.ListDirectoryFlat(isoPath);
+        IReadOnlyList<string> names = XisoReader.ListDirectoryFlat(isoPath);
 
         Assert.Equal(3, names.Count); // default.xbe, media, empty
         Assert.Contains("default.xbe", names, StringComparer.OrdinalIgnoreCase);
@@ -74,9 +76,9 @@ public class ListDirectoryFlatTests : IDisposable
     [Fact]
     public void ListDirectoryFlat_Subdirectory_DoesNotRecurse()
     {
-        var isoPath = CreateIso(CreateSourceTree());
+        string isoPath = CreateIso(CreateSourceTree());
 
-        var names = XisoReader.ListDirectoryFlat(isoPath, "/media");
+        IReadOnlyList<string> names = XisoReader.ListDirectoryFlat(isoPath, "/media");
 
         Assert.Equal(2, names.Count); // video.bik, sub
         Assert.Contains("video.bik", names, StringComparer.OrdinalIgnoreCase);
@@ -87,9 +89,9 @@ public class ListDirectoryFlatTests : IDisposable
     [Fact]
     public void ListDirectoryFlat_EmptyDirectory_ReturnsEmpty()
     {
-        var isoPath = CreateIso(CreateSourceTree());
+        string isoPath = CreateIso(CreateSourceTree());
 
-        var names = XisoReader.ListDirectoryFlat(isoPath, "/empty");
+        IReadOnlyList<string> names = XisoReader.ListDirectoryFlat(isoPath, "/empty");
 
         Assert.Empty(names);
     }
@@ -97,7 +99,7 @@ public class ListDirectoryFlatTests : IDisposable
     [Fact]
     public void ListDirectoryFlat_MissingPath_Throws()
     {
-        var isoPath = CreateIso(CreateSourceTree());
+        string isoPath = CreateIso(CreateSourceTree());
 
         Assert.Throws<InvalidDataException>(() => XisoReader.ListDirectoryFlat(isoPath, "/nope"));
     }
@@ -108,8 +110,8 @@ public class ListDirectoryFlatTests : IDisposable
     [Fact]
     public void ListDirectoryFlat_InvalidIso_Throws()
     {
-        var junk = CreateTempDir();
-        var junkFile = Path.Combine(junk, "junk.iso");
+        string junk = CreateTempDir();
+        string junkFile = Path.Combine(junk, "junk.iso");
         File.WriteAllBytes(junkFile, new byte[4096]);
 
         Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectoryFlat(junkFile));
@@ -118,10 +120,10 @@ public class ListDirectoryFlatTests : IDisposable
     [Fact]
     public void ListDirectoryFlat_MatchesListDirectoryNames()
     {
-        var isoPath = CreateIso(CreateSourceTree());
+        string isoPath = CreateIso(CreateSourceTree());
 
-        var flat = XisoReader.ListDirectoryFlat(isoPath, "/media");
-        var entries = XisoReader.ListDirectory(isoPath, "/media");
+        IReadOnlyList<string> flat = XisoReader.ListDirectoryFlat(isoPath, "/media");
+        IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(isoPath, "/media");
 
         Assert.Equal(entries.Select(e => e.Name).OrderBy(n => n, StringComparer.Ordinal),
             flat.OrderBy(n => n, StringComparer.Ordinal));

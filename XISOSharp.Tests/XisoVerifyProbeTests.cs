@@ -26,7 +26,7 @@ public sealed class XisoVerifyProbeTests : IDisposable
     {
         Logger.Quiet = false;
         Logger.RealQuiet = false;
-        foreach (var f in _tempFiles)
+        foreach (string f in _tempFiles)
         {
             if (File.Exists(f))
                 File.Delete(f);
@@ -43,11 +43,11 @@ public sealed class XisoVerifyProbeTests : IDisposable
     /// </summary>
     private string CreateProbeImage(long partitionBase, uint rootSector = 0x108, uint rootSize = 2048)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"xiso_probe_{Guid.NewGuid():N}.iso");
-        var magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
+        string path = Path.Combine(Path.GetTempPath(), $"xiso_probe_{Guid.NewGuid():N}.iso");
+        byte[] magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
         const int headerLength = Constants.HeaderOffset + Constants.HeaderDataLength + 4 + 4
                                  + Constants.FileTimeSize + Constants.UnusedSize + Constants.HeaderDataLength;
-        using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        using (FileStream fs = new(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
             fs.SetLength(Constants.Xgd2HybridLseekOffset + headerLength + Constants.SectorSize);
             fs.Seek(partitionBase + Constants.HeaderOffset, SeekOrigin.Begin);
@@ -67,7 +67,7 @@ public sealed class XisoVerifyProbeTests : IDisposable
 
     private static (uint rootSector, uint rootSize, long discLseek) Verify(string path)
     {
-        using var fs = new FileStream(path,
+        using FileStream fs = new(path,
             new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
         return XisoReader.VerifyXiso(fs, Path.GetFileName(path));
     }
@@ -75,7 +75,7 @@ public sealed class XisoVerifyProbeTests : IDisposable
     [Fact]
     public void VerifyXiso_PlainBaseZero_ReturnsZeroLseek()
     {
-        var (rootSector, rootSize, discLseek) = Verify(CreateProbeImage(0));
+        (uint rootSector, uint rootSize, long discLseek) = Verify(CreateProbeImage(0));
         Assert.Equal(0x108u, rootSector);
         Assert.Equal(2048u, rootSize);
         Assert.Equal(0, discLseek);
@@ -84,7 +84,7 @@ public sealed class XisoVerifyProbeTests : IDisposable
     [Fact]
     public void VerifyXiso_GlobalBaseMagic_ReturnsGlobalLseek()
     {
-        var (rootSector, rootSize, discLseek) = Verify(CreateProbeImage(Constants.GlobalLseekOffset));
+        (uint rootSector, uint rootSize, long discLseek) = Verify(CreateProbeImage(Constants.GlobalLseekOffset));
         Assert.Equal(0x108u, rootSector);
         Assert.Equal(2048u, rootSize);
         Assert.Equal(Constants.GlobalLseekOffset, discLseek);
@@ -93,14 +93,14 @@ public sealed class XisoVerifyProbeTests : IDisposable
     [Fact]
     public void VerifyXiso_Xgd3BaseMagic_ReturnsXgd3Lseek()
     {
-        var (_, _, discLseek) = Verify(CreateProbeImage(Constants.Xgd3LseekOffset));
+        (_, _, long discLseek) = Verify(CreateProbeImage(Constants.Xgd3LseekOffset));
         Assert.Equal(Constants.Xgd3LseekOffset, discLseek);
     }
 
     [Fact]
     public void VerifyXiso_Xgd1BaseMagic_ReturnsXgd1Lseek()
     {
-        var (_, _, discLseek) = Verify(CreateProbeImage(Constants.Xgd1LseekOffset));
+        (_, _, long discLseek) = Verify(CreateProbeImage(Constants.Xgd1LseekOffset));
         Assert.Equal(Constants.Xgd1LseekOffset, discLseek);
     }
 
@@ -108,16 +108,16 @@ public sealed class XisoVerifyProbeTests : IDisposable
     public void VerifyXiso_BaseZeroWinsWhenBothPresent()
     {
         // Probe order must prefer the plain base, mirroring extract-xiso's chain.
-        var path = CreateProbeImage(0);
-        var magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
-        using (var fs = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None))
+        string path = CreateProbeImage(0);
+        byte[] magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
+        using (FileStream fs = new(path, FileMode.Open, FileAccess.Write, FileShare.None))
         {
             fs.SetLength(Constants.GlobalLseekOffset + Constants.HeaderOffset + 64);
             fs.Seek(Constants.GlobalLseekOffset + Constants.HeaderOffset, SeekOrigin.Begin);
             fs.Write(magic, 0, magic.Length);
         }
 
-        var (_, _, discLseek) = Verify(path);
+        (_, _, long discLseek) = Verify(path);
         Assert.Equal(0, discLseek);
     }
 
@@ -126,8 +126,8 @@ public sealed class XisoVerifyProbeTests : IDisposable
     {
         // Sparse file spanning every probe offset (reads back zeros, no
         // allocation); all probes miss, so the chain must reject the image.
-        var path = Path.Combine(Path.GetTempPath(), $"xiso_probe_{Guid.NewGuid():N}.iso");
-        using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        string path = Path.Combine(Path.GetTempPath(), $"xiso_probe_{Guid.NewGuid():N}.iso");
+        using (FileStream fs = new(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
             fs.SetLength((long)Constants.Xgd2HybridLseekOffset + Constants.HeaderOffset + 64);
         }

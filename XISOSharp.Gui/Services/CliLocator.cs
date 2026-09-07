@@ -8,16 +8,20 @@ namespace XISOSharp.Gui.Services;
 internal static class CliLocator
 {
     /// <summary>
-    /// Gets the CLI file name for the current OS.
+    /// Gets the CLI file name for the current OS (published binary is
+    /// <c>XISOSharp</c>; <c>XISOSharp.Cli</c> is still accepted as a legacy fallback).
     /// </summary>
-    internal static string CliFileName => ToolLocator.GetFileName("XISOSharp.Cli");
+    internal static string CliFileName => ToolLocator.GetFileName("XISOSharp");
 
     /// <summary>
     /// Resolves the CLI via explicit override, then a sibling of the GUI executable, then <c>PATH</c>.
+    /// Accepts the legacy <c>XISOSharp.Cli(.exe)</c> name as a fallback so older installs keep working.
     /// </summary>
     /// <param name="overridePath">User-configured CLI path; ignored when missing or blank.</param>
     /// <returns>The resolved executable path, or <c>null</c> when not found.</returns>
-    internal static string? Resolve(string? overridePath) => ToolLocator.Resolve(overridePath, "XISOSharp.Cli.exe", "XISOSharp.Cli");
+    internal static string? Resolve(string? overridePath) =>
+        ToolLocator.ResolveByBaseName(overridePath, "XISOSharp")
+        ?? ToolLocator.ResolveByBaseName(overridePath, "XISOSharp.Cli");
 
     /// <summary>
     /// Runs the CLI with <c>-v</c> and returns its first output line.

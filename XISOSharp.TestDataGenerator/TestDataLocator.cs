@@ -19,7 +19,7 @@ public static class TestDataLocator
     /// <returns>Full path of the <c>TestData</c> root (created on demand by the writer).</returns>
     public static string GetTestDataRoot(string? baseDirectory = null)
     {
-        var start = baseDirectory ?? AppContext.BaseDirectory;
+        string start = baseDirectory ?? AppContext.BaseDirectory;
         string? dir = Path.GetFullPath(start);
         while (dir is not null)
         {

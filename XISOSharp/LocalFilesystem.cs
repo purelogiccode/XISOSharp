@@ -49,12 +49,12 @@ public sealed class LocalFilesystem(string? root = null) : IFilesystem
             return Path.GetFullPath(path);
         }
 
-        var normalized = path.Replace('\\', Path.DirectorySeparatorChar)
+        string normalized = path.Replace('\\', Path.DirectorySeparatorChar)
             .Replace('/', Path.DirectorySeparatorChar)
             .TrimStart(Path.DirectorySeparatorChar);
-        var full = Path.GetFullPath(Path.Combine(Root, normalized));
+        string full = Path.GetFullPath(Path.Combine(Root, normalized));
 
-        var rootFull = Path.GetFullPath(Root);
+        string rootFull = Path.GetFullPath(Root);
         if (!XisoPaths.AreSamePath(full, rootFull) && !XisoPaths.IsWithinDirectory(full, rootFull))
         {
             throw new UnauthorizedAccessException(

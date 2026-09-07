@@ -12,7 +12,7 @@ public sealed class XisoOutputGuardTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -27,7 +27,7 @@ public sealed class XisoOutputGuardTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_outguard_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_outguard_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -35,7 +35,7 @@ public sealed class XisoOutputGuardTests : IDisposable
 
     private static string CreateDummy(string dir, string name)
     {
-        var path = Path.Combine(dir, name);
+        string path = Path.Combine(dir, name);
         File.WriteAllBytes(path, new byte[4096]);
         return path;
     }
@@ -43,9 +43,9 @@ public sealed class XisoOutputGuardTests : IDisposable
     [Fact]
     public void CompressToCso_OutputEqualsSource_Throws()
     {
-        var dir = CreateTempDir();
-        var src = CreateDummy(dir, "game.iso");
-        var ex = Assert.Throws<IOException>(() => CisoWriter.CompressToCso(src, src));
+        string dir = CreateTempDir();
+        string src = CreateDummy(dir, "game.iso");
+        IOException ex = Assert.Throws<IOException>(() => CisoWriter.CompressToCso(src, src));
         Assert.Contains("same", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(4096, new FileInfo(src).Length);
     }
@@ -53,9 +53,9 @@ public sealed class XisoOutputGuardTests : IDisposable
     [Fact]
     public void CompressToCso_SourceCollidesWithSplitPart_Throws()
     {
-        var dir = CreateTempDir();
-        var src = CreateDummy(dir, "game.1.cso");
-        var ex = Assert.Throws<IOException>(() =>
+        string dir = CreateTempDir();
+        string src = CreateDummy(dir, "game.1.cso");
+        IOException ex = Assert.Throws<IOException>(() =>
             CisoWriter.CompressToCso(src, Path.Combine(dir, "game.cso"), splitBytes: 2048));
         Assert.Contains("same", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(4096, new FileInfo(src).Length);
@@ -64,9 +64,9 @@ public sealed class XisoOutputGuardTests : IDisposable
     [Fact]
     public void DecompressToIso_OutputEqualsSource_Throws()
     {
-        var dir = CreateTempDir();
-        var src = CreateDummy(dir, "game.cso");
-        var ex = Assert.Throws<IOException>(() => CisoReader.DecompressToIso(src, src));
+        string dir = CreateTempDir();
+        string src = CreateDummy(dir, "game.cso");
+        IOException ex = Assert.Throws<IOException>(() => CisoReader.DecompressToIso(src, src));
         Assert.Contains("same", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(4096, new FileInfo(src).Length);
     }
@@ -74,10 +74,10 @@ public sealed class XisoOutputGuardTests : IDisposable
     [Fact]
     public void RebuildRedump_OutputEqualsPart_Throws()
     {
-        var dir = CreateTempDir();
-        var xiso = CreateDummy(dir, "game.xiso");
-        var video = CreateDummy(dir, "game.video.iso");
-        var ex = Assert.Throws<IOException>(() =>
+        string dir = CreateTempDir();
+        string xiso = CreateDummy(dir, "game.xiso");
+        string video = CreateDummy(dir, "game.video.iso");
+        IOException ex = Assert.Throws<IOException>(() =>
             XisoRedump.RebuildRedump(xiso, video, null, null, xiso, quiet: true));
         Assert.Contains("must not overwrite", ex.Message, StringComparison.Ordinal);
     }
@@ -85,9 +85,9 @@ public sealed class XisoOutputGuardTests : IDisposable
     [Fact]
     public void WipeFiller_OutputEqualsInput_Throws()
     {
-        var dir = CreateTempDir();
-        var iso = CreateDummy(dir, "game.iso");
-        var ex = Assert.Throws<IOException>(() => XisoOperations.WipeFiller(iso, iso, quiet: true));
+        string dir = CreateTempDir();
+        string iso = CreateDummy(dir, "game.iso");
+        IOException ex = Assert.Throws<IOException>(() => XisoOperations.WipeFiller(iso, iso, quiet: true));
         Assert.Contains("must not overwrite", ex.Message, StringComparison.Ordinal);
         Assert.Equal(4096, new FileInfo(iso).Length);
     }
@@ -95,9 +95,9 @@ public sealed class XisoOutputGuardTests : IDisposable
     [Fact]
     public void WipeAndTrim_OutputEqualsInput_Throws()
     {
-        var dir = CreateTempDir();
-        var iso = CreateDummy(dir, "game.iso");
-        var ex = Assert.Throws<IOException>(() => XisoOperations.WipeAndTrim(iso, iso, quiet: true));
+        string dir = CreateTempDir();
+        string iso = CreateDummy(dir, "game.iso");
+        IOException ex = Assert.Throws<IOException>(() => XisoOperations.WipeAndTrim(iso, iso, quiet: true));
         Assert.Contains("must not overwrite", ex.Message, StringComparison.Ordinal);
         Assert.Equal(4096, new FileInfo(iso).Length);
     }
@@ -106,13 +106,13 @@ public sealed class XisoOutputGuardTests : IDisposable
     public void TrimXiso_SamePath_StillTrimsInPlace()
     {
         // In-place trim is an explicit, safe semantic (SetLength) — not refused.
-        var dir = CreateTempDir();
-        var src = Path.Combine(dir, "src");
+        string dir = CreateTempDir();
+        string src = Path.Combine(dir, "src");
         Directory.CreateDirectory(src);
         File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
         XisoWriter.CreateXiso(src, dir, null, null, out _, "game.iso", null);
 
-        var iso = Path.Combine(dir, "game.iso");
+        string iso = Path.Combine(dir, "game.iso");
         Assert.True(XisoOperations.TrimXiso(iso, iso, quiet: true));
         Assert.True(new FileInfo(iso).Length > 0);
     }

@@ -93,7 +93,7 @@ public class GlobMatcherTests
     [Fact]
     public void MultiplePatterns_AnyMatch_ReturnsTrue()
     {
-        var matcher = new GlobMatcher(["*.tmp", "**/node_modules/**"]);
+        GlobMatcher matcher = new(["*.tmp", "**/node_modules/**"]);
         Assert.True(matcher.IsMatch("x.tmp"));
         Assert.True(matcher.IsMatch("a/node_modules/b"));
         Assert.False(matcher.IsMatch("keep.txt"));
@@ -103,7 +103,7 @@ public class GlobMatcherTests
     [Fact]
     public void EmptyPatterns_MatchesNothing()
     {
-        var matcher = new GlobMatcher([]);
+        GlobMatcher matcher = new([]);
         Assert.False(matcher.IsMatch("file.txt"));
         Assert.False(matcher.IsMatch("a/b"));
     }
@@ -111,7 +111,7 @@ public class GlobMatcherTests
     [Fact]
     public void NullOrEmptyPath_MatchesNothing()
     {
-        var matcher = new GlobMatcher(["*"]);
+        GlobMatcher matcher = new(["*"]);
         Assert.False(matcher.IsMatch(null));
         Assert.False(matcher.IsMatch(""));
     }
@@ -148,7 +148,7 @@ public class GlobMatcherTests
     [InlineData("[-a].txt", "-.txt", true)] // leading dash is a literal class member
     public void MalformedPatterns_NeverThrow(string pattern, string path, bool expected)
     {
-        var matcher = new GlobMatcher([pattern]);
+        GlobMatcher matcher = new([pattern]);
         Assert.Equal(expected, matcher.IsMatch(path));
     }
 }

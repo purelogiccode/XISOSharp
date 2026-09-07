@@ -10,7 +10,7 @@ public sealed class XisoPathsTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -25,7 +25,7 @@ public sealed class XisoPathsTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_paths_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_paths_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -34,8 +34,8 @@ public sealed class XisoPathsTests : IDisposable
     [Fact]
     public void AreSamePath_IdenticalStrings_Match()
     {
-        var dir = CreateTempDir();
-        var file = Path.Combine(dir, "game.iso");
+        string dir = CreateTempDir();
+        string file = Path.Combine(dir, "game.iso");
         File.WriteAllText(file, "x");
         Assert.True(XisoPaths.AreSamePath(file, file));
     }
@@ -43,10 +43,10 @@ public sealed class XisoPathsTests : IDisposable
     [Fact]
     public void AreSamePath_RelativeVsAbsolute_Match()
     {
-        var dir = CreateTempDir();
-        var file = Path.Combine(dir, "game.iso");
+        string dir = CreateTempDir();
+        string file = Path.Combine(dir, "game.iso");
         File.WriteAllText(file, "x");
-        var cwd = Directory.GetCurrentDirectory();
+        string cwd = Directory.GetCurrentDirectory();
         try
         {
             Directory.SetCurrentDirectory(dir);
@@ -61,26 +61,26 @@ public sealed class XisoPathsTests : IDisposable
     [Fact]
     public void AreSamePath_TrailingSeparator_Match()
     {
-        var dir = CreateTempDir();
+        string dir = CreateTempDir();
         Assert.True(XisoPaths.AreSamePath(dir, dir + Path.DirectorySeparatorChar));
     }
 
     [Fact]
     public void AreSamePath_CaseRule_FollowsOsConvention()
     {
-        var dir = CreateTempDir();
-        var lower = Path.Combine(dir, "game.iso");
-        var upper = Path.Combine(dir, "GAME.ISO");
-        var expected = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
+        string dir = CreateTempDir();
+        string lower = Path.Combine(dir, "game.iso");
+        string upper = Path.Combine(dir, "GAME.ISO");
+        bool expected = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
         Assert.Equal(expected, XisoPaths.AreSamePath(lower, upper));
     }
 
     [Fact]
     public void AreSamePath_DifferentFiles_Differ()
     {
-        var dir = CreateTempDir();
-        var a = Path.Combine(dir, "a.iso");
-        var b = Path.Combine(dir, "b.iso");
+        string dir = CreateTempDir();
+        string a = Path.Combine(dir, "a.iso");
+        string b = Path.Combine(dir, "b.iso");
         File.WriteAllText(a, "a");
         File.WriteAllText(b, "b");
         Assert.False(XisoPaths.AreSamePath(a, b));
@@ -89,10 +89,10 @@ public sealed class XisoPathsTests : IDisposable
     [Fact]
     public void AreSamePath_FileVsDirectory_Differ()
     {
-        var dir = CreateTempDir();
-        var sub = Path.Combine(dir, "sub");
+        string dir = CreateTempDir();
+        string sub = Path.Combine(dir, "sub");
         Directory.CreateDirectory(sub);
-        var file = Path.Combine(dir, "sub.iso");
+        string file = Path.Combine(dir, "sub.iso");
         File.WriteAllText(file, "x");
         Assert.False(XisoPaths.AreSamePath(sub, file));
     }
@@ -107,7 +107,7 @@ public sealed class XisoPathsTests : IDisposable
     [Fact]
     public void IsWithinDirectory_DirectChild_Matches()
     {
-        var dir = CreateTempDir();
+        string dir = CreateTempDir();
         Assert.True(XisoPaths.IsWithinDirectory(Path.Combine(dir, "out.iso"), dir));
         Assert.True(XisoPaths.IsWithinDirectory(Path.Combine(dir, "sub", "out.iso"), dir));
     }
@@ -115,8 +115,8 @@ public sealed class XisoPathsTests : IDisposable
     [Fact]
     public void IsWithinDirectory_SiblingPrefix_DoesNotMatch()
     {
-        var dir = CreateTempDir();
-        var sibling = dir + "2";
+        string dir = CreateTempDir();
+        string sibling = dir + "2";
         Directory.CreateDirectory(sibling);
         _tempDirs.Add(sibling);
         Assert.False(XisoPaths.IsWithinDirectory(Path.Combine(sibling, "out.iso"), dir));
@@ -125,14 +125,14 @@ public sealed class XisoPathsTests : IDisposable
     [Fact]
     public void IsWithinDirectory_SameDir_DoesNotMatch()
     {
-        var dir = CreateTempDir();
+        string dir = CreateTempDir();
         Assert.False(XisoPaths.IsWithinDirectory(dir, dir));
     }
 
     [Fact]
     public void IsWithinDirectory_Parent_DoesNotMatch()
     {
-        var dir = CreateTempDir();
+        string dir = CreateTempDir();
         Assert.False(XisoPaths.IsWithinDirectory(Path.GetDirectoryName(dir), dir));
     }
 

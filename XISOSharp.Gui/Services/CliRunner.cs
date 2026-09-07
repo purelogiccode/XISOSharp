@@ -41,7 +41,7 @@ internal static class CliRunner
         Log.Information("Running CLI: {Cli} {Args}", cliPath, string.Join(" ", args));
         try
         {
-            var result = await ProcessRunner
+            ProcessRunResult result = await ProcessRunner
                 .RunAsync(cliPath, args, timeout: null, cancellationToken: ct, onLine: onLine)
                 .ConfigureAwait(false);
             if (result.ExitCode == -1 && !string.IsNullOrWhiteSpace(result.StandardError)

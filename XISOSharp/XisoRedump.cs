@@ -1,4 +1,5 @@
 using System.Text;
+using ZARSharp;
 
 namespace XISOSharp;
 
@@ -17,13 +18,13 @@ public static class XisoRedump
 
     private static bool WriteBytes(FileStream inFs, FileStream outFs, long offset, long length)
     {
-        var buf = new byte[64 * Constants.SectorSize];
+        byte[] buf = new byte[64 * Constants.SectorSize];
         long copied = 0;
         if (offset >= 0) inFs.Seek(offset, SeekOrigin.Begin);
         while (copied < length)
         {
-            var toRead = (int)Math.Min(buf.Length, length - copied);
-            var n = inFs.Read(buf, 0, toRead);
+            int toRead = (int)Math.Min(buf.Length, length - copied);
+            int n = inFs.Read(buf, 0, toRead);
             if (n == 0) break;
             outFs.Write(buf, 0, n);
             copied += n;
@@ -34,13 +35,13 @@ public static class XisoRedump
 
     private static void WriteZeroes(FileStream outFs, long offset, long length)
     {
-        var buf = new byte[64 * Constants.SectorSize];
+        byte[] buf = new byte[64 * Constants.SectorSize];
         Array.Clear(buf, 0, buf.Length);
         long written = 0;
         if (offset >= 0) outFs.Seek(offset, SeekOrigin.Begin);
         while (written < length)
         {
-            var toWrite = (int)Math.Min(buf.Length, length - written);
+            int toWrite = (int)Math.Min(buf.Length, length - written);
             outFs.Write(buf, 0, toWrite);
             written += toWrite;
         }
@@ -57,10 +58,10 @@ public static class XisoRedump
             return false;
         }
 
-        var total = 0;
+        int total = 0;
         while (total < buf.Length)
         {
-            var n = fs.Read(buf[total..]);
+            int n = fs.Read(buf[total..]);
             if (n == 0) break;
             total += n;
         }
@@ -84,32 +85,32 @@ public static class XisoRedump
         cancellationToken.ThrowIfCancellationRequested();
 
         if (!File.Exists(redumpPath)) return false;
-        var isoSize = new FileInfo(redumpPath).Length;
-        var redumpIsoType = XgdTables.GetRedumpIsoTypeBySize(isoSize);
+        long isoSize = new FileInfo(redumpPath).Length;
+        int redumpIsoType = XgdTables.GetRedumpIsoTypeBySize(isoSize);
         if (redumpIsoType < 0)
         {
             if (!quiet) Logger.LogErr($"[ERROR] Unexpected Redump ISO size {isoSize}, cannot determine video type\n");
             return false;
         }
 
-        using var isoFs = new FileStream(redumpPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        var videoType = XgdTables.GetVideoType(isoFs, redumpIsoType);
+        using FileStream isoFs = new(redumpPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        int videoType = XgdTables.GetVideoType(isoFs, redumpIsoType);
         if (videoType < 0)
         {
             if (!quiet) Logger.LogErr("[ERROR] Cannot determine video type (wave PVD unknown)\n");
             return false;
         }
 
-        var l0 = XgdTables.VideoL0Length[videoType];
-        var l1 = XgdTables.VideoL1Length[videoType];
+        long l0 = XgdTables.VideoL0Length[videoType];
+        long l1 = XgdTables.VideoL1Length[videoType];
 
-        var videoPath = outputVideoPath ?? DeriveVideoPath(redumpPath);
+        string videoPath = outputVideoPath ?? DeriveVideoPath(redumpPath);
         outPath = videoPath;
 
         if (!quiet)
             Logger.Log($"[INFO] Writing video partition to {videoPath} (type {videoType}, L0 {l0} + L1 {l1})\n");
 
-        using var videoFs = new FileStream(videoPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+        using FileStream videoFs = new(videoPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
         if (!WriteBytes(isoFs, videoFs, 0, l0)) return false;
         if (!WriteBytes(isoFs, videoFs, isoSize - l1, l1)) return false;
         return true;
@@ -117,12 +118,12 @@ public static class XisoRedump
 
     private static string DeriveVideoPath(string redumpPath)
     {
-        var dir = Path.GetDirectoryName(redumpPath) ?? "";
-        var filename = Path.GetFileNameWithoutExtension(redumpPath) ?? "video";
+        string dir = Path.GetDirectoryName(redumpPath) ?? "";
+        string filename = Path.GetFileNameWithoutExtension(redumpPath) ?? "video";
         // Strip compound extensions like .redump
         string[] compounds = [".video.iso", ".redump.iso", ".skeleton.xiso", ".xiso"];
-        var full = Path.GetFileName(redumpPath) ?? "";
-        foreach (var ext in compounds)
+        string full = Path.GetFileName(redumpPath) ?? "";
+        foreach (string ext in compounds)
         {
             if (full.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
             {
@@ -140,16 +141,16 @@ public static class XisoRedump
 
     private static long FindUpdateOffset(FileStream videoFs)
     {
-        var updateOffset = videoFs.Length;
-        var videoBuf = new byte[16];
+        long updateOffset = videoFs.Length;
+        byte[] videoBuf = new byte[16];
         ReadOnlySpan<byte> filler = FillerPattern;
         while (updateOffset >= SectorSize)
         {
             videoFs.Seek(updateOffset - SectorSize, SeekOrigin.Begin);
-            var total = 0;
+            int total = 0;
             while (total < videoBuf.Length)
             {
-                var n = videoFs.Read(videoBuf, total, videoBuf.Length - total);
+                int n = videoFs.Read(videoBuf, total, videoBuf.Length - total);
                 if (n == 0) break;
                 total += n;
             }
@@ -173,19 +174,19 @@ public static class XisoRedump
         bool quiet = false)
     {
         if (!File.Exists(videoPath)) return false;
-        var videoLen = new FileInfo(videoPath).Length;
-        var videoType = XgdTables.GetVideoTypeBySize(videoLen);
+        long videoLen = new FileInfo(videoPath).Length;
+        int videoType = XgdTables.GetVideoTypeBySize(videoLen);
         if (videoType != 16 && videoType != 17 && videoType != 18)
         {
             if (!quiet) Logger.Log($"[INFO] Cannot extract update — not an XGD3 video partition (size {videoLen})\n");
             return false;
         }
 
-        var updatePath = outputUpdatePath ??
-                         Path.Combine(Path.GetDirectoryName(videoPath) ?? "", "su20076000_00000000");
-        using var videoFs = new FileStream(videoPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None, 65536);
-        var updateOffset = FindUpdateOffset(videoFs);
-        var updateLength = videoFs.Length - updateOffset - SectorSize;
+        string updatePath = outputUpdatePath ??
+                            Path.Combine(Path.GetDirectoryName(videoPath) ?? "", "su20076000_00000000");
+        using FileStream videoFs = new(videoPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None, 65536);
+        long updateOffset = FindUpdateOffset(videoFs);
+        long updateLength = videoFs.Length - updateOffset - SectorSize;
         if (updateLength <= 0)
         {
             if (!quiet) Logger.LogErr("[ERROR] No system update found in video partition\n");
@@ -194,7 +195,7 @@ public static class XisoRedump
 
         if (!quiet)
             Logger.Log($"[INFO] Writing system update to {updatePath} ({updateLength} bytes at {updateOffset})\n");
-        using (var updateFs = new FileStream(updatePath, FileMode.Create, FileAccess.Write, FileShare.None, 65536))
+        using (FileStream updateFs = new(updatePath, FileMode.Create, FileAccess.Write, FileShare.None, 65536))
         {
             if (!WriteBytes(videoFs, updateFs, updateOffset, updateLength))
                 return false;
@@ -215,8 +216,8 @@ public static class XisoRedump
     {
         if (updateFs != null)
         {
-            var suSize = updateFs.Length;
-            var l1Trimmed = l1Length - suSize - SectorSize;
+            long suSize = updateFs.Length;
+            long l1Trimmed = l1Length - suSize - SectorSize;
             if (!WriteBytes(videoFs, redumpFs, l0Length, l1Trimmed)) return false;
             if (!WriteBytes(updateFs, redumpFs, 0, suSize)) return false;
             videoFs.Seek(-SectorSize, SeekOrigin.End);
@@ -259,7 +260,7 @@ public static class XisoRedump
     {
         // The output is written while the inputs are still being read: refuse
         // to clobber any of them (xdvdfs #36).
-        foreach (var input in new[] { xisoPath, videoPath, fillerOrSeedPath, updatePath, securitySectorsPath })
+        foreach (string? input in new[] { xisoPath, videoPath, fillerOrSeedPath, updatePath, securitySectorsPath })
         {
             if (!string.IsNullOrWhiteSpace(input) && XisoPaths.AreSamePath(input, outputRedumpPath))
                 throw new IOException($"Output '{outputRedumpPath}' must not overwrite its input '{input}'");
@@ -269,7 +270,7 @@ public static class XisoRedump
         // "ZArchive rebuild is coming soon!"): materialize it to a temp XISO first.
         if (xisoPath.EndsWith(".zar", StringComparison.OrdinalIgnoreCase))
         {
-            var materialized = MaterializeZarXiso(xisoPath, quiet, cancellationToken, out var scratchDir);
+            string? materialized = MaterializeZarXiso(xisoPath, quiet, cancellationToken, out string? scratchDir);
             if (materialized == null) return false;
             try
             {
@@ -298,8 +299,8 @@ public static class XisoRedump
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var videoLen = new FileInfo(videoPath).Length;
-        var videoType = XgdTables.GetVideoTypeBySize(videoLen);
+        long videoLen = new FileInfo(videoPath).Length;
+        int videoType = XgdTables.GetVideoTypeBySize(videoLen);
         // If videoType unknown (-1), try PVD path via redump-type heuristic? Fall back to size-based video type using file length directly if it matches VIDEO_LENGTH
         if (videoType < 0)
         {
@@ -307,14 +308,14 @@ public static class XisoRedump
             return false;
         }
 
-        var xisoType = XgdTables.GetXisoTypeFromVideo(videoType);
-        var xisoLength = XgdTables.XisoLength[xisoType];
-        var redumpLength = XgdTables.GetRedumpLength(videoType);
-        var
+        int xisoType = XgdTables.GetXisoTypeFromVideo(videoType);
+        long xisoLength = XgdTables.XisoLength[xisoType];
+        long redumpLength = XgdTables.GetRedumpLength(videoType);
+        int
             xgdType = xisoType; // XisoType maps 1:1 to XGD type for security-sector validation (Hybrid maps to 2, which follows XGD2 rule of 1 sector range)
 
         // Open XISO and validate
-        using var isoFs = new FileStream(xisoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        using FileStream isoFs = new(xisoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
         // Validate magic via Verify-like check (optional but preserves XboxKit IsValidXISO)
         // We'll just check header at 0x10000
 
@@ -328,9 +329,9 @@ public static class XisoRedump
             }
         }
         isoFs.Seek(0, SeekOrigin.Begin);
-        var isoSize = isoFs.Length;
+        long isoSize = isoFs.Length;
 
-        using var videoFs = new FileStream(videoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        using FileStream videoFs = new(videoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
 
         // Determine filler vs PRNG
         FileStream? fillerFs = null;
@@ -339,14 +340,14 @@ public static class XisoRedump
 
         if (!string.IsNullOrEmpty(fillerOrSeedPath) && File.Exists(fillerOrSeedPath))
         {
-            var fillerLen = new FileInfo(fillerOrSeedPath).Length;
+            long fillerLen = new FileInfo(fillerOrSeedPath).Length;
             if (fillerLen == 4 && xisoType == 0)
             {
                 // Treat as seed file
-                using var seedFs = new FileStream(fillerOrSeedPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using FileStream seedFs = new(fillerOrSeedPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 Span<byte> seedBuf = stackalloc byte[4];
                 seedFs.ReadExactly(seedBuf);
-                var seed = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(seedBuf);
+                uint seed = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(seedBuf);
                 if (!quiet) Logger.Log($"[INFO] Using seed {seed:X8} from {fillerOrSeedPath}\n");
                 prng = new XboxPrng(seed);
                 // Need security sectors
@@ -362,7 +363,7 @@ public static class XisoRedump
                 else
                 {
                     // Try default file in same dir as xiso
-                    var candidate = Path.Combine(Path.GetDirectoryName(xisoPath) ?? "", "sectors.txt");
+                    string candidate = Path.Combine(Path.GetDirectoryName(xisoPath) ?? "", "sectors.txt");
                     if (File.Exists(candidate))
                         securitySectors = SecuritySectors.ParseFile(candidate, redumpLength, xgdType, quiet) ?? [];
                 }
@@ -379,13 +380,13 @@ public static class XisoRedump
                 fillerFs = new FileStream(fillerOrSeedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
                 if (!quiet) Logger.Log($"[INFO] Using filler {fillerOrSeedPath} ({fillerLen} bytes)\n");
                 // If filler is trimmed (excludes security sectors), need sectors.txt too
-                var expectedFiller = GetExpectedFillerSize(isoFs, xisoLength, quiet);
+                long expectedFiller = GetExpectedFillerSize(isoFs, xisoLength, quiet);
                 // Rewind isoFS after helper moved it
                 isoFs.Seek(0, SeekOrigin.Begin);
                 if (fillerLen < expectedFiller)
                 {
-                    var secPath = securitySectorsPath ??
-                                  Path.Combine(Path.GetDirectoryName(xisoPath) ?? "", "sectors.txt");
+                    string secPath = securitySectorsPath ??
+                                     Path.Combine(Path.GetDirectoryName(xisoPath) ?? "", "sectors.txt");
                     if (!File.Exists(secPath)) secPath = "sectors.txt";
                     if (File.Exists(secPath))
                         securitySectors = SecuritySectors.ParseFile(secPath, redumpLength, xgdType, quiet) ?? [];
@@ -399,7 +400,7 @@ public static class XisoRedump
                 else
                 {
                     // Optionally load sectors if file exists anyway for zero-skip logic (PRNG path already)
-                    var secPath = securitySectorsPath ?? "sectors.txt";
+                    string secPath = securitySectorsPath ?? "sectors.txt";
                     if (File.Exists(secPath))
                         securitySectors = SecuritySectors.ParseFile(secPath, redumpLength, xgdType, quiet) ?? [];
                 }
@@ -422,7 +423,7 @@ public static class XisoRedump
             if (!quiet) Logger.Log($"[INFO] Using system update {updatePath} ({updateFs.Length} bytes)\n");
         }
 
-        using var redumpFs = new FileStream(outputRedumpPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+        using FileStream redumpFs = new(outputRedumpPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
         bool result;
         try
         {
@@ -440,11 +441,11 @@ public static class XisoRedump
 
     private static long GetExpectedFillerSize(FileStream isoFs, long xisoLength, bool quiet)
     {
-        (var sys, var file) =
+        (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> file) =
             XisoRanges.GetXisoRanges(isoFs, 0, quiet);
-        var all = XisoRanges.MergeRanges(sys, file);
+        List<(uint Start, uint End)> all = XisoRanges.MergeRanges(sys, file);
         long validBytes = 0;
-        foreach ((var s, var e) in all) validBytes += (e - s + 1) * SectorSize;
+        foreach ((uint s, uint e) in all) validBytes += (e - s + 1) * SectorSize;
         return xisoLength - validBytes;
     }
 
@@ -455,24 +456,24 @@ public static class XisoRedump
     {
         ct.ThrowIfCancellationRequested();
 
-        var xisoType = XgdTables.GetXisoTypeFromVideo(videoType);
-        var xisoLength = XgdTables.XisoLength[xisoType];
-        var xisoOffset = XgdTables.XisoOffset[xisoType];
-        var redumpLength = XgdTables.GetRedumpLength(videoType);
-        var l0Length = XgdTables.VideoL0Length[videoType];
-        var l1Length = XgdTables.VideoL1Length[videoType];
+        int xisoType = XgdTables.GetXisoTypeFromVideo(videoType);
+        long xisoLength = XgdTables.XisoLength[xisoType];
+        long xisoOffset = XgdTables.XisoOffset[xisoType];
+        long redumpLength = XgdTables.GetRedumpLength(videoType);
+        long l0Length = XgdTables.VideoL0Length[videoType];
+        long l1Length = XgdTables.VideoL1Length[videoType];
 
         // Write L0
         if (!WriteBytes(videoFs, redumpFs, 0, l0Length)) return false;
 
-        var l0Padding = xisoOffset - l0Length;
+        long l0Padding = xisoOffset - l0Length;
         if (l0Padding < 0) return false;
         WriteZeroes(redumpFs, -1, l0Padding);
 
         // Game partition
-        var isoSize = isoFs.Length;
+        long isoSize = isoFs.Length;
         isoFs.Seek(0, SeekOrigin.Begin);
-        var writeFiller = fillerFs != null || prng != null;
+        bool writeFiller = fillerFs != null || prng != null;
 
         if (!writeFiller)
         {
@@ -481,30 +482,30 @@ public static class XisoRedump
         }
         else
         {
-            (var sysRanges, var fileRanges) =
+            (List<(uint Start, uint End)> sysRanges, List<(uint Start, uint End)> fileRanges) =
                 XisoRanges.GetXisoRanges(isoFs, 0, quiet);
-            var ranges = XisoRanges.MergeRanges(sysRanges, fileRanges);
+            List<(uint Start, uint End)> ranges = XisoRanges.MergeRanges(sysRanges, fileRanges);
             if (!quiet)
             {
-                foreach ((var start, var end) in ranges)
+                foreach ((uint start, uint end) in ranges)
                     Logger.Log($"[INFO] XISO File Extent: {start}-{end}\n");
             }
 
-            var xisoOffsetSector = xisoOffset / SectorSize;
+            long xisoOffsetSector = xisoOffset / SectorSize;
             long currentByte = 0;
             isoFs.Seek(0, SeekOrigin.Begin);
             while (currentByte < xisoLength)
             {
                 ct.ThrowIfCancellationRequested();
-                var currentSector = (currentByte + SectorSize - 1) / SectorSize;
+                long currentSector = (currentByte + SectorSize - 1) / SectorSize;
                 long xisoBytes = 0;
                 long fillerBytes = 0;
 
                 // Security sector wipe pass
                 if (prng != null || fillerFs != null)
                 {
-                    var wiped = false;
-                    for (var i = 0; i < securitySectors.Length; i++)
+                    bool wiped = false;
+                    for (int i = 0; i < securitySectors.Length; i++)
                     {
                         if (currentSector + xisoOffsetSector == securitySectors[i])
                         {
@@ -533,7 +534,7 @@ public static class XisoRedump
                 }
                 else
                 {
-                    for (var i = 0; i < ranges.Count; i++)
+                    for (int i = 0; i < ranges.Count; i++)
                     {
                         if (currentSector >= ranges[i].Start && currentSector <= ranges[i].End)
                         {
@@ -550,7 +551,7 @@ public static class XisoRedump
 
                 if (prng != null || fillerFs != null)
                 {
-                    for (var i = 0; i < securitySectors.Length; i++)
+                    for (int i = 0; i < securitySectors.Length; i++)
                     {
                         if (currentSector + xisoOffsetSector < securitySectors[i] + 4095)
                         {
@@ -580,7 +581,7 @@ public static class XisoRedump
                 }
                 else
                 {
-                    var bytesToWrite = xisoBytes > 0 ? xisoBytes : xisoLength - currentByte;
+                    long bytesToWrite = xisoBytes > 0 ? xisoBytes : xisoLength - currentByte;
                     if (!WriteBytes(isoFs, redumpFs, -1, bytesToWrite)) return false;
                     currentByte += bytesToWrite;
                 }
@@ -590,7 +591,7 @@ public static class XisoRedump
         }
 
         // L1 padding
-        var l1Padding = redumpLength - l1Length - (xisoOffset + xisoLength);
+        long l1Padding = redumpLength - l1Length - (xisoOffset + xisoLength);
         WriteZeroes(redumpFs, -1, l1Padding);
 
         // L1
@@ -620,7 +621,7 @@ public static class XisoRedump
         if (!File.Exists(zarPath))
             throw new FileNotFoundException($"XISO/ZAR input not found: {zarPath}", zarPath);
 
-        using var reader = ZARSharp.ZArchiveReader.TryOpen(zarPath);
+        using ZArchiveReader? reader = ZArchiveReader.TryOpen(zarPath);
         if (reader == null)
         {
             if (!quiet) Logger.LogErr($"[ERROR] Not a valid ZArchive: {zarPath}\n");
@@ -628,11 +629,11 @@ public static class XisoRedump
         }
 
         scratchDir = Path.Combine(Path.GetTempPath(), $"XISOSharp_zar_{Guid.NewGuid():N}");
-        var filesDir = Path.Combine(scratchDir, "files");
+        string filesDir = Path.Combine(scratchDir, "files");
         Directory.CreateDirectory(filesDir);
         try
         {
-            var files = ExtractZarTree(reader, filesDir, cancellationToken);
+            List<string> files = ExtractZarTree(reader, filesDir, cancellationToken);
             if (files.Count == 0)
             {
                 if (!quiet) Logger.LogErr($"[ERROR] ZArchive contains no files: {zarPath}\n");
@@ -649,7 +650,7 @@ public static class XisoRedump
 
             if (!quiet)
                 Logger.Log($"[INFO] Repacking {files.Count} files from {zarPath} into a temporary XISO\n");
-            var tempXiso = Path.Combine(scratchDir, "game.xiso");
+            string tempXiso = Path.Combine(scratchDir, "game.xiso");
             if (XisoWriter.PackFromDirectory(filesDir, tempXiso, cancellationToken: cancellationToken) != 0)
             {
                 if (!quiet) Logger.LogErr($"[ERROR] Failed repacking ZArchive contents into an XISO: {zarPath}\n");
@@ -666,7 +667,7 @@ public static class XisoRedump
         }
     }
 
-    private static List<string> ExtractZarTree(ZARSharp.ZArchiveReader reader, string outputDir,
+    private static List<string> ExtractZarTree(ZArchiveReader reader, string outputDir,
         CancellationToken cancellationToken) =>
         // Shared engine: same walk, same files, same errors as before.
         ZARSharp.Pipeline.ZarPackEngine
@@ -676,14 +677,14 @@ public static class XisoRedump
     {
         try
         {
-            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096);
+            using FileStream fs = new(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096);
             if (fs.Length < Constants.HeaderOffset + Constants.HeaderDataLength) return false;
             fs.Seek(Constants.HeaderOffset, SeekOrigin.Begin);
             Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
-            var total = 0;
+            int total = 0;
             while (total < buf.Length)
             {
-                var n = fs.Read(buf[total..]);
+                int n = fs.Read(buf[total..]);
                 if (n == 0) break;
                 total += n;
             }
@@ -722,11 +723,11 @@ public static class XisoRedump
     {
         // Attempt to infer video/filler/seed/update among additionalFiles by size/extension
         string? video = null, filler = null, update = null;
-        foreach (var f in additionalFiles)
+        foreach (string f in additionalFiles)
         {
             if (!File.Exists(f)) continue;
-            var sz = new FileInfo(f).Length;
-            var name = Path.GetFileName(f);
+            long sz = new FileInfo(f).Length;
+            string name = Path.GetFileName(f);
             if (video == null && (f.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase) ||
                                   XgdTables.GetVideoTypeBySize(sz) >= 0))
             {

@@ -33,8 +33,8 @@ public class AvlTreeEdgeCasesTests
     public void FreeTree_SimpleTree_CleansUpReferences()
     {
         AvlNode? root = null;
-        var node1 = new AvlNode { Filename = "file1.txt", FileSize = 100 };
-        var node2 = new AvlNode { Filename = "file2.txt", FileSize = 200 };
+        AvlNode node1 = new() { Filename = "file1.txt", FileSize = 100 };
+        AvlNode node2 = new() { Filename = "file2.txt", FileSize = 200 };
 
         AvlTree.AvlInsert(ref root, node1);
         AvlTree.AvlInsert(ref root, node2);
@@ -59,12 +59,12 @@ public class AvlTreeEdgeCasesTests
     [Fact]
     public void FreeTree_WithSubdirectory_CleansUpRecursively()
     {
-        var subNode = new AvlNode { Filename = "subfile.txt", FileSize = 50 };
+        AvlNode subNode = new() { Filename = "subfile.txt", FileSize = 50 };
         AvlNode? subRoot = null;
         AvlTree.AvlInsert(ref subRoot, subNode);
 
         AvlNode? root = null;
-        var dirNode = new AvlNode { Filename = "dir", Subdirectory = subRoot };
+        AvlNode dirNode = new() { Filename = "dir", Subdirectory = subRoot };
         AvlTree.AvlInsert(ref root, dirNode);
 
         AvlTree.FreeTree(root);
@@ -86,7 +86,7 @@ public class AvlTreeEdgeCasesTests
     public void AvlFetch_NullFilename_ThrowsNullReferenceException()
     {
         AvlNode? root = null;
-        var node = new AvlNode { Filename = "file.txt" };
+        AvlNode node = new() { Filename = "file.txt" };
         AvlTree.AvlInsert(ref root, node);
 
         Assert.Throws<NullReferenceException>(() => AvlTree.AvlFetch(root, null!));
@@ -100,7 +100,7 @@ public class AvlTreeEdgeCasesTests
     public void AvlFetch_EmptyKey_ReturnsNull_UnlessInsertedEmpty()
     {
         AvlNode? root = null;
-        var result = AvlTree.AvlFetch(root, "");
+        AvlNode? result = AvlTree.AvlFetch(root, "");
         Assert.Null(result);
     }
 
@@ -113,12 +113,12 @@ public class AvlTreeEdgeCasesTests
     public void AvlTraverseDepthFirst_InvalidMethod_ReturnsZero()
     {
         AvlNode? root = null;
-        var node = new AvlNode { Filename = "test" };
+        AvlNode node = new() { Filename = "test" };
         AvlTree.AvlInsert(ref root, node);
 
-        var callCount = 0;
+        int callCount = 0;
 
-        var result = AvlTree.AvlTraverseDepthFirst(root, Cb, null, (AvlTraversalMethod)99, 0);
+        int result = AvlTree.AvlTraverseDepthFirst(root, Cb, null, (AvlTraversalMethod)99, 0);
         Assert.Equal(0, result);
         Assert.Equal(0, callCount);
         return;
@@ -186,7 +186,7 @@ public class AvlTreeEdgeCasesTests
     [Fact]
     public void AvlTraverseDepthFirst_NullRoot_AllMethods_ReturnZero()
     {
-        var callCount = 0;
+        int callCount = 0;
         TraversalCallback cb = (_, _, _) =>
         {
             callCount++;
@@ -208,8 +208,8 @@ public class AvlTreeEdgeCasesTests
     public void AvlInsert_Duplicate_ReturnsAvlError()
     {
         AvlNode? root = null;
-        var node1 = new AvlNode { Filename = "file.txt" };
-        var node2 = new AvlNode { Filename = "file.txt" };
+        AvlNode node1 = new() { Filename = "file.txt" };
+        AvlNode node2 = new() { Filename = "file.txt" };
 
         Assert.Equal(AvlResult.AvlBalanced, AvlTree.AvlInsert(ref root, node1));
         Assert.Equal(AvlResult.AvlError, AvlTree.AvlInsert(ref root, node2));
@@ -224,8 +224,8 @@ public class AvlTreeEdgeCasesTests
     public void AvlInsert_CaseInsensitiveDuplicate_ReturnsAvlError()
     {
         AvlNode? root = null;
-        var node1 = new AvlNode { Filename = "File.TXT" };
-        var node2 = new AvlNode { Filename = "file.txt" };
+        AvlNode node1 = new() { Filename = "File.TXT" };
+        AvlNode node2 = new() { Filename = "file.txt" };
 
         Assert.Equal(AvlResult.AvlBalanced, AvlTree.AvlInsert(ref root, node1));
         Assert.Equal(AvlResult.AvlError, AvlTree.AvlInsert(ref root, node2));

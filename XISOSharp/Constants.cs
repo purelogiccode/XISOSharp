@@ -62,9 +62,9 @@ public static class Constants
         if (header.Length < FilenameOffset)
             return false;
 
-        var allFf = true;
-        var allZero = true;
-        for (var i = 0; i < FilenameOffset; i++)
+        bool allFf = true;
+        bool allZero = true;
+        for (int i = 0; i < FilenameOffset; i++)
         {
             if (header[i] != 0xFF) allFf = false;
             if (header[i] != 0x00) allZero = false;
@@ -218,7 +218,7 @@ public static class Constants
     {
         get
         {
-            var platform = OperatingSystem.IsWindows() ? "win" :
+            string platform = OperatingSystem.IsWindows() ? "win" :
                 OperatingSystem.IsLinux() ? "linux" :
                 OperatingSystem.IsMacOS() ? "macos" : "cross-platform";
             return $"extract-xiso v{ExisoVersion} for {platform} - written by in <in@fishtank.com>\n";

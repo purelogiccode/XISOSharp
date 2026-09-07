@@ -1,3 +1,5 @@
+using XISOSharp.BlockDevice;
+
 namespace XISOSharp.Tests;
 
 /// <summary>
@@ -11,7 +13,7 @@ public class XisoChecksumTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -38,7 +40,7 @@ public class XisoChecksumTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_chk_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_chk_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -46,7 +48,7 @@ public class XisoChecksumTests : IDisposable
 
     private string CreateSourceDir(Action<string> populate)
     {
-        var src = Path.Combine(Path.GetTempPath(), $"xiso_chk_src_{Guid.NewGuid():N}");
+        string src = Path.Combine(Path.GetTempPath(), $"xiso_chk_src_{Guid.NewGuid():N}");
         Directory.CreateDirectory(src);
         _tempDirs.Add(src);
         populate(src);
@@ -56,7 +58,7 @@ public class XisoChecksumTests : IDisposable
     private string CreateIso(string srcDir, string? outputDir = null, int? prependSectors = null)
     {
         outputDir ??= CreateTempDir();
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null,
+        int result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null,
             prependSectors: prependSectors);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
@@ -76,14 +78,14 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_Deterministic_SameContentSameChecksum()
     {
-        var src1 = CreateSourceDir(PopulateSimple);
-        var src2 = CreateSourceDir(PopulateSimple);
+        string src1 = CreateSourceDir(PopulateSimple);
+        string src2 = CreateSourceDir(PopulateSimple);
 
-        var iso1 = CreateIso(src1);
-        var iso2 = CreateIso(src2);
+        string iso1 = CreateIso(src1);
+        string iso2 = CreateIso(src2);
 
-        var hash1 = XisoChecksum.ComputeImageChecksum(iso1);
-        var hash2 = XisoChecksum.ComputeImageChecksum(iso2);
+        byte[] hash1 = XisoChecksum.ComputeImageChecksum(iso1);
+        byte[] hash2 = XisoChecksum.ComputeImageChecksum(iso2);
 
         Assert.Equal(hash1, hash2);
     }
@@ -91,14 +93,14 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_DifferentContent_DifferentChecksum()
     {
-        var src1 = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "a.txt"), "content A"));
-        var src2 = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "a.txt"), "content B"));
+        string src1 = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "a.txt"), "content A"));
+        string src2 = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "a.txt"), "content B"));
 
-        var iso1 = CreateIso(src1);
-        var iso2 = CreateIso(src2);
+        string iso1 = CreateIso(src1);
+        string iso2 = CreateIso(src2);
 
-        var hash1 = XisoChecksum.ComputeImageChecksum(iso1);
-        var hash2 = XisoChecksum.ComputeImageChecksum(iso2);
+        byte[] hash1 = XisoChecksum.ComputeImageChecksum(iso1);
+        byte[] hash2 = XisoChecksum.ComputeImageChecksum(iso2);
 
         Assert.NotEqual(hash1, hash2);
     }
@@ -106,11 +108,11 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_EmptyDirectory_ProducesValidHash()
     {
-        var src = CreateSourceDir(_ => { });
-        var iso = CreateIso(src);
+        string src = CreateSourceDir(_ => { });
+        string iso = CreateIso(src);
 
-        var hash = XisoChecksum.ComputeImageChecksum(iso);
-        var hex = XisoChecksum.ComputeImageChecksumHex(iso);
+        byte[] hash = XisoChecksum.ComputeImageChecksum(iso);
+        string hex = XisoChecksum.ComputeImageChecksumHex(iso);
 
         Assert.NotNull(hash);
         Assert.Equal(32, hash.Length);
@@ -123,10 +125,10 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_HexLength64AndLowercase()
     {
-        var src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "data"));
-        var iso = CreateIso(src);
+        string src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "data"));
+        string iso = CreateIso(src);
 
-        var hex = XisoChecksum.ComputeImageChecksumHex(iso);
+        string hex = XisoChecksum.ComputeImageChecksumHex(iso);
 
         Assert.Equal(64, hex.Length);
         // Ensure hex string contains only 0-9 a-f
@@ -136,12 +138,12 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_BytesAndHexAreConsistent()
     {
-        var src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "consistency check"));
-        var iso = CreateIso(src);
+        string src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "consistency check"));
+        string iso = CreateIso(src);
 
-        var bytes = XisoChecksum.ComputeImageChecksum(iso);
-        var hex = XisoChecksum.ComputeImageChecksumHex(iso);
-        var hexFromBytes = Convert.ToHexString(bytes).ToLowerInvariant();
+        byte[] bytes = XisoChecksum.ComputeImageChecksum(iso);
+        string hex = XisoChecksum.ComputeImageChecksumHex(iso);
+        string hexFromBytes = Convert.ToHexString(bytes).ToLowerInvariant();
 
         Assert.Equal(hexFromBytes, hex);
     }
@@ -149,13 +151,13 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_FileStreamOverloadMatchesPathOverload()
     {
-        var src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "stream vs path"));
-        var iso = CreateIso(src);
+        string src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "stream vs path"));
+        string iso = CreateIso(src);
 
-        var hashViaPath = XisoChecksum.ComputeImageChecksum(iso);
+        byte[] hashViaPath = XisoChecksum.ComputeImageChecksum(iso);
 
-        using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        var hashViaStream = XisoChecksum.ComputeImageChecksum(fs, Path.GetFileName(iso));
+        using FileStream fs = new(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        byte[] hashViaStream = XisoChecksum.ComputeImageChecksum(fs, Path.GetFileName(iso));
 
         Assert.Equal(hashViaPath, hashViaStream);
     }
@@ -163,14 +165,14 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_CaseSensitivity_ProducesDifferentChecksum()
     {
-        var srcLower = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "hello.txt"), "same content"));
-        var srcUpper = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "HELLO.txt"), "same content"));
+        string srcLower = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "hello.txt"), "same content"));
+        string srcUpper = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "HELLO.txt"), "same content"));
 
-        var isoLower = CreateIso(srcLower);
-        var isoUpper = CreateIso(srcUpper);
+        string isoLower = CreateIso(srcLower);
+        string isoUpper = CreateIso(srcUpper);
 
-        var hashLower = XisoChecksum.ComputeImageChecksum(isoLower);
-        var hashUpper = XisoChecksum.ComputeImageChecksum(isoUpper);
+        byte[] hashLower = XisoChecksum.ComputeImageChecksum(isoLower);
+        byte[] hashUpper = XisoChecksum.ComputeImageChecksum(isoUpper);
 
         Assert.NotEqual(hashLower, hashUpper);
     }
@@ -180,24 +182,24 @@ public class XisoChecksumTests : IDisposable
     {
         // Same logical files but created in opposite order; checksum must still match because
         // XisoChecksum sorts paths ordinally.
-        var src1 = CreateSourceDir(d =>
+        string src1 = CreateSourceDir(d =>
         {
             File.WriteAllText(Path.Combine(d, "a.txt"), "alpha");
             File.WriteAllText(Path.Combine(d, "b.txt"), "beta");
             File.WriteAllText(Path.Combine(d, "c.txt"), "gamma");
         });
-        var src2 = CreateSourceDir(d =>
+        string src2 = CreateSourceDir(d =>
         {
             File.WriteAllText(Path.Combine(d, "c.txt"), "gamma");
             File.WriteAllText(Path.Combine(d, "b.txt"), "beta");
             File.WriteAllText(Path.Combine(d, "a.txt"), "alpha");
         });
 
-        var iso1 = CreateIso(src1);
-        var iso2 = CreateIso(src2);
+        string iso1 = CreateIso(src1);
+        string iso2 = CreateIso(src2);
 
-        var hash1 = XisoChecksum.ComputeImageChecksum(iso1);
-        var hash2 = XisoChecksum.ComputeImageChecksum(iso2);
+        byte[] hash1 = XisoChecksum.ComputeImageChecksum(iso1);
+        byte[] hash2 = XisoChecksum.ComputeImageChecksum(iso2);
 
         Assert.Equal(hash1, hash2);
         // Also hex variant deterministic
@@ -209,32 +211,32 @@ public class XisoChecksumTests : IDisposable
     {
         // Create normal and prepended ISOs from the same source; checksums should match
         // when the prepended one is read with the correct skip offset.
-        var src = CreateSourceDir(PopulateSimple);
+        string src = CreateSourceDir(PopulateSimple);
 
-        var normalIso = CreateIso(src, prependSectors: null);
-        var prependedIso = CreateIso(src, prependSectors: 64);
+        string normalIso = CreateIso(src, prependSectors: null);
+        string prependedIso = CreateIso(src, prependSectors: 64);
 
-        var hashNormal = XisoChecksum.ComputeImageChecksum(normalIso);
-        var hashPrependedViaSkip = XisoChecksum.ComputeImageChecksum(prependedIso, skipSectors: 64);
+        byte[] hashNormal = XisoChecksum.ComputeImageChecksum(normalIso);
+        byte[] hashPrependedViaSkip = XisoChecksum.ComputeImageChecksum(prependedIso, skipSectors: 64);
 
         Assert.Equal(hashNormal, hashPrependedViaSkip);
 
         // Hex overload with skip should also match
-        var hexNormal = XisoChecksum.ComputeImageChecksumHex(normalIso);
-        var hexPrepended = XisoChecksum.ComputeImageChecksumHex(prependedIso, skipSectors: 64);
+        string hexNormal = XisoChecksum.ComputeImageChecksumHex(normalIso);
+        string hexPrepended = XisoChecksum.ComputeImageChecksumHex(prependedIso, skipSectors: 64);
         Assert.Equal(hexNormal, hexPrepended);
     }
 
     [Fact]
     public void ComputeImageChecksum_SkipSectors_FileStreamOverloadMatchesPathOverload()
     {
-        var src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "skip stream"));
-        var prependedIso = CreateIso(src, prependSectors: 32);
+        string src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "skip stream"));
+        string prependedIso = CreateIso(src, prependSectors: 32);
 
-        var hashViaPath = XisoChecksum.ComputeImageChecksum(prependedIso, skipSectors: 32);
+        byte[] hashViaPath = XisoChecksum.ComputeImageChecksum(prependedIso, skipSectors: 32);
 
-        using var fs = new FileStream(prependedIso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        var hashViaStream = XisoChecksum.ComputeImageChecksum(fs, Path.GetFileName(prependedIso), skipSectors: 32);
+        using FileStream fs = new(prependedIso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        byte[] hashViaStream = XisoChecksum.ComputeImageChecksum(fs, Path.GetFileName(prependedIso), skipSectors: 32);
 
         Assert.Equal(hashViaPath, hashViaStream);
     }
@@ -242,17 +244,17 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_CisoV2SingleFile_MatchesIsoChecksum()
     {
-        var src = CreateSourceDir(d =>
+        string src = CreateSourceDir(d =>
         {
             File.WriteAllText(Path.Combine(d, "file.txt"), "ciso checksum single");
             Directory.CreateDirectory(Path.Combine(d, "sub"));
             File.WriteAllText(Path.Combine(d, "sub", "nested.bin"), new string('n', 5000));
         });
-        var iso = CreateIso(src);
+        string iso = CreateIso(src);
 
         Assert.Equal(0, CisoWriter.CompressToCso(iso, Path.ChangeExtension(iso, ".cso"), level: 9,
             splitBytes: null, version: CisoWriter.VersionLz4));
-        var cso = Path.ChangeExtension(iso, ".cso");
+        string cso = Path.ChangeExtension(iso, ".cso");
         Assert.True(File.Exists(cso));
 
         // The .cso path is auto-detected and routed through CisoBlockDevice
@@ -262,17 +264,17 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_CisoV1SingleFile_MatchesIsoChecksum()
     {
-        var src = CreateSourceDir(d =>
+        string src = CreateSourceDir(d =>
         {
             File.WriteAllText(Path.Combine(d, "file.txt"), "ciso v1 checksum");
             Directory.CreateDirectory(Path.Combine(d, "sub"));
             File.WriteAllText(Path.Combine(d, "sub", "nested.bin"), new string('v', 5000));
         });
-        var iso = CreateIso(src);
+        string iso = CreateIso(src);
 
         Assert.Equal(0, CisoWriter.CompressToCso(iso, Path.ChangeExtension(iso, ".cso"), level: 6,
             splitBytes: null, version: CisoWriter.VersionDeflate));
-        var cso = Path.ChangeExtension(iso, ".cso");
+        string cso = Path.ChangeExtension(iso, ".cso");
 
         Assert.Equal(XisoChecksum.ComputeImageChecksumHex(iso), XisoChecksum.ComputeImageChecksumHex(cso));
     }
@@ -280,18 +282,18 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_CisoV2SplitParts_MatchesIsoChecksum()
     {
-        var src = CreateSourceDir(d =>
+        string src = CreateSourceDir(d =>
         {
             File.WriteAllText(Path.Combine(d, "file.txt"), "ciso checksum split");
             Directory.CreateDirectory(Path.Combine(d, "sub"));
             File.WriteAllText(Path.Combine(d, "sub", "nested.bin"), new string('s', 20000));
         });
-        var iso = CreateIso(src);
+        string iso = CreateIso(src);
 
         // Tiny split point forces multiple .N.cso parts
         Assert.Equal(0, CisoWriter.CompressToCso(iso, Path.ChangeExtension(iso, ".cso"), level: 9,
             splitBytes: 4096, version: CisoWriter.VersionLz4));
-        var firstPart = Path.ChangeExtension(iso, ".1.cso");
+        string firstPart = Path.ChangeExtension(iso, ".1.cso");
         Assert.True(File.Exists(firstPart));
         Assert.True(File.Exists(Path.ChangeExtension(iso, ".2.cso")), "expected at least two split parts");
 
@@ -302,17 +304,17 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_CisoV1SplitParts_MatchesIsoChecksum()
     {
-        var src = CreateSourceDir(d =>
+        string src = CreateSourceDir(d =>
         {
             File.WriteAllText(Path.Combine(d, "file.txt"), "ciso v1 checksum split");
             Directory.CreateDirectory(Path.Combine(d, "sub"));
             File.WriteAllText(Path.Combine(d, "sub", "nested.bin"), new string('w', 20000));
         });
-        var iso = CreateIso(src);
+        string iso = CreateIso(src);
 
         Assert.Equal(0, CisoWriter.CompressToCso(iso, Path.ChangeExtension(iso, ".cso"), level: 6,
             splitBytes: 4096, version: CisoWriter.VersionDeflate));
-        var firstPart = Path.ChangeExtension(iso, ".1.cso");
+        string firstPart = Path.ChangeExtension(iso, ".1.cso");
         Assert.True(File.Exists(firstPart));
 
         Assert.Equal(XisoChecksum.ComputeImageChecksumHex(iso), XisoChecksum.ComputeImageChecksumHex(firstPart));
@@ -321,14 +323,14 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_IBlockDeviceOverload_CisoDeviceMatchesIsoChecksum()
     {
-        var src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "block device checksum"));
-        var iso = CreateIso(src);
+        string src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "block device checksum"));
+        string iso = CreateIso(src);
 
         Assert.Equal(0, CisoWriter.CompressToCso(iso, Path.ChangeExtension(iso, ".cso"), level: 9,
             splitBytes: null, version: CisoWriter.VersionLz4));
 
-        using var dev = new BlockDevice.CisoBlockDevice(Path.ChangeExtension(iso, ".cso"));
-        var viaDevice = Convert.ToHexString(XisoChecksum.ComputeImageChecksum(dev, "game.cso")).ToLowerInvariant();
+        using CisoBlockDevice dev = new(Path.ChangeExtension(iso, ".cso"));
+        string viaDevice = Convert.ToHexString(XisoChecksum.ComputeImageChecksum(dev, "game.cso")).ToLowerInvariant();
 
         Assert.Equal(XisoChecksum.ComputeImageChecksumHex(iso), viaDevice);
     }
@@ -336,23 +338,23 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_NestedDirectoryVsFlat_DifferentChecksum()
     {
-        var srcFlat = CreateSourceDir(d =>
+        string srcFlat = CreateSourceDir(d =>
         {
             File.WriteAllText(Path.Combine(d, "a.txt"), "content");
             File.WriteAllText(Path.Combine(d, "b.txt"), "content");
         });
-        var srcNested = CreateSourceDir(d =>
+        string srcNested = CreateSourceDir(d =>
         {
             File.WriteAllText(Path.Combine(d, "a.txt"), "content");
             Directory.CreateDirectory(Path.Combine(d, "sub"));
             File.WriteAllText(Path.Combine(d, "sub", "b.txt"), "content");
         });
 
-        var isoFlat = CreateIso(srcFlat);
-        var isoNested = CreateIso(srcNested);
+        string isoFlat = CreateIso(srcFlat);
+        string isoNested = CreateIso(srcNested);
 
-        var hashFlat = XisoChecksum.ComputeImageChecksum(isoFlat);
-        var hashNested = XisoChecksum.ComputeImageChecksum(isoNested);
+        byte[] hashFlat = XisoChecksum.ComputeImageChecksum(isoFlat);
+        byte[] hashNested = XisoChecksum.ComputeImageChecksum(isoNested);
 
         Assert.NotEqual(hashFlat, hashNested);
     }
@@ -360,31 +362,31 @@ public class XisoChecksumTests : IDisposable
     [Fact]
     public void ComputeImageChecksum_CancellationToken_ThrowsWhenCancelled()
     {
-        var src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "cancel"));
-        var iso = CreateIso(src);
+        string src = CreateSourceDir(d => File.WriteAllText(Path.Combine(d, "file.txt"), "cancel"));
+        string iso = CreateIso(src);
 
-        using var cts = new CancellationTokenSource();
+        using CancellationTokenSource cts = new();
         cts.Cancel();
 
         Assert.Throws<OperationCanceledException>(() => XisoChecksum.ComputeImageChecksum(iso, ct: cts.Token));
 
-        using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        using FileStream fs = new(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
         Assert.Throws<OperationCanceledException>(() => XisoChecksum.ComputeImageChecksum(fs, "iso", ct: cts.Token));
     }
 
     [Fact]
     public void ComputeImageChecksumHex_IsLowercaseAndMatchesBytes()
     {
-        var src = CreateSourceDir(d =>
+        string src = CreateSourceDir(d =>
         {
             File.WriteAllText(Path.Combine(d, "alpha.txt"), "alpha");
             Directory.CreateDirectory(Path.Combine(d, "beta"));
             File.WriteAllText(Path.Combine(d, "beta", "gamma.bin"), new string('x', 1000));
         });
-        var iso = CreateIso(src);
+        string iso = CreateIso(src);
 
-        var hex = XisoChecksum.ComputeImageChecksumHex(iso);
-        var bytes = XisoChecksum.ComputeImageChecksum(iso);
+        string hex = XisoChecksum.ComputeImageChecksumHex(iso);
+        byte[] bytes = XisoChecksum.ComputeImageChecksum(iso);
 
         Assert.Equal(64, hex.Length);
         Assert.Equal(Convert.ToHexString(bytes).ToLowerInvariant(), hex);

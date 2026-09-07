@@ -31,7 +31,7 @@ public static class HashUtil
     /// <returns><c>true</c> if all bytes are zero; otherwise <c>false</c>.</returns>
     public static bool IsAllZero(byte[] a)
     {
-        foreach (var b in a)
+        foreach (byte b in a)
         {
             if (b != 0)
                 return false;
@@ -51,9 +51,9 @@ public static class HashUtil
         try
         {
             ArgumentException.ThrowIfNullOrEmpty(filePath);
-            using var sha = SHA256.Create();
-            using var fs = File.OpenRead(filePath);
-            var hash = sha.ComputeHash(fs);
+            using SHA256 sha = SHA256.Create();
+            using FileStream fs = File.OpenRead(filePath);
+            byte[] hash = sha.ComputeHash(fs);
             return ToHex(hash);
         }
         catch (Exception ex)
@@ -75,9 +75,9 @@ public static class HashUtil
         try
         {
             ArgumentException.ThrowIfNullOrEmpty(filePath);
-            using var md5 = MD5.Create();
-            using var fs = File.OpenRead(filePath);
-            var hash = md5.ComputeHash(fs);
+            using MD5 md5 = MD5.Create();
+            using FileStream fs = File.OpenRead(filePath);
+            byte[] hash = md5.ComputeHash(fs);
             return ToHex(hash);
         }
         catch (Exception ex)

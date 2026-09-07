@@ -44,7 +44,7 @@ public class ConstantsTests
     [Fact]
     public void NumSectors_LargeValue()
     {
-        var expected = (uint)Math.Ceiling((uint.MaxValue >> 1) / (double)Constants.SectorSize);
+        uint expected = (uint)Math.Ceiling((uint.MaxValue >> 1) / (double)Constants.SectorSize);
         Assert.Equal(expected, Constants.NumSectors(uint.MaxValue >> 1));
     }
 }

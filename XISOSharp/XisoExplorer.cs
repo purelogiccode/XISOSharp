@@ -52,7 +52,7 @@ public sealed class XisoExplorer
         IsoPath = isoPath;
         try
         {
-            using var stream = XisoReader.OpenImageStream(isoPath);
+            using Stream stream = XisoReader.OpenImageStream(isoPath);
             Volume = XisoReader.GetVolumeInfo(stream, isoPath);
         }
         catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException)
@@ -84,8 +84,8 @@ public sealed class XisoExplorer
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public IReadOnlyList<ExplorerNode> ListChildren(string internalPath)
     {
-        var path = Normalize(internalPath);
-        using var stream = XisoReader.OpenImageStream(IsoPath);
+        string path = Normalize(internalPath);
+        using Stream stream = XisoReader.OpenImageStream(IsoPath);
         return XisoReader.ListDirectory(stream, IsoPath, path)
             .Select(e => FromEntry(e, Combine(path, e.Name)))
             .ToArray();
@@ -100,15 +100,15 @@ public sealed class XisoExplorer
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public ExplorerNode? GetNode(string internalPath)
     {
-        var path = Normalize(internalPath);
+        string path = Normalize(internalPath);
         if (string.Equals(path, "/", StringComparison.Ordinal))
         {
             return new ExplorerNode("/", "/", IsDirectory: true, Size: 0,
                 Volume.RootDirSector, Attributes: 0);
         }
 
-        using var stream = XisoReader.OpenImageStream(IsoPath);
-        var entry = XisoReader.GetEntryInfo(stream, IsoPath, path);
+        using Stream stream = XisoReader.OpenImageStream(IsoPath);
+        EntryInfo? entry = XisoReader.GetEntryInfo(stream, IsoPath, path);
         return entry is null ? null : FromEntry(entry, path);
     }
 
@@ -136,7 +136,7 @@ public sealed class XisoExplorer
         CancellationToken cancellationToken = default,
         IProgress<ProgressInfo>? progress = null)
     {
-        using var stream = XisoReader.OpenImageStream(IsoPath);
+        using Stream stream = XisoReader.OpenImageStream(IsoPath);
         XisoReader.CopyOut(stream, IsoPath, Normalize(internalPath), destPath, options, cancellationToken,
             progress);
     }
@@ -153,8 +153,8 @@ public sealed class XisoExplorer
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public string? ComputeHashHex(string internalPath, HashAlgorithmName algorithm)
     {
-        using var stream = XisoReader.OpenImageStream(IsoPath);
-        var hash = XisoReader.ComputeFileHash(stream, IsoPath, Normalize(internalPath), algorithm);
+        using Stream stream = XisoReader.OpenImageStream(IsoPath);
+        byte[]? hash = XisoReader.ComputeFileHash(stream, IsoPath, Normalize(internalPath), algorithm);
         return hash is null ? null : Convert.ToHexString(hash);
     }
 
@@ -170,7 +170,7 @@ public sealed class XisoExplorer
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public XexInfo? GetXexInfo(string internalPath)
     {
-        using var stream = XisoReader.OpenImageStream(IsoPath);
+        using Stream stream = XisoReader.OpenImageStream(IsoPath);
         return XisoReader.GetXexInfo(stream, IsoPath, Normalize(internalPath));
     }
 
@@ -186,7 +186,7 @@ public sealed class XisoExplorer
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public XbeInfo? GetXbeInfo(string internalPath)
     {
-        using var stream = XisoReader.OpenImageStream(IsoPath);
+        using Stream stream = XisoReader.OpenImageStream(IsoPath);
         return XisoReader.GetXbeInfo(stream, IsoPath, Normalize(internalPath));
     }
 
@@ -197,7 +197,7 @@ public sealed class XisoExplorer
     /// <param name="name">Entry file name (no separators).</param>
     public static string Combine(string directory, string name)
     {
-        var dir = Normalize(directory);
+        string dir = Normalize(directory);
         return string.Equals(dir, "/", StringComparison.Ordinal) ? "/" + name : dir + "/" + name;
     }
 
@@ -212,7 +212,7 @@ public sealed class XisoExplorer
         if (string.IsNullOrEmpty(internalPath))
             return "/";
 
-        var path = internalPath.Replace('\\', '/');
+        string path = internalPath.Replace('\\', '/');
         if (!path.StartsWith('/'))
             path = "/" + path;
 

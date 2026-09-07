@@ -58,7 +58,7 @@ public sealed class BlockDeviceStream : Stream
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (buffer.IsEmpty) return 0;
         if (_position >= _device.Length) return 0;
-        var n = _device.Read(_position, buffer);
+        int n = _device.Read(_position, buffer);
         _position += n;
         return n;
     }

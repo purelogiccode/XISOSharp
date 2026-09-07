@@ -38,7 +38,7 @@ public static class XisoZarchive
 
     private static int GetOrAddName(List<string> names, Dictionary<string, int> lookup, string name)
     {
-        if (lookup.TryGetValue(name, out var idx)) return idx;
+        if (lookup.TryGetValue(name, out int idx)) return idx;
         idx = names.Count;
         names.Add(name);
         lookup[name] = idx;
@@ -47,8 +47,8 @@ public static class XisoZarchive
 
     private static int CompareNodeName(string n1, string n2)
     {
-        var min = Math.Min(n1.Length, n2.Length);
-        for (var i = 0; i < min; i++)
+        int min = Math.Min(n1.Length, n2.Length);
+        for (int i = 0; i < min; i++)
         {
             char c1 = n1[i], c2 = n2[i];
             if (c1 >= 'A' && c1 <= 'Z') c1 = (char)(c1 + 32);
@@ -62,10 +62,10 @@ public static class XisoZarchive
     private static ushort ReadUShort(FileStream fs)
     {
         Span<byte> buf = stackalloc byte[2];
-        var total = 0;
+        int total = 0;
         while (total < 2)
         {
-            var n = fs.Read(buf[total..]);
+            int n = fs.Read(buf[total..]);
             if (n == 0) throw new EndOfStreamException();
             total += n;
         }
@@ -76,10 +76,10 @@ public static class XisoZarchive
     private static uint ReadUInt(FileStream fs)
     {
         Span<byte> buf = stackalloc byte[4];
-        var total = 0;
+        int total = 0;
         while (total < 4)
         {
-            var n = fs.Read(buf[total..]);
+            int n = fs.Read(buf[total..]);
             if (n == 0) throw new EndOfStreamException();
             total += n;
         }
@@ -104,15 +104,15 @@ public static class XisoZarchive
         IProgress<ZarProgress>? progress = null)
     {
         ct.ThrowIfCancellationRequested();
-        var outZar = zarPath ?? DeriveZarPath(isoPath);
-        using var isoFs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        string outZar = zarPath ?? DeriveZarPath(isoPath);
+        using FileStream isoFs = new(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
         return CreateZar(isoFs, isoOffset, outZar, false, quiet, ct, compressor, progress);
     }
 
     private static string DeriveZarPath(string input)
     {
-        var dir = Path.GetDirectoryName(input) ?? "";
-        var full = Path.GetFileName(input) ?? "archive";
+        string dir = Path.GetDirectoryName(input) ?? "";
+        string full = Path.GetFileName(input) ?? "archive";
         if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".redump.iso".Length];
         else if (full.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".video.iso".Length];
         else if (full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".iso".Length];
@@ -138,13 +138,13 @@ public static class XisoZarchive
         IProgress<ZarProgress>? progress = null)
     {
         ct.ThrowIfCancellationRequested();
-        var headerOffset = xisoOffset + Constants.HeaderOffset;
+        long headerOffset = xisoOffset + Constants.HeaderOffset;
         isoFs.Seek(headerOffset + 20, SeekOrigin.Begin);
-        var rootOffset = ReadUInt(isoFs);
-        var rootSize = ReadUInt(isoFs);
+        uint rootOffset = ReadUInt(isoFs);
+        uint rootSize = ReadUInt(isoFs);
 
         ParseXdvdfs(isoFs, xisoOffset, (long)rootOffset * Constants.SectorSize, rootSize, removeUpdate,
-            out var rootNode, out var names);
+            out PathNode rootNode, out List<string> names);
 
         if (!quiet) Logger.Log($"[INFO] Writing ZArchive to {zarPath}\n");
         try
@@ -152,8 +152,8 @@ public static class XisoZarchive
             // The XISO walk order is the pack order (directories before
             // children, siblings case-insensitively sorted); the shared
             // engine streams it exactly like WriteNode did.
-            var source = new XisoPackSource(isoFs, xisoOffset, rootNode, names, $"XISO:{xisoOffset}");
-            var options = new ZarPipelineOptions
+            XisoPackSource source = new(isoFs, xisoOffset, rootNode, names, $"XISO:{xisoOffset}");
+            ZarPipelineOptions options = new()
             {
                 Compressor = compressor,
                 // Historical behavior: the destination is truncated.
@@ -190,8 +190,8 @@ public static class XisoZarchive
     private static void ParseXdvdfs(FileStream isoFs, long isoOffset, long dirOffset, uint dirSize, bool removeUpdate,
         out PathNode rootNode, out List<string> names)
     {
-        var nameList = new List<string>();
-        var lookup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        List<string> nameList = new();
+        Dictionary<string, int> lookup = new(StringComparer.OrdinalIgnoreCase);
         rootNode = new PathNode();
         ParseNode(isoFs, isoOffset, dirOffset, dirSize, 0, rootNode, nameList, lookup);
         if (removeUpdate)
@@ -233,22 +233,22 @@ public static class XisoZarchive
                 "invalid TOC entry: too many entries in one directory table (possible corrupt offset chain).");
         }
 
-        var pos = isoOffset + dirOffset + childOffset;
+        long pos = isoOffset + dirOffset + childOffset;
         isoFs.Seek(pos, SeekOrigin.Begin);
-        var left = ReadUShort(isoFs);
+        ushort left = ReadUShort(isoFs);
         if (childOffset == 0 && IsEmptyTable(isoFs, left)) return;
-        var right = ReadUShort(isoFs);
-        var entrySector = ReadUInt(isoFs);
-        var entrySize = ReadUInt(isoFs);
-        var attrs = (byte)isoFs.ReadByte();
-        var nameLen = (byte)isoFs.ReadByte();
-        var nameBytes = new byte[nameLen];
+        ushort right = ReadUShort(isoFs);
+        uint entrySector = ReadUInt(isoFs);
+        uint entrySize = ReadUInt(isoFs);
+        byte attrs = (byte)isoFs.ReadByte();
+        byte nameLen = (byte)isoFs.ReadByte();
+        byte[] nameBytes = new byte[nameLen];
         if (nameLen > 0)
         {
-            var read = 0;
+            int read = 0;
             while (read < nameLen)
             {
-                var n = isoFs.Read(nameBytes, read, nameLen - read);
+                int n = isoFs.Read(nameBytes, read, nameLen - read);
                 if (n == 0) return;
                 read += n;
             }
@@ -256,9 +256,9 @@ public static class XisoZarchive
 
         // Xbox names are WINDOWS_1252 bytes; decode via Latin1 like every other
         // reader path (ASCII would corrupt bytes >= 0x80 into '?').
-        var name = Latin1Encoding.Instance.GetString(nameBytes);
-        var isDir = (attrs & 0x10) != 0;
-        var entryOffset = (long)entrySector * Constants.SectorSize;
+        string name = Latin1Encoding.Instance.GetString(nameBytes);
+        bool isDir = (attrs & 0x10) != 0;
+        long entryOffset = (long)entrySector * Constants.SectorSize;
 
         if (left != 0 && left != 0xFFFF)
         {
@@ -266,8 +266,8 @@ public static class XisoZarchive
                 depth + 1);
         }
 
-        var nameIdx = GetOrAddName(names, lookup, name);
-        var node = new PathNode { IsFile = !isDir, NameIndex = nameIdx };
+        int nameIdx = GetOrAddName(names, lookup, name);
+        PathNode node = new() { IsFile = !isDir, NameIndex = nameIdx };
         if (isDir)
         {
             ParseNode(isoFs, isoOffset, entryOffset, entrySize, 0, node, names, lookup, null, depth + 1);
@@ -299,10 +299,10 @@ public static class XisoZarchive
         if (left == Constants.PadShort) return true;
         if (left != Constants.EmptyDirectorySentinel) return false;
         Span<byte> peek = stackalloc byte[12];
-        var total = 0;
+        int total = 0;
         while (total < 12)
         {
-            var n = isoFs.Read(peek[total..]);
+            int n = isoFs.Read(peek[total..]);
             if (n == 0) break;
             total += n;
         }
@@ -331,17 +331,17 @@ public static class XisoZarchive
 
         public IReadOnlyList<ZarPackEntry> Collect(CancellationToken cancellationToken = default)
         {
-            var entries = new List<ZarPackEntry>();
+            List<ZarPackEntry> entries = new();
             Walk(_root, string.Empty, entries, cancellationToken);
             return entries;
         }
 
         private void Walk(PathNode dir, string path, List<ZarPackEntry> entries, CancellationToken ct)
         {
-            foreach (var child in dir.Subnodes)
+            foreach (PathNode child in dir.Subnodes)
             {
                 ct.ThrowIfCancellationRequested();
-                var childPath = path.Length == 0 ? _names[child.NameIndex] : path + "/" + _names[child.NameIndex];
+                string childPath = path.Length == 0 ? _names[child.NameIndex] : path + "/" + _names[child.NameIndex];
                 if (!child.IsFile)
                 {
                     entries.Add(new ZarPackEntry { RelativePath = childPath, IsDirectory = true });
@@ -349,8 +349,8 @@ public static class XisoZarchive
                     continue;
                 }
 
-                var offset = _xisoOffset + child.SourceOffset;
-                var size = (long)child.FileSize;
+                long offset = _xisoOffset + child.SourceOffset;
+                long size = (long)child.FileSize;
                 entries.Add(new ZarPackEntry
                 {
                     RelativePath = childPath,
@@ -392,7 +392,7 @@ public static class XisoZarchive
 
         public override int Read(Span<byte> buffer)
         {
-            var remaining = Length - _position;
+            long remaining = Length - _position;
             if (remaining <= 0)
             {
                 return 0;

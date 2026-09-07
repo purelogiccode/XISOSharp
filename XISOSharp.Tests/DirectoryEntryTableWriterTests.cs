@@ -17,7 +17,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
     {
         Logger.Quiet = false;
         Logger.RealQuiet = false;
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -32,7 +32,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -44,7 +44,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
     [Fact]
     public void BuildTable_InsertsAllEntries_SearchableByName()
     {
-        var root = DirectoryEntryTableWriter.BuildTable([
+        AvlNode? root = DirectoryEntryTableWriter.BuildTable([
             new DirectoryEntryTableWriter.DirectoryTableEntry("beta.txt", false, 10, 100),
             new DirectoryEntryTableWriter.DirectoryTableEntry("alpha.txt", false, 11, 200),
             new DirectoryEntryTableWriter.DirectoryTableEntry("GAMMA", true, 12, 2048),
@@ -61,7 +61,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
     [Fact]
     public void BuildTable_DuplicateCaseInsensitive_Throws()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() =>
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
             DirectoryEntryTableWriter.BuildTable([
                 new DirectoryEntryTableWriter.DirectoryTableEntry("File.txt", false, 10, 100),
                 new DirectoryEntryTableWriter.DirectoryTableEntry("FILE.TXT", false, 11, 100),
@@ -81,7 +81,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
     [Fact]
     public void BuildTable_TooLongName_Throws()
     {
-        var name = new string('a', Constants.FilenameMaxChars + 1);
+        string name = new('a', Constants.FilenameMaxChars + 1);
         Assert.Throws<InvalidOperationException>(() =>
             DirectoryEntryTableWriter.BuildTable(
                 [new DirectoryEntryTableWriter.DirectoryTableEntry(name, false, 10, 100)]));
@@ -91,7 +91,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
     public void ComputeTableSize_SingleFile_MatchesHandComputed()
     {
         // "a": 14 + 1 = 15 bytes, DWORD-padded to 16.
-        var root = DirectoryEntryTableWriter.BuildTable(
+        AvlNode? root = DirectoryEntryTableWriter.BuildTable(
             [new DirectoryEntryTableWriter.DirectoryTableEntry("a", false, 7, 5)]);
         Assert.Equal(16u, DirectoryEntryTableWriter.ComputeTableSize(root));
         Assert.Equal(0u, root!.Offset);
@@ -103,15 +103,15 @@ public class DirectoryEntryTableWriterTests : IDisposable
         // 8 entries x (14 + 255 = 269 -> 272 bytes): the 8th would span
         // 1904..2176 across the 2048 boundary, so it moves to offset 2048
         // and the total is 2048 + 272 = 2320.
-        var entries = Enumerable.Range(0, 8).Select(i =>
+        IEnumerable<DirectoryEntryTableWriter.DirectoryTableEntry> entries = Enumerable.Range(0, 8).Select(i =>
             new DirectoryEntryTableWriter.DirectoryTableEntry($"f{i:D3}_{new string('x', 250)}", false, (uint)i, 10));
-        var root = DirectoryEntryTableWriter.BuildTable(entries);
+        AvlNode? root = DirectoryEntryTableWriter.BuildTable(entries);
         Assert.Equal(2320u, DirectoryEntryTableWriter.ComputeTableSize(root));
 
-        var max = new uint[1];
+        uint[] max = new uint[1];
         AvlTree.AvlTraverseDepthFirst(root, static (node, ctx, _) =>
         {
-            var seen = (uint[])ctx!;
+            uint[] seen = (uint[])ctx!;
             if (node.Offset > seen[0]) seen[0] = node.Offset;
             return 0;
         }, max, AvlTraversalMethod.Prefix, 0);
@@ -121,9 +121,9 @@ public class DirectoryEntryTableWriterTests : IDisposable
     [Fact]
     public void SerializeTable_Empty_ReturnsSingleFFSector()
     {
-        foreach (var empty in new[] { null, AvlNode.EmptySubdirectory })
+        foreach (AvlNode? empty in new[] { null, AvlNode.EmptySubdirectory })
         {
-            var bytes = DirectoryEntryTableWriter.SerializeTable(empty);
+            byte[] bytes = DirectoryEntryTableWriter.SerializeTable(empty);
             Assert.Equal(Constants.SectorSize, bytes.Length);
             Assert.All(bytes, static b => Assert.Equal(Constants.PadByte, b));
         }
@@ -134,8 +134,8 @@ public class DirectoryEntryTableWriterTests : IDisposable
     [Fact]
     public void EncodeEntry_FileRecord_MatchesHandComputedBytes()
     {
-        var node = new AvlNode { Filename = "AB", StartSector = 0x123, FileSize = 0x456 };
-        var record = DirectoryEntryTableWriter.EncodeEntry(node);
+        AvlNode node = new() { Filename = "AB", StartSector = 0x123, FileSize = 0x456 };
+        byte[] record = DirectoryEntryTableWriter.EncodeEntry(node);
         Assert.Equal(new byte[]
         {
             0x00, 0x00, // lOffset: no left child
@@ -152,7 +152,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
     public void EncodeEntry_DirectoryRecord_RoundsSizeAndSetsDirAttribute()
     {
         // Table byte size 100 -> on-disk 2048; child offsets stored in DWORDs.
-        var root = new AvlNode
+        AvlNode root = new()
         {
             Filename = "SUB",
             Subdirectory = new AvlNode(),
@@ -161,7 +161,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
             Left = new AvlNode { Filename = "a", Offset = 40 },
             Right = new AvlNode { Filename = "z", Offset = 80 },
         };
-        var record = DirectoryEntryTableWriter.EncodeEntry(root);
+        byte[] record = DirectoryEntryTableWriter.EncodeEntry(root);
         Assert.Equal(new byte[]
         {
             0x0A, 0x00, // lOffset: 40 / 4
@@ -179,10 +179,10 @@ public class DirectoryEntryTableWriterTests : IDisposable
     {
         // BUG-LIB-034: rewrite used to normalize every file to Archive (0x20),
         // losing read-only/hidden/system bits.
-        var file = new AvlNode { Filename = "R", FileSize = 10, Attributes = 0x21 };
+        AvlNode file = new() { Filename = "R", FileSize = 10, Attributes = 0x21 };
         Assert.Equal(0x21, DirectoryEntryTableWriter.EncodeEntry(file)[12]);
 
-        var dir = new AvlNode
+        AvlNode dir = new()
         {
             Filename = "D", Subdirectory = new AvlNode(), FileSize = 2048, Attributes = 0x13
         };
@@ -192,10 +192,10 @@ public class DirectoryEntryTableWriterTests : IDisposable
     [Fact]
     public void EncodeEntry_UnspecifiedAttributes_FallsBackToKindDefault()
     {
-        var file = new AvlNode { Filename = "F", FileSize = 10 };
+        AvlNode file = new() { Filename = "F", FileSize = 10 };
         Assert.Equal(Constants.AttributeArc, DirectoryEntryTableWriter.EncodeEntry(file)[12]);
 
-        var dir = new AvlNode { Filename = "D", Subdirectory = new AvlNode(), FileSize = 2048 };
+        AvlNode dir = new() { Filename = "D", Subdirectory = new AvlNode(), FileSize = 2048 };
         Assert.Equal(Constants.AttributeDir, DirectoryEntryTableWriter.EncodeEntry(dir)[12]);
     }
 
@@ -204,7 +204,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
     {
         // BUG-LIB-035: must fail fast with a named error, not mid-write with a
         // generic ArgumentException after sizing already ran.
-        var ex = Assert.Throws<InvalidOperationException>(() => DirectoryEntryTableWriter.BuildTable(
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => DirectoryEntryTableWriter.BuildTable(
             [new DirectoryEntryTableWriter.DirectoryTableEntry("😀.txt", false, 10, 100)]));
         Assert.Contains("Latin-1", ex.Message, StringComparison.Ordinal);
     }
@@ -212,7 +212,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
     [Fact]
     public void BuildTable_AttributesFlowIntoEncodedRecord()
     {
-        var root = DirectoryEntryTableWriter.BuildTable(
+        AvlNode? root = DirectoryEntryTableWriter.BuildTable(
             [new DirectoryEntryTableWriter.DirectoryTableEntry("r.txt", false, 7, 5, 0x23)]);
         Assert.NotNull(root);
         Assert.Equal(0x23, DirectoryEntryTableWriter.EncodeEntry(root)[12]);
@@ -221,9 +221,9 @@ public class DirectoryEntryTableWriterTests : IDisposable
     [Fact]
     public void SerializeTable_MatchesWriterOutput_ForEveryTableInImage()
     {
-        var src = CreateTempDir("xiso_tbl_src");
+        string src = CreateTempDir("xiso_tbl_src");
         File.WriteAllText(Path.Combine(src, "file1.txt"), "hello");
-        var bin = new byte[5000];
+        byte[] bin = new byte[5000];
         new Random(42).NextBytes(bin);
         File.WriteAllBytes(Path.Combine(src, "file2.txt"), bin);
         File.WriteAllBytes(Path.Combine(src, "empty.txt"), Array.Empty<byte>());
@@ -231,18 +231,18 @@ public class DirectoryEntryTableWriterTests : IDisposable
         File.WriteAllText(Path.Combine(src, "subdir", "nested.txt"), "nested");
         Directory.CreateDirectory(Path.Combine(src, "emptydir"));
 
-        var outDir = CreateTempDir("xiso_tbl_out");
-        Assert.Equal(0, XisoWriter.CreateXiso(src, outDir, null, null, out var isoPath, null, null));
+        string outDir = CreateTempDir("xiso_tbl_out");
+        Assert.Equal(0, XisoWriter.CreateXiso(src, outDir, null, null, out string? isoPath, null, null));
         Assert.NotNull(isoPath);
 
-        var layout = XisoReader.GetSectorLayout(isoPath);
-        var dirSizes = layout.Entries.Where(static e => e.IsDirectory)
+        SectorLayout layout = XisoReader.GetSectorLayout(isoPath);
+        Dictionary<string, uint> dirSizes = layout.Entries.Where(static e => e.IsDirectory)
             .ToDictionary(static e => e.Path, static e => e.FileSize, StringComparer.Ordinal);
 
-        using var fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        foreach (var dir in layout.Entries.Where(static e => e.IsDirectory))
+        using FileStream fs = new(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        foreach (FileSectorExtent dir in layout.Entries.Where(static e => e.IsDirectory))
         {
-            var entries = XisoReader.ListDirectory(isoPath, dir.Path)
+            List<DirectoryEntryTableWriter.DirectoryTableEntry> entries = XisoReader.ListDirectory(isoPath, dir.Path)
                 .Select(e => new DirectoryEntryTableWriter.DirectoryTableEntry(
                     e.Name,
                     e.IsDirectory,
@@ -252,15 +252,15 @@ public class DirectoryEntryTableWriterTests : IDisposable
                     e.Attributes))
                 .ToList();
 
-            var table = DirectoryEntryTableWriter.BuildTable(entries);
-            var serialized = DirectoryEntryTableWriter.SerializeTable(table);
+            AvlNode? table = DirectoryEntryTableWriter.BuildTable(entries);
+            byte[] serialized = DirectoryEntryTableWriter.SerializeTable(table);
 
-            var onDisk = new byte[dir.SectorCount * Constants.SectorSize];
+            byte[] onDisk = new byte[dir.SectorCount * Constants.SectorSize];
             fs.Seek(layout.Volume.DiscLseek + ((long)dir.StartSector * Constants.SectorSize), SeekOrigin.Begin);
-            var read = 0;
+            int read = 0;
             while (read < onDisk.Length)
             {
-                var n = fs.Read(onDisk, read, onDisk.Length - read);
+                int n = fs.Read(onDisk, read, onDisk.Length - read);
                 Assert.True(n > 0, "Truncated directory table on disk.");
                 read += n;
             }

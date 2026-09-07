@@ -52,7 +52,7 @@ internal static class AppLogging
 
         try
         {
-            var dir = Path.GetDirectoryName(logPath);
+            string? dir = Path.GetDirectoryName(logPath);
             if (!string.IsNullOrEmpty(dir))
                 _ = Directory.CreateDirectory(dir);
         }
@@ -82,7 +82,7 @@ internal static class AppLogging
         Logger.ForwardInfo = msg => Log.Information("{Message}", msg.TrimEnd('\r', '\n'));
         Logger.ForwardError = msg =>
         {
-            var text = msg.TrimEnd('\r', '\n');
+            string text = msg.TrimEnd('\r', '\n');
             if (msg.StartsWith("warning:", StringComparison.OrdinalIgnoreCase) ||
                 msg.StartsWith("[WARNING]", StringComparison.OrdinalIgnoreCase))
             {

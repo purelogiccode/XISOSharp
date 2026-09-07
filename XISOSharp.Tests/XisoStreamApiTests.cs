@@ -42,7 +42,7 @@ public class XisoStreamApiTests : IDisposable
         Logger.RealQuiet = false;
         _logCapture.Dispose();
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -57,7 +57,7 @@ public class XisoStreamApiTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -65,25 +65,25 @@ public class XisoStreamApiTests : IDisposable
 
     private string CreateIso()
     {
-        var src = CreateTempDir("xiso_stream_src");
+        string src = CreateTempDir("xiso_stream_src");
         Directory.CreateDirectory(Path.Combine(src, "sub"));
         File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
         File.WriteAllText(Path.Combine(src, "sub", "b.txt"), new string('B', 5000));
 
-        var isoDir = CreateTempDir("xiso_stream_iso");
-        var result = XisoWriter.CreateXiso(src, isoDir, null, null, out var created, "game.iso", null);
+        string isoDir = CreateTempDir("xiso_stream_iso");
+        int result = XisoWriter.CreateXiso(src, isoDir, null, null, out string? created, "game.iso", null);
         Assert.Equal(0, result);
         return created!;
     }
 
     private static Dictionary<string, string> HashTree(string root)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        Dictionary<string, string> result = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
-            var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
-            using var sha = SHA256.Create();
-            using var fs = File.OpenRead(file);
+            string rel = Path.GetRelativePath(root, file).Replace('\\', '/');
+            using SHA256 sha = SHA256.Create();
+            using FileStream fs = File.OpenRead(file);
             result[rel] = Convert.ToHexString(sha.ComputeHash(fs));
         }
 
@@ -118,9 +118,9 @@ public class XisoStreamApiTests : IDisposable
     [Fact]
     public void OpenImageStream_Iso_ReturnsReadableFileView()
     {
-        var isoPath = CreateIso();
+        string isoPath = CreateIso();
 
-        using var s = XisoReader.OpenImageStream(isoPath);
+        using Stream s = XisoReader.OpenImageStream(isoPath);
 
         Assert.True(s.CanRead);
         Assert.True(s.CanSeek);
@@ -130,16 +130,16 @@ public class XisoStreamApiTests : IDisposable
     [Fact]
     public void UnpackImage_FromMemoryStream_MatchesFileExtract()
     {
-        var isoPath = CreateIso();
-        var bytes = File.ReadAllBytes(isoPath);
-        using var ms = new MemoryStream(bytes, writable: false);
-        var dest = CreateTempDir("xiso_stream_dest");
+        string isoPath = CreateIso();
+        byte[] bytes = File.ReadAllBytes(isoPath);
+        using MemoryStream ms = new(bytes, writable: false);
+        string dest = CreateTempDir("xiso_stream_dest");
 
-        var rc = XisoReader.UnpackImage(ms, "game.iso", dest);
+        int rc = XisoReader.UnpackImage(ms, "game.iso", dest);
 
         Assert.Equal(0, rc);
         Assert.True(ms.CanRead);
-        var control = CreateTempDir("xiso_stream_control");
+        string control = CreateTempDir("xiso_stream_control");
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, control));
         Assert.Equal(HashTree(control), HashTree(dest));
     }
@@ -147,15 +147,15 @@ public class XisoStreamApiTests : IDisposable
     [Fact]
     public void Extract_FromFileStream_LeavesStreamOpen()
     {
-        var isoPath = CreateIso();
-        using var fs = File.OpenRead(isoPath);
-        var dest = CreateTempDir("xiso_stream_dest2");
+        string isoPath = CreateIso();
+        using FileStream fs = File.OpenRead(isoPath);
+        string dest = CreateTempDir("xiso_stream_dest2");
 
-        var rc = XisoReader.Extract(fs, "game.iso", dest, !XisoReader.IsOptimizedImage(isoPath));
+        int rc = XisoReader.Extract(fs, "game.iso", dest, !XisoReader.IsOptimizedImage(isoPath));
 
         Assert.Equal(0, rc);
         Assert.True(fs.CanRead);
-        var control = CreateTempDir("xiso_stream_control2");
+        string control = CreateTempDir("xiso_stream_control2");
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, control));
         Assert.Equal(HashTree(control), HashTree(dest));
     }
@@ -163,8 +163,8 @@ public class XisoStreamApiTests : IDisposable
     [Fact]
     public void List_Tree_FromStream_ReturnZero()
     {
-        var isoPath = CreateIso();
-        using var ms = new MemoryStream(File.ReadAllBytes(isoPath), writable: false);
+        string isoPath = CreateIso();
+        using MemoryStream ms = new(File.ReadAllBytes(isoPath), writable: false);
 
         Assert.Equal(0, XisoReader.List(ms, "game.iso", !XisoReader.IsOptimizedImage(isoPath)));
         Assert.Equal(0, XisoReader.Tree(ms, "game.iso", !XisoReader.IsOptimizedImage(isoPath)));
@@ -173,17 +173,17 @@ public class XisoStreamApiTests : IDisposable
     [Fact]
     public async Task DecodeXisoAsync_FromStream_Extracts()
     {
-        var isoPath = CreateIso();
-        await using var ms = new MemoryStream(await File.ReadAllBytesAsync(isoPath), writable: false);
-        var dest = CreateTempDir("xiso_stream_dest3");
+        string isoPath = CreateIso();
+        await using MemoryStream ms = new(await File.ReadAllBytesAsync(isoPath), writable: false);
+        string dest = CreateTempDir("xiso_stream_dest3");
 
-        var (result, outIso) = await XisoReader.DecodeXisoAsync(
+        (int result, string? outIso) = await XisoReader.DecodeXisoAsync(
             ms, "game.iso", dest, ExtractMode.Extract,
             llCompat: !XisoReader.IsOptimizedImage(isoPath));
 
         Assert.Equal(0, result);
         Assert.Null(outIso);
-        var control = CreateTempDir("xiso_stream_control3");
+        string control = CreateTempDir("xiso_stream_control3");
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, control));
         Assert.Equal(HashTree(control), HashTree(dest));
     }
@@ -191,9 +191,9 @@ public class XisoStreamApiTests : IDisposable
     [Fact]
     public void IsOptimizedImage_Stream_MatchesPathProbe()
     {
-        var isoPath = CreateIso();
-        using var ms = new MemoryStream(File.ReadAllBytes(isoPath), writable: false);
-        var pos = ms.Position;
+        string isoPath = CreateIso();
+        using MemoryStream ms = new(File.ReadAllBytes(isoPath), writable: false);
+        long pos = ms.Position;
 
         Assert.Equal(XisoReader.IsOptimizedImage(isoPath), XisoReader.IsOptimizedImage(ms));
         Assert.Equal(pos, ms.Position);
@@ -207,11 +207,11 @@ public class XisoStreamApiTests : IDisposable
     [Fact]
     public void DecodeXiso_NonSeekableStream_ThrowsArgumentException()
     {
-        var isoPath = CreateIso();
-        using var inner = File.OpenRead(isoPath);
-        using var ns = new NonSeekableStream(inner);
+        string isoPath = CreateIso();
+        using FileStream inner = File.OpenRead(isoPath);
+        using NonSeekableStream ns = new(inner);
 
-        var ex = Assert.Throws<ArgumentException>(() =>
+        ArgumentException ex = Assert.Throws<ArgumentException>(() =>
             XisoReader.DecodeXiso(ns, "game.iso", null, ExtractMode.List, out _, false));
         Assert.Contains("seekable", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -219,8 +219,8 @@ public class XisoStreamApiTests : IDisposable
     [Fact]
     public void DecodeXiso_RewriteModeFromStream_Refused()
     {
-        var isoPath = CreateIso();
-        using var ms = new MemoryStream(File.ReadAllBytes(isoPath), writable: false);
+        string isoPath = CreateIso();
+        using MemoryStream ms = new(File.ReadAllBytes(isoPath), writable: false);
 
         Assert.Throws<ArgumentException>(() =>
             XisoReader.DecodeXiso(ms, "game.iso", null, ExtractMode.Rewrite, out _, false));

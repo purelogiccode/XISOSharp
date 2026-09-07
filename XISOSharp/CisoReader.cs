@@ -33,14 +33,14 @@ public static class CisoReader
     {
         try
         {
-            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 256);
+            using FileStream fs = new(path, FileMode.Open, FileAccess.Read, FileShare.Read, 256);
             if (fs.Length < HeaderSize) return false;
             Span<byte> hdr = stackalloc byte[24];
-            var n = fs.Read(hdr);
+            int n = fs.Read(hdr);
             if (n != 24) return false;
-            var magic = BinaryPrimitives.ReadUInt32LittleEndian(hdr[..4]);
-            var hsize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
-            var ver = hdr[20];
+            uint magic = BinaryPrimitives.ReadUInt32LittleEndian(hdr[..4]);
+            uint hsize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
+            byte ver = hdr[20];
             return magic == Magic && hsize == HeaderSize &&
                    (ver == CisoWriter.VersionDeflate || ver == CisoWriter.VersionLz4);
         }
@@ -60,12 +60,12 @@ public static class CisoReader
         ct.ThrowIfCancellationRequested();
         if (!File.Exists(csoPath)) throw new FileNotFoundException($"CSO not found: {csoPath}");
 
-        var output = outputIsoPath ?? DeriveDefaultIsoPath(csoPath);
+        string output = outputIsoPath ?? DeriveDefaultIsoPath(csoPath);
         if (XisoPaths.AreSamePath(csoPath, output))
             throw new IOException("Source and destination paths are the same");
 
-        using var src = OpenReadStream(csoPath);
-        using var dst = new FileStream(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+        using Stream src = OpenReadStream(csoPath);
+        using FileStream dst = new(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
         DecompressStream(src, dst, progress, ct);
         Logger.Log($"Decompressed {csoPath} -> {output} ({new FileInfo(output).Length} bytes)\n");
         return 0;
@@ -101,12 +101,12 @@ public static class CisoReader
         Span<byte> header = stackalloc byte[24];
         source.Seek(0, SeekOrigin.Begin);
         ReadExact(source, header);
-        var magic = BinaryPrimitives.ReadUInt32LittleEndian(header[..4]);
-        var hsize = BinaryPrimitives.ReadUInt32LittleEndian(header[4..8]);
-        var uncompressedSize = BinaryPrimitives.ReadUInt64LittleEndian(header[8..16]);
-        var blockSize = BinaryPrimitives.ReadUInt32LittleEndian(header[16..20]);
-        var version = header[20];
-        var align = header[21];
+        uint magic = BinaryPrimitives.ReadUInt32LittleEndian(header[..4]);
+        uint hsize = BinaryPrimitives.ReadUInt32LittleEndian(header[4..8]);
+        ulong uncompressedSize = BinaryPrimitives.ReadUInt64LittleEndian(header[8..16]);
+        uint blockSize = BinaryPrimitives.ReadUInt32LittleEndian(header[16..20]);
+        byte version = header[20];
+        byte align = header[21];
 
         if (magic != Magic) throw new InvalidDataException("Not a CISO file (bad magic)");
         if (hsize != HeaderSize) throw new InvalidDataException($"Unsupported CISO header size {hsize} (expected 24)");
@@ -120,29 +120,29 @@ public static class CisoReader
         // otherwise allocate gigabytes of index before the file-size guard runs.
         if (uncompressedSize > (ulong)long.MaxValue)
             throw new InvalidDataException($"CISO uncompressed size {uncompressedSize} exceeds supported range");
-        var totalBlocks = (long)((uncompressedSize + blockSize - 1) / blockSize);
-        var indexLen = totalBlocks + 1;
+        long totalBlocks = (long)((uncompressedSize + blockSize - 1) / blockSize);
+        long indexLen = totalBlocks + 1;
         if (indexLen > int.MaxValue)
         {
             throw new InvalidDataException(
                 $"CISO index too large ({indexLen} entries) for claimed size {uncompressedSize}");
         }
 
-        var indexCount = (int)indexLen;
+        int indexCount = (int)indexLen;
         if ((long)indexCount * 4 > source.Length - HeaderSize)
             throw new InvalidDataException("CISO index table exceeds file size");
 
-        var indexEntries = new uint[indexCount];
+        uint[] indexEntries = new uint[indexCount];
         Span<byte> leBuf = stackalloc byte[4];
         // Index starts at 24
-        for (var i = 0; i < indexCount; i++)
+        for (int i = 0; i < indexCount; i++)
         {
             ReadExact(source, leBuf);
             indexEntries[i] = BinaryPrimitives.ReadUInt32LittleEndian(leBuf);
         }
 
         // Decompress each sector
-        var blockBuf = new byte[BlockSize];
+        byte[] blockBuf = new byte[BlockSize];
         long written = 0;
 
         progress?.Report(new ProgressInfo(ProgressInfoType.FileCount, Count: totalBlocks));
@@ -151,8 +151,8 @@ public static class CisoReader
         {
             ct.ThrowIfCancellationRequested();
 
-            var rawEntry = indexEntries[sector];
-            var rawNext = indexEntries[sector + 1];
+            uint rawEntry = indexEntries[sector];
+            uint rawNext = indexEntries[sector + 1];
             bool isPlain;
             if (version == CisoWriter.VersionDeflate)
             {
@@ -165,15 +165,15 @@ public static class CisoReader
                 isPlain = (rawEntry & 0x80000000u) == 0;
             }
 
-            var offset = (rawEntry & 0x7FFFFFFFu) * (ulong)(1u << align);
-            var nextOffset = (rawNext & 0x7FFFFFFFu) * (ulong)(1u << align);
+            ulong offset = (rawEntry & 0x7FFFFFFFu) * (ulong)(1u << align);
+            ulong nextOffset = (rawNext & 0x7FFFFFFFu) * (ulong)(1u << align);
             if (nextOffset < offset)
             {
                 throw new InvalidDataException(
                     $"CISO index corruption at sector {sector}: next {nextOffset} < offset {offset}");
             }
 
-            var dataLen = (long)(nextOffset - offset);
+            long dataLen = (long)(nextOffset - offset);
             if (dataLen < 0) throw new InvalidDataException($"Negative data length at sector {sector}");
 
             source.Seek((long)offset, SeekOrigin.Begin);
@@ -183,7 +183,7 @@ public static class CisoReader
             // payload. The real bytes are present in the file — extend the read for the
             // last sector (ciso read.rs instead pads with zeros, which corrupts payloads
             // whose tail is non-zero).
-            var readLen = dataLen;
+            long readLen = dataLen;
             if (!isPlain && sector == totalBlocks - 1)
                 readLen = Math.Min(dataLen + (1L << align) - 1, source.Length - (long)offset);
 
@@ -196,10 +196,10 @@ public static class CisoReader
                 if (written + toRead > (long)uncompressedSize)
                     toRead = (long)uncompressedSize - written;
 
-                var read = 0;
+                int read = 0;
                 while (read < toRead)
                 {
-                    var n = source.Read(blockBuf, read, (int)(toRead - read));
+                    int n = source.Read(blockBuf, read, (int)(toRead - read));
                     if (n == 0) throw new EndOfStreamException($"Unexpected EOF at plain sector {sector}");
                     read += n;
                 }
@@ -214,11 +214,11 @@ public static class CisoReader
                 if (readLen <= 0)
                     throw new InvalidDataException($"Zero-length compressed sector {sector}");
 
-                var compBuf = new byte[readLen];
-                var compRead = 0;
+                byte[] compBuf = new byte[readLen];
+                int compRead = 0;
                 while (compRead < readLen)
                 {
-                    var n = source.Read(compBuf, compRead, (int)(readLen - compRead));
+                    int n = source.Read(compBuf, compRead, (int)(readLen - compRead));
                     if (n == 0) break;
                     compRead += n;
                 }
@@ -226,8 +226,8 @@ public static class CisoReader
                 if (compRead < readLen)
                     Array.Resize(ref compBuf, compRead);
 
-                var expected = (int)Math.Min(BlockSize, (long)uncompressedSize - written);
-                var sectorData = DecompressSector(version, align, compBuf, expected);
+                int expected = (int)Math.Min(BlockSize, (long)uncompressedSize - written);
+                byte[] sectorData = DecompressSector(version, align, compBuf, expected);
 
                 dest.Write(sectorData, 0, expected);
                 written += expected;
@@ -277,7 +277,7 @@ public static class CisoReader
     /// </summary>
     public static void ReadFromCso(string csoPath, long offset, Span<byte> buffer)
     {
-        using var fs = OpenReadStream(csoPath);
+        using Stream fs = OpenReadStream(csoPath);
         ReadFromCsoCore(fs, offset, buffer);
     }
 
@@ -295,18 +295,18 @@ public static class CisoReader
         Span<byte> header = stackalloc byte[24];
         csoFs.Seek(0, SeekOrigin.Begin);
         ReadExact(csoFs, header);
-        var magic = BinaryPrimitives.ReadUInt32LittleEndian(header[..4]);
-        var hsize = BinaryPrimitives.ReadUInt32LittleEndian(header[4..8]);
-        var uncompressedSize = BinaryPrimitives.ReadUInt64LittleEndian(header[8..16]);
-        var blockSize = BinaryPrimitives.ReadUInt32LittleEndian(header[16..20]);
-        var version = header[20];
-        var align = header[21];
+        uint magic = BinaryPrimitives.ReadUInt32LittleEndian(header[..4]);
+        uint hsize = BinaryPrimitives.ReadUInt32LittleEndian(header[4..8]);
+        ulong uncompressedSize = BinaryPrimitives.ReadUInt64LittleEndian(header[8..16]);
+        uint blockSize = BinaryPrimitives.ReadUInt32LittleEndian(header[16..20]);
+        byte version = header[20];
+        byte align = header[21];
         if (magic != Magic || hsize != HeaderSize || blockSize != BlockSize)
             throw new InvalidDataException("Invalid CISO header");
 
-        var totalBlocks = (long)((uncompressedSize + blockSize - 1) / blockSize);
-        var indexLen = totalBlocks + 1;
-        var indexEntries = new uint[indexLen];
+        long totalBlocks = (long)((uncompressedSize + blockSize - 1) / blockSize);
+        long indexLen = totalBlocks + 1;
+        uint[] indexEntries = new uint[indexLen];
         Span<byte> leBuf = stackalloc byte[4];
         for (long i = 0; i < indexLen; i++)
         {
@@ -316,33 +316,33 @@ public static class CisoReader
 
         long bufferPos = 0;
         long remaining = buffer.Length;
-        var currentOffset = offset;
+        long currentOffset = offset;
 
         while (remaining > 0)
         {
-            var sector = currentOffset / BlockSize;
-            var sectorOffset = currentOffset % BlockSize;
+            long sector = currentOffset / BlockSize;
+            long sectorOffset = currentOffset % BlockSize;
             if (sector >= totalBlocks) throw new ArgumentOutOfRangeException(nameof(offset));
 
-            var rawEntry = indexEntries[sector];
-            var rawNext = indexEntries[sector + 1];
-            var isPlain = version == CisoWriter.VersionDeflate
+            uint rawEntry = indexEntries[sector];
+            uint rawNext = indexEntries[sector + 1];
+            bool isPlain = version == CisoWriter.VersionDeflate
                 ? (rawEntry & 0x80000000u) != 0
                 : (rawEntry & 0x80000000u) == 0;
 
-            var off = (rawEntry & 0x7FFFFFFFu) * (ulong)(1u << align);
-            var nextOff = (rawNext & 0x7FFFFFFFu) * (ulong)(1u << align);
-            var dataLen = (long)(nextOff - off);
+            ulong off = (rawEntry & 0x7FFFFFFFu) * (ulong)(1u << align);
+            ulong nextOff = (rawNext & 0x7FFFFFFFu) * (ulong)(1u << align);
+            long dataLen = (long)(nextOff - off);
             csoFs.Seek((long)off, SeekOrigin.Begin);
 
-            var sectorData = new byte[BlockSize];
+            byte[] sectorData = new byte[BlockSize];
             if (isPlain)
             {
                 // Read plain sector
-                var n = 0;
+                int n = 0;
                 while (n < BlockSize)
                 {
-                    var r = csoFs.Read(sectorData, n, BlockSize - n);
+                    int r = csoFs.Read(sectorData, n, BlockSize - n);
                     if (r == 0) throw new EndOfStreamException();
                     n += r;
                 }
@@ -353,15 +353,15 @@ public static class CisoReader
 
                 // The last sector's index gap can round down (final entry stores
                 // position >> align); extend the read to recover the true payload.
-                var readLen = dataLen;
+                long readLen = dataLen;
                 if (sector == totalBlocks - 1)
                     readLen = Math.Min(dataLen + (1L << align) - 1, csoFs.Length - (long)off);
 
-                var compBuf = new byte[readLen];
-                var n = 0;
+                byte[] compBuf = new byte[readLen];
+                int n = 0;
                 while (n < readLen)
                 {
-                    var r = csoFs.Read(compBuf, n, (int)(readLen - n));
+                    int r = csoFs.Read(compBuf, n, (int)(readLen - n));
                     if (r == 0) break;
                     n += r;
                 }
@@ -372,7 +372,7 @@ public static class CisoReader
                 sectorData = DecompressSector(version, align, compBuf, BlockSize);
             }
 
-            var toCopy = Math.Min(remaining, BlockSize - sectorOffset);
+            long toCopy = Math.Min(remaining, BlockSize - sectorOffset);
             sectorData.AsSpan((int)sectorOffset, (int)toCopy).CopyTo(buffer.Slice((int)bufferPos, (int)toCopy));
             bufferPos += toCopy;
             remaining -= toCopy;
@@ -388,7 +388,7 @@ public static class CisoReader
     {
         if (CisoSplitFile.IsSplitPath(path))
         {
-            var parts = CisoSplitFile.OpenParts(path);
+            List<FileStream> parts = CisoSplitFile.OpenParts(path);
             if (parts.Count == 0) throw new FileNotFoundException($"CSO not found: {path}");
             return parts.Count == 1 ? parts[0] : new CisoSplitInputStream(parts);
         }
@@ -406,19 +406,19 @@ public static class CisoReader
     {
         if (version == CisoWriter.VersionLz4)
         {
-            var strict = TryDecodeV2Payload(payload, expected);
+            byte[]? strict = TryDecodeV2Payload(payload, expected);
             if (strict != null) return strict;
         }
 
         // Lenient fallbacks: trailing zero bytes may be alignment padding, so try
         // trimming them before decoding.
-        var maxTrim = Math.Max(align == 0 ? 0 : (1 << align) - 1, 3);
-        for (var trim = 0; trim <= maxTrim && trim <= payload.Length; trim++)
+        int maxTrim = Math.Max(align == 0 ? 0 : (1 << align) - 1, 3);
+        for (int trim = 0; trim <= maxTrim && trim <= payload.Length; trim++)
         {
-            var tryLen = payload.Length - trim;
+            int tryLen = payload.Length - trim;
             if (tryLen <= 0) continue;
-            var tailZero = true;
-            for (var z = tryLen; z < payload.Length; z++)
+            bool tailZero = true;
+            for (int z = tryLen; z < payload.Length; z++)
             {
                 if (payload[z] != 0)
                 {
@@ -429,11 +429,11 @@ public static class CisoReader
 
             if (!tailZero && trim != 0) continue;
 
-            var decoded = TryDecodeAny(version, payload.AsSpan(0, tryLen), expected);
+            byte[]? decoded = TryDecodeAny(version, payload.AsSpan(0, tryLen), expected);
             if (decoded != null) return decoded;
         }
 
-        var full = TryDecodeAny(version, payload, expected);
+        byte[]? full = TryDecodeAny(version, payload, expected);
         if (full != null) return full;
 
         throw new InvalidDataException(
@@ -450,21 +450,21 @@ public static class CisoReader
     private static byte[]? TryDecodeV2Payload(byte[] payload, int expected)
     {
         if (payload.Length < 4) return null;
-        var sizeField = BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, 4));
-        var blockLen = (int)(sizeField & 0x7FFFFFFFu);
+        uint sizeField = BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, 4));
+        int blockLen = (int)(sizeField & 0x7FFFFFFFu);
         if (blockLen <= 0 || blockLen > payload.Length - 4) return null;
 
-        var body = payload.AsSpan(4, blockLen);
+        Span<byte> body = payload.AsSpan(4, blockLen);
         if ((sizeField & 0x80000000u) != 0)
         {
             // The frame stored the sector uncompressed.
             return body.Length >= expected ? body.Slice(0, expected).ToArray() : null;
         }
 
-        var dst = new byte[BlockSize];
+        byte[] dst = new byte[BlockSize];
         try
         {
-            var n = Lz4.Decompress(body, dst);
+            int n = Lz4.Decompress(body, dst);
             // Accept an exact remainder or a full (zero-padded) last block.
             if (n == expected || (n == BlockSize && expected < BlockSize))
                 return dst[..expected];
@@ -493,8 +493,8 @@ public static class CisoReader
     private static byte[]? TryDecodeAny(byte version, ReadOnlySpan<byte> data, int expected)
     {
         // Declared codec first, then the cross-codec fallback (e.g. DEFLATE bytes under a v2 header).
-        var primary = version == CisoWriter.VersionLz4 ? SectorCodec.Lz4 : SectorCodec.Deflate;
-        var secondary = primary == SectorCodec.Lz4 ? SectorCodec.Deflate : SectorCodec.Lz4;
+        SectorCodec primary = version == CisoWriter.VersionLz4 ? SectorCodec.Lz4 : SectorCodec.Deflate;
+        SectorCodec secondary = primary == SectorCodec.Lz4 ? SectorCodec.Deflate : SectorCodec.Lz4;
         return TryDecode(primary, data, expected) ?? TryDecode(secondary, data, expected);
     }
 
@@ -518,26 +518,26 @@ public static class CisoReader
 
     private static byte[] DecodeLz4(ReadOnlySpan<byte> data)
     {
-        var dst = new byte[BlockSize];
-        var n = Lz4.Decompress(data, dst);
+        byte[] dst = new byte[BlockSize];
+        int n = Lz4.Decompress(data, dst);
         return dst[..n];
     }
 
     private static byte[] DecodeDeflate(ReadOnlySpan<byte> data)
     {
-        using var ms = new MemoryStream(data.ToArray());
-        using var ds = new DeflateStream(ms, CompressionMode.Decompress);
-        using var outMs = new MemoryStream();
+        using MemoryStream ms = new(data.ToArray());
+        using DeflateStream ds = new(ms, CompressionMode.Decompress);
+        using MemoryStream outMs = new();
         ds.CopyTo(outMs);
         return outMs.ToArray();
     }
 
     private static void ReadExact(Stream s, Span<byte> buf)
     {
-        var offset = 0;
+        int offset = 0;
         while (offset < buf.Length)
         {
-            var n = s.Read(buf[offset..]);
+            int n = s.Read(buf[offset..]);
             if (n == 0) throw new EndOfStreamException();
             offset += n;
         }
@@ -550,8 +550,8 @@ public static class CisoReader
     /// </summary>
     public static string DeriveDefaultIsoPath(string csoPath)
     {
-        var dir = Path.GetDirectoryName(csoPath) ?? "";
-        var file = Path.GetFileName(csoPath);
+        string dir = Path.GetDirectoryName(csoPath) ?? "";
+        string file = Path.GetFileName(csoPath);
         // Strip .cso and restore .iso
         if (file.EndsWith(".1.cso", StringComparison.OrdinalIgnoreCase))
         {
@@ -563,7 +563,7 @@ public static class CisoReader
         }
         else
         {
-            var ext = Path.GetExtension(file);
+            string ext = Path.GetExtension(file);
             if (!string.IsNullOrEmpty(ext))
                 file = Path.ChangeExtension(file, ".iso");
             else

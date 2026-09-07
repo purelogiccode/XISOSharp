@@ -26,7 +26,7 @@ Open `CSharp_XISOSharp.sln` in Visual Studio, or run:
 dotnet build
 ```
 
-The tester resolves `extract-xiso` via the shared `XISOSharp.ToolLocator` chain (explicit path, then a sibling of the app executable of either spelling, then `PATH`) with a `-v` probe over the single shared `XISOSharp.ProcessRunner` (async drains, timeout, tree-kill) — the same pair that backs the GUI (`XISOSharp.Cli`) and the battle harness, replacing per-app runners. A bundled Windows `extract-xiso.exe` is copied to the output when present, but absence falls back gracefully through the same chain. If no tool is found, comparison tests against the native tool are skipped and only standalone C# library tests run.
+The tester resolves `extract-xiso` via the shared `XISOSharp.ToolLocator` chain (explicit path, then a sibling of the app executable of either spelling, then `PATH`) with a `-v` probe over the single shared `XISOSharp.ProcessRunner` (async drains, timeout, tree-kill) — the same pair that backs the GUI (`XISOSharp`) and the battle harness, replacing per-app runners. A bundled Windows `extract-xiso.exe` is copied to the output when present, but absence falls back gracefully through the same chain. If no tool is found, comparison tests against the native tool are skipped and only standalone C# library tests run.
 
 ## License
 

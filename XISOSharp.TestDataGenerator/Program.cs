@@ -14,9 +14,9 @@ internal static class Program
     private static int Main(string[] args)
     {
         string? root = null;
-        var force = false;
+        bool force = false;
 
-        foreach (var arg in args)
+        foreach (string arg in args)
         {
             if (arg is "--force" or "-f")
             {
@@ -37,7 +37,7 @@ internal static class Program
 
         try
         {
-            foreach (var action in TestDataWriter.EnsureTestData(root, force))
+            foreach (string action in TestDataWriter.EnsureTestData(root, force))
             {
                 Console.WriteLine(action);
             }

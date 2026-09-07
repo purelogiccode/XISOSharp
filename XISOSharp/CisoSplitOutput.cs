@@ -31,11 +31,11 @@ internal sealed class CisoSplitOutput : Stream
 
     private FileStream GetPart(long partIndex)
     {
-        if (_parts.TryGetValue(partIndex, out var part)) return part;
+        if (_parts.TryGetValue(partIndex, out FileStream? part)) return part;
 
         // CreateNew, not Create: refusing existing parts matches XisoSplitter
         // instead of silently clobbering them (BUG-LIB-027).
-        var path = CisoSplitFile.PartPath(_outputPath, partIndex);
+        string path = CisoSplitFile.PartPath(_outputPath, partIndex);
         try
         {
             part = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536);
@@ -61,18 +61,18 @@ internal sealed class CisoSplitOutput : Stream
     public override void Write(ReadOnlySpan<byte> buffer)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        var written = 0;
+        int written = 0;
         while (written < buffer.Length)
         {
-            var globalPosition = Position + written;
-            var handle = GetPart(globalPosition / _splitPoint);
+            long globalPosition = Position + written;
+            FileStream handle = GetPart(globalPosition / _splitPoint);
 
             // Bytes remaining to the split point (a write starting exactly on the boundary
             // fills a whole part before splitting again, as in SplitOutput).
-            var bytesToSplit = globalPosition % _splitPoint;
+            long bytesToSplit = globalPosition % _splitPoint;
             if (bytesToSplit == 0) bytesToSplit = _splitPoint;
 
-            var toWrite = (int)Math.Min(buffer.Length - written, bytesToSplit);
+            int toWrite = (int)Math.Min(buffer.Length - written, bytesToSplit);
             handle.Seek(globalPosition, SeekOrigin.Begin);
             handle.Write(buffer.Slice(written, toWrite));
             written += toWrite;
@@ -130,7 +130,7 @@ internal sealed class CisoSplitOutput : Stream
     /// <summary>Flushes all created part files.</summary>
     public override void Flush()
     {
-        foreach (var part in _parts.Values) part.Flush();
+        foreach (FileStream part in _parts.Values) part.Flush();
     }
 
     /// <summary>Disposes all created part streams.</summary>
@@ -141,7 +141,7 @@ internal sealed class CisoSplitOutput : Stream
         _disposed = true;
         if (disposing)
         {
-            foreach (var part in _parts.Values) part.Dispose();
+            foreach (FileStream part in _parts.Values) part.Dispose();
             _parts.Clear();
         }
 

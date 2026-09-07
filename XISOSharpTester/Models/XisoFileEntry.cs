@@ -37,7 +37,7 @@ public class XisoFileEntry
         {
             if (string.IsNullOrEmpty(FilePath))
                 return null;
-            var info = new FileInfo(FilePath);
+            FileInfo info = new(FilePath);
             if (!info.Exists)
                 return null;
             return info.Length;

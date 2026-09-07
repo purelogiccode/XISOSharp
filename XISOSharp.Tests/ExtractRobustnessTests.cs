@@ -61,7 +61,7 @@ public class ExtractRobustnessTests : IDisposable
         _outCapture.Dispose();
         _errCapture.Dispose();
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -77,7 +77,7 @@ public class ExtractRobustnessTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -85,18 +85,18 @@ public class ExtractRobustnessTests : IDisposable
 
     private string CreateIso(Action<string> populate, string isoName)
     {
-        var src = CreateTempDir("xiso_robust_src");
+        string src = CreateTempDir("xiso_robust_src");
         populate(src);
-        var dir = CreateTempDir("xiso_robust_iso");
-        var result = XisoWriter.CreateXiso(src, dir, null, null, out var created, isoName, null);
+        string dir = CreateTempDir("xiso_robust_iso");
+        int result = XisoWriter.CreateXiso(src, dir, null, null, out string? created, isoName, null);
         Assert.Equal(0, result);
         return created!;
     }
 
     private static void WritePayload(string path, int size)
     {
-        var payload = new byte[size];
-        for (var i = 0; i < payload.Length; i++) payload[i] = (byte)(i % 251);
+        byte[] payload = new byte[size];
+        for (int i = 0; i < payload.Length; i++) payload[i] = (byte)(i % 251);
         File.WriteAllBytes(path, payload);
     }
 
@@ -107,15 +107,15 @@ public class ExtractRobustnessTests : IDisposable
     /// </summary>
     private static string TruncateInsideFile(string isoPath, string internalPath, int dropBytes)
     {
-        var entry = XisoReader.GetEntryInfo(isoPath, internalPath);
+        EntryInfo? entry = XisoReader.GetEntryInfo(isoPath, internalPath);
         Assert.NotNull(entry);
-        var vol = XisoReader.GetVolumeInfo(isoPath);
-        var dataEnd = ((long)entry.StartSector * Constants.SectorSize) + vol.DiscLseek + entry.FileSize;
+        VolumeInfo vol = XisoReader.GetVolumeInfo(isoPath);
+        long dataEnd = ((long)entry.StartSector * Constants.SectorSize) + vol.DiscLseek + entry.FileSize;
         Assert.True(dataEnd - dropBytes > Constants.HeaderOffset,
             "fixture layout unexpectedly small; cannot truncate inside file data");
 
-        var data = File.ReadAllBytes(isoPath);
-        var cut = Path.Combine(Path.GetDirectoryName(isoPath)!, "cut_" + Path.GetFileName(isoPath));
+        byte[] data = File.ReadAllBytes(isoPath);
+        string cut = Path.Combine(Path.GetDirectoryName(isoPath)!, "cut_" + Path.GetFileName(isoPath));
         File.WriteAllBytes(cut, data.AsSpan(0, (int)(dataEnd - dropBytes)).ToArray());
         return cut;
     }
@@ -123,13 +123,13 @@ public class ExtractRobustnessTests : IDisposable
     [Fact]
     public void TruncatedImage_Unpack_ThrowsNamedTruncationError()
     {
-        var isoPath = CreateIso(src => WritePayload(Path.Combine(src, "c.bin"), 20000), "game.iso");
-        var cut = TruncateInsideFile(isoPath, "/c.bin", 5000);
-        var dest = CreateTempDir("xiso_robust_dest");
+        string isoPath = CreateIso(src => WritePayload(Path.Combine(src, "c.bin"), 20000), "game.iso");
+        string cut = TruncateInsideFile(isoPath, "/c.bin", 5000);
+        string dest = CreateTempDir("xiso_robust_dest");
 
         // Pre-fix this hung forever: a 0-byte read at end of image never
         // advanced totalSize, so the copy loop never exited.
-        var ex = Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(cut, dest));
+        ExtractFileException ex = Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(cut, dest));
         Assert.Equal(ExtractError.ErrFileTruncated, ex.ErrorCode);
         Assert.Contains("c.bin", ex.Message, StringComparison.Ordinal);
         Assert.Contains("20000", ex.Message, StringComparison.Ordinal);
@@ -140,13 +140,13 @@ public class ExtractRobustnessTests : IDisposable
     [Fact]
     public void BlockedDestination_Unpack_ThrowsWithFileContext()
     {
-        var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
-        var dest = CreateTempDir("xiso_robust_dest");
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+        string dest = CreateTempDir("xiso_robust_dest");
 
         // A directory where the file goes: FileStream.Create fails on every OS.
         Directory.CreateDirectory(Path.Combine(dest, "a.txt"));
 
-        var ex = Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(isoPath, dest));
+        ExtractFileException ex = Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(isoPath, dest));
         Assert.Equal(ExtractError.ErrFileWrite, ex.ErrorCode);
         Assert.Contains("a.txt", ex.Message, StringComparison.Ordinal);
         Assert.Contains("sector", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -156,31 +156,31 @@ public class ExtractRobustnessTests : IDisposable
     [Fact]
     public void FailFast_StopsAtFirstError_NotSummary()
     {
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var dest = CreateTempDir("xiso_robust_dest");
+        string dest = CreateTempDir("xiso_robust_dest");
         Directory.CreateDirectory(Path.Combine(dest, "b.txt"));
 
-        var ex = Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(isoPath, dest));
+        ExtractFileException ex = Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(isoPath, dest));
         Assert.NotEqual(ExtractError.ErrExtractFailed, ex.ErrorCode);
     }
 
     [Fact]
     public void ContinueOnError_ExtractsRest_AndSummarizes()
     {
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var dest = CreateTempDir("xiso_robust_dest");
+        string dest = CreateTempDir("xiso_robust_dest");
         Directory.CreateDirectory(Path.Combine(dest, "b.txt"));
 
-        var options = new UnpackOptions { ContinueOnError = true };
-        var ex = Assert.Throws<ExtractErrorException>(() =>
+        UnpackOptions options = new() { ContinueOnError = true };
+        ExtractErrorException ex = Assert.Throws<ExtractErrorException>(() =>
             XisoReader.UnpackImage(isoPath, dest, options: options));
         Assert.Equal(ExtractError.ErrExtractFailed, ex.ErrorCode);
         Assert.Contains("Failed to unpack image", ex.Message, StringComparison.Ordinal);
@@ -195,20 +195,20 @@ public class ExtractRobustnessTests : IDisposable
     [Fact]
     public void ContinueOnError_BlockedSubdirectory_SkipsSubtree()
     {
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "top.txt"), "top");
             Directory.CreateDirectory(Path.Combine(src, "sub"));
             File.WriteAllText(Path.Combine(src, "sub", "inner.txt"), "inner");
         }, "game.iso");
-        var dest = CreateTempDir("xiso_robust_dest");
+        string dest = CreateTempDir("xiso_robust_dest");
 
         // A file where the subdirectory goes: CreateDirectory fails, so the
         // whole subtree is skipped while the rest still extracts.
         File.WriteAllText(Path.Combine(dest, "sub"), "blocker");
 
-        var options = new UnpackOptions { ContinueOnError = true };
-        var ex = Assert.Throws<ExtractErrorException>(() =>
+        UnpackOptions options = new() { ContinueOnError = true };
+        ExtractErrorException ex = Assert.Throws<ExtractErrorException>(() =>
             XisoReader.UnpackImage(isoPath, dest, options: options));
         Assert.Equal(ExtractError.ErrExtractFailed, ex.ErrorCode);
         Assert.Contains("sub", ex.Message, StringComparison.Ordinal);
@@ -219,11 +219,11 @@ public class ExtractRobustnessTests : IDisposable
     [Fact]
     public void CopyOut_Truncated_ThrowsNamedError()
     {
-        var isoPath = CreateIso(src => WritePayload(Path.Combine(src, "c.bin"), 20000), "game.iso");
-        var cut = TruncateInsideFile(isoPath, "/c.bin", 5000);
-        var dest = Path.Combine(CreateTempDir("xiso_robust_dest"), "c.bin");
+        string isoPath = CreateIso(src => WritePayload(Path.Combine(src, "c.bin"), 20000), "game.iso");
+        string cut = TruncateInsideFile(isoPath, "/c.bin", 5000);
+        string dest = Path.Combine(CreateTempDir("xiso_robust_dest"), "c.bin");
 
-        var ex = Assert.Throws<ExtractFileException>(() => XisoReader.CopyOut(cut, "/c.bin", dest));
+        ExtractFileException ex = Assert.Throws<ExtractFileException>(() => XisoReader.CopyOut(cut, "/c.bin", dest));
         Assert.Equal(ExtractError.ErrFileTruncated, ex.ErrorCode);
         Assert.Contains("/c.bin", ex.Message, StringComparison.Ordinal);
         Assert.Contains("20000", ex.Message, StringComparison.Ordinal);
@@ -232,17 +232,17 @@ public class ExtractRobustnessTests : IDisposable
     [Fact]
     public void CopyOutDirectory_ContinueOnError_Summarizes()
     {
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             Directory.CreateDirectory(Path.Combine(src, "sub"));
             File.WriteAllText(Path.Combine(src, "sub", "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "sub", "b.txt"), "world");
         }, "game.iso");
-        var dest = CreateTempDir("xiso_robust_dest");
+        string dest = CreateTempDir("xiso_robust_dest");
         Directory.CreateDirectory(Path.Combine(dest, "b.txt"));
 
-        var options = new UnpackOptions { ContinueOnError = true };
-        var ex = Assert.Throws<ExtractErrorException>(() =>
+        UnpackOptions options = new() { ContinueOnError = true };
+        ExtractErrorException ex = Assert.Throws<ExtractErrorException>(() =>
             XisoReader.CopyOut(isoPath, "/sub", dest, options));
         Assert.Equal(ExtractError.ErrExtractFailed, ex.ErrorCode);
         Assert.Contains("b.txt", ex.Message, StringComparison.Ordinal);
@@ -252,14 +252,14 @@ public class ExtractRobustnessTests : IDisposable
     [Fact]
     public void Cli_ContinueOnError_ExitOne_NamesFile()
     {
-        var isoPath = CreateIso(src => WritePayload(Path.Combine(src, "c.bin"), 20000), "game.iso");
-        var cut = TruncateInsideFile(isoPath, "/c.bin", 5000);
-        var dest = CreateTempDir("xiso_robust_cli");
+        string isoPath = CreateIso(src => WritePayload(Path.Combine(src, "c.bin"), 20000), "game.iso");
+        string cut = TruncateInsideFile(isoPath, "/c.bin", 5000);
+        string dest = CreateTempDir("xiso_robust_cli");
 
-        var rc = Program.Main(["-x", "-d", dest, "--continue-on-error", cut]);
+        int rc = Program.Main(["-x", "-d", dest, "--continue-on-error", cut]);
 
         Assert.Equal(1, rc);
-        var err = _errCapture.ToString();
+        string err = _errCapture.ToString();
         Assert.Contains("Failed to unpack image", err, StringComparison.Ordinal);
         Assert.Contains("c.bin", err, StringComparison.Ordinal);
     }
@@ -267,9 +267,9 @@ public class ExtractRobustnessTests : IDisposable
     [Fact]
     public void Cli_ContinueOnError_WrongMode_Rejected()
     {
-        var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
 
-        var rc = Program.Main(["-t", "--continue-on-error", isoPath]);
+        int rc = Program.Main(["-t", "--continue-on-error", isoPath]);
 
         Assert.Equal(1, rc);
         Assert.Contains("--continue-on-error is only supported", _errCapture.ToString(), StringComparison.Ordinal);

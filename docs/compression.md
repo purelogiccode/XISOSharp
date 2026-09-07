@@ -78,10 +78,10 @@ extension marks split input).
 ## CLI
 
 ```
-XISOSharp.Cli compress <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
-XISOSharp.Cli cso <sourceDir|image.iso> [output.cso]       # alias
-XISOSharp.Cli decompress <cso|.1.cso> [output.iso]
-XISOSharp.Cli uncso|decso <cso|.1.cso> [output.iso]        # aliases
+XISOSharp compress <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
+XISOSharp cso <sourceDir|image.iso> [output.cso]       # alias
+XISOSharp decompress <cso|.1.cso> [output.iso]
+XISOSharp uncso|decso <cso|.1.cso> [output.iso]        # aliases
 ```
 
 | Flag | Effect |
@@ -94,18 +94,18 @@ Examples:
 
 ```bash
 # Directory → CISO (build ISO then compress in one pass); default v2 LZ4, split output
-XISOSharp.Cli compress ./game_dir game.cso --ciso-level 9
+XISOSharp compress ./game_dir game.cso --ciso-level 9
 #   → game.1.cso (+ game.2.cso, … for images > ~4 GiB)
 
 # ISO → single-file CISO (classic layout, escape hatch)
-XISOSharp.Cli cso game.iso game.cso --ciso-split 0
+XISOSharp cso game.iso game.cso --ciso-split 0
 
 # Classic DEFLATE CISO with a custom split point
-XISOSharp.Cli cso game.iso game.cso --ciso-version 1 --ciso-split 1073741824
+XISOSharp cso game.iso game.cso --ciso-version 1 --ciso-split 1073741824
 
 # Decompress (single or split input)
-XISOSharp.Cli decompress game.1.cso game.iso
-XISOSharp.Cli uncso game.cso
+XISOSharp decompress game.1.cso game.iso
+XISOSharp uncso game.cso
 ```
 
 Multi-file handling: `compress` accepts `sourceDir` or `image.iso`; when given a directory it first builds an ISO (via `XisoWriter.CreateXiso` pipeline) then wraps via `CisoWriter`.
@@ -149,15 +149,15 @@ Header detection: `IsCso` checks `CISO` magic + `headerSize==24` + `version 1/2`
 - `checksum`/`extract`/`list` operate directly on `.cso` without decompressing to a temp file.
 
 ```bash
-XISOSharp.Cli checksum game.iso      # plain ISO
-XISOSharp.Cli checksum game.1.cso    # CISO (single or split) — same hash as game.iso
+XISOSharp checksum game.iso      # plain ISO
+XISOSharp checksum game.1.cso    # CISO (single or split) — same hash as game.iso
 ```
 
 ```bash
-XISOSharp.Cli checksum game.iso      # plain ISO
-XISOSharp.Cli checksum game.1.cso    # CISO (single or split) — same hash as game.iso
-XISOSharp.Cli -d out -x game.cso     # extract from CISO — same files as game.iso
-XISOSharp.Cli rewrite game.cso       # rewrite from CISO — same bytes as rewriting game.iso
+XISOSharp checksum game.iso      # plain ISO
+XISOSharp checksum game.1.cso    # CISO (single or split) — same hash as game.iso
+XISOSharp -d out -x game.cso     # extract from CISO — same files as game.iso
+XISOSharp rewrite game.cso       # rewrite from CISO — same bytes as rewriting game.iso
 ```
 
 Usage:
@@ -186,9 +186,9 @@ See [xdvdfs Compat — Block Device](xdvdfs-compat.md#block-device).
 Verified:
 
 ```bash
-XISOSharp.Cli compress sourceDir out.cso
-XISOSharp.Cli decompress out.1.cso rebuilt.iso
-XISOSharp.Cli checksum source.iso rebuilt.iso --silent  # hex match
+XISOSharp compress sourceDir out.cso
+XISOSharp decompress out.1.cso rebuilt.iso
+XISOSharp checksum source.iso rebuilt.iso --silent  # hex match
 # Also: decompress Rust-produced v2 CISO → same checksum
 ```
 

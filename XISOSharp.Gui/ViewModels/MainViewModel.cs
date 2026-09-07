@@ -276,7 +276,7 @@ internal sealed partial class MainViewModel : ObservableObject
     {
         try
         {
-            var settings = GuiSettings.Load();
+            GuiSettings settings = GuiSettings.Load();
             CliPath = settings.CliPath;
             OverwriteExisting = settings.OverwriteByDefault;
             await DetectCliAsync().ConfigureAwait(false);
@@ -294,7 +294,7 @@ internal sealed partial class MainViewModel : ObservableObject
     {
         try
         {
-            var resolved = CliLocator.Resolve(string.IsNullOrWhiteSpace(CliPath) ? null : CliPath);
+            string? resolved = CliLocator.Resolve(string.IsNullOrWhiteSpace(CliPath) ? null : CliPath);
             if (resolved is null)
             {
                 CliStatus = "XISOSharp CLI not found — set the CLI path on the Settings tab.";
@@ -305,8 +305,8 @@ internal sealed partial class MainViewModel : ObservableObject
 
             CliPath = resolved;
             AppendLog($"[GUI] Using CLI: {resolved}");
-            var version = await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
-            var status = version is null ? $"Found but -v failed: {resolved}" : $"Ready — {version}";
+            string? version = await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
+            string status = version is null ? $"Found but -v failed: {resolved}" : $"Ready — {version}";
             SetOnUi(() => CliStatus = status);
             AppendLog(version is null ? "[GUI] CLI -v probe failed." : $"[GUI] {version}");
             if (version is null)
@@ -445,8 +445,8 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunCreateAsync() =>
         GuardedAsync(() =>
         {
-            var source = RequireValue(CrSource, "source directory");
-            var excludes = SplitLines(CrExcludes);
+            string source = RequireValue(CrSource, "source directory");
+            List<string> excludes = SplitLines(CrExcludes);
             return RunJobAsync("create", CliCommands.Create(source, NullIfEmpty(CrName), excludes,
                 CrSkipSystemUpdate, CrDisableXbePatch, OverwriteExisting));
         });
@@ -455,7 +455,7 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunRewriteAsync() =>
         GuardedAsync(() =>
         {
-            var images = RequireLines(RwImages, "image");
+            List<string> images = RequireLines(RwImages, "image");
             ThrowIfRewriteCollision(NullIfEmpty(RwOutput), images);
             return RunJobAsync("rewrite", CliCommands.Rewrite(images, NullIfEmpty(RwOutput), NullIfEmpty(RwWorkDir),
                 RwDeleteOld, RwDisableXbePatch, RwValidate, RwChecksums, RwStrict, NullIfEmpty(RwReport),
@@ -466,7 +466,7 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunWipeAsync() =>
         GuardedAsync(() =>
         {
-            var image = RequireValue(WpImage, "image");
+            string image = RequireValue(WpImage, "image");
             ThrowIfSameOutput(NullIfEmpty(WpOutput), [image], "Wipe output");
             return RunJobAsync("wipe",
                 CliCommands.Wipe(image, NullIfEmpty(WpOutput), OverwriteExisting));
@@ -476,7 +476,7 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunTrimAsync() =>
         GuardedAsync(() =>
         {
-            var image = RequireValue(WpImage, "image");
+            string image = RequireValue(WpImage, "image");
             ThrowIfSameOutput(NullIfEmpty(WpOutput), [image], "Trim output");
             return RunJobAsync("trim",
                 CliCommands.Trim(image, NullIfEmpty(WpOutput), OverwriteExisting));
@@ -486,8 +486,8 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunRebuildAsync() =>
         GuardedAsync(() =>
         {
-            var parts = RequireLines(RbParts, "component");
-            var output = RequireValue(RbOutput, "output Redump ISO");
+            List<string> parts = RequireLines(RbParts, "component");
+            string output = RequireValue(RbOutput, "output Redump ISO");
             ThrowIfSameOutput(output, string.IsNullOrWhiteSpace(RbSectors) ? parts : [.. parts, RbSectors.Trim()],
                 "Rebuild output");
             return RunJobAsync("rebuild",
@@ -498,7 +498,7 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunCompressAsync() =>
         GuardedAsync(() =>
         {
-            var source = RequireValue(CpSource, "source directory or image");
+            string source = RequireValue(CpSource, "source directory or image");
             ThrowIfCompressCollision(source, NullIfEmpty(CpOutput), NullIfEmpty(CpSplit));
             return RunJobAsync("compress", CliCommands.Compress(source, NullIfEmpty(CpOutput),
                 Math.Clamp(CpLevel, 0, 9), string.Equals(CpVersion, "1", StringComparison.Ordinal) ? 1 : 2,
@@ -509,7 +509,7 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunDecompressAsync() =>
         GuardedAsync(() =>
         {
-            var cso = RequireValue(DcCso, "CSO file");
+            string cso = RequireValue(DcCso, "CSO file");
             ThrowIfDecompressCollision(cso, NullIfEmpty(DcOutput));
             return RunJobAsync("decompress",
                 CliCommands.Decompress(cso, NullIfEmpty(DcOutput), OverwriteExisting));
@@ -519,8 +519,8 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunValidateAsync() =>
         GuardedAsync(() =>
         {
-            var source = RequireValue(VaSource, "source ISO");
-            var output = RequireValue(VaOutput, "output ISO");
+            string source = RequireValue(VaSource, "source ISO");
+            string output = RequireValue(VaOutput, "output ISO");
             return RunJobAsync("validate", CliCommands.Validate(source, output, VaChecksums, NullIfEmpty(VaReport)));
         });
 
@@ -528,7 +528,7 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunChecksumAsync() =>
         GuardedAsync(() =>
         {
-            var images = RequireLines(string.IsNullOrWhiteSpace(CsImages) ? VaSource : CsImages, "image");
+            List<string> images = RequireLines(string.IsNullOrWhiteSpace(CsImages) ? VaSource : CsImages, "image");
             return RunJobAsync("checksum", CliCommands.Checksum(images, CsSilent));
         });
 
@@ -536,8 +536,8 @@ internal sealed partial class MainViewModel : ObservableObject
     private Task RunBatchAsync() =>
         GuardedAsync(() =>
         {
-            var dir = RequireValue(BaDir, "batch directory");
-            var modeFlag = BaMode switch
+            string dir = RequireValue(BaDir, "batch directory");
+            string modeFlag = BaMode switch
             {
                 "List" => "-l",
                 "Tree" => "-t",
@@ -584,7 +584,7 @@ internal sealed partial class MainViewModel : ObservableObject
                 return;
             }
 
-            foreach (var input in inputs)
+            foreach (string input in inputs)
             {
                 if (XisoPaths.AreSamePath(output, input))
                 {
@@ -618,10 +618,10 @@ internal sealed partial class MainViewModel : ObservableObject
                 return;
             }
 
-            var trimmed = output.Trim();
-            foreach (var raw in images)
+            string trimmed = output.Trim();
+            foreach (string raw in images)
             {
-                var input = raw.Trim();
+                string input = raw.Trim();
                 if (XisoPaths.AreSamePath(trimmed, input))
                 {
                     throw new InvalidOperationException(
@@ -655,7 +655,7 @@ internal sealed partial class MainViewModel : ObservableObject
     {
         try
         {
-            var src = source.Trim();
+            string src = source.Trim();
             string outputBase;
             if (string.IsNullOrWhiteSpace(output))
             {
@@ -691,8 +691,8 @@ internal sealed partial class MainViewModel : ObservableObject
                     $"Compress output is the same file as the input ({src}); choose another output.");
             }
 
-            var splitting = !string.IsNullOrWhiteSpace(splitBytes)
-                            && !string.Equals(splitBytes.Trim(), "0", StringComparison.Ordinal);
+            bool splitting = !string.IsNullOrWhiteSpace(splitBytes)
+                             && !string.Equals(splitBytes.Trim(), "0", StringComparison.Ordinal);
             if (splitting)
             {
                 string firstPart;
@@ -732,7 +732,7 @@ internal sealed partial class MainViewModel : ObservableObject
     {
         try
         {
-            var src = cso.Trim();
+            string src = cso.Trim();
             string probe;
             if (string.IsNullOrWhiteSpace(output))
             {
@@ -803,7 +803,7 @@ internal sealed partial class MainViewModel : ObservableObject
 
         IsRunning = true;
         LastExit = string.Empty;
-        var cts = new CancellationTokenSource();
+        CancellationTokenSource cts = new();
         lock (_runningCtsLock)
         {
             _runningCts = cts;
@@ -811,16 +811,16 @@ internal sealed partial class MainViewModel : ObservableObject
 
         try
         {
-            AppendLog($"$ XISOSharp.Cli {Quote(args)}");
-            Log.Information("Starting {Title}: XISOSharp.Cli {Args}", title, Quote(args));
-            var exit = await CliRunner.RunAsync(cli, args, AppendLog, cts.Token).ConfigureAwait(false);
-            var exitText = $"Exit code: {exit}";
+            AppendLog($"$ XISOSharp {Quote(args)}");
+            Log.Information("Starting {Title}: XISOSharp {Args}", title, Quote(args));
+            int exit = await CliRunner.RunAsync(cli, args, AppendLog, cts.Token).ConfigureAwait(false);
+            string exitText = $"Exit code: {exit}";
             SetOnUi(() => LastExit = exitText);
             AppendLog($"[GUI] {title} finished with exit code {exit}.");
             if (exit != 0)
             {
                 Log.Warning("Job {Title} exited with code {Exit}", title, exit);
-                BugReporter.ReportWarning($"GUI job '{title}' exited with code {exit}: XISOSharp.Cli {Quote(args)}");
+                BugReporter.ReportWarning($"GUI job '{title}' exited with code {exit}: XISOSharp {Quote(args)}");
             }
             else
             {
@@ -889,9 +889,9 @@ internal sealed partial class MainViewModel : ObservableObject
 
     private void AppendLogCore(string line)
     {
-        foreach (var part in line.Split('\n'))
+        foreach (string part in line.Split('\n'))
         {
-            var text = part.Length > 0 && part[^1] == '\r' ? part[..^1] : part;
+            string text = part.Length > 0 && part[^1] == '\r' ? part[..^1] : part;
             _logLines.Enqueue(text);
         }
 
@@ -900,8 +900,8 @@ internal sealed partial class MainViewModel : ObservableObject
             _logLines.Dequeue();
         }
 
-        var sb = new StringBuilder();
-        foreach (var queued in _logLines)
+        StringBuilder sb = new();
+        foreach (string queued in _logLines)
         {
             if (sb.Length > 0)
             {
@@ -923,16 +923,16 @@ internal sealed partial class MainViewModel : ObservableObject
             return "\"\"";
         }
 
-        var needsQuotes = arg.Contains(' ', StringComparison.Ordinal) || arg.Contains('\t', StringComparison.Ordinal)
-                                                                      || arg.Contains('"', StringComparison.Ordinal) ||
-                                                                      arg.Contains('\n', StringComparison.Ordinal)
-                                                                      || arg.Contains('\r', StringComparison.Ordinal);
+        bool needsQuotes = arg.Contains(' ', StringComparison.Ordinal) || arg.Contains('\t', StringComparison.Ordinal)
+                                                                       || arg.Contains('"', StringComparison.Ordinal) ||
+                                                                       arg.Contains('\n', StringComparison.Ordinal)
+                                                                       || arg.Contains('\r', StringComparison.Ordinal);
         if (!needsQuotes)
         {
             return arg;
         }
 
-        var escaped = arg.Replace("\\", @"\\", StringComparison.Ordinal)
+        string escaped = arg.Replace("\\", @"\\", StringComparison.Ordinal)
             .Replace("\"", "\\\"", StringComparison.Ordinal);
         return $"\"{escaped}\"";
     }
@@ -951,7 +951,7 @@ internal sealed partial class MainViewModel : ObservableObject
 
     private static List<string> RequireLines(string value, string what)
     {
-        var lines = SplitLines(value);
+        List<string> lines = SplitLines(value);
         if (lines.Count == 0)
         {
             throw new InvalidOperationException($"Select {what} first.");

@@ -22,7 +22,7 @@ internal static class SelfTest
     /// <returns>0 when all checks pass; otherwise 1.</returns>
     internal static async Task<int> RunAsync(Action<string> log, string? e2ECliPath = null)
     {
-        var failures = 0;
+        int failures = 0;
         try
         {
             Log.Information("GUI self-test started");
@@ -75,10 +75,10 @@ internal static class SelfTest
             {
                 try
                 {
-                    var lines = new List<string>();
-                    var exit = await CliRunner.RunAsync(e2ECliPath, ["-v"], lines.Add, CancellationToken.None)
+                    List<string> lines = new();
+                    int exit = await CliRunner.RunAsync(e2ECliPath, ["-v"], lines.Add, CancellationToken.None)
                         .ConfigureAwait(false);
-                    var ok = exit == 0 && lines.Count > 0;
+                    bool ok = exit == 0 && lines.Count > 0;
                     log($"{(ok ? "PASS" : "FAIL")} runner-e2e (-v via CliRunner, exit {exit}, {lines.Count} line(s))");
                     if (!ok)
                     {
@@ -117,10 +117,10 @@ internal static class SelfTest
 
         void Check(string name, string[] actual, string[] expected)
         {
-            var ok = actual.Length == expected.Length;
+            bool ok = actual.Length == expected.Length;
             if (ok)
             {
-                for (var i = 0; i < actual.Length; i++)
+                for (int i = 0; i < actual.Length; i++)
                 {
                     if (!string.Equals(actual[i], expected[i], StringComparison.Ordinal))
                     {

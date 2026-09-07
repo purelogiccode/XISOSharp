@@ -13,29 +13,29 @@ public class XisoExceptionTests
     [Fact]
     public void XisoFormatException_IsIOException()
     {
-        var ex = new XisoFormatException("bad format");
+        XisoFormatException ex = new("bad format");
         Assert.IsType<IOException>(ex, exactMatch: false);
     }
 
     [Fact]
     public void XisoFormatException_ParameterlessConstructor_HasEmptyMessage()
     {
-        var ex = new XisoFormatException();
+        XisoFormatException ex = new();
         Assert.NotNull(ex.Message);
     }
 
     [Fact]
     public void XisoFormatException_StringConstructor_PreservesMessage()
     {
-        var ex = new XisoFormatException("corrupt header");
+        XisoFormatException ex = new("corrupt header");
         Assert.Contains("corrupt header", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void XisoFormatException_InnerException_PreservesBoth()
     {
-        var inner = new InvalidOperationException("root cause");
-        var ex = new XisoFormatException("outer", inner);
+        InvalidOperationException inner = new("root cause");
+        XisoFormatException ex = new("outer", inner);
 
         Assert.Contains("outer", ex.Message, StringComparison.Ordinal);
         Assert.Same(inner, ex.InnerException);
@@ -59,28 +59,28 @@ public class XisoExceptionTests
     [Fact]
     public void XisoEmptyException_IsExtractErrorException()
     {
-        var ex = new XisoEmptyException();
+        XisoEmptyException ex = new();
         Assert.IsType<ExtractErrorException>(ex, exactMatch: false);
     }
 
     [Fact]
     public void XisoEmptyException_ParameterlessConstructor_HasErrorCode()
     {
-        var ex = new XisoEmptyException();
+        XisoEmptyException ex = new();
         Assert.Equal(ExtractError.ErrIsoNoFiles, ex.ErrorCode);
     }
 
     [Fact]
     public void XisoEmptyException_ParameterlessConstructor_HasMessage()
     {
-        var ex = new XisoEmptyException();
+        XisoEmptyException ex = new();
         Assert.Contains("no files", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public void XisoEmptyException_StringConstructor_PreservesMessage()
     {
-        var ex = new XisoEmptyException("custom empty message");
+        XisoEmptyException ex = new("custom empty message");
         Assert.Contains("custom empty message", ex.Message, StringComparison.Ordinal);
         Assert.Equal(ExtractError.ErrIsoNoFiles, ex.ErrorCode);
     }
@@ -88,8 +88,8 @@ public class XisoExceptionTests
     [Fact]
     public void XisoEmptyException_InnerException_PreservesAll()
     {
-        var inner = new IOException("disk error");
-        var ex = new XisoEmptyException("wrapper", inner);
+        IOException inner = new("disk error");
+        XisoEmptyException ex = new("wrapper", inner);
 
         Assert.Contains("wrapper", ex.Message, StringComparison.Ordinal);
         Assert.Same(inner, ex.InnerException);
@@ -130,14 +130,14 @@ public class XisoExceptionTests
     [Fact]
     public void XisoFileTooLargeException_IsIOException()
     {
-        var ex = new XisoFileTooLargeException("big.bin", 5_000_000_000L);
+        XisoFileTooLargeException ex = new("big.bin", 5_000_000_000L);
         Assert.IsType<IOException>(ex, exactMatch: false);
     }
 
     [Fact]
     public void XisoFileTooLargeException_ParameterlessConstructor_HasDefaults()
     {
-        var ex = new XisoFileTooLargeException();
+        XisoFileTooLargeException ex = new();
         Assert.Equal("", ex.FileName);
         Assert.Equal(0, ex.FileSize);
         Assert.NotNull(ex.Message);
@@ -146,14 +146,14 @@ public class XisoExceptionTests
     [Fact]
     public void XisoFileTooLargeException_StringConstructor_PreservesMessage()
     {
-        var ex = new XisoFileTooLargeException("custom message");
+        XisoFileTooLargeException ex = new("custom message");
         Assert.Contains("custom message", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void XisoFileTooLargeException_FileNameAndSizeConstructor_PreservesProperties()
     {
-        var ex = new XisoFileTooLargeException("huge.dat", 5_000_000_000L);
+        XisoFileTooLargeException ex = new("huge.dat", 5_000_000_000L);
 
         Assert.Equal("huge.dat", ex.FileName);
         Assert.Equal(5_000_000_000L, ex.FileSize);
@@ -164,8 +164,8 @@ public class XisoExceptionTests
     [Fact]
     public void XisoFileTooLargeException_InnerException_PreservesAll()
     {
-        var inner = new InvalidOperationException("disk full");
-        var ex = new XisoFileTooLargeException("wrapper", inner);
+        InvalidOperationException inner = new("disk full");
+        XisoFileTooLargeException ex = new("wrapper", inner);
 
         Assert.Contains("wrapper", ex.Message, StringComparison.Ordinal);
         Assert.Same(inner, ex.InnerException);
@@ -175,7 +175,7 @@ public class XisoExceptionTests
     public void XisoFileTooLargeException_ExactLimit_FileSizeIsUint32MaxPlus1()
     {
         const long overLimit = (long)uint.MaxValue + 1;
-        var ex = new XisoFileTooLargeException("borderline.bin", overLimit);
+        XisoFileTooLargeException ex = new("borderline.bin", overLimit);
 
         Assert.Equal(overLimit, ex.FileSize);
         Assert.Equal("borderline.bin", ex.FileName);
@@ -199,7 +199,7 @@ public class XisoExceptionTests
     [Fact]
     public void ExtractFileException_NullInner_LeavesInnerExceptionNull()
     {
-        var ex = new ExtractFileException(
+        ExtractFileException ex = new(
             ExtractError.ErrFileTruncated, "inner.bin", "out.bin", 0, 100, "truncated", 10, null);
 
         Assert.Null(ex.InnerException);
@@ -209,8 +209,8 @@ public class XisoExceptionTests
     [Fact]
     public void ExtractFileException_WithInner_PreservesInner()
     {
-        var inner = new IOException("disk gone");
-        var ex = new ExtractFileException(
+        IOException inner = new("disk gone");
+        ExtractFileException ex = new(
             ExtractError.ErrFileWrite, "inner.bin", "out.bin", 0, 100, "write failed", -1, inner);
 
         Assert.Same(inner, ex.InnerException);
@@ -230,7 +230,7 @@ public class XisoExceptionTests
             new XisoFileTooLargeException("big", 1)
         ];
 
-        foreach (var ex in exceptions)
+        foreach (Exception ex in exceptions)
         {
             Assert.IsType<Exception>(ex, exactMatch: false);
             Assert.NotNull(ex.Message);

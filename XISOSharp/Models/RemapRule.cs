@@ -45,7 +45,7 @@ public sealed class RemapRule
         // Split on the first ':' that is neither escaped nor a drive-letter colon
         // (upstream xdvdfs splits on every ':' and drops the extras; the TOML
         // spec form is unaffected — it never passes through this parser).
-        var colon = FindSeparator(raw);
+        int colon = FindSeparator(raw);
         string host;
         string image;
         if (colon >= 0)
@@ -68,7 +68,7 @@ public sealed class RemapRule
             return false;
         }
 
-        var isExclusion = host.StartsWith('!');
+        bool isExclusion = host.StartsWith('!');
         if (!isExclusion && string.IsNullOrEmpty(image))
         {
             error = $"Map rule \"{host}\" must have an image path unless it is an exclusion rule (starting with '!')";
@@ -76,7 +76,7 @@ public sealed class RemapRule
         }
 
         // Validate host glob can be built (strip !)
-        var hostForGlob = isExclusion ? host.Substring(1) : host;
+        string hostForGlob = isExclusion ? host.Substring(1) : host;
         if (string.IsNullOrEmpty(hostForGlob))
         {
             error = $"Exclusion rule \"{host}\" has empty host pattern after '!'";
@@ -119,7 +119,7 @@ public sealed class RemapRule
     /// </summary>
     private static int FindSeparator(string raw)
     {
-        for (var i = 0; i < raw.Length; i++)
+        for (int i = 0; i < raw.Length; i++)
         {
             if (raw[i] == '\\' && i + 1 < raw.Length &&
                 (raw[i + 1] == ':' || raw[i + 1] == '\\'))
@@ -142,7 +142,7 @@ public sealed class RemapRule
     /// </summary>
     private static bool IsDriveColon(string raw, int colon)
     {
-        var letter = colon - 1;
+        int letter = colon - 1;
         if (letter < 0 || !char.IsAsciiLetter(raw[letter]))
             return false;
         if (letter != 0 && !(letter == 1 && raw[0] == '!'))
@@ -159,8 +159,8 @@ public sealed class RemapRule
     {
         if (part.IndexOf('\\') < 0)
             return part;
-        var sb = new StringBuilder(part.Length);
-        for (var i = 0; i < part.Length; i++)
+        StringBuilder sb = new(part.Length);
+        for (int i = 0; i < part.Length; i++)
         {
             if (part[i] == '\\' && i + 1 < part.Length &&
                 (part[i + 1] == ':' || part[i + 1] == '\\'))
@@ -179,12 +179,12 @@ public sealed class RemapRule
 
     internal static List<int> FindMatchIndices(string rewrite)
     {
-        var indices = new List<int>();
-        var matching = false;
-        var current = 0;
-        for (var idx = 0; idx < rewrite.Length; idx++)
+        List<int> indices = new();
+        bool matching = false;
+        int current = 0;
+        for (int idx = 0; idx < rewrite.Length; idx++)
         {
-            var c = rewrite[idx];
+            char c = rewrite[idx];
             if (c == '{')
             {
                 if (matching)

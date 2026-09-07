@@ -53,7 +53,7 @@ public sealed class XisoZarPipelineTests : IDisposable
         _outCapture.Dispose();
         _errCapture.Dispose();
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -71,7 +71,7 @@ public sealed class XisoZarPipelineTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -79,14 +79,14 @@ public sealed class XisoZarPipelineTests : IDisposable
 
     private string CreateIso(string name, int fileCount)
     {
-        var src = CreateTempDir("xiso_zp_src");
-        for (var i = 0; i < fileCount; i++)
+        string src = CreateTempDir("xiso_zp_src");
+        for (int i = 0; i < fileCount; i++)
         {
             File.WriteAllText(Path.Combine(src, $"{name}{i}.txt"), $"payload {name} {i} " + new string('x', 5000));
         }
 
-        var outDir = CreateTempDir("xiso_zp_iso");
-        var result = XisoWriter.CreateXiso(src, outDir, null, null, out var isoPath, null, null);
+        string outDir = CreateTempDir("xiso_zp_iso");
+        int result = XisoWriter.CreateXiso(src, outDir, null, null, out string? isoPath, null, null);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         return isoPath;
@@ -113,19 +113,19 @@ public sealed class XisoZarPipelineTests : IDisposable
     [Fact]
     public void CreateZar_ReportsProgress_ToCompletion()
     {
-        var iso = CreateIso("prog", 3);
-        var zar = Path.Combine(CreateTempDir("xiso_zp_zar"), "prog.zar");
+        string iso = CreateIso("prog", 3);
+        string zar = Path.Combine(CreateTempDir("xiso_zp_zar"), "prog.zar");
 
-        var collector = new Collector();
+        Collector collector = new();
         Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true, progress: collector));
 
         Assert.NotEmpty(collector.Events);
-        var last = collector.Events[^1];
+        ZarProgress last = collector.Events[^1];
         Assert.Equal(3, last.FilesTotal);
         Assert.Equal(3, last.FilesCompleted);
         Assert.Equal(1.0, last.Ratio);
         Assert.All(collector.Events, e => Assert.Equal(ZarOperation.Pack, e.Operation));
-        var seen = collector.Events.Select(e => e.CurrentFile)
+        HashSet<string> seen = collector.Events.Select(e => e.CurrentFile)
             .Where(s => s.Length != 0).Distinct(StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
         Assert.Equal(3, seen.Count);
     }
@@ -133,11 +133,11 @@ public sealed class XisoZarPipelineTests : IDisposable
     [Fact]
     public void Cli_Zar_PolicySkip_SecondRunSkips()
     {
-        var iso = CreateIso("skip", 2);
-        var zar = Path.Combine(CreateTempDir("xiso_zp_skip"), "skip.zar");
+        string iso = CreateIso("skip", 2);
+        string zar = Path.Combine(CreateTempDir("xiso_zp_skip"), "skip.zar");
 
         Assert.Equal(0, Program.Main(["--zar", "-o", zar, iso]));
-        var before = File.ReadAllBytes(zar);
+        byte[] before = File.ReadAllBytes(zar);
 
         _outCapture.GetStringBuilder().Clear();
         Assert.Equal(0, Program.Main(["--zar", "--policy", "skip", "-o", zar, iso]));
@@ -148,8 +148,8 @@ public sealed class XisoZarPipelineTests : IDisposable
     [Fact]
     public void Cli_Zar_PolicyOverwrite_Repacks()
     {
-        var iso = CreateIso("over", 2);
-        var zar = Path.Combine(CreateTempDir("xiso_zp_over"), "over.zar");
+        string iso = CreateIso("over", 2);
+        string zar = Path.Combine(CreateTempDir("xiso_zp_over"), "over.zar");
 
         Assert.Equal(0, Program.Main(["--zar", "-o", zar, iso]));
         _outCapture.GetStringBuilder().Clear();
@@ -160,8 +160,8 @@ public sealed class XisoZarPipelineTests : IDisposable
     [Fact]
     public void Cli_Zar_JobsParallel_PacksAllInputs()
     {
-        var isoA = CreateIso("jobA", 2);
-        var isoB = CreateIso("jobB", 2);
+        string isoA = CreateIso("jobA", 2);
+        string isoB = CreateIso("jobB", 2);
 
         Assert.Equal(0, Program.Main(["--zar", "--jobs", "2", "--policy", "overwrite", isoA, isoB]));
         Assert.True(File.Exists(Path.ChangeExtension(isoA, ".zar")));
@@ -171,14 +171,14 @@ public sealed class XisoZarPipelineTests : IDisposable
     [Fact]
     public void Cli_Zar_BadPolicy_ReturnsOne()
     {
-        var iso = CreateIso("badpol", 1);
+        string iso = CreateIso("badpol", 1);
         Assert.Equal(1, Program.Main(["--zar", "--policy", "bogus", iso]));
     }
 
     [Fact]
     public void Cli_Zar_BadJobs_ReturnsOne()
     {
-        var iso = CreateIso("badjobs", 1);
+        string iso = CreateIso("badjobs", 1);
         Assert.Equal(1, Program.Main(["--zar", "--jobs", "0", iso]));
     }
 }

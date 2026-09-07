@@ -62,14 +62,14 @@ public static class XisoFileCopier
         byte[]? rented = null;
         try
         {
-            var buf = buffer ?? (rented =
+            byte[] buf = buffer ?? (rented =
                 ArrayPool<byte>.Shared.Rent((int)Math.Min(byteCount, MaxPooledChunkSize)));
             long totalCopied = 0;
             while (totalCopied < byteCount)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var toRead = (int)Math.Min(byteCount - totalCopied, buf.Length);
-                var read = source.Read(buf, 0, toRead);
+                int toRead = (int)Math.Min(byteCount - totalCopied, buf.Length);
+                int read = source.Read(buf, 0, toRead);
                 if (read <= 0)
                     throw new TruncatedCopyException(byteCount, totalCopied);
                 onChunk(buf, read);

@@ -136,7 +136,7 @@ internal static class CliOutputGuard
     {
         try
         {
-            foreach (var part in parts)
+            foreach (string? part in parts)
             {
                 if (!string.IsNullOrWhiteSpace(part) && XisoPaths.AreSamePath(part, output))
                 {

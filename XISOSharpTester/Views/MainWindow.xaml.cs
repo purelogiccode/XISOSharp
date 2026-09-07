@@ -39,7 +39,7 @@ internal partial class MainWindow
         {
             if (MainPageView.DataContext is MainViewModel { IsRunning: true })
             {
-                var result = MessageBox.Show(
+                MessageBoxResult result = MessageBox.Show(
                     "A test run is currently in progress. Are you sure you want to exit?",
                     "Tests Running",
                     MessageBoxButton.YesNo,

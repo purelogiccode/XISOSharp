@@ -70,19 +70,19 @@ public static class XisoPatcher
         if (!File.Exists(hostFile))
             throw new FileNotFoundException($"Host file not found: {hostFile}", hostFile);
 
-        var segments = SplitInternalPath(internalPath);
-        var fileName = segments[^1];
+        string[] segments = SplitInternalPath(internalPath);
+        string fileName = segments[^1];
 
-        var volInfo = XisoReader.GetVolumeInfo(isoPath);
+        VolumeInfo volInfo = XisoReader.GetVolumeInfo(isoPath);
         if (!volInfo.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");
 
-        var newData = File.ReadAllBytes(hostFile);
+        byte[] newData = File.ReadAllBytes(hostFile);
         ApplyXbeMediaPatch(fileName, newData);
 
-        var layout = XisoReader.GetSectorLayout(isoPath);
-        var canonicalParent = ResolveCanonicalParentPath(isoPath, segments, internalPath);
-        var existing = XisoReader.GetEntryInfo(isoPath, internalPath);
+        SectorLayout layout = XisoReader.GetSectorLayout(isoPath);
+        string canonicalParent = ResolveCanonicalParentPath(isoPath, segments, internalPath);
+        EntryInfo? existing = XisoReader.GetEntryInfo(isoPath, internalPath);
         if (existing?.IsDirectory == true)
         {
             throw new InvalidDataException(
@@ -100,12 +100,12 @@ public static class XisoPatcher
         {
             // Keep the first backup: overwriting a previous `.old` would
             // destroy the true pre-patch original (BUG-LIB-027).
-            var backupPath = isoPath + ".old";
+            string backupPath = isoPath + ".old";
             if (!File.Exists(backupPath))
                 File.Copy(isoPath, backupPath);
         }
 
-        using var fs = new FileStream(
+        using FileStream fs = new(
             isoPath,
             new FileStreamOptions
             {
@@ -128,11 +128,11 @@ public static class XisoPatcher
     private static List<DirectoryEntryTableWriter.DirectoryTableEntry> ReadSiblingEntries(
         string isoPath, SectorLayout layout, string canonicalParent)
     {
-        var dirSizes = layout.Entries.Where(static e => e.IsDirectory)
+        Dictionary<string, uint> dirSizes = layout.Entries.Where(static e => e.IsDirectory)
             .ToDictionary(static e => e.Path, static e => e.FileSize, StringComparer.Ordinal);
 
-        var siblings = new List<DirectoryEntryTableWriter.DirectoryTableEntry>();
-        foreach (var e in XisoReader.ListDirectory(isoPath, canonicalParent))
+        List<DirectoryEntryTableWriter.DirectoryTableEntry> siblings = new();
+        foreach (EntryInfo e in XisoReader.ListDirectory(isoPath, canonicalParent))
         {
             siblings.Add(new DirectoryEntryTableWriter.DirectoryTableEntry(
                 e.Name,
@@ -151,12 +151,12 @@ public static class XisoPatcher
         string canonicalParent, string fileName, EntryInfo existing, byte[] newData,
         string isoPath, string internalPath)
     {
-        var parent = FindDirExtent(layout, canonicalParent, internalPath);
-        var oldSectors = existing.FileSize == 0
+        FileSectorExtent parent = FindDirExtent(layout, canonicalParent, internalPath);
+        uint oldSectors = existing.FileSize == 0
             ? 0u
             : (existing.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize;
-        var need = SectorAllocator.RequiredSectors((ulong)newData.Length);
-        var allocator = SectorAllocator.FromLayout(layout);
+        uint need = SectorAllocator.RequiredSectors((ulong)newData.Length);
+        SectorAllocator allocator = SectorAllocator.FromLayout(layout);
 
         uint target;
         if (need > oldSectors)
@@ -184,12 +184,12 @@ public static class XisoPatcher
         string canonicalParent, string fileName, byte[] newData,
         List<DirectoryEntryTableWriter.DirectoryTableEntry> siblings, string internalPath)
     {
-        var parent = FindDirExtent(layout, canonicalParent, internalPath);
+        FileSectorExtent parent = FindDirExtent(layout, canonicalParent, internalPath);
 
-        var tableEntries = new List<DirectoryEntryTableWriter.DirectoryTableEntry>(siblings);
+        List<DirectoryEntryTableWriter.DirectoryTableEntry> tableEntries = new(siblings);
 
-        var allocator = SectorAllocator.FromLayout(layout);
-        var dataSector = AllocateOrThrow(allocator, layout,
+        SectorAllocator allocator = SectorAllocator.FromLayout(layout);
+        uint dataSector = AllocateOrThrow(allocator, layout,
             SectorAllocator.RequiredSectors((ulong)newData.Length), (ulong)newData.Length, isoPath);
         tableEntries.Add(new DirectoryEntryTableWriter.DirectoryTableEntry(
             fileName, false, dataSector, (uint)newData.Length));
@@ -205,12 +205,12 @@ public static class XisoPatcher
                 $"Cannot copy into '{internalPath}': {ex.Message}", ex);
         }
 
-        var newTableSize = DirectoryEntryTableWriter.ComputeTableSize(table);
-        var tableBytes = DirectoryEntryTableWriter.SerializeTable(table);
-        var tableSectors = (uint)(tableBytes.Length / Constants.SectorSize);
+        uint newTableSize = DirectoryEntryTableWriter.ComputeTableSize(table);
+        byte[] tableBytes = DirectoryEntryTableWriter.SerializeTable(table);
+        uint tableSectors = (uint)(tableBytes.Length / Constants.SectorSize);
 
-        var moved = tableSectors > parent.SectorCount;
-        var tableTarget = moved
+        bool moved = tableSectors > parent.SectorCount;
+        uint tableTarget = moved
             ? AllocateOrThrow(allocator, layout, tableSectors, (ulong)tableBytes.Length, isoPath)
             : parent.StartSector;
 
@@ -220,7 +220,7 @@ public static class XisoPatcher
                 SectorAllocator.RequiredSectors((ulong)newData.Length));
         }
 
-        var tableAbs = discLseek + ((long)tableTarget * Constants.SectorSize);
+        long tableAbs = discLseek + ((long)tableTarget * Constants.SectorSize);
         fs.Seek(tableAbs, SeekOrigin.Begin);
         fs.Write(tableBytes, 0, tableBytes.Length);
         if (!moved)
@@ -235,13 +235,13 @@ public static class XisoPatcher
         }
         else
         {
-            var grandparentPath = canonicalParent[..canonicalParent.LastIndexOf('/')];
+            string grandparentPath = canonicalParent[..canonicalParent.LastIndexOf('/')];
             if (grandparentPath.Length == 0)
                 grandparentPath = "/";
-            var grandparent = FindDirExtent(layout, grandparentPath, internalPath);
-            var parentName = canonicalParent[(canonicalParent.LastIndexOf('/') + 1)..];
-            var rounded = newTableSize +
-                          ((Constants.SectorSize - (newTableSize % Constants.SectorSize)) % Constants.SectorSize);
+            FileSectorExtent grandparent = FindDirExtent(layout, grandparentPath, internalPath);
+            string parentName = canonicalParent[(canonicalParent.LastIndexOf('/') + 1)..];
+            uint rounded = newTableSize +
+                           ((Constants.SectorSize - (newTableSize % Constants.SectorSize)) % Constants.SectorSize);
             PatchEntryRecord(fs, discLseek, grandparent, parentName, tableTarget, rounded,
                 grandparentPath);
         }
@@ -260,7 +260,7 @@ public static class XisoPatcher
         catch (InvalidOperationException ex)
         {
             ulong free = 0;
-            foreach (var range in layout.FreeRanges)
+            foreach (SectorRange range in layout.FreeRanges)
                 free += range.SectorCount;
             throw new InvalidDataException(
                 $"Not enough free space in '{isoPath}': need {sectors} sectors " +
@@ -271,7 +271,7 @@ public static class XisoPatcher
     private static FileSectorExtent FindDirExtent(SectorLayout layout, string dirPath,
         string internalPath)
     {
-        foreach (var e in layout.Entries)
+        foreach (FileSectorExtent e in layout.Entries)
         {
             if (e.IsDirectory && e.Path.Equals(dirPath, StringComparison.Ordinal))
                 return e;
@@ -288,11 +288,11 @@ public static class XisoPatcher
         if (segments.Length == 1)
             return "/";
 
-        var current = "/";
-        foreach (var seg in segments[..^1])
+        string current = "/";
+        foreach (string seg in segments[..^1])
         {
             string? match = null;
-            foreach (var e in XisoReader.ListDirectory(isoPath, current))
+            foreach (EntryInfo e in XisoReader.ListDirectory(isoPath, current))
             {
                 if (e.IsDirectory && string.Equals(e.Name, seg, StringComparison.OrdinalIgnoreCase))
                 {
@@ -311,7 +311,7 @@ public static class XisoPatcher
 
     private static string[] SplitInternalPath(string internalPath)
     {
-        var segments = internalPath.TrimStart('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        string[] segments = internalPath.TrimStart('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length == 0)
         {
             throw new InvalidDataException(
@@ -319,7 +319,7 @@ public static class XisoPatcher
                 "(e.g. /dir/file.bin).");
         }
 
-        foreach (var seg in segments)
+        foreach (string seg in segments)
         {
             if (seg is "." or "..")
             {
@@ -341,7 +341,7 @@ public static class XisoPatcher
                     $"{Constants.FilenameMaxChars} characters.");
             }
 
-            foreach (var c in seg)
+            foreach (char c in seg)
             {
                 if (c > 0xFF)
                 {
@@ -365,12 +365,12 @@ public static class XisoPatcher
             return;
         }
 
-        var bm = new BoyerMoore(Constants.MediaEnable);
+        BoyerMoore bm = new(Constants.MediaEnable);
         bm.Init();
-        var pos = 0;
+        int pos = 0;
         while (pos < data.Length)
         {
-            var found = bm.Search(data, pos, data.Length - pos);
+            int found = bm.Search(data, pos, data.Length - pos);
             if (found < 0)
                 break;
             data[found + Constants.MediaEnableBytePos] = Constants.MediaEnableByte;
@@ -381,8 +381,8 @@ public static class XisoPatcher
     private static void PatchEntryRecord(FileStream fs, long discLseek, FileSectorExtent table,
         string entryName, uint newStartSector, uint newFileSize, string contextPath)
     {
-        var tableAbs = discLseek + ((long)table.StartSector * Constants.SectorSize);
-        var recordAbs = FindEntryRecordOffset(fs, tableAbs, entryName, contextPath);
+        long tableAbs = discLseek + ((long)table.StartSector * Constants.SectorSize);
+        long recordAbs = FindEntryRecordOffset(fs, tableAbs, entryName, contextPath);
         // StartSector field: record is lOffset(2) + rOffset(2) + StartSector(4) + FileSize(4) + ...
         fs.Seek(recordAbs + 4, SeekOrigin.Begin);
         Span<byte> buf = stackalloc byte[8];
@@ -405,7 +405,7 @@ public static class XisoPatcher
     private static void WriteSectors(FileStream fs, long discLseek, uint startSector, byte[] data,
         uint spanSectors)
     {
-        var spanBytes = (long)spanSectors * Constants.SectorSize;
+        long spanBytes = (long)spanSectors * Constants.SectorSize;
         if (data.Length > spanBytes)
             throw new ArgumentException("Data does not fit the sector span.", nameof(data));
         fs.Seek(discLseek + ((long)startSector * Constants.SectorSize), SeekOrigin.Begin);
@@ -423,11 +423,11 @@ public static class XisoPatcher
         if (length <= 0)
             return;
         fs.Seek(absStart, SeekOrigin.Begin);
-        var chunk = new byte[(int)Math.Min(length, 65536)];
+        byte[] chunk = new byte[(int)Math.Min(length, 65536)];
         Array.Fill(chunk, Constants.PadByte);
         while (length > 0)
         {
-            var n = (int)Math.Min(length, chunk.Length);
+            int n = (int)Math.Min(length, chunk.Length);
             fs.Write(chunk, 0, n);
             length -= n;
         }
@@ -440,9 +440,9 @@ public static class XisoPatcher
         // (right pushed before left; same sentinels and hardening), returning the
         // absolute offset of the first case-insensitive name match — the same
         // record GetEntryInfo resolves, so the patch hits the right entry.
-        var stack = new Stack<long>();
+        Stack<long> stack = new();
         stack.Push(0);
-        var visited = new HashSet<long>();
+        HashSet<long> visited = new();
 
         Span<byte> shortBuf = stackalloc byte[2];
         Span<byte> intBuf = stackalloc byte[4];
@@ -451,8 +451,8 @@ public static class XisoPatcher
 
         while (stack.Count > 0)
         {
-            var offset = stack.Pop();
-            var absOffset = tableAbs + offset;
+            long offset = stack.Pop();
+            long absOffset = tableAbs + offset;
             if (absOffset < tableAbs || absOffset >= fs.Length)
             {
                 throw new XisoFormatException(
@@ -475,14 +475,14 @@ public static class XisoPatcher
 
             fs.Seek(absOffset, SeekOrigin.Begin);
             ReadExact(fs, shortBuf);
-            var lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+            ushort lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
             if (lOffset == Constants.PadShort && offset == 0)
                 continue;
 
             if (lOffset == Constants.EmptyDirectorySentinel && offset == 0)
             {
-                var peekPos = fs.Position;
-                var isAllZeros = false;
+                long peekPos = fs.Position;
+                bool isAllZeros = false;
                 try
                 {
                     ReadExact(fs, headerRest);
@@ -502,16 +502,16 @@ public static class XisoPatcher
             }
 
             ReadExact(fs, shortBuf);
-            var rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+            ushort rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
             ReadExact(fs, intBuf);
             ReadExact(fs, intBuf);
             ReadExact(fs, byteBuf);
             ReadExact(fs, byteBuf);
-            var filenameLength = byteBuf[0];
+            byte filenameLength = byteBuf[0];
 
-            var nameBuf = new byte[filenameLength];
+            byte[] nameBuf = new byte[filenameLength];
             ReadExact(fs, nameBuf);
-            var filename = Latin1Encoding.Instance.GetString(nameBuf);
+            string filename = Latin1Encoding.Instance.GetString(nameBuf);
 
             if (!string.Equals(filename, ".", StringComparison.Ordinal) &&
                 !string.Equals(filename, "..", StringComparison.Ordinal) &&
@@ -532,10 +532,10 @@ public static class XisoPatcher
 
     private static void ReadExact(FileStream fs, Span<byte> buffer)
     {
-        var read = 0;
+        int read = 0;
         while (read < buffer.Length)
         {
-            var n = fs.Read(buffer[read..]);
+            int n = fs.Read(buffer[read..]);
             if (n <= 0)
                 throw new EndOfStreamException("Unexpected end of image while reading a directory table.");
             read += n;

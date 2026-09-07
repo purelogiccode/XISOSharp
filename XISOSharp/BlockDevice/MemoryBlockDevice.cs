@@ -30,7 +30,7 @@ public sealed class MemoryBlockDevice : IBlockDevice
     public MemoryBlockDevice(long capacity)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(capacity, Array.MaxLength, nameof(capacity));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(capacity, Array.MaxLength);
         _data = new byte[capacity];
         Length = capacity;
     }
@@ -43,7 +43,7 @@ public sealed class MemoryBlockDevice : IBlockDevice
     {
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
         if (offset >= Length) return 0;
-        var available = (int)Math.Min(buffer.Length, Length - offset);
+        int available = (int)Math.Min(buffer.Length, Length - offset);
         _data.AsSpan((int)offset, available).CopyTo(buffer);
         // Zero-fill remainder if reading beyond written length but within buffer
         if (available < buffer.Length)
@@ -55,7 +55,7 @@ public sealed class MemoryBlockDevice : IBlockDevice
     public void Write(long offset, ReadOnlySpan<byte> buffer)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
-        var end = offset + buffer.Length;
+        long end = offset + buffer.Length;
         EnsureCapacity(end);
         buffer.CopyTo(_data.AsSpan((int)offset, buffer.Length));
         if (end > Length) Length = end;
@@ -72,7 +72,7 @@ public sealed class MemoryBlockDevice : IBlockDevice
                 $"MemoryBlockDevice cannot grow to {needed} bytes (exceeds maximum array length {Array.MaxLength}).");
         }
 
-        var newSize = Math.Max(needed, _data.Length == 0 ? 4096 : _data.Length * 2);
+        long newSize = Math.Max(needed, _data.Length == 0 ? 4096 : _data.Length * 2);
         while (newSize < needed) newSize *= 2;
         if (newSize > Array.MaxLength) newSize = needed;
         Array.Resize(ref _data, (int)newSize);
@@ -81,7 +81,7 @@ public sealed class MemoryBlockDevice : IBlockDevice
     /// <summary>Returns a copy of the written bytes.</summary>
     public byte[] ToArray()
     {
-        var outArr = new byte[Length];
+        byte[] outArr = new byte[Length];
         Array.Copy(_data, outArr, Length);
         return outArr;
     }

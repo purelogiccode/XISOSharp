@@ -40,7 +40,7 @@ public static class Lz4
     public static int MaxCompressedOutputSize(int inputLength)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(inputLength);
-        var required = 20L + ((long)inputLength * 110 / 100);
+        long required = 20L + ((long)inputLength * 110 / 100);
         if (required > int.MaxValue)
         {
             throw new ArgumentOutOfRangeException(nameof(inputLength), inputLength,
@@ -58,7 +58,7 @@ public static class Lz4
     public static int Compress(ReadOnlySpan<byte> input, Span<byte> destination, int acceleration = 1)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(acceleration, 1);
-        var required = MaxCompressedOutputSize(input.Length);
+        int required = MaxCompressedOutputSize(input.Length);
         if (destination.Length < required)
         {
             throw new ArgumentException(
@@ -66,17 +66,17 @@ public static class Lz4
                 nameof(destination));
         }
 
-        var outPos = 0;
+        int outPos = 0;
         if (input.Length < MinLength)
         {
             WriteLastLiterals(input, destination, ref outPos, 0);
             return outPos;
         }
 
-        var dict = new int[HashTableSize];
-        var endPosCheck = input.Length - MfLimit;
-        var literalStart = 0;
-        var cur = 0;
+        int[] dict = new int[HashTableSize];
+        int endPosCheck = input.Length - MfLimit;
+        int literalStart = 0;
+        int cur = 0;
 
         // lz4_flex: a block cannot start with a match, so seed the table with position 0.
         dict[GetHashTableIndex(input, 0)] = 0;
@@ -84,8 +84,8 @@ public static class Lz4
 
         while (true)
         {
-            var nonMatchCount = acceleration << IncreaseStepSizeBitShift;
-            var nextCur = cur;
+            int nonMatchCount = acceleration << IncreaseStepSizeBitShift;
+            int nextCur = cur;
             int candidate;
             int offset;
 
@@ -93,7 +93,7 @@ public static class Lz4
             // 1 << IncreaseStepSizeBitShift non-matches.
             while (true)
             {
-                var stepSize = nonMatchCount >> IncreaseStepSizeBitShift;
+                int stepSize = nonMatchCount >> IncreaseStepSizeBitShift;
                 nonMatchCount++;
 
                 cur = nextCur;
@@ -105,7 +105,7 @@ public static class Lz4
                     return outPos;
                 }
 
-                var hash = GetHashTableIndex(input, cur);
+                int hash = GetHashTableIndex(input, cur);
                 candidate = dict[hash];
                 dict[hash] = cur;
 
@@ -128,14 +128,14 @@ public static class Lz4
                 candidate--;
             }
 
-            var litLen = cur - literalStart;
+            int litLen = cur - literalStart;
             cur += MinMatch;
             candidate += MinMatch;
-            var dupLen = CountMatchBytes(input, ref cur, candidate);
+            int dupLen = CountMatchBytes(input, ref cur, candidate);
 
             dict[GetHashTableIndex(input, cur - 2)] = cur - 2;
 
-            var token = (byte)((Math.Min(litLen, 0xF) << 4) | Math.Min(dupLen, 0xF));
+            byte token = (byte)((Math.Min(litLen, 0xF) << 4) | Math.Min(dupLen, 0xF));
             destination[outPos++] = token;
             if (litLen >= 0xF)
                 WriteInteger(destination, ref outPos, litLen - 0xF);
@@ -159,13 +159,13 @@ public static class Lz4
     /// </summary>
     public static int Decompress(ReadOnlySpan<byte> source, Span<byte> destination)
     {
-        var srcPos = 0;
-        var dstPos = 0;
+        int srcPos = 0;
+        int dstPos = 0;
 
         while (srcPos < source.Length)
         {
-            var token = source[srcPos++];
-            var litLen = token >> 4;
+            byte token = source[srcPos++];
+            int litLen = token >> 4;
             if (litLen == 0xF)
             {
                 byte add;
@@ -190,12 +190,12 @@ public static class Lz4
 
             if (srcPos + 2 > source.Length)
                 throw new InvalidDataException("LZ4: truncated match offset");
-            var offset = source[srcPos] | (source[srcPos + 1] << 8);
+            int offset = source[srcPos] | (source[srcPos + 1] << 8);
             srcPos += 2;
             if (offset == 0)
                 throw new InvalidDataException("LZ4: match offset is zero");
 
-            var matchLen = token & 0xF;
+            int matchLen = token & 0xF;
             if (matchLen == 0xF)
             {
                 byte add;
@@ -215,14 +215,14 @@ public static class Lz4
                 throw new InvalidDataException("LZ4: match overruns destination");
 
             // Overlap-safe copy.
-            var matchPos = dstPos - offset;
+            int matchPos = dstPos - offset;
             if (offset >= matchLen)
             {
                 destination.Slice(matchPos, matchLen).CopyTo(destination.Slice(dstPos));
             }
             else
             {
-                for (var i = 0; i < matchLen; i++)
+                for (int i = 0; i < matchLen; i++)
                     destination[dstPos + i] = destination[matchPos + i];
             }
 
@@ -235,8 +235,8 @@ public static class Lz4
     private static int GetHashTableIndex(ReadOnlySpan<byte> input, int pos)
     {
         // lz4_flex hash5: (read_u64(pos) << 24 * prime) >> 48, table index = hash >> 4.
-        var seq = BinaryPrimitives.ReadUInt64LittleEndian(input.Slice(pos, 8));
-        var hash = (uint)(((seq << 24) * Prime5Bytes) >> 48);
+        ulong seq = BinaryPrimitives.ReadUInt64LittleEndian(input.Slice(pos, 8));
+        uint hash = (uint)(((seq << 24) * Prime5Bytes) >> 48);
         return (int)(hash >> HashTableBitShift);
     }
 
@@ -253,7 +253,7 @@ public static class Lz4
 
     private static void WriteLastLiterals(ReadOnlySpan<byte> input, Span<byte> destination, ref int pos, int start)
     {
-        var litLen = input.Length - start;
+        int litLen = input.Length - start;
         destination[pos++] = litLen < 0xF ? (byte)(litLen << 4) : (byte)0xF0;
         if (litLen >= 0xF)
             WriteInteger(destination, ref pos, litLen - 0xF);
@@ -264,15 +264,15 @@ public static class Lz4
 
     private static int CountMatchBytes(ReadOnlySpan<byte> input, ref int cur, int candidate)
     {
-        var start = cur;
-        var maxInputMatch = Math.Max(0, input.Length - (cur + EndOffset));
-        var maxCandidateMatch = input.Length - candidate;
-        var inputEnd = cur + Math.Min(maxInputMatch, maxCandidateMatch);
+        int start = cur;
+        int maxInputMatch = Math.Max(0, input.Length - (cur + EndOffset));
+        int maxCandidateMatch = input.Length - candidate;
+        int inputEnd = cur + Math.Min(maxInputMatch, maxCandidateMatch);
 
         while (cur + 8 <= inputEnd)
         {
-            var diff = BinaryPrimitives.ReadUInt64LittleEndian(input.Slice(cur, 8)) ^
-                       BinaryPrimitives.ReadUInt64LittleEndian(input.Slice(candidate, 8));
+            ulong diff = BinaryPrimitives.ReadUInt64LittleEndian(input.Slice(cur, 8)) ^
+                         BinaryPrimitives.ReadUInt64LittleEndian(input.Slice(candidate, 8));
             if (diff == 0)
             {
                 cur += 8;
@@ -287,8 +287,8 @@ public static class Lz4
 
         if (inputEnd - cur >= 4)
         {
-            var diff = BinaryPrimitives.ReadUInt32LittleEndian(input.Slice(cur, 4)) ^
-                       BinaryPrimitives.ReadUInt32LittleEndian(input.Slice(candidate, 4));
+            uint diff = BinaryPrimitives.ReadUInt32LittleEndian(input.Slice(cur, 4)) ^
+                        BinaryPrimitives.ReadUInt32LittleEndian(input.Slice(candidate, 4));
             if (diff == 0)
             {
                 cur += 4;

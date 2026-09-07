@@ -27,7 +27,7 @@ internal sealed class BugReportSink : ILogEventSink
             if (logEvent.Level < LogEventLevel.Error)
                 return;
 
-            var message = logEvent.RenderMessage();
+            string message = logEvent.RenderMessage();
             if (string.IsNullOrWhiteSpace(message) && logEvent.Exception != null)
                 message = logEvent.Exception.Message;
 

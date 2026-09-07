@@ -17,7 +17,7 @@ public class UnpackImageTests : IDisposable
         Logger.Quiet = false;
         Logger.RealQuiet = false;
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -32,7 +32,7 @@ public class UnpackImageTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_unpack_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_unpack_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -40,7 +40,7 @@ public class UnpackImageTests : IDisposable
 
     private static string CreateSourceTree()
     {
-        var root = Path.Combine(Path.GetTempPath(), $"xiso_unpack_src_{Guid.NewGuid():N}");
+        string root = Path.Combine(Path.GetTempPath(), $"xiso_unpack_src_{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(root, "sub"));
 
         File.WriteAllText(Path.Combine(root, "a.txt"), "hello");
@@ -50,11 +50,11 @@ public class UnpackImageTests : IDisposable
 
     private static string CreateIso(string srcDir, string isoName)
     {
-        var outputDir = Path.Combine(Path.GetTempPath(), $"xiso_unpack_out_{Guid.NewGuid():N}");
+        string outputDir = Path.Combine(Path.GetTempPath(), $"xiso_unpack_out_{Guid.NewGuid():N}");
         Directory.CreateDirectory(outputDir);
 
-        var isoPath = Path.Combine(outputDir, isoName);
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var created, isoName, null);
+        string isoPath = Path.Combine(outputDir, isoName);
+        int result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? created, isoName, null);
         Assert.Equal(0, result);
         Assert.Equal(isoPath, created);
         return isoPath;
@@ -62,12 +62,12 @@ public class UnpackImageTests : IDisposable
 
     private static Dictionary<string, string> HashTree(string root)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        Dictionary<string, string> result = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
-            var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
-            using var sha = SHA256.Create();
-            using var fs = File.OpenRead(file);
+            string rel = Path.GetRelativePath(root, file).Replace('\\', '/');
+            using SHA256 sha = SHA256.Create();
+            using FileStream fs = File.OpenRead(file);
             result[rel] = Convert.ToHexString(sha.ComputeHash(fs));
         }
 
@@ -77,19 +77,19 @@ public class UnpackImageTests : IDisposable
     [Fact]
     public void UnpackImage_NoOutputPath_ExtractsToIsoNamedDirectory()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var workDir = CreateTempDir();
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string workDir = CreateTempDir();
 
-        var originalCwd = Directory.GetCurrentDirectory();
+        string originalCwd = Directory.GetCurrentDirectory();
         try
         {
             Directory.SetCurrentDirectory(workDir);
 
-            var result = XisoReader.UnpackImage(isoPath);
+            int result = XisoReader.UnpackImage(isoPath);
 
             Assert.Equal(0, result);
-            var target = Path.Combine(workDir, "game");
+            string target = Path.Combine(workDir, "game");
             Assert.True(Directory.Exists(target), $"expected ISO-named directory {target}");
             Assert.Equal(HashTree(src), HashTree(target));
         }
@@ -102,11 +102,11 @@ public class UnpackImageTests : IDisposable
     [Fact]
     public void UnpackImage_WithOutputPath_ExtractsToDirectory()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var dest = CreateTempDir();
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string dest = CreateTempDir();
 
-        var result = XisoReader.UnpackImage(isoPath, dest);
+        int result = XisoReader.UnpackImage(isoPath, dest);
 
         Assert.Equal(0, result);
         Assert.Equal(HashTree(src), HashTree(dest));
@@ -115,19 +115,19 @@ public class UnpackImageTests : IDisposable
     [Fact]
     public void UnpackImage_WithoutOptimizedTag_StillExtracts()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
 
         // Wipe the optimized-tag marker so the image looks like a legacy (non-optimized)
         // dump; UnpackImage must probe the tag and fall back to llCompat mode.
-        using (var fs = File.Open(isoPath, FileMode.Open, FileAccess.ReadWrite))
+        using (FileStream fs = File.Open(isoPath, FileMode.Open, FileAccess.ReadWrite))
         {
             fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
             fs.Write(new byte[Constants.OptimizedTagLength]);
         }
 
-        var dest = CreateTempDir();
-        var result = XisoReader.UnpackImage(isoPath, dest);
+        string dest = CreateTempDir();
+        int result = XisoReader.UnpackImage(isoPath, dest);
 
         Assert.Equal(0, result);
         Assert.Equal(HashTree(src), HashTree(dest));
@@ -138,18 +138,18 @@ public class UnpackImageTests : IDisposable
     {
         // The optimized-tag probe must shift with the skip offset (the writer places
         // the tag at prependOffset + 31337), so prepended images are detected correctly.
-        var src = CreateSourceTree();
-        var isoDir = Path.Combine(Path.GetTempPath(), $"xiso_unpack_pre_{Guid.NewGuid():N}");
+        string src = CreateSourceTree();
+        string isoDir = Path.Combine(Path.GetTempPath(), $"xiso_unpack_pre_{Guid.NewGuid():N}");
         Directory.CreateDirectory(isoDir);
-        var isoPath = Path.Combine(isoDir, "prepended.iso");
+        string isoPath = Path.Combine(isoDir, "prepended.iso");
 
-        var createResult = XisoWriter.CreateXiso(src, isoDir, null, null, out _, "prepended.iso", null,
+        int createResult = XisoWriter.CreateXiso(src, isoDir, null, null, out _, "prepended.iso", null,
             prependSectors: 64);
         Assert.Equal(0, createResult);
         Assert.True(File.Exists(isoPath));
 
-        var dest = CreateTempDir();
-        var result = XisoReader.UnpackImage(isoPath, dest, skipSectors: 64);
+        string dest = CreateTempDir();
+        int result = XisoReader.UnpackImage(isoPath, dest, skipSectors: 64);
 
         Assert.Equal(0, result);
         Assert.Equal(HashTree(src), HashTree(dest));
@@ -158,8 +158,8 @@ public class UnpackImageTests : IDisposable
     [Fact]
     public void UnpackImage_NegativeSkipSectors_Throws()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
 
         Assert.Throws<ArgumentOutOfRangeException>(() => XisoReader.UnpackImage(isoPath, skipSectors: -1));
     }
@@ -180,11 +180,11 @@ public class UnpackImageTests : IDisposable
     {
         // BUG-LIB-022: the rewrite write phase observes the token — cancelling
         // on the first written file aborts the run instead of finishing it.
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var outDir = CreateTempDir();
-        using var cts = new CancellationTokenSource();
-        var progress = new CancelOnFirstFile(cts);
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string outDir = CreateTempDir();
+        using CancellationTokenSource cts = new();
+        CancelOnFirstFile progress = new(cts);
 
         Assert.ThrowsAny<OperationCanceledException>(() =>
             XisoReader.DecodeXiso(isoPath, outDir, ExtractMode.Rewrite, out _, true,
@@ -200,25 +200,25 @@ public class UnpackImageTests : IDisposable
         // BUG-LIB-013: the writer must use the rewrite's own disc lseek (passed
         // explicitly), never the Logger.XboxDiscLseek legacy mirror. Poison the
         // global: a prepended image (nonzero lseek) must still rewrite byte-true.
-        var src = CreateSourceTree();
-        var isoDir = CreateTempDir();
-        var createResult = XisoWriter.CreateXiso(src, isoDir, null, null, out _, "prepended.iso", null,
+        string src = CreateSourceTree();
+        string isoDir = CreateTempDir();
+        int createResult = XisoWriter.CreateXiso(src, isoDir, null, null, out _, "prepended.iso", null,
             prependSectors: 64);
         Assert.Equal(0, createResult);
-        var isoPath = Path.Combine(isoDir, "prepended.iso");
+        string isoPath = Path.Combine(isoDir, "prepended.iso");
 
-        var savedLseek = Logger.XboxDiscLseek;
+        long savedLseek = Logger.XboxDiscLseek;
         Logger.XboxDiscLseek = 0x0BAD_F00D;
         try
         {
-            var outDir = CreateTempDir();
-            var rc = XisoReader.DecodeXiso(isoPath, outDir, ExtractMode.Rewrite, out var rewritten, true,
+            string outDir = CreateTempDir();
+            int rc = XisoReader.DecodeXiso(isoPath, outDir, ExtractMode.Rewrite, out string? rewritten, true,
                 skipSectors: 64);
             Assert.Equal(0, rc);
             Assert.NotNull(rewritten);
 
             Assert.True(XisoReader.AuditXiso(rewritten).IsValid);
-            var dest = CreateTempDir();
+            string dest = CreateTempDir();
             Assert.Equal(0, XisoReader.UnpackImage(rewritten, dest));
             Assert.Equal(HashTree(src), HashTree(dest));
         }
@@ -231,15 +231,15 @@ public class UnpackImageTests : IDisposable
     [Fact]
     public void UnpackImage_InvalidIso_Throws()
     {
-        var junkDir = CreateTempDir();
-        var junkFile = Path.Combine(junkDir, "junk.iso");
+        string junkDir = CreateTempDir();
+        string junkFile = Path.Combine(junkDir, "junk.iso");
         File.WriteAllBytes(junkFile, new byte[4096]);
 
         // A small invalid file is too short to probe the XGD offsets, so verification
         // fails with IOException; a full-size invalid image fails with XisoFormatException.
         // The working directory must be left unchanged (verification precedes the chdir).
-        var originalCwd = Directory.GetCurrentDirectory();
-        var ex = Record.Exception(() => XisoReader.UnpackImage(junkFile));
+        string originalCwd = Directory.GetCurrentDirectory();
+        Exception? ex = Record.Exception(() => XisoReader.UnpackImage(junkFile));
         Assert.True(ex is XisoFormatException or IOException,
             $"Expected XisoFormatException or IOException, got {(ex == null ? "no exception" : ex.GetType().Name)}");
         Assert.Equal(originalCwd, Directory.GetCurrentDirectory());

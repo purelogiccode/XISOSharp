@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using XISOSharp.BlockDevice;
 using XISOSharp.TestDataGenerator;
 
 namespace XISOSharp.Tests;
@@ -39,7 +40,7 @@ public class CisoSplitInteropTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -72,7 +73,7 @@ public class CisoSplitInteropTests : IDisposable
 
     private static string RunXdvdfs(string[] arguments, string workDir)
     {
-        var psi = new ProcessStartInfo
+        ProcessStartInfo psi = new()
         {
             FileName = XdvdfsExePath(),
             WorkingDirectory = workDir,
@@ -81,15 +82,15 @@ public class CisoSplitInteropTests : IDisposable
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        foreach (var arg in arguments)
+        foreach (string arg in arguments)
         {
             psi.ArgumentList.Add(arg);
         }
 
-        using var proc = Process.Start(psi);
+        using Process? proc = Process.Start(psi);
         Assert.NotNull(proc);
-        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-        var stderrTask = proc.StandardError.ReadToEndAsync();
+        Task<string> stdoutTask = proc.StandardOutput.ReadToEndAsync();
+        Task<string> stderrTask = proc.StandardError.ReadToEndAsync();
         if (!proc.WaitForExit(120000))
         {
             try
@@ -105,15 +106,15 @@ public class CisoSplitInteropTests : IDisposable
             Assert.Fail("xdvdfs.exe timed out and was killed.");
         }
 
-        var stdout = stdoutTask.GetAwaiter().GetResult();
-        var stderr = stderrTask.GetAwaiter().GetResult();
+        string stdout = stdoutTask.GetAwaiter().GetResult();
+        string stderr = stderrTask.GetAwaiter().GetResult();
         Assert.True(proc.ExitCode == 0, $"xdvdfs.exe failed (exit {proc.ExitCode}): {stderr}");
         return stdout;
     }
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "xiso_cisointerop_" + Guid.NewGuid().ToString("N"));
+        string dir = Path.Combine(Path.GetTempPath(), "xiso_cisointerop_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -122,8 +123,8 @@ public class CisoSplitInteropTests : IDisposable
     private string CreateTempIso(string? sourceDir = null)
     {
         sourceDir ??= SourceDir;
-        var outDir = CreateTempDir();
-        var rc = XisoWriter.CreateXiso(sourceDir, outDir, null, null, out var outPath, null, null);
+        string outDir = CreateTempDir();
+        int rc = XisoWriter.CreateXiso(sourceDir, outDir, null, null, out string? outPath, null, null);
         Assert.Equal(0, rc);
         Assert.NotNull(outPath);
         Assert.True(File.Exists(outPath));
@@ -137,12 +138,12 @@ public class CisoSplitInteropTests : IDisposable
 
     private static Dictionary<string, string> ParseMd5Listing(string stdout)
     {
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var line in stdout.Split('\n'))
+        Dictionary<string, string> map = new(StringComparer.Ordinal);
+        foreach (string line in stdout.Split('\n'))
         {
-            var trimmed = line.Trim();
+            string trimmed = line.Trim();
             if (trimmed.Length == 0) continue;
-            var sep = trimmed.IndexOf("  ", StringComparison.Ordinal);
+            int sep = trimmed.IndexOf("  ", StringComparison.Ordinal);
             Assert.True(sep > 0, $"unexpected md5 line: {trimmed}");
             map[trimmed[(sep + 2)..]] = trimmed[..sep];
         }
@@ -159,10 +160,10 @@ public class CisoSplitInteropTests : IDisposable
     /// </summary>
     private static Dictionary<string, string> FilesOnly(Dictionary<string, string> listing, string sourceDir)
     {
-        var files = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (path, hash) in listing)
+        Dictionary<string, string> files = new(StringComparer.Ordinal);
+        foreach ((string path, string hash) in listing)
         {
-            var local = path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+            string local = path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
             if (File.Exists(Path.Combine(sourceDir, local)))
             {
                 files[path] = hash;
@@ -177,18 +178,18 @@ public class CisoSplitInteropTests : IDisposable
     {
         Assert.True(ReferenceAvailable(), "Missing reference oracle 'Xdvdfs'.");
 
-        var isoPath = CreateTempIso();
-        var workDir = CreateTempDir();
+        string isoPath = CreateTempIso();
+        string workDir = CreateTempDir();
 
         // Note: the reference SplitOutput derives part names from the file name only
         // and creates them relative to the process working directory.
         RunXdvdfs(["compress", isoPath, Path.Combine(workDir, "rust.cso")], workDir);
 
-        var part1 = Path.Combine(workDir, "rust.1.cso");
+        string part1 = Path.Combine(workDir, "rust.1.cso");
         Assert.True(File.Exists(part1), "expected the reference writer to emit rust.1.cso");
         Assert.True(CisoReader.IsCso(part1));
 
-        var decPath = Path.Combine(CreateTempDir(), "rust.iso");
+        string decPath = Path.Combine(CreateTempDir(), "rust.iso");
         Assert.Equal(0, CisoReader.DecompressToIso(part1, decPath));
 
         // The reference repacks the image before compressing, so compare content
@@ -198,7 +199,7 @@ public class CisoSplitInteropTests : IDisposable
             FilesOnly(ParseMd5Listing(StockMd5(isoPath, workDir)), SourceDir),
             FilesOnly(ParseMd5Listing(StockMd5(decPath, workDir)), SourceDir));
 
-        using var dev = new BlockDevice.CisoBlockDevice(part1);
+        using CisoBlockDevice dev = new(part1);
         Assert.Equal(new FileInfo(decPath).Length, dev.Length);
     }
 
@@ -207,23 +208,23 @@ public class CisoSplitInteropTests : IDisposable
     {
         Assert.True(ReferenceAvailable(), "Missing reference oracle 'Xdvdfs'.");
 
-        var srcDir = CreateTempDir();
+        string srcDir = CreateTempDir();
         Directory.CreateDirectory(Path.Combine(srcDir, "sub"));
-        var blob = Enumerable.Range(0, 200000).Select(i => (byte)((i * 2654435761u) >> 16)).ToArray();
+        byte[] blob = Enumerable.Range(0, 200000).Select(i => (byte)((i * 2654435761u) >> 16)).ToArray();
         File.WriteAllText(Path.Combine(srcDir, "hello.txt"), "hello rust golden world");
         File.WriteAllBytes(Path.Combine(srcDir, "sub", "blob.bin"), blob);
 
-        var workDir = CreateTempDir();
+        string workDir = CreateTempDir();
         RunXdvdfs(["compress", srcDir, Path.Combine(workDir, "rustdir.cso")], workDir);
 
-        var part1 = Path.Combine(workDir, "rustdir.1.cso");
+        string part1 = Path.Combine(workDir, "rustdir.1.cso");
         Assert.True(File.Exists(part1), "expected the reference writer to emit rustdir.1.cso");
 
-        var decPath = Path.Combine(CreateTempDir(), "rustdir.iso");
+        string decPath = Path.Combine(CreateTempDir(), "rustdir.iso");
         Assert.Equal(0, CisoReader.DecompressToIso(part1, decPath));
 
-        var got = FilesOnly(ParseMd5Listing(StockMd5(decPath, workDir)), srcDir);
-        var expected = new Dictionary<string, string>(StringComparer.Ordinal)
+        Dictionary<string, string> got = FilesOnly(ParseMd5Listing(StockMd5(decPath, workDir)), srcDir);
+        Dictionary<string, string> expected = new(StringComparer.Ordinal)
         {
             ["/hello.txt"] = Md5Hex("hello rust golden world"u8.ToArray()),
             ["/sub/blob.bin"] = Md5Hex(blob),
@@ -236,9 +237,9 @@ public class CisoSplitInteropTests : IDisposable
     {
         Assert.True(ReferenceAvailable(), "Missing reference oracle 'Xdvdfs'.");
 
-        var isoPath = CreateTempIso();
-        var workDir = CreateTempDir();
-        var csoPath = Path.Combine(workDir, "single.cso");
+        string isoPath = CreateTempIso();
+        string workDir = CreateTempDir();
+        string csoPath = Path.Combine(workDir, "single.cso");
         Assert.Equal(0, CisoWriter.CompressToCso(isoPath, csoPath, level: 9));
 
         Assert.Equal(
@@ -253,16 +254,16 @@ public class CisoSplitInteropTests : IDisposable
         // split.rs): part names, sparse global-offset writes, and the overshoot rule
         // (a write crossing the split point lands whole, so each part's data starts
         // exactly where the previous part's file ends). Needs no reference binary.
-        var isoPath = CreateTempIso();
-        var csoDir = CreateTempDir();
-        var csoPath = Path.Combine(csoDir, "ours.cso");
+        string isoPath = CreateTempIso();
+        string csoDir = CreateTempDir();
+        string csoPath = Path.Combine(csoDir, "ours.cso");
         const long splitBytes = 16384;
         Assert.Equal(0, CisoWriter.CompressToCso(isoPath, csoPath, level: 9, splitBytes: splitBytes));
 
-        var parts = new List<string>();
-        for (var i = 1;; i++)
+        List<string> parts = new();
+        for (int i = 1;; i++)
         {
-            var part = Path.Combine(csoDir, $"ours.{i}.cso");
+            string part = Path.Combine(csoDir, $"ours.{i}.cso");
             if (!File.Exists(part)) break;
             parts.Add(part);
         }
@@ -270,10 +271,10 @@ public class CisoSplitInteropTests : IDisposable
         Assert.True(parts.Count >= 2, $"expected at least 2 parts, got {parts.Count}");
 
         long previousLength = 0;
-        foreach (var part in parts)
+        foreach (string part in parts)
         {
-            var data = File.ReadAllBytes(part);
-            var firstData = Array.FindIndex(data, b => b != 0);
+            byte[] data = File.ReadAllBytes(part);
+            int firstData = Array.FindIndex(data, b => b != 0);
             Assert.True(firstData >= 0, $"{part} has no data");
             // Data starts exactly where the previous part's file ends (sequential
             // global-offset writes into sparse part files).
@@ -286,7 +287,7 @@ public class CisoSplitInteropTests : IDisposable
 
         // Content round-trips through our tiling reader (SplitFileReader parity note
         // in the class doc: stock 0.8.3 itself cannot read sparse multi-part files).
-        var decPath = Path.Combine(CreateTempDir(), "ours.iso");
+        string decPath = Path.Combine(CreateTempDir(), "ours.iso");
         Assert.Equal(0, CisoReader.DecompressToIso(parts[0], decPath));
         Assert.True(ComputeSha256(isoPath).AsSpan().SequenceEqual(ComputeSha256(decPath)));
     }

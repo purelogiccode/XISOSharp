@@ -84,7 +84,7 @@ internal sealed class Program
     {
         try
         {
-            var resolved = CliLocator.Resolve(overridePath);
+            string? resolved = CliLocator.Resolve(overridePath);
             if (resolved is null)
             {
                 Console.WriteLine("CLI not found (override, app folder, or PATH).");
@@ -93,7 +93,7 @@ internal sealed class Program
             }
 
             Console.WriteLine($"CLI: {resolved}");
-            var version = await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
+            string? version = await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
             if (version is null)
             {
                 Console.WriteLine("CLI -v probe failed.");

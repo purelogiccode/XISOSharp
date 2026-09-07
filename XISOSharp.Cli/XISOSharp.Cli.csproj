@@ -9,10 +9,12 @@
     <!-- Multi-target to match the library so XISOSharp.Tests (net8/9/10) can
              reference the CLI on every TFM and exercise all lib closures. -->
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-    <!-- AssemblyName matches the project identity: the XISOSharp CLI ships as
-             XISOSharp.Cli(.exe). A bare "XISOSharp" is impossible — the class
-             library already owns that assembly name, and two same-named
-             assemblies break solution restore ("Ambiguous project name"). -->
+    <!-- AssemblyName stays XISOSharp.Cli (project identity + RootNamespace): the
+             class library already owns the XISOSharp simple name, and the CLI
+             references it — building the CLI as XISOSharp.dll would collide
+             with the referenced XISOSharp.dll in the same output folder.
+             The *published* single-file binary is still named XISOSharp(.exe)
+             via the RenamePublishedExeToXisoSharp target below. -->
     <AssemblyName>XISOSharp.Cli</AssemblyName>
     <RootNamespace>XISOSharp.Cli</RootNamespace>
     <ApplicationIcon>icon\icon.ico</ApplicationIcon>
@@ -50,6 +52,22 @@
   <ItemGroup>
     <InternalsVisibleTo Include="XISOSharp.Tests" />
   </ItemGroup>
+
+  <!-- Published binary ships as XISOSharp(.exe), not XISOSharp.Cli(.exe).
+       Covers both `dotnet publish` directly and publish-cli.ps1. Only the
+       file name changes — the build output (XISOSharp.Cli.dll) is untouched,
+       so the library reference never collides. -->
+  <Target Name="RenamePublishedExeToXisoSharp" AfterTargets="Publish">
+    <Move SourceFiles="$(PublishDir)XISOSharp.Cli.exe"
+          DestinationFiles="$(PublishDir)XISOSharp.exe"
+          Condition="Exists('$(PublishDir)XISOSharp.Cli.exe')" />
+    <Move SourceFiles="$(PublishDir)XISOSharp.Cli"
+          DestinationFiles="$(PublishDir)XISOSharp"
+          Condition="Exists('$(PublishDir)XISOSharp.Cli')" />
+    <Move SourceFiles="$(PublishDir)XISOSharp.Cli.pdb"
+          DestinationFiles="$(PublishDir)XISOSharp.pdb"
+          Condition="Exists('$(PublishDir)XISOSharp.Cli.pdb')" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Meziantou.Analyzer">

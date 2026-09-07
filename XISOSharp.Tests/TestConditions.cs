@@ -31,7 +31,7 @@ internal static class SkipConditions
     {
         try
         {
-            var dir = AppContext.BaseDirectory;
+            string? dir = AppContext.BaseDirectory;
             while (dir is not null)
             {
                 if (File.Exists(Path.Combine(dir, "CSharp_XISOSharp.sln")))
@@ -52,7 +52,7 @@ internal static class SkipConditions
 
     internal static string? OraclePath(OracleKind kind)
     {
-        var root = SolutionRoot();
+        string? root = SolutionRoot();
         if (root is null)
         {
             return null;
@@ -78,7 +78,7 @@ internal static class SkipConditions
                 return kind == OracleKind.Zarchive && File.Exists(OraclePath(kind));
             }
 
-            var path = OraclePath(kind);
+            string? path = OraclePath(kind);
             return path is not null && File.Exists(path);
         }
         catch
@@ -91,7 +91,7 @@ internal static class SkipConditions
     {
         try
         {
-            var root = Path.GetPathRoot(Path.GetTempPath());
+            string? root = Path.GetPathRoot(Path.GetTempPath());
             if (string.IsNullOrEmpty(root))
             {
                 return false;
@@ -127,7 +127,7 @@ internal static class SkipConditions
                 return _fileLinkCache.Value;
             }
 
-            var available = ProbeSymlink(kind);
+            bool available = ProbeSymlink(kind);
             if (kind == SymlinkKind.DirLink)
             {
                 _dirLinkCache = available;
@@ -143,15 +143,15 @@ internal static class SkipConditions
 
     private static bool ProbeSymlink(SymlinkKind kind)
     {
-        var probeRoot = Path.Combine(Path.GetTempPath(), $"xiso_skip_probe_{Guid.NewGuid():N}");
+        string probeRoot = Path.Combine(Path.GetTempPath(), $"xiso_skip_probe_{Guid.NewGuid():N}");
         try
         {
             Directory.CreateDirectory(probeRoot);
             if (kind == SymlinkKind.DirLink)
             {
-                var target = Path.Combine(probeRoot, "target");
+                string target = Path.Combine(probeRoot, "target");
                 Directory.CreateDirectory(target);
-                var link = Path.Combine(probeRoot, "link");
+                string link = Path.Combine(probeRoot, "link");
                 try
                 {
                     Directory.CreateSymbolicLink(link, target);
@@ -166,7 +166,7 @@ internal static class SkipConditions
 
                     try
                     {
-                        var psi = new ProcessStartInfo
+                        ProcessStartInfo psi = new()
                         {
                             FileName = "cmd.exe",
                             RedirectStandardOutput = true,
@@ -179,15 +179,15 @@ internal static class SkipConditions
                         psi.ArgumentList.Add("/J");
                         psi.ArgumentList.Add(link);
                         psi.ArgumentList.Add(target);
-                        using var proc = Process.Start(psi);
+                        using Process? proc = Process.Start(psi);
                         if (proc is null)
                         {
                             return false;
                         }
 
-                        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-                        var stderrTask = proc.StandardError.ReadToEndAsync();
-                        var exited = proc.WaitForExit(30000);
+                        Task<string> stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                        Task<string> stderrTask = proc.StandardError.ReadToEndAsync();
+                        bool exited = proc.WaitForExit(30000);
                         stdoutTask.GetAwaiter().GetResult();
                         stderrTask.GetAwaiter().GetResult();
                         return exited && proc.ExitCode == 0 && Directory.Exists(link);
@@ -200,9 +200,9 @@ internal static class SkipConditions
             }
             else
             {
-                var target = Path.Combine(probeRoot, "target.txt");
+                string target = Path.Combine(probeRoot, "target.txt");
                 File.WriteAllText(target, "probe");
-                var link = Path.Combine(probeRoot, "link.txt");
+                string link = Path.Combine(probeRoot, "link.txt");
                 try
                 {
                     File.CreateSymbolicLink(link, target);

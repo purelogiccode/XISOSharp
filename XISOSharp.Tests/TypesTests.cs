@@ -62,7 +62,7 @@ public class TypesTests
     [Fact]
     public void CreateList_Defaults()
     {
-        var list = new CreateList();
+        CreateList list = new();
         Assert.Equal("", list.Path);
         Assert.Null(list.Name);
         Assert.Null(list.Next);
@@ -75,8 +75,8 @@ public class TypesTests
     [Fact]
     public void CreateList_Linked()
     {
-        var first = new CreateList { Path = "dir1", Name = "iso1" };
-        var second = new CreateList { Path = "dir2", Name = "iso2", Next = first };
+        CreateList first = new() { Path = "dir1", Name = "iso1" };
+        CreateList second = new() { Path = "dir2", Name = "iso2", Next = first };
 
         Assert.Same(first, second.Next);
         Assert.Equal("dir1", second.Next.Path);
@@ -114,9 +114,9 @@ public class TypesTests
     public void TraversalCallback_Invoke()
     {
         int receivedDepth;
-        var node = new AvlNode { Filename = "test" };
+        AvlNode node = new() { Filename = "test" };
 
-        var result = Cb(node, "ctx", 3);
+        int result = Cb(node, "ctx", 3);
         Assert.Equal(42, result);
         Assert.Equal(3, receivedDepth);
         return;

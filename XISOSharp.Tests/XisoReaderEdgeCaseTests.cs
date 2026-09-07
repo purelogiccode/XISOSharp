@@ -23,7 +23,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
         Logger.Quiet = false;
         Logger.RealQuiet = false;
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -38,7 +38,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_edge_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_edge_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -46,8 +46,8 @@ public class XisoReaderEdgeCaseTests : IDisposable
 
     private string CreateTestIso()
     {
-        var outputDir = CreateTempDir();
-        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
         return isoPath;
     }
@@ -57,15 +57,15 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void ListDirectory_NonExistentPath_ThrowsInvalidDataException()
     {
-        var isoPath = CreateTestIso();
+        string isoPath = CreateTestIso();
         Assert.Throws<InvalidDataException>(() => XisoReader.ListDirectory(isoPath, "/nonexistent"));
     }
 
     [Fact]
     public void ListDirectory_DeeplyNestedPath_WorksCorrectly()
     {
-        var isoPath = CreateTestIso();
-        var entries = XisoReader.ListDirectory(isoPath, "/subdir/nested");
+        string isoPath = CreateTestIso();
+        IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(isoPath, "/subdir/nested");
         Assert.NotEmpty(entries);
         Assert.Contains(entries, static e => string.Equals(e.Name, "deep.txt", StringComparison.Ordinal));
     }
@@ -73,7 +73,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void ListDirectory_InvalidIso_ThrowsXisoFormatException()
     {
-        var tempFile = Path.Combine(CreateTempDir(), "bad.bin");
+        string tempFile = Path.Combine(CreateTempDir(), "bad.bin");
         File.WriteAllBytes(tempFile, new byte[1024]);
 
         Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(tempFile));
@@ -82,10 +82,10 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void ListDirectory_EntryInfo_SectorAndSizeAreConsistent()
     {
-        var isoPath = CreateTestIso();
-        var entries = XisoReader.ListDirectory(isoPath);
+        string isoPath = CreateTestIso();
+        IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(isoPath);
 
-        foreach (var entry in entries)
+        foreach (EntryInfo entry in entries)
         {
             if (!entry.IsDirectory)
             {
@@ -102,8 +102,8 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void GetEntryInfo_DeepPath_ReturnsCorrectEntry()
     {
-        var isoPath = CreateTestIso();
-        var entry = XisoReader.GetEntryInfo(isoPath, "/subdir/nested/deep.txt");
+        string isoPath = CreateTestIso();
+        EntryInfo? entry = XisoReader.GetEntryInfo(isoPath, "/subdir/nested/deep.txt");
 
         Assert.NotNull(entry);
         Assert.Equal("deep.txt", entry.Name);
@@ -113,7 +113,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void GetEntryInfo_InvalidIso_ThrowsXisoFormatException()
     {
-        var tempFile = Path.Combine(CreateTempDir(), "bad.bin");
+        string tempFile = Path.Combine(CreateTempDir(), "bad.bin");
         File.WriteAllBytes(tempFile, new byte[1024]);
 
         Assert.Throws<XisoFormatException>(() => XisoReader.GetEntryInfo(tempFile, "/file.txt"));
@@ -122,16 +122,16 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void GetEntryInfo_EmptyPath_ReturnsNull()
     {
-        var isoPath = CreateTestIso();
+        string isoPath = CreateTestIso();
         Assert.Null(XisoReader.GetEntryInfo(isoPath, ""));
     }
 
     [Fact]
     public void GetEntryInfo_PathWithTrailingSlash_ReturnsDirectoryEntry()
     {
-        var isoPath = CreateTestIso();
+        string isoPath = CreateTestIso();
         // A trailing slash is ignored: "/subdir/" resolves to the "subdir" directory entry.
-        var entry = XisoReader.GetEntryInfo(isoPath, "/subdir/");
+        EntryInfo? entry = XisoReader.GetEntryInfo(isoPath, "/subdir/");
         Assert.NotNull(entry);
         Assert.Equal("subdir", entry.Name);
         Assert.True(entry.IsDirectory);
@@ -144,13 +144,13 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void ComputeFileHash_AllSupportedAlgorithms_ReturnHash()
     {
-        var isoPath = CreateTestIso();
+        string isoPath = CreateTestIso();
 
-        var md5 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.MD5);
-        var sha1 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA1);
-        var sha256 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA256);
-        var sha384 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA384);
-        var sha512 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA512);
+        byte[]? md5 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.MD5);
+        byte[]? sha1 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA1);
+        byte[]? sha256 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA256);
+        byte[]? sha384 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA384);
+        byte[]? sha512 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA512);
 
         Assert.NotNull(md5);
         Assert.NotNull(sha1);
@@ -168,8 +168,8 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void ComputeFileHash_SHA1_ReturnsCorrectLength()
     {
-        var isoPath = CreateTestIso();
-        var hash = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA1);
+        string isoPath = CreateTestIso();
+        byte[]? hash = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA1);
 
         Assert.NotNull(hash);
         Assert.Equal(20, hash.Length); // SHA-1 is 20 bytes
@@ -178,8 +178,8 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void ComputeFileHash_SHA512_ReturnsCorrectLength()
     {
-        var isoPath = CreateTestIso();
-        var hash = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA512);
+        string isoPath = CreateTestIso();
+        byte[]? hash = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.SHA512);
 
         Assert.NotNull(hash);
         Assert.Equal(64, hash.Length); // SHA-512 is 64 bytes
@@ -188,10 +188,10 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void ComputeFileHash_MD5_IsDeterministic()
     {
-        var isoPath = CreateTestIso();
+        string isoPath = CreateTestIso();
 
-        var hash1 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.MD5);
-        var hash2 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.MD5);
+        byte[]? hash1 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.MD5);
+        byte[]? hash2 = XisoReader.ComputeFileHash(isoPath, "/file1.txt", HashAlgorithmName.MD5);
 
         Assert.NotNull(hash1);
         Assert.NotNull(hash2);
@@ -201,16 +201,16 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void ComputeDirectoryHashes_EmptyDirectory_ReturnsEmpty()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
 
         // Create source with only an empty subdirectory
         Directory.CreateDirectory(Path.Combine(srcDir, "empty"));
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        var hashes = XisoReader.ComputeDirectoryHashes(isoPath, "/", HashAlgorithmName.SHA256);
+        IReadOnlyList<(string Path, byte[] Hash)> hashes = XisoReader.ComputeDirectoryHashes(isoPath, "/", HashAlgorithmName.SHA256);
 
         // Should have no file hashes (only empty dir exists)
         Assert.Empty(hashes);
@@ -219,9 +219,9 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void ComputeDirectoryHashes_NestedDirectory_ReturnsAllFiles()
     {
-        var isoPath = CreateTestIso();
+        string isoPath = CreateTestIso();
 
-        var hashes = XisoReader.ComputeDirectoryHashes(isoPath, "/subdir", HashAlgorithmName.SHA256);
+        IReadOnlyList<(string Path, byte[] Hash)> hashes = XisoReader.ComputeDirectoryHashes(isoPath, "/subdir", HashAlgorithmName.SHA256);
 
         Assert.NotEmpty(hashes);
         // Should include subfile.txt and nested/deep.txt
@@ -236,10 +236,10 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void GetVolumeInfo_VerySmallFile_ReturnsNotValid()
     {
-        var tempFile = Path.Combine(CreateTempDir(), "tiny.bin");
+        string tempFile = Path.Combine(CreateTempDir(), "tiny.bin");
         File.WriteAllBytes(tempFile, new byte[10]);
 
-        var info = XisoReader.GetVolumeInfo(tempFile);
+        VolumeInfo info = XisoReader.GetVolumeInfo(tempFile);
 
         Assert.False(info.IsValid);
     }
@@ -247,10 +247,10 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void GetVolumeInfo_ExactHeaderSize_ReturnsNotValid()
     {
-        var tempFile = Path.Combine(CreateTempDir(), "header_only.bin");
+        string tempFile = Path.Combine(CreateTempDir(), "header_only.bin");
         File.WriteAllBytes(tempFile, new byte[Constants.HeaderOffset + Constants.HeaderDataLength]);
 
-        var info = XisoReader.GetVolumeInfo(tempFile);
+        VolumeInfo info = XisoReader.GetVolumeInfo(tempFile);
 
         Assert.False(info.IsValid);
     }
@@ -258,8 +258,8 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void GetVolumeInfo_CreatedIso_HasCorrectMetadata()
     {
-        var isoPath = CreateTestIso();
-        var info = XisoReader.GetVolumeInfo(isoPath);
+        string isoPath = CreateTestIso();
+        VolumeInfo info = XisoReader.GetVolumeInfo(isoPath);
 
         Assert.True(info.IsValid);
         Assert.True(info.RootDirSector > 0);
@@ -272,9 +272,9 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void GetVolumeInfo_FileLength_MatchesActualFileSize()
     {
-        var isoPath = CreateTestIso();
-        var info = XisoReader.GetVolumeInfo(isoPath);
-        var actualSize = new FileInfo(isoPath).Length;
+        string isoPath = CreateTestIso();
+        VolumeInfo info = XisoReader.GetVolumeInfo(isoPath);
+        long actualSize = new FileInfo(isoPath).Length;
 
         Assert.Equal(actualSize, info.FileLength);
     }
@@ -282,10 +282,10 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void GetVolumeInfo_TotalSectors_MatchesFileLength()
     {
-        var isoPath = CreateTestIso();
-        var info = XisoReader.GetVolumeInfo(isoPath);
+        string isoPath = CreateTestIso();
+        VolumeInfo info = XisoReader.GetVolumeInfo(isoPath);
 
-        var expectedSectors = info.FileLength / Constants.SectorSize;
+        long expectedSectors = info.FileLength / Constants.SectorSize;
         Assert.Equal(expectedSectors, info.TotalSectors);
     }
 
@@ -296,9 +296,9 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void CopyOut_DirectoryWithNestedFiles_ExtractsAll()
     {
-        var isoPath = CreateTestIso();
-        var destDir = CreateTempDir();
-        var destPath = Path.Combine(destDir, "subdir_copy");
+        string isoPath = CreateTestIso();
+        string destDir = CreateTempDir();
+        string destPath = Path.Combine(destDir, "subdir_copy");
 
         XisoReader.CopyOut(isoPath, "/subdir", destPath);
 
@@ -310,15 +310,15 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void CopyOut_EmptyFile_CreatesZeroLengthFile()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var destDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string destDir = CreateTempDir();
 
         File.WriteAllText(Path.Combine(srcDir, "empty.txt"), "");
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        var destPath = Path.Combine(destDir, "empty.txt");
+        string destPath = Path.Combine(destDir, "empty.txt");
         XisoReader.CopyOut(isoPath, "/empty.txt", destPath);
 
         Assert.True(File.Exists(destPath));
@@ -328,21 +328,21 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void CopyOut_LargeFile_PreservesContent()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var destDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string destDir = CreateTempDir();
 
-        var data = new byte[512 * 1024]; // 512KB
+        byte[] data = new byte[512 * 1024]; // 512KB
         new Random(42).NextBytes(data);
         File.WriteAllBytes(Path.Combine(srcDir, "large.bin"), data);
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        var destPath = Path.Combine(destDir, "large.bin");
+        string destPath = Path.Combine(destDir, "large.bin");
         XisoReader.CopyOut(isoPath, "/large.bin", destPath);
 
-        var extracted = File.ReadAllBytes(destPath);
+        byte[] extracted = File.ReadAllBytes(destPath);
         Assert.Equal(data, extracted);
     }
 
@@ -353,9 +353,9 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void DecodeXiso_CancelledBeforeStart_ThrowsOperationCanceled()
     {
-        var isoPath = CreateTestIso();
-        var extractDir = CreateTempDir();
-        var cts = new CancellationTokenSource();
+        string isoPath = CreateTestIso();
+        string extractDir = CreateTempDir();
+        CancellationTokenSource cts = new();
         cts.Cancel();
 
         Assert.Throws<OperationCanceledException>(() =>
@@ -365,9 +365,9 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public async Task DecodeXisoAsync_CancelledBeforeStart_ThrowsOperationCanceled()
     {
-        var isoPath = CreateTestIso();
-        var extractDir = CreateTempDir();
-        var cts = new CancellationTokenSource();
+        string isoPath = CreateTestIso();
+        string extractDir = CreateTempDir();
+        CancellationTokenSource cts = new();
         await cts.CancelAsync();
 
 #pragma warning disable MA0004
@@ -383,10 +383,10 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void VerifyXiso_RawIso_DetectsZeroOffset()
     {
-        var isoPath = CreateTestIso();
+        string isoPath = CreateTestIso();
 
-        using var fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        (_, _, var discLseek) = XisoReader.VerifyXiso(fs, "test.iso");
+        using FileStream fs = new(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        (_, _, long discLseek) = XisoReader.VerifyXiso(fs, "test.iso");
 
         Assert.Equal(0, discLseek);
     }
@@ -398,14 +398,14 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void Rewrite_ThenExtract_PreservesAllContent()
     {
-        var createDir = CreateTempDir();
-        var rewriteDir = CreateTempDir();
-        var extractDir = CreateTempDir();
+        string createDir = CreateTempDir();
+        string rewriteDir = CreateTempDir();
+        string extractDir = CreateTempDir();
 
-        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Rewrite(isoPath, rewriteDir, out var rewrittenPath);
+        XisoReader.Rewrite(isoPath, rewriteDir, out string? rewrittenPath);
         Assert.NotNull(rewrittenPath);
 
         XisoReader.Extract(rewrittenPath, extractDir, false);
@@ -422,13 +422,13 @@ public class XisoReaderEdgeCaseTests : IDisposable
     [Fact]
     public void Rewrite_WithCustomName_UsesProvidedName()
     {
-        var createDir = CreateTempDir();
-        var rewriteDir = CreateTempDir();
+        string createDir = CreateTempDir();
+        string rewriteDir = CreateTempDir();
 
-        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Rewrite(isoPath, rewriteDir, out var rewrittenPath, outputName: "rewritten_custom");
+        XisoReader.Rewrite(isoPath, rewriteDir, out string? rewrittenPath, outputName: "rewritten_custom");
 
         Assert.NotNull(rewrittenPath);
         // The outputName controls the ISO filename within the output directory

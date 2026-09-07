@@ -60,7 +60,7 @@ internal static class Program
     /// <returns>0 on success, 1 on error.</returns>
     internal static int Main(string[] args)
     {
-        AppLogging.Configure("XISOSharp.Cli");
+        AppLogging.Configure("XISOSharp");
         try
         {
             return MainInner(args);
@@ -105,75 +105,75 @@ internal static class Program
             return 1;
         }
 
-        var extract = true;
-        var rewrite = false;
-        var listMode = false;
-        var tree = false;
-        var info = false;
-        var lsMode = false;
-        var xexInfoMode = false;
-        var xbeInfoMode = false;
-        var repairMode = false;
-        var repairDryRun = false;
-        var salvageMode = false;
+        bool extract = true;
+        bool rewrite = false;
+        bool listMode = false;
+        bool tree = false;
+        bool info = false;
+        bool lsMode = false;
+        bool xexInfoMode = false;
+        bool xbeInfoMode = false;
+        bool repairMode = false;
+        bool repairDryRun = false;
+        bool salvageMode = false;
         string? repairOut = null;
-        var unpackMode = false;
-        var hashMode = false;
-        var copyOut = false;
-        var copyIn = false;
-        var copyInNoBackup = false;
-        var auditMode = false;
-        var validateMode = false;
-        var checksumFlagMode = false;
-        var checksumSilent = false;
+        bool unpackMode = false;
+        bool hashMode = false;
+        bool copyOut = false;
+        bool copyIn = false;
+        bool copyInNoBackup = false;
+        bool auditMode = false;
+        bool validateMode = false;
+        bool checksumFlagMode = false;
+        bool checksumSilent = false;
         string? hashAlgo = null;
-        var xSeen = false;
-        var deleteOld = false;
-        var assumeYes = false;
-        var assumeNo = false;
+        bool xSeen = false;
+        bool deleteOld = false;
+        bool assumeYes = false;
+        bool assumeNo = false;
         string? path = null;
         string? outputName = null;
-        var createList = new List<(string Dir, string? Name)>();
-        var isos = 0;
-        var err = 0;
+        List<(string Dir, string? Name)> createList = new();
+        int isos = 0;
+        int err = 0;
 
-        var validateFlag = false;
-        var validateChecksums = false;
-        var validateStrict = false;
+        bool validateFlag = false;
+        bool validateChecksums = false;
+        bool validateStrict = false;
         string? validateReport = null;
 
         int? skipSectors = null;
         int? prependSectors = null;
         ulong? createFileTime = null;
-        var excludePatterns = new List<string>();
+        List<string> excludePatterns = new();
         string? batchDir = null;
-        var batchRecursive = false;
-        var skipExisting = false;
-        var continueOnError = false;
+        bool batchRecursive = false;
+        bool skipExisting = false;
+        bool continueOnError = false;
         string? packInput = null;
         string? packName = null;
         string? packIsoFile = null;
 
-        var filetimeMode = false;
-        var setFiletimeMode = false;
+        bool filetimeMode = false;
+        bool setFiletimeMode = false;
 
         // XboxKit redump / archival modes
-        var videoMode = false;
-        var randomMode = false;
-        var seedMode = false;
-        var wipeMode = false;
-        var trimMode = false;
-        var petrifyMode = false;
-        var updateMode = false;
-        var zarMode = false;
-        var allMode = false;
-        var bestMode = false;
-        var compressAlias = false;
-        var jobs = 1;
+        bool videoMode = false;
+        bool randomMode = false;
+        bool seedMode = false;
+        bool wipeMode = false;
+        bool trimMode = false;
+        bool petrifyMode = false;
+        bool updateMode = false;
+        bool zarMode = false;
+        bool allMode = false;
+        bool bestMode = false;
+        bool compressAlias = false;
+        int jobs = 1;
         ZarCollisionPolicy? zarPolicy = null;
         string? securitySectorsPath = null;
 
-        var optind = 0;
+        int optind = 0;
 
         // Handle standalone verb commands early (don't start with '-')
         if (args.Length > 0 && string.Equals(args[0], "validate", StringComparison.OrdinalIgnoreCase))
@@ -221,9 +221,9 @@ internal static class Program
             return RunJoinMode(args, 1);
         }
 
-        for (var i = optind; i < args.Length; i++)
+        for (int i = optind; i < args.Length; i++)
         {
-            var arg = args[i];
+            string arg = args[i];
             if (arg.StartsWith('-') && arg.Length > 1)
             {
                 switch (arg)
@@ -242,7 +242,7 @@ internal static class Program
                             return 1;
                         }
 
-                        var dir = args[++i];
+                        string dir = args[++i];
                         string? name = null;
                         if (i + 1 < args.Length && !args[i + 1].StartsWith('-'))
                         {
@@ -526,7 +526,7 @@ internal static class Program
                         break;
                     case "--skip-sectors":
                         if (i + 1 < args.Length &&
-                            int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var skipVal) && skipVal >= 0)
+                            int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out int skipVal) && skipVal >= 0)
                         {
                             skipSectors = skipVal;
                             i++;
@@ -541,7 +541,7 @@ internal static class Program
                         break;
                     case "--prepend-sectors":
                         if (i + 1 < args.Length &&
-                            int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var prependVal) &&
+                            int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out int prependVal) &&
                             prependVal >= 0)
                         {
                             prependSectors = prependVal;
@@ -557,7 +557,7 @@ internal static class Program
                         break;
                     case "--file-time":
                         if (i + 1 < args.Length &&
-                            FileTimeHelper.TryParseFileTime(args[i + 1], out var createRaw, out _))
+                            FileTimeHelper.TryParseFileTime(args[i + 1], out ulong createRaw, out _))
                         {
                             createFileTime = createRaw;
                             i++;
@@ -819,9 +819,9 @@ internal static class Program
         // ("open error: -d"). Flags must precede filenames, so name the mistake
         // instead. CLI-025: no existence bypass — a file literally named like a
         // flag is still reachable as ./-y or by absolute path.
-        for (var i = optind; i < args.Length; i++)
+        for (int i = optind; i < args.Length; i++)
         {
-            var misplaced = CliOutputGuard.CheckMisplacedFlag(args[i]);
+            string? misplaced = CliOutputGuard.CheckMisplacedFlag(args[i]);
             if (misplaced != null)
             {
                 Logger.LogErr(misplaced);
@@ -970,7 +970,7 @@ internal static class Program
         // CLI-001: the classic operational modes stack silently (last flag wins);
         // require exactly one. (--md5/--sha256 double-selection is rejected
         // during parsing since both share hashMode.)
-        var classicModes = new[]
+        int classicModes = new[]
         {
             listMode, tree, info, lsMode, xexInfoMode, xbeInfoMode, repairMode, salvageMode, hashMode, copyOut,
             copyIn, auditMode, validateMode
@@ -983,8 +983,8 @@ internal static class Program
         }
 
         // XboxKit redump modes are mutually exclusive with other operational modes
-        var anyRedumpMode = videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode ||
-                            zarMode || allMode || bestMode || compressAlias;
+        bool anyRedumpMode = videoMode || randomMode || seedMode || wipeMode || trimMode || petrifyMode || updateMode ||
+                             zarMode || allMode || bestMode || compressAlias;
         if (anyRedumpMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree ||
                               hashMode || copyOut || copyIn || auditMode ||
                               validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
@@ -1072,12 +1072,12 @@ internal static class Program
                 return 1;
             }
 
-            var isoPath = args[optind];
+            string isoPath = args[optind];
             try
             {
-                var raw = XisoReader.GetFileTimeRaw(isoPath, skipSectors);
-                var dto = FileTimeHelper.FromFileTimeRaw(raw);
-                var iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
+                ulong raw = XisoReader.GetFileTimeRaw(isoPath, skipSectors);
+                DateTimeOffset dto = FileTimeHelper.FromFileTimeRaw(raw);
+                string iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
                 Logger.Log($"FileTime: {iso8601} ({raw}) 0x{raw:X16}\n");
                 // Also emit raw only to stdout for scripting when quiet? Match xdvdfs raw behavior on --silent?
                 return 0;
@@ -1111,9 +1111,9 @@ internal static class Program
                 return 1;
             }
 
-            var isoPath = args[optind];
-            var valueStr = args[optind + 1];
-            if (!FileTimeHelper.TryParseFileTime(valueStr, out var raw, out var dto))
+            string isoPath = args[optind];
+            string valueStr = args[optind + 1];
+            if (!FileTimeHelper.TryParseFileTime(valueStr, out ulong raw, out DateTimeOffset dto))
             {
                 Logger.LogErr(
                     $"Error: invalid filetime value '{valueStr}' (expected ISO-8601, decimal, 0x hex, 'now', or '0')\n");
@@ -1123,7 +1123,7 @@ internal static class Program
             try
             {
                 XisoReader.SetFileTime(isoPath, raw, skipSectors);
-                var iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
+                string iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
                 Logger.Log($"Set FileTime for {isoPath} to {iso8601} ({raw}) 0x{raw:X16}\n");
                 return 0;
             }
@@ -1148,14 +1148,14 @@ internal static class Program
                 return 1;
             }
 
-            var cExit = 0;
-            for (var k = optind; k < args.Length; k++)
+            int cExit = 0;
+            for (int k = optind; k < args.Length; k++)
             {
-                var iso = args[k];
+                string iso = args[k];
                 try
                 {
-                    var hash = XisoChecksum.ComputeImageChecksum(iso);
-                    var hex = Convert.ToHexString(hash).ToLowerInvariant();
+                    byte[] hash = XisoChecksum.ComputeImageChecksum(iso);
+                    string hex = Convert.ToHexString(hash).ToLowerInvariant();
                     if (checksumSilent)
                         Logger.Log($"{hex}\n");
                     else
@@ -1173,7 +1173,7 @@ internal static class Program
 
         // The list of ISO files to process: explicit filenames, a --batch directory scan,
         // or a --pack ISO input.
-        var isoFiles = ExpandIsoFiles(batchDir, batchRecursive, args, optind, packIsoFile);
+        List<string>? isoFiles = ExpandIsoFiles(batchDir, batchRecursive, args, optind, packIsoFile);
         if (isoFiles == null)
         {
             return 1;
@@ -1236,14 +1236,14 @@ internal static class Program
             if (RejectIgnoredOutputFlags("-c (create)"))
                 return 1;
 
-            foreach ((var dir, var name) in createList)
+            foreach ((string dir, string? name) in createList)
             {
                 string? outputDir = null;
                 string? isoName = null;
 
                 if (name != null)
                 {
-                    var lastSep = name.LastIndexOf(Constants.PathChar);
+                    int lastSep = name.LastIndexOf(Constants.PathChar);
                     if (lastSep >= 0)
                     {
                         outputDir = name[..lastSep];
@@ -1306,12 +1306,12 @@ internal static class Program
                 return 1;
             }
 
-            var xisoPath = args[optind];
-            var internalPath = optind + 1 < args.Length ? args[optind + 1] : "/";
+            string xisoPath = args[optind];
+            string internalPath = optind + 1 < args.Length ? args[optind + 1] : "/";
 
             try
             {
-                var volInfo = XisoReader.GetVolumeInfo(xisoPath);
+                VolumeInfo volInfo = XisoReader.GetVolumeInfo(xisoPath);
 
                 if (!volInfo.IsValid)
                 {
@@ -1329,9 +1329,9 @@ internal static class Program
                 Logger.Log($"  Root Size:      {volInfo.RootDirSize} bytes\n");
                 try
                 {
-                    var raw = XisoReader.GetFileTimeRaw(xisoPath, skipSectors);
-                    var dto = FileTimeHelper.FromFileTimeRaw(raw);
-                    var iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
+                    ulong raw = XisoReader.GetFileTimeRaw(xisoPath, skipSectors);
+                    DateTimeOffset dto = FileTimeHelper.FromFileTimeRaw(raw);
+                    string iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
                     Logger.Log($"  FileTime:       {iso8601} ({raw})\n");
                     Logger.Log($"  FileTime raw:   0x{raw:X16} ({raw})\n");
                 }
@@ -1342,7 +1342,7 @@ internal static class Program
 
                 Logger.Log("\n");
 
-                var entries = XisoReader.ListDirectory(xisoPath, internalPath);
+                IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(xisoPath, internalPath);
                 if (entries.Count == 0)
                 {
                     Logger.Log($"{internalPath}: empty directory\n");
@@ -1350,7 +1350,7 @@ internal static class Program
                 else
                 {
                     Logger.Log($"Directory: {internalPath}\n\n");
-                    foreach (var entry in entries)
+                    foreach (EntryInfo entry in entries)
                     {
                         Logger.Log($"  {entry.Name}{(entry.IsDirectory ? "/" : "")}\n");
                         Logger.Log($"    Sector:    {entry.StartSector}\n");
@@ -1391,19 +1391,19 @@ internal static class Program
                 return 1;
             }
 
-            var xisoPath = args[optind];
-            var internalPath = optind + 1 < args.Length ? args[optind + 1] : "/";
+            string xisoPath = args[optind];
+            string internalPath = optind + 1 < args.Length ? args[optind + 1] : "/";
 
             try
             {
-                var entries = XisoReader.ListDirectoryFlat(xisoPath, internalPath);
+                IReadOnlyList<string> entries = XisoReader.ListDirectoryFlat(xisoPath, internalPath);
                 if (entries.Count == 0)
                 {
                     Logger.Log($"{internalPath}: empty directory\n");
                 }
                 else
                 {
-                    foreach (var name in entries)
+                    foreach (string name in entries)
                     {
                         Logger.Log($"{name}\n");
                     }
@@ -1436,12 +1436,12 @@ internal static class Program
                 return 1;
             }
 
-            var xisoPath = args[optind];
-            var internalPath = args[optind + 1];
+            string xisoPath = args[optind];
+            string internalPath = args[optind + 1];
 
             try
             {
-                var xex = XisoReader.GetXexInfo(xisoPath, internalPath);
+                XexInfo? xex = XisoReader.GetXexInfo(xisoPath, internalPath);
                 if (xex == null)
                 {
                     Logger.LogErr($"Not an XEX2 executable: {internalPath}\n");
@@ -1494,12 +1494,12 @@ internal static class Program
                 return 1;
             }
 
-            var xisoPath = args[optind];
-            var internalPath = args[optind + 1];
+            string xisoPath = args[optind];
+            string internalPath = args[optind + 1];
 
             try
             {
-                var xbe = XisoReader.GetXbeInfo(xisoPath, internalPath);
+                XbeInfo? xbe = XisoReader.GetXbeInfo(xisoPath, internalPath);
                 if (xbe == null)
                 {
                     Logger.LogErr($"Not an XBEH executable: {internalPath}\n");
@@ -1542,12 +1542,12 @@ internal static class Program
                 return 1;
             }
 
-            var xisoPath = args[optind];
-            var backupPath = xisoPath + ".old";
-            var hadBackup = File.Exists(backupPath);
+            string xisoPath = args[optind];
+            string backupPath = xisoPath + ".old";
+            bool hadBackup = File.Exists(backupPath);
             try
             {
-                var result = XisoReader.Repair(xisoPath, createBackup: !copyInNoBackup, dryRun: repairDryRun);
+                RepairResult result = XisoReader.Repair(xisoPath, createBackup: !copyInNoBackup, dryRun: repairDryRun);
                 Logger.Log($"Repairing {xisoPath}:\n\n");
                 if (result.BackupPath != null)
                 {
@@ -1559,7 +1559,7 @@ internal static class Program
                 if (result.Fixed.Count > 0)
                 {
                     Logger.Log(repairDryRun ? "  Would fix:\n" : "  Fixed:\n");
-                    foreach (var fix in result.Fixed)
+                    foreach (string fix in result.Fixed)
                     {
                         Logger.Log($"    - {fix}\n");
                     }
@@ -1572,7 +1572,7 @@ internal static class Program
                 else
                 {
                     Logger.Log($"  Result:         FAIL ({result.Remaining.Count} issue(s))\n");
-                    foreach (var issue in result.Remaining)
+                    foreach (string issue in result.Remaining)
                     {
                         Logger.LogErr($"    - {issue}\n");
                     }
@@ -1603,19 +1603,19 @@ internal static class Program
                 return 1;
             }
 
-            var xisoPath = args[optind];
-            var salvageOutput = repairOut ?? XisoSalvager.DefaultOutputPath(xisoPath);
+            string xisoPath = args[optind];
+            string salvageOutput = repairOut ?? XisoSalvager.DefaultOutputPath(xisoPath);
             if (!OverwritePrompt.ConfirmOverwrite(salvageOutput, assumeYes, assumeNo))
                 return 1;
 
             try
             {
-                var result = XisoReader.Salvage(xisoPath, salvageOutput);
+                SalvageResult result = XisoReader.Salvage(xisoPath, salvageOutput);
                 Logger.Log($"Salvaging {xisoPath} -> {result.OutputPath}:\n\n");
                 if (result.Copied.Count > 0)
                 {
                     Logger.Log($"  Carried ({result.Copied.Count}):\n");
-                    foreach (var carried in result.Copied)
+                    foreach (string carried in result.Copied)
                     {
                         Logger.Log($"    + {carried}\n");
                     }
@@ -1624,7 +1624,7 @@ internal static class Program
                 if (result.Skipped.Count > 0)
                 {
                     Logger.Log($"  Dropped ({result.Skipped.Count}):\n");
-                    foreach (var dropped in result.Skipped)
+                    foreach (string dropped in result.Skipped)
                     {
                         Logger.LogErr($"    - {dropped}\n");
                     }
@@ -1638,7 +1638,7 @@ internal static class Program
                 {
                     Logger.Log(
                         $"  Result:         FAIL ({result.OutputIssues.Count} issue(s) in rebuilt image)\n");
-                    foreach (var issue in result.OutputIssues)
+                    foreach (string issue in result.OutputIssues)
                     {
                         Logger.LogErr($"    - {issue}\n");
                     }
@@ -1662,7 +1662,7 @@ internal static class Program
         // run resumes instead of redoing completed files.
         // #9 (xdvdfs #187): with --continue-on-error, per-file failures are logged
         // and skipped instead of aborting the run; the summary still fails the exit code.
-        var unpackOptions = skipExisting || continueOnError
+        UnpackOptions? unpackOptions = skipExisting || continueOnError
             ? new UnpackOptions { SkipExisting = skipExisting, ContinueOnError = continueOnError }
             : null;
 
@@ -1693,16 +1693,16 @@ internal static class Program
                 return 1;
             }
 
-            var xisoPath = args[optind];
-            var internalPath = optind + 1 < args.Length ? args[optind + 1] : null;
-            var algorithm = new HashAlgorithmName(hashAlgo);
+            string xisoPath = args[optind];
+            string? internalPath = optind + 1 < args.Length ? args[optind + 1] : null;
+            HashAlgorithmName algorithm = new(hashAlgo);
 
             try
             {
                 if (internalPath != null)
                 {
                     // Hash specific file or all files in a directory
-                    var entry = XisoReader.GetEntryInfo(xisoPath, internalPath);
+                    EntryInfo? entry = XisoReader.GetEntryInfo(xisoPath, internalPath);
                     if (entry == null)
                     {
                         Logger.LogErr($"Path not found: {internalPath}\n");
@@ -1711,15 +1711,15 @@ internal static class Program
 
                     if (entry.IsDirectory)
                     {
-                        var results = XisoReader.ComputeDirectoryHashes(xisoPath, internalPath, algorithm);
-                        foreach ((var filePath, var hash) in results)
+                        IReadOnlyList<(string Path, byte[] Hash)> results = XisoReader.ComputeDirectoryHashes(xisoPath, internalPath, algorithm);
+                        foreach ((string filePath, byte[] hash) in results)
                         {
                             Logger.Log($"{Convert.ToHexString(hash).ToLowerInvariant()}  {filePath}\n");
                         }
                     }
                     else
                     {
-                        var hash = XisoReader.ComputeFileHash(xisoPath, internalPath, algorithm);
+                        byte[]? hash = XisoReader.ComputeFileHash(xisoPath, internalPath, algorithm);
                         if (hash != null)
                             Logger.Log($"{Convert.ToHexString(hash).ToLowerInvariant()}  {internalPath}\n");
                     }
@@ -1727,8 +1727,8 @@ internal static class Program
                 else
                 {
                     // Hash all files
-                    var results = XisoReader.ComputeDirectoryHashes(xisoPath, "/", algorithm);
-                    foreach ((var filePath, var hash) in results)
+                    IReadOnlyList<(string Path, byte[] Hash)> results = XisoReader.ComputeDirectoryHashes(xisoPath, "/", algorithm);
+                    foreach ((string filePath, byte[] hash) in results)
                     {
                         Logger.Log($"{Convert.ToHexString(hash).ToLowerInvariant()}  {filePath}\n");
                     }
@@ -1761,13 +1761,13 @@ internal static class Program
                 return 1;
             }
 
-            var xisoPath = args[optind];
-            var internalPath = args[optind + 1];
-            var destPath = args[optind + 2];
+            string xisoPath = args[optind];
+            string internalPath = args[optind + 1];
+            string destPath = args[optind + 2];
 
             try
             {
-                var entry = XisoReader.GetEntryInfo(xisoPath, internalPath);
+                EntryInfo? entry = XisoReader.GetEntryInfo(xisoPath, internalPath);
                 if (entry == null)
                 {
                     Logger.LogErr($"Path not found in XISO: {internalPath}\n");
@@ -1813,9 +1813,9 @@ internal static class Program
                 return 1;
             }
 
-            var xisoPath = args[optind];
-            var hostPath = args[optind + 1];
-            var internalPath = args[optind + 2];
+            string xisoPath = args[optind];
+            string hostPath = args[optind + 1];
+            string internalPath = args[optind + 2];
             if (!File.Exists(hostPath))
             {
                 Logger.LogErr($"Host file not found: {hostPath}\n");
@@ -1828,8 +1828,8 @@ internal static class Program
                 return 1;
             }
 
-            var backupPath = xisoPath + ".old";
-            var hadBackup = File.Exists(backupPath);
+            string backupPath = xisoPath + ".old";
+            bool hadBackup = File.Exists(backupPath);
             try
             {
                 XisoReader.CopyIn(xisoPath, hostPath, internalPath, createBackup: !copyInNoBackup);
@@ -1864,13 +1864,13 @@ internal static class Program
                 return 1;
             }
 
-            var allValid = true;
-            for (var i = 0; i < isoFiles.Count; i++)
+            bool allValid = true;
+            for (int i = 0; i < isoFiles.Count; i++)
             {
-                var xisoPath = isoFiles[i];
+                string xisoPath = isoFiles[i];
                 try
                 {
-                    var result = XisoReader.AuditXiso(xisoPath);
+                    AuditResult result = XisoReader.AuditXiso(xisoPath);
                     Logger.Log($"Auditing {xisoPath}:\n\n");
                     Logger.Log($"  Files checked:  {result.FilesChecked}\n");
                     Logger.Log($"  Dirs checked:   {result.DirsChecked}\n");
@@ -1883,7 +1883,7 @@ internal static class Program
                     {
                         allValid = false;
                         Logger.Log($"  Result:         FAIL ({result.Issues.Count} issue(s))\n");
-                        foreach (var issue in result.Issues)
+                        foreach (string issue in result.Issues)
                         {
                             Logger.LogErr($"    - {issue}\n");
                         }
@@ -1920,12 +1920,12 @@ internal static class Program
                 return 1;
             }
 
-            var sourcePath = args[optind];
-            var outputPath = args[optind + 1];
+            string sourcePath = args[optind];
+            string outputPath = args[optind + 1];
 
             try
             {
-                var result = XisoValidator.ValidateConversion(sourcePath, outputPath, validateChecksums);
+                ValidationResult result = XisoValidator.ValidateConversion(sourcePath, outputPath, validateChecksums);
                 XisoValidator.LogResult(result, sourcePath, outputPath, validateChecksums);
 
                 if (validateReport != null)
@@ -1968,14 +1968,14 @@ internal static class Program
                 return 1;
         }
 
-        for (var i = 0; i < isoFiles.Count; i++)
+        for (int i = 0; i < isoFiles.Count; i++)
         {
             isos++;
             Logger.Log("\n");
             Logger.TotalBytes = Logger.TotalFiles = 0;
 
-            var xisoPath = isoFiles[i];
-            var optimized = false;
+            string xisoPath = isoFiles[i];
+            bool optimized = false;
 
             try
             {
@@ -2013,7 +2013,7 @@ internal static class Program
             {
                 // #15 (xdvdfs #36): refuse an -o that points at the input or its
                 // backup before anything else (even an "already optimized" skip).
-                var rewriteRefusal = CliOutputGuard.CheckRewriteOutput(xisoPath, outputName);
+                string? rewriteRefusal = CliOutputGuard.CheckRewriteOutput(xisoPath, outputName);
                 if (rewriteRefusal != null)
                 {
                     Logger.LogErr(rewriteRefusal);
@@ -2027,7 +2027,7 @@ internal static class Program
                     continue;
                 }
 
-                var oldPath = xisoPath + ".old";
+                string oldPath = xisoPath + ".old";
                 if (File.Exists(oldPath))
                 {
                     Logger.LogErr($"{oldPath} already exists, cannot rewrite {xisoPath}\n");
@@ -2046,7 +2046,7 @@ internal static class Program
                 try
                 {
                     File.Move(xisoPath, oldPath);
-                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out var newIsoPath, true,
+                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out string? newIsoPath, true,
                         outputName: outputName, skipSectors: skipSectors, prependSectors: prependSectors);
 
                     if (err == 0)
@@ -2059,7 +2059,7 @@ internal static class Program
                     if (err == 0 && validateFlag && newIsoPath != null)
                     {
                         Logger.Log("\n");
-                        var valResult = XisoValidator.ValidateConversion(oldPath, newIsoPath, validateChecksums);
+                        ValidationResult valResult = XisoValidator.ValidateConversion(oldPath, newIsoPath, validateChecksums);
                         XisoValidator.LogResult(valResult, oldPath, newIsoPath, validateChecksums);
 
                         if (validateReport != null)
@@ -2206,15 +2206,15 @@ internal static class Program
             return 1;
         }
 
-        var xisoPath = args[optind];
-        var destPath = optind + 1 < args.Length ? args[optind + 1] : null;
+        string xisoPath = args[optind];
+        string? destPath = optind + 1 < args.Length ? args[optind + 1] : null;
 
         try
         {
-            var unpackOptions = skipExisting || continueOnError
+            UnpackOptions? unpackOptions = skipExisting || continueOnError
                 ? new UnpackOptions { SkipExisting = skipExisting, ContinueOnError = continueOnError }
                 : null;
-            var result = XisoReader.UnpackImage(xisoPath, destPath, skipSectors: skipSectors,
+            int result = XisoReader.UnpackImage(xisoPath, destPath, skipSectors: skipSectors,
                 options: unpackOptions);
             return result == 0 ? 0 : 1;
         }
@@ -2241,14 +2241,14 @@ internal static class Program
 
     private static int RunRebuildMode(string[] args, int optind, string? outputName, string? securitySectorsPath)
     {
-        var outRebuild = outputName;
-        var secPath = securitySectorsPath;
-        var assumeYes = false;
-        var assumeNo = false;
-        var positionals = new List<string>();
-        for (var i = optind; i < args.Length; i++)
+        string? outRebuild = outputName;
+        string? secPath = securitySectorsPath;
+        bool assumeYes = false;
+        bool assumeNo = false;
+        List<string> positionals = new();
+        for (int i = optind; i < args.Length; i++)
         {
-            var a = args[i];
+            string a = args[i];
             if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
             {
@@ -2326,10 +2326,10 @@ internal static class Program
             return 1;
         }
 
-        var xisoPath = positionals[0];
-        var videoPath = positionals.Count > 1 ? positionals[1] : null;
-        var fillerOrSeed = positionals.Count > 2 ? positionals[2] : null;
-        var updatePath = positionals.Count > 3 ? positionals[3] : null;
+        string xisoPath = positionals[0];
+        string? videoPath = positionals.Count > 1 ? positionals[1] : null;
+        string? fillerOrSeed = positionals.Count > 2 ? positionals[2] : null;
+        string? updatePath = positionals.Count > 3 ? positionals[3] : null;
 
         if (positionals.Count > 4)
         {
@@ -2343,11 +2343,11 @@ internal static class Program
         // rebuild fails with a clear message instead of a phantom path.
         if (videoPath == null)
         {
-            var dir = Path.GetDirectoryName(xisoPath) ?? ".";
-            var baseName = Path.GetFileNameWithoutExtension(xisoPath);
+            string dir = Path.GetDirectoryName(xisoPath) ?? ".";
+            string baseName = Path.GetFileNameWithoutExtension(xisoPath);
             // Strip compound .xiso etc.
             if (baseName.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase)) baseName = baseName[..^5];
-            var candidate = Path.Combine(dir, baseName + ".video.iso");
+            string candidate = Path.Combine(dir, baseName + ".video.iso");
             if (File.Exists(candidate))
             {
                 videoPath = candidate;
@@ -2361,10 +2361,10 @@ internal static class Program
             return 1;
         }
 
-        var outRedump = outRebuild ?? DeriveRedumpPath(xisoPath);
+        string outRedump = outRebuild ?? DeriveRedumpPath(xisoPath);
 
         // #15 (xdvdfs #36): the output is written while the parts are read.
-        var rebuildRefusal = CliOutputGuard.CheckRebuildOutput(outRedump, secPath,
+        string? rebuildRefusal = CliOutputGuard.CheckRebuildOutput(outRedump, secPath,
             xisoPath, videoPath, fillerOrSeed, updatePath);
         if (rebuildRefusal != null)
         {
@@ -2377,7 +2377,7 @@ internal static class Program
 
         try
         {
-            var ok = XisoRedump.RebuildRedump(xisoPath, videoPath, fillerOrSeed, updatePath, outRedump, secPath,
+            bool ok = XisoRedump.RebuildRedump(xisoPath, videoPath, fillerOrSeed, updatePath, outRedump, secPath,
                 quiet: Logger.Quiet);
             if (!ok)
             {
@@ -2398,15 +2398,15 @@ internal static class Program
     private static int RunBuildImage(string[] args, int optind)
     {
         string? specFile = null;
-        var mapRaw = new List<string>();
+        List<string> mapRaw = new();
         string? metaOutput = null;
-        var dryRun = false;
+        bool dryRun = false;
         ulong? fileTime = null;
-        var positionals = new List<string>();
+        List<string> positionals = new();
 
-        for (var i = optind; i < args.Length; i++)
+        for (int i = optind; i < args.Length; i++)
         {
-            var a = args[i];
+            string a = args[i];
             if (string.Equals(a, "-f", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--file", StringComparison.OrdinalIgnoreCase))
             {
@@ -2449,7 +2449,7 @@ internal static class Program
             else if (string.Equals(a, "--file-time", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length ||
-                    !FileTimeHelper.TryParseFileTime(args[i + 1], out var raw, out _))
+                    !FileTimeHelper.TryParseFileTime(args[i + 1], out ulong raw, out _))
                 {
                     Logger.LogErr(
                         "Error: --file-time requires a value (ISO-8601, decimal raw, 0x hex, 'now', or '0' for deterministic images)\n");
@@ -2509,15 +2509,15 @@ internal static class Program
             return 1;
         }
 
-        var sourcePathStr = positionals.Count >= 1 ? positionals[0] : Directory.GetCurrentDirectory();
-        var imagePathStr = positionals.Count >= 2 ? positionals[1] : null;
+        string sourcePathStr = positionals.Count >= 1 ? positionals[0] : Directory.GetCurrentDirectory();
+        string? imagePathStr = positionals.Count >= 2 ? positionals[1] : null;
 
         // Resolve sourceDir and specPath candidate
         string sourceDir;
         string specPath;
         {
-            var isDir = false;
-            var isFile = false;
+            bool isDir = false;
+            bool isFile = false;
             try
             {
                 isDir = Directory.Exists(sourcePathStr) &&
@@ -2558,14 +2558,14 @@ internal static class Program
                 specPath = Path.GetFullPath(specFile);
         }
 
-        var rules = new List<RemapRule>();
+        List<RemapRule> rules = new();
         string? specOutput = null;
 
         if (mapRaw.Count > 0)
         {
-            foreach (var raw in mapRaw)
+            foreach (string raw in mapRaw)
             {
-                if (!RemapRule.TryParse(raw, out var r, out var err))
+                if (!RemapRule.TryParse(raw, out RemapRule? r, out string? err))
                 {
                     Logger.LogErr($"Error: invalid map rule \"{raw}\": {err}\n");
                     return 1;
@@ -2582,7 +2582,7 @@ internal static class Program
             {
                 try
                 {
-                    (var outp, var parsed) = RemapFilesystem.ParseSpecFile(specPath);
+                    (string? outp, List<RemapRule> parsed) = RemapFilesystem.ParseSpecFile(specPath);
                     specOutput = outp;
                     rules.AddRange(parsed);
                 }
@@ -2619,9 +2619,9 @@ internal static class Program
         else
         {
             // Default: <sourceDir>.xiso.iso sibling of sourceDir
-            var trimmed = sourceDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var parent = Path.GetDirectoryName(trimmed) ?? Directory.GetCurrentDirectory();
-            var name = Path.GetFileName(trimmed);
+            string trimmed = sourceDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string parent = Path.GetDirectoryName(trimmed) ?? Directory.GetCurrentDirectory();
+            string name = Path.GetFileName(trimmed);
             if (string.IsNullOrEmpty(name)) name = "image";
             // with_extension is_dir=true logic: append .xiso.iso
             outputIso = Path.Combine(parent, name + ".xiso.iso");
@@ -2632,8 +2632,8 @@ internal static class Program
         {
             try
             {
-                var list = RemapFilesystem.DryRunRemap(sourceDir, rules);
-                foreach ((var host, var guest) in list)
+                IReadOnlyList<(string HostPath, string ImagePath)> list = RemapFilesystem.DryRunRemap(sourceDir, rules);
+                foreach ((string host, string guest) in list)
                     Console.WriteLine($"{host} -> {guest}");
                 return 0;
             }
@@ -2652,7 +2652,7 @@ internal static class Program
             }
 
             // Ensure output directory exists
-            var outDir = Path.GetDirectoryName(outputIso);
+            string? outDir = Path.GetDirectoryName(outputIso);
             if (!string.IsNullOrEmpty(outDir))
                 Directory.CreateDirectory(outDir);
             Logger.Log($"{Constants.Banner}");
@@ -2670,12 +2670,12 @@ internal static class Program
         }
 
         optind++;
-        var mapRaw = new List<string>();
+        List<string> mapRaw = new();
         string? metaOutput = null;
-        var positionals = new List<string>();
-        for (var i = optind; i < args.Length; i++)
+        List<string> positionals = new();
+        for (int i = optind; i < args.Length; i++)
         {
-            var a = args[i];
+            string a = args[i];
             if (string.Equals(a, "-m", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--map", StringComparison.OrdinalIgnoreCase))
             {
@@ -2728,10 +2728,10 @@ internal static class Program
             return 1;
         }
 
-        var rules = new List<RemapRule>();
-        foreach (var raw in mapRaw)
+        List<RemapRule> rules = new();
+        foreach (string raw in mapRaw)
         {
-            if (!RemapRule.TryParse(raw, out var r, out var err))
+            if (!RemapRule.TryParse(raw, out RemapRule? r, out string? err))
             {
                 Logger.LogErr($"Error: invalid map rule \"{raw}\": {err}\n");
                 return 1;
@@ -2740,8 +2740,8 @@ internal static class Program
             rules.Add(r!);
         }
 
-        var outFile = positionals.Count == 1 ? positionals[0] : null;
-        var toml = RemapFilesystem.GenerateSpecText(rules, metaOutput);
+        string? outFile = positionals.Count == 1 ? positionals[0] : null;
+        string toml = RemapFilesystem.GenerateSpecText(rules, metaOutput);
         if (outFile != null)
         {
             try
@@ -2766,19 +2766,19 @@ internal static class Program
     private static int RunCompressMode(string[] args, int optind)
     {
         string? output = null;
-        var level = 9;
+        int level = 9;
         // xdvdfs compress always writes through ciso::split::SplitOutput (split point 0xffbf6000,
         // ~4 GiB). Match that by default; --ciso-split overrides the point, --ciso-split 0
         // writes a single .cso.
         long? splitBytes = CisoWriter.DefaultSplitPoint;
-        var version = CisoWriter.VersionLz4;
-        var assumeYes = false;
-        var assumeNo = false;
-        var positionals = new List<string>();
+        byte version = CisoWriter.VersionLz4;
+        bool assumeYes = false;
+        bool assumeNo = false;
+        List<string> positionals = new();
 
-        for (var i = optind; i < args.Length; i++)
+        for (int i = optind; i < args.Length; i++)
         {
-            var a = args[i];
+            string a = args[i];
             if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
             {
@@ -2811,7 +2811,7 @@ internal static class Program
                     return 1;
                 }
 
-                var v = args[++i];
+                string v = args[++i];
                 if (string.Equals(v, "1", StringComparison.OrdinalIgnoreCase))
                 {
                     version = CisoWriter.VersionDeflate;
@@ -2830,7 +2830,7 @@ internal static class Program
             else if (string.Equals(a, "--ciso-split", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(a, "--split", StringComparison.OrdinalIgnoreCase))
             {
-                if (i + 1 >= args.Length || !long.TryParse(args[i + 1], CultureInfo.InvariantCulture, out var sb) ||
+                if (i + 1 >= args.Length || !long.TryParse(args[i + 1], CultureInfo.InvariantCulture, out long sb) ||
                     sb < 0)
                 {
                     Logger.LogErr("Error: --ciso-split requires a non-negative integer (bytes)\n");
@@ -2903,12 +2903,12 @@ internal static class Program
             return 1;
         }
 
-        var source = positionals[0];
-        var outCso = positionals.Count == 2 ? positionals[1] : output;
+        string source = positionals[0];
+        string? outCso = positionals.Count == 2 ? positionals[1] : output;
 
         // #15 (xdvdfs #36): refuse before the -y/-n prompt, not after it.
-        var probeCsoBase = outCso ?? CisoWriter.DeriveDefaultCsoPath(source, Directory.Exists(source));
-        var compressRefusal = CliOutputGuard.CheckImageOutput(source, probeCsoBase);
+        string probeCsoBase = outCso ?? CisoWriter.DeriveDefaultCsoPath(source, Directory.Exists(source));
+        string? compressRefusal = CliOutputGuard.CheckImageOutput(source, probeCsoBase);
         if (compressRefusal != null)
         {
             Logger.LogErr(compressRefusal);
@@ -2917,7 +2917,7 @@ internal static class Program
 
         // Resolve the path CompressToCso will write (first split part when splitting)
         // so an existing output triggers the -y/-n prompt instead of silent overwrite.
-        var probeCso = probeCsoBase;
+        string probeCso = probeCsoBase;
         if (splitBytes.HasValue)
             probeCso = Path.ChangeExtension(probeCso, "1.cso"); // CisoSplitFile.PartPath(_, 0) parity
         if (!OverwritePrompt.ConfirmOverwrite(probeCso, assumeYes, assumeNo))
@@ -2926,7 +2926,7 @@ internal static class Program
         try
         {
             Logger.Log(Constants.Banner);
-            var rc = CisoWriter.CompressToCso(source, outCso, level, splitBytes, version);
+            int rc = CisoWriter.CompressToCso(source, outCso, level, splitBytes, version);
             return rc;
         }
         catch (Exception ex)
@@ -2939,13 +2939,13 @@ internal static class Program
     private static int RunDecompressMode(string[] args, int optind)
     {
         string? output = null;
-        var assumeYes = false;
-        var assumeNo = false;
-        var positionals = new List<string>();
+        bool assumeYes = false;
+        bool assumeNo = false;
+        List<string> positionals = new();
 
-        for (var i = optind; i < args.Length; i++)
+        for (int i = optind; i < args.Length; i++)
         {
-            var a = args[i];
+            string a = args[i];
             if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
             {
@@ -3020,12 +3020,12 @@ internal static class Program
             return 1;
         }
 
-        var source = positionals[0];
-        var outIso = positionals.Count == 2 ? positionals[1] : output;
+        string source = positionals[0];
+        string? outIso = positionals.Count == 2 ? positionals[1] : output;
 
         // #15 (xdvdfs #36): refuse before the -y/-n prompt, not after it.
-        var probeIso = outIso ?? CisoReader.DeriveDefaultIsoPath(source);
-        var decompressRefusal = CliOutputGuard.CheckImageOutput(source, probeIso);
+        string probeIso = outIso ?? CisoReader.DeriveDefaultIsoPath(source);
+        string? decompressRefusal = CliOutputGuard.CheckImageOutput(source, probeIso);
         if (decompressRefusal != null)
         {
             Logger.LogErr(decompressRefusal);
@@ -3043,7 +3043,7 @@ internal static class Program
         try
         {
             Logger.Log(Constants.Banner);
-            var rc = CisoReader.DecompressToIso(source, outIso);
+            int rc = CisoReader.DecompressToIso(source, outIso);
             return rc;
         }
         catch (Exception ex)
@@ -3055,12 +3055,12 @@ internal static class Program
 
     private static int RunChecksumMode(string[] args, int optind)
     {
-        var silent = false;
-        var positionals = new List<string>();
+        bool silent = false;
+        List<string> positionals = new();
 
-        for (var i = optind; i < args.Length; i++)
+        for (int i = optind; i < args.Length; i++)
         {
-            var a = args[i];
+            string a = args[i];
             if (string.Equals(a, "--silent", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "-s", StringComparison.OrdinalIgnoreCase))
             {
@@ -3105,13 +3105,13 @@ internal static class Program
             return 1;
         }
 
-        var exit = 0;
-        foreach (var iso in positionals)
+        int exit = 0;
+        foreach (string iso in positionals)
         {
             try
             {
-                var hash = XisoChecksum.ComputeImageChecksum(iso);
-                var hex = Convert.ToHexString(hash).ToLowerInvariant();
+                byte[] hash = XisoChecksum.ComputeImageChecksum(iso);
+                string hex = Convert.ToHexString(hash).ToLowerInvariant();
                 if (silent)
                     Logger.Log($"{hex}\n");
                 else
@@ -3135,19 +3135,19 @@ internal static class Program
     /// </summary>
     private static List<string> FindExistingSplitParts(string iso, string splitBase, long partSize, bool halves)
     {
-        var existing = new List<string>();
+        List<string> existing = new();
         try
         {
             if (!File.Exists(iso) || !XisoReader.GetVolumeInfo(iso).IsValid)
                 return existing;
-            var length = new FileInfo(iso).Length;
+            long length = new FileInfo(iso).Length;
             if (length <= 0)
                 return existing;
             long chunk;
             if (halves)
             {
-                var cut = (((length + 1) / 2) + Constants.SectorSize - 1) / Constants.SectorSize *
-                          Constants.SectorSize;
+                long cut = (((length + 1) / 2) + Constants.SectorSize - 1) / Constants.SectorSize *
+                           Constants.SectorSize;
                 chunk = cut <= 0 || cut >= length ? length : cut;
             }
             else
@@ -3157,10 +3157,10 @@ internal static class Program
                     return existing;
             }
 
-            var partCount = (int)Math.Min((long)int.MaxValue, ((length - 1) / chunk) + 1);
-            for (var i = 0; i < partCount; i++)
+            int partCount = (int)Math.Min((long)int.MaxValue, ((length - 1) / chunk) + 1);
+            for (int i = 0; i < partCount; i++)
             {
-                var part = XisoSplitter.PartPath(splitBase, i);
+                string part = XisoSplitter.PartPath(splitBase, i);
                 if (File.Exists(part))
                     existing.Add(part);
             }
@@ -3178,13 +3178,13 @@ internal static class Program
     {
         string? sizeText = null;
         string? outputBase = null;
-        var assumeYes = false;
-        var assumeNo = false;
-        var positionals = new List<string>();
+        bool assumeYes = false;
+        bool assumeNo = false;
+        List<string> positionals = new();
 
-        for (var i = optind; i < args.Length; i++)
+        for (int i = optind; i < args.Length; i++)
         {
-            var a = args[i];
+            string a = args[i];
             if (string.Equals(a, "--size", StringComparison.OrdinalIgnoreCase))
             {
                 if (++i >= args.Length)
@@ -3263,8 +3263,8 @@ internal static class Program
             return 1;
         }
 
-        var halves = false;
-        var partSize = XisoSplitter.DefaultPartSizeBytes;
+        bool halves = false;
+        long partSize = XisoSplitter.DefaultPartSizeBytes;
         if (sizeText != null)
         {
             if (!TryParseSplitSize(sizeText, out partSize, out halves))
@@ -3280,19 +3280,19 @@ internal static class Program
             }
         }
 
-        var exit = 0;
-        foreach (var iso in positionals)
+        int exit = 0;
+        foreach (string iso in positionals)
         {
             try
             {
-                var splitBase = outputBase
-                                ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(iso)) ?? "",
-                                    Path.GetFileNameWithoutExtension(iso));
+                string splitBase = outputBase
+                                   ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(iso)) ?? "",
+                                       Path.GetFileNameWithoutExtension(iso));
                 // CLI-008: prompt before clobbering existing parts (-y deletes the
                 // confirmed colliders first, -n/refusal skips the image).
-                var collisions = FindExistingSplitParts(iso, splitBase, partSize, halves);
-                var refused = false;
-                foreach (var collider in collisions)
+                List<string> collisions = FindExistingSplitParts(iso, splitBase, partSize, halves);
+                bool refused = false;
+                foreach (string collider in collisions)
                 {
                     if (!OverwritePrompt.ConfirmOverwrite(collider, assumeYes, assumeNo))
                     {
@@ -3307,7 +3307,7 @@ internal static class Program
                 {
                     // The source probed valid inside FindExistingSplitParts, so
                     // removing the confirmed colliders cannot strand a bad split.
-                    foreach (var collider in collisions)
+                    foreach (string collider in collisions)
                     {
                         try
                         {
@@ -3326,10 +3326,10 @@ internal static class Program
                 if (refused)
                     continue;
 
-                var parts = halves
+                IReadOnlyList<string> parts = halves
                     ? XisoReader.SplitXisoHalves(iso, splitBase)
                     : XisoReader.SplitXiso(iso, splitBase, partSize);
-                foreach (var part in parts)
+                foreach (string part in parts)
                     Logger.Log($"split: {part}\n");
             }
             catch (Exception ex)
@@ -3345,13 +3345,13 @@ internal static class Program
     private static int RunJoinMode(string[] args, int optind)
     {
         string? outputPath = null;
-        var assumeYes = false;
-        var assumeNo = false;
-        var positionals = new List<string>();
+        bool assumeYes = false;
+        bool assumeNo = false;
+        List<string> positionals = new();
 
-        for (var i = optind; i < args.Length; i++)
+        for (int i = optind; i < args.Length; i++)
         {
-            var a = args[i];
+            string a = args[i];
             if (string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase))
             {
@@ -3419,8 +3419,8 @@ internal static class Program
             return 1;
         }
 
-        var exit = 0;
-        foreach (var first in positionals)
+        int exit = 0;
+        foreach (string first in positionals)
         {
             try
             {
@@ -3433,8 +3433,8 @@ internal static class Program
                     continue;
                 }
 
-                var joined = outputPath
-                             ?? Path.ChangeExtension(first[..^".1.iso".Length], ".iso");
+                string joined = outputPath
+                                ?? Path.ChangeExtension(first[..^".1.iso".Length], ".iso");
                 // CLI-008: prompt before clobbering an existing output.
                 if (File.Exists(joined))
                 {
@@ -3493,7 +3493,7 @@ internal static class Program
         }
 
         long multiplier = 1;
-        var digits = text;
+        string digits = text;
         if (text.Length > 1 && char.IsAsciiLetter(text[^1]))
         {
             multiplier = char.ToUpperInvariant(text[^1]) switch
@@ -3508,7 +3508,7 @@ internal static class Program
             digits = text[..^1];
         }
 
-        if (!long.TryParse(digits, CultureInfo.InvariantCulture, out var count) || count <= 0)
+        if (!long.TryParse(digits, CultureInfo.InvariantCulture, out long count) || count <= 0)
             return false;
         try
         {
@@ -3524,9 +3524,9 @@ internal static class Program
 
     private static string DeriveRedumpPath(string xisoPath)
     {
-        var dir = Path.GetDirectoryName(xisoPath) ?? "";
-        var full = Path.GetFileName(xisoPath) ?? "redump";
-        var baseName = full;
+        string dir = Path.GetDirectoryName(xisoPath) ?? "";
+        string full = Path.GetFileName(xisoPath) ?? "redump";
+        string baseName = full;
         if (full.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase))
         {
             baseName = full[..^5];
@@ -3546,7 +3546,7 @@ internal static class Program
     {
         _ = securitySectorsPath;
         // Single-output guard
-        var singleModeCount = new[] { video, random, seed, wipe, trim, petrify, update, zar }.Count(b => b) == 1;
+        bool singleModeCount = new[] { video, random, seed, wipe, trim, petrify, update, zar }.Count(b => b) == 1;
         // CLI-014: -o with several redump modes used to skip the single-input
         // guard below and then be ignored per-file. Fail loudly instead.
         if (outputName != null && !singleModeCount)
@@ -3564,7 +3564,7 @@ internal static class Program
         // #15 (xdvdfs #36): a single-input -o must not point back at the input.
         if (outputName != null && singleModeCount && isoFiles.Count == 1)
         {
-            var batchRefusal = CliOutputGuard.CheckSingleInputOutput(isoFiles[0], outputName);
+            string? batchRefusal = CliOutputGuard.CheckSingleInputOutput(isoFiles[0], outputName);
             if (batchRefusal != null)
             {
                 Logger.LogErr(batchRefusal);
@@ -3572,13 +3572,13 @@ internal static class Program
             }
         }
 
-        var exit = 0;
+        int exit = 0;
 
         // ZarManager-style batch: a lone --zar over several inputs with an
         // explicit (non-interactive) policy packs in parallel.
         if (zar && singleModeCount && policy.HasValue && jobs > 1 && isoFiles.Count > 1)
         {
-            var failures = 0;
+            int failures = 0;
             Parallel.ForEach(isoFiles, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, jobs) }, iso =>
             {
                 if (DeriveAndPackZar(iso, policy.Value) != 0)
@@ -3587,7 +3587,7 @@ internal static class Program
             return failures;
         }
 
-        foreach (var iso in isoFiles)
+        foreach (string iso in isoFiles)
         {
             long size = 0;
             try
@@ -3601,21 +3601,21 @@ internal static class Program
                 continue;
             }
 
-            var redumpType = XgdTables.GetRedumpIsoTypeBySize(size);
-            var vidType = XgdTables.GetVideoTypeBySize(size);
-            var isRedump = redumpType >= 0;
-            var isVideo = vidType >= 0;
+            int redumpType = XgdTables.GetRedumpIsoTypeBySize(size);
+            int vidType = XgdTables.GetVideoTypeBySize(size);
+            bool isRedump = redumpType >= 0;
+            bool isVideo = vidType >= 0;
 
             // Derive isoOffset / length for partition ops
             long isoOffset = 0;
-            var xisoLen = size;
+            long xisoLen = size;
             if (isRedump)
             {
-                var videoTypeForRedump = -1;
+                int videoTypeForRedump = -1;
                 // Need to get videoType via PVD for wave-dependent sizes — open file
                 try
                 {
-                    using var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+                    using FileStream fs = new(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
                     videoTypeForRedump = XgdTables.GetVideoType(fs, redumpType);
                 }
                 catch
@@ -3623,17 +3623,17 @@ internal static class Program
                     // ignored
                 }
 
-                var vType = videoTypeForRedump >= 0 ? videoTypeForRedump : 0;
-                var xsType = XgdTables.GetXisoTypeFromVideo(vType >= 0 ? vType : 0);
+                int vType = videoTypeForRedump >= 0 ? videoTypeForRedump : 0;
+                int xsType = XgdTables.GetXisoTypeFromVideo(vType >= 0 ? vType : 0);
                 if (xsType < 0 || xsType >= XgdTables.XisoOffset.Length)
                     xsType = redumpType >= 0 ? XgdTables.GetXgdType(redumpType) : 0;
                 isoOffset = XgdTables.XisoOffset[xsType];
                 xisoLen = XgdTables.XisoLength[xsType];
             }
 
-            var dir = Path.GetDirectoryName(iso) ?? "";
-            var full = Path.GetFileName(iso) ?? "output";
-            var baseName = full;
+            string dir = Path.GetDirectoryName(iso) ?? "";
+            string full = Path.GetFileName(iso) ?? "output";
+            string baseName = full;
             if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase))
                 baseName = full[..^".redump.iso".Length];
             else if (full.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase))
@@ -3657,14 +3657,14 @@ internal static class Program
                 }
                 else
                 {
-                    var outVideo = (outputName != null && singleModeCount)
+                    string outVideo = (outputName != null && singleModeCount)
                         ? outputName
                         : Path.Combine(dir, baseName + ".video.iso");
                     if (!ConfirmOutput(outVideo, $"--video for {iso}"))
                     {
                         // Skipped by user choice (-n refusal already failed this file above).
                     }
-                    else if (!XisoRedump.TryExtractVideo(iso, outVideo, out var outPath, Logger.Quiet))
+                    else if (!XisoRedump.TryExtractVideo(iso, outVideo, out string? outPath, Logger.Quiet))
                     {
                         Logger.LogErr($"[ERROR] Failed extracting video from {iso}\n");
                         exit = 1;
@@ -3680,7 +3680,7 @@ internal static class Program
             {
                 if (isVideo)
                 {
-                    var outUpd = (outputName != null && singleModeCount)
+                    string outUpd = (outputName != null && singleModeCount)
                         ? outputName
                         : Path.Combine(dir, "su20076000_00000000");
                     if (!ConfirmOutput(outUpd, $"--update for {iso}"))
@@ -3700,7 +3700,7 @@ internal static class Program
                 else if (isRedump)
                 {
                     // Need video file — if video was just extracted, it will exist at derived path
-                    var videoPath = Path.Combine(dir, baseName + ".video.iso");
+                    string videoPath = Path.Combine(dir, baseName + ".video.iso");
                     if (!File.Exists(videoPath))
                     {
                         if (singleModeCount)
@@ -3716,7 +3716,7 @@ internal static class Program
                     }
                     else
                     {
-                        var outUpd = (outputName != null && singleModeCount)
+                        string outUpd = (outputName != null && singleModeCount)
                             ? outputName
                             : Path.Combine(dir, "su20076000_00000000");
                         if (!ConfirmOutput(outUpd, $"--update for {iso}"))
@@ -3751,12 +3751,12 @@ internal static class Program
             if (random)
             {
                 // Extract filler
-                var outFiller = (outputName != null && singleModeCount)
+                string outFiller = (outputName != null && singleModeCount)
                     ? outputName
                     : Path.Combine(dir, baseName + ".filler");
                 // A declined output counts as handled (skipped) so later ops still run.
-                var fillerConfirmed = ConfirmOutput(outFiller, $"--random for {iso}");
-                var ok = !fillerConfirmed || (isRedump
+                bool fillerConfirmed = ConfirmOutput(outFiller, $"--random for {iso}");
+                bool ok = !fillerConfirmed || (isRedump
                     ? XisoOperations.ExtractFiller(iso, outFiller, isoOffset, xisoLen, Logger.Quiet)
                     : XisoOperations.ExtractFiller(iso, outFiller, 0, null, Logger.Quiet));
                 if (!ok)
@@ -3772,14 +3772,14 @@ internal static class Program
 
             if (seed)
             {
-                var outSeed = (outputName != null && singleModeCount)
+                string outSeed = (outputName != null && singleModeCount)
                     ? outputName
                     : Path.Combine(dir, baseName + ".seed");
                 // A declined output counts as handled (skipped) so later ops still run;
                 // the failure cleanup below must not touch a file we refused to overwrite.
-                var seedConfirmed = ConfirmOutput(outSeed, $"--seed for {iso}");
-                var ok = !seedConfirmed ||
-                         XisoOperations.TryExtractSeed(iso, outSeed, isRedump ? isoOffset : 0, Logger.Quiet);
+                bool seedConfirmed = ConfirmOutput(outSeed, $"--seed for {iso}");
+                bool ok = !seedConfirmed ||
+                          XisoOperations.TryExtractSeed(iso, outSeed, isRedump ? isoOffset : 0, Logger.Quiet);
                 if (!ok)
                 {
                     if (singleModeCount)
@@ -3806,17 +3806,17 @@ internal static class Program
                 }
             }
 
-            var wipeDeclined = false;
+            bool wipeDeclined = false;
 
             if (wipe)
             {
-                var outWiped = (outputName != null && singleModeCount)
+                string outWiped = (outputName != null && singleModeCount)
                     ? outputName
                     : Path.Combine(dir, baseName + ".wiped.xiso");
                 // A declined output counts as handled (skipped) so later ops still run.
-                var wipeConfirmed = ConfirmOutput(outWiped, $"--wipe for {iso}");
+                bool wipeConfirmed = ConfirmOutput(outWiped, $"--wipe for {iso}");
                 wipeDeclined = !wipeConfirmed;
-                var ok = !wipeConfirmed || (isRedump
+                bool ok = !wipeConfirmed || (isRedump
                     ? XisoOperations.WipeFiller(iso, outWiped, isoOffset, Logger.Quiet)
                     : XisoOperations.WipeFiller(iso, outWiped, 0, Logger.Quiet));
 
@@ -3838,14 +3838,14 @@ internal static class Program
             if (trim)
             {
                 // If both wipe and trim are set (e.g. --best/--all), do combined operation to avoid double work
-                var combinedWipeTrim = wipe;
+                bool combinedWipeTrim = wipe;
                 if (combinedWipeTrim)
                 {
-                    var outTrimWiped = (outputName != null && singleModeCount)
+                    string outTrimWiped = (outputName != null && singleModeCount)
                         ? outputName
                         : Path.Combine(dir, baseName + ".trim.wiped.xiso");
                     // The wiped file from previous step is at .wiped.xiso; we could do WipeAndTrim directly from original
-                    var wipedPath = Path.Combine(dir, baseName + ".wiped.xiso");
+                    string wipedPath = Path.Combine(dir, baseName + ".wiped.xiso");
                     // If we already produced wiped, trim it; else do combined.
                     // A declined --wipe must not be consumed+deleted here: fall through to
                     // the combined op (which confirms its own output) instead.
@@ -3877,14 +3877,14 @@ internal static class Program
                     }
                     else
                     {
-                        var outPath2 = (outputName != null && singleModeCount)
+                        string outPath2 = (outputName != null && singleModeCount)
                             ? outputName
                             : Path.Combine(dir, baseName + ".wiped.xiso");
                         // Do combined directly. A declined output counts as handled
                         // (skipped) but the structural continue below still applies.
-                        var trimConfirmed = ConfirmOutput(outPath2, $"--trim for {iso}");
-                        var ok = !trimConfirmed ||
-                                 XisoOperations.WipeAndTrim(iso, outPath2, isRedump ? isoOffset : 0, Logger.Quiet);
+                        bool trimConfirmed = ConfirmOutput(outPath2, $"--trim for {iso}");
+                        bool ok = !trimConfirmed ||
+                                  XisoOperations.WipeAndTrim(iso, outPath2, isRedump ? isoOffset : 0, Logger.Quiet);
                         if (!ok)
                         {
                             Logger.LogErr($"[ERROR] Failed wiping+trimming {iso}\n");
@@ -3901,13 +3901,13 @@ internal static class Program
                 }
                 else
                 {
-                    var outTrim = (outputName != null && singleModeCount)
+                    string outTrim = (outputName != null && singleModeCount)
                         ? outputName
                         : Path.Combine(dir, baseName + ".trim.xiso");
                     // A declined output counts as handled (skipped) so later ops still run.
-                    var trimConfirmed = ConfirmOutput(outTrim, $"--trim for {iso}");
-                    var ok = !trimConfirmed ||
-                             XisoOperations.TrimXiso(iso, outTrim, isRedump ? isoOffset : 0, Logger.Quiet);
+                    bool trimConfirmed = ConfirmOutput(outTrim, $"--trim for {iso}");
+                    bool ok = !trimConfirmed ||
+                              XisoOperations.TrimXiso(iso, outTrim, isRedump ? isoOffset : 0, Logger.Quiet);
                     if (!ok)
                     {
                         Logger.LogErr($"[ERROR] Failed trimming {iso}\n");
@@ -3922,10 +3922,10 @@ internal static class Program
 
             if (petrify)
             {
-                var outSkel = (outputName != null && singleModeCount)
+                string outSkel = (outputName != null && singleModeCount)
                     ? outputName
                     : Path.Combine(dir, baseName + ".skeleton.xiso");
-                var outHash = Path.Combine(dir, baseName + ".hash");
+                string outHash = Path.Combine(dir, baseName + ".hash");
                 // petrify already derives hash path internally if null, but we pass explicit
                 if (!ConfirmOutput(outSkel, $"--petrify for {iso}") ||
                     !ConfirmOutput(outHash, $"--petrify hash for {iso}"))
@@ -3945,7 +3945,7 @@ internal static class Program
 
             if (zar)
             {
-                var outZar = (outputName != null && singleModeCount)
+                string outZar = (outputName != null && singleModeCount)
                     ? outputName
                     : Path.Combine(dir, baseName + ".zar");
                 if (policy == null)
@@ -3994,18 +3994,18 @@ internal static class Program
                 return 1;
             }
 
-            var redumpType = XgdTables.GetRedumpIsoTypeBySize(size);
+            int redumpType = XgdTables.GetRedumpIsoTypeBySize(size);
             long offset = 0;
             if (redumpType >= 0)
             {
-                var xsType = XgdTables.GetXgdType(redumpType);
+                int xsType = XgdTables.GetXgdType(redumpType);
                 if (xsType >= 0 && xsType < XgdTables.XisoOffset.Length)
                     offset = XgdTables.XisoOffset[xsType];
             }
 
-            var isoDir = Path.GetDirectoryName(isoPath) ?? "";
-            var full = Path.GetFileName(isoPath) ?? "output";
-            var stem = full;
+            string isoDir = Path.GetDirectoryName(isoPath) ?? "";
+            string full = Path.GetFileName(isoPath) ?? "output";
+            string stem = full;
             if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase))
                 stem = full[..^".redump.iso".Length];
             else if (full.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase))
@@ -4229,13 +4229,13 @@ internal static class Program
             {
                 // Case-insensitive *.iso matching on every platform (the SearchOption
                 // overload would be case-sensitive on Linux/macOS).
-                var options = new EnumerationOptions
+                EnumerationOptions options = new()
                 {
                     MatchCasing = MatchCasing.CaseInsensitive,
                     RecurseSubdirectories = batchRecursive,
                     AttributesToSkip = FileAttributes.None // include hidden files, like the SearchOption overload
                 };
-                var isoFiles = Directory.EnumerateFiles(batchDir, "*.iso", options)
+                List<string> isoFiles = Directory.EnumerateFiles(batchDir, "*.iso", options)
                     .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
@@ -4256,7 +4256,7 @@ internal static class Program
             }
         }
 
-        var files = args.Skip(optind).ToList();
+        List<string> files = args.Skip(optind).ToList();
         if (packIsoFile != null)
         {
             files.Insert(0, packIsoFile);
@@ -4270,7 +4270,7 @@ internal static class Program
     /// </summary>
     private static string FormatXexModuleFlags(uint flags)
     {
-        var parts = new List<string>();
+        List<string> parts = new();
         if ((flags & 0x01) != 0) parts.Add("Title");
         if ((flags & 0x02) != 0) parts.Add("ExportsToTitle");
         if ((flags & 0x04) != 0) parts.Add("SystemDebugger");
@@ -4301,7 +4301,7 @@ internal static class Program
     /// </summary>
     private static string FormatXexMediaTypes(uint media)
     {
-        var parts = new List<string>();
+        List<string> parts = new();
         if ((media & 0x00000001) != 0) parts.Add("HardDisk");
         if ((media & 0x00000002) != 0) parts.Add("DvdX2");
         if ((media & 0x00000004) != 0) parts.Add("DvdCd");
@@ -4347,7 +4347,7 @@ internal static class Program
     /// </summary>
     private static string FormatXbeMedia(uint media)
     {
-        var parts = new List<string>();
+        List<string> parts = new();
         if ((media & 0x01) != 0) parts.Add("HardDisk");
         if ((media & 0x02) != 0) parts.Add("DvdCd");
         if ((media & 0x04) != 0) parts.Add("Dvd5Ro");
@@ -4364,7 +4364,7 @@ internal static class Program
     /// </summary>
     private static string FormatXbeRegion(uint region)
     {
-        var parts = new List<string>();
+        List<string> parts = new();
         if ((region & 0x01) != 0) parts.Add("NorthAmerica");
         if ((region & 0x02) != 0) parts.Add("Japan");
         if ((region & 0x04) != 0) parts.Add("RestOfWorld");
@@ -4376,7 +4376,7 @@ internal static class Program
     /// </summary>
     private static string FormatAttributes(byte attrs)
     {
-        var parts = new List<string>();
+        List<string> parts = new();
         if ((attrs & Constants.AttributeDir) != 0) parts.Add("Directory");
         if ((attrs & Constants.AttributeRo) != 0) parts.Add("ReadOnly");
         if ((attrs & Constants.AttributeHid) != 0) parts.Add("Hidden");
@@ -4393,8 +4393,8 @@ internal static class Program
         Console.Error.Write(Constants.Banner + """
                                                  Usage:
 
-                                                    XISOSharp.Cli [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
-                                                    XISOSharp.Cli [options] -c <dir> [name] [-c <dir> [name]] ...
+                                                    XISOSharp [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
+                                                    XISOSharp [options] -c <dir> [name] [-c <dir> [name]] ...
 
                                                    Mutually exclusive modes:
 

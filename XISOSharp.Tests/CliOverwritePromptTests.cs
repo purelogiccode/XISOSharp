@@ -13,7 +13,7 @@ public sealed class CliOverwritePromptTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -28,7 +28,7 @@ public sealed class CliOverwritePromptTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_overwrite_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_overwrite_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -36,7 +36,7 @@ public sealed class CliOverwritePromptTests : IDisposable
 
     private string CreateExistingFile()
     {
-        var path = Path.Combine(CreateTempDir(), "out.iso");
+        string path = Path.Combine(CreateTempDir(), "out.iso");
         File.WriteAllText(path, "existing");
         return path;
     }
@@ -44,8 +44,8 @@ public sealed class CliOverwritePromptTests : IDisposable
     [Fact]
     public void MissingFile_ReturnsTrueWithoutPrompting()
     {
-        var missing = Path.Combine(CreateTempDir(), "nope.iso");
-        var output = new StringWriter();
+        string missing = Path.Combine(CreateTempDir(), "nope.iso");
+        StringWriter output = new();
         Assert.True(OverwritePrompt.ConfirmOverwrite(missing, assumeYes: false, assumeNo: false,
             new StringReader("n"), output));
         Assert.Equal(string.Empty, output.ToString());
@@ -54,8 +54,8 @@ public sealed class CliOverwritePromptTests : IDisposable
     [Fact]
     public void AssumeYes_ExistingFile_ReturnsTrueWithoutPrompting()
     {
-        var path = CreateExistingFile();
-        var output = new StringWriter();
+        string path = CreateExistingFile();
+        StringWriter output = new();
         // A "n" answer is queued: it must never be consumed.
         Assert.True(OverwritePrompt.ConfirmOverwrite(path, assumeYes: true, assumeNo: false,
             new StringReader("n"), output));
@@ -65,8 +65,8 @@ public sealed class CliOverwritePromptTests : IDisposable
     [Fact]
     public void AssumeNo_ExistingFile_ReturnsFalseWithError()
     {
-        var path = CreateExistingFile();
-        var output = new StringWriter();
+        string path = CreateExistingFile();
+        StringWriter output = new();
         Assert.False(OverwritePrompt.ConfirmOverwrite(path, assumeYes: false, assumeNo: true,
             new StringReader("y"), output));
         Assert.Contains($"[ERROR] File already exists: {path}", output.ToString(), StringComparison.Ordinal);
@@ -80,11 +80,11 @@ public sealed class CliOverwritePromptTests : IDisposable
     [InlineData(" Yes ")]
     public void Prompt_AcceptsYesAnswers(string answer)
     {
-        var path = CreateExistingFile();
-        var output = new StringWriter();
+        string path = CreateExistingFile();
+        StringWriter output = new();
         Assert.True(OverwritePrompt.ConfirmOverwrite(path, assumeYes: false, assumeNo: false,
             new StringReader(answer), output));
-        var text = output.ToString();
+        string text = output.ToString();
         Assert.Contains($"[WARNING] File already exists: {path}", text, StringComparison.Ordinal);
         Assert.Contains("Would you like to overwrite? (Y/N)", text, StringComparison.Ordinal);
     }
@@ -97,8 +97,8 @@ public sealed class CliOverwritePromptTests : IDisposable
     [InlineData("maybe")]
     public void Prompt_RejectsNonYesAnswers(string answer)
     {
-        var path = CreateExistingFile();
-        var output = new StringWriter();
+        string path = CreateExistingFile();
+        StringWriter output = new();
         Assert.False(OverwritePrompt.ConfirmOverwrite(path, assumeYes: false, assumeNo: false,
             new StringReader(answer), output));
     }
@@ -106,8 +106,8 @@ public sealed class CliOverwritePromptTests : IDisposable
     [Fact]
     public void Prompt_ClosedStdin_Declines()
     {
-        var path = CreateExistingFile();
-        var reader = new StringReader(string.Empty);
+        string path = CreateExistingFile();
+        StringReader reader = new(string.Empty);
         reader.ReadToEnd(); // subsequent ReadLine returns null, like redirected /dev/null
         Assert.False(OverwritePrompt.ConfirmOverwrite(path, assumeYes: false, assumeNo: false,
             reader, new StringWriter()));
@@ -116,7 +116,7 @@ public sealed class CliOverwritePromptTests : IDisposable
     [Fact]
     public void DeriveDefaultCsoPath_FileReplacesExtension()
     {
-        var dir = CreateTempDir();
+        string dir = CreateTempDir();
         Assert.Equal(Path.Combine(dir, "game.cso"),
             CisoWriter.DeriveDefaultCsoPath(Path.Combine(dir, "game.iso"), isDir: false));
         Assert.Equal(Path.Combine(dir, "game.cso"),
@@ -126,8 +126,8 @@ public sealed class CliOverwritePromptTests : IDisposable
     [Fact]
     public void DeriveDefaultCsoPath_DirectoryMapsToSibling()
     {
-        var dir = CreateTempDir();
-        var src = Path.Combine(dir, "src");
+        string dir = CreateTempDir();
+        string src = Path.Combine(dir, "src");
         Directory.CreateDirectory(src);
         Assert.Equal(Path.Combine(dir, "src.cso"), CisoWriter.DeriveDefaultCsoPath(src, isDir: true));
     }
@@ -135,7 +135,7 @@ public sealed class CliOverwritePromptTests : IDisposable
     [Fact]
     public void DeriveDefaultIsoPath_StripsCsoSuffix()
     {
-        var dir = CreateTempDir();
+        string dir = CreateTempDir();
         Assert.Equal(Path.Combine(dir, "game.iso"),
             CisoReader.DeriveDefaultIsoPath(Path.Combine(dir, "game.cso")));
         Assert.Equal(Path.Combine(dir, "game.iso"),

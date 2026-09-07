@@ -68,40 +68,40 @@ public static class XisoRepairer
                 $"Cannot repair split part '{isoPath}' in place; reassemble the image first.");
         }
 
-        var volInfo = XisoReader.GetVolumeInfo(isoPath);
+        VolumeInfo volInfo = XisoReader.GetVolumeInfo(isoPath);
         if (!volInfo.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");
 
-        var initial = XisoReader.AuditXiso(isoPath);
+        AuditResult initial = XisoReader.AuditXiso(isoPath);
         if (volInfo is { RootDirSector: 0, RootDirSize: 0 })
         {
             // Empty volume: the audit passes by definition, nothing to walk.
             return new RepairResult([], initial.Issues, null, dryRun);
         }
 
-        var fileLength = new FileInfo(isoPath).Length;
-        var trustedAttrs = new HashSet<long>();
-        var decidedKeys = new HashSet<string>(StringComparer.Ordinal);
-        var fixedMessages = new List<string>();
+        long fileLength = new FileInfo(isoPath).Length;
+        HashSet<long> trustedAttrs = new();
+        HashSet<string> decidedKeys = new(StringComparer.Ordinal);
+        List<string> fixedMessages = new();
         string? backupPath = null;
-        var appliedAny = false;
+        bool appliedAny = false;
 
         // Converge: fixing a directory's attribute byte makes its table
         // trustworthy, which can reveal fixable entries one level down.
         // Decided fixes are trusted immediately, so dry-run previews converge
         // exactly like real runs.
-        for (var pass = 0; pass < MaxRepairPasses; pass++)
+        for (int pass = 0; pass < MaxRepairPasses; pass++)
         {
-            var entries = CollectEntries(isoPath, volInfo, fileLength, trustedAttrs);
-            var fixes = DecideFixes(entries, trustedAttrs);
+            List<RawEntry> entries = CollectEntries(isoPath, volInfo, fileLength, trustedAttrs);
+            List<PendingFix> fixes = DecideFixes(entries, trustedAttrs);
 
             // Missing optimized tag (the audit flags it; a too-short file
             // cannot hold one, so the fix is only offered when it fits).
-            var tagFix = DecideTagFix(isoPath, fileLength);
+            PendingFix? tagFix = DecideTagFix(isoPath, fileLength);
             if (tagFix != null)
                 fixes.Add(tagFix);
 
-            var fresh = fixes.Where(f => decidedKeys.Add(f.Key)).ToList();
+            List<PendingFix> fresh = fixes.Where(f => decidedKeys.Add(f.Key)).ToList();
             if (fresh.Count == 0)
                 break;
 
@@ -118,13 +118,13 @@ public static class XisoRepairer
                     File.Copy(isoPath, backupPath);
             }
 
-            using var fs = new FileStream(
+            using FileStream fs = new(
                 isoPath,
                 new FileStreamOptions
                 {
                     Mode = FileMode.Open, Access = FileAccess.ReadWrite, Share = FileShare.None, BufferSize = 65536
                 });
-            foreach (var fix in fresh)
+            foreach (PendingFix fix in fresh)
                 fix.Apply(fs);
             appliedAny = true;
         }
@@ -132,7 +132,7 @@ public static class XisoRepairer
         if (!appliedAny)
             return new RepairResult(fixedMessages.ToArray(), initial.Issues, backupPath, dryRun);
 
-        var reaudit = XisoReader.AuditXiso(isoPath);
+        AuditResult reaudit = XisoReader.AuditXiso(isoPath);
         return new RepairResult(fixedMessages.ToArray(), reaudit.Issues, backupPath, dryRun);
     }
 
@@ -160,14 +160,14 @@ public static class XisoRepairer
         long fileLength,
         HashSet<long> trustedAttrs)
     {
-        var entries = new List<RawEntry>();
-        using var fs = new FileStream(
+        List<RawEntry> entries = new();
+        using FileStream fs = new(
             isoPath,
             new FileStreamOptions
             {
                 Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
             });
-        var rootDirStart = ((long)volInfo.RootDirSector * Constants.SectorSize) + volInfo.DiscLseek;
+        long rootDirStart = ((long)volInfo.RootDirSector * Constants.SectorSize) + volInfo.DiscLseek;
         if (rootDirStart < fileLength)
         {
             CollectWalk(fs, rootDirStart, rootDirStart, "/", fileLength, volInfo.DiscLseek,
@@ -203,7 +203,7 @@ public static class XisoRepairer
         if (depth > Constants.MaxTocDepth)
             return;
 
-        var entriesInTable = 0;
+        int entriesInTable = 0;
         Span<byte> shortBuf = stackalloc byte[2];
         Span<byte> intBuf = stackalloc byte[4];
         Span<byte> byteBuf = stackalloc byte[1];
@@ -221,20 +221,20 @@ public static class XisoRepairer
             {
                 fs.Seek(dirStart, SeekOrigin.Begin);
                 ReadExact(fs, shortBuf);
-                var lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+                ushort lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
 
                 if (lOffset == Constants.PadShort && dirStart == tableStart)
                     return;
 
                 if (lOffset == Constants.EmptyDirectorySentinel && dirStart == tableStart)
                 {
-                    var peekPos = fs.Position;
-                    var isAllZeros = false;
+                    long peekPos = fs.Position;
+                    bool isAllZeros = false;
                     try
                     {
                         ReadExact(fs, headerRest);
                         isAllZeros = true;
-                        foreach (var b in headerRest)
+                        foreach (byte b in headerRest)
                         {
                             if (b != 0)
                             {
@@ -255,7 +255,7 @@ public static class XisoRepairer
 
                 if (lOffset != 0 && lOffset != Constants.PadShort)
                 {
-                    var leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
+                    long leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
                     if (leftSeek >= 0 && leftSeek < fileLength)
                     {
                         CollectWalk(fs, leftSeek, tableStart, path, fileLength, discLseek,
@@ -265,32 +265,32 @@ public static class XisoRepairer
 
                 fs.Seek(dirStart + 2, SeekOrigin.Begin);
                 ReadExact(fs, shortBuf);
-                var rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+                ushort rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
 
                 ReadExact(fs, intBuf);
-                var startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+                uint startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
 
                 ReadExact(fs, intBuf);
-                var fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+                uint fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
 
                 ReadExact(fs, byteBuf);
-                var rawAttributes = byteBuf[0];
+                byte rawAttributes = byteBuf[0];
 
                 ReadExact(fs, byteBuf);
-                var filenameLength = byteBuf[0];
+                byte filenameLength = byteBuf[0];
 
-                var nameBuf = new byte[filenameLength];
+                byte[] nameBuf = new byte[filenameLength];
                 ReadExact(fs, nameBuf);
-                var filename = Latin1Encoding.Instance.GetString(nameBuf);
+                string filename = Latin1Encoding.Instance.GetString(nameBuf);
 
                 entries.Add(new RawEntry(dirStart + 12, rawAttributes, dirStart + 14, filename, tableStart, path));
 
-                var attributes = Constants.MaskAttributes(rawAttributes);
-                var trusted = (rawAttributes & Constants.AttributeReservedMask) == 0 ||
-                              trustedAttrs.Contains(dirStart + 12);
+                byte attributes = Constants.MaskAttributes(rawAttributes);
+                bool trusted = (rawAttributes & Constants.AttributeReservedMask) == 0 ||
+                               trustedAttrs.Contains(dirStart + 12);
                 if (trusted && (attributes & Constants.AttributeDir) != 0 && fileSize > 0)
                 {
-                    var sectorOffset = ((long)startSector * Constants.SectorSize) + discLseek;
+                    long sectorOffset = ((long)startSector * Constants.SectorSize) + discLseek;
                     if (sectorOffset >= 0 && sectorOffset < fileLength)
                     {
                         CollectWalk(fs, sectorOffset, sectorOffset, path + filename + "/", fileLength, discLseek,
@@ -300,7 +300,7 @@ public static class XisoRepairer
 
                 if (rOffset != 0 && rOffset != Constants.PadShort)
                 {
-                    var rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
+                    long rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
                     if (rightSeek < 0 || rightSeek >= fileLength)
                         break;
 
@@ -320,10 +320,10 @@ public static class XisoRepairer
 
     private static void ReadExact(FileStream fs, Span<byte> buffer)
     {
-        var offset = 0;
+        int offset = 0;
         while (offset < buffer.Length)
         {
-            var read = fs.Read(buffer[offset..]);
+            int read = fs.Read(buffer[offset..]);
             if (read <= 0)
                 throw new IOException($"Read error: expected {buffer.Length} bytes, got {offset}");
 
@@ -333,23 +333,23 @@ public static class XisoRepairer
 
     private static List<PendingFix> DecideFixes(List<RawEntry> entries, HashSet<long> trustedAttrs)
     {
-        var fixes = new List<PendingFix>();
+        List<PendingFix> fixes = new();
 
         // Collision scope is the containing table: group entries, seed each
         // table's name set with its current names, then apply renames in walk
         // order so two entries sanitizing to the same name collide safely.
-        foreach (var table in entries.GroupBy(static e => e.TableStart))
+        foreach (IGrouping<long, RawEntry> table in entries.GroupBy(static e => e.TableStart))
         {
-            var names = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var e in table)
+            HashSet<string> names = new(StringComparer.Ordinal);
+            foreach (RawEntry e in table)
                 names.Add(e.Name);
 
-            foreach (var e in table)
+            foreach (RawEntry e in table)
             {
                 if ((e.RawAttrs & Constants.AttributeReservedMask) != 0)
                 {
-                    var masked = Constants.MaskAttributes(e.RawAttrs);
-                    var attrOffset = e.AttrOffset;
+                    byte masked = Constants.MaskAttributes(e.RawAttrs);
+                    long attrOffset = e.AttrOffset;
                     trustedAttrs.Add(attrOffset);
                     fixes.Add(new PendingFix(
                         $"attr:{attrOffset}",
@@ -363,15 +363,15 @@ public static class XisoRepairer
 
                 if (e.Name.Contains('/') || e.Name.Contains('\\'))
                 {
-                    var sanitized = e.Name.Replace('/', '_').Replace('\\', '_');
+                    string sanitized = e.Name.Replace('/', '_').Replace('\\', '_');
                     names.Remove(e.Name);
                     if (names.Add(sanitized))
                     {
-                        var nameBytes = Latin1Encoding.Instance.GetBytes(sanitized);
-                        var nameOffset = e.NameOffset;
+                        byte[] nameBytes = Latin1Encoding.Instance.GetBytes(sanitized);
+                        long nameOffset = e.NameOffset;
                         if (nameBytes.Length == Latin1Encoding.Instance.GetByteCount(e.Name))
                         {
-                            var oldRef = $"{e.DirPath}{e.Name}";
+                            string oldRef = $"{e.DirPath}{e.Name}";
                             fixes.Add(new PendingFix(
                                 $"name:{nameOffset}",
                                 $"'{oldRef}' renamed to '{sanitized}' (replaced path separator)",
@@ -409,7 +409,7 @@ public static class XisoRepairer
 
         try
         {
-            using var fs = new FileStream(
+            using FileStream fs = new(
                 isoPath,
                 new FileStreamOptions
                 {
@@ -418,7 +418,7 @@ public static class XisoRepairer
             fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
             Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];
             ReadExact(fs, tagBuf);
-            var tag = Encoding.ASCII.GetString(tagBuf);
+            string tag = Encoding.ASCII.GetString(tagBuf);
             if (tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin], StringComparison.Ordinal))
                 return null;
         }
@@ -428,7 +428,7 @@ public static class XisoRepairer
         }
 
         // Byte-identical to what XisoWriter stores at the same offset.
-        var tagBytes = Encoding.ASCII.GetBytes(Constants.OptimizedTag);
+        byte[] tagBytes = Encoding.ASCII.GetBytes(Constants.OptimizedTag);
         return new PendingFix(
             "tag",
             $"Wrote optimized tag at offset {Constants.OptimizedTagOffset}.",

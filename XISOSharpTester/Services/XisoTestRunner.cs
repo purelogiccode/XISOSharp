@@ -50,10 +50,10 @@ public static class XisoTestRunner
         {
             ArgumentNullException.ThrowIfNull(files);
             Log.Information("Test session starting for {Count} file(s)", files.Count);
-            var session = new TestSessionResult();
-            var exeAvailable = File.Exists(xisoSharpExePath);
+            TestSessionResult session = new();
+            bool exeAvailable = File.Exists(xisoSharpExePath);
 
-            using var wrapper = exeAvailable ? new XisoSharpWrapper(xisoSharpExePath) : null;
+            using XisoSharpWrapper? wrapper = exeAvailable ? new XisoSharpWrapper(xisoSharpExePath) : null;
 
             if (wrapper != null)
             {
@@ -72,16 +72,16 @@ public static class XisoTestRunner
                 }
             }
 
-            for (var i = 0; i < files.Count; i++)
+            for (int i = 0; i < files.Count; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var file = files[i];
-                var fileIndex = i;
-                var currentWrapper = wrapper;
+                XisoFileEntry file = files[i];
+                int fileIndex = i;
+                XisoSharpWrapper? currentWrapper = wrapper;
                 progress?.Report(new TestProgress(file.FileName, fileIndex + 1, files.Count,
                     "Starting", $"Testing {file.FileName}..."));
 
-                var result = await Task
+                PerFileResult result = await Task
                     .Run(() => TestSingleFile(file, currentWrapper, progress, fileIndex, files.Count,
                         cancellationToken), cancellationToken)
                     .ConfigureAwait(false);
@@ -115,8 +115,8 @@ public static class XisoTestRunner
         int totalFiles,
         CancellationToken cancellationToken = default)
     {
-        var sw = Stopwatch.StartNew();
-        var result = new PerFileResult
+        Stopwatch sw = Stopwatch.StartNew();
+        PerFileResult result = new()
         {
             FileName = entry.FileName, FilePath = entry.FilePath, FileSize = entry.FileSize
         };
@@ -125,7 +125,7 @@ public static class XisoTestRunner
         {
             ArgumentNullException.ThrowIfNull(entry);
             cancellationToken.ThrowIfCancellationRequested();
-            var path = entry.FilePath;
+            string path = entry.FilePath;
 
             if (!File.Exists(path))
             {
@@ -194,22 +194,22 @@ public static class XisoTestRunner
         Report(progress, entry.FileName, fileIndex + 1, totalFiles, "Verify",
             "Validating XISO header...");
 
-        var tSw = Stopwatch.StartNew();
+        Stopwatch tSw = Stopwatch.StartNew();
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await using var fs = File.OpenRead(entry.FilePath);
-            (var rootDirSector, var rootDirSize, var discLseek) = XisoReader.VerifyXiso(fs, entry.FileName);
+            await using FileStream fs = File.OpenRead(entry.FilePath);
+            (uint rootDirSector, uint rootDirSize, long discLseek) = XisoReader.VerifyXiso(fs, entry.FileName);
             tSw.Stop();
 
-            var csDetail = $"Valid XISO | RootSector={rootDirSector} RootSize={rootDirSize} DiscLseek={discLseek}";
+            string csDetail = $"Valid XISO | RootSector={rootDirSector} RootSize={rootDirSize} DiscLseek={discLseek}";
 
             if (wrapper is { Available: true })
             {
-                var exeResult = await wrapper.ListFilesAsync(entry.FilePath, cancellationToken)
+                XisoSharpWrapper.Result exeResult = await wrapper.ListFilesAsync(entry.FilePath, cancellationToken)
                     .ConfigureAwait(false);
-                var exeValid = exeResult.ExitCode == 0;
-                var exeDetail = exeValid ? "extract-xiso: valid" : $"extract-xiso: exit code {exeResult.ExitCode}";
+                bool exeValid = exeResult.ExitCode == 0;
+                string exeDetail = exeValid ? "extract-xiso: valid" : $"extract-xiso: exit code {exeResult.ExitCode}";
 
                 result.SubTests.Add(new SubTestResult
                 {
@@ -272,22 +272,22 @@ public static class XisoTestRunner
         Report(progress, entry.FileName, fileIndex + 1, totalFiles, "List",
             "Comparing file listing...");
 
-        var tSw = Stopwatch.StartNew();
+        Stopwatch tSw = Stopwatch.StartNew();
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             // Get C# listing
-            var csOutput = CaptureCSharpListOutput(entry.FilePath, cancellationToken);
-            var csEntries = ParseListOutput(csOutput);
+            string csOutput = CaptureCSharpListOutput(entry.FilePath, cancellationToken);
+            List<ListEntry> csEntries = ParseListOutput(csOutput);
 
             if (wrapper is { Available: true })
             {
-                var exeResult = await wrapper.ListFilesAsync(entry.FilePath, cancellationToken)
+                XisoSharpWrapper.Result exeResult = await wrapper.ListFilesAsync(entry.FilePath, cancellationToken)
                     .ConfigureAwait(false);
                 if (exeResult.ExitCode == 0)
                 {
-                    var exeEntries = ParseListOutput(exeResult.StdOut);
-                    var comparison = CompareListEntries(csEntries, exeEntries);
+                    List<ListEntry> exeEntries = ParseListOutput(exeResult.StdOut);
+                    ListComparison comparison = CompareListEntries(csEntries, exeEntries);
                     tSw.Stop();
 
                     result.SubTests.Add(new SubTestResult
@@ -364,16 +364,16 @@ public static class XisoTestRunner
         Report(progress, entry.FileName, fileIndex + 1, totalFiles, "Extract",
             "Extracting and comparing file hashes...");
 
-        var tSw = Stopwatch.StartNew();
+        Stopwatch tSw = Stopwatch.StartNew();
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var isoLength = TryGetIsoLength(entry.FilePath);
+            long isoLength = TryGetIsoLength(entry.FilePath);
             if (isoLength > 0)
             {
                 // Staging holds two full extractions (C# + native); gate with margin (TST-013).
-                var required = (isoLength * 2) + (100L * 1024 * 1024);
-                var skip = CheckTempSpace(required, entry.FilePath);
+                long required = (isoLength * 2) + (100L * 1024 * 1024);
+                string? skip = CheckTempSpace(required, entry.FilePath);
                 if (skip is not null)
                 {
                     tSw.Stop();
@@ -391,15 +391,15 @@ public static class XisoTestRunner
                 }
             }
 
-            var csTempDir = CreateTempSubDir("cs_extract");
-            var exeTempDir = CreateTempSubDir("exe_extract");
+            string csTempDir = CreateTempSubDir("cs_extract");
+            string exeTempDir = CreateTempSubDir("exe_extract");
             try
             {
                 try
                 {
                     lock (LoggerLock)
                     {
-                        var saveQuiet = Logger.Quiet;
+                        bool saveQuiet = Logger.Quiet;
                         Logger.Quiet = true;
                         try
                         {
@@ -431,7 +431,7 @@ public static class XisoTestRunner
                 // extract-xiso extraction
                 if (wrapper is { Available: true })
                 {
-                    var exeResult = await wrapper.ExtractFilesAsync(entry.FilePath, exeTempDir, cancellationToken)
+                    XisoSharpWrapper.Result exeResult = await wrapper.ExtractFilesAsync(entry.FilePath, exeTempDir, cancellationToken)
                         .ConfigureAwait(false);
                     if (exeResult.ExitCode != 0)
                     {
@@ -446,7 +446,7 @@ public static class XisoTestRunner
                         return;
                     }
 
-                    var comparison = CompareExtractedDirs(csTempDir, exeTempDir);
+                    DirComparison comparison = CompareExtractedDirs(csTempDir, exeTempDir);
                     tSw.Stop();
 
                     result.SubTests.Add(new SubTestResult
@@ -460,7 +460,7 @@ public static class XisoTestRunner
                 else
                 {
                     tSw.Stop();
-                    var csFileCount = CountFiles(csTempDir);
+                    int csFileCount = CountFiles(csTempDir);
                     result.SubTests.Add(new SubTestResult
                     {
                         TestName = "Extract & Hash Compare",
@@ -518,13 +518,13 @@ public static class XisoTestRunner
             return;
         }
 
-        var tSw = Stopwatch.StartNew();
-        var isoLength = TryGetIsoLength(entry.FilePath);
+        Stopwatch tSw = Stopwatch.StartNew();
+        long isoLength = TryGetIsoLength(entry.FilePath);
         if (isoLength > 0)
         {
             // Rewrite stages an input copy plus a rebuilt ISO per side (TST-013).
-            var required = (isoLength * 4) + (100L * 1024 * 1024);
-            var skip = CheckTempSpace(required, entry.FilePath);
+            long required = (isoLength * 4) + (100L * 1024 * 1024);
+            string? skip = CheckTempSpace(required, entry.FilePath);
             if (skip is not null)
             {
                 tSw.Stop();
@@ -542,24 +542,24 @@ public static class XisoTestRunner
             }
         }
 
-        var csWorkDir = CreateTempSubDir("cs_rewrite");
-        var exeWorkDir = CreateTempSubDir("exe_rewrite");
+        string csWorkDir = CreateTempSubDir("cs_rewrite");
+        string exeWorkDir = CreateTempSubDir("exe_rewrite");
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             // C# rewrite
-            var csInput = Path.Combine(csWorkDir, entry.FileName);
+            string csInput = Path.Combine(csWorkDir, entry.FileName);
             File.Copy(entry.FilePath, csInput, true);
 
             // Check if already optimized (tag at offset 31337)
-            await using (var fs = File.OpenRead(csInput))
+            await using (FileStream fs = File.OpenRead(csInput))
             {
                 if (fs.Length > Constants.OptimizedTagOffset + Constants.OptimizedTag.Length)
                 {
                     fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
                     Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTag.Length];
                     fs.ReadExactly(tagBuf);
-                    var tag = Encoding.ASCII.GetString(tagBuf);
+                    string tag = Encoding.ASCII.GetString(tagBuf);
                     if (string.Equals(tag, Constants.OptimizedTag, StringComparison.Ordinal))
                     {
                         tSw.Stop();
@@ -575,12 +575,12 @@ public static class XisoTestRunner
                 }
             }
 
-            var csOutDir = Path.Combine(csWorkDir, "cs_out");
+            string csOutDir = Path.Combine(csWorkDir, "cs_out");
             Directory.CreateDirectory(csOutDir);
 
             lock (LoggerLock)
             {
-                var saveQuiet = Logger.Quiet;
+                bool saveQuiet = Logger.Quiet;
                 Logger.Quiet = true;
                 try
                 {
@@ -611,18 +611,18 @@ public static class XisoTestRunner
 
             // Find the C# output ISO
             // Maybe in csWorkDir
-            var csIsoOutput = Directory.GetFiles(csOutDir, "*.iso").FirstOrDefault() ?? Directory
+            string? csIsoOutput = Directory.GetFiles(csOutDir, "*.iso").FirstOrDefault() ?? Directory
                 .GetFiles(csWorkDir, "*.iso", SearchOption.AllDirectories)
                 .FirstOrDefault(static f => !f.EndsWith(".old", StringComparison.OrdinalIgnoreCase));
 
             // extract-xiso rewrite
-            var exeInput = Path.Combine(exeWorkDir, entry.FileName);
+            string exeInput = Path.Combine(exeWorkDir, entry.FileName);
             File.Copy(entry.FilePath, exeInput, true);
 
-            var exeOutDir = Path.Combine(exeWorkDir, "exe_out");
+            string exeOutDir = Path.Combine(exeWorkDir, "exe_out");
             Directory.CreateDirectory(exeOutDir);
 
-            var exeResult = await wrapper.RewriteAsync(exeInput, exeOutDir, cancellationToken)
+            XisoSharpWrapper.Result exeResult = await wrapper.RewriteAsync(exeInput, exeOutDir, cancellationToken)
                 .ConfigureAwait(false);
             if (exeResult.ExitCode != 0)
             {
@@ -637,7 +637,7 @@ public static class XisoTestRunner
                 return;
             }
 
-            var exeIsoOutput = Directory.GetFiles(exeOutDir, "*.iso").FirstOrDefault();
+            string? exeIsoOutput = Directory.GetFiles(exeOutDir, "*.iso").FirstOrDefault();
 
             if (csIsoOutput == null || exeIsoOutput == null)
             {
@@ -653,11 +653,11 @@ public static class XisoTestRunner
                 return;
             }
 
-            var csHash = HashUtil.ComputeSha256(csIsoOutput);
-            var exeHash = HashUtil.ComputeSha256(exeIsoOutput);
-            var match = string.Equals(csHash, exeHash, StringComparison.Ordinal);
-            var csSize = new FileInfo(csIsoOutput).Length;
-            var exeSize = new FileInfo(exeIsoOutput).Length;
+            string csHash = HashUtil.ComputeSha256(csIsoOutput);
+            string exeHash = HashUtil.ComputeSha256(exeIsoOutput);
+            bool match = string.Equals(csHash, exeHash, StringComparison.Ordinal);
+            long csSize = new FileInfo(csIsoOutput).Length;
+            long exeSize = new FileInfo(exeIsoOutput).Length;
 
             tSw.Stop();
             result.SubTests.Add(new SubTestResult
@@ -699,9 +699,9 @@ public static class XisoTestRunner
         cancellationToken.ThrowIfCancellationRequested();
         lock (LoggerLock)
         {
-            var saveOut = Logger.Out;
-            var saveQuiet = Logger.Quiet;
-            using var sw = new StringWriter(CultureInfo.InvariantCulture);
+            TextWriter saveOut = Logger.Out;
+            bool saveQuiet = Logger.Quiet;
+            using StringWriter sw = new(CultureInfo.InvariantCulture);
             Logger.Out = sw;
             Logger.Quiet = false;
             try
@@ -743,29 +743,29 @@ public static class XisoTestRunner
         try
         {
             ArgumentNullException.ThrowIfNull(output);
-            var entries = new List<ListEntry>();
+            List<ListEntry> entries = new();
 
             // Matches: " - Path: filename                        Size: N bytes,  StartSector: S"
             // or with nesting: " - filename                        Size: N bytes,  StartSector: S"
             // or dir: " - dirname                                 DIR"
-            var fileRegex =
-                new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}Size:\s*(?<size>\d+)\s*bytes,\s*StartSector:\s*(?<sector>\d+)",
+            Regex fileRegex =
+                new(@"^\s*-\s+(?<path>.*?)\s{2,}Size:\s*(?<size>\d+)\s*bytes,\s*StartSector:\s*(?<sector>\d+)",
                     RegexOptions.Multiline | RegexOptions.ExplicitCapture | RegexOptions.Compiled,
                     TimeSpan.FromSeconds(5));
-            var dirRegex = new Regex(@"^\s*-\s+(?<path>.*?)\s{2,}DIR", RegexOptions.Multiline | RegexOptions.Compiled,
+            Regex dirRegex = new(@"^\s*-\s+(?<path>.*?)\s{2,}DIR", RegexOptions.Multiline | RegexOptions.Compiled,
                 TimeSpan.FromSeconds(5));
 
             foreach (Match m in fileRegex.Matches(output))
             {
-                var path = m.Groups["path"].Value.Trim();
-                var size = uint.Parse(m.Groups["size"].Value, CultureInfo.InvariantCulture);
-                var sector = uint.Parse(m.Groups["sector"].Value, CultureInfo.InvariantCulture);
+                string path = m.Groups["path"].Value.Trim();
+                uint size = uint.Parse(m.Groups["size"].Value, CultureInfo.InvariantCulture);
+                uint sector = uint.Parse(m.Groups["sector"].Value, CultureInfo.InvariantCulture);
                 entries.Add(new ListEntry(path, false, size, sector));
             }
 
             foreach (Match m in dirRegex.Matches(output))
             {
-                var path = m.Groups["path"].Value.Trim();
+                string path = m.Groups["path"].Value.Trim();
                 entries.Add(new ListEntry(path, true, 0, 0));
             }
 
@@ -784,22 +784,22 @@ public static class XisoTestRunner
 
     private static ListComparison CompareListEntries(List<ListEntry> csEntries, List<ListEntry> exeEntries)
     {
-        var details = new List<string>();
+        List<string> details = new();
 
         if (csEntries.Count != exeEntries.Count)
         {
             details.Add($"File count: C#={csEntries.Count} extract-xiso={exeEntries.Count}");
         }
 
-        var csByPath = csEntries.ToDictionary(static e => e.Path, StringComparer.OrdinalIgnoreCase);
-        var exeByPath = exeEntries.ToDictionary(static e => e.Path, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, ListEntry> csByPath = csEntries.ToDictionary(static e => e.Path, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, ListEntry> exeByPath = exeEntries.ToDictionary(static e => e.Path, StringComparer.OrdinalIgnoreCase);
 
-        var matchCount = 0;
-        var mismatchCount = 0;
+        int matchCount = 0;
+        int mismatchCount = 0;
 
-        foreach ((var path, var csEntry) in csByPath)
+        foreach ((string path, ListEntry csEntry) in csByPath)
         {
-            if (exeByPath.TryGetValue(path, out var exeEntry))
+            if (exeByPath.TryGetValue(path, out ListEntry? exeEntry))
             {
                 if (csEntry.IsDirectory == exeEntry.IsDirectory &&
                     csEntry.Size == exeEntry.Size &&
@@ -821,13 +821,13 @@ public static class XisoTestRunner
             }
         }
 
-        foreach (var path in exeByPath.Keys.Except(csByPath.Keys, StringComparer.OrdinalIgnoreCase))
+        foreach (string path in exeByPath.Keys.Except(csByPath.Keys, StringComparer.OrdinalIgnoreCase))
         {
             mismatchCount++;
             details.Add($"ONLY IN extract-xiso: {path}");
         }
 
-        var allMatch = mismatchCount == 0;
+        bool allMatch = mismatchCount == 0;
         if (allMatch)
         {
             details.Add($"{matchCount} entries match \u2713");
@@ -840,26 +840,26 @@ public static class XisoTestRunner
 
     private static DirComparison CompareExtractedDirs(string csDir, string exeDir)
     {
-        var details = new List<string>();
-        var mismatchCount = 0;
-        var matchCount = 0;
+        List<string> details = new();
+        int mismatchCount = 0;
+        int matchCount = 0;
 
-        var csFiles = Directory.GetFiles(csDir, "*", SearchOption.AllDirectories)
+        Dictionary<string, (string FullPath, string Relative)> csFiles = Directory.GetFiles(csDir, "*", SearchOption.AllDirectories)
             .Select(f => (FullPath: f, Relative: Path.GetRelativePath(csDir, f)))
             .ToDictionary(static x => x.Relative, StringComparer.OrdinalIgnoreCase);
 
-        var exeFiles = Directory.GetFiles(exeDir, "*", SearchOption.AllDirectories)
+        Dictionary<string, (string FullPath, string Relative)> exeFiles = Directory.GetFiles(exeDir, "*", SearchOption.AllDirectories)
             .Select(f => (FullPath: f, Relative: Path.GetRelativePath(exeDir, f)))
             .ToDictionary(static x => x.Relative, StringComparer.OrdinalIgnoreCase);
 
-        foreach ((var relative, var csPath) in csFiles)
+        foreach ((string relative, (string FullPath, string Relative) csPath) in csFiles)
         {
-            if (exeFiles.TryGetValue(relative, out var exePath))
+            if (exeFiles.TryGetValue(relative, out (string FullPath, string Relative) exePath))
             {
                 try
                 {
-                    var csHash = HashUtil.ComputeSha256(csPath.FullPath);
-                    var exeHash = HashUtil.ComputeSha256(exePath.FullPath);
+                    string csHash = HashUtil.ComputeSha256(csPath.FullPath);
+                    string exeHash = HashUtil.ComputeSha256(exePath.FullPath);
                     if (string.Equals(csHash, exeHash, StringComparison.Ordinal))
                     {
                         matchCount++;
@@ -885,7 +885,7 @@ public static class XisoTestRunner
             }
         }
 
-        foreach (var relative in exeFiles.Keys.Except(csFiles.Keys, StringComparer.OrdinalIgnoreCase))
+        foreach (string relative in exeFiles.Keys.Except(csFiles.Keys, StringComparer.OrdinalIgnoreCase))
         {
             mismatchCount++;
             details.Add($"ONLY IN extract-xiso: {relative}");
@@ -896,7 +896,7 @@ public static class XisoTestRunner
             details.Insert(5, $"... ({matchCount - 5} more matching files)");
         }
 
-        var allMatch = mismatchCount == 0;
+        bool allMatch = mismatchCount == 0;
         if (allMatch)
         {
             details.Clear();
@@ -931,8 +931,8 @@ public static class XisoTestRunner
         {
             // Best-effort delete, but never silent (TST-013): report the leaked size
             // so GB-scale temp leaks are visible in Serilog and the session log.
-            var leakedBytes = GetDirectorySizeSafe(path);
-            var sizeText = leakedBytes >= 0 ? FormatByteCount(leakedBytes) : "unknown size";
+            long leakedBytes = GetDirectorySizeSafe(path);
+            string sizeText = leakedBytes >= 0 ? FormatByteCount(leakedBytes) : "unknown size";
             Log.Warning(ex, "Temp cleanup failed for {Path} ({Size} left behind); manual cleanup may be needed", path,
                 sizeText);
             BugReporter.ReportWarning($"Temp cleanup failed for {path} ({sizeText} left behind)");
@@ -956,7 +956,7 @@ public static class XisoTestRunner
         try
         {
             long total = 0;
-            foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+            foreach (string file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
             {
                 try
                 {
@@ -1000,15 +1000,15 @@ public static class XisoTestRunner
     {
         try
         {
-            var tempRoot = Path.GetPathRoot(Path.GetTempPath());
+            string? tempRoot = Path.GetPathRoot(Path.GetTempPath());
             if (string.IsNullOrEmpty(tempRoot))
                 return null;
 
-            var drive = new DriveInfo(tempRoot);
+            DriveInfo drive = new(tempRoot);
             if (!drive.IsReady)
                 return null;
 
-            var free = drive.AvailableFreeSpace;
+            long free = drive.AvailableFreeSpace;
             if (free >= requiredBytes)
                 return null;
 
@@ -1040,15 +1040,15 @@ public static class XisoTestRunner
     {
         try
         {
-            var root = Path.Combine(Path.GetTempPath(), "XISOSharpTester");
+            string root = Path.Combine(Path.GetTempPath(), "XISOSharpTester");
 
             // Full 128-bit GUID plus a retry loop on collision (TST-012): the old
             // 8-char prefix was only 32 bits and never retried, so parallel runs
             // could collide. Collisions are now astronomically unlikely, and a race
             // still retries instead of reusing a foreign directory.
-            for (var attempt = 0; attempt < 10; attempt++)
+            for (int attempt = 0; attempt < 10; attempt++)
             {
-                var dir = Path.Combine(root, Guid.NewGuid().ToString("N"), name);
+                string dir = Path.Combine(root, Guid.NewGuid().ToString("N"), name);
                 try
                 {
                     if (!Directory.Exists(dir))
@@ -1067,7 +1067,7 @@ public static class XisoTestRunner
                 }
             }
 
-            var fallback = Path.Combine(root, Guid.NewGuid().ToString("N"), name);
+            string fallback = Path.Combine(root, Guid.NewGuid().ToString("N"), name);
             Directory.CreateDirectory(fallback);
             return fallback;
         }

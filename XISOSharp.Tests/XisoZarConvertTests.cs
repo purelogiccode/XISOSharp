@@ -18,7 +18,7 @@ public sealed class XisoZarConvertTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -33,7 +33,7 @@ public sealed class XisoZarConvertTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -41,15 +41,15 @@ public sealed class XisoZarConvertTests : IDisposable
 
     private string CreateSourceDir(Action<string> populate)
     {
-        var src = CreateTempDir("xiso_zc_src");
+        string src = CreateTempDir("xiso_zc_src");
         populate(src);
         return src;
     }
 
     private string CreateIso(string srcDir, int? prependSectors = null)
     {
-        var outDir = CreateTempDir("xiso_zc_iso");
-        var result = XisoWriter.CreateXiso(srcDir, outDir, null, null, out var isoPath, null, null,
+        string outDir = CreateTempDir("xiso_zc_iso");
+        int result = XisoWriter.CreateXiso(srcDir, outDir, null, null, out string? isoPath, null, null,
             prependSectors: prependSectors);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
@@ -58,8 +58,8 @@ public sealed class XisoZarConvertTests : IDisposable
 
     private static Dictionary<string, byte[]> SnapshotFiles(string dir)
     {
-        var map = new Dictionary<string, byte[]>(StringComparer.Ordinal);
-        foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+        Dictionary<string, byte[]> map = new(StringComparer.Ordinal);
+        foreach (string file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
         {
             map[Path.GetRelativePath(dir, file).Replace('\\', '/')] = File.ReadAllBytes(file);
         }
@@ -72,9 +72,9 @@ public sealed class XisoZarConvertTests : IDisposable
     {
         Assert.Equal(expected.Keys.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
             actual.Keys.Order(StringComparer.OrdinalIgnoreCase).ToArray());
-        foreach (var (rel, data) in expected)
+        foreach ((string rel, byte[] data) in expected)
         {
-            Assert.True(actual.TryGetValue(rel, out var got), $"missing {rel}");
+            Assert.True(actual.TryGetValue(rel, out byte[]? got), $"missing {rel}");
             Assert.Equal(data, got);
         }
     }
@@ -94,9 +94,9 @@ public sealed class XisoZarConvertTests : IDisposable
 
     private static byte[] PatternBytes(int length, int seed)
     {
-        var data = new byte[length];
-        var state = (uint)((seed * 2654435761u) + 1);
-        for (var i = 0; i < length; i++)
+        byte[] data = new byte[length];
+        uint state = (uint)((seed * 2654435761u) + 1);
+        for (int i = 0; i < length; i++)
         {
             state = (state * 1664525) + 1013904223;
             data[i] = (byte)(state >> 24);
@@ -113,15 +113,15 @@ public sealed class XisoZarConvertTests : IDisposable
     [Fact]
     public void Convert_RoundTrip_ExtractMatchesSource()
     {
-        var src = CreateSourceDir(PopulateRich);
-        var expected = SnapshotFiles(src);
-        var iso = CreateIso(src);
-        var work = CreateTempDir("xiso_zc_rt");
-        var zar = Path.Combine(work, "game.zar");
+        string src = CreateSourceDir(PopulateRich);
+        Dictionary<string, byte[]> expected = SnapshotFiles(src);
+        string iso = CreateIso(src);
+        string work = CreateTempDir("xiso_zc_rt");
+        string zar = Path.Combine(work, "game.zar");
 
         Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
 
-        var outDir = Path.Combine(work, "out");
+        string outDir = Path.Combine(work, "out");
         ZArchiveTool.Extract(zar, outDir);
         AssertSnapshotsEqual(expected, SnapshotFiles(outDir));
     }
@@ -132,16 +132,16 @@ public sealed class XisoZarConvertTests : IDisposable
         // Highly compressible content: raw block storage would be ~input size,
         // zstd must come in well under it. This fails if the writer regresses
         // to raw-only storage.
-        var src = CreateSourceDir(PopulateRich);
-        var rawTotal = Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories)
+        string src = CreateSourceDir(PopulateRich);
+        long rawTotal = Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories)
             .Sum(f => new FileInfo(f).Length);
-        var iso = CreateIso(src);
-        var work = CreateTempDir("xiso_zc_ratio");
-        var zar = Path.Combine(work, "game.zar");
+        string iso = CreateIso(src);
+        string work = CreateTempDir("xiso_zc_ratio");
+        string zar = Path.Combine(work, "game.zar");
 
         Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
 
-        var zarLen = new FileInfo(zar).Length;
+        long zarLen = new FileInfo(zar).Length;
         Assert.True(zarLen < rawTotal / 2,
             $"ZAR {zarLen} B not < half of raw input {rawTotal} B; compression not engaged?");
     }
@@ -149,19 +149,19 @@ public sealed class XisoZarConvertTests : IDisposable
     [Fact]
     public void Convert_OpensInReader_NamesSizesAndHashes()
     {
-        var src = CreateSourceDir(PopulateRich);
-        var expected = SnapshotFiles(src);
-        var iso = CreateIso(src);
-        var work = CreateTempDir("xiso_zc_rd");
-        var zar = Path.Combine(work, "game.zar");
+        string src = CreateSourceDir(PopulateRich);
+        Dictionary<string, byte[]> expected = SnapshotFiles(src);
+        string iso = CreateIso(src);
+        string work = CreateTempDir("xiso_zc_rd");
+        string zar = Path.Combine(work, "game.zar");
 
         Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
 
-        using var reader = ZArchiveReader.TryOpen(zar);
+        using ZArchiveReader? reader = ZArchiveReader.TryOpen(zar);
         Assert.NotNull(reader);
-        foreach (var (rel, data) in expected)
+        foreach ((string rel, byte[] data) in expected)
         {
-            var h = reader.LookUp(rel);
+            uint h = reader.LookUp(rel);
             Assert.NotEqual(ZArchiveReader.InvalidNode, h);
             Assert.True(reader.IsFile(h));
             Assert.Equal((ulong)data.Length, reader.GetFileSize(h));
@@ -169,7 +169,7 @@ public sealed class XisoZarConvertTests : IDisposable
         }
 
         // Empty directory survives the conversion.
-        var dir = reader.LookUp("sub/emptydir");
+        uint dir = reader.LookUp("sub/emptydir");
         Assert.NotEqual(ZArchiveReader.InvalidNode, dir);
         Assert.True(reader.IsDirectory(dir));
     }
@@ -177,22 +177,22 @@ public sealed class XisoZarConvertTests : IDisposable
     [Fact]
     public void Convert_RemoveUpdate_ExcludesSystemUpdate()
     {
-        var src = CreateSourceDir(d =>
+        string src = CreateSourceDir(d =>
         {
             File.WriteAllText(Path.Combine(d, "default.xbe"), "xbe");
             Directory.CreateDirectory(Path.Combine(d, "$SystemUpdate"));
             File.WriteAllText(Path.Combine(d, "$SystemUpdate", "upd.bin"), "update");
         });
-        var iso = CreateIso(src);
-        var work = CreateTempDir("xiso_zc_su");
-        var zar = Path.Combine(work, "game.zar");
+        string iso = CreateIso(src);
+        string work = CreateTempDir("xiso_zc_su");
+        string zar = Path.Combine(work, "game.zar");
 
-        using (var fs = new FileStream(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
+        using (FileStream fs = new(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
         {
             Assert.True(XisoZarchive.CreateZar(fs, 0, zar, removeUpdate: true, quiet: true));
         }
 
-        var outDir = Path.Combine(work, "out");
+        string outDir = Path.Combine(work, "out");
         ZArchiveTool.Extract(zar, outDir);
         Assert.True(File.Exists(Path.Combine(outDir, "default.xbe")));
         Assert.False(Directory.Exists(Path.Combine(outDir, "$SystemUpdate")));
@@ -201,16 +201,16 @@ public sealed class XisoZarConvertTests : IDisposable
     [Fact]
     public void Convert_IsoOffset_RoundTrip()
     {
-        var src = CreateSourceDir(PopulateRich);
-        var expected = SnapshotFiles(src);
-        var iso = CreateIso(src, prependSectors: 16);
+        string src = CreateSourceDir(PopulateRich);
+        Dictionary<string, byte[]> expected = SnapshotFiles(src);
+        string iso = CreateIso(src, prependSectors: 16);
         const long offset = 16L * Constants.SectorSize;
-        var work = CreateTempDir("xiso_zc_off");
-        var zar = Path.Combine(work, "game.zar");
+        string work = CreateTempDir("xiso_zc_off");
+        string zar = Path.Combine(work, "game.zar");
 
         Assert.True(XisoZarchive.CreateZar(iso, zar, offset, quiet: true));
 
-        var outDir = Path.Combine(work, "out");
+        string outDir = Path.Combine(work, "out");
         ZArchiveTool.Extract(zar, outDir);
         AssertSnapshotsEqual(expected, SnapshotFiles(outDir));
     }
@@ -218,15 +218,15 @@ public sealed class XisoZarConvertTests : IDisposable
     [Fact]
     public void Convert_RawCompressorOption_StillValidArchive()
     {
-        var src = CreateSourceDir(PopulateRich);
-        var expected = SnapshotFiles(src);
-        var iso = CreateIso(src);
-        var work = CreateTempDir("xiso_zc_raw");
-        var zar = Path.Combine(work, "game.zar");
+        string src = CreateSourceDir(PopulateRich);
+        Dictionary<string, byte[]> expected = SnapshotFiles(src);
+        string iso = CreateIso(src);
+        string work = CreateTempDir("xiso_zc_raw");
+        string zar = Path.Combine(work, "game.zar");
 
         Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true, compressor: new ZarRawCompressor()));
 
-        var outDir = Path.Combine(work, "out");
+        string outDir = Path.Combine(work, "out");
         ZArchiveTool.Extract(zar, outDir);
         AssertSnapshotsEqual(expected, SnapshotFiles(outDir));
     }
@@ -234,19 +234,19 @@ public sealed class XisoZarConvertTests : IDisposable
     [Fact]
     public void Convert_HashesMatchSource_Sha256()
     {
-        var src = CreateSourceDir(PopulateRich);
-        var iso = CreateIso(src);
-        var work = CreateTempDir("xiso_zc_hash");
-        var zar = Path.Combine(work, "game.zar");
+        string src = CreateSourceDir(PopulateRich);
+        string iso = CreateIso(src);
+        string work = CreateTempDir("xiso_zc_hash");
+        string zar = Path.Combine(work, "game.zar");
 
         Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
 
-        using var reader = ZArchiveReader.TryOpen(zar);
+        using ZArchiveReader? reader = ZArchiveReader.TryOpen(zar);
         Assert.NotNull(reader);
-        foreach (var file in Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories))
+        foreach (string file in Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories))
         {
-            var rel = Path.GetRelativePath(src, file).Replace('\\', '/');
-            var h = reader.LookUp(rel);
+            string rel = Path.GetRelativePath(src, file).Replace('\\', '/');
+            uint h = reader.LookUp(rel);
             Assert.NotEqual(ZArchiveReader.InvalidNode, h);
             Assert.Equal(
                 SHA256.HashData(File.ReadAllBytes(file)),
@@ -258,19 +258,19 @@ public sealed class XisoZarConvertTests : IDisposable
     public void Interop_ReferenceExeExtractsOurZar()
     {
         // zarchive.exe moved with ZARSharp to the sibling CSharp_ZARSharp repo.
-        var exe = Path.Combine(SolutionRoot(), "..", "CSharp_ZARSharp", "References", "ZArchive-0.1.2", "zarchive.exe");
+        string exe = Path.Combine(SolutionRoot(), "..", "CSharp_ZARSharp", "References", "ZArchive-0.1.2", "zarchive.exe");
         Assert.True(File.Exists(exe), "Missing reference oracle 'Zarchive'.");
 
-        var src = CreateSourceDir(PopulateRich);
-        var expected = SnapshotFiles(src);
-        var iso = CreateIso(src);
-        var work = CreateTempDir("xiso_zc_exe");
-        var zar = Path.Combine(work, "game.zar");
+        string src = CreateSourceDir(PopulateRich);
+        Dictionary<string, byte[]> expected = SnapshotFiles(src);
+        string iso = CreateIso(src);
+        string work = CreateTempDir("xiso_zc_exe");
+        string zar = Path.Combine(work, "game.zar");
 
         Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
 
-        var outDir = Path.Combine(work, "exedra");
-        var psi = new ProcessStartInfo
+        string outDir = Path.Combine(work, "exedra");
+        ProcessStartInfo psi = new()
         {
             FileName = exe,
             RedirectStandardOutput = true,
@@ -280,10 +280,10 @@ public sealed class XisoZarConvertTests : IDisposable
         };
         psi.ArgumentList.Add(zar);
         psi.ArgumentList.Add(outDir);
-        using var proc = Process.Start(psi);
+        using Process? proc = Process.Start(psi);
         Assert.NotNull(proc);
-        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-        var stderrTask = proc.StandardError.ReadToEndAsync();
+        Task<string> stdoutTask = proc.StandardOutput.ReadToEndAsync();
+        Task<string> stderrTask = proc.StandardError.ReadToEndAsync();
         if (!proc.WaitForExit(120000))
         {
             try
@@ -299,8 +299,8 @@ public sealed class XisoZarConvertTests : IDisposable
             Assert.Fail("zarchive.exe timed out and was killed.");
         }
 
-        var stdout = stdoutTask.GetAwaiter().GetResult();
-        var stderr = stderrTask.GetAwaiter().GetResult();
+        string stdout = stdoutTask.GetAwaiter().GetResult();
+        string stderr = stderrTask.GetAwaiter().GetResult();
         Assert.True(proc.ExitCode == 0, $"zarchive.exe failed (exit {proc.ExitCode}): {stderr}{stdout}");
         AssertSnapshotsEqual(expected, SnapshotFiles(outDir));
     }

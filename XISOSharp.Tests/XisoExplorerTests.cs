@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
+using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
 
@@ -18,7 +19,7 @@ public class XisoExplorerTests : IDisposable
         Logger.Quiet = false;
         Logger.RealQuiet = false;
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -33,7 +34,7 @@ public class XisoExplorerTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -41,8 +42,8 @@ public class XisoExplorerTests : IDisposable
 
     private static byte[] BuildXex2()
     {
-        var data = new byte[0x1000];
-        var span = data.AsSpan();
+        byte[] data = new byte[0x1000];
+        Span<byte> span = data.AsSpan();
 
         "XEX2"u8.CopyTo(span);
         BinaryPrimitives.WriteUInt32BigEndian(span[0x04..], 0x89);
@@ -86,16 +87,16 @@ public class XisoExplorerTests : IDisposable
 
     private string CreateExplorerIso()
     {
-        var srcDir = CreateTempDir("xiso_explore_src");
+        string srcDir = CreateTempDir("xiso_explore_src");
         File.WriteAllText(Path.Combine(srcDir, "readme.txt"), "hello explorer");
         File.WriteAllBytes(Path.Combine(srcDir, "empty.bin"), []);
         File.WriteAllBytes(Path.Combine(srcDir, "default.xex"), BuildXex2());
-        var sub = Path.Combine(srcDir, "sub");
+        string sub = Path.Combine(srcDir, "sub");
         Directory.CreateDirectory(sub);
         File.WriteAllBytes(Path.Combine(sub, "nested.bin"), [1, 2, 3, 4, 5]);
 
-        var outputDir = CreateTempDir("xiso_explore_out");
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir("xiso_explore_out");
+        int result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         return isoPath;
@@ -104,18 +105,18 @@ public class XisoExplorerTests : IDisposable
     [Fact]
     public void Open_ValidImage_VolumeValidAndRootChildren()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
 
         Assert.True(explorer.Volume.IsValid);
         Assert.True(explorer.Volume.FileLength > 0);
 
-        var names = explorer.ListChildren("/").Select(n => n.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> names = explorer.ListChildren("/").Select(n => n.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Assert.Contains("readme.txt", names);
         Assert.Contains("empty.bin", names);
         Assert.Contains("default.xex", names);
         Assert.Contains("sub", names);
 
-        var root = explorer.GetNode("/");
+        ExplorerNode? root = explorer.GetNode("/");
         Assert.NotNull(root);
         Assert.True(root.IsDirectory);
     }
@@ -123,15 +124,15 @@ public class XisoExplorerTests : IDisposable
     [Fact]
     public void Open_MissingFile_ThrowsFileNotFound()
     {
-        var missing = Path.Combine(CreateTempDir("xiso_explore"), "nope.iso");
+        string missing = Path.Combine(CreateTempDir("xiso_explore"), "nope.iso");
         Assert.Throws<FileNotFoundException>(() => new XisoExplorer(missing));
     }
 
     [Fact]
     public void Open_GarbageFile_ThrowsXisoFormat()
     {
-        var dir = CreateTempDir("xiso_explore");
-        var garbage = Path.Combine(dir, "garbage.iso");
+        string dir = CreateTempDir("xiso_explore");
+        string garbage = Path.Combine(dir, "garbage.iso");
         File.WriteAllBytes(garbage, new byte[65536]);
         Assert.Throws<XisoFormatException>(() => new XisoExplorer(garbage));
     }
@@ -146,10 +147,10 @@ public class XisoExplorerTests : IDisposable
     [Fact]
     public void ListChildren_Subdirectory_CaseInsensitive()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
 
-        var children = explorer.ListChildren("/SUB");
-        var nested = Assert.Single(children);
+        IReadOnlyList<ExplorerNode> children = explorer.ListChildren("/SUB");
+        ExplorerNode nested = Assert.Single(children);
         Assert.Equal("nested.bin", nested.Name);
         Assert.False(nested.IsDirectory);
         Assert.Equal(5, nested.Size);
@@ -159,23 +160,23 @@ public class XisoExplorerTests : IDisposable
     [Fact]
     public void ListChildren_Missing_ThrowsInvalidData()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
         Assert.Throws<InvalidDataException>(() => explorer.ListChildren("/nope"));
     }
 
     [Fact]
     public void ListChildren_FilePath_ThrowsInvalidData()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
         Assert.Throws<InvalidDataException>(() => explorer.ListChildren("/readme.txt"));
     }
 
     [Fact]
     public void GetNode_File_ReturnsMetadata()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
 
-        var node = explorer.GetNode("/readme.txt");
+        ExplorerNode? node = explorer.GetNode("/readme.txt");
         Assert.NotNull(node);
         Assert.Equal("readme.txt", node.Name);
         Assert.False(node.IsDirectory);
@@ -185,7 +186,7 @@ public class XisoExplorerTests : IDisposable
     [Fact]
     public void GetNode_Missing_ReturnsNull()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
         Assert.Null(explorer.GetNode("/nope.txt"));
     }
 
@@ -205,8 +206,8 @@ public class XisoExplorerTests : IDisposable
     [Fact]
     public void CopyOut_File_BytesEqual()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
-        var dest = Path.Combine(CreateTempDir("xiso_explore"), "readme.txt");
+        XisoExplorer explorer = new(CreateExplorerIso());
+        string dest = Path.Combine(CreateTempDir("xiso_explore"), "readme.txt");
 
         explorer.CopyOut("/readme.txt", dest);
 
@@ -216,8 +217,8 @@ public class XisoExplorerTests : IDisposable
     [Fact]
     public void CopyOut_Directory_Recursive()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
-        var dest = Path.Combine(CreateTempDir("xiso_explore"), "sub_out");
+        XisoExplorer explorer = new(CreateExplorerIso());
+        string dest = Path.Combine(CreateTempDir("xiso_explore"), "sub_out");
 
         explorer.CopyOut("/sub", dest);
 
@@ -227,18 +228,18 @@ public class XisoExplorerTests : IDisposable
     [Fact]
     public void CopyOut_Missing_ThrowsInvalidData()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
-        var dest = Path.Combine(CreateTempDir("xiso_explore"), "nope.txt");
+        XisoExplorer explorer = new(CreateExplorerIso());
+        string dest = Path.Combine(CreateTempDir("xiso_explore"), "nope.txt");
         Assert.Throws<InvalidDataException>(() => explorer.CopyOut("/nope.txt", dest));
     }
 
     [Fact]
     public void Hash_File_MatchesDirectCompute()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
 
-        var hex = explorer.ComputeHashHex("/readme.txt", HashAlgorithmName.SHA256);
-        var expected = Convert.ToHexString(
+        string? hex = explorer.ComputeHashHex("/readme.txt", HashAlgorithmName.SHA256);
+        string expected = Convert.ToHexString(
             XisoReader.ComputeFileHash(explorer.IsoPath, "/readme.txt", HashAlgorithmName.SHA256)!);
 
         Assert.Equal(expected, hex);
@@ -248,9 +249,9 @@ public class XisoExplorerTests : IDisposable
     [Fact]
     public void Hash_EmptyFile_KnownDigest()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
 
-        var hex = explorer.ComputeHashHex("/empty.bin", HashAlgorithmName.SHA256);
+        string? hex = explorer.ComputeHashHex("/empty.bin", HashAlgorithmName.SHA256);
 
         Assert.Equal("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855", hex);
     }
@@ -258,23 +259,23 @@ public class XisoExplorerTests : IDisposable
     [Fact]
     public void Hash_Missing_ReturnsNull()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
         Assert.Null(explorer.ComputeHashHex("/nope.txt", HashAlgorithmName.SHA256));
     }
 
     [Fact]
     public void Hash_Directory_ThrowsInvalidData()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
         Assert.Throws<InvalidDataException>(() => explorer.ComputeHashHex("/sub", HashAlgorithmName.SHA256));
     }
 
     [Fact]
     public void Xex_RealXex_ParsesFields()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
 
-        var xex = explorer.GetXexInfo("/default.xex");
+        XexInfo? xex = explorer.GetXexInfo("/default.xex");
 
         Assert.NotNull(xex);
         Assert.Equal(0x89u, xex.ModuleFlags);
@@ -285,7 +286,7 @@ public class XisoExplorerTests : IDisposable
     [Fact]
     public void Xex_NonXex_ReturnsNull()
     {
-        var explorer = new XisoExplorer(CreateExplorerIso());
+        XisoExplorer explorer = new(CreateExplorerIso());
 
         Assert.Null(explorer.GetXexInfo("/readme.txt"));
         Assert.Null(explorer.GetXexInfo("/sub"));

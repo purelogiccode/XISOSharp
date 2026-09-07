@@ -26,17 +26,17 @@ public static class SecuritySectors
 
         if (!quiet) Logger.Log($"[INFO] Reading security sector ranges {path}\n");
 
-        var securitySectors = new List<int>();
-        using var sr = new StreamReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read));
-        var lineCount = 0;
-        var maxStart = (redumpLength / Constants.SectorSize) - 4096;
+        List<int> securitySectors = new();
+        using StreamReader sr = new(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read));
+        int lineCount = 0;
+        long maxStart = (redumpLength / Constants.SectorSize) - 4096;
         while (sr.ReadLine() is { } line)
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
-            var range = line.Split('-');
+            string[] range = line.Split('-');
             if (range.Length == 2 && int.TryParse(range[0].Trim(), System.Globalization.CultureInfo.InvariantCulture,
-                    out var startSector) &&
-                int.TryParse(range[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var endSector))
+                    out int startSector) &&
+                int.TryParse(range[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out int endSector))
             {
                 if (startSector < 0 || startSector > maxStart || endSector - startSector != 4095)
                 {
@@ -78,17 +78,17 @@ public static class SecuritySectors
     /// </summary>
     public static int[]? ParseLines(IEnumerable<string> lines, long redumpLength, int xgdType, bool quiet = false)
     {
-        var securitySectors = new List<int>();
-        var maxStart = (redumpLength / Constants.SectorSize) - 4096;
-        var lineCount = 0;
-        foreach (var raw in lines)
+        List<int> securitySectors = new();
+        long maxStart = (redumpLength / Constants.SectorSize) - 4096;
+        int lineCount = 0;
+        foreach (string raw in lines)
         {
-            var line = raw.Trim();
+            string line = raw.Trim();
             if (line.Length == 0) continue;
-            var range = line.Split('-');
+            string[] range = line.Split('-');
             if (range.Length == 2 &&
-                int.TryParse(range[0].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var s) &&
-                int.TryParse(range[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var e))
+                int.TryParse(range[0].Trim(), System.Globalization.CultureInfo.InvariantCulture, out int s) &&
+                int.TryParse(range[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out int e))
             {
                 if (s < 0 || s > maxStart || e - s != 4095)
                 {

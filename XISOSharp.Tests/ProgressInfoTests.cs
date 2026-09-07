@@ -16,7 +16,7 @@ public class ProgressInfoTests : IDisposable
         Logger.Quiet = false;
         Logger.RealQuiet = false;
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -31,7 +31,7 @@ public class ProgressInfoTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_prog_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_prog_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -57,7 +57,7 @@ public class ProgressInfoTests : IDisposable
 
     private static string CreateSourceTree()
     {
-        var root = Path.Combine(Path.GetTempPath(), $"xiso_prog_src_{Guid.NewGuid():N}");
+        string root = Path.Combine(Path.GetTempPath(), $"xiso_prog_src_{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(root, "sub", "deep"));
         Directory.CreateDirectory(Path.Combine(root, "empty"));
 
@@ -70,11 +70,11 @@ public class ProgressInfoTests : IDisposable
     [Fact]
     public void CreateXiso_ProgressEvents_ReportCountsFirstAndFinishLast()
     {
-        var src = CreateSourceTree();
-        var outputDir = CreateTempDir();
-        var progress = new CollectingProgress();
+        string src = CreateSourceTree();
+        string outputDir = CreateTempDir();
+        CollectingProgress progress = new();
 
-        var result = XisoWriter.CreateXiso(src, outputDir, null, null, out _, null, null, progress: progress);
+        int result = XisoWriter.CreateXiso(src, outputDir, null, null, out _, null, null, progress: progress);
         Assert.Equal(0, result);
 
         Assert.True(progress.Events.Count >= 5, $"expected at least 5 events, got {progress.Events.Count}");
@@ -89,39 +89,39 @@ public class ProgressInfoTests : IDisposable
     [Fact]
     public void CreateXiso_ProgressEvents_ReportPathsAndSizes()
     {
-        var src = CreateSourceTree();
-        var outputDir = CreateTempDir();
-        var progress = new CollectingProgress();
+        string src = CreateSourceTree();
+        string outputDir = CreateTempDir();
+        CollectingProgress progress = new();
 
         XisoWriter.CreateXiso(src, outputDir, null, null, out _, null, null, progress: progress);
 
-        var dirs = progress.Events.Where(e => e.Type == ProgressInfoType.DirAdded).ToList();
-        var files = progress.Events.Where(e => e.Type == ProgressInfoType.FileAdded).ToList();
+        List<ProgressInfo> dirs = progress.Events.Where(e => e.Type == ProgressInfoType.DirAdded).ToList();
+        List<ProgressInfo> files = progress.Events.Where(e => e.Type == ProgressInfoType.FileAdded).ToList();
 
-        var dirPaths = dirs.Select(d => d.Path ?? "").OrderBy(p => p, StringComparer.Ordinal).ToArray();
+        string[] dirPaths = dirs.Select(d => d.Path ?? "").OrderBy(p => p, StringComparer.Ordinal).ToArray();
         Assert.Equal(["/", "/empty", "/sub", "/sub/deep"], dirPaths);
 
-        var filePaths = files.Select(f => f.Path ?? "").OrderBy(p => p, StringComparer.Ordinal).ToArray();
+        string[] filePaths = files.Select(f => f.Path ?? "").OrderBy(p => p, StringComparer.Ordinal).ToArray();
         Assert.Equal(["/root.txt", "/sub/data.bin", "/sub/deep/nested.txt"], filePaths);
 
-        var dataBin = files.Single(f => string.Equals(f.Path, "/sub/data.bin", StringComparison.Ordinal));
+        ProgressInfo dataBin = files.Single(f => string.Equals(f.Path, "/sub/data.bin", StringComparison.Ordinal));
         Assert.Equal(5000, dataBin.Size);
         Assert.True(dataBin.Sector > 0);
 
-        var rootTxt = files.Single(f => string.Equals(f.Path, "/root.txt", StringComparison.Ordinal));
+        ProgressInfo rootTxt = files.Single(f => string.Equals(f.Path, "/root.txt", StringComparison.Ordinal));
         Assert.Equal(5, rootTxt.Size);
     }
 
     [Fact]
     public void CreateXiso_ProgressEvents_ParentDirectoryPrecedesChildren()
     {
-        var src = CreateSourceTree();
-        var outputDir = CreateTempDir();
-        var progress = new CollectingProgress();
+        string src = CreateSourceTree();
+        string outputDir = CreateTempDir();
+        CollectingProgress progress = new();
 
         XisoWriter.CreateXiso(src, outputDir, null, null, out _, null, null, progress: progress);
 
-        var indexOf = progress.Events
+        Dictionary<(ProgressInfoType Type, string? Path), int> indexOf = progress.Events
             .Select((e, i) => (e, i))
             .ToDictionary(x => (x.e.Type, x.e.Path), x => x.i);
 
@@ -135,11 +135,11 @@ public class ProgressInfoTests : IDisposable
     [Fact]
     public void CreateXiso_ProgressEvents_EmptyDirectoryEmitsDirAddedOnly()
     {
-        var src = CreateTempDir();
+        string src = CreateTempDir();
         Directory.CreateDirectory(Path.Combine(src, "empty"));
         File.WriteAllText(Path.Combine(src, "keep.txt"), "x");
-        var outputDir = CreateTempDir();
-        var progress = new CollectingProgress();
+        string outputDir = CreateTempDir();
+        CollectingProgress progress = new();
 
         XisoWriter.CreateXiso(src, outputDir, null, null, out _, null, null, progress: progress);
 
@@ -152,15 +152,15 @@ public class ProgressInfoTests : IDisposable
     [Fact]
     public void CreateXiso_ProgressEvents_FileSizesSumToSourceBytes()
     {
-        var src = CreateSourceTree();
-        var outputDir = CreateTempDir();
-        var progress = new CollectingProgress();
+        string src = CreateSourceTree();
+        string outputDir = CreateTempDir();
+        CollectingProgress progress = new();
 
         XisoWriter.CreateXiso(src, outputDir, null, null, out _, null, null, progress: progress);
 
-        var expected = Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories)
+        long expected = Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories)
             .Sum(f => new FileInfo(f).Length);
-        var reported = progress.Events.Where(e => e.Type == ProgressInfoType.FileAdded).Sum(e => e.Size);
+        long reported = progress.Events.Where(e => e.Type == ProgressInfoType.FileAdded).Sum(e => e.Size);
 
         Assert.Equal(expected, reported);
     }
@@ -168,15 +168,15 @@ public class ProgressInfoTests : IDisposable
     [Fact]
     public void CreateXiso_ProgressEvents_NoFinishedPackingOnFailure()
     {
-        var src = CreateSourceTree();
-        var outputDir = CreateTempDir();
-        var progress = new CollectingProgress();
+        string src = CreateSourceTree();
+        string outputDir = CreateTempDir();
+        CollectingProgress progress = new();
 
         // A throwing byte-progress callback aborts the write phase mid-operation.
         // (The first invocation — the pre-write total report — is outside the write
         // try-block, so the callback must fail on a later invocation to exercise it.)
-        var calls = 0;
-        var result = XisoWriter.CreateXiso(src, outputDir, null, null, out _, null,
+        int calls = 0;
+        int result = XisoWriter.CreateXiso(src, outputDir, null, null, out _, null,
             (_, _) =>
             {
                 if (++calls > 1) throw new InvalidOperationException("abort");
@@ -191,11 +191,11 @@ public class ProgressInfoTests : IDisposable
     [Fact]
     public void CreateXiso_EmptySource_ReportsZeroCounts()
     {
-        var src = CreateTempDir(); // empty
-        var outputDir = CreateTempDir();
-        var progress = new CollectingProgress();
+        string src = CreateTempDir(); // empty
+        string outputDir = CreateTempDir();
+        CollectingProgress progress = new();
 
-        var result = XisoWriter.CreateXiso(src, outputDir, null, null, out _, null, null, progress: progress);
+        int result = XisoWriter.CreateXiso(src, outputDir, null, null, out _, null, null, progress: progress);
         Assert.Equal(0, result);
 
         Assert.Equal(ProgressInfoType.FileCount, progress.Events[0].Type);
@@ -210,15 +210,15 @@ public class ProgressInfoTests : IDisposable
     [Fact]
     public void Rewrite_WithProgress_ReportsEvents()
     {
-        var src = CreateSourceTree();
-        var createDir = CreateTempDir();
-        XisoWriter.CreateXiso(src, createDir, null, null, out var isoPath, null, null);
+        string src = CreateSourceTree();
+        string createDir = CreateTempDir();
+        XisoWriter.CreateXiso(src, createDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        var rewriteDir = CreateTempDir();
-        var progress = new CollectingProgress();
+        string rewriteDir = CreateTempDir();
+        CollectingProgress progress = new();
 
-        var result = XisoReader.Rewrite(isoPath, rewriteDir, out var rewrittenPath, progress: progress);
+        int result = XisoReader.Rewrite(isoPath, rewriteDir, out string? rewrittenPath, progress: progress);
         Assert.Equal(0, result);
         Assert.NotNull(rewrittenPath);
 
@@ -236,11 +236,11 @@ public class ProgressInfoTests : IDisposable
     [Fact]
     public async Task CreateXisoAsync_WithProgress_ReportsEvents()
     {
-        var src = CreateSourceTree();
-        var outputDir = CreateTempDir();
-        var progress = new CollectingProgress();
+        string src = CreateSourceTree();
+        string outputDir = CreateTempDir();
+        CollectingProgress progress = new();
 
-        (var result, _) = await XisoWriter.CreateXisoAsync(
+        (int result, _) = await XisoWriter.CreateXisoAsync(
             src, outputDir, null, null, null, null, progress: progress);
         Assert.Equal(0, result);
 

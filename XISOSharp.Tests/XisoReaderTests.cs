@@ -72,7 +72,7 @@ public class XisoReaderTests : IDisposable
 
         // BUG-TEST-008: track every temp dir/file so earlier values are not
         // orphaned when several tests share the fixture instance lifetime.
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -95,7 +95,7 @@ public class XisoReaderTests : IDisposable
             }
         }
 
-        foreach (var file in _tempFiles)
+        foreach (string file in _tempFiles)
         {
             try
             {
@@ -121,7 +121,7 @@ public class XisoReaderTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -129,7 +129,7 @@ public class XisoReaderTests : IDisposable
 
     private string CreateTempFile(string prefix, string extension)
     {
-        var file = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}{extension}");
+        string file = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}{extension}");
         _tempFiles.Add(file);
         return file;
     }
@@ -140,10 +140,10 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void VerifyXiso_ValidFile_ReturnsExpectedValues()
     {
-        using var fs = new FileStream(TestIsoPath,
+        using FileStream fs = new(TestIsoPath,
             new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
 
-        (var rootDirSector, var rootDirSize, var discLseek) = XisoReader.VerifyXiso(fs, "source.iso");
+        (uint rootDirSector, uint rootDirSize, long discLseek) = XisoReader.VerifyXiso(fs, "source.iso");
 
         Assert.True(rootDirSector > 0);
         Assert.True(rootDirSize > 0);
@@ -157,7 +157,7 @@ public class XisoReaderTests : IDisposable
     public void VerifyXiso_NonExistentFile_Throws() =>
         Assert.Throws<FileNotFoundException>(static () =>
         {
-            using var fs = new FileStream(NonExistentPath,
+            using FileStream fs = new(NonExistentPath,
                 new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
             XisoReader.VerifyXiso(fs, "missing.iso");
         });
@@ -169,7 +169,7 @@ public class XisoReaderTests : IDisposable
     public void VerifyXiso_InvalidFileNotIso_Throws() =>
         Assert.Throws<IOException>(static () =>
         {
-            using var fs = new FileStream(InvalidFilePath,
+            using FileStream fs = new(InvalidFilePath,
                 new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
             XisoReader.VerifyXiso(fs, "binary.bin");
         });
@@ -180,16 +180,16 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void VerifyXiso_LargeInvalidFile_Throws()
     {
-        var invalidPath = CreateTempFile("xiso_garbage", ".bin");
+        string invalidPath = CreateTempFile("xiso_garbage", ".bin");
         try
         {
-            var data = new byte[Constants.HeaderOffset + Constants.SectorSize];
+            byte[] data = new byte[Constants.HeaderOffset + Constants.SectorSize];
             new Random(42).NextBytes(data);
             File.WriteAllBytes(invalidPath, data);
 
             Assert.Throws<IOException>(() =>
             {
-                using var fs = new FileStream(invalidPath,
+                using FileStream fs = new(invalidPath,
                     new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
                 XisoReader.VerifyXiso(fs, "garbage.bin");
             });
@@ -207,7 +207,7 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void DecodeXiso_ListMode_ReturnsSuccess()
     {
-        var err = XisoReader.DecodeXiso(TestIsoPath, null, ExtractMode.List, out _, true);
+        int err = XisoReader.DecodeXiso(TestIsoPath, null, ExtractMode.List, out _, true);
         Assert.Equal(0, err);
     }
 
@@ -217,14 +217,14 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void DecodeXiso_ExtractMode_ExtractsFiles()
     {
-        var tempDir = CreateTempDir("xiso_extract_test");
+        string tempDir = CreateTempDir("xiso_extract_test");
 
-        var err = XisoReader.DecodeXiso(TestIsoPath, tempDir, ExtractMode.Extract, out _, true);
+        int err = XisoReader.DecodeXiso(TestIsoPath, tempDir, ExtractMode.Extract, out _, true);
 
         Assert.Equal(0, err);
         Assert.True(Directory.Exists(tempDir));
 
-        var files = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories);
+        string[] files = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories);
         Assert.NotEmpty(files);
     }
 
@@ -234,16 +234,16 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void DecodeXiso_ExtractMode_WithoutOutputDir_ExtractsToIsoNamedDir()
     {
-        var cwd = Directory.GetCurrentDirectory();
-        var tempDir = CreateTempDir("xiso_e2e");
+        string cwd = Directory.GetCurrentDirectory();
+        string tempDir = CreateTempDir("xiso_e2e");
         try
         {
             Directory.SetCurrentDirectory(tempDir);
 
-            var err = XisoReader.DecodeXiso(TestIsoPath, null, ExtractMode.Extract, out _, true);
+            int err = XisoReader.DecodeXiso(TestIsoPath, null, ExtractMode.Extract, out _, true);
             Assert.Equal(0, err);
 
-            var extractedDir = Path.Combine(tempDir, "source");
+            string extractedDir = Path.Combine(tempDir, "source");
             Assert.True(Directory.Exists(extractedDir));
             Assert.NotEmpty(Directory.GetFiles(extractedDir, "*", SearchOption.AllDirectories));
         }
@@ -259,10 +259,10 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void DecodeXiso_LargeInvalidFile_Throws()
     {
-        var invalidPath = CreateTempFile("xiso_garbage", ".bin");
+        string invalidPath = CreateTempFile("xiso_garbage", ".bin");
         try
         {
-            var data = new byte[Constants.HeaderOffset + Constants.SectorSize];
+            byte[] data = new byte[Constants.HeaderOffset + Constants.SectorSize];
             new Random(42).NextBytes(data);
             File.WriteAllBytes(invalidPath, data);
 
@@ -295,7 +295,7 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void ExtractErrorException_MessageContainsErrorCode()
     {
-        var ex = new ExtractErrorException(ExtractError.ErrEndOfSector);
+        ExtractErrorException ex = new(ExtractError.ErrEndOfSector);
         Assert.Contains("ErrEndOfSector", ex.Message, StringComparison.Ordinal);
     }
 
@@ -305,7 +305,7 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void ExtractErrorException_MessageContainsErrorCode_NoFiles()
     {
-        var ex = new ExtractErrorException(ExtractError.ErrIsoNoFiles);
+        ExtractErrorException ex = new(ExtractError.ErrIsoNoFiles);
         Assert.Contains("ErrIsoNoFiles", ex.Message, StringComparison.Ordinal);
     }
 
@@ -317,16 +317,16 @@ public class XisoReaderTests : IDisposable
     [Fact]
     public void VerifyXiso_InsaneRootDirSize_ThrowsXisoFormatException()
     {
-        var invalidPath = CreateTempFile("xiso_bad_toc", ".bin");
+        string invalidPath = CreateTempFile("xiso_bad_toc", ".bin");
         try
         {
-            var magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
+            byte[] magic = Encoding.ASCII.GetBytes(Constants.HeaderData);
             const int fileLength = Constants.HeaderOffset + Constants.HeaderDataLength
                                                           + 4 + 4
                                                           + Constants.FileTimeSize + Constants.UnusedSize
                                                           + Constants.HeaderDataLength;
 
-            var data = new byte[fileLength];
+            byte[] data = new byte[fileLength];
             Array.Copy(magic, 0, data, Constants.HeaderOffset, magic.Length);
 
             const int sectorOffset = Constants.HeaderOffset + Constants.HeaderDataLength;
@@ -350,7 +350,7 @@ public class XisoReaderTests : IDisposable
 
             Assert.Throws<XisoFormatException>(() =>
             {
-                using var fs = new FileStream(invalidPath,
+                using FileStream fs = new(invalidPath,
                     new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read });
                 XisoReader.VerifyXiso(fs, "bad_toc.iso");
             });

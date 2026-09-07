@@ -16,7 +16,7 @@ public class XisoZarRebuildTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -31,7 +31,7 @@ public class XisoZarRebuildTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -56,7 +56,7 @@ public class XisoZarRebuildTests : IDisposable
     /// </summary>
     private sealed class ScopedTempParent : IDisposable
     {
-        public string Parent { get; }
+        private string Parent { get; }
 
         private readonly string? _savedTmp;
         private readonly string? _savedTemp;
@@ -64,7 +64,7 @@ public class XisoZarRebuildTests : IDisposable
 
         public ScopedTempParent(List<string> track, string prefix)
         {
-            var realTemp = Path.GetTempPath();
+            string realTemp = Path.GetTempPath();
             Parent = Path.Combine(realTemp, $"{prefix}_{Guid.NewGuid():N}");
             Directory.CreateDirectory(Parent);
             track.Add(Parent);
@@ -122,22 +122,22 @@ public class XisoZarRebuildTests : IDisposable
     [Fact]
     public void RebuildRedump_ZarFileTree_RepacksThenFailsOnVideo()
     {
-        var work = CreateTempDir("xiso_zarrb");
-        var src = Path.Combine(work, "src");
+        string work = CreateTempDir("xiso_zarrb");
+        string src = Path.Combine(work, "src");
         Directory.CreateDirectory(src);
         PopulateSimple(src);
-        var zar = Path.Combine(work, "game.zar");
+        string zar = Path.Combine(work, "game.zar");
         ZArchiveTool.Pack(src, zar);
-        var fakeVideo = Path.Combine(work, "game.video.iso");
+        string fakeVideo = Path.Combine(work, "game.video.iso");
         File.WriteAllBytes(fakeVideo, new byte[2048]);
-        var outRedump = Path.Combine(work, "game.redump.iso");
-        using var tempScope = new ScopedTempParent(_tempDirs, "xiso_zarrb_tmp");
-        var before = tempScope.ZarScratchDirs();
+        string outRedump = Path.Combine(work, "game.redump.iso");
+        using ScopedTempParent tempScope = new(_tempDirs, "xiso_zarrb_tmp");
+        string[] before = tempScope.ZarScratchDirs();
         Assert.Empty(before);
 
         string log;
         bool ok;
-        using (var capture = new LogCapture())
+        using (LogCapture capture = new())
         {
             ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, null, quiet: false);
             log = capture.Output;
@@ -152,27 +152,27 @@ public class XisoZarRebuildTests : IDisposable
     [Fact]
     public void RebuildRedump_ZarSingleEmbeddedXiso_UsedVerbatim()
     {
-        var work = CreateTempDir("xiso_zarrb");
-        var src = Path.Combine(work, "src");
+        string work = CreateTempDir("xiso_zarrb");
+        string src = Path.Combine(work, "src");
         Directory.CreateDirectory(src);
         PopulateSimple(src);
-        var isoDir = CreateTempDir("xiso_zarrb_iso");
-        Assert.Equal(0, XisoWriter.CreateXiso(src, isoDir, null, null, out var isoPath, null, null));
+        string isoDir = CreateTempDir("xiso_zarrb_iso");
+        Assert.Equal(0, XisoWriter.CreateXiso(src, isoDir, null, null, out string? isoPath, null, null));
         Assert.NotNull(isoPath);
-        var single = Path.Combine(work, "single");
+        string single = Path.Combine(work, "single");
         Directory.CreateDirectory(single);
         File.Copy(isoPath, Path.Combine(single, "game.xiso"));
-        var zar = Path.Combine(work, "GAME.ZAR");
+        string zar = Path.Combine(work, "GAME.ZAR");
         ZArchiveTool.Pack(single, zar);
-        var fakeVideo = Path.Combine(work, "game.video.iso");
+        string fakeVideo = Path.Combine(work, "game.video.iso");
         File.WriteAllBytes(fakeVideo, new byte[2048]);
-        var outRedump = Path.Combine(work, "game.redump.iso");
-        using var tempScope = new ScopedTempParent(_tempDirs, "xiso_zarrb_tmp");
+        string outRedump = Path.Combine(work, "game.redump.iso");
+        using ScopedTempParent tempScope = new(_tempDirs, "xiso_zarrb_tmp");
         Assert.Empty(tempScope.ZarScratchDirs());
 
         string log;
         bool ok;
-        using (var capture = new LogCapture())
+        using (LogCapture capture = new())
         {
             ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, null, quiet: false);
             log = capture.Output;
@@ -186,16 +186,16 @@ public class XisoZarRebuildTests : IDisposable
     [Fact]
     public void RebuildRedump_CorruptZar_ReturnsFalse()
     {
-        var work = CreateTempDir("xiso_zarrb");
-        var zar = Path.Combine(work, "bad.zar");
+        string work = CreateTempDir("xiso_zarrb");
+        string zar = Path.Combine(work, "bad.zar");
         File.WriteAllBytes(zar, [0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01]);
-        var fakeVideo = Path.Combine(work, "game.video.iso");
+        string fakeVideo = Path.Combine(work, "game.video.iso");
         File.WriteAllBytes(fakeVideo, new byte[2048]);
-        var outRedump = Path.Combine(work, "game.redump.iso");
+        string outRedump = Path.Combine(work, "game.redump.iso");
 
         string log;
         bool ok;
-        using (var capture = new LogCapture())
+        using (LogCapture capture = new())
         {
             ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, null, quiet: false);
             log = capture.Output;
@@ -210,18 +210,18 @@ public class XisoZarRebuildTests : IDisposable
     {
         // Packing an empty dir yields zero offset records, which the reader rejects —
         // faithful to the C++ reference (zarchivereader.cpp rejects offsetRecords.empty()).
-        var work = CreateTempDir("xiso_zarrb");
-        var empty = Path.Combine(work, "empty");
+        string work = CreateTempDir("xiso_zarrb");
+        string empty = Path.Combine(work, "empty");
         Directory.CreateDirectory(empty);
-        var zar = Path.Combine(work, "empty.zar");
+        string zar = Path.Combine(work, "empty.zar");
         ZArchiveTool.Pack(empty, zar);
-        var fakeVideo = Path.Combine(work, "game.video.iso");
+        string fakeVideo = Path.Combine(work, "game.video.iso");
         File.WriteAllBytes(fakeVideo, new byte[2048]);
-        var outRedump = Path.Combine(work, "game.redump.iso");
+        string outRedump = Path.Combine(work, "game.redump.iso");
 
         string log;
         bool ok;
-        using (var capture = new LogCapture())
+        using (LogCapture capture = new())
         {
             ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, null, quiet: false);
             log = capture.Output;
@@ -234,9 +234,9 @@ public class XisoZarRebuildTests : IDisposable
     [Fact]
     public void RebuildRedump_MissingZar_ThrowsFileNotFoundException()
     {
-        var work = CreateTempDir("xiso_zarrb");
-        var missing = Path.Combine(work, "nope.zar");
-        var fakeVideo = Path.Combine(work, "game.video.iso");
+        string work = CreateTempDir("xiso_zarrb");
+        string missing = Path.Combine(work, "nope.zar");
+        string fakeVideo = Path.Combine(work, "game.video.iso");
         File.WriteAllBytes(fakeVideo, new byte[2048]);
 
         Assert.Throws<FileNotFoundException>(() =>
@@ -247,20 +247,20 @@ public class XisoZarRebuildTests : IDisposable
     [Fact]
     public void TryRebuildFromArgs_ZarXiso_InfersVideoAndMaterializes()
     {
-        var work = CreateTempDir("xiso_zarrb");
-        var src = Path.Combine(work, "src");
+        string work = CreateTempDir("xiso_zarrb");
+        string src = Path.Combine(work, "src");
         Directory.CreateDirectory(src);
         PopulateSimple(src);
-        var zar = Path.Combine(work, "game.zar");
+        string zar = Path.Combine(work, "game.zar");
         ZArchiveTool.Pack(src, zar);
-        var fakeVideo = Path.Combine(work, "game.video.iso");
+        string fakeVideo = Path.Combine(work, "game.video.iso");
         File.WriteAllBytes(fakeVideo, new byte[2048]);
-        var outRedump = Path.Combine(work, "game.redump.iso");
-        using var tempScope = new ScopedTempParent(_tempDirs, "xiso_zarrb_tmp");
+        string outRedump = Path.Combine(work, "game.redump.iso");
+        using ScopedTempParent tempScope = new(_tempDirs, "xiso_zarrb_tmp");
         Assert.Empty(tempScope.ZarScratchDirs());
 
         bool ok;
-        using (var capture = new LogCapture())
+        using (LogCapture capture = new())
         {
             ok = XisoRedump.TryRebuildFromArgs([fakeVideo], zar, outRedump, quiet: false);
             Assert.Contains("Repacking 3 files", capture.Output, StringComparison.Ordinal);
@@ -273,17 +273,17 @@ public class XisoZarRebuildTests : IDisposable
     [Fact]
     public void RebuildRedump_ZarSidecar_Cancellation_ThrowsOperationCanceledException()
     {
-        var work = CreateTempDir("xiso_zarrb");
-        var src = Path.Combine(work, "src");
+        string work = CreateTempDir("xiso_zarrb");
+        string src = Path.Combine(work, "src");
         Directory.CreateDirectory(src);
         PopulateSimple(src);
-        var zar = Path.Combine(work, "game.zar");
+        string zar = Path.Combine(work, "game.zar");
         ZArchiveTool.Pack(src, zar);
-        var fakeVideo = Path.Combine(work, "game.video.iso");
+        string fakeVideo = Path.Combine(work, "game.video.iso");
         File.WriteAllBytes(fakeVideo, new byte[2048]);
-        using var cts = new CancellationTokenSource();
+        using CancellationTokenSource cts = new();
         cts.Cancel();
-        using var tempScope = new ScopedTempParent(_tempDirs, "xiso_zarrb_tmp");
+        using ScopedTempParent tempScope = new(_tempDirs, "xiso_zarrb_tmp");
 
         Assert.Throws<OperationCanceledException>(() =>
             XisoRedump.RebuildRedump(zar, fakeVideo, null, null,

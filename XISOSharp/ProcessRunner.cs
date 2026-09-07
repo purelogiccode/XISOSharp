@@ -50,7 +50,7 @@ public static class ProcessRunner
         ArgumentException.ThrowIfNullOrEmpty(fileName);
         ArgumentNullException.ThrowIfNull(args);
 
-        var psi = new ProcessStartInfo
+        ProcessStartInfo psi = new()
         {
             FileName = fileName,
             UseShellExecute = false,
@@ -60,7 +60,7 @@ public static class ProcessRunner
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
         };
-        foreach (var arg in args)
+        foreach (string arg in args)
         {
             psi.ArgumentList.Add(arg);
         }
@@ -87,18 +87,18 @@ public static class ProcessRunner
 
         using (process)
         {
-            var hasTimeout = timeout.HasValue && timeout.Value != Timeout.InfiniteTimeSpan;
-            using var timeoutCts = hasTimeout ? new CancellationTokenSource(timeout!.Value) : null;
-            using var linkedCts = timeoutCts is null
+            bool hasTimeout = timeout.HasValue && timeout.Value != Timeout.InfiniteTimeSpan;
+            using CancellationTokenSource? timeoutCts = hasTimeout ? new CancellationTokenSource(timeout!.Value) : null;
+            using CancellationTokenSource? linkedCts = timeoutCts is null
                 ? null
                 : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-            var effectiveToken = linkedCts?.Token ?? cancellationToken;
+            CancellationToken effectiveToken = linkedCts?.Token ?? cancellationToken;
 
             // Static callback with state avoids capturing the outer `using var process`
             // (disposed-capture analyzer) and guarantees unregistration before dispose.
             await using (effectiveToken.Register(static state =>
                    {
-                       var proc = (Process)state!;
+                       Process proc = (Process)state!;
                        try
                        {
                            if (!proc.HasExited)
@@ -113,11 +113,11 @@ public static class ProcessRunner
                        }
                    }, process))
             {
-                var stdoutBuilder = new StringBuilder();
-                var stderrBuilder = new StringBuilder();
-                var lineGate = new object();
-                var stdoutTask = PumpAsync(process.StandardOutput, stdoutBuilder, onLine, lineGate);
-                var stderrTask = PumpAsync(process.StandardError, stderrBuilder, onLine, lineGate);
+                StringBuilder stdoutBuilder = new();
+                StringBuilder stderrBuilder = new();
+                object lineGate = new();
+                Task stdoutTask = PumpAsync(process.StandardOutput, stdoutBuilder, onLine, lineGate);
+                Task stderrTask = PumpAsync(process.StandardError, stderrBuilder, onLine, lineGate);
                 try
                 {
                     await process.WaitForExitAsync(effectiveToken).ConfigureAwait(false);
@@ -132,7 +132,7 @@ public static class ProcessRunner
 
                 await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
 
-                var exitCode = GetExitCodeSafe(process);
+                int exitCode = GetExitCodeSafe(process);
                 return new ProcessRunResult
                 {
                     ExitCode = exitCode,

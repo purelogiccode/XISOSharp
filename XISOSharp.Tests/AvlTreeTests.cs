@@ -75,9 +75,9 @@ public class AvlTreeTests
     public void AvlInsert_EmptyTree_BecomesRoot()
     {
         AvlNode? root = null;
-        var node = new AvlNode { Filename = "test" };
+        AvlNode node = new() { Filename = "test" };
 
-        var result = AvlTree.AvlInsert(ref root, node);
+        AvlResult result = AvlTree.AvlInsert(ref root, node);
 
         Assert.Equal(AvlResult.AvlBalanced, result);
         Assert.Same(node, root);
@@ -94,11 +94,11 @@ public class AvlTreeTests
     public void AvlInsert_Duplicate_ReturnsError()
     {
         AvlNode? root = null;
-        var node1 = new AvlNode { Filename = "test" };
-        var node2 = new AvlNode { Filename = "test" };
+        AvlNode node1 = new() { Filename = "test" };
+        AvlNode node2 = new() { Filename = "test" };
 
         AvlTree.AvlInsert(ref root, node1);
-        var result = AvlTree.AvlInsert(ref root, node2);
+        AvlResult result = AvlTree.AvlInsert(ref root, node2);
 
         Assert.Equal(AvlResult.AvlError, result);
     }
@@ -112,11 +112,11 @@ public class AvlTreeTests
     public void AvlInsert_CaseInsensitiveDuplicate_ReturnsError()
     {
         AvlNode? root = null;
-        var node1 = new AvlNode { Filename = "test" };
-        var node2 = new AvlNode { Filename = "TEST" };
+        AvlNode node1 = new() { Filename = "test" };
+        AvlNode node2 = new() { Filename = "TEST" };
 
         AvlTree.AvlInsert(ref root, node1);
-        var result = AvlTree.AvlInsert(ref root, node2);
+        AvlResult result = AvlTree.AvlInsert(ref root, node2);
 
         Assert.Equal(AvlResult.AvlError, result);
     }
@@ -130,9 +130,9 @@ public class AvlTreeTests
     public void AvlFetch_FindsInsertedNode()
     {
         AvlNode? root = null;
-        var node1 = new AvlNode { Filename = "alpha" };
-        var node2 = new AvlNode { Filename = "beta" };
-        var node3 = new AvlNode { Filename = "gamma" };
+        AvlNode node1 = new() { Filename = "alpha" };
+        AvlNode node2 = new() { Filename = "beta" };
+        AvlNode node3 = new() { Filename = "gamma" };
 
         AvlTree.AvlInsert(ref root, node1);
         AvlTree.AvlInsert(ref root, node2);
@@ -161,23 +161,23 @@ public class AvlTreeTests
     public void AvlInsert_MultipleNodes_TreeIsBalanced()
     {
         AvlNode? root = null;
-        var nodes = new List<AvlNode>();
+        List<AvlNode> nodes = new();
 
-        for (var i = 0; i < 100; i++)
+        for (int i = 0; i < 100; i++)
         {
-            var node = new AvlNode { Filename = $"file{i:D3}" };
+            AvlNode node = new() { Filename = $"file{i:D3}" };
             nodes.Add(node);
-            var result = AvlTree.AvlInsert(ref root, node);
+            AvlResult result = AvlTree.AvlInsert(ref root, node);
             Assert.NotEqual(AvlResult.AvlError, result);
         }
 
-        foreach (var node in nodes)
+        foreach (AvlNode node in nodes)
         {
-            var found = AvlTree.AvlFetch(root, node.Filename);
+            AvlNode? found = AvlTree.AvlFetch(root, node.Filename);
             Assert.Same(node, found);
         }
 
-        var depth = GetTreeDepth(root);
+        int depth = GetTreeDepth(root);
         Assert.True(depth <= 12, $"Tree depth {depth} exceeds expected max for 100 nodes (should be ~7)");
     }
 
@@ -190,11 +190,11 @@ public class AvlTreeTests
     public void AvlTraverse_Prefix_VisitsInCorrectOrder()
     {
         AvlNode? root = null;
-        var nodeC = new AvlNode { Filename = "c" };
-        var nodeA = new AvlNode { Filename = "a" };
-        var nodeB = new AvlNode { Filename = "b" };
-        var nodeE = new AvlNode { Filename = "e" };
-        var nodeD = new AvlNode { Filename = "d" };
+        AvlNode nodeC = new() { Filename = "c" };
+        AvlNode nodeA = new() { Filename = "a" };
+        AvlNode nodeB = new() { Filename = "b" };
+        AvlNode nodeE = new() { Filename = "e" };
+        AvlNode nodeD = new() { Filename = "d" };
 
         AvlTree.AvlInsert(ref root, nodeC);
         AvlTree.AvlInsert(ref root, nodeA);
@@ -202,7 +202,7 @@ public class AvlTreeTests
         AvlTree.AvlInsert(ref root, nodeE);
         AvlTree.AvlInsert(ref root, nodeD);
 
-        var visited = new List<string>();
+        List<string> visited = new();
         AvlTree.AvlTraverseDepthFirst(root, static (node, ctx, _) =>
         {
             ((List<string>)ctx!).Add(node.Filename);
@@ -227,12 +227,12 @@ public class AvlTreeTests
     public void AvlTraverse_Infix_VisitsInSortedOrder()
     {
         AvlNode? root = null;
-        foreach (var name in new[] { "z", "a", "m", "q", "b" })
+        foreach (string name in new[] { "z", "a", "m", "q", "b" })
         {
             AvlTree.AvlInsert(ref root, new AvlNode { Filename = name });
         }
 
-        var visited = new List<string>();
+        List<string> visited = new();
         AvlTree.AvlTraverseDepthFirst(root, static (node, ctx, _) =>
         {
             ((List<string>)ctx!).Add(node.Filename);
@@ -256,7 +256,7 @@ public class AvlTreeTests
         AvlTree.AvlInsert(ref root, new AvlNode { Filename = "e" });
         AvlTree.AvlInsert(ref root, new AvlNode { Filename = "b" });
 
-        var visited = new List<string>();
+        List<string> visited = new();
         AvlTree.AvlTraverseDepthFirst(root, static (node, ctx, _) =>
         {
             ((List<string>)ctx!).Add(node.Filename);
@@ -274,7 +274,7 @@ public class AvlTreeTests
     [Fact]
     public void AvlTraverse_NullRoot_ReturnsZero()
     {
-        var result = AvlTree.AvlTraverseDepthFirst(null, static (_, _, _) => 1, null, AvlTraversalMethod.Prefix, 0);
+        int result = AvlTree.AvlTraverseDepthFirst(null, static (_, _, _) => 1, null, AvlTraversalMethod.Prefix, 0);
         Assert.Equal(0, result);
     }
 
@@ -291,8 +291,8 @@ public class AvlTreeTests
         AvlTree.AvlInsert(ref root, new AvlNode { Filename = "b" });
         AvlTree.AvlInsert(ref root, new AvlNode { Filename = "c" });
 
-        var callCount = 0;
-        var result = AvlTree.AvlTraverseDepthFirst(root, (_, _, _) =>
+        int callCount = 0;
+        int result = AvlTree.AvlTraverseDepthFirst(root, (_, _, _) =>
         {
             callCount++;
             return 1;
@@ -311,7 +311,7 @@ public class AvlTreeTests
     [Fact]
     public void EmptySubdirectory_Sentinel_IsNotNullAndIdentifiable()
     {
-        var node = new AvlNode { Filename = "dir", Subdirectory = AvlNode.EmptySubdirectory };
+        AvlNode node = new() { Filename = "dir", Subdirectory = AvlNode.EmptySubdirectory };
 
         Assert.NotNull(node.Subdirectory);
         Assert.True(ReferenceEquals(node.Subdirectory, AvlNode.EmptySubdirectory));
@@ -327,9 +327,9 @@ public class AvlTreeTests
     public void AvlInsert_ManyNodes_AllSkewsValid()
     {
         AvlNode? root = null;
-        for (var i = 0; i < 50; i++)
+        for (int i = 0; i < 50; i++)
         {
-            var node = new AvlNode { Filename = $"f{i:D4}" };
+            AvlNode node = new() { Filename = $"f{i:D4}" };
             AvlTree.AvlInsert(ref root, node);
         }
 
@@ -345,22 +345,22 @@ public class AvlTreeTests
     public void AvlInsert_RandomOrder_Consistent()
     {
         AvlNode? root = null;
-        var rng = new Random(42);
-        var names = Enumerable.Range(0, 200)
+        Random rng = new(42);
+        List<string> names = Enumerable.Range(0, 200)
             .Select(_ => $"file_{rng.Next():X8}")
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
-        foreach (var name in names)
+        foreach (string name in names)
         {
-            var node = new AvlNode { Filename = name };
-            var res = AvlTree.AvlInsert(ref root, node);
+            AvlNode node = new() { Filename = name };
+            AvlResult res = AvlTree.AvlInsert(ref root, node);
             Assert.NotEqual(AvlResult.AvlError, res);
         }
 
         VerifyAvlBalance(root);
 
-        foreach (var name in names)
+        foreach (string name in names)
         {
             Assert.NotNull(AvlTree.AvlFetch(root, name));
         }
@@ -379,8 +379,8 @@ public class AvlTreeTests
         {
             if (node == null) return;
 
-            var leftDepth = GetTreeDepth(node.Left);
-            var rightDepth = GetTreeDepth(node.Right);
+            int leftDepth = GetTreeDepth(node.Left);
+            int rightDepth = GetTreeDepth(node.Right);
             Assert.True(Math.Abs(leftDepth - rightDepth) <= 1,
                 $"Unbalanced at node '{node.Filename}': left={leftDepth}, right={rightDepth}");
 

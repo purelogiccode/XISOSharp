@@ -23,11 +23,11 @@ public static class AvlTree
     /// </returns>
     public static int AvlCompareKey(string lhs, string rhs)
     {
-        var i = 0;
+        int i = 0;
         while (true)
         {
-            var a = i < lhs.Length ? lhs[i] : '\0';
-            var b = i < rhs.Length ? rhs[i] : '\0';
+            char a = i < lhs.Length ? lhs[i] : '\0';
+            char b = i < rhs.Length ? rhs[i] : '\0';
             i++;
 
             if (a is >= 'a' and <= 'z')
@@ -71,7 +71,7 @@ public static class AvlTree
         {
             if (root == null) return null;
 
-            var result = AvlCompareKey(filename, root.Filename);
+            int result = AvlCompareKey(filename, root.Filename);
 
             switch (result)
             {
@@ -106,18 +106,18 @@ public static class AvlTree
             return AvlResult.AvlBalanced;
         }
 
-        var result = AvlCompareKey(node.Filename, root.Filename);
+        int result = AvlCompareKey(node.Filename, root.Filename);
 
         switch (result)
         {
             case < 0:
             {
-                var tmp = AvlInsert(ref root.Left, node);
+                AvlResult tmp = AvlInsert(ref root.Left, node);
                 return tmp == AvlResult.AvlBalanced ? AvlLeftGrown(ref root) : tmp;
             }
             case > 0:
             {
-                var tmp = AvlInsert(ref root.Right, node);
+                AvlResult tmp = AvlInsert(ref root.Right, node);
                 return tmp == AvlResult.AvlBalanced ? AvlRightGrown(ref root) : tmp;
             }
             default:
@@ -160,7 +160,7 @@ public static class AvlTree
                     }
 
                     root.Left.Right.Skew = AvlSkew.NoSkew;
-                    var left = root.Left;
+                    AvlNode left = root.Left;
                     AvlRotateLeft(ref left);
                     root.Left = left;
                 }
@@ -219,7 +219,7 @@ public static class AvlTree
                     }
 
                     root.Right.Left.Skew = AvlSkew.NoSkew;
-                    var right = root.Right;
+                    AvlNode right = root.Right;
                     AvlRotateRight(ref right);
                     root.Right = right;
                 }
@@ -240,7 +240,7 @@ public static class AvlTree
     /// </summary>
     private static void AvlRotateLeft(ref AvlNode root)
     {
-        var tmp = root;
+        AvlNode tmp = root;
         root = root.Right!;
         tmp.Right = root.Left;
         root.Left = tmp;
@@ -251,7 +251,7 @@ public static class AvlTree
     /// </summary>
     private static void AvlRotateRight(ref AvlNode root)
     {
-        var tmp = root;
+        AvlNode tmp = root;
         root = root.Left!;
         tmp.Left = root.Right;
         root.Right = tmp;

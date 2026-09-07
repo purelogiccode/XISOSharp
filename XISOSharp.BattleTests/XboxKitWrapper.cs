@@ -26,7 +26,7 @@ internal sealed class XboxKitWrapper : IDisposable
     /// <summary>Runs the exe with args in <paramref name="workDir"/> (outputs land next to inputs).</summary>
     public (int ExitCode, string StdOut, string StdErr) Run(string workDir, params string[] args)
     {
-        var psi = new ProcessStartInfo
+        ProcessStartInfo psi = new()
         {
             FileName = _exePath,
             WorkingDirectory = workDir,
@@ -37,11 +37,11 @@ internal sealed class XboxKitWrapper : IDisposable
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
         };
-        foreach (var a in args) psi.ArgumentList.Add(a);
+        foreach (string a in args) psi.ArgumentList.Add(a);
 
-        using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start xboxkit.exe");
-        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-        var stderrTask = proc.StandardError.ReadToEndAsync();
+        using Process proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start xboxkit.exe");
+        Task<string> stdoutTask = proc.StandardOutput.ReadToEndAsync();
+        Task<string> stderrTask = proc.StandardError.ReadToEndAsync();
         const int timeoutMs = 600_000;
         if (!proc.WaitForExit(timeoutMs))
         {
@@ -69,8 +69,8 @@ internal sealed class XboxKitWrapper : IDisposable
         }
 
         proc.WaitForExit();
-        var stdout = stdoutTask.GetAwaiter().GetResult();
-        var stderr = stderrTask.GetAwaiter().GetResult();
+        string stdout = stdoutTask.GetAwaiter().GetResult();
+        string stderr = stderrTask.GetAwaiter().GetResult();
         return (proc.ExitCode, stdout, stderr);
     }
 
@@ -83,7 +83,7 @@ internal sealed class XboxKitWrapper : IDisposable
     /// <summary>Rebuild mode: <c>xboxkit &lt;input.xiso&gt; [files...]</c>.</summary>
     public (int ExitCode, string StdOut, string StdErr) Rebuild(string workDir, params string[] parts)
     {
-        var args = new List<string> { "-y", "-q" };
+        List<string> args = new() { "-y", "-q" };
         args.AddRange(parts);
         return Run(workDir, args.ToArray());
     }
@@ -93,8 +93,8 @@ internal sealed class XboxKitWrapper : IDisposable
     {
         try
         {
-            (var code, var so, var se) = Run(Path.GetTempPath(), "--help");
-            var txt = string.IsNullOrWhiteSpace(so) ? se : so;
+            (int code, string so, string se) = Run(Path.GetTempPath(), "--help");
+            string txt = string.IsNullOrWhiteSpace(so) ? se : so;
             return txt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim()
                    ?? $"exit:{code}";
         }

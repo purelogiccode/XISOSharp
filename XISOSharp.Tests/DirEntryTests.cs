@@ -15,7 +15,7 @@ public class DirEntryTests
     [Fact]
     public void New_DirEntry_HasDefaults()
     {
-        var entry = new DirEntry();
+        DirEntry entry = new();
 
         Assert.Null(entry.Left);
         Assert.Null(entry.Parent);
@@ -35,11 +35,11 @@ public class DirEntryTests
     [Fact]
     public void DirEntry_FieldsCanBeSet()
     {
-        var left = new DirEntry();
-        var parent = new DirEntry();
-        var avlNode = new AvlNode();
+        DirEntry left = new();
+        DirEntry parent = new();
+        AvlNode avlNode = new();
 
-        var entry = new DirEntry
+        DirEntry entry = new()
         {
             Left = left,
             Parent = parent,
@@ -70,9 +70,9 @@ public class DirEntryTests
     [Fact]
     public void DirEntry_LinkedLeftSiblings()
     {
-        var a = new DirEntry { Filename = "a" };
-        var b = new DirEntry { Filename = "b", Left = a };
-        var c = new DirEntry { Filename = "c", Left = b };
+        DirEntry a = new() { Filename = "a" };
+        DirEntry b = new() { Filename = "b", Left = a };
+        DirEntry c = new() { Filename = "c", Left = b };
 
         Assert.Same(b, c.Left);
         Assert.Same(a, c.Left.Left);
@@ -85,8 +85,8 @@ public class DirEntryTests
     [Fact]
     public void DirEntry_ParentChain()
     {
-        var leaf = new DirEntry { Filename = "leaf" };
-        var dir = new DirEntry { Filename = "dir" };
+        DirEntry leaf = new() { Filename = "leaf" };
+        DirEntry dir = new() { Filename = "dir" };
         leaf.Parent = dir;
 
         Assert.Same(dir, leaf.Parent);

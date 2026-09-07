@@ -56,9 +56,9 @@ internal static class Latin1Encoding
         {
             ArgumentNullException.ThrowIfNull(chars);
             ArgumentNullException.ThrowIfNull(bytes);
-            for (var i = 0; i < charCount; i++)
+            for (int i = 0; i < charCount; i++)
             {
-                var c = chars[charIndex + i];
+                char c = chars[charIndex + i];
                 if (c > 0xFF)
                 {
                     throw new ArgumentException(
@@ -77,9 +77,9 @@ internal static class Latin1Encoding
         {
             ArgumentNullException.ThrowIfNull(s);
             ArgumentNullException.ThrowIfNull(bytes);
-            for (var i = 0; i < charCount; i++)
+            for (int i = 0; i < charCount; i++)
             {
-                var c = s[charIndex + i];
+                char c = s[charIndex + i];
                 if (c > 0xFF)
                 {
                     throw new ArgumentException(
@@ -102,9 +102,9 @@ internal static class Latin1Encoding
                     "Destination is too small for the encoded bytes.", nameof(bytes));
             }
 
-            for (var i = 0; i < chars.Length; i++)
+            for (int i = 0; i < chars.Length; i++)
             {
-                var c = chars[i];
+                char c = chars[i];
                 if (c > 0xFF)
                 {
                     throw new ArgumentException(
@@ -127,7 +127,7 @@ internal static class Latin1Encoding
         /// <inheritdoc/>
         public override int GetChars(byte[] bytes, int byteIndex, int byteCount, char[] chars, int charIndex)
         {
-            for (var i = 0; i < byteCount; i++)
+            for (int i = 0; i < byteCount; i++)
             {
                 chars[charIndex + i] = (char)bytes[byteIndex + i];
             }
@@ -144,7 +144,7 @@ internal static class Latin1Encoding
                     "Destination is too small for the decoded characters.", nameof(chars));
             }
 
-            for (var i = 0; i < bytes.Length; i++)
+            for (int i = 0; i < bytes.Length; i++)
             {
                 chars[i] = (char)bytes[i];
             }
@@ -154,7 +154,7 @@ internal static class Latin1Encoding
 
         private static void ValidateEncodable(ReadOnlySpan<char> chars, string paramName)
         {
-            for (var i = 0; i < chars.Length; i++)
+            for (int i = 0; i < chars.Length; i++)
             {
                 if (chars[i] > 0xFF)
                 {

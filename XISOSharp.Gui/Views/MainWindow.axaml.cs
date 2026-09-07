@@ -64,6 +64,10 @@ public partial class MainWindow : Window
 
     private MainViewModel Vm => (MainViewModel)DataContext!;
 
+    // Null-safe VM access for catch blocks: never throws, so exception handling
+    // cannot itself crash the async void method.
+    private MainViewModel? VmOrNull => DataContext as MainViewModel;
+
     private void LogBox_TextChanged(object? sender, TextChangedEventArgs e)
     {
         try
@@ -82,17 +86,16 @@ public partial class MainWindow : Window
 
     private async Task<string?> PickSingleFileAsync(IReadOnlyList<FilePickerFileType> filters, string title)
     {
-        var vm = Vm;
         try
         {
-            var files = await PickFilesAsync(filters, title, allowMultiple: false).ConfigureAwait(false);
+            List<string> files = await PickFilesAsync(filters, title, allowMultiple: false).ConfigureAwait(false);
             return files.Count > 0 ? files[0] : null;
         }
         catch (Exception ex)
         {
             Log.Error(ex, "File picker failed: {Title}", title);
             BugReporter.ReportException(ex, $"File picker failed: {title}");
-            vm.LogMessage($"[GUI] File picker failed: {ex.Message}");
+            VmOrNull?.LogMessage($"[GUI] File picker failed: {ex.Message}");
             return null;
         }
     }
@@ -100,17 +103,16 @@ public partial class MainWindow : Window
     private async Task<List<string>> PickFilesAsync(IReadOnlyList<FilePickerFileType> filters, string title,
         bool allowMultiple)
     {
-        var vm = Vm;
         try
         {
-            var storage = GetTopLevel(this)?.StorageProvider;
+            IStorageProvider? storage = GetTopLevel(this)?.StorageProvider;
             if (storage is null)
             {
                 Log.Warning("File picker unavailable (no storage provider): {Title}", title);
                 return [];
             }
 
-            var picked = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+            IReadOnlyList<IStorageFile> picked = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
             {
                 Title = title,
                 AllowMultiple = allowMultiple,
@@ -122,24 +124,23 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "File picker failed: {Title}", title);
             BugReporter.ReportException(ex, $"File picker failed: {title}");
-            vm.LogMessage($"[GUI] File picker failed: {ex.Message}");
+            VmOrNull?.LogMessage($"[GUI] File picker failed: {ex.Message}");
             return [];
         }
     }
 
     private async Task<string?> PickFolderAsync(string title)
     {
-        var vm = Vm;
         try
         {
-            var storage = GetTopLevel(this)?.StorageProvider;
+            IStorageProvider? storage = GetTopLevel(this)?.StorageProvider;
             if (storage is null)
             {
                 Log.Warning("Folder picker unavailable (no storage provider): {Title}", title);
                 return null;
             }
 
-            var picked = await storage.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            IReadOnlyList<IStorageFolder> picked = await storage.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
                 Title = title,
                 AllowMultiple = false,
@@ -150,24 +151,23 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Folder picker failed: {Title}", title);
             BugReporter.ReportException(ex, $"Folder picker failed: {title}");
-            vm.LogMessage($"[GUI] Folder picker failed: {ex.Message}");
+            VmOrNull?.LogMessage($"[GUI] Folder picker failed: {ex.Message}");
             return null;
         }
     }
 
     private async Task<string?> PickSaveAsync(string title, string? suggestedName)
     {
-        var vm = Vm;
         try
         {
-            var storage = GetTopLevel(this)?.StorageProvider;
+            IStorageProvider? storage = GetTopLevel(this)?.StorageProvider;
             if (storage is null)
             {
                 Log.Warning("Save picker unavailable (no storage provider): {Title}", title);
                 return null;
             }
 
-            var picked = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
+            IStorageFile? picked = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
             {
                 Title = title,
                 SuggestedFileName = suggestedName,
@@ -178,7 +178,7 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Save picker failed: {Title}", title);
             BugReporter.ReportException(ex, $"Save picker failed: {title}");
-            vm.LogMessage($"[GUI] Save picker failed: {ex.Message}");
+            VmOrNull?.LogMessage($"[GUI] Save picker failed: {ex.Message}");
             return null;
         }
     }
@@ -209,7 +209,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var paths = e.DataTransfer.TryGetFiles()
+            List<string> paths = e.DataTransfer.TryGetFiles()
                 ?.Select(f =>
                 {
                     try
@@ -237,9 +237,9 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var images = paths.Where(p => File.Exists(p) && IsImage(p)).ToList();
-            var dirs = paths.Where(Directory.Exists).ToList();
-            foreach (var skipped in paths.Except(images, StringComparer.OrdinalIgnoreCase)
+            List<string> images = paths.Where(p => File.Exists(p) && IsImage(p)).ToList();
+            List<string> dirs = paths.Where(Directory.Exists).ToList();
+            foreach (string skipped in paths.Except(images, StringComparer.OrdinalIgnoreCase)
                          .Except(dirs, StringComparer.OrdinalIgnoreCase))
             {
                 Vm.LogMessage($"[GUI] Drop skipped (not an image or folder): {skipped}");
@@ -258,7 +258,7 @@ public partial class MainWindow : Window
                     Vm.LogMessage($"[GUI] Drop: {images.Count} image(s) added to the Rewrite tab.");
                 }
 
-                foreach (var dir in dirs)
+                foreach (string dir in dirs)
                 {
                     DropDirectory(dir);
                 }
@@ -364,27 +364,27 @@ public partial class MainWindow : Window
 
     private static string AppendDistinctLines(string current, IEnumerable<string> added)
     {
-        var existing = new HashSet<string>(
+        HashSet<string> existing = new(
             current.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
                 .Select(line => line.Trim()),
             StringComparer.OrdinalIgnoreCase);
-        var fresh = added.Select(a => a.Trim()).Where(a => existing.Add(a)).ToList();
+        List<string> fresh = added.Select(a => a.Trim()).Where(a => existing.Add(a)).ToList();
         return AppendLines(current, fresh);
     }
 
     private static string AppendLines(string current, IEnumerable<string> added)
     {
-        var lines = current.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).ToList();
+        List<string> lines = current.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).ToList();
         lines.AddRange(added);
         return string.Join(Environment.NewLine, lines);
     }
 
     private async void BrowseExImage_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSingleFileAsync([ImageFilter], "Select image").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSingleFileAsync([ImageFilter], "Select image").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.ExImage = picked);
@@ -396,7 +396,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse extract image failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -407,10 +407,10 @@ public partial class MainWindow : Window
 
     private async void BrowseExDest_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickFolderAsync("Select destination directory").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickFolderAsync("Select destination directory").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.ExDest = picked);
@@ -422,7 +422,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse extract destination failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -433,10 +433,10 @@ public partial class MainWindow : Window
 
     private async void BrowseCrSource_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickFolderAsync("Select source directory").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickFolderAsync("Select source directory").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.CrSource = picked);
@@ -448,7 +448,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse create source failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -459,10 +459,10 @@ public partial class MainWindow : Window
 
     private async void AddRwImages_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickFilesAsync([ImageFilter], "Add images", allowMultiple: true).ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            List<string> picked = await PickFilesAsync([ImageFilter], "Add images", allowMultiple: true).ConfigureAwait(false);
             if (picked.Count != 0)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.RwImages = AppendLines(vm.RwImages, picked));
@@ -474,7 +474,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Add rewrite images failed");
             try
             {
-                vm.LogMessage($"[GUI] Add images failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Add images failed: {ex.Message}");
             }
             catch
             {
@@ -485,10 +485,10 @@ public partial class MainWindow : Window
 
     private async void BrowseRwOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSaveAsync("Rewrite output", "rewritten.iso").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSaveAsync("Rewrite output", "rewritten.iso").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.RwOutput = picked);
@@ -500,7 +500,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse rewrite output failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -511,10 +511,10 @@ public partial class MainWindow : Window
 
     private async void BrowseRwWorkDir_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickFolderAsync("Select work directory").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickFolderAsync("Select work directory").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.RwWorkDir = picked);
@@ -526,7 +526,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse rewrite work directory failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -537,10 +537,10 @@ public partial class MainWindow : Window
 
     private async void BrowseRwReport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSaveAsync("Validation report", "report.json").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSaveAsync("Validation report", "report.json").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.RwReport = picked);
@@ -552,7 +552,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse rewrite report failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -563,10 +563,10 @@ public partial class MainWindow : Window
 
     private async void BrowseWpImage_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSingleFileAsync([IsoFilter], "Select image").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSingleFileAsync([IsoFilter], "Select image").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.WpImage = picked);
@@ -578,7 +578,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse wipe image failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -589,10 +589,10 @@ public partial class MainWindow : Window
 
     private async void AddRbParts_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickFilesAsync([ImageFilter], "Add rebuild components", allowMultiple: true)
+            MainViewModel vm = Vm;
+            List<string> picked = await PickFilesAsync([ImageFilter], "Add rebuild components", allowMultiple: true)
                 .ConfigureAwait(false);
             if (picked.Count != 0)
             {
@@ -605,7 +605,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Add rebuild parts failed");
             try
             {
-                vm.LogMessage($"[GUI] Add rebuild parts failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Add rebuild parts failed: {ex.Message}");
             }
             catch
             {
@@ -616,10 +616,10 @@ public partial class MainWindow : Window
 
     private async void BrowseRbOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSaveAsync("Redump output", "redump.iso").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSaveAsync("Redump output", "redump.iso").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.RbOutput = picked);
@@ -631,7 +631,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse rebuild output failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -642,10 +642,10 @@ public partial class MainWindow : Window
 
     private async void BrowseRbSectors_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSingleFileAsync([FilePickerFileTypes.TextPlain], "Select sectors file")
+            MainViewModel vm = Vm;
+            string? picked = await PickSingleFileAsync([FilePickerFileTypes.TextPlain], "Select sectors file")
                 .ConfigureAwait(false);
             if (picked is not null)
             {
@@ -658,7 +658,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse rebuild sectors failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -669,10 +669,10 @@ public partial class MainWindow : Window
 
     private async void BrowseCpSourceFile_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSingleFileAsync([IsoFilter], "Select source image").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSingleFileAsync([IsoFilter], "Select source image").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.CpSource = picked);
@@ -684,7 +684,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse compress source file failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -695,10 +695,10 @@ public partial class MainWindow : Window
 
     private async void BrowseCpSourceFolder_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickFolderAsync("Select source directory").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickFolderAsync("Select source directory").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.CpSource = picked);
@@ -710,7 +710,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse compress source folder failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -721,10 +721,10 @@ public partial class MainWindow : Window
 
     private async void BrowseCpOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSaveAsync("CSO output", "game.cso").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSaveAsync("CSO output", "game.cso").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.CpOutput = picked);
@@ -736,7 +736,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse compress output failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -747,10 +747,10 @@ public partial class MainWindow : Window
 
     private async void BrowseDcCso_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSingleFileAsync([CsoFilter], "Select CSO").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSingleFileAsync([CsoFilter], "Select CSO").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.DcCso = picked);
@@ -762,7 +762,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse decompress CSO failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -773,10 +773,10 @@ public partial class MainWindow : Window
 
     private async void BrowseDcOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSaveAsync("ISO output", "game.iso").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSaveAsync("ISO output", "game.iso").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.DcOutput = picked);
@@ -788,7 +788,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse decompress output failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -799,10 +799,10 @@ public partial class MainWindow : Window
 
     private async void BrowseVaSource_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSingleFileAsync([IsoFilter], "Select source ISO").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSingleFileAsync([IsoFilter], "Select source ISO").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.VaSource = picked);
@@ -814,7 +814,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse validate source failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -825,10 +825,10 @@ public partial class MainWindow : Window
 
     private async void BrowseVaOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSingleFileAsync([IsoFilter], "Select output ISO").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSingleFileAsync([IsoFilter], "Select output ISO").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.VaOutput = picked);
@@ -840,7 +840,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse validate output failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -851,10 +851,10 @@ public partial class MainWindow : Window
 
     private async void BrowseVaReport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSaveAsync("Validation report", "report.json").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSaveAsync("Validation report", "report.json").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.VaReport = picked);
@@ -866,7 +866,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse validate report failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -877,10 +877,10 @@ public partial class MainWindow : Window
 
     private async void AddCsImages_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickFilesAsync([ImageFilter], "Add images", allowMultiple: true).ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            List<string> picked = await PickFilesAsync([ImageFilter], "Add images", allowMultiple: true).ConfigureAwait(false);
             if (picked.Count != 0)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.CsImages = AppendLines(vm.CsImages, picked));
@@ -892,7 +892,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Add checksum images failed");
             try
             {
-                vm.LogMessage($"[GUI] Add images failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Add images failed: {ex.Message}");
             }
             catch
             {
@@ -903,10 +903,10 @@ public partial class MainWindow : Window
 
     private async void BrowseBaDir_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickFolderAsync("Select batch directory").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickFolderAsync("Select batch directory").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.BaDir = picked);
@@ -918,7 +918,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse batch directory failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -929,10 +929,10 @@ public partial class MainWindow : Window
 
     private async void BrowseBaDest_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickFolderAsync("Select destination directory").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickFolderAsync("Select destination directory").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.BaDest = picked);
@@ -944,7 +944,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse batch destination failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {
@@ -955,10 +955,10 @@ public partial class MainWindow : Window
 
     private async void BrowseCliPath_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var vm = Vm;
         try
         {
-            var picked = await PickSingleFileAsync([], "Select XISOSharp executable").ConfigureAwait(false);
+            MainViewModel vm = Vm;
+            string? picked = await PickSingleFileAsync([], "Select XISOSharp executable").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.CliPath = picked);
@@ -970,7 +970,7 @@ public partial class MainWindow : Window
             BugReporter.ReportException(ex, "Browse CLI path failed");
             try
             {
-                vm.LogMessage($"[GUI] Browse failed: {ex.Message}");
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
             }
             catch
             {

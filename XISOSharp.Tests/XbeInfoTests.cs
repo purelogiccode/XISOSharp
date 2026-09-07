@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
 using XISOSharp.Cli;
+using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
 
@@ -18,7 +19,7 @@ public class XbeInfoTests : IDisposable
         Logger.Quiet = false;
         Logger.RealQuiet = false;
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -33,7 +34,7 @@ public class XbeInfoTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_xbe_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_xbe_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -47,8 +48,8 @@ public class XbeInfoTests : IDisposable
     /// </summary>
     private static byte[] BuildXbe()
     {
-        var data = new byte[0x1000];
-        var span = data.AsSpan();
+        byte[] data = new byte[0x1000];
+        Span<byte> span = data.AsSpan();
 
         // Fixed header
         "XBEH"u8.CopyTo(span);
@@ -81,14 +82,14 @@ public class XbeInfoTests : IDisposable
 
     private string CreateIsoWithFile(string fileName, byte[] content)
     {
-        var srcDir = Path.Combine(Path.GetTempPath(), $"xiso_xbe_src_{Guid.NewGuid():N}");
+        string srcDir = Path.Combine(Path.GetTempPath(), $"xiso_xbe_src_{Guid.NewGuid():N}");
         Directory.CreateDirectory(srcDir);
         File.WriteAllBytes(Path.Combine(srcDir, fileName), content);
         _tempDirs.Add(srcDir);
 
-        var outputDir = CreateTempDir();
+        string outputDir = CreateTempDir();
 
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        int result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         return isoPath;
@@ -96,8 +97,8 @@ public class XbeInfoTests : IDisposable
 
     private string CreateIsoWithDirectory(string srcDir)
     {
-        var outputDir = CreateTempDir();
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir();
+        int result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         return isoPath;
@@ -106,9 +107,9 @@ public class XbeInfoTests : IDisposable
     [Fact]
     public void GetXbeInfo_ParsesAllFields()
     {
-        var isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
+        string isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
 
-        var xbe = XisoReader.GetXbeInfo(isoPath, "/default.xbe");
+        XbeInfo? xbe = XisoReader.GetXbeInfo(isoPath, "/default.xbe");
 
         Assert.NotNull(xbe);
         Assert.Equal(0x00010000u, xbe.BaseAddress);
@@ -132,7 +133,7 @@ public class XbeInfoTests : IDisposable
     [Fact]
     public void GetXbeInfo_NonXbeFile_ReturnsNull()
     {
-        var isoPath = CreateIsoWithFile("readme.txt", "hello world"u8.ToArray());
+        string isoPath = CreateIsoWithFile("readme.txt", "hello world"u8.ToArray());
 
         Assert.Null(XisoReader.GetXbeInfo(isoPath, "/readme.txt"));
     }
@@ -140,7 +141,7 @@ public class XbeInfoTests : IDisposable
     [Fact]
     public void GetXbeInfo_MissingPath_ReturnsNull()
     {
-        var isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
+        string isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
 
         Assert.Null(XisoReader.GetXbeInfo(isoPath, "/nope.xbe"));
     }
@@ -148,11 +149,11 @@ public class XbeInfoTests : IDisposable
     [Fact]
     public void GetXbeInfo_DirectoryPath_ReturnsNull()
     {
-        var srcDir = CreateTempDir();
+        string srcDir = CreateTempDir();
         Directory.CreateDirectory(Path.Combine(srcDir, "sub"));
         File.WriteAllBytes(Path.Combine(srcDir, "default.xbe"), "x"u8.ToArray());
 
-        var isoPath = CreateIsoWithDirectory(srcDir);
+        string isoPath = CreateIsoWithDirectory(srcDir);
 
         Assert.Null(XisoReader.GetXbeInfo(isoPath, "/sub"));
     }
@@ -160,7 +161,7 @@ public class XbeInfoTests : IDisposable
     [Fact]
     public void GetXbeInfo_TooShortFile_ReturnsNull()
     {
-        var isoPath = CreateIsoWithFile("tiny.xbe", new byte[0x10]);
+        string isoPath = CreateIsoWithFile("tiny.xbe", new byte[0x10]);
 
         Assert.Null(XisoReader.GetXbeInfo(isoPath, "/tiny.xbe"));
     }
@@ -169,10 +170,10 @@ public class XbeInfoTests : IDisposable
     public void GetXbeInfo_CertOffsetBeyondEnd_ReturnsNull()
     {
         // Malformed header: the certificate pointer aims past the file.
-        var data = BuildXbe();
+        byte[] data = BuildXbe();
         BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(0x118), 0x0001F000);
 
-        var isoPath = CreateIsoWithFile("default.xbe", data);
+        string isoPath = CreateIsoWithFile("default.xbe", data);
 
         Assert.Null(XisoReader.GetXbeInfo(isoPath, "/default.xbe"));
     }
@@ -181,10 +182,10 @@ public class XbeInfoTests : IDisposable
     public void GetXbeInfo_CertAddressBelowBase_ReturnsNull()
     {
         // Malformed header: file offset would go negative.
-        var data = BuildXbe();
+        byte[] data = BuildXbe();
         BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(0x118), 0x00000080);
 
-        var isoPath = CreateIsoWithFile("default.xbe", data);
+        string isoPath = CreateIsoWithFile("default.xbe", data);
 
         Assert.Null(XisoReader.GetXbeInfo(isoPath, "/default.xbe"));
     }
@@ -192,10 +193,10 @@ public class XbeInfoTests : IDisposable
     [Fact]
     public void GetXbeInfo_WrongCertSize_ReturnsNull()
     {
-        var data = BuildXbe();
+        byte[] data = BuildXbe();
         BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(0x400), 0x100);
 
-        var isoPath = CreateIsoWithFile("default.xbe", data);
+        string isoPath = CreateIsoWithFile("default.xbe", data);
 
         Assert.Null(XisoReader.GetXbeInfo(isoPath, "/default.xbe"));
     }
@@ -203,8 +204,8 @@ public class XbeInfoTests : IDisposable
     [Fact]
     public void GetXbeInfo_InvalidIso_Throws()
     {
-        var junkDir = CreateTempDir();
-        var junkFile = Path.Combine(junkDir, "junk.iso");
+        string junkDir = CreateTempDir();
+        string junkFile = Path.Combine(junkDir, "junk.iso");
         File.WriteAllBytes(junkFile, new byte[4096]);
 
         Assert.Throws<XisoFormatException>(() => XisoReader.GetXbeInfo(junkFile, "/default.xbe"));
@@ -216,10 +217,10 @@ public class XbeInfoTests : IDisposable
     [Fact]
     public void Explorer_GetXbeInfo_ParsesCert()
     {
-        var isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
-        var explorer = new XisoExplorer(isoPath);
+        string isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
+        XisoExplorer explorer = new(isoPath);
 
-        var xbe = explorer.GetXbeInfo("/default.xbe");
+        XbeInfo? xbe = explorer.GetXbeInfo("/default.xbe");
 
         Assert.NotNull(xbe);
         Assert.Equal(0x4D530004u, xbe.TitleId);
@@ -230,7 +231,7 @@ public class XbeInfoTests : IDisposable
     [Fact]
     public void Cli_XbeInfo_EndToEnd()
     {
-        var isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
+        string isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
 
         Assert.Equal(0, Program.Main(["--xbe-info", isoPath, "/default.xbe"]));
     }
@@ -238,7 +239,7 @@ public class XbeInfoTests : IDisposable
     [Fact]
     public void Cli_XbeInfo_NonXbe_ReturnsOne()
     {
-        var isoPath = CreateIsoWithFile("readme.txt", "hello world"u8.ToArray());
+        string isoPath = CreateIsoWithFile("readme.txt", "hello world"u8.ToArray());
 
         Assert.Equal(1, Program.Main(["--xbe-info", isoPath, "/readme.txt"]));
     }
@@ -246,7 +247,7 @@ public class XbeInfoTests : IDisposable
     [Fact]
     public void Cli_XbeInfo_CombinedWithExtract_ReturnsOne()
     {
-        var isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
+        string isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
 
         Assert.Equal(1, Program.Main(["-x", "--xbe-info", isoPath, "/default.xbe"]));
     }

@@ -38,7 +38,7 @@ partition sits at a nonstandard offset, auto-detection can fail. Find the offset
 use `--skip-sectors`:
 
 ```bash
-XISOSharp.Cli --skip-sectors 129824 -d ./out dump.iso    # XGD2-style offset
+XISOSharp --skip-sectors 129824 -d ./out dump.iso    # XGD2-style offset
 ```
 
 **Do I need `--skip-sectors` for every Redump image?**
@@ -57,7 +57,7 @@ pattern `**/$SystemUpdate/**` (matches entries named exactly `$SystemUpdate`); d
 Use the repeatable `-X` flag with glob patterns:
 
 ```bash
-XISOSharp.Cli -X "**/*.tmp" -X "**/node_modules/**" -c ./game_files
+XISOSharp -X "**/*.tmp" -X "**/node_modules/**" -c ./game_files
 ```
 
 Patterns without a `**/` prefix match only at the root. See
@@ -75,7 +75,7 @@ Re-run the same command with `--skip-existing` (extract, `--unpack`, or
 `--copy-out`; pairs with `--batch`):
 
 ```bash
-XISOSharp.Cli --skip-existing --unpack game.iso ./out
+XISOSharp --skip-existing --unpack game.iso ./out
 ```
 
 Files already on disk with matching sizes are skipped (`skip: <path>`); missing or
@@ -87,9 +87,9 @@ signal. See [CLI Reference](cli.md#resume-interrupted-unpacks).
 Often, yes — diagnose with the deep audit, then repair or rebuild:
 
 ```bash
-XISOSharp.Cli -V game.iso            # list every issue found
-XISOSharp.Cli --repair game.iso      # patchable issues, in place (+ .old backup)
-XISOSharp.Cli --salvage game.iso     # rebuild game.salvaged.iso from reachable entries
+XISOSharp -V game.iso            # list every issue found
+XISOSharp --repair game.iso      # patchable issues, in place (+ .old backup)
+XISOSharp --salvage game.iso     # rebuild game.salvaged.iso from reachable entries
 ```
 
 `--repair` fixes reserved attribute bits, a missing optimized tag, and path
@@ -104,7 +104,7 @@ Use `--copy-in` (the reverse of `--copy-out`): it patches one host file into the
 image in place, replacing the entry when it exists or adding it otherwise:
 
 ```bash
-XISOSharp.Cli --copy-in game.iso ./my-config.ini /config.ini
+XISOSharp --copy-in game.iso ./my-config.ini /config.ini
 ```
 
 A `game.iso.old` backup is kept unless `--no-backup` is passed. A host directory

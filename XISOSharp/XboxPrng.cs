@@ -30,7 +30,7 @@ public sealed class XboxPrng
     {
         for (long i = 0; i < count; i++)
         {
-            for (var j = 0; j < Constants.SectorSize; j += 2)
+            for (int j = 0; j < Constants.SectorSize; j += 2)
                 _state = (uint)(((_state + 1UL) * _mult) % 0xFFFFFFFB);
         }
     }
@@ -43,7 +43,7 @@ public sealed class XboxPrng
     /// <param name="count">Number of 2048-byte sectors to generate.</param>
     public void WriteSectors(Stream output, long count)
     {
-        var sector = new byte[Constants.SectorSize];
+        byte[] sector = new byte[Constants.SectorSize];
         for (long i = 0; i < count; i++)
         {
             GenerateSector(sector);
@@ -53,10 +53,10 @@ public sealed class XboxPrng
 
     private void GenerateSector(Span<byte> sector)
     {
-        for (var j = 0; j < Constants.SectorSize; j += 2)
+        for (int j = 0; j < Constants.SectorSize; j += 2)
         {
             _state = (uint)(((_state + 1UL) * _mult) % 0xFFFFFFFB);
-            var sample = (ushort)((_state ^ _mask) >> 8);
+            ushort sample = (ushort)((_state ^ _mask) >> 8);
             sector[j] = (byte)sample;
             sector[j + 1] = (byte)(sample >> 8);
         }
@@ -74,16 +74,16 @@ public sealed class XboxPrng
         Span<byte> magic = stackalloc byte[24];
         if (!TryReadAt(isoFs, xisoOffset + 0x10800, magic))
             return null;
-        var magic2 = "XBOX_DVD_LAYOUT_TOOL_SIG"u8;
+        ReadOnlySpan<byte> magic2 = "XBOX_DVD_LAYOUT_TOOL_SIG"u8;
         if (!magic[..magic2.Length].SequenceEqual(magic2))
             return null;
 
         Span<byte> nextBuf = stackalloc byte[8];
         if (!TryReadAt(isoFs, xisoOffset + 0x10820, nextBuf))
             return null;
-        var versionOffset = 0x10824;
-        var allZero = true;
-        for (var k = 0; k < 8; k++)
+        int versionOffset = 0x10824;
+        bool allZero = true;
+        for (int k = 0; k < 8; k++)
         {
             if (nextBuf[k] != 0)
             {
@@ -97,14 +97,14 @@ public sealed class XboxPrng
         Span<byte> versionBuf = stackalloc byte[2];
         if (!TryReadAt(isoFs, xisoOffset + versionOffset, versionBuf))
             return null;
-        var version = (ushort)(versionBuf[0] | (versionBuf[1] << 8));
+        ushort version = (ushort)(versionBuf[0] | (versionBuf[1] << 8));
         if (version == 0) return null;
         if (!quiet) Logger.Log($"[INFO] XGD1 Version: {version}\n");
 
-        var firstSector = new byte[Constants.SectorSize * 2];
+        byte[] firstSector = new byte[Constants.SectorSize * 2];
         if (!TryReadAtArray(isoFs, xisoOffset, firstSector))
             return null;
-        if (TryGetSeed(firstSector, out var seed))
+        if (TryGetSeed(firstSector, out uint seed))
             return seed;
         return null;
     }
@@ -118,7 +118,7 @@ public sealed class XboxPrng
     /// <returns>The recovered seed, or <c>null</c> if validation or brute-force fails.</returns>
     public static uint? ExtractSeed(string isoPath, long xisoOffset = 0, bool quiet = false)
     {
-        using var fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        using FileStream fs = new(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
         return ExtractSeed(fs, xisoOffset, quiet);
     }
 
@@ -133,10 +133,10 @@ public sealed class XboxPrng
             return false;
         }
 
-        var total = 0;
+        int total = 0;
         while (total < buf.Length)
         {
-            var n = fs.Read(buf[total..]);
+            int n = fs.Read(buf[total..]);
             if (n == 0) break;
             total += n;
         }
@@ -155,10 +155,10 @@ public sealed class XboxPrng
             return false;
         }
 
-        var total = 0;
+        int total = 0;
         while (total < buf.Length)
         {
-            var n = fs.Read(buf, total, buf.Length - total);
+            int n = fs.Read(buf, total, buf.Length - total);
             if (n == 0) break;
             total += n;
         }
@@ -181,28 +181,28 @@ public sealed class XboxPrng
     public static bool TryGetSeed(byte[] sector, out uint outSeed, CancellationToken cancellationToken)
     {
         uint foundSeed = 0;
-        var seedFound = false;
+        bool seedFound = false;
 
         const long maxUInt32 = (long)uint.MaxValue + 1;
-        var range = Partitioner.Create(0L, maxUInt32);
+        OrderablePartitioner<Tuple<long, long>> range = Partitioner.Create(0L, maxUInt32);
         try
         {
             Parallel.ForEach(range, new ParallelOptions { CancellationToken = cancellationToken },
                 (chunk, state) =>
                 {
-                    for (var i = chunk.Item1; i < chunk.Item2; i++)
+                    for (long i = chunk.Item1; i < chunk.Item2; i++)
                     {
                         if (Volatile.Read(ref seedFound))
                             break;
-                        var seedGuess = (uint)i;
-                        var multGuess = FixedSeeds[seedGuess & 7];
-                        var stateGuess = (uint)(((seedGuess + 1UL) * multGuess) % 0xFFFFFFFB);
-                        var maskAttempt = stateGuess;
-                        var match = true;
-                        for (var j = 0; j < Constants.SectorSize * 2; j += 2)
+                        uint seedGuess = (uint)i;
+                        uint multGuess = FixedSeeds[seedGuess & 7];
+                        uint stateGuess = (uint)(((seedGuess + 1UL) * multGuess) % 0xFFFFFFFB);
+                        uint maskAttempt = stateGuess;
+                        bool match = true;
+                        for (int j = 0; j < Constants.SectorSize * 2; j += 2)
                         {
                             stateGuess = (uint)(((stateGuess + 1UL) * multGuess) % 0xFFFFFFFB);
-                            var sample = (ushort)((stateGuess ^ maskAttempt) >> 8);
+                            ushort sample = (ushort)((stateGuess ^ maskAttempt) >> 8);
                             if (sector[j] != (byte)sample || sector[j + 1] != (byte)(sample >> 8))
                             {
                                 match = false;

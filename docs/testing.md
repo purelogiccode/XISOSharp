@@ -237,7 +237,7 @@ with per-node copy-out, SHA-256 display, and an XEX2 info panel.
 All three runners share one core implementation: the single shared
 `XISOSharp.ProcessRunner` (async drains, timeout, tree-kill) + `XISOSharp.ToolLocator`
 (override → sibling of the app → `PATH`, plus a `-v` probe) back the GUI
-(`XISOSharp.Cli`), the Tester (`extract-xiso`/`extract-xiso.exe`, extensionless
+(`XISOSharp`), the Tester (`extract-xiso`/`extract-xiso.exe`, extensionless
 accepted), and the battle harness — replacing the old per-app runners.
 
 It targets Windows only and is not part of CI.

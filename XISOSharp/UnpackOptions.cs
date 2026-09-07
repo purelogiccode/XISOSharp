@@ -55,7 +55,7 @@ public sealed class UnpackOptions
         if (Failures.Count == 0)
             return;
 
-        var lines = Failures.Select(f => $"  {f.Message}");
+        IEnumerable<string> lines = Failures.Select(f => $"  {f.Message}");
         throw new ExtractErrorException(ExtractError.ErrExtractFailed,
             $"Failed to unpack image \"{imageName}\": {Failures.Count} file(s) failed:\n" +
             string.Join("\n", lines),

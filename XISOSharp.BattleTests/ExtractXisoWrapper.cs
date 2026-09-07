@@ -28,7 +28,7 @@ internal sealed class ExtractXisoWrapper : IDisposable
 
     private (int ExitCode, string StdOut, string StdErr) RunCore(string? workingDirectory, string[] args)
     {
-        var psi = new ProcessStartInfo
+        ProcessStartInfo psi = new()
         {
             FileName = _exePath,
             RedirectStandardOutput = true,
@@ -43,11 +43,11 @@ internal sealed class ExtractXisoWrapper : IDisposable
             psi.WorkingDirectory = workingDirectory;
         }
 
-        foreach (var a in args) psi.ArgumentList.Add(a);
+        foreach (string a in args) psi.ArgumentList.Add(a);
 
-        using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start extract-xiso.exe");
-        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-        var stderrTask = proc.StandardError.ReadToEndAsync();
+        using Process proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start extract-xiso.exe");
+        Task<string> stdoutTask = proc.StandardOutput.ReadToEndAsync();
+        Task<string> stderrTask = proc.StandardError.ReadToEndAsync();
         const int timeoutMs = 600_000;
         if (!proc.WaitForExit(timeoutMs))
         {
@@ -75,15 +75,15 @@ internal sealed class ExtractXisoWrapper : IDisposable
         }
 
         proc.WaitForExit();
-        var stdout = stdoutTask.GetAwaiter().GetResult();
-        var stderr = stderrTask.GetAwaiter().GetResult();
+        string stdout = stdoutTask.GetAwaiter().GetResult();
+        string stderr = stderrTask.GetAwaiter().GetResult();
         return (proc.ExitCode, stdout, stderr);
     }
 
     /// <summary>Runs quiet (-Q) variant.</summary>
     public (int ExitCode, string StdOut, string StdErr) RunQuiet(params string[] args)
     {
-        var list = new List<string>(args) { "-Q" };
+        List<string> list = new(args) { "-Q" };
         return Run(list.ToArray());
     }
 
@@ -106,8 +106,8 @@ internal sealed class ExtractXisoWrapper : IDisposable
     /// <summary>Gets version via <c>-v</c>.</summary>
     public string GetVersion()
     {
-        (var code, var so, var se) = Run("-v");
-        var txt = string.IsNullOrWhiteSpace(so) ? se : so;
+        (int code, string so, string se) = Run("-v");
+        string txt = string.IsNullOrWhiteSpace(so) ? se : so;
         return txt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? $"exit:{code}";
     }
 

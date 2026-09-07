@@ -28,7 +28,7 @@ public class NumSectorsBenchmarks
     public void Setup()
     {
         _batch = new uint[256];
-        for (var i = 0; i < _batch.Length; i++)
+        for (int i = 0; i < _batch.Length; i++)
         {
             _batch[i] = unchecked(ByteCount + (uint)i);
         }
@@ -52,9 +52,9 @@ public class NumSectorsBenchmarks
     [Benchmark]
     public uint NumSectors_Batch256()
     {
-        var sum = 0u;
-        var batch = _batch;
-        for (var i = 0; i < batch.Length; i++)
+        uint sum = 0u;
+        uint[] batch = _batch;
+        for (int i = 0; i < batch.Length; i++)
         {
             sum += Constants.NumSectors(batch[i]);
         }

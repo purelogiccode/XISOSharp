@@ -50,7 +50,7 @@ public static class PdfExporter
                         header.Item().Text("XISOSharp Tester — Results Report")
                             .Bold().FontSize(16).FontColor(Colors.Blue.Darken3);
 
-                        var genText = $"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+                        string genText = $"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
                         if (xisoSharpVersion != null)
                         {
                             genText += $"    extract-xiso: {xisoSharpVersion}";
@@ -104,12 +104,12 @@ public static class PdfExporter
                                 .Padding(3).Text("P/F/S").Bold();
                         });
 
-                        foreach (var file in session.FileResults)
+                        foreach (PerFileResult file in session.FileResults)
                         {
-                            var bgColor = file.AllPassed ? Colors.Green.Lighten5 :
+                            Color bgColor = file.AllPassed ? Colors.Green.Lighten5 :
                                 file.Failed > 0 ? Colors.Red.Lighten5 : Colors.Grey.Lighten4;
 
-                            var statusText = file.AllPassed ? "PASS" :
+                            string statusText = file.AllPassed ? "PASS" :
                                 file.Failed > 0 ? "FAIL" : "SKIP";
 
                             table.Cell().Background(bgColor).Padding(3)
@@ -145,7 +145,7 @@ public static class PdfExporter
 
     private static string FormatSubTests(PerFileResult file)
     {
-        var parts = file.SubTests.Select(static t =>
+        IEnumerable<string> parts = file.SubTests.Select(static t =>
             $"{t.Status switch
             {
                 TestStatus.Passed => "\u2713",

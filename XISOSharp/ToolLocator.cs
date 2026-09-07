@@ -3,7 +3,7 @@ namespace XISOSharp;
 /// <summary>
 /// Shared executable lookup chain (BUG-X-005): explicit override, then a sibling of the
 /// app executable (publish layouts), then <c>PATH</c>, with a <c>-v</c> probe built on
-/// <see cref="ProcessRunner"/>. GUI (XISOSharp.Cli), Tester (extract-xiso), and BattleTests
+/// <see cref="ProcessRunner"/>. GUI (XISOSharp), Tester (extract-xiso), and BattleTests
 /// (extract-xiso) all delegate here so coverage stays identical; only the file names differ.
 /// </summary>
 public static class ToolLocator
@@ -35,8 +35,8 @@ public static class ToolLocator
                 return overridePath;
             }
 
-            var fileName = OperatingSystem.IsWindows() ? windowsFileName : unixFileName;
-            var sibling = Path.Combine(AppContext.BaseDirectory, fileName);
+            string fileName = OperatingSystem.IsWindows() ? windowsFileName : unixFileName;
+            string sibling = Path.Combine(AppContext.BaseDirectory, fileName);
             if (File.Exists(sibling))
             {
                 return sibling;
@@ -74,17 +74,17 @@ public static class ToolLocator
         ArgumentException.ThrowIfNullOrEmpty(fileName);
         try
         {
-            var pathEnv = Environment.GetEnvironmentVariable("PATH");
+            string? pathEnv = Environment.GetEnvironmentVariable("PATH");
             if (string.IsNullOrEmpty(pathEnv))
             {
                 return null;
             }
 
-            foreach (var dir in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            foreach (string dir in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
             {
                 try
                 {
-                    var candidate = Path.Combine(dir.Trim(), fileName);
+                    string candidate = Path.Combine(dir.Trim(), fileName);
                     if (File.Exists(candidate))
                     {
                         return candidate;
@@ -125,7 +125,7 @@ public static class ToolLocator
 
         try
         {
-            var result = await ProcessRunner
+            ProcessRunResult result = await ProcessRunner
                 .RunAsync(toolPath, ["-v"], timeout ?? TimeSpan.FromSeconds(15), cancellationToken)
                 .ConfigureAwait(false);
             if (result.ExitCode != 0 && result.ExitCode != 255)
@@ -133,12 +133,12 @@ public static class ToolLocator
                 return null;
             }
 
-            var text = string.IsNullOrWhiteSpace(result.StandardOutput)
+            string text = string.IsNullOrWhiteSpace(result.StandardOutput)
                 ? result.StandardError
                 : result.StandardOutput;
-            foreach (var line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            foreach (string line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
-                var trimmed = line.Trim();
+                string trimmed = line.Trim();
                 if (trimmed.Length > 0)
                 {
                     return trimmed;

@@ -41,7 +41,7 @@ public sealed class GlobMatcher
     {
         ArgumentNullException.ThrowIfNull(patterns);
 
-        var list = patterns.Where(static p => !string.IsNullOrEmpty(p)).ToList();
+        List<string> list = patterns.Where(static p => !string.IsNullOrEmpty(p)).ToList();
         _originalPatterns = list.ToArray();
         _patterns = list
             .Select(static p => new Regex(
@@ -64,8 +64,8 @@ public sealed class GlobMatcher
         if (string.IsNullOrEmpty(relativePath))
             return false;
 
-        var path = relativePath.Replace('\\', '/');
-        foreach (var pattern in _patterns)
+        string path = relativePath.Replace('\\', '/');
+        foreach (Regex pattern in _patterns)
         {
             if (pattern.IsMatch(path))
                 return true;
@@ -92,14 +92,14 @@ public sealed class GlobMatcher
     {
         if (string.IsNullOrEmpty(relativePath))
             return new GlobMatchResult(false, []);
-        var path = relativePath.Replace('\\', '/');
+        string path = relativePath.Replace('\\', '/');
         // Prefer WaxGlob for capturing, fallback to regex match (no groups)
-        foreach (var pat in _originalPatterns)
+        foreach (string pat in _originalPatterns)
         {
             try
             {
-                var wg = new WaxGlob(pat);
-                var caps = wg.GetCaptures(path);
+                WaxGlob wg = new(pat);
+                IReadOnlyList<string>? caps = wg.GetCaptures(path);
                 if (caps != null)
                     return new GlobMatchResult(true, caps.ToArray());
             }
@@ -121,7 +121,7 @@ public sealed class GlobMatcher
     /// </summary>
     public bool TryMatch(string? relativePath, out string[] groups)
     {
-        var r = MatchWithGroups(relativePath);
+        GlobMatchResult r = MatchWithGroups(relativePath);
         groups = r.Groups;
         return r.IsMatch;
     }
@@ -138,23 +138,23 @@ public sealed class GlobMatcher
 
         // A trailing slash means "the directory and everything below it", unless the
         // pattern already ends with a '**' segment (e.g. "a/**/" behaves like "a/**").
-        var normalized = glob;
+        string normalized = glob;
         if (glob.EndsWith('/'))
         {
-            var trimmed = glob.TrimEnd('/');
+            string trimmed = glob.TrimEnd('/');
             normalized = trimmed.EndsWith("/**", StringComparison.Ordinal) ||
                          string.Equals(trimmed, "**", StringComparison.Ordinal)
                 ? trimmed
                 : trimmed + "/**";
         }
 
-        var segments = normalized.Split('/');
-        var sb = new StringBuilder("^");
-        var count = segments.Length;
+        string[] segments = normalized.Split('/');
+        StringBuilder sb = new("^");
+        int count = segments.Length;
 
-        for (var i = 0; i < count; i++)
+        for (int i = 0; i < count; i++)
         {
-            var segment = segments[i];
+            string segment = segments[i];
             if (string.Equals(segment, "**", StringComparison.Ordinal))
             {
                 if (count == 1)
@@ -196,10 +196,10 @@ public sealed class GlobMatcher
 
     private static void AppendSegmentRegex(StringBuilder sb, string segment)
     {
-        var i = 0;
+        int i = 0;
         while (i < segment.Length)
         {
-            var c = segment[i];
+            char c = segment[i];
             switch (c)
             {
                 case '*':
@@ -210,7 +210,7 @@ public sealed class GlobMatcher
                     sb.Append("[^/]");
                     i++;
                     break;
-                case '[' when TryParseCharClass(segment, i, out var charClass, out var end):
+                case '[' when TryParseCharClass(segment, i, out string charClass, out int end):
                     sb.Append(charClass);
                     i = end;
                     break;
@@ -233,19 +233,19 @@ public sealed class GlobMatcher
     /// </summary>
     private static bool TryParseCharClass(string glob, int start, out string charClass, out int end)
     {
-        var i = start + 1;
-        var negate = false;
+        int i = start + 1;
+        bool negate = false;
         if (i < glob.Length && (glob[i] == '!' || glob[i] == '^'))
         {
             negate = true;
             i++;
         }
 
-        var content = new StringBuilder();
-        var closed = false;
+        StringBuilder content = new();
+        bool closed = false;
         while (i < glob.Length)
         {
-            var c = glob[i];
+            char c = glob[i];
             if (c == ']' && content.Length > 0)
             {
                 closed = true;

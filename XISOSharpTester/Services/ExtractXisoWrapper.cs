@@ -1,4 +1,5 @@
 using Serilog;
+using XISOSharp;
 using XISOSharpTester.Logging;
 
 #pragma warning disable MA0048 // File name must match type name — class name intentionally differs from file name
@@ -79,11 +80,10 @@ public class XisoSharpWrapper : IDisposable
             // Thin delegate over the shared core runner (BUG-X-004): async drains,
             // timeout, cancel, tree-kill, ArgumentList, and exit reporting live in
             // XISOSharp.ProcessRunner so GUI and Tester stay identical.
-            var core = await XISOSharp.ProcessRunner
+            ProcessRunResult core = await ProcessRunner
                 .RunAsync(_exePath, args, ProcessTimeout, cancellationToken)
                 .ConfigureAwait(false);
-            var result = new Result
-                { ExitCode = core.ExitCode, StdOut = core.StandardOutput, StdErr = core.StandardError };
+            Result result = new() { ExitCode = core.ExitCode, StdOut = core.StandardOutput, StdErr = core.StandardError };
             if (result.ExitCode != 0)
             {
                 Log.Warning("extract-xiso exited with code {Exit}: {Args}", result.ExitCode,
@@ -243,16 +243,16 @@ public class XisoSharpWrapper : IDisposable
     {
         try
         {
-            var r = await RunAsync(["-v"], cancellationToken).ConfigureAwait(false);
+            Result r = await RunAsync(["-v"], cancellationToken).ConfigureAwait(false);
             if (r.ExitCode != 0 && r.ExitCode != 255) return null;
 
-            var stdout = r.StdOut.Trim();
+            string stdout = r.StdOut.Trim();
             if (string.IsNullOrEmpty(stdout))
             {
                 stdout = r.All.Trim();
             }
 
-            var lines = stdout.Split('\n');
+            string[] lines = stdout.Split('\n');
             return lines.FirstOrDefault()?.Trim();
         }
         catch (OperationCanceledException)

@@ -18,7 +18,7 @@ public class XisoCorruptionResilienceTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -34,7 +34,7 @@ public class XisoCorruptionResilienceTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -42,10 +42,10 @@ public class XisoCorruptionResilienceTests : IDisposable
 
     private string CreateIso(Action<string> populate, string isoName)
     {
-        var src = CreateTempDir("xiso_corrupt_src");
+        string src = CreateTempDir("xiso_corrupt_src");
         populate(src);
-        var dir = CreateTempDir("xiso_corrupt_iso");
-        var result = XisoWriter.CreateXiso(src, dir, null, null, out var created, isoName, null);
+        string dir = CreateTempDir("xiso_corrupt_iso");
+        int result = XisoWriter.CreateXiso(src, dir, null, null, out string? created, isoName, null);
         Assert.Equal(0, result);
         Assert.NotNull(created);
         return created;
@@ -53,19 +53,19 @@ public class XisoCorruptionResilienceTests : IDisposable
 
     private string CopyIso(string isoPath, string prefix)
     {
-        var dest = Path.Combine(CreateTempDir(prefix), Path.GetFileName(isoPath));
+        string dest = Path.Combine(CreateTempDir(prefix), Path.GetFileName(isoPath));
         File.Copy(isoPath, dest);
         return dest;
     }
 
     private static long FindEntryHeader(byte[] img, long tableAbs, uint tableSize, string name)
     {
-        var nameBytes = Encoding.ASCII.GetBytes(name);
-        var tableEnd = tableAbs + tableSize;
-        for (var i = tableAbs; i + 14 + nameBytes.Length <= Math.Min(tableEnd, img.Length); i++)
+        byte[] nameBytes = Encoding.ASCII.GetBytes(name);
+        long tableEnd = tableAbs + tableSize;
+        for (long i = tableAbs; i + 14 + nameBytes.Length <= Math.Min(tableEnd, img.Length); i++)
         {
-            var match = true;
-            for (var k = 0; k < nameBytes.Length; k++)
+            bool match = true;
+            for (int k = 0; k < nameBytes.Length; k++)
             {
                 if (img[i + 14 + k] != nameBytes[k])
                 {
@@ -84,7 +84,7 @@ public class XisoCorruptionResilienceTests : IDisposable
 
     private static (uint RootSize, long RootAbs) RootLayout(string isoPath)
     {
-        var vol = XisoReader.GetVolumeInfo(isoPath);
+        VolumeInfo vol = XisoReader.GetVolumeInfo(isoPath);
         Assert.True(vol.IsValid, $"fixture ISO invalid: {isoPath}");
         return (vol.RootDirSize, ((long)vol.RootDirSector * Constants.SectorSize) + vol.DiscLseek);
     }
@@ -96,56 +96,56 @@ public class XisoCorruptionResilienceTests : IDisposable
     [Fact]
     public void VerifyXiso_SecondMagicCorrupt_ThrowsCorrupt()
     {
-        var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
-        var img = File.ReadAllBytes(isoPath);
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+        byte[] img = File.ReadAllBytes(isoPath);
         Array.Clear(img, Constants.HeaderOffset + 20 + 4 + 4 + Constants.FileTimeSize + Constants.UnusedSize,
             Constants.HeaderDataLength);
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        using var fs = new FileStream(bad, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var ex = Assert.Throws<XisoFormatException>(() => XisoReader.VerifyXiso(fs, "game.iso"));
+        using FileStream fs = new(bad, FileMode.Open, FileAccess.Read, FileShare.Read);
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.VerifyXiso(fs, "game.iso"));
         Assert.Contains("corrupt", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public void VerifyXiso_ZeroRootSectorAndSize_ThrowsEmpty()
     {
-        var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
-        var img = File.ReadAllBytes(isoPath);
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+        byte[] img = File.ReadAllBytes(isoPath);
         Array.Clear(img, Constants.HeaderOffset + Constants.HeaderDataLength, 8);
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        using var fs = new FileStream(bad, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using FileStream fs = new(bad, FileMode.Open, FileAccess.Read, FileShare.Read);
         Assert.Throws<XisoEmptyException>(() => XisoReader.VerifyXiso(fs, "game.iso"));
     }
 
     [Fact]
     public void VerifyXiso_NonZeroSectorZeroSize_ThrowsNamed()
     {
-        var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
-        var img = File.ReadAllBytes(isoPath);
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+        byte[] img = File.ReadAllBytes(isoPath);
         BinaryPrimitives.WriteUInt32LittleEndian(img.AsSpan(Constants.HeaderOffset + 24), 0u);
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        using var fs = new FileStream(bad, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var ex = Assert.Throws<XisoFormatException>(() => XisoReader.VerifyXiso(fs, "game.iso"));
+        using FileStream fs = new(bad, FileMode.Open, FileAccess.Read, FileShare.Read);
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.VerifyXiso(fs, "game.iso"));
         Assert.Contains("size is zero", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public void VerifyXiso_OversizedRoot_ThrowsNamed()
     {
-        var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
-        var img = File.ReadAllBytes(isoPath);
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+        byte[] img = File.ReadAllBytes(isoPath);
         BinaryPrimitives.WriteUInt32LittleEndian(img.AsSpan(Constants.HeaderOffset + 24), 0xFFFFFF00u);
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        using var fs = new FileStream(bad, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var ex = Assert.Throws<XisoFormatException>(() => XisoReader.VerifyXiso(fs, "game.iso"));
+        using FileStream fs = new(bad, FileMode.Open, FileAccess.Read, FileShare.Read);
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.VerifyXiso(fs, "game.iso"));
         Assert.Contains("exceeds available space", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -156,22 +156,22 @@ public class XisoCorruptionResilienceTests : IDisposable
     [Fact]
     public void Extract_SubdirStartBeyondEof_ThrowsInvalidToc()
     {
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "top.txt"), "top");
             Directory.CreateDirectory(Path.Combine(src, "sub"));
             File.WriteAllText(Path.Combine(src, "sub", "inner.txt"), "inner");
         }, "game.iso");
-        var (rootSize, rootAbs) = RootLayout(isoPath);
+        (uint rootSize, long rootAbs) = RootLayout(isoPath);
 
-        var img = File.ReadAllBytes(isoPath);
-        var header = FindEntryHeader(img, rootAbs, rootSize, "sub");
+        byte[] img = File.ReadAllBytes(isoPath);
+        long header = FindEntryHeader(img, rootAbs, rootSize, "sub");
         BinaryPrimitives.WriteUInt32LittleEndian(img.AsSpan((int)header + 4), 0x00FFFFFFu);
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        var dest = CreateTempDir("xiso_corrupt_dest");
-        var ex = Assert.Throws<XisoFormatException>(() => XisoReader.UnpackImage(bad, dest));
+        string dest = CreateTempDir("xiso_corrupt_dest");
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.UnpackImage(bad, dest));
         Assert.Contains("invalid TOC entry", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("outside the image", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -179,22 +179,22 @@ public class XisoCorruptionResilienceTests : IDisposable
     [Fact]
     public void Extract_FileStartBeyondEof_ThrowsTruncated()
     {
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
-            var payload = new byte[20000];
+            byte[] payload = new byte[20000];
             new Random(7).NextBytes(payload);
             File.WriteAllBytes(Path.Combine(src, "c.bin"), payload);
         }, "game.iso");
-        var (rootSize, rootAbs) = RootLayout(isoPath);
+        (uint rootSize, long rootAbs) = RootLayout(isoPath);
 
-        var img = File.ReadAllBytes(isoPath);
-        var header = FindEntryHeader(img, rootAbs, rootSize, "c.bin");
+        byte[] img = File.ReadAllBytes(isoPath);
+        long header = FindEntryHeader(img, rootAbs, rootSize, "c.bin");
         BinaryPrimitives.WriteUInt32LittleEndian(img.AsSpan((int)header + 4), 0x00FFFFFFu);
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        var dest = CreateTempDir("xiso_corrupt_dest");
-        var ex = Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(bad, dest));
+        string dest = CreateTempDir("xiso_corrupt_dest");
+        ExtractFileException ex = Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(bad, dest));
         Assert.Contains("c.bin", ex.Message, StringComparison.Ordinal);
     }
 
@@ -205,27 +205,27 @@ public class XisoCorruptionResilienceTests : IDisposable
     [Fact]
     public void FileSizeMaxValue_FailsFastEverywhere()
     {
-        var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "big.bin"), "small"), "game.iso");
-        var (rootSize, rootAbs) = RootLayout(isoPath);
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "big.bin"), "small"), "game.iso");
+        (uint rootSize, long rootAbs) = RootLayout(isoPath);
 
-        var img = File.ReadAllBytes(isoPath);
-        var header = FindEntryHeader(img, rootAbs, rootSize, "big.bin");
+        byte[] img = File.ReadAllBytes(isoPath);
+        long header = FindEntryHeader(img, rootAbs, rootSize, "big.bin");
         BinaryPrimitives.WriteUInt32LittleEndian(img.AsSpan((int)header + 8), uint.MaxValue);
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
         // Metadata still reads: the size is reported, not acted on.
-        var entry = XisoReader.GetEntryInfo(bad, "/big.bin");
+        EntryInfo? entry = XisoReader.GetEntryInfo(bad, "/big.bin");
         Assert.NotNull(entry);
         Assert.Equal(uint.MaxValue, entry.FileSize);
 
         // Every data path fails fast instead of allocating or looping.
-        var dest = CreateTempDir("xiso_corrupt_dest");
+        string dest = CreateTempDir("xiso_corrupt_dest");
         Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(bad, dest));
         Assert.Throws<IOException>(() => XisoReader.ComputeFileHash(bad, "/big.bin", HashAlgorithmName.SHA256));
         Assert.Throws<ExtractFileException>(() =>
             XisoReader.CopyOut(bad, "/big.bin", Path.Combine(dest, "big.bin")));
-        var ex = Assert.Throws<XisoFormatException>(() => XisoReader.GetSectorLayout(bad));
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.GetSectorLayout(bad));
         Assert.Contains("invalid TOC entry", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -240,14 +240,14 @@ public class XisoCorruptionResilienceTests : IDisposable
     {
         Assert.True(SkipConditions.IsNtfsTempDrive(), "Requires NTFS temp drive.");
 
-        var src = CreateTempDir("xiso_corrupt_src");
-        var bigPath = Path.Combine(src, "huge.bin");
-        using (var fs = new FileStream(bigPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        string src = CreateTempDir("xiso_corrupt_src");
+        string bigPath = Path.Combine(src, "huge.bin");
+        using (FileStream fs = new(bigPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
             fs.SetLength(5L * 1024 * 1024 * 1024);
         }
 
-        var ex = Assert.Throws<XisoFileTooLargeException>(() =>
+        XisoFileTooLargeException ex = Assert.Throws<XisoFileTooLargeException>(() =>
             XisoWriter.CreateXiso(src, CreateTempDir("xiso_corrupt_iso"), null, null, out _, null, null));
         Assert.Contains("huge.bin", ex.Message, StringComparison.Ordinal);
     }
@@ -259,41 +259,41 @@ public class XisoCorruptionResilienceTests : IDisposable
     [Fact]
     public void Extract_FilenameWithSlash_ThrowsXisoFormat()
     {
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (rootSize, rootAbs) = RootLayout(isoPath);
+        (uint rootSize, long rootAbs) = RootLayout(isoPath);
 
-        var img = File.ReadAllBytes(isoPath);
-        var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
+        byte[] img = File.ReadAllBytes(isoPath);
+        long header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
         img[header + 14] = (byte)'/';
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        var dest = CreateTempDir("xiso_corrupt_dest");
-        var ex = Assert.Throws<XisoFormatException>(() => XisoReader.UnpackImage(bad, dest));
+        string dest = CreateTempDir("xiso_corrupt_dest");
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.UnpackImage(bad, dest));
         Assert.Contains("invalid character", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public void Audit_FilenameWithSlash_ReportsIssue()
     {
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (rootSize, rootAbs) = RootLayout(isoPath);
+        (uint rootSize, long rootAbs) = RootLayout(isoPath);
 
-        var img = File.ReadAllBytes(isoPath);
-        var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
+        byte[] img = File.ReadAllBytes(isoPath);
+        long header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
         img[header + 14] = (byte)'/';
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        var result = XisoReader.AuditXiso(bad);
+        AuditResult result = XisoReader.AuditXiso(bad);
         Assert.False(result.IsValid);
         Assert.Contains(result.Issues, static i => i.Contains("path separator", StringComparison.OrdinalIgnoreCase));
     }
@@ -303,20 +303,20 @@ public class XisoCorruptionResilienceTests : IDisposable
     {
         // BUG-LIB-021: the listing walk rejects separator names exactly like
         // TraverseXiso instead of handing them to Path.Combine.
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (rootSize, rootAbs) = RootLayout(isoPath);
+        (uint rootSize, long rootAbs) = RootLayout(isoPath);
 
-        var img = File.ReadAllBytes(isoPath);
-        var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
+        byte[] img = File.ReadAllBytes(isoPath);
+        long header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
         img[header + 14] = (byte)'/';
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        var ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad, "/"));
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad, "/"));
         Assert.Contains("path separator", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -325,24 +325,24 @@ public class XisoCorruptionResilienceTests : IDisposable
     {
         // BUG-LIB-023: names colliding case-insensitively cannot round-trip,
         // so rewrite fails naming the duplicate instead of dropping a file.
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (rootSize, rootAbs) = RootLayout(isoPath);
+        (uint rootSize, long rootAbs) = RootLayout(isoPath);
 
-        var img = File.ReadAllBytes(isoPath);
-        var header = FindEntryHeader(img, rootAbs, rootSize, "b.txt");
+        byte[] img = File.ReadAllBytes(isoPath);
+        long header = FindEntryHeader(img, rootAbs, rootSize, "b.txt");
         // Same letters, different case: still "b.txt" case-insensitively,
         // so the rewrite tree build must refuse the duplicate.
         "A.TXT"u8.CopyTo(img.AsSpan((int)header + 14));
         img[(int)header + 13] = (byte)"A.TXT".Length;
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        var outDir = CreateTempDir("xiso_corrupt_dest");
-        var ex = Assert.Throws<XisoFormatException>(() =>
+        string outDir = CreateTempDir("xiso_corrupt_dest");
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() =>
             XisoReader.DecodeXiso(bad, outDir, ExtractMode.Rewrite, out _, true));
         Assert.Contains("duplicate filename", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -352,14 +352,14 @@ public class XisoCorruptionResilienceTests : IDisposable
     {
         // BUG-LIB-023 (writer side): a case-sensitive host holding both cases
         // fails the run instead of packing one file and dropping the other.
-        var src = CreateTempDir("xiso_corrupt_casesrc");
+        string src = CreateTempDir("xiso_corrupt_casesrc");
         File.WriteAllText(Path.Combine(src, "File.txt"), "upper");
         if (File.Exists(Path.Combine(src, "file.txt")))
             return; // Case-insensitive filesystem: both names are one file.
         File.WriteAllText(Path.Combine(src, "file.txt"), "lower");
 
-        var dir = CreateTempDir("xiso_corrupt_caseiso");
-        var rc = XisoWriter.CreateXiso(src, dir, null, null, out var created, "case.iso", null);
+        string dir = CreateTempDir("xiso_corrupt_caseiso");
+        int rc = XisoWriter.CreateXiso(src, dir, null, null, out string? created, "case.iso", null);
         Assert.Equal(1, rc);
         Assert.True(created == null || !File.Exists(created));
     }
@@ -367,20 +367,20 @@ public class XisoCorruptionResilienceTests : IDisposable
     [Fact]
     public void Extract_FilenameWithNul_ThrowsNamed()
     {
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (rootSize, rootAbs) = RootLayout(isoPath);
+        (uint rootSize, long rootAbs) = RootLayout(isoPath);
 
-        var img = File.ReadAllBytes(isoPath);
-        var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
+        byte[] img = File.ReadAllBytes(isoPath);
+        long header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
         img[header + 14] = 0x00;
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        var dest = CreateTempDir("xiso_corrupt_dest");
+        string dest = CreateTempDir("xiso_corrupt_dest");
         Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(bad, dest));
     }
 
@@ -390,17 +390,17 @@ public class XisoCorruptionResilienceTests : IDisposable
 
     private string CreateTableTruncatedIso()
     {
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var rootAbs = RootLayout(isoPath).RootAbs;
+        long rootAbs = RootLayout(isoPath).RootAbs;
 
-        var img = File.ReadAllBytes(isoPath);
+        byte[] img = File.ReadAllBytes(isoPath);
         img[rootAbs] = 0x00;
         img[rootAbs + 1] = 0x00;
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img[..(int)(rootAbs + 2)]);
         return bad;
     }
@@ -409,8 +409,8 @@ public class XisoCorruptionResilienceTests : IDisposable
     public void TruncatedTable_Unpack_ThrowsBounded()
     {
         // The header-level check fires first: root sector beyond end of image.
-        var bad = CreateTableTruncatedIso();
-        var ex = Assert.Throws<XisoFormatException>(() =>
+        string bad = CreateTableTruncatedIso();
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() =>
             XisoReader.UnpackImage(bad, CreateTempDir("xiso_corrupt_dest")));
         Assert.Contains("beyond end", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -418,14 +418,14 @@ public class XisoCorruptionResilienceTests : IDisposable
     [Fact]
     public void TruncatedTable_ListDirectory_ThrowsBounded()
     {
-        var bad = CreateTableTruncatedIso();
+        string bad = CreateTableTruncatedIso();
         Assert.Throws<IOException>(() => XisoReader.ListDirectory(bad, "/"));
     }
 
     [Fact]
     public void TruncatedTable_Audit_ThrowsBounded()
     {
-        var bad = CreateTableTruncatedIso();
+        string bad = CreateTableTruncatedIso();
         Assert.Throws<IOException>(() => XisoReader.AuditXiso(bad));
     }
 
@@ -433,8 +433,8 @@ public class XisoCorruptionResilienceTests : IDisposable
     public void TruncatedTable_GetSectorLayout_ThrowsBounded()
     {
         // The table-bounds precheck fires: table extends past end of image.
-        var bad = CreateTableTruncatedIso();
-        var ex = Assert.Throws<XisoFormatException>(() => XisoReader.GetSectorLayout(bad));
+        string bad = CreateTableTruncatedIso();
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.GetSectorLayout(bad));
         Assert.Contains("outside the image", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -445,25 +445,25 @@ public class XisoCorruptionResilienceTests : IDisposable
     /// </summary>
     private string CreateTableEndAtEofIso()
     {
-        var isoPath = CreateIso(src =>
+        string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var rootAbs = RootLayout(isoPath).RootAbs;
+        long rootAbs = RootLayout(isoPath).RootAbs;
 
-        var img = File.ReadAllBytes(isoPath).ToList();
-        var fileLen = img.Count;
+        List<byte> img = File.ReadAllBytes(isoPath).ToList();
+        int fileLen = img.Count;
 
         // Position P: dword-aligned, first header ushort in-bounds, 12-byte
         // peek past EOF.
-        var p = fileLen - 6 - ((((fileLen - 6 - (int)rootAbs) % 4) + 4) % 4);
+        int p = fileLen - 6 - ((((fileLen - 6 - (int)rootAbs) % 4) + 4) % 4);
         Assert.True(p > rootAbs && p + 2 <= fileLen && p + 14 > fileLen,
             $"no suitable peek-past-end position (rootAbs={rootAbs}, fileLen={fileLen})");
 
-        var imgArr = img.ToArray();
-        var bHeader = FindEntryHeader(imgArr, rootAbs, (uint)(fileLen - rootAbs), "b.txt");
-        var target = (ushort)((p - rootAbs) / 4);
+        byte[] imgArr = img.ToArray();
+        long bHeader = FindEntryHeader(imgArr, rootAbs, (uint)(fileLen - rootAbs), "b.txt");
+        ushort target = (ushort)((p - rootAbs) / 4);
         BinaryPrimitives.WriteUInt16LittleEndian(imgArr.AsSpan((int)bHeader + 2), target);
 
         // Stretch the root table bound to end-of-file so the walk may reach P.
@@ -473,7 +473,7 @@ public class XisoCorruptionResilienceTests : IDisposable
         imgArr[p] = 0x00;
         imgArr[p + 1] = 0x00;
 
-        var bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, imgArr);
         return bad;
     }
@@ -481,28 +481,28 @@ public class XisoCorruptionResilienceTests : IDisposable
     [Fact]
     public void TableEndingAtEof_Unpack_ThrowsBounded()
     {
-        var bad = CreateTableEndAtEofIso();
+        string bad = CreateTableEndAtEofIso();
         Assert.Throws<IOException>(() => XisoReader.UnpackImage(bad, CreateTempDir("xiso_corrupt_dest")));
     }
 
     [Fact]
     public void TableEndingAtEof_ListDirectory_ThrowsBounded()
     {
-        var bad = CreateTableEndAtEofIso();
+        string bad = CreateTableEndAtEofIso();
         Assert.Throws<IOException>(() => XisoReader.ListDirectory(bad, "/"));
     }
 
     [Fact]
     public void TableEndingAtEof_Audit_ThrowsBounded()
     {
-        var bad = CreateTableEndAtEofIso();
+        string bad = CreateTableEndAtEofIso();
         Assert.Throws<IOException>(() => XisoReader.AuditXiso(bad));
     }
 
     [Fact]
     public void TableEndingAtEof_GetSectorLayout_ThrowsBounded()
     {
-        var bad = CreateTableEndAtEofIso();
+        string bad = CreateTableEndAtEofIso();
         Assert.Throws<IOException>(() => XisoReader.GetSectorLayout(bad));
     }
 }

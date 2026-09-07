@@ -26,7 +26,7 @@ public class XisoDiscFormatTests : IDisposable
         Logger.Quiet = false;
         Logger.RealQuiet = false;
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -41,7 +41,7 @@ public class XisoDiscFormatTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -56,7 +56,7 @@ public class XisoDiscFormatTests : IDisposable
     [InlineData(0x12345678L, "Unknown")]
     public void DiscFormat_MapsKnownOffsets(long discLseek, string expected)
     {
-        var vol = new VolumeInfo(true, 0, 0, discLseek, 0, 0);
+        VolumeInfo vol = new(true, 0, 0, discLseek, 0, 0);
 
         Assert.Equal(expected, vol.DiscFormat);
     }
@@ -68,7 +68,7 @@ public class XisoDiscFormatTests : IDisposable
     {
         // An invalid probe carries no layout identity even when the offset
         // happens to be zero or match a known layout.
-        var vol = new VolumeInfo(false, 0, 0, discLseek, 0, 0);
+        VolumeInfo vol = new(false, 0, 0, discLseek, 0, 0);
 
         Assert.Equal("Unknown", vol.DiscFormat);
     }
@@ -76,15 +76,15 @@ public class XisoDiscFormatTests : IDisposable
     [Fact]
     public void DiscFormat_PackedIso_RoundTripsRaw()
     {
-        var srcDir = CreateTempDir("xiso_discfmt_src");
+        string srcDir = CreateTempDir("xiso_discfmt_src");
         File.WriteAllText(Path.Combine(srcDir, "readme.txt"), "hello");
 
-        var outputDir = CreateTempDir("xiso_discfmt_out");
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir("xiso_discfmt_out");
+        int result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
 
-        var vol = XisoReader.GetVolumeInfo(isoPath);
+        VolumeInfo vol = XisoReader.GetVolumeInfo(isoPath);
 
         Assert.True(vol.IsValid);
         Assert.Equal(0, vol.DiscLseek);
@@ -94,11 +94,11 @@ public class XisoDiscFormatTests : IDisposable
     [Fact]
     public void Cli_Info_PrintsDiscFormat()
     {
-        var srcDir = CreateTempDir("xiso_discfmt_cli_src");
+        string srcDir = CreateTempDir("xiso_discfmt_cli_src");
         File.WriteAllText(Path.Combine(srcDir, "readme.txt"), "hello");
 
-        var outputDir = CreateTempDir("xiso_discfmt_cli_out");
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir("xiso_discfmt_cli_out");
+        int result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
 

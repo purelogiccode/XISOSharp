@@ -14,7 +14,7 @@ public class CisoAutoDetectTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -29,7 +29,7 @@ public class CisoAutoDetectTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -45,12 +45,12 @@ public class CisoAutoDetectTests : IDisposable
 
     private static string CreateIso(string work)
     {
-        var src = Path.Combine(work, "src");
+        string src = Path.Combine(work, "src");
         Directory.CreateDirectory(src);
         PopulateSimple(src);
-        var isoDir = Path.Combine(work, "iso");
+        string isoDir = Path.Combine(work, "iso");
         Directory.CreateDirectory(isoDir);
-        Assert.Equal(0, XisoWriter.CreateXiso(src, isoDir, null, null, out var isoPath, "game.iso", null));
+        Assert.Equal(0, XisoWriter.CreateXiso(src, isoDir, null, null, out string? isoPath, "game.iso", null));
         Assert.NotNull(isoPath);
         return isoPath;
     }
@@ -64,12 +64,12 @@ public class CisoAutoDetectTests : IDisposable
 
     private static void AssertSameTree(string dirA, string dirB)
     {
-        var filesA = Directory.GetFiles(dirA, "*", SearchOption.AllDirectories)
+        string[] filesA = Directory.GetFiles(dirA, "*", SearchOption.AllDirectories)
             .Select(p => Path.GetRelativePath(dirA, p)).OrderBy(p => p, StringComparer.Ordinal).ToArray();
-        var filesB = Directory.GetFiles(dirB, "*", SearchOption.AllDirectories)
+        string[] filesB = Directory.GetFiles(dirB, "*", SearchOption.AllDirectories)
             .Select(p => Path.GetRelativePath(dirB, p)).OrderBy(p => p, StringComparer.Ordinal).ToArray();
         Assert.Equal(filesA, filesB);
-        foreach (var rel in filesA)
+        foreach (string rel in filesA)
             Assert.Equal(File.ReadAllBytes(Path.Combine(dirA, rel)), File.ReadAllBytes(Path.Combine(dirB, rel)));
     }
 
@@ -106,11 +106,11 @@ public class CisoAutoDetectTests : IDisposable
     [Fact]
     public void Extract_CsoInput_MatchesIsoExtraction()
     {
-        var work = CreateTempDir("xiso_csoauto");
-        var iso = CreateIso(work);
-        var cso = Compress(iso, Path.Combine(work, "game.cso"));
-        var outIso = Path.Combine(work, "from_iso");
-        var outCso = Path.Combine(work, "from_cso");
+        string work = CreateTempDir("xiso_csoauto");
+        string iso = CreateIso(work);
+        string cso = Compress(iso, Path.Combine(work, "game.cso"));
+        string outIso = Path.Combine(work, "from_iso");
+        string outCso = Path.Combine(work, "from_cso");
 
         Assert.Equal(0, XisoReader.Extract(iso, outIso, llCompat: false));
         Assert.Equal(0, XisoReader.Extract(cso, outCso, llCompat: false));
@@ -120,11 +120,11 @@ public class CisoAutoDetectTests : IDisposable
     [Fact]
     public void Extract_DeflateCsoInput_MatchesIsoExtraction()
     {
-        var work = CreateTempDir("xiso_csoauto");
-        var iso = CreateIso(work);
-        var cso = Compress(iso, Path.Combine(work, "game.cso"), version: CisoWriter.VersionDeflate);
-        var outIso = Path.Combine(work, "from_iso");
-        var outCso = Path.Combine(work, "from_cso");
+        string work = CreateTempDir("xiso_csoauto");
+        string iso = CreateIso(work);
+        string cso = Compress(iso, Path.Combine(work, "game.cso"), version: CisoWriter.VersionDeflate);
+        string outIso = Path.Combine(work, "from_iso");
+        string outCso = Path.Combine(work, "from_cso");
 
         Assert.Equal(0, XisoReader.Extract(iso, outIso, llCompat: false));
         Assert.Equal(0, XisoReader.Extract(cso, outCso, llCompat: false));
@@ -134,24 +134,24 @@ public class CisoAutoDetectTests : IDisposable
     [Fact]
     public void ListAndTree_CsoInput_SucceedAndNameContainer()
     {
-        var work = CreateTempDir("xiso_csoauto");
-        var iso = CreateIso(work);
-        var cso = Compress(iso, Path.Combine(work, "game.cso"));
+        string work = CreateTempDir("xiso_csoauto");
+        string iso = CreateIso(work);
+        string cso = Compress(iso, Path.Combine(work, "game.cso"));
 
         string listCsoLog, treeCsoLog, listIsoLog;
-        using (var capture = new LogCapture())
+        using (LogCapture capture = new())
         {
             Assert.Equal(0, XisoReader.List(cso, llCompat: false));
             listCsoLog = capture.Output;
         }
 
-        using (var capture = new LogCapture())
+        using (LogCapture capture = new())
         {
             Assert.Equal(0, XisoReader.Tree(cso, llCompat: false));
             treeCsoLog = capture.Output;
         }
 
-        using (var capture = new LogCapture())
+        using (LogCapture capture = new())
         {
             Assert.Equal(0, XisoReader.List(iso, llCompat: false));
             listIsoLog = capture.Output;
@@ -169,11 +169,11 @@ public class CisoAutoDetectTests : IDisposable
     [Fact]
     public void UnpackImage_CsoInput_MatchesIsoUnpack()
     {
-        var work = CreateTempDir("xiso_csoauto");
-        var iso = CreateIso(work);
-        var cso = Compress(iso, Path.Combine(work, "game.cso"));
-        var outIso = Path.Combine(work, "from_iso");
-        var outCso = Path.Combine(work, "from_cso");
+        string work = CreateTempDir("xiso_csoauto");
+        string iso = CreateIso(work);
+        string cso = Compress(iso, Path.Combine(work, "game.cso"));
+        string outIso = Path.Combine(work, "from_iso");
+        string outCso = Path.Combine(work, "from_cso");
 
         Assert.Equal(0, XisoReader.UnpackImage(iso, outIso));
         Assert.Equal(0, XisoReader.UnpackImage(cso, outCso));
@@ -183,16 +183,16 @@ public class CisoAutoDetectTests : IDisposable
     [Fact]
     public void Rewrite_CsoInput_ByteIdenticalToRewriteIso()
     {
-        var work = CreateTempDir("xiso_csoauto");
-        var iso = CreateIso(work);
-        var cso = Compress(iso, Path.Combine(work, "game.cso"));
-        var outIsoDir = Path.Combine(work, "rw_iso");
-        var outCsoDir = Path.Combine(work, "rw_cso");
+        string work = CreateTempDir("xiso_csoauto");
+        string iso = CreateIso(work);
+        string cso = Compress(iso, Path.Combine(work, "game.cso"));
+        string outIsoDir = Path.Combine(work, "rw_iso");
+        string outCsoDir = Path.Combine(work, "rw_cso");
         Directory.CreateDirectory(outIsoDir);
         Directory.CreateDirectory(outCsoDir);
 
-        Assert.Equal(0, XisoReader.Rewrite(iso, outIsoDir, out var isoOut));
-        Assert.Equal(0, XisoReader.Rewrite(cso, outCsoDir, out var csoOut));
+        Assert.Equal(0, XisoReader.Rewrite(iso, outIsoDir, out string? isoOut));
+        Assert.Equal(0, XisoReader.Rewrite(cso, outCsoDir, out string? csoOut));
 
         Assert.NotNull(isoOut);
         Assert.NotNull(csoOut);
@@ -203,13 +203,13 @@ public class CisoAutoDetectTests : IDisposable
     [Fact]
     public void Extract_SplitCsoInput_MatchesIsoExtraction()
     {
-        var work = CreateTempDir("xiso_csoauto");
-        var iso = CreateIso(work);
+        string work = CreateTempDir("xiso_csoauto");
+        string iso = CreateIso(work);
         Compress(iso, Path.Combine(work, "game.cso"), splitBytes: 1 << 20);
-        var firstPart = Path.Combine(work, "game.1.cso");
+        string firstPart = Path.Combine(work, "game.1.cso");
         Assert.True(File.Exists(firstPart));
-        var outIso = Path.Combine(work, "from_iso");
-        var outCso = Path.Combine(work, "from_split");
+        string outIso = Path.Combine(work, "from_iso");
+        string outCso = Path.Combine(work, "from_split");
 
         Assert.Equal(0, XisoReader.Extract(iso, outIso, llCompat: false));
         Assert.Equal(0, XisoReader.Extract(firstPart, outCso, llCompat: false));
@@ -219,10 +219,10 @@ public class CisoAutoDetectTests : IDisposable
     [Fact]
     public void Extract_CsoInput_DefaultDirUsesGameStem()
     {
-        var work = CreateTempDir("xiso_csoauto");
-        var iso = CreateIso(work);
-        var cso = Compress(iso, Path.Combine(work, "game.cso"));
-        var cwd = Directory.GetCurrentDirectory();
+        string work = CreateTempDir("xiso_csoauto");
+        string iso = CreateIso(work);
+        string cso = Compress(iso, Path.Combine(work, "game.cso"));
+        string cwd = Directory.GetCurrentDirectory();
         Directory.SetCurrentDirectory(work);
         try
         {
@@ -242,13 +242,13 @@ public class CisoAutoDetectTests : IDisposable
     {
         // The CLI rewrite flow renames game.cso -> game.cso.old before decoding;
         // the CISO magic sniff must still route it to the decompressed view.
-        var work = CreateTempDir("xiso_csoauto");
-        var iso = CreateIso(work);
-        var cso = Compress(iso, Path.Combine(work, "game.cso"));
-        var renamed = Path.Combine(work, "game.cso.old");
+        string work = CreateTempDir("xiso_csoauto");
+        string iso = CreateIso(work);
+        string cso = Compress(iso, Path.Combine(work, "game.cso"));
+        string renamed = Path.Combine(work, "game.cso.old");
         File.Move(cso, renamed);
-        var outIso = Path.Combine(work, "from_iso");
-        var outCso = Path.Combine(work, "from_renamed");
+        string outIso = Path.Combine(work, "from_iso");
+        string outCso = Path.Combine(work, "from_renamed");
 
         Assert.Equal(0, XisoReader.Extract(iso, outIso, llCompat: false));
         Assert.Equal(0, XisoReader.Extract(renamed, outCso, llCompat: false));
@@ -258,9 +258,9 @@ public class CisoAutoDetectTests : IDisposable
     [Fact]
     public void IsOptimizedImage_CsoMatchesIso()
     {
-        var work = CreateTempDir("xiso_csoauto");
-        var iso = CreateIso(work);
-        var cso = Compress(iso, Path.Combine(work, "game.cso"));
+        string work = CreateTempDir("xiso_csoauto");
+        string iso = CreateIso(work);
+        string cso = Compress(iso, Path.Combine(work, "game.cso"));
 
         Assert.Equal(XisoReader.IsOptimizedImage(iso), XisoReader.IsOptimizedImage(cso));
     }

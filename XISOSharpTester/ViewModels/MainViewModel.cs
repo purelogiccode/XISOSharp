@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Serilog;
 using XISOSharpTester.Logging;
@@ -54,7 +55,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     /// </summary>
     private void InvalidateCommands()
     {
-        var dispatcher = Application.Current?.Dispatcher;
+        Dispatcher? dispatcher = Application.Current?.Dispatcher;
         if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(InvalidateCommands);
@@ -92,7 +93,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
                 return;
             }
 
-            var resolved = XISOSharp.ToolLocator.Resolve(
+            string? resolved = XISOSharp.ToolLocator.Resolve(
                 string.IsNullOrWhiteSpace(XisoSharpPath) ? null : XisoSharpPath,
                 "extract-xiso.exe",
                 "extract-xiso");
@@ -364,14 +365,14 @@ internal partial class MainViewModel : INotifyPropertyChanged
     /// </summary>
     private void SyncFileResults()
     {
-        var dispatcher = Application.Current?.Dispatcher;
+        Dispatcher? dispatcher = Application.Current?.Dispatcher;
         if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(SyncFileResults);
             return;
         }
 
-        var source = _sessionResult?.FileResults;
+        IList<PerFileResult>? source = _sessionResult?.FileResults;
         if (source is null || source.Count == 0)
         {
             if (FileResults.Count != 0)
@@ -381,8 +382,8 @@ internal partial class MainViewModel : INotifyPropertyChanged
 
         if (FileResults.Count == source.Count)
         {
-            var same = true;
-            for (var i = 0; i < source.Count; i++)
+            bool same = true;
+            for (int i = 0; i < source.Count; i++)
             {
                 if (!ReferenceEquals(FileResults[i], source[i]))
                 {
@@ -396,7 +397,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
         }
 
         FileResults.Clear();
-        foreach (var item in source)
+        foreach (PerFileResult item in source)
             FileResults.Add(item);
     }
 
@@ -404,7 +405,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     {
         try
         {
-            var dlg = new OpenFileDialog
+            OpenFileDialog dlg = new()
             {
                 Title = "Select extract-xiso tool",
                 Filter =
@@ -430,13 +431,13 @@ internal partial class MainViewModel : INotifyPropertyChanged
     {
         try
         {
-            var dlg = new OpenFileDialog
+            OpenFileDialog dlg = new()
             {
                 Title = "Select XISO files", Filter = "ISO files (*.iso)|*.iso|All files (*.*)|*.*", Multiselect = true
             };
             if (dlg.ShowDialog() == true)
             {
-                foreach (var path in dlg.FileNames)
+                foreach (string path in dlg.FileNames)
                 {
                     AddFileIfNew(path);
                 }
@@ -473,8 +474,8 @@ internal partial class MainViewModel : INotifyPropertyChanged
         {
             try
             {
-                var isoFiles = Directory.GetFiles(dlg.FolderName, "*.iso", SearchOption.AllDirectories);
-                foreach (var path in isoFiles)
+                string[] isoFiles = Directory.GetFiles(dlg.FolderName, "*.iso", SearchOption.AllDirectories);
+                foreach (string path in isoFiles)
                 {
                     AddFileIfNew(path);
                 }
@@ -533,7 +534,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     {
         try
         {
-            var totalSize = Files.Sum(static f =>
+            long totalSize = Files.Sum(static f =>
             {
                 try
                 {
@@ -545,7 +546,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
                     return 0;
                 }
             });
-            var sizeStr = totalSize switch
+            string sizeStr = totalSize switch
             {
                 < 1024 => $"{totalSize} B",
                 < 1024 * 1024 => $"{totalSize / 1024.0:F1} KB",
@@ -576,7 +577,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
         ProgressText = "Starting tests...";
         FileProgress = "";
 
-        var exePath = IsXisoSharpValid ? XisoSharpPath : string.Empty;
+        string exePath = IsXisoSharpValid ? XisoSharpPath : string.Empty;
         if (!IsXisoSharpValid)
         {
             AddLog("WARNING: extract-xiso not selected. Comparison tests will be skipped.");
@@ -588,7 +589,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
             Log.Information("Starting test run for {Count} file(s) with {Exe}", Files.Count, exePath);
         }
 
-        var progress = new Progress<TestProgress>(p =>
+        Progress<TestProgress> progress = new(p =>
         {
             // Non-blocking: InvokeAsync never blocks the worker, so a modal
             // dialog pumping a nested dispatcher frame cannot deadlock the run.
@@ -597,7 +598,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
             // simply skips the UI update.
             try
             {
-                var dispatcher = Application.Current?.Dispatcher;
+                Dispatcher? dispatcher = Application.Current?.Dispatcher;
                 if (dispatcher is null)
                     return;
 
@@ -626,7 +627,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
 
         try
         {
-            var session = await XisoTestRunner.RunAsync(Files.ToList(), exePath, progress).ConfigureAwait(false);
+            TestSessionResult session = await XisoTestRunner.RunAsync(Files.ToList(), exePath, progress).ConfigureAwait(false);
             OnUiAfterRun(session);
         }
         catch (Exception ex)
@@ -647,7 +648,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     /// </summary>
     private void OnUiAfterRun(TestSessionResult session)
     {
-        var dispatcher = Application.Current?.Dispatcher;
+        Dispatcher? dispatcher = Application.Current?.Dispatcher;
         if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(() => OnUiAfterRun(session));
@@ -673,7 +674,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     /// </summary>
     private void OnUiAfterFailure(string fatalMessage)
     {
-        var dispatcher = Application.Current?.Dispatcher;
+        Dispatcher? dispatcher = Application.Current?.Dispatcher;
         if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(() => OnUiAfterFailure(fatalMessage));
@@ -690,7 +691,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     /// </summary>
     private void OnUiAfterFinally()
     {
-        var dispatcher = Application.Current?.Dispatcher;
+        Dispatcher? dispatcher = Application.Current?.Dispatcher;
         if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(OnUiAfterFinally);
@@ -767,7 +768,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
 
         try
         {
-            var sb = new StringBuilder();
+            StringBuilder sb = new();
             sb.AppendLine("=== XISOSharp Tester Results ===");
             sb.AppendLine(CultureInfo.InvariantCulture, $"Date: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine(CultureInfo.InvariantCulture, $"Summary: {SessionResult.TotalFiles} files | " +
@@ -775,14 +776,14 @@ internal partial class MainViewModel : INotifyPropertyChanged
                                                         $"{SessionResult.SkippedSubTests} skipped | {SessionResult.TotalElapsedSeconds:N1}s");
             sb.AppendLine();
 
-            foreach (var file in SessionResult.FileResults)
+            foreach (PerFileResult file in SessionResult.FileResults)
             {
-                var status = file.AllPassed ? "PASS" : file.Failed > 0 ? "FAIL" : "SKIP";
+                string status = file.AllPassed ? "PASS" : file.Failed > 0 ? "FAIL" : "SKIP";
                 sb.AppendLine(CultureInfo.InvariantCulture,
                     $"--- {file.FileName} ({file.FileSize}) [{status}] {file.ElapsedSeconds:N2}s ---");
-                foreach (var t in file.SubTests)
+                foreach (SubTestResult t in file.SubTests)
                 {
-                    var icon = t.Status switch
+                    string icon = t.Status switch
                     {
                         TestStatus.Passed => "[PASS]",
                         TestStatus.Failed => "[FAIL]",
@@ -808,7 +809,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
 
     private void AddLog(string message)
     {
-        var dispatcher = Application.Current?.Dispatcher;
+        Dispatcher? dispatcher = Application.Current?.Dispatcher;
         if (dispatcher?.CheckAccess() == false)
         {
             dispatcher.Invoke(() => AddLog(message));
@@ -817,7 +818,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
 
         try
         {
-            var ts = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            string ts = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
             LogEntries.Add(new LogEntry { Message = message, Timestamp = ts });
             LogText += $"[{ts}] {message}\n";
             if (message.StartsWith("FATAL", StringComparison.OrdinalIgnoreCase) ||
@@ -844,7 +845,7 @@ internal partial class MainViewModel : INotifyPropertyChanged
     {
         try
         {
-            var about = new AboutWindow { Owner = Application.Current.MainWindow };
+            AboutWindow about = new() { Owner = Application.Current.MainWindow };
             about.ShowDialog();
         }
         catch (Exception ex)
@@ -1048,7 +1049,7 @@ public sealed class AsyncRelayCommand : ICommand
 
     /// <summary>
     /// Awaits the async handler, observing faults to the log (never unobserved).
-    /// Resumes on the UI context so <paramref name="onFault"/>-style logging is thread-safe.
+    /// Resumes on the UI context so <c>onFault</c>-style logging is thread-safe.
     /// </summary>
     public async void Execute(object? parameter)
     {

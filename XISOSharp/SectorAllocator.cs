@@ -70,7 +70,7 @@ public sealed class SectorAllocator
         get
         {
             ulong end = FirstFreeSector;
-            foreach (var (start, count) in _used)
+            foreach ((uint start, uint count) in _used)
             {
                 end = Math.Max(end, (ulong)start + count);
             }
@@ -91,7 +91,7 @@ public sealed class SectorAllocator
         get
         {
             ulong total = 0;
-            foreach (var (_, count) in _used)
+            foreach ((uint _, uint count) in _used)
             {
                 total += count;
             }
@@ -109,7 +109,7 @@ public sealed class SectorAllocator
         if (byteCount == 0)
             return 0;
 
-        var sectors = byteCount / Constants.SectorSize;
+        ulong sectors = byteCount / Constants.SectorSize;
         if (byteCount % Constants.SectorSize != 0)
             sectors++;
 
@@ -135,7 +135,7 @@ public sealed class SectorAllocator
     /// </exception>
     public uint AllocateContiguous(uint sectorCount)
     {
-        var pos = FindFit(sectorCount);
+        uint pos = FindFit(sectorCount);
         if (sectorCount != 0)
             InsertUsed(pos, sectorCount);
 
@@ -163,7 +163,7 @@ public sealed class SectorAllocator
 
         checked
         {
-            var end = (ulong)startSector + sectorCount;
+            ulong end = (ulong)startSector + sectorCount;
             if (end - 1 > uint.MaxValue)
             {
                 throw new ArgumentOutOfRangeException(nameof(sectorCount), sectorCount,
@@ -177,10 +177,10 @@ public sealed class SectorAllocator
             }
         }
 
-        foreach (var (start, count) in _used)
+        foreach ((uint start, uint count) in _used)
         {
-            var existingEnd = (ulong)start + count;
-            var newEnd = (ulong)startSector + sectorCount;
+            ulong existingEnd = (ulong)start + count;
+            ulong newEnd = (ulong)startSector + sectorCount;
             if (startSector < existingEnd && start < newEnd)
             {
                 throw new ArgumentException(
@@ -202,16 +202,16 @@ public sealed class SectorAllocator
         if (sectorCount == 0)
             return true;
 
-        var end = (ulong)startSector + sectorCount;
+        ulong end = (ulong)startSector + sectorCount;
         if (end - 1 > uint.MaxValue || startSector < FirstFreeSector)
             return false;
 
         if (TotalSectors.HasValue && end > (ulong)TotalSectors.Value)
             return false;
 
-        foreach (var (start, count) in _used)
+        foreach ((uint start, uint count) in _used)
         {
-            var existingEnd = (ulong)start + count;
+            ulong existingEnd = (ulong)start + count;
             if (startSector < existingEnd && start < end)
                 return false;
         }
@@ -224,8 +224,8 @@ public sealed class SectorAllocator
     {
         get
         {
-            var ranges = new List<SectorRange>(_used.Count);
-            foreach (var (start, count) in _used)
+            List<SectorRange> ranges = new(_used.Count);
+            foreach ((uint start, uint count) in _used)
             {
                 ranges.Add(new SectorRange(start, count));
             }
@@ -249,10 +249,10 @@ public sealed class SectorAllocator
                     "Free ranges require a bounded image (TotalSectors must be set).");
             }
 
-            var free = new List<SectorRange>();
+            List<SectorRange> free = new();
             ulong cursor = FirstFreeSector;
-            var limit = (ulong)TotalSectors.Value;
-            foreach (var (start, count) in _used)
+            ulong limit = (ulong)TotalSectors.Value;
+            foreach ((uint start, uint count) in _used)
             {
                 if (start > cursor)
                     free.Add(new SectorRange((uint)cursor, (uint)(start - cursor)));
@@ -286,8 +286,8 @@ public sealed class SectorAllocator
                 nameof(layout));
         }
 
-        var allocator = new SectorAllocator(0, layout.TotalSectors);
-        foreach (var range in layout.UsedRanges)
+        SectorAllocator allocator = new(0, layout.TotalSectors);
+        foreach (SectorRange range in layout.UsedRanges)
         {
             allocator.MarkUsed(range.StartSector, range.SectorCount);
         }
@@ -298,7 +298,7 @@ public sealed class SectorAllocator
     private uint FindFit(uint sectorCount)
     {
         ulong cursor = FirstFreeSector;
-        foreach (var (start, count) in _used)
+        foreach ((uint start, uint count) in _used)
         {
             if (start >= cursor + sectorCount)
                 return (uint)cursor;
@@ -318,7 +318,7 @@ public sealed class SectorAllocator
         {
             // Unbounded (creation) mode: the tail past tracked space always fits unless
             // the run's last sector leaves the addressable range.
-            var last = cursor + sectorCount - (sectorCount == 0 ? 0UL : 1UL);
+            ulong last = cursor + sectorCount - (sectorCount == 0 ? 0UL : 1UL);
             if (last > uint.MaxValue)
             {
                 throw new InvalidOperationException(
@@ -334,15 +334,15 @@ public sealed class SectorAllocator
         _used.Add((startSector, sectorCount));
         _used.Sort(static (a, b) => a.Start.CompareTo(b.Start));
 
-        var merged = new List<(uint Start, uint Count)>(_used.Count);
-        foreach (var (start, count) in _used)
+        List<(uint Start, uint Count)> merged = new(_used.Count);
+        foreach ((uint start, uint count) in _used)
         {
             if (merged.Count > 0)
             {
-                var (lastStart, lastCount) = merged[^1];
+                (uint lastStart, uint lastCount) = merged[^1];
                 if (start <= (ulong)lastStart + lastCount)
                 {
-                    var end = Math.Max((ulong)lastStart + lastCount, (ulong)start + count);
+                    ulong end = Math.Max((ulong)lastStart + lastCount, (ulong)start + count);
                     merged[^1] = (lastStart, (uint)(end - lastStart));
                     continue;
                 }

@@ -28,7 +28,7 @@ public class AvlNodeTests
     [Fact]
     public void New_AvlNode_HasDefaults()
     {
-        var node = new AvlNode();
+        AvlNode node = new();
 
         Assert.Equal(0u, node.Offset);
         Assert.Equal(0, node.DirStart);
@@ -49,11 +49,11 @@ public class AvlNodeTests
     [Fact]
     public void AvlNode_FieldsCanBeSet()
     {
-        var left = new AvlNode();
-        var right = new AvlNode();
-        var subdir = new AvlNode();
+        AvlNode left = new();
+        AvlNode right = new();
+        AvlNode subdir = new();
 
-        var node = new AvlNode
+        AvlNode node = new()
         {
             Offset = 100,
             DirStart = 0x1000,
@@ -123,7 +123,7 @@ public class AvlNodeTests
     [Fact]
     public void AvlNode_AllSkewValues_CanBeSet()
     {
-        var node = new AvlNode { Skew = AvlSkew.NoSkew };
+        AvlNode node = new() { Skew = AvlSkew.NoSkew };
 
         Assert.Equal(AvlSkew.NoSkew, node.Skew);
 

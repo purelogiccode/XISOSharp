@@ -46,9 +46,9 @@ No reference tool repairs images — XISOSharp does. Diagnose first, then pick t
 matching verb:
 
 ```bash
-XISOSharp.Cli -V game.iso          # deep audit: header, tag, tree, bounds, cycles
-XISOSharp.Cli --repair game.iso    # fixable in place (keeps game.iso.old backup)
-XISOSharp.Cli --salvage game.iso   # rebuild game.salvaged.iso from the rest
+XISOSharp -V game.iso          # deep audit: header, tag, tree, bounds, cycles
+XISOSharp --repair game.iso    # fixable in place (keeps game.iso.old backup)
+XISOSharp --salvage game.iso   # rebuild game.salvaged.iso from the rest
 ```
 
 - `-V` lists every issue found. Fixable-in-place issues (reserved attribute

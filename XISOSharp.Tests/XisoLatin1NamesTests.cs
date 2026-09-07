@@ -22,7 +22,7 @@ public sealed class XisoLatin1NamesTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -37,7 +37,7 @@ public sealed class XisoLatin1NamesTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -45,13 +45,13 @@ public sealed class XisoLatin1NamesTests : IDisposable
 
     private string CreateIso()
     {
-        var src = CreateTempDir("xiso_latin_src");
+        string src = CreateTempDir("xiso_latin_src");
         File.WriteAllText(Path.Combine(src, CafeFile), "caf\u00E9 content");
         File.WriteAllText(Path.Combine(src, NaiveFile), "na\u00EFve content");
         Directory.CreateDirectory(Path.Combine(src, UberDir));
         File.WriteAllText(Path.Combine(src, UberDir, "inner.txt"), "inner content");
-        var outDir = CreateTempDir("xiso_latin_iso");
-        var result = XisoWriter.CreateXiso(src, outDir, null, null, out var isoPath, null, null);
+        string outDir = CreateTempDir("xiso_latin_iso");
+        int result = XisoWriter.CreateXiso(src, outDir, null, null, out string? isoPath, null, null);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         return isoPath;
@@ -60,10 +60,10 @@ public sealed class XisoLatin1NamesTests : IDisposable
     [Fact]
     public void GetFileEntries_PreservesLatin1Names()
     {
-        var iso = CreateIso();
+        string iso = CreateIso();
 
-        var entries = XisoRanges.GetFileEntries(iso);
-        var paths = entries.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+        List<(string Path, long Offset, uint Size)> entries = XisoRanges.GetFileEntries(iso);
+        HashSet<string> paths = entries.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
 
         Assert.Contains(CafeFile, paths);
         Assert.Contains(NaiveFile, paths);
@@ -74,14 +74,14 @@ public sealed class XisoLatin1NamesTests : IDisposable
     [Fact]
     public void Petrify_HashFile_PreservesLatin1Names()
     {
-        var iso = CreateIso();
-        var work = CreateTempDir("xiso_latin_hash");
-        var skel = Path.Combine(work, "game.skeleton.xiso");
-        var hash = Path.Combine(work, "game.hash");
+        string iso = CreateIso();
+        string work = CreateTempDir("xiso_latin_hash");
+        string skel = Path.Combine(work, "game.skeleton.xiso");
+        string hash = Path.Combine(work, "game.hash");
 
         Assert.True(XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: true));
 
-        var lines = File.ReadAllLines(hash);
+        string[] lines = File.ReadAllLines(hash);
         Assert.Equal(3, lines.Length);
         Assert.Contains(lines, l => l.EndsWith(" " + CafeFile, StringComparison.Ordinal));
         Assert.Contains(lines, l => l.EndsWith(" " + NaiveFile, StringComparison.Ordinal));
@@ -92,22 +92,22 @@ public sealed class XisoLatin1NamesTests : IDisposable
     [Fact]
     public void CreateZar_LookupAndExtract_PreserveLatin1Names()
     {
-        var iso = CreateIso();
-        var work = CreateTempDir("xiso_latin_zar");
-        var zar = Path.Combine(work, "game.zar");
+        string iso = CreateIso();
+        string work = CreateTempDir("xiso_latin_zar");
+        string zar = Path.Combine(work, "game.zar");
 
         Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
 
-        using var reader = ZArchiveReader.TryOpen(zar);
+        using ZArchiveReader? reader = ZArchiveReader.TryOpen(zar);
         Assert.NotNull(reader);
-        foreach (var rel in new[] { CafeFile, NaiveFile, UberFile })
+        foreach (string rel in new[] { CafeFile, NaiveFile, UberFile })
         {
-            var h = reader.LookUp(rel);
+            uint h = reader.LookUp(rel);
             Assert.NotEqual(ZArchiveReader.InvalidNode, h);
             Assert.True(reader.IsFile(h));
         }
 
-        var outDir = Path.Combine(work, "out");
+        string outDir = Path.Combine(work, "out");
         ZArchiveTool.Extract(zar, outDir);
         Assert.True(File.Exists(Path.Combine(outDir, CafeFile)));
         Assert.True(File.Exists(Path.Combine(outDir, NaiveFile)));

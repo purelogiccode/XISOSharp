@@ -86,6 +86,11 @@
   <ItemGroup>
     <Using Include="System.IO" />
     <Using Include="System.Net.Http" />
+    <!-- BUG-X-001: the linked AppLogging.cs refers to the library's logger as bare
+         `Logger`, which resolves in Cli/Gui via their XISOSharp.* enclosing namespaces
+         but not under XISOSharpTester.*. Alias makes bare `Logger` resolve here too
+         without editing the shared source. -->
+    <Using Include="XISOSharp.Logger" Alias="Logger" />
   </ItemGroup>
 
   <ItemGroup>

@@ -17,7 +17,7 @@ public sealed class CliOutputGuardTests
     [Fact]
     public void CheckRewriteOutput_SameAsInput_Refuses()
     {
-        var refusal = CliOutputGuard.CheckRewriteOutput("game.iso", "./game.iso");
+        string? refusal = CliOutputGuard.CheckRewriteOutput("game.iso", "./game.iso");
         Assert.NotNull(refusal);
         Assert.Contains("omit -o", refusal, StringComparison.Ordinal);
     }
@@ -25,7 +25,7 @@ public sealed class CliOutputGuardTests
     [Fact]
     public void CheckRewriteOutput_SameAsBackup_Refuses()
     {
-        var refusal = CliOutputGuard.CheckRewriteOutput("game.iso", "game.iso.old");
+        string? refusal = CliOutputGuard.CheckRewriteOutput("game.iso", "game.iso.old");
         Assert.NotNull(refusal);
         Assert.Contains(".old", refusal, StringComparison.Ordinal);
     }
@@ -33,7 +33,7 @@ public sealed class CliOutputGuardTests
     [Fact]
     public void CheckSingleInputOutput_Same_Refuses()
     {
-        var refusal = CliOutputGuard.CheckSingleInputOutput("game.iso", "game.iso");
+        string? refusal = CliOutputGuard.CheckSingleInputOutput("game.iso", "game.iso");
         Assert.NotNull(refusal);
         Assert.Contains("-o", refusal, StringComparison.Ordinal);
     }
@@ -44,7 +44,7 @@ public sealed class CliOutputGuardTests
     [Fact]
     public void CheckRebuildOutput_OutputEqualsPart_RefusesAndNamesIt()
     {
-        var refusal = CliOutputGuard.CheckRebuildOutput("game.xiso", null,
+        string? refusal = CliOutputGuard.CheckRebuildOutput("game.xiso", null,
             "game.xiso", "game.video.iso", null, null);
         Assert.NotNull(refusal);
         Assert.Contains("game.xiso", refusal, StringComparison.Ordinal);
@@ -53,7 +53,7 @@ public sealed class CliOutputGuardTests
     [Fact]
     public void CheckRebuildOutput_OutputEqualsSectorsFile_Refuses()
     {
-        var refusal = CliOutputGuard.CheckRebuildOutput("sectors.txt", "sectors.txt",
+        string? refusal = CliOutputGuard.CheckRebuildOutput("sectors.txt", "sectors.txt",
             "game.xiso", "game.video.iso", null, null);
         Assert.NotNull(refusal);
         Assert.Contains("sectors", refusal, StringComparison.Ordinal);
@@ -67,7 +67,7 @@ public sealed class CliOutputGuardTests
     [Fact]
     public void CheckImageOutput_Same_Refuses()
     {
-        var refusal = CliOutputGuard.CheckImageOutput("game.iso", "game.iso");
+        string? refusal = CliOutputGuard.CheckImageOutput("game.iso", "game.iso");
         Assert.NotNull(refusal);
         Assert.Contains("same file", refusal, StringComparison.Ordinal);
     }
@@ -84,7 +84,7 @@ public sealed class CliOutputGuardTests
     [InlineData("--batch")]
     public void CheckMisplacedFlag_KnownFlag_ReportsMustComeFirst(string token)
     {
-        var refusal = CliOutputGuard.CheckMisplacedFlag(token);
+        string? refusal = CliOutputGuard.CheckMisplacedFlag(token);
         Assert.NotNull(refusal);
         Assert.Contains(token, refusal, StringComparison.Ordinal);
         Assert.Contains("must come before", refusal, StringComparison.Ordinal);

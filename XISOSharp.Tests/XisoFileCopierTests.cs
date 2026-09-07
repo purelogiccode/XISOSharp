@@ -20,7 +20,7 @@ public class XisoFileCopierTests : IDisposable
     {
         Logger.Quiet = false;
         Logger.RealQuiet = false;
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -35,7 +35,7 @@ public class XisoFileCopierTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -70,7 +70,7 @@ public class XisoFileCopierTests : IDisposable
 
     private static byte[] RandomBytes(int size, int seed)
     {
-        var data = new byte[size];
+        byte[] data = new byte[size];
         new Random(seed).NextBytes(data);
         return data;
     }
@@ -87,12 +87,12 @@ public class XisoFileCopierTests : IDisposable
     [InlineData(3 * 1024 * 1024)]
     public void CopyExact_RoundTrips_AllSizes(int size)
     {
-        var data = RandomBytes(size, 1234);
-        using var source = new MemoryStream(data, writable: false);
-        using var dest = new MemoryStream();
-        var progress = new List<long>();
+        byte[] data = RandomBytes(size, 1234);
+        using MemoryStream source = new(data, writable: false);
+        using MemoryStream dest = new();
+        List<long> progress = new();
 
-        var copied = XisoFileCopier.CopyExact(
+        long copied = XisoFileCopier.CopyExact(
             source, size,
             // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
             (buffer, count) => dest.Write(buffer, 0, count),
@@ -116,11 +116,11 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyExact_ZeroBytes_InvokesNeitherCallback()
     {
-        using var source = new MemoryStream([1, 2, 3], writable: false);
-        var chunks = 0;
-        var progress = 0;
+        using MemoryStream source = new([1, 2, 3], writable: false);
+        int chunks = 0;
+        int progress = 0;
 
-        var copied = XisoFileCopier.CopyExact(
+        long copied = XisoFileCopier.CopyExact(
             source, 0,
             (_, _) => chunks++,
             new byte[TwoMb],
@@ -134,9 +134,9 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyExact_ShortSource_ThrowsTruncatedWithCounts()
     {
-        using var source = new MemoryStream(new byte[300], writable: false);
+        using MemoryStream source = new(new byte[300], writable: false);
 
-        var ex = Assert.Throws<TruncatedCopyException>(() =>
+        TruncatedCopyException ex = Assert.Throws<TruncatedCopyException>(() =>
             XisoFileCopier.CopyExact(source, 1000, (_, _) => { }, new byte[TwoMb]));
 
         Assert.Equal(1000, ex.ExpectedBytes);
@@ -146,11 +146,11 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyExact_ShortReads_StitchedExactly()
     {
-        var data = RandomBytes(10000, 99);
-        using var source = new ShortReadStream(data, maxPerRead: 777);
-        using var dest = new MemoryStream();
+        byte[] data = RandomBytes(10000, 99);
+        using ShortReadStream source = new(data, maxPerRead: 777);
+        using MemoryStream dest = new();
 
-        var copied = XisoFileCopier.CopyExact(
+        long copied = XisoFileCopier.CopyExact(
             source, data.Length,
             // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
             (buffer, count) => dest.Write(buffer, 0, count),
@@ -163,11 +163,11 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyExact_NullBuffer_RentsPooledBuffer()
     {
-        var data = RandomBytes(3 * 1024 * 1024, 7);
-        using var source = new MemoryStream(data, writable: false);
-        using var dest = new MemoryStream();
+        byte[] data = RandomBytes(3 * 1024 * 1024, 7);
+        using MemoryStream source = new(data, writable: false);
+        using MemoryStream dest = new();
 
-        var copied = XisoFileCopier.CopyExact(
+        long copied = XisoFileCopier.CopyExact(
             source, data.Length,
             // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
             (buffer, count) => dest.Write(buffer, 0, count),
@@ -180,7 +180,7 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyExact_EmptyBuffer_Throws()
     {
-        using var source = new MemoryStream([1], writable: false);
+        using MemoryStream source = new([1], writable: false);
         Assert.Throws<ArgumentException>(() =>
             XisoFileCopier.CopyExact(source, 1, (_, _) => { }, Array.Empty<byte>()));
     }
@@ -188,7 +188,7 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyExact_NegativeCount_Throws()
     {
-        using var source = new MemoryStream([1], writable: false);
+        using MemoryStream source = new([1], writable: false);
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             XisoFileCopier.CopyExact(source, -1, (_, _) => { }, new byte[TwoMb]));
     }
@@ -196,8 +196,8 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyExact_PreCancelledToken_Throws()
     {
-        using var source = new MemoryStream(new byte[100], writable: false);
-        using var cts = new CancellationTokenSource();
+        using MemoryStream source = new(new byte[100], writable: false);
+        using CancellationTokenSource cts = new();
         cts.Cancel();
 
         Assert.Throws<OperationCanceledException>(() =>
@@ -208,9 +208,9 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyExact_CancelMidCopy_AbortsPromptly()
     {
-        var data = RandomBytes(3 * 1024 * 1024, 11);
-        using var source = new MemoryStream(data, writable: false);
-        using var cts = new CancellationTokenSource();
+        byte[] data = RandomBytes(3 * 1024 * 1024, 11);
+        using MemoryStream source = new(data, writable: false);
+        using CancellationTokenSource cts = new();
 
         Assert.Throws<OperationCanceledException>(() =>
             XisoFileCopier.CopyExact(
@@ -225,10 +225,10 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyExact_SinkException_PropagatesUnwrapped()
     {
-        using var source = new MemoryStream(new byte[100], writable: false);
-        var boom = new InvalidOperationException("boom");
+        using MemoryStream source = new(new byte[100], writable: false);
+        InvalidOperationException boom = new("boom");
 
-        var ex = Assert.Throws<InvalidOperationException>(() =>
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
             XisoFileCopier.CopyExact(source, 100, (_, _) => throw boom, new byte[TwoMb]));
 
         Assert.Same(boom, ex);
@@ -236,15 +236,15 @@ public class XisoFileCopierTests : IDisposable
 
     private string CreateIsoWithSizedFiles(out byte[] big, out byte[] small)
     {
-        var src = CreateTempDir("xiso_copier_src");
+        string src = CreateTempDir("xiso_copier_src");
         big = RandomBytes(3 * 1024 * 1024, 4242);
         small = RandomBytes(5000, 43);
         File.WriteAllBytes(Path.Combine(src, "big.bin"), big);
         File.WriteAllBytes(Path.Combine(src, "small.txt"), small);
         File.WriteAllBytes(Path.Combine(src, "empty.txt"), Array.Empty<byte>());
 
-        var outDir = CreateTempDir("xiso_copier_out");
-        Assert.Equal(0, XisoWriter.CreateXiso(src, outDir, null, null, out var isoPath, null, null));
+        string outDir = CreateTempDir("xiso_copier_out");
+        Assert.Equal(0, XisoWriter.CreateXiso(src, outDir, null, null, out string? isoPath, null, null));
         Assert.NotNull(isoPath);
         return isoPath;
     }
@@ -252,14 +252,14 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyOut_ReportsFileProgress_PerChunk()
     {
-        var isoPath = CreateIsoWithSizedFiles(out var big, out _);
-        var progress = new CollectingProgress();
-        var dest = Path.Combine(CreateTempDir("xiso_copier_dest"), "big.bin");
+        string isoPath = CreateIsoWithSizedFiles(out byte[] big, out _);
+        CollectingProgress progress = new();
+        string dest = Path.Combine(CreateTempDir("xiso_copier_dest"), "big.bin");
 
         XisoReader.CopyOut(isoPath, "/big.bin", dest, progress: progress);
 
         Assert.Equal(big, File.ReadAllBytes(dest));
-        var events = progress.Events.Where(static e => e.Type == ProgressInfoType.FileProgress).ToList();
+        List<ProgressInfo> events = progress.Events.Where(static e => e.Type == ProgressInfoType.FileProgress).ToList();
         // 3 MB through a 2 MB buffer = exactly two chunks.
         Assert.Equal(2, events.Count);
         Assert.Equal(TwoMb, events[0].Size);
@@ -267,7 +267,7 @@ public class XisoFileCopierTests : IDisposable
         Assert.All(events, e => Assert.Equal(big.Length, e.Count));
         Assert.All(events, static e => Assert.Equal("/big.bin", e.Path));
 
-        var entry = XisoReader.GetEntryInfo(isoPath, "/big.bin");
+        EntryInfo? entry = XisoReader.GetEntryInfo(isoPath, "/big.bin");
         Assert.NotNull(entry);
         Assert.All(events, e => Assert.Equal(entry.StartSector, (uint)e.Sector));
     }
@@ -275,20 +275,20 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyOut_SmallAndEmptyFiles_ProgressShape()
     {
-        var isoPath = CreateIsoWithSizedFiles(out _, out var small);
-        var progress = new CollectingProgress();
+        string isoPath = CreateIsoWithSizedFiles(out _, out byte[] small);
+        CollectingProgress progress = new();
 
-        var smallDest = Path.Combine(CreateTempDir("xiso_copier_dest"), "small.txt");
+        string smallDest = Path.Combine(CreateTempDir("xiso_copier_dest"), "small.txt");
         XisoReader.CopyOut(isoPath, "/small.txt", smallDest, progress: progress);
         Assert.Equal(small, File.ReadAllBytes(smallDest));
 
-        var smallEvents = progress.Events.Where(static e => e.Type == ProgressInfoType.FileProgress).ToList();
-        var single = Assert.Single(smallEvents);
+        List<ProgressInfo> smallEvents = progress.Events.Where(static e => e.Type == ProgressInfoType.FileProgress).ToList();
+        ProgressInfo single = Assert.Single(smallEvents);
         Assert.Equal(small.Length, single.Size);
         Assert.Equal(small.Length, single.Count);
 
         progress.Events.Clear();
-        var emptyDest = Path.Combine(CreateTempDir("xiso_copier_dest"), "empty.txt");
+        string emptyDest = Path.Combine(CreateTempDir("xiso_copier_dest"), "empty.txt");
         XisoReader.CopyOut(isoPath, "/empty.txt", emptyDest, progress: progress);
         Assert.Equal(0, new FileInfo(emptyDest).Length);
         Assert.DoesNotContain(progress.Events, static e => e.Type == ProgressInfoType.FileProgress);
@@ -297,21 +297,21 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void UnpackImage_ReportsFileProgress_AndStillReportsFileAdded()
     {
-        var isoPath = CreateIsoWithSizedFiles(out var big, out var small);
-        var progress = new CollectingProgress();
-        var dest = CreateTempDir("xiso_copier_unpack");
+        string isoPath = CreateIsoWithSizedFiles(out byte[] big, out byte[] small);
+        CollectingProgress progress = new();
+        string dest = CreateTempDir("xiso_copier_unpack");
 
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, dest, progress: progress));
 
         Assert.Equal(big, File.ReadAllBytes(Path.Combine(dest, "big.bin")));
         Assert.Equal(small, File.ReadAllBytes(Path.Combine(dest, "small.txt")));
 
-        var added = progress.Events
+        List<ProgressInfo> added = progress.Events
             .Where(static e => e.Type == ProgressInfoType.FileAdded)
             .ToList();
         Assert.Equal(3, added.Count);
 
-        var byFile = progress.Events
+        Dictionary<string, List<ProgressInfo>> byFile = progress.Events
             .Where(static e => e.Type == ProgressInfoType.FileProgress)
             .GroupBy(static e => e.Path, StringComparer.Ordinal)
             .ToDictionary(static g => g.Key!, static g => g.OrderBy(static e => e.Size).ToList(),
@@ -319,7 +319,7 @@ public class XisoFileCopierTests : IDisposable
 
         // Every non-empty file ends its progress at its full size; the empty
         // file reports FileAdded but no FileProgress (nothing to copy).
-        foreach (var file in added)
+        foreach (ProgressInfo file in added)
         {
             if (file.Size == 0)
             {
@@ -335,19 +335,19 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyOut_LargeFile_ByteIdentical()
     {
-        var src = CreateTempDir("xiso_copier_src");
-        var data = RandomBytes(5 * 1024 * 1024, 2026);
+        string src = CreateTempDir("xiso_copier_src");
+        byte[] data = RandomBytes(5 * 1024 * 1024, 2026);
         File.WriteAllBytes(Path.Combine(src, "large.bin"), data);
 
-        var outDir = CreateTempDir("xiso_copier_out");
-        Assert.Equal(0, XisoWriter.CreateXiso(src, outDir, null, null, out var isoPath, null, null));
+        string outDir = CreateTempDir("xiso_copier_out");
+        Assert.Equal(0, XisoWriter.CreateXiso(src, outDir, null, null, out string? isoPath, null, null));
         Assert.NotNull(isoPath);
 
-        var dest = Path.Combine(CreateTempDir("xiso_copier_dest"), "large.bin");
+        string dest = Path.Combine(CreateTempDir("xiso_copier_dest"), "large.bin");
         XisoReader.CopyOut(isoPath, "/large.bin", dest);
         Assert.Equal(data, File.ReadAllBytes(dest));
 
-        var hash = XisoReader.ComputeFileHash(isoPath, "/large.bin", HashAlgorithmName.SHA256);
+        byte[]? hash = XisoReader.ComputeFileHash(isoPath, "/large.bin", HashAlgorithmName.SHA256);
         Assert.Equal(SHA256.HashData(data), hash);
     }
 }

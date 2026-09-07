@@ -67,7 +67,7 @@ public class CliDestinationDirTests : IDisposable
         _outCapture.Dispose();
         _errCapture.Dispose();
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -83,7 +83,7 @@ public class CliDestinationDirTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -91,20 +91,20 @@ public class CliDestinationDirTests : IDisposable
 
     private string CreateSourceTree()
     {
-        var root = CreateTempDir("xiso_d_src");
+        string root = CreateTempDir("xiso_d_src");
         Directory.CreateDirectory(Path.Combine(root, "sub dir"));
         File.WriteAllText(Path.Combine(root, "a.txt"), "hello");
         File.WriteAllText(Path.Combine(root, "sub dir", "b.txt"), new string('B', 5000));
-        var payload = new byte[20000];
-        for (var i = 0; i < payload.Length; i++) payload[i] = (byte)(i % 251);
+        byte[] payload = new byte[20000];
+        for (int i = 0; i < payload.Length; i++) payload[i] = (byte)(i % 251);
         File.WriteAllBytes(Path.Combine(root, "data.bin"), payload);
         return root;
     }
 
     private string CreateIso(string srcDir, string isoName, string? outputDir = null)
     {
-        var dir = outputDir ?? CreateTempDir("xiso_d_iso");
-        var result = XisoWriter.CreateXiso(srcDir, dir, null, null, out var created, isoName, null);
+        string dir = outputDir ?? CreateTempDir("xiso_d_iso");
+        int result = XisoWriter.CreateXiso(srcDir, dir, null, null, out string? created, isoName, null);
         Assert.Equal(0, result);
         Assert.Equal(Path.Combine(XisoPaths.TrimTrailingSeparators(dir), isoName), created);
         return created!;
@@ -112,12 +112,12 @@ public class CliDestinationDirTests : IDisposable
 
     private static Dictionary<string, string> HashTree(string root)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        Dictionary<string, string> result = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
-            var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
-            using var sha = SHA256.Create();
-            using var fs = File.OpenRead(file);
+            string rel = Path.GetRelativePath(root, file).Replace('\\', '/');
+            using SHA256 sha = SHA256.Create();
+            using FileStream fs = File.OpenRead(file);
             result[rel] = Convert.ToHexString(sha.ComputeHash(fs));
         }
 
@@ -127,10 +127,10 @@ public class CliDestinationDirTests : IDisposable
     [Fact]
     public void Extract_TrailingSeparator_SameTreeAsControl()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var control = CreateTempDir("xiso_d_control");
-        var trailed = CreateTempDir("xiso_d_trailed") + Path.DirectorySeparatorChar;
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string control = CreateTempDir("xiso_d_control");
+        string trailed = CreateTempDir("xiso_d_trailed") + Path.DirectorySeparatorChar;
 
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, control));
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, trailed));
@@ -141,11 +141,11 @@ public class CliDestinationDirTests : IDisposable
     [Fact]
     public void Extract_DoubledTrailingSeparators_SameTreeAsControl()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var control = CreateTempDir("xiso_d_control2");
-        var doubled = CreateTempDir("xiso_d_doubled")
-                      + new string(Path.DirectorySeparatorChar, 2);
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string control = CreateTempDir("xiso_d_control2");
+        string doubled = CreateTempDir("xiso_d_doubled")
+                         + new string(Path.DirectorySeparatorChar, 2);
 
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, control));
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, doubled));
@@ -155,10 +155,10 @@ public class CliDestinationDirTests : IDisposable
     [Fact]
     public void Extract_DestinationWithSpaces_MatchesControl()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var control = CreateTempDir("xiso_d_control3");
-        var spaced = Path.Combine(CreateTempDir("xiso_d_parent"), "my games out");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string control = CreateTempDir("xiso_d_control3");
+        string spaced = Path.Combine(CreateTempDir("xiso_d_parent"), "my games out");
         _tempDirs.Add(spaced);
 
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, control));
@@ -169,9 +169,9 @@ public class CliDestinationDirTests : IDisposable
     [Fact]
     public void CreateIso_OutputDirWithTrailingSeparator_NamesOutputNormally()
     {
-        var src = CreateSourceTree();
-        var isoDir = CreateTempDir("xiso_d_create") + Path.DirectorySeparatorChar;
-        var isoPath = CreateIso(src, "game.iso", isoDir);
+        string src = CreateSourceTree();
+        string isoDir = CreateTempDir("xiso_d_create") + Path.DirectorySeparatorChar;
+        string isoPath = CreateIso(src, "game.iso", isoDir);
         Assert.True(File.Exists(isoPath));
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, CreateTempDir("xiso_d_verify")));
     }
@@ -179,11 +179,11 @@ public class CliDestinationDirTests : IDisposable
     [Fact]
     public void Extract_EmptyDestination_ThrowsArgumentException()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var cwd = Directory.GetCurrentDirectory();
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string cwd = Directory.GetCurrentDirectory();
 
-        var ex = Assert.Throws<ArgumentException>(() => XisoReader.UnpackImage(isoPath, ""));
+        ArgumentException ex = Assert.Throws<ArgumentException>(() => XisoReader.UnpackImage(isoPath, ""));
         Assert.Contains("must not be empty", ex.Message, StringComparison.Ordinal);
         Assert.Equal(cwd, Directory.GetCurrentDirectory());
     }
@@ -191,11 +191,11 @@ public class CliDestinationDirTests : IDisposable
     [Fact]
     public void Extract_DestinationIsExistingFile_ThrowsIOException()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var blocker = Path.Combine(CreateTempDir("xiso_d_blocker"), "file");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string blocker = Path.Combine(CreateTempDir("xiso_d_blocker"), "file");
         File.WriteAllText(blocker, "in the way");
-        var cwd = Directory.GetCurrentDirectory();
+        string cwd = Directory.GetCurrentDirectory();
 
         Assert.Throws<IOException>(() => XisoReader.UnpackImage(isoPath, blocker));
         Assert.Equal(cwd, Directory.GetCurrentDirectory());
@@ -204,9 +204,9 @@ public class CliDestinationDirTests : IDisposable
     [WindowsOnlyFact]
     public void Extract_UnreachableUnc_FailsCleanly()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var cwd = Directory.GetCurrentDirectory();
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string cwd = Directory.GetCurrentDirectory();
 
         Assert.Throws<IOException>(() =>
             XisoReader.UnpackImage(isoPath, @"\\xiso-sharp-invalid-host\share\out"));
@@ -216,10 +216,10 @@ public class CliDestinationDirTests : IDisposable
     [WindowsOnlyFact]
     public void Extract_DevicePathPrefix_MatchesControl()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var control = CreateTempDir("xiso_d_control4");
-        var extended = @"\\?\" + CreateTempDir("xiso_d_extended");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string control = CreateTempDir("xiso_d_control4");
+        string extended = @"\\?\" + CreateTempDir("xiso_d_extended");
 
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, control));
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, extended));
@@ -229,12 +229,12 @@ public class CliDestinationDirTests : IDisposable
     [Fact]
     public void Cli_Extract_DFlagFirst_TrailingSepAndSpaces_ExitZero()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var dest = Path.Combine(CreateTempDir("xiso_d_cli"), "my games out")
-                   + Path.DirectorySeparatorChar;
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string dest = Path.Combine(CreateTempDir("xiso_d_cli"), "my games out")
+                      + Path.DirectorySeparatorChar;
 
-        var rc = Program.Main(["-x", "-d", dest, isoPath]);
+        int rc = Program.Main(["-x", "-d", dest, isoPath]);
 
         Assert.Equal(0, rc);
         Assert.Equal(HashTree(src), HashTree(XisoPaths.TrimTrailingSeparators(dest)));
@@ -243,15 +243,15 @@ public class CliDestinationDirTests : IDisposable
     [Fact]
     public void Cli_Extract_DFlagAfterIso_ReportsMisplacedFlag()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var dest = Path.Combine(CreateTempDir("xiso_d_cli2"), "new");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string dest = Path.Combine(CreateTempDir("xiso_d_cli2"), "new");
 
         // Exact upstream #61 shape: the flag trails the positional.
-        var rc = Program.Main([isoPath, "-d", dest]);
+        int rc = Program.Main([isoPath, "-d", dest]);
 
         Assert.Equal(1, rc);
-        var err = _errCapture.ToString();
+        string err = _errCapture.ToString();
         Assert.Contains("-d", err, StringComparison.Ordinal);
         Assert.Contains("must come before", err, StringComparison.Ordinal);
         Assert.False(Directory.Exists(dest));
@@ -260,10 +260,10 @@ public class CliDestinationDirTests : IDisposable
     [WindowsOnlyFact]
     public void Cli_Extract_UnreachableUnc_ExitOne()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
 
-        var rc = Program.Main(["-x", "-d", @"\\xiso-sharp-invalid-host\share\out", isoPath]);
+        int rc = Program.Main(["-x", "-d", @"\\xiso-sharp-invalid-host\share\out", isoPath]);
 
         Assert.Equal(1, rc);
         Assert.NotEmpty(_errCapture.ToString());
@@ -275,11 +275,11 @@ public class CliDestinationDirTests : IDisposable
         // CLI-025: no existence bypass — a bare "-d" in a positional slot is
         // a misplaced-flag error even when a file with that name exists on
         // disk (use ./-d or the absolute path for such files).
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
         File.WriteAllText(Path.Combine(_runDir, "-d"), "decoy, not an image");
 
-        var rc = Program.Main([isoPath, "-d"]);
+        int rc = Program.Main([isoPath, "-d"]);
 
         Assert.Equal(1, rc);
         Assert.Contains("must come before", _errCapture.ToString(), StringComparison.Ordinal);
@@ -291,12 +291,12 @@ public class CliDestinationDirTests : IDisposable
         // The absolute spelling of a file literally named like a flag keeps
         // working: it falls through to the normal (failing) image open
         // instead of the flag error.
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var decoy = Path.Combine(_runDir, "-d");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string decoy = Path.Combine(_runDir, "-d");
         File.WriteAllText(decoy, "decoy, not an image");
 
-        var rc = Program.Main([isoPath, decoy]);
+        int rc = Program.Main([isoPath, decoy]);
 
         Assert.Equal(1, rc);
         Assert.DoesNotContain("must come before", _errCapture.ToString(), StringComparison.Ordinal);

@@ -68,10 +68,10 @@ public static class DirectoryEntryTableWriter
         ArgumentNullException.ThrowIfNull(entries);
 
         AvlNode? root = null;
-        foreach (var entry in entries.OrderBy(static e => e.Name, StringComparer.Ordinal))
+        foreach (DirectoryTableEntry entry in entries.OrderBy(static e => e.Name, StringComparer.Ordinal))
         {
             ValidateName(entry.Name);
-            var node = new AvlNode
+            AvlNode node = new()
             {
                 Filename = entry.Name,
                 // Opaque marker: never traversed, never serialized as a table.
@@ -106,7 +106,7 @@ public static class DirectoryEntryTableWriter
         // BUG-LIB-035: size in bytes, not chars — Filename.Length undercounts
         // names outside ASCII. Latin-1 is 1:1, but the byte count is the
         // contract EncodeEntry below allocates against.
-        var length = (uint)(Constants.FilenameOffset + Latin1Encoding.Instance.GetByteCount(node.Filename));
+        uint length = (uint)(Constants.FilenameOffset + Latin1Encoding.Instance.GetByteCount(node.Filename));
         length += (Constants.DwordSize - (length % Constants.DwordSize)) % Constants.DwordSize;
 
         if (NumSectors(size + length) > NumSectors(size))
@@ -134,7 +134,7 @@ public static class DirectoryEntryTableWriter
         if (tableRoot == null || ReferenceEquals(tableRoot, AvlNode.EmptySubdirectory))
             return Constants.SectorSize;
 
-        var acc = new TableSizeAccumulator();
+        TableSizeAccumulator acc = new();
         AvlTree.AvlTraverseDepthFirst(tableRoot, static (node, ctx, _) =>
         {
             PlaceEntry(node, ref ((TableSizeAccumulator)ctx!).Size);
@@ -156,9 +156,9 @@ public static class DirectoryEntryTableWriter
         ArgumentNullException.ThrowIfNull(node);
         ValidateName(node.Filename);
 
-        var nameBytes = Latin1Encoding.Instance.GetBytes(node.Filename);
+        byte[] nameBytes = Latin1Encoding.Instance.GetBytes(node.Filename);
 
-        var fileSizeForEntry = node.FileSize;
+        uint fileSizeForEntry = node.FileSize;
         if (node.Subdirectory != null)
         {
             fileSizeForEntry +=
@@ -168,15 +168,15 @@ public static class DirectoryEntryTableWriter
         // BUG-LIB-034: preserve the source attribute bits (RO/HID/SYS) instead
         // of normalizing every file to Archive. Nodes built without attributes
         // (fresh pack) carry 0 and keep the historical directory/archive default.
-        var attributes = node.Attributes != 0
+        byte attributes = node.Attributes != 0
             ? node.Attributes
             : node.Subdirectory != null
                 ? Constants.AttributeDir
                 : Constants.AttributeArc;
-        var lOffset = (ushort)(node.Left != null ? node.Left.Offset / Constants.DwordSize : 0);
-        var rOffset = (ushort)(node.Right != null ? node.Right.Offset / Constants.DwordSize : 0);
+        ushort lOffset = (ushort)(node.Left != null ? node.Left.Offset / Constants.DwordSize : 0);
+        ushort rOffset = (ushort)(node.Right != null ? node.Right.Offset / Constants.DwordSize : 0);
 
-        var record = new byte[Constants.FilenameOffset + nameBytes.Length];
+        byte[] record = new byte[Constants.FilenameOffset + nameBytes.Length];
         BinaryPrimitives.WriteUInt16LittleEndian(record.AsSpan(0, 2), lOffset);
         BinaryPrimitives.WriteUInt16LittleEndian(record.AsSpan(2, 2), rOffset);
         BinaryPrimitives.WriteUInt32LittleEndian(record.AsSpan(4, 4), node.StartSector);
@@ -205,17 +205,17 @@ public static class DirectoryEntryTableWriter
     {
         if (tableRoot == null || ReferenceEquals(tableRoot, AvlNode.EmptySubdirectory))
         {
-            var empty = new byte[Constants.SectorSize];
+            byte[] empty = new byte[Constants.SectorSize];
             Array.Fill(empty, Constants.PadByte);
             return empty;
         }
 
-        var tableSize = ComputeTableSize(tableRoot);
-        var buffer = new byte[SectorAllocator.RequiredSectors(tableSize) * Constants.SectorSize];
+        uint tableSize = ComputeTableSize(tableRoot);
+        byte[] buffer = new byte[SectorAllocator.RequiredSectors(tableSize) * Constants.SectorSize];
         Array.Fill(buffer, Constants.PadByte);
         AvlTree.AvlTraverseDepthFirst(tableRoot, static (node, ctx, _) =>
         {
-            var record = EncodeEntry(node);
+            byte[] record = EncodeEntry(node);
             Buffer.BlockCopy(record, 0, (byte[])ctx!, (int)node.Offset, record.Length);
             return 0;
         }, buffer, AvlTraversalMethod.Prefix, 0);

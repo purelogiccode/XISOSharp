@@ -206,7 +206,7 @@ public static class Logger
 
         try
         {
-            var text = args.Length == 0 ? message : string.Format(message, args);
+            string text = args.Length == 0 ? message : string.Format(message, args);
             if (!string.IsNullOrEmpty(text))
                 target(text);
         }

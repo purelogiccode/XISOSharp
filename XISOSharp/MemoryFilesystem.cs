@@ -46,7 +46,7 @@ public sealed class MemoryFilesystem : IFilesystem
     /// <summary>Materializes every parent directory of <paramref name="key"/>.</summary>
     private void MaterializeParents(string key)
     {
-        var index = -1;
+        int index = -1;
         while ((index = key.IndexOf('/', index + 1)) > 0)
         {
             _directories.Add(key[..index]);
@@ -56,7 +56,7 @@ public sealed class MemoryFilesystem : IFilesystem
     /// <inheritdoc/>
     public Stream CreateFile(string path)
     {
-        var key = Normalize(path);
+        string key = Normalize(path);
         if (key.Length == 0)
         {
             throw new ArgumentException("Destination root cannot hold a file.", nameof(path));
@@ -69,7 +69,7 @@ public sealed class MemoryFilesystem : IFilesystem
     /// <inheritdoc/>
     public void CreateDirectory(string path)
     {
-        var key = Normalize(path);
+        string key = Normalize(path);
         if (key.Length == 0)
         {
             return;
@@ -83,7 +83,7 @@ public sealed class MemoryFilesystem : IFilesystem
     public bool FileExists(string path) => _files.ContainsKey(Normalize(path));
 
     /// <inheritdoc/>
-    public long FileLength(string path) => _files.TryGetValue(Normalize(path), out var bytes) ? bytes.LongLength : -1;
+    public long FileLength(string path) => _files.TryGetValue(Normalize(path), out byte[]? bytes) ? bytes.LongLength : -1;
 
     /// <summary>
     /// Returns a snapshot of the bytes stored at <paramref name="path"/>

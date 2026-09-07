@@ -26,7 +26,7 @@ internal sealed class XdvdfsWrapper : IDisposable
     /// <summary>Runs the exe with args, returns exit code and stdout/stderr.</summary>
     public (int ExitCode, string StdOut, string StdErr) Run(params string[] args)
     {
-        var psi = new ProcessStartInfo
+        ProcessStartInfo psi = new()
         {
             FileName = _exePath,
             RedirectStandardOutput = true,
@@ -36,11 +36,11 @@ internal sealed class XdvdfsWrapper : IDisposable
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
         };
-        foreach (var a in args) psi.ArgumentList.Add(a);
+        foreach (string a in args) psi.ArgumentList.Add(a);
 
-        using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start xdvdfs.exe");
-        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-        var stderrTask = proc.StandardError.ReadToEndAsync();
+        using Process proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start xdvdfs.exe");
+        Task<string> stdoutTask = proc.StandardOutput.ReadToEndAsync();
+        Task<string> stderrTask = proc.StandardError.ReadToEndAsync();
         const int timeoutMs = 600_000;
         if (!proc.WaitForExit(timeoutMs))
         {
@@ -68,8 +68,8 @@ internal sealed class XdvdfsWrapper : IDisposable
         }
 
         proc.WaitForExit();
-        var stdout = stdoutTask.GetAwaiter().GetResult();
-        var stderr = stderrTask.GetAwaiter().GetResult();
+        string stdout = stdoutTask.GetAwaiter().GetResult();
+        string stderr = stderrTask.GetAwaiter().GetResult();
         return (proc.ExitCode, stdout, stderr);
     }
 
@@ -96,8 +96,8 @@ internal sealed class XdvdfsWrapper : IDisposable
     {
         try
         {
-            (var code, var so, var se) = Run("-V");
-            var txt = string.IsNullOrWhiteSpace(so) ? se : so;
+            (int code, string so, string se) = Run("-V");
+            string txt = string.IsNullOrWhiteSpace(so) ? se : so;
             return txt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim()
                    ?? $"exit:{code}";
         }

@@ -20,7 +20,7 @@ public class XisoValidatorTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -35,7 +35,7 @@ public class XisoValidatorTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_val_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_val_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -43,8 +43,8 @@ public class XisoValidatorTests : IDisposable
 
     private string CreateIsoFromSource()
     {
-        var outputDir = CreateTempDir();
-        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
         return isoPath;
     }
@@ -52,9 +52,9 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void ValidateConversion_SameIso_Passes()
     {
-        var isoPath = CreateIsoFromSource();
+        string isoPath = CreateIsoFromSource();
 
-        var result = XisoValidator.ValidateConversion(isoPath, isoPath);
+        ValidationResult result = XisoValidator.ValidateConversion(isoPath, isoPath);
 
         Assert.True(result.Passed, $"Validation failed: {string.Join("; ", result.Issues)}");
         Assert.Equal(result.SourceFileCount, result.OutputFileCount);
@@ -65,9 +65,9 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void ValidateConversion_SameIso_Checksums_Passes()
     {
-        var isoPath = CreateIsoFromSource();
+        string isoPath = CreateIsoFromSource();
 
-        var result = XisoValidator.ValidateConversion(isoPath, isoPath, true);
+        ValidationResult result = XisoValidator.ValidateConversion(isoPath, isoPath, true);
 
         Assert.True(result.Passed, $"Validation with checksums failed: {string.Join("; ", result.Issues)}");
         Assert.Empty(result.Issues);
@@ -76,16 +76,16 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void ValidateConversion_CreateThenRewrite_Passes()
     {
-        var createDir = CreateTempDir();
-        var rewriteDir = CreateTempDir();
+        string createDir = CreateTempDir();
+        string rewriteDir = CreateTempDir();
 
-        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Rewrite(isoPath, rewriteDir, out var rewrittenPath);
+        XisoReader.Rewrite(isoPath, rewriteDir, out string? rewrittenPath);
         Assert.NotNull(rewrittenPath);
 
-        var result = XisoValidator.ValidateConversion(isoPath, rewrittenPath);
+        ValidationResult result = XisoValidator.ValidateConversion(isoPath, rewrittenPath);
 
         Assert.True(result.Passed,
             $"Validation of rewrite failed: {string.Join("; ", result.Issues.Select(static i => $"{i.Type}: {i.Path}"))}");
@@ -95,16 +95,16 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void ValidateConversion_CreateThenRewrite_Checksums_Passes()
     {
-        var createDir = CreateTempDir();
-        var rewriteDir = CreateTempDir();
+        string createDir = CreateTempDir();
+        string rewriteDir = CreateTempDir();
 
-        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        XisoReader.Rewrite(isoPath, rewriteDir, out var rewrittenPath);
+        XisoReader.Rewrite(isoPath, rewriteDir, out string? rewrittenPath);
         Assert.NotNull(rewrittenPath);
 
-        var result = XisoValidator.ValidateConversion(isoPath, rewrittenPath, true);
+        ValidationResult result = XisoValidator.ValidateConversion(isoPath, rewrittenPath, true);
 
         Assert.True(result.Passed,
             $"Validation of rewrite with checksums failed: {string.Join("; ", result.Issues.Select(static i => $"{i.Type}: {i.Path}"))}");
@@ -114,17 +114,17 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void ValidateConversion_DifferentIsos_DetectsDifferences()
     {
-        var iso1 = CreateIsoFromSource();
+        string iso1 = CreateIsoFromSource();
 
         // Create a second ISO with fewer files
-        var partialDir = CreateTempDir();
+        string partialDir = CreateTempDir();
         Directory.CreateDirectory(Path.Combine(partialDir, "partial"));
         File.WriteAllText(Path.Combine(partialDir, "partial", "only_file.txt"), "hello");
-        var partialIsoDir = CreateTempDir();
-        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out var iso2, null, null);
+        string partialIsoDir = CreateTempDir();
+        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out string? iso2, null, null);
         Assert.NotNull(iso2);
 
-        var result = XisoValidator.ValidateConversion(iso1, iso2);
+        ValidationResult result = XisoValidator.ValidateConversion(iso1, iso2);
 
         Assert.False(result.Passed);
         Assert.NotEmpty(result.Issues);
@@ -134,9 +134,9 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void ValidateConversion_FileCounts_AreCorrect()
     {
-        var isoPath = CreateIsoFromSource();
+        string isoPath = CreateIsoFromSource();
 
-        var result = XisoValidator.ValidateConversion(isoPath, isoPath);
+        ValidationResult result = XisoValidator.ValidateConversion(isoPath, isoPath);
 
         // Test source has: file1.txt, file2.txt, binary.bin, test.xbe, subdir/subfile.txt, subdir/nested/deep.txt
         Assert.True(result.SourceFileCount >= 5, $"Expected at least 5 files, got {result.SourceFileCount}");
@@ -146,9 +146,9 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void ValidateConversion_TotalBytes_AreCorrect()
     {
-        var isoPath = CreateIsoFromSource();
+        string isoPath = CreateIsoFromSource();
 
-        var result = XisoValidator.ValidateConversion(isoPath, isoPath);
+        ValidationResult result = XisoValidator.ValidateConversion(isoPath, isoPath);
 
         Assert.True(result.SourceTotalBytes > 0, "Total bytes should be positive");
         Assert.Equal(result.SourceTotalBytes, result.OutputTotalBytes);
@@ -157,8 +157,8 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void ValidateConversion_InvalidOutput_ThrowsException()
     {
-        var isoPath = CreateIsoFromSource();
-        var tempFile = Path.Combine(CreateTempDir(), "not_an_iso.bin");
+        string isoPath = CreateIsoFromSource();
+        string tempFile = Path.Combine(CreateTempDir(), "not_an_iso.bin");
         File.WriteAllBytes(tempFile, new byte[1024]);
 
         Assert.ThrowsAny<Exception>(() => XisoValidator.ValidateConversion(isoPath, tempFile));
@@ -167,8 +167,8 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void ValidateConversion_NonExistentSource_ThrowsException()
     {
-        var isoPath = CreateIsoFromSource();
-        var nonExistent = Path.Combine(CreateTempDir(), "no_such_file.iso");
+        string isoPath = CreateIsoFromSource();
+        string nonExistent = Path.Combine(CreateTempDir(), "no_such_file.iso");
 
         Assert.ThrowsAny<Exception>(() => XisoValidator.ValidateConversion(nonExistent, isoPath));
     }
@@ -176,8 +176,8 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void LogResult_Passed_OutputsPassMessage()
     {
-        var isoPath = CreateIsoFromSource();
-        var result = XisoValidator.ValidateConversion(isoPath, isoPath);
+        string isoPath = CreateIsoFromSource();
+        ValidationResult result = XisoValidator.ValidateConversion(isoPath, isoPath);
 
         // Should not throw
         XisoValidator.LogResult(result, isoPath, isoPath);
@@ -187,11 +187,11 @@ public class XisoValidatorTests : IDisposable
     public void LogResult_ChecksumsVerified_LogsMatch()
     {
         // BUG-LIB-018: a verified-clean result must say MATCH, not stay silent.
-        var isoPath = CreateIsoFromSource();
-        var result = XisoValidator.ValidateConversion(isoPath, isoPath, verifyChecksums: true);
+        string isoPath = CreateIsoFromSource();
+        ValidationResult result = XisoValidator.ValidateConversion(isoPath, isoPath, verifyChecksums: true);
 
-        var capture = new StringWriter();
-        var saved = Logger.Out;
+        StringWriter capture = new();
+        TextWriter saved = Logger.Out;
         Logger.Out = capture;
         try
         {
@@ -208,11 +208,11 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void LogResult_ChecksumsNotVerified_LogsSkipped()
     {
-        var isoPath = CreateIsoFromSource();
-        var result = XisoValidator.ValidateConversion(isoPath, isoPath);
+        string isoPath = CreateIsoFromSource();
+        ValidationResult result = XisoValidator.ValidateConversion(isoPath, isoPath);
 
-        var capture = new StringWriter();
-        var saved = Logger.Out;
+        StringWriter capture = new();
+        TextWriter saved = Logger.Out;
         Logger.Out = capture;
         try
         {
@@ -229,14 +229,14 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void WriteReport_CreatesValidJson()
     {
-        var isoPath = CreateIsoFromSource();
-        var result = XisoValidator.ValidateConversion(isoPath, isoPath);
-        var reportPath = Path.Combine(CreateTempDir(), "report.json");
+        string isoPath = CreateIsoFromSource();
+        ValidationResult result = XisoValidator.ValidateConversion(isoPath, isoPath);
+        string reportPath = Path.Combine(CreateTempDir(), "report.json");
 
         XisoValidator.WriteReport(result, isoPath, isoPath, reportPath);
 
         Assert.True(File.Exists(reportPath), "Report file should exist");
-        var json = File.ReadAllText(reportPath);
+        string json = File.ReadAllText(reportPath);
         Assert.Contains("\"passed\": true", json, StringComparison.Ordinal);
         Assert.Contains("\"fileCount\"", json, StringComparison.Ordinal);
     }
@@ -244,21 +244,21 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void WriteReport_WithIssues_IncludesIssueDetails()
     {
-        var iso1 = CreateIsoFromSource();
+        string iso1 = CreateIsoFromSource();
 
-        var partialDir = CreateTempDir();
+        string partialDir = CreateTempDir();
         Directory.CreateDirectory(Path.Combine(partialDir, "partial"));
         File.WriteAllText(Path.Combine(partialDir, "partial", "only_file.txt"), "hello");
-        var partialIsoDir = CreateTempDir();
-        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out var iso2, null, null);
+        string partialIsoDir = CreateTempDir();
+        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out string? iso2, null, null);
         Assert.NotNull(iso2);
 
-        var result = XisoValidator.ValidateConversion(iso1, iso2);
-        var reportPath = Path.Combine(CreateTempDir(), "report_issues.json");
+        ValidationResult result = XisoValidator.ValidateConversion(iso1, iso2);
+        string reportPath = Path.Combine(CreateTempDir(), "report_issues.json");
 
         XisoValidator.WriteReport(result, iso1, iso2, reportPath);
 
-        var json = File.ReadAllText(reportPath);
+        string json = File.ReadAllText(reportPath);
         Assert.Contains("\"passed\": false", json, StringComparison.Ordinal);
         Assert.Contains("MissingInOutput", json, StringComparison.Ordinal);
     }
@@ -266,8 +266,8 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void ValidateConversion_ExitCode_Passed_ReturnsZero()
     {
-        var isoPath = CreateIsoFromSource();
-        var result = XisoValidator.ValidateConversion(isoPath, isoPath);
+        string isoPath = CreateIsoFromSource();
+        ValidationResult result = XisoValidator.ValidateConversion(isoPath, isoPath);
 
         Assert.Equal(0, result.Passed ? 0 : 2);
     }
@@ -275,16 +275,16 @@ public class XisoValidatorTests : IDisposable
     [Fact]
     public void ValidateConversion_ExitCode_Failed_ReturnsTwo()
     {
-        var iso1 = CreateIsoFromSource();
+        string iso1 = CreateIsoFromSource();
 
-        var partialDir = CreateTempDir();
+        string partialDir = CreateTempDir();
         Directory.CreateDirectory(Path.Combine(partialDir, "partial"));
         File.WriteAllText(Path.Combine(partialDir, "partial", "only_file.txt"), "hello");
-        var partialIsoDir = CreateTempDir();
-        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out var iso2, null, null);
+        string partialIsoDir = CreateTempDir();
+        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out string? iso2, null, null);
         Assert.NotNull(iso2);
 
-        var result = XisoValidator.ValidateConversion(iso1, iso2);
+        ValidationResult result = XisoValidator.ValidateConversion(iso1, iso2);
 
         Assert.False(result.Passed);
         Assert.Equal(2, result.Passed ? 0 : 2);
@@ -296,14 +296,14 @@ public class XisoValidatorTests : IDisposable
         // Sector-offset combos are deliberately rejected (TODO #22): the
         // validator reads both images at detected offsets, and one value
         // could not serve a Redump source + plain output anyway.
-        var iso = CreateIsoFromSource();
+        string iso = CreateIsoFromSource();
         Assert.Equal(1, Program.Main(["validate", iso, iso, "--skip-sectors", "1"]));
     }
 
     [Fact]
     public void Cli_RewriteValidate_WithPrependSectors_ReturnsOne()
     {
-        var iso = CreateIsoFromSource();
+        string iso = CreateIsoFromSource();
         Assert.Equal(1, Program.Main(["-r", "--validate", "--prepend-sectors", "1", iso]));
     }
 

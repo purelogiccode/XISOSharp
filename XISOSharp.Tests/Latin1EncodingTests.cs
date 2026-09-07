@@ -12,7 +12,7 @@ public class Latin1EncodingTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -27,7 +27,7 @@ public class Latin1EncodingTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_latin1_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_latin1_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -36,13 +36,13 @@ public class Latin1EncodingTests : IDisposable
     [Fact]
     public void CreateExtract_AsciiFilename_PreservesExactly()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var extractDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string extractDir = CreateTempDir();
 
         File.WriteAllText(Path.Combine(srcDir, "hello.txt"), "content");
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
         XisoReader.Extract(isoPath, extractDir, false);
@@ -53,13 +53,13 @@ public class Latin1EncodingTests : IDisposable
     [Fact]
     public void CreateExtract_FilenameWithSpaces_PreservesExactly()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var extractDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string extractDir = CreateTempDir();
 
         File.WriteAllText(Path.Combine(srcDir, "file with spaces.txt"), "content");
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
         XisoReader.Extract(isoPath, extractDir, false);
@@ -70,13 +70,13 @@ public class Latin1EncodingTests : IDisposable
     [Fact]
     public void CreateExtract_FilenameWithDots_PreservesExactly()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var extractDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string extractDir = CreateTempDir();
 
         File.WriteAllText(Path.Combine(srcDir, "file.name.with.dots.txt"), "content");
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
         XisoReader.Extract(isoPath, extractDir, false);
@@ -87,13 +87,13 @@ public class Latin1EncodingTests : IDisposable
     [Fact]
     public void CreateExtract_FilenameWithDashes_PreservesExactly()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var extractDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string extractDir = CreateTempDir();
 
         File.WriteAllText(Path.Combine(srcDir, "my-file_name.txt"), "content");
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
         XisoReader.Extract(isoPath, extractDir, false);
@@ -104,13 +104,13 @@ public class Latin1EncodingTests : IDisposable
     [Fact]
     public void CreateExtract_UppercaseFilename_PreservesCase()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var extractDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string extractDir = CreateTempDir();
 
         File.WriteAllText(Path.Combine(srcDir, "README.TXT"), "content");
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
         XisoReader.Extract(isoPath, extractDir, false);
@@ -121,15 +121,15 @@ public class Latin1EncodingTests : IDisposable
     [Fact]
     public void CreateExtract_LongFilename_PreservesExactly()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var extractDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string extractDir = CreateTempDir();
 
         // 40-char filename (under 42-byte XISO limit for some implementations)
         const string longName = "this_is_a_filename_that_is_quite_long.txt";
         File.WriteAllText(Path.Combine(srcDir, longName), "content");
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
         XisoReader.Extract(isoPath, extractDir, false);
@@ -141,20 +141,20 @@ public class Latin1EncodingTests : IDisposable
     [Fact]
     public void CreateExtract_NonAsciiLatin1_RoundTrips()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var extractDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string extractDir = CreateTempDir();
 
         // 0xE9 = é in Latin-1
-        var nonAsciiName = "café" + (char)0xE9 + ".txt";
+        string nonAsciiName = "café" + (char)0xE9 + ".txt";
         File.WriteAllText(Path.Combine(srcDir, nonAsciiName), "accented content");
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
         XisoReader.Extract(isoPath, extractDir, false);
 
-        var extractedFiles = Directory.GetFiles(extractDir);
+        string[] extractedFiles = Directory.GetFiles(extractDir);
         Assert.Single(extractedFiles);
         Assert.Equal(nonAsciiName, Path.GetFileName(extractedFiles[0]));
         Assert.Equal("accented content", File.ReadAllText(extractedFiles[0]));
@@ -163,38 +163,38 @@ public class Latin1EncodingTests : IDisposable
     [Fact]
     public void CreateExtract_FileContent_PreservesAllByteValues()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var extractDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string extractDir = CreateTempDir();
 
         // Create file with all 256 byte values
-        var data = new byte[256];
-        for (var i = 0; i < 256; i++)
+        byte[] data = new byte[256];
+        for (int i = 0; i < 256; i++)
         {
             data[i] = (byte)i;
         }
 
         File.WriteAllBytes(Path.Combine(srcDir, "allbytes.bin"), data);
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
         XisoReader.Extract(isoPath, extractDir, false);
 
-        var extracted = File.ReadAllBytes(Path.Combine(extractDir, "allbytes.bin"));
+        byte[] extracted = File.ReadAllBytes(Path.Combine(extractDir, "allbytes.bin"));
         Assert.Equal(data, extracted);
     }
 
     [Fact]
     public void CreateExtract_EmptyFile_PreservesZeroLength()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var extractDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string extractDir = CreateTempDir();
 
         File.WriteAllText(Path.Combine(srcDir, "empty.txt"), "");
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
         XisoReader.Extract(isoPath, extractDir, false);
@@ -206,29 +206,29 @@ public class Latin1EncodingTests : IDisposable
     [Fact]
     public void CreateExtract_MultipleFilesWithMixedNames_AllPreserved()
     {
-        var srcDir = CreateTempDir();
-        var outputDir = CreateTempDir();
-        var extractDir = CreateTempDir();
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        string extractDir = CreateTempDir();
 
-        var names = new[]
+        string[] names = new[]
         {
             "normal.txt", "with spaces.txt", "with-dashes.txt", "with.dots.txt", "UPPERCASE.TXT", "MiXeD.CaSe",
             "123numeric.txt"
         };
 
-        foreach (var name in names)
+        foreach (string name in names)
         {
             File.WriteAllText(Path.Combine(srcDir, name), $"content of {name}");
         }
 
-        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
         XisoReader.Extract(isoPath, extractDir, false);
 
-        foreach (var name in names)
+        foreach (string name in names)
         {
-            var path = Path.Combine(extractDir, name);
+            string path = Path.Combine(extractDir, name);
             Assert.True(File.Exists(path), $"File '{name}' not found after extract");
             Assert.Equal($"content of {name}", File.ReadAllText(path));
         }

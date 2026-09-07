@@ -42,7 +42,7 @@ public class App : Application
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var viewModel = new MainViewModel();
+                MainViewModel viewModel = new();
                 desktop.MainWindow = new MainWindow
                 {
                     DataContext = viewModel,

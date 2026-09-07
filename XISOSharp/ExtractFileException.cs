@@ -108,7 +108,7 @@ public sealed class ExtractFileException : ExtractErrorException
     private static string FormatMessage(string internalPath, string destPath, uint startSector, long fileSize,
         string detail, long bytesRead)
     {
-        var where = $"\"{internalPath}\" (sector {startSector}, {fileSize} bytes) -> \"{destPath}\"";
+        string where = $"\"{internalPath}\" (sector {startSector}, {fileSize} bytes) -> \"{destPath}\"";
         return bytesRead >= 0
             ? $"Failed to extract {where}: {detail} (read {bytesRead} of {fileSize} bytes)"
             : $"Failed to extract {where}: {detail}";

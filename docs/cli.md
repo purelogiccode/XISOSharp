@@ -19,18 +19,18 @@ options, validation flags, exit codes, and batch behavior.
 ## Syntax
 
 ```
-XISOSharp.Cli [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
-XISOSharp.Cli [options] -c <dir> [name] [-c <dir> [name]] ...
-XISOSharp.Cli validate <source.iso> <output.iso> [options]
-XISOSharp.Cli rebuild <xiso|game.zar> [video.iso] [filler|seed] [su20076000_00000000] -o <redump.iso>
-XISOSharp.Cli build-image [sourceDir] [output.iso] -m "host:image" [-f <toml>] [-O output] [-D|--dry-run]
-XISOSharp.Cli image-spec from -O <out> -m "host:image" ... [specPath]
-XISOSharp.Cli compress|cso <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
-XISOSharp.Cli decompress|uncso|decso <cso|.1.cso> [output.iso]
-XISOSharp.Cli checksum [--silent] <image> [images...]
-XISOSharp.Cli --checksum <image> [--silent]            # flag form
-XISOSharp.Cli split [--size <bytes|half>] [--output <base>] <image> [images...]
-XISOSharp.Cli join [--output <file>] <first.1.iso> [...]
+XISOSharp [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
+XISOSharp [options] -c <dir> [name] [-c <dir> [name]] ...
+XISOSharp validate <source.iso> <output.iso> [options]
+XISOSharp rebuild <xiso|game.zar> [video.iso] [filler|seed] [su20076000_00000000] -o <redump.iso>
+XISOSharp build-image [sourceDir] [output.iso] -m "host:image" [-f <toml>] [-O output] [-D|--dry-run]
+XISOSharp image-spec from -O <out> -m "host:image" ... [specPath]
+XISOSharp compress|cso <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
+XISOSharp decompress|uncso|decso <cso|.1.cso> [output.iso]
+XISOSharp checksum [--silent] <image> [images...]
+XISOSharp --checksum <image> [--silent]            # flag form
+XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...]
+XISOSharp join [--output <file>] <first.1.iso> [...]
 ```
 
 - Flags must precede positional arguments; the first non-flag token ends option parsing (except verbs above which are detected as first token).
@@ -85,7 +85,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--best` | Alias: `--trim --wipe` (XISO). Mirrors XboxKit `-b`. |
 | `--compress` | Alias: `--petrify --update --video --zar`. Mirrors XboxKit `-c`. Also see xdvdfs `compress`. |
 | `--security-sectors <file>` | Rebuild-only override of the security sector ranges (`start-end` lines, `4096` sectors each, `4095` validated, sorted `int[]`). Alias: `--sectors`. Rejected outside the `rebuild` verb. |
-| `rebuild <xiso\|game.zar> [video.iso] [filler\|seed] [su…] -o <redump.iso>` | **Rebuild** Redump ISO (`XisoRedump.RebuildRedump`): `L0`+`l0Padding`+game partition scan (filler/PRNG + security-sector zero-skip) + `l1Padding`+`L1` (optionally `l1Trimmed+updateFS+lastSector`). `<xiso>` accepts a `.zar` sidecar (single embedded XISO verbatim, else tree repacked). Positional alias `XISOSharp.Cli <input.xiso> [files...]` also accepted. See [Archival](archival.md#rebuild). |
+| `rebuild <xiso\|game.zar> [video.iso] [filler\|seed] [su…] -o <redump.iso>` | **Rebuild** Redump ISO (`XisoRedump.RebuildRedump`): `L0`+`l0Padding`+game partition scan (filler/PRNG + security-sector zero-skip) + `l1Padding`+`L1` (optionally `l1Trimmed+updateFS+lastSector`). `<xiso>` accepts a `.zar` sidecar (single embedded XISO verbatim, else tree repacked). Positional alias `XISOSharp <input.xiso> [files...]` also accepted. See [Archival](archival.md#rebuild). |
 | `build-image [sourceDir] [output.iso] -m "host:image" [-f <toml>] [-O output] [-D\|--dry-run] [--file-time <value>]` | **xdvdfs parity:** ordered `wax` remapping (`RemapFilesystem`, `WaxGlob` `*`/`**`/`?`/`[]`/`{a,b}` + `{0}` whole + `{n}` groups, `!negation` first-wins, suffix re-add), `xdvdfs.toml` `[map_rules]`, `--dry-run` via `DryRunRemap` → `CreateFromRemapTree` (`IsRemap` skips CWD). In `-m` rules the separator is the first unescaped `:` — write `\:` for a literal colon, `\\` for a backslash. See [xdvdfs Compat](xdvdfs-compat.md#build-image). |
 | `image-spec from -O <out> -m "host:image" ... [specPath]` | **xdvdfs parity:** TOML generation (`GenerateSpecText` preserve-order `[metadata] output` + `[map_rules]`), stdout when `specPath` omitted. See [xdvdfs Compat](xdvdfs-compat.md#image-spec). |
 | `compress\|cso <src> [out.cso] [--ciso-level 0..9] [--ciso-version 1\|2\|auto] [--ciso-split bytes]` | **CISO** compress: `CisoWriter.CompressToCso` — v2 (default) LZ4 sectors with fixed `align 2`, byte-identical to modern `xdvdfs compress` (pure-managed `lz4_flex` port); v1 BCL DEFLATE `0x80000000` with dynamic `align` 0/1/2; threshold `+12`. Use on `sourceDir` or `image.iso`. Output splits at `0xffbf6000` (~4 GiB) into `.1.cso`/`.2.cso`… parts (xdvdfs `SplitOutput` parity); `--ciso-split 0` writes a single `.cso`. See [Compression](compression.md). |
@@ -158,9 +158,9 @@ Re-run the same command with `--skip-existing` to resume: every file already on 
 files — and short files from torn writes — are written normally.
 
 ```bash
-XISOSharp.Cli --unpack game.iso ./out                 # interrupted halfway
-XISOSharp.Cli --skip-existing --unpack game.iso ./out # resumes: skips done files
-XISOSharp.Cli --skip-existing --batch ./isos -d ./out # bulk runs resume per image
+XISOSharp --unpack game.iso ./out                 # interrupted halfway
+XISOSharp --skip-existing --unpack game.iso ./out # resumes: skips done files
+XISOSharp --skip-existing --batch ./isos -d ./out # bulk runs resume per image
 ```
 
 Notes:
@@ -181,7 +181,7 @@ entry, its sector, and expected vs actual bytes, with the OS error as the inner
 exception:
 
 ```bash
-XISOSharp.Cli -x -d ./out game.iso
+XISOSharp -x -d ./out game.iso
 # Error: Failed to extract "./out/videos/intro.wmv" (sector 1234, 20000 bytes) -> "intro.wmv": could not create output file: ...
 ```
 
@@ -197,7 +197,7 @@ of the image still extracts; an uncreatable directory skips its whole subtree.
 The run still ends with a summary naming every failure, and a non-zero exit:
 
 ```bash
-XISOSharp.Cli --continue-on-error --unpack game.iso ./out
+XISOSharp --continue-on-error --unpack game.iso ./out
 # Error: Failed to extract ... (logged per file as it happens)
 # Failed to unpack image "game.iso": 2 file(s) failed:
 #   Failed to extract ...
@@ -236,7 +236,7 @@ CLI keeps the flags-first contract, but a known flag spelling in a filename
 slot now fails fast with a named error instead of a bogus open attempt:
 
 ```bash
-XISOSharp.Cli game.iso -d ./new/
+XISOSharp game.iso -d ./new/
 # Error: -d must come before ISO filenames (e.g. -x -d <value> game.iso); a flag after the first filename is read as a filename
 ```
 
@@ -353,119 +353,119 @@ sufficient). Consequences:
 
 ```bash
 # Extract one ISO to a specific directory
-XISOSharp.Cli -d ./out game.iso
+XISOSharp -d ./out game.iso
 
 # Unpack the whole image (auto-named output directory)
-XISOSharp.Cli --unpack game.iso
+XISOSharp --unpack game.iso
 
 # Unpack to a specific destination
-XISOSharp.Cli --unpack game.iso ./out
+XISOSharp --unpack game.iso ./out
 
 # Resume an interrupted unpack (skips files already on disk)
-XISOSharp.Cli --skip-existing --unpack game.iso ./out
+XISOSharp --skip-existing --unpack game.iso ./out
 
 # Extract several ISOs (default mode)
-XISOSharp.Cli game1.iso game2.iso game3.iso
+XISOSharp game1.iso game2.iso game3.iso
 
 # Create with a custom name, skipping $SystemUpdate and temp files
-XISOSharp.Cli -s -X "**/*.tmp" -c ./game_files custom_name.iso
+XISOSharp -s -X "**/*.tmp" -c ./game_files custom_name.iso
 
 # Create a Redump-style image (game partition at the XGD2 offset)
-XISOSharp.Cli -c --prepend-sectors 129824 ./game_files redump.iso
+XISOSharp -c --prepend-sectors 129824 ./game_files redump.iso
 
 # Pack a directory into an ISO (alias-style convenience)
-XISOSharp.Cli --pack ./game_files
+XISOSharp --pack ./game_files
 
 # Repack an existing ISO in place (optimizes it, keeping a .old copy)
-XISOSharp.Cli --pack game.iso
+XISOSharp --pack game.iso
 
 # Extract a Redump image whose game partition starts at a nonstandard offset
-XISOSharp.Cli --skip-sectors 129824 -d ./out redump.iso
+XISOSharp --skip-sectors 129824 -d ./out redump.iso
 
 # Optimize (rewrite) an ISO, then validate the result
-XISOSharp.Cli -r --validate --validate-strict game.iso
+XISOSharp -r --validate --validate-strict game.iso
 
 # Validate two images against each other
-XISOSharp.Cli validate --validate-checksums --validate-report report.json source.iso rebuilt.iso
+XISOSharp validate --validate-checksums --validate-report report.json source.iso rebuilt.iso
 
 # Deep-audit several images
-XISOSharp.Cli -V game1.iso game2.iso
+XISOSharp -V game1.iso game2.iso
 
 # Batch-process every ISO in a directory (recursive)
-XISOSharp.Cli -r --batch ./isos --batch-recursive
-XISOSharp.Cli --batch ./isos -d ./extracted
-XISOSharp.Cli --skip-existing --batch ./isos -d ./extracted  # resume interrupted bulk extract
+XISOSharp -r --batch ./isos --batch-recursive
+XISOSharp --batch ./isos -d ./extracted
+XISOSharp --skip-existing --batch ./isos -d ./extracted  # resume interrupted bulk extract
 
 # Hash all files in an image with SHA-256
-XISOSharp.Cli --sha256 game.iso
+XISOSharp --sha256 game.iso
 
 # List the root directory of an image (non-recursive)
-XISOSharp.Cli --ls game.iso
+XISOSharp --ls game.iso
 
 # List a subdirectory
-XISOSharp.Cli --ls game.iso /media
+XISOSharp --ls game.iso /media
 
 # Show the Xbox 360 executable header of a game
 # (title ID, entry point, region, media types, ...)
-XISOSharp.Cli --xex-info game360.iso /default.xex
+XISOSharp --xex-info game360.iso /default.xex
 
 # Show the original-Xbox executable header + certificate
 # (title ID/name, media, region, ...)
-XISOSharp.Cli --xbe-info game.iso /default.xbe
+XISOSharp --xbe-info game.iso /default.xbe
 
 # Copy one directory out of an image
-XISOSharp.Cli --copy-out game.iso /media ./media_out
+XISOSharp --copy-out game.iso /media ./media_out
 
 # Patch one file into an image (replaces /config.ini; keeps game.iso.old backup)
-XISOSharp.Cli --copy-in game.iso ./my-config.ini /config.ini
+XISOSharp --copy-in game.iso ./my-config.ini /config.ini
 
 # --- Archival (Redump) ---
 
 # Extract video partition (writes game.video.iso)
-XISOSharp.Cli --video game.redump.iso
+XISOSharp --video game.redump.iso
 
 # Extract filler + seed, wipe & trim
-XISOSharp.Cli --random game.redump.iso
-XISOSharp.Cli --seed game.redump.iso          # XGD1 only
-XISOSharp.Cli --wipe -o wiped.xiso game.redump.iso
-XISOSharp.Cli --trim -o trimmed.xiso game.redump.iso
-XISOSharp.Cli --all game.redump.iso           # all-of-the-above + video/wipe
-XISOSharp.Cli --best game.redump.iso          # trim + wipe
+XISOSharp --random game.redump.iso
+XISOSharp --seed game.redump.iso          # XGD1 only
+XISOSharp --wipe -o wiped.xiso game.redump.iso
+XISOSharp --trim -o trimmed.xiso game.redump.iso
+XISOSharp --all game.redump.iso           # all-of-the-above + video/wipe
+XISOSharp --best game.redump.iso          # trim + wipe
 
 # Petrify + update + zar
-XISOSharp.Cli --petrify game.iso              # skeleton + .hash (SHA-1)
-XISOSharp.Cli --update game.redump.iso        # XGD3 su20076000_00000000
-XISOSharp.Cli --zar -o game.zar game.iso
+XISOSharp --petrify game.iso              # skeleton + .hash (SHA-1)
+XISOSharp --update game.redump.iso        # XGD3 su20076000_00000000
+XISOSharp --zar -o game.zar game.iso
 
 # Rebuild Redump from components (lossless round-trip)
-XISOSharp.Cli rebuild x.iso video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso
-XISOSharp.Cli rebuild x.iso video.iso --security-sectors sectors.txt -o rebuilt.redump.iso
-XISOSharp.Cli rebuild game.zar video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso   # .zar sidecar as <xiso>
+XISOSharp rebuild x.iso video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso
+XISOSharp rebuild x.iso video.iso --security-sectors sectors.txt -o rebuilt.redump.iso
+XISOSharp rebuild game.zar video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso   # .zar sidecar as <xiso>
 
 # With security sectors (rebuild only; 4096-sector ranges)
-XISOSharp.Cli rebuild x.iso video.iso filler.bin su20076000_00000000 --security-sectors sectors.txt -o rebuilt.redump.iso
+XISOSharp rebuild x.iso video.iso filler.bin su20076000_00000000 --security-sectors sectors.txt -o rebuilt.redump.iso
 
 # --- xdvdfs parity ---
 
 # Ordered remapping (wax captures, negation, dry-run, xdvdfs.toml)
-XISOSharp.Cli build-image ./src -m "bin:/" -m "assets/**:/assets/{1}" -O out.iso
-XISOSharp.Cli build-image -D -m "!secret/**" -m "**:/{0}" ./src
-XISOSharp.Cli build-image -f xdvdfs.toml ./src -O out.iso
+XISOSharp build-image ./src -m "bin:/" -m "assets/**:/assets/{1}" -O out.iso
+XISOSharp build-image -D -m "!secret/**" -m "**:/{0}" ./src
+XISOSharp build-image -f xdvdfs.toml ./src -O out.iso
 
 # Generate TOML spec
-XISOSharp.Cli image-spec from -O dist/image.iso -m "bin:/" -m "assets:/{0}" xdvdfs.toml
+XISOSharp image-spec from -O dist/image.iso -m "bin:/" -m "assets:/{0}" xdvdfs.toml
 
 # CISO compress / decompress (DEFLATE v1 + LZ4 v2)
-XISOSharp.Cli compress ./game_dir game.cso --ciso-level 9
-XISOSharp.Cli cso game.iso game.cso --ciso-version 2 --ciso-split 0
-XISOSharp.Cli decompress game.cso game.iso
-XISOSharp.Cli uncso game.cso
-XISOSharp.Cli decso game.cso
+XISOSharp compress ./game_dir game.cso --ciso-level 9
+XISOSharp cso game.iso game.cso --ciso-version 2 --ciso-split 0
+XISOSharp decompress game.cso game.iso
+XISOSharp uncso game.cso
+XISOSharp decso game.cso
 
 # SHA3-256 image checksum (deterministic, BTreeMap sorted)
-XISOSharp.Cli checksum game.iso
-XISOSharp.Cli checksum --silent game1.iso game2.iso
-XISOSharp.Cli --checksum game.iso
+XISOSharp checksum game.iso
+XISOSharp checksum --silent game1.iso game2.iso
+XISOSharp --checksum game.iso
 ```
 
 ## Notes

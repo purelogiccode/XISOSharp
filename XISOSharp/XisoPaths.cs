@@ -29,8 +29,8 @@ public static class XisoPaths
         if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
             return false;
 
-        var fullA = TryResolve(a);
-        var fullB = TryResolve(b);
+        string? fullA = TryResolve(a);
+        string? fullB = TryResolve(b);
         if (fullA == null || fullB == null)
         {
             // At least one side is not a valid path: only identical spellings count.
@@ -50,8 +50,8 @@ public static class XisoPaths
         if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(directory))
             return false;
 
-        var full = TryResolve(path);
-        var dir = TryResolve(directory);
+        string? full = TryResolve(path);
+        string? dir = TryResolve(directory);
         if (full == null || dir == null || dir.Length == 0 || full.Length <= dir.Length)
             return false;
 
@@ -85,7 +85,7 @@ public static class XisoPaths
         if (string.IsNullOrEmpty(path))
             return path;
 
-        var trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         if (trimmed.Length == 0)
             return path;
 
@@ -99,7 +99,7 @@ public static class XisoPaths
             return trimmed;
         }
 
-        var rootContentLength = (root ?? string.Empty)
+        int rootContentLength = (root ?? string.Empty)
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Length;
         return trimmed.Length <= rootContentLength ? path : trimmed;
     }

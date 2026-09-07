@@ -13,7 +13,7 @@ public class WaxGlobTests
     [Fact]
     public void Constructor_PatternProperty_ReturnsOriginal()
     {
-        var g = new WaxGlob("src/*.txt");
+        WaxGlob g = new("src/*.txt");
         Assert.Equal("src/*.txt", g.Pattern);
     }
 
@@ -25,7 +25,7 @@ public class WaxGlobTests
     [InlineData("*", "a/b", false)]
     public void Star_MatchesWithinSingleSegment(string pattern, string candidate, bool expected)
     {
-        var g = new WaxGlob(pattern);
+        WaxGlob g = new(pattern);
         Assert.Equal(expected, g.IsMatch(candidate));
     }
 
@@ -42,7 +42,7 @@ public class WaxGlobTests
     [InlineData("**/file.txt", "a/b/file.txt", true)]
     public void DoubleStar_MatchesAcrossSegments(string pattern, string candidate, bool expected)
     {
-        var g = new WaxGlob(pattern);
+        WaxGlob g = new(pattern);
         Assert.Equal(expected, g.IsMatch(candidate));
     }
 
@@ -53,14 +53,14 @@ public class WaxGlobTests
     [InlineData("a/**/b", "a/b/c", false)]
     public void DoubleStar_InMiddle_MatchesZeroOrMoreSegments(string pattern, string candidate, bool expected)
     {
-        var g = new WaxGlob(pattern);
+        WaxGlob g = new(pattern);
         Assert.Equal(expected, g.IsMatch(candidate));
     }
 
     [Fact]
     public void IsMatch_CaseInsensitive()
     {
-        var g = new WaxGlob("SRC/*.TXT");
+        WaxGlob g = new("SRC/*.TXT");
         Assert.True(g.IsMatch("src/file.txt"));
         Assert.True(g.IsMatch("SRC/FILE.TXT"));
         Assert.True(g.IsMatch("Src/File.Txt"));
@@ -69,7 +69,7 @@ public class WaxGlobTests
     [Fact]
     public void LeadingSlash_IsTrimmed()
     {
-        var g = new WaxGlob("/src/*.txt");
+        WaxGlob g = new("/src/*.txt");
         Assert.True(g.IsMatch("src/file.txt"));
         // Wax patterns are relative; leading slash in pattern is ignored.
         // Candidate matching is against relative paths without leading slash.
@@ -83,14 +83,14 @@ public class WaxGlobTests
     [InlineData("./", "", true)]
     public void DotSlashPrefix_IsNormalized(string pattern, string candidate, bool expected)
     {
-        var g = new WaxGlob(pattern);
+        WaxGlob g = new(pattern);
         Assert.Equal(expected, g.IsMatch(candidate));
     }
 
     [Fact]
     public void EmptyPattern_MatchesOnlyEmpty()
     {
-        var g = new WaxGlob("");
+        WaxGlob g = new("");
         Assert.True(g.IsMatch(""));
         Assert.False(g.IsMatch("a"));
         Assert.False(g.IsMatch("a/b"));
@@ -103,8 +103,8 @@ public class WaxGlobTests
     [Fact]
     public void GetCaptures_SingleStar_ReturnsSegment()
     {
-        var g = new WaxGlob("src/*.txt");
-        var caps = g.GetCaptures("src/file.txt");
+        WaxGlob g = new("src/*.txt");
+        IReadOnlyList<string>? caps = g.GetCaptures("src/file.txt");
         Assert.NotNull(caps);
         // caps[0] whole match, caps[1] star capture
         Assert.Equal("src/file.txt", caps[0]);
@@ -114,8 +114,8 @@ public class WaxGlobTests
     [Fact]
     public void GetCaptures_Star_WholeMatchIsIndexZero()
     {
-        var g = new WaxGlob("*");
-        var caps = g.GetCaptures("hello");
+        WaxGlob g = new("*");
+        IReadOnlyList<string>? caps = g.GetCaptures("hello");
         Assert.NotNull(caps);
         Assert.Equal("hello", caps[0]);
         Assert.Equal("hello", caps[1]);
@@ -126,14 +126,14 @@ public class WaxGlobTests
     [Fact]
     public void GetCaptures_TrailingDoubleStar_CapturesRemainder()
     {
-        var g = new WaxGlob("src/**");
-        var caps = g.GetCaptures("src/a/b/c.txt");
+        WaxGlob g = new("src/**");
+        IReadOnlyList<string>? caps = g.GetCaptures("src/a/b/c.txt");
         Assert.NotNull(caps);
         Assert.Equal("src/a/b/c.txt", caps[0]);
         // group 1 is remainder after src/
         Assert.Equal("a/b/c.txt", caps[1]);
 
-        var caps2 = g.GetCaptures("src");
+        IReadOnlyList<string>? caps2 = g.GetCaptures("src");
         Assert.NotNull(caps2);
         // trailing ** optional group may be empty or null -> stored as ""
         Assert.Equal("src", caps2[0]);
@@ -144,8 +144,8 @@ public class WaxGlobTests
     [Fact]
     public void GetCaptures_LeadingDoubleStar_CapturesPrefix()
     {
-        var g = new WaxGlob("**/file.txt");
-        var caps = g.GetCaptures("a/b/file.txt");
+        WaxGlob g = new("**/file.txt");
+        IReadOnlyList<string>? caps = g.GetCaptures("a/b/file.txt");
         Assert.NotNull(caps);
         Assert.Equal("a/b/file.txt", caps[0]);
         // For "**/file.txt" the leading ** captures "a/b/" inclusive?
@@ -156,13 +156,13 @@ public class WaxGlobTests
     [Fact]
     public void GetCaptures_MiddleDoubleStar_CapturesMiddleSegment()
     {
-        var g = new WaxGlob("a/**/b");
-        var caps = g.GetCaptures("a/x/y/b");
+        WaxGlob g = new("a/**/b");
+        IReadOnlyList<string>? caps = g.GetCaptures("a/x/y/b");
         Assert.NotNull(caps);
         Assert.Equal("a/x/y/b", caps[0]);
         Assert.Equal("x/y/", caps[1]);
 
-        var caps2 = g.GetCaptures("a/b");
+        IReadOnlyList<string>? caps2 = g.GetCaptures("a/b");
         Assert.NotNull(caps2);
         Assert.Equal("a/b", caps2[0]);
         Assert.Equal(string.Empty, caps2[1]);
@@ -172,18 +172,18 @@ public class WaxGlobTests
     public void GetCaptures_BraceAlternatives_CapturesChoice()
     {
         // "{a,b}" should match either and capture the choice as group 1
-        var g = new WaxGlob("src/{a,b}/file.txt");
+        WaxGlob g = new("src/{a,b}/file.txt");
         Assert.True(g.IsMatch("src/a/file.txt"));
         Assert.True(g.IsMatch("src/b/file.txt"));
         Assert.False(g.IsMatch("src/c/file.txt"));
 
-        var caps = g.GetCaptures("src/a/file.txt");
+        IReadOnlyList<string>? caps = g.GetCaptures("src/a/file.txt");
         Assert.NotNull(caps);
         // Whole match + one capture for the brace alternatives
         Assert.Equal("src/a/file.txt", caps[0]);
         Assert.Equal("a", caps[1]);
 
-        var caps2 = g.GetCaptures("src/b/file.txt");
+        IReadOnlyList<string>? caps2 = g.GetCaptures("src/b/file.txt");
         Assert.NotNull(caps2);
         Assert.Equal("b", caps2[1]);
     }
@@ -191,8 +191,8 @@ public class WaxGlobTests
     [Fact]
     public void GetCaptures_QuestionMark_CapturesSingleChar()
     {
-        var g = new WaxGlob("a?c");
-        var caps = g.GetCaptures("abc");
+        WaxGlob g = new("a?c");
+        IReadOnlyList<string>? caps = g.GetCaptures("abc");
         Assert.NotNull(caps);
         Assert.Equal("abc", caps[0]);
         Assert.Equal("b", caps[1]);
@@ -203,12 +203,12 @@ public class WaxGlobTests
     [Fact]
     public void GetCaptures_CharClass_Matches()
     {
-        var g = new WaxGlob("[abc].txt");
+        WaxGlob g = new("[abc].txt");
         Assert.True(g.IsMatch("a.txt"));
         Assert.True(g.IsMatch("b.txt"));
         Assert.False(g.IsMatch("d.txt"));
         // Char class is not capturing, only whole match
-        var caps = g.GetCaptures("a.txt");
+        IReadOnlyList<string>? caps = g.GetCaptures("a.txt");
         Assert.NotNull(caps);
         Assert.Single(caps); // only whole match, no captures
         Assert.Equal("a.txt", caps[0]);
@@ -217,15 +217,15 @@ public class WaxGlobTests
     [Fact]
     public void GetCaptures_NonMatching_ReturnsNull()
     {
-        var g = new WaxGlob("src/*.txt");
-        var caps = g.GetCaptures("other/file.txt");
+        WaxGlob g = new("src/*.txt");
+        IReadOnlyList<string>? caps = g.GetCaptures("other/file.txt");
         Assert.Null(caps);
     }
 
     [Fact]
     public void GetCapture_OutOfRange_ReturnsEmpty()
     {
-        var g = new WaxGlob("src/*.txt");
+        WaxGlob g = new("src/*.txt");
         // valid captures have size 2 (whole + star)
         Assert.Equal(string.Empty, g.GetCapture("src/file.txt", 99));
         Assert.Equal(string.Empty, g.GetCapture("src/file.txt", -1));
@@ -237,7 +237,7 @@ public class WaxGlobTests
     [Fact]
     public void GetCapture_IndexZero_IsWholeMatch()
     {
-        var g = new WaxGlob("a/**/b");
+        WaxGlob g = new("a/**/b");
         Assert.Equal("a/x/b", g.GetCapture("a/x/b", 0));
         Assert.Equal("x/", g.GetCapture("a/x/b", 1));
     }
@@ -246,8 +246,8 @@ public class WaxGlobTests
     public void CaptureIndexSequence_MultipleWildcards()
     {
         // Pattern with multiple capturing wildcards should have sequential indices
-        var g = new WaxGlob("*/*/*.txt");
-        var caps = g.GetCaptures("a/b/c.txt");
+        WaxGlob g = new("*/*/*.txt");
+        IReadOnlyList<string>? caps = g.GetCaptures("a/b/c.txt");
         Assert.NotNull(caps);
         // 0 whole, 1 first *, 2 second *, 3 third * (without .txt)
         Assert.Equal(4, caps.Count);
@@ -283,7 +283,7 @@ public class WaxGlobTests
     [Fact]
     public void RegexPattern_Exposed()
     {
-        var g = new WaxGlob("src/*.txt");
+        WaxGlob g = new("src/*.txt");
         Assert.False(string.IsNullOrEmpty(g.RegexPattern));
         Assert.StartsWith("^", g.RegexPattern, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith("$", g.RegexPattern, StringComparison.OrdinalIgnoreCase);
@@ -297,17 +297,17 @@ public class WaxGlobTests
     [InlineData("**/*.tmp", "x/y/a.tmp", true)]
     public void MixedPatterns_MatchExpected(string pattern, string candidate, bool expected)
     {
-        var g = new WaxGlob(pattern);
+        WaxGlob g = new(pattern);
         Assert.Equal(expected, g.IsMatch(candidate));
     }
 
     [Fact]
     public void GetCaptures_DollarLazyStar_TreatedAsStar()
     {
-        var g = new WaxGlob("file$.txt");
+        WaxGlob g = new("file$.txt");
         // $ is wax lazy star – treated same as *
         Assert.True(g.IsMatch("fileabc.txt"));
-        var caps = g.GetCaptures("fileabc.txt");
+        IReadOnlyList<string>? caps = g.GetCaptures("fileabc.txt");
         Assert.NotNull(caps);
         Assert.Equal("abc", caps[1]);
     }
@@ -315,10 +315,10 @@ public class WaxGlobTests
     [Fact]
     public void EscapedStar_MatchesLiteral()
     {
-        var g = new WaxGlob("a\\*b");
+        WaxGlob g = new("a\\*b");
         Assert.True(g.IsMatch("a*b"));
         Assert.False(g.IsMatch("axb"));
-        var caps = g.GetCaptures("a*b");
+        IReadOnlyList<string>? caps = g.GetCaptures("a*b");
         Assert.NotNull(caps);
         // escaped star should not be capturing
         Assert.Single(caps);

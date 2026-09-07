@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
 
@@ -15,7 +16,7 @@ public class XexInfoTests : IDisposable
         Logger.Quiet = false;
         Logger.RealQuiet = false;
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -30,7 +31,7 @@ public class XexInfoTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_xex_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_xex_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -44,8 +45,8 @@ public class XexInfoTests : IDisposable
     /// </summary>
     private static byte[] BuildXex2()
     {
-        var data = new byte[0x1000];
-        var span = data.AsSpan();
+        byte[] data = new byte[0x1000];
+        Span<byte> span = data.AsSpan();
 
         // Fixed header
         "XEX2"u8.CopyTo(span);
@@ -105,14 +106,14 @@ public class XexInfoTests : IDisposable
 
     private string CreateIsoWithFile(string fileName, byte[] content)
     {
-        var srcDir = Path.Combine(Path.GetTempPath(), $"xiso_xex_src_{Guid.NewGuid():N}");
+        string srcDir = Path.Combine(Path.GetTempPath(), $"xiso_xex_src_{Guid.NewGuid():N}");
         Directory.CreateDirectory(srcDir);
         File.WriteAllBytes(Path.Combine(srcDir, fileName), content);
         _tempDirs.Add(srcDir);
 
-        var outputDir = CreateTempDir();
+        string outputDir = CreateTempDir();
 
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        int result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         return isoPath;
@@ -121,9 +122,9 @@ public class XexInfoTests : IDisposable
     [Fact]
     public void GetXexInfo_ParsesAllFields()
     {
-        var isoPath = CreateIsoWithFile("default.xex", BuildXex2());
+        string isoPath = CreateIsoWithFile("default.xex", BuildXex2());
 
-        var xex = XisoReader.GetXexInfo(isoPath, "/default.xex");
+        XexInfo? xex = XisoReader.GetXexInfo(isoPath, "/default.xex");
 
         Assert.NotNull(xex);
         Assert.Equal(0x89u, xex.ModuleFlags);
@@ -147,7 +148,7 @@ public class XexInfoTests : IDisposable
     [Fact]
     public void GetXexInfo_NonXexFile_ReturnsNull()
     {
-        var isoPath = CreateIsoWithFile("readme.txt", "hello world"u8.ToArray());
+        string isoPath = CreateIsoWithFile("readme.txt", "hello world"u8.ToArray());
 
         Assert.Null(XisoReader.GetXexInfo(isoPath, "/readme.txt"));
     }
@@ -155,7 +156,7 @@ public class XexInfoTests : IDisposable
     [Fact]
     public void GetXexInfo_MissingPath_ReturnsNull()
     {
-        var isoPath = CreateIsoWithFile("default.xex", BuildXex2());
+        string isoPath = CreateIsoWithFile("default.xex", BuildXex2());
 
         Assert.Null(XisoReader.GetXexInfo(isoPath, "/nope.xex"));
     }
@@ -163,19 +164,19 @@ public class XexInfoTests : IDisposable
     [Fact]
     public void GetXexInfo_DirectoryPath_ReturnsNull()
     {
-        var srcDir = CreateTempDir();
+        string srcDir = CreateTempDir();
         Directory.CreateDirectory(Path.Combine(srcDir, "sub"));
         File.WriteAllText(Path.Combine(srcDir, "default.xex"), "x");
 
-        var isoPath = CreateIsoWithDirectory(srcDir);
+        string isoPath = CreateIsoWithDirectory(srcDir);
 
         Assert.Null(XisoReader.GetXexInfo(isoPath, "/sub"));
     }
 
     private string CreateIsoWithDirectory(string srcDir)
     {
-        var outputDir = CreateTempDir();
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var isoPath, null, null);
+        string outputDir = CreateTempDir();
+        int result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         return isoPath;
@@ -184,7 +185,7 @@ public class XexInfoTests : IDisposable
     [Fact]
     public void GetXexInfo_TooShortFile_ReturnsNull()
     {
-        var isoPath = CreateIsoWithFile("tiny.xex", new byte[0x10]);
+        string isoPath = CreateIsoWithFile("tiny.xex", new byte[0x10]);
 
         Assert.Null(XisoReader.GetXexInfo(isoPath, "/tiny.xex"));
     }
@@ -194,8 +195,8 @@ public class XexInfoTests : IDisposable
     {
         // Malformed header with huge section offsets that would wrap uint arithmetic:
         // the parser must skip the sections instead of reading out of bounds.
-        var data = new byte[0x1000];
-        var span = data.AsSpan();
+        byte[] data = new byte[0x1000];
+        Span<byte> span = data.AsSpan();
         "XEX2"u8.CopyTo(span);
         BinaryPrimitives.WriteUInt32BigEndian(span[0x04..], 1); // module flags
         BinaryPrimitives.WriteUInt32BigEndian(span[0x08..], 0x400); // header size
@@ -206,9 +207,9 @@ public class XexInfoTests : IDisposable
         BinaryPrimitives.WriteUInt32BigEndian(span[0x20..], 0x000003FF); // file format info key
         BinaryPrimitives.WriteUInt32BigEndian(span[0x24..], 0xFFFFFFF8); // format offset (would wrap)
 
-        var isoPath = CreateIsoWithFile("default.xex", data);
+        string isoPath = CreateIsoWithFile("default.xex", data);
 
-        var xex = XisoReader.GetXexInfo(isoPath, "/default.xex");
+        XexInfo? xex = XisoReader.GetXexInfo(isoPath, "/default.xex");
 
         Assert.NotNull(xex);
         Assert.Equal(1u, xex.ModuleFlags); // fixed header still parsed
@@ -220,8 +221,8 @@ public class XexInfoTests : IDisposable
     [Fact]
     public void GetXexInfo_InvalidIso_Throws()
     {
-        var junkDir = CreateTempDir();
-        var junkFile = Path.Combine(junkDir, "junk.iso");
+        string junkDir = CreateTempDir();
+        string junkFile = Path.Combine(junkDir, "junk.iso");
         File.WriteAllBytes(junkFile, new byte[4096]);
 
         Assert.Throws<XisoFormatException>(() => XisoReader.GetXexInfo(junkFile, "/default.xex"));

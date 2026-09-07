@@ -42,8 +42,8 @@ public class BoyerMoore
     public BoyerMoore(byte[] pattern, int alphabetSize = Constants.DefaultAlphabetSize)
     {
         ArgumentNullException.ThrowIfNull(pattern);
-        ArgumentOutOfRangeException.ThrowIfLessThan(alphabetSize, 1, nameof(alphabetSize));
-        foreach (var b in pattern)
+        ArgumentOutOfRangeException.ThrowIfLessThan(alphabetSize, 1);
+        foreach (byte b in pattern)
         {
             if (b >= alphabetSize)
             {
@@ -87,7 +87,7 @@ public class BoyerMoore
         }
 
         i = _patLen;
-        var j = _patLen + 1;
+        int j = _patLen + 1;
         while (i > 0)
         {
             _gsTable[_patLen + 1 + i] = j;
@@ -114,7 +114,7 @@ public class BoyerMoore
             }
         }
 
-        var k = _gsTable[_patLen + 1 + j];
+        int k = _gsTable[_patLen + 1 + j];
 
         while (j <= _patLen)
         {
@@ -161,11 +161,11 @@ public class BoyerMoore
 
         int j;
 
-        var i = j = _patLen - 1;
+        int i = j = _patLen - 1;
 
         // Tables are non-null here (guarded above); locals avoid re-checks in the loop.
-        var gsTable = _gsTable!;
-        var bcTable = _bcTable!;
+        int[] gsTable = _gsTable!;
+        int[] bcTable = _bcTable!;
 
         while (j < length && i >= 0)
         {
@@ -176,8 +176,8 @@ public class BoyerMoore
             }
             else
             {
-                var k = gsTable[i + 1];
-                var l = bcTable[text[startIndex + j]];
+                int k = gsTable[i + 1];
+                int l = bcTable[text[startIndex + j]];
 
                 j += Math.Max(k, l);
                 i = _patLen - 1;

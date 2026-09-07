@@ -3,7 +3,9 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Threading;
 using Serilog;
+using XISOSharp;
 using XISOSharpTester.Logging;
 
 namespace XISOSharpTester.ViewModels;
@@ -19,7 +21,7 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
 {
     private static readonly ExplorerTreeNode Dummy = new();
 
-    private readonly Func<ExplorerTreeNode, IReadOnlyList<XISOSharp.ExplorerNode>>? _loader;
+    private readonly Func<ExplorerTreeNode, IReadOnlyList<ExplorerNode>>? _loader;
     private ObservableCollection<ExplorerTreeNode>? _children;
     private bool _isExpanded;
     private bool _isSelected;
@@ -42,8 +44,8 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
     /// by node on first expand (directories only).
     /// </summary>
     internal ExplorerTreeNode(
-        XISOSharp.ExplorerNode data,
-        Func<ExplorerTreeNode, IReadOnlyList<XISOSharp.ExplorerNode>> loader)
+        ExplorerNode data,
+        Func<ExplorerTreeNode, IReadOnlyList<ExplorerNode>> loader)
     {
         Name = data.Name;
         FullPath = data.FullPath;
@@ -138,7 +140,7 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
         if (_isLoading)
             return;
 
-        var dispatcher = Application.Current?.Dispatcher;
+        Dispatcher? dispatcher = Application.Current?.Dispatcher;
         if (dispatcher is null)
         {
             // No dispatcher (unit tests, shutdown, design-time): load synchronously
@@ -146,9 +148,9 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
             // mutated from a pool thread (TST-010/TST-011).
             try
             {
-                var syncLoaded = _loader(this);
+                IReadOnlyList<ExplorerNode> syncLoaded = _loader(this);
                 _children.Clear();
-                foreach (var child in syncLoaded)
+                foreach (ExplorerNode child in syncLoaded)
                     _children.Add(new ExplorerTreeNode(child, _loader));
 
                 ErrorText = null;
@@ -171,11 +173,11 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
         _ = EnsureChildrenAsync(dispatcher);
     }
 
-    private async Task EnsureChildrenAsync(System.Windows.Threading.Dispatcher dispatcher)
+    private async Task EnsureChildrenAsync(Dispatcher dispatcher)
     {
-        var loader = _loader;
-        var self = this;
-        IReadOnlyList<XISOSharp.ExplorerNode> loaded;
+        Func<ExplorerTreeNode, IReadOnlyList<ExplorerNode>>? loader = _loader;
+        ExplorerTreeNode self = this;
+        IReadOnlyList<ExplorerNode> loaded;
         try
         {
             // Off the UI thread: ListChildren performs sync I/O (TST-010).
@@ -192,8 +194,8 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
         MarshalExpandResult(dispatcher, loaded, null);
     }
 
-    private void MarshalExpandResult(System.Windows.Threading.Dispatcher dispatcher,
-        IReadOnlyList<XISOSharp.ExplorerNode>? loaded, string? error)
+    private void MarshalExpandResult(Dispatcher dispatcher,
+        IReadOnlyList<ExplorerNode>? loaded, string? error)
     {
         try
         {
@@ -214,10 +216,10 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
                         _children.Clear();
                         if (loaded is not null)
                         {
-                            var loader = _loader;
+                            Func<ExplorerTreeNode, IReadOnlyList<ExplorerNode>>? loader = _loader;
                             if (loader is not null)
                             {
-                                foreach (var child in loaded)
+                                foreach (ExplorerNode child in loaded)
                                     _children.Add(new ExplorerTreeNode(child, loader));
                             }
                         }

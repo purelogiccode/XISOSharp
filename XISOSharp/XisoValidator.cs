@@ -86,34 +86,34 @@ public static class XisoValidator
         string outputPath,
         bool verifyChecksums = false)
     {
-        var sourceTree = CollectFileTree(sourcePath);
-        var outputTree = CollectFileTree(outputPath);
+        List<FileTreeEntry> sourceTree = CollectFileTree(sourcePath);
+        List<FileTreeEntry> outputTree = CollectFileTree(outputPath);
 
-        var sourceFiles = sourceTree.Where(static e => !e.IsDirectory).ToList();
-        var outputFiles = outputTree.Where(static e => !e.IsDirectory).ToList();
-        var sourceDirs = sourceTree.Where(static e => e.IsDirectory).ToList();
-        var outputDirs = outputTree.Where(static e => e.IsDirectory).ToList();
+        List<FileTreeEntry> sourceFiles = sourceTree.Where(static e => !e.IsDirectory).ToList();
+        List<FileTreeEntry> outputFiles = outputTree.Where(static e => !e.IsDirectory).ToList();
+        List<FileTreeEntry> sourceDirs = sourceTree.Where(static e => e.IsDirectory).ToList();
+        List<FileTreeEntry> outputDirs = outputTree.Where(static e => e.IsDirectory).ToList();
 
-        var sourceTotalBytes = sourceFiles.Sum(static e => e.Size);
-        var outputTotalBytes = outputFiles.Sum(static e => e.Size);
+        long sourceTotalBytes = sourceFiles.Sum(static e => e.Size);
+        long outputTotalBytes = outputFiles.Sum(static e => e.Size);
 
-        var issues = new List<ValidationIssue>();
+        List<ValidationIssue> issues = new();
 
         // Build case-insensitive dictionaries for comparison
-        var sourceDict = new Dictionary<string, FileTreeEntry>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in sourceFiles)
+        Dictionary<string, FileTreeEntry> sourceDict = new(StringComparer.OrdinalIgnoreCase);
+        foreach (FileTreeEntry entry in sourceFiles)
         {
             sourceDict[entry.Path] = entry;
         }
 
-        var outputDict = new Dictionary<string, FileTreeEntry>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in outputFiles)
+        Dictionary<string, FileTreeEntry> outputDict = new(StringComparer.OrdinalIgnoreCase);
+        foreach (FileTreeEntry entry in outputFiles)
         {
             outputDict[entry.Path] = entry;
         }
 
         // Check for missing files (in source but not in output)
-        foreach ((var path, var entry) in sourceDict)
+        foreach ((string path, FileTreeEntry entry) in sourceDict)
         {
             if (!outputDict.ContainsKey(path))
             {
@@ -128,7 +128,7 @@ public static class XisoValidator
         }
 
         // Check for extra files (in output but not in source)
-        foreach ((var path, var entry) in outputDict)
+        foreach ((string path, FileTreeEntry entry) in outputDict)
         {
             if (!sourceDict.ContainsKey(path))
             {
@@ -143,9 +143,9 @@ public static class XisoValidator
         }
 
         // Check file sizes and optionally checksums for files present in both
-        foreach ((var path, var srcEntry) in sourceDict)
+        foreach ((string path, FileTreeEntry srcEntry) in sourceDict)
         {
-            if (!outputDict.TryGetValue(path, out var outEntry))
+            if (!outputDict.TryGetValue(path, out FileTreeEntry? outEntry))
                 continue;
 
             if (srcEntry.Size != outEntry.Size)
@@ -160,8 +160,8 @@ public static class XisoValidator
             }
             else if (verifyChecksums && srcEntry.Size > 0)
             {
-                var srcHash = XisoReader.ComputeFileHash(sourcePath, path, HashAlgorithmName.SHA256);
-                var outHash = XisoReader.ComputeFileHash(outputPath, path, HashAlgorithmName.SHA256);
+                byte[]? srcHash = XisoReader.ComputeFileHash(sourcePath, path, HashAlgorithmName.SHA256);
+                byte[]? outHash = XisoReader.ComputeFileHash(outputPath, path, HashAlgorithmName.SHA256);
 
                 if (srcHash != null && outHash != null && !srcHash.AsSpan().SequenceEqual(outHash))
                 {
@@ -176,7 +176,7 @@ public static class XisoValidator
             }
         }
 
-        var passed = issues.Count == 0;
+        bool passed = issues.Count == 0;
         return new ValidationResult(
             passed,
             sourceFiles.Count,
@@ -195,7 +195,7 @@ public static class XisoValidator
     /// <returns>List of <see cref="FileTreeEntry"/> for all entries in the image.</returns>
     private static List<FileTreeEntry> CollectFileTree(string isoPath)
     {
-        var entries = new List<FileTreeEntry>();
+        List<FileTreeEntry> entries = new();
         CollectEntries(isoPath, "/", entries);
         return entries;
     }
@@ -216,11 +216,11 @@ public static class XisoValidator
                 $"invalid TOC entry at '{currentPath}': maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
         }
 
-        var dirEntries = XisoReader.ListDirectory(isoPath, currentPath);
+        IReadOnlyList<EntryInfo> dirEntries = XisoReader.ListDirectory(isoPath, currentPath);
 
-        foreach (var entry in dirEntries)
+        foreach (EntryInfo entry in dirEntries)
         {
-            var fullPath = currentPath.TrimEnd('/') + "/" + entry.Name;
+            string fullPath = currentPath.TrimEnd('/') + "/" + entry.Name;
 
             if (entry.IsDirectory)
             {
@@ -248,8 +248,8 @@ public static class XisoValidator
     public static void LogResult(
         ValidationResult result, string sourcePath, string outputPath, bool checksumsVerified = false)
     {
-        var sourceName = Path.GetFileName(sourcePath);
-        var outputName = Path.GetFileName(outputPath);
+        string sourceName = Path.GetFileName(sourcePath);
+        string outputName = Path.GetFileName(outputPath);
 
         Logger.Log(
             $"[VALIDATE] Source: {sourceName} ({result.SourceFileCount} files, {result.SourceTotalBytes:N0} bytes)\n");
@@ -268,7 +268,7 @@ public static class XisoValidator
         }
 
         // File paths
-        var pathIssues = result.Issues.Where(static i =>
+        List<ValidationIssue> pathIssues = result.Issues.Where(static i =>
             i.Type is ValidationIssueType.MissingInOutput or ValidationIssueType.ExtraInOutput).ToList();
         if (pathIssues.Count == 0)
             Logger.Log("[VALIDATE] File paths: MATCH\n");
@@ -276,14 +276,14 @@ public static class XisoValidator
             Logger.Log($"[VALIDATE] File paths: MISMATCH — {pathIssues.Count} path difference(s)\n");
 
         // File sizes
-        var sizeIssues = result.Issues.Where(static i => i.Type == ValidationIssueType.SizeMismatch).ToList();
+        List<ValidationIssue> sizeIssues = result.Issues.Where(static i => i.Type == ValidationIssueType.SizeMismatch).ToList();
         if (sizeIssues.Count == 0)
             Logger.Log("[VALIDATE] File sizes: MATCH\n");
         else
             Logger.Log($"[VALIDATE] File sizes: MISMATCH — {sizeIssues.Count} size difference(s)\n");
 
         // Checksums
-        var checksumIssues = result.Issues.Where(static i => i.Type == ValidationIssueType.ChecksumMismatch).ToList();
+        List<ValidationIssue> checksumIssues = result.Issues.Where(static i => i.Type == ValidationIssueType.ChecksumMismatch).ToList();
         if (checksumIssues.Count > 0)
         {
             Logger.Log($"[VALIDATE] Checksums: FAIL — {checksumIssues.Count} checksum difference(s) (SHA-256)\n");
@@ -298,7 +298,7 @@ public static class XisoValidator
         }
 
         // Detailed issues
-        foreach (var issue in result.Issues)
+        foreach (ValidationIssue issue in result.Issues)
         {
             switch (issue.Type)
             {
@@ -313,10 +313,10 @@ public static class XisoValidator
                         $"[VALIDATE] SIZE MISMATCH: {issue.Path} — source: {issue.SourceSize:N0}, output: {issue.OutputSize:N0}\n");
                     break;
                 case ValidationIssueType.ChecksumMismatch:
-                    var srcHex = issue.SourceHash != null
+                    string srcHex = issue.SourceHash != null
                         ? Convert.ToHexString(issue.SourceHash).ToLowerInvariant()
                         : "?";
-                    var outHex = issue.OutputHash != null
+                    string outHex = issue.OutputHash != null
                         ? Convert.ToHexString(issue.OutputHash).ToLowerInvariant()
                         : "?";
                     Logger.LogErr(
@@ -345,7 +345,7 @@ public static class XisoValidator
         string outputPath,
         string reportPath)
     {
-        var report = new ValidationReport(
+        ValidationReport report = new(
             new ValidationReportSide(sourcePath, result.SourceFileCount, result.SourceDirCount,
                 result.SourceTotalBytes),
             new ValidationReportSide(outputPath, result.OutputFileCount, result.OutputDirCount,
@@ -360,12 +360,12 @@ public static class XisoValidator
                 Hex(i.SourceHash),
                 Hex(i.OutputHash))).ToList());
 
-        var context = new ValidationReportJsonContext(new JsonSerializerOptions
+        ValidationReportJsonContext context = new(new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         });
-        var json = JsonSerializer.Serialize(report, context.ValidationReport);
+        string json = JsonSerializer.Serialize(report, context.ValidationReport);
         File.WriteAllText(reportPath, json, Encoding.UTF8);
         return;
 

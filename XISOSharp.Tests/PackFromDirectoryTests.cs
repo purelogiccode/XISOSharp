@@ -16,7 +16,7 @@ public class PackFromDirectoryTests : IDisposable
         Logger.Quiet = false;
         Logger.RealQuiet = false;
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -31,7 +31,7 @@ public class PackFromDirectoryTests : IDisposable
 
     private string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"xiso_pack_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_pack_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -39,7 +39,7 @@ public class PackFromDirectoryTests : IDisposable
 
     private static string CreateSourceTree()
     {
-        var root = Path.Combine(Path.GetTempPath(), $"xiso_pack_src_{Guid.NewGuid():N}");
+        string root = Path.Combine(Path.GetTempPath(), $"xiso_pack_src_{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(root, "sub"));
         Directory.CreateDirectory(Path.Combine(root, "node_modules"));
 
@@ -52,12 +52,12 @@ public class PackFromDirectoryTests : IDisposable
 
     private static Dictionary<string, string> HashTree(string root)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        Dictionary<string, string> result = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
-            var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
-            using var sha = SHA256.Create();
-            using var fs = File.OpenRead(file);
+            string rel = Path.GetRelativePath(root, file).Replace('\\', '/');
+            using SHA256 sha = SHA256.Create();
+            using FileStream fs = File.OpenRead(file);
             result[rel] = Convert.ToHexString(sha.ComputeHash(fs));
         }
 
@@ -66,9 +66,9 @@ public class PackFromDirectoryTests : IDisposable
 
     private static string ExtractToTemp(string isoPath)
     {
-        var dest = Path.Combine(Path.GetTempPath(), $"xiso_pack_out_{Guid.NewGuid():N}");
+        string dest = Path.Combine(Path.GetTempPath(), $"xiso_pack_out_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dest);
-        var result = XisoReader.Extract(isoPath, dest, false);
+        int result = XisoReader.Extract(isoPath, dest, false);
         Assert.Equal(0, result);
         return dest;
     }
@@ -76,47 +76,47 @@ public class PackFromDirectoryTests : IDisposable
     [Fact]
     public void PackFromDirectory_CreatesIso_With1To1Mapping()
     {
-        var src = CreateSourceTree();
-        var outputDir = CreateTempDir();
-        var isoPath = Path.Combine(outputDir, "packed.iso");
+        string src = CreateSourceTree();
+        string outputDir = CreateTempDir();
+        string isoPath = Path.Combine(outputDir, "packed.iso");
 
-        var result = XisoWriter.PackFromDirectory(src, isoPath);
+        int result = XisoWriter.PackFromDirectory(src, isoPath);
         Assert.Equal(0, result);
         Assert.True(File.Exists(isoPath));
 
-        var extracted = ExtractToTemp(isoPath);
+        string extracted = ExtractToTemp(isoPath);
         Assert.Equal(HashTree(src), HashTree(extracted));
     }
 
     [Fact]
     public void PackFromDirectory_OutputPathMayIncludeSubdirectory()
     {
-        var src = CreateSourceTree();
-        var outputDir = CreateTempDir();
-        var nested = Path.Combine(outputDir, "nested");
-        var isoPath = Path.Combine(nested, "packed.iso");
+        string src = CreateSourceTree();
+        string outputDir = CreateTempDir();
+        string nested = Path.Combine(outputDir, "nested");
+        string isoPath = Path.Combine(nested, "packed.iso");
 
-        var result = XisoWriter.PackFromDirectory(src, isoPath);
+        int result = XisoWriter.PackFromDirectory(src, isoPath);
         Assert.Equal(0, result);
         Assert.True(File.Exists(isoPath));
 
-        var extracted = ExtractToTemp(isoPath);
+        string extracted = ExtractToTemp(isoPath);
         Assert.Equal(HashTree(src), HashTree(extracted));
     }
 
     [Fact]
     public void PackFromDirectory_ExcludePatterns_AreHonored()
     {
-        var src = CreateSourceTree();
-        var outputDir = CreateTempDir();
-        var isoPath = Path.Combine(outputDir, "packed.iso");
+        string src = CreateSourceTree();
+        string outputDir = CreateTempDir();
+        string isoPath = Path.Combine(outputDir, "packed.iso");
 
-        var result = XisoWriter.PackFromDirectory(src, isoPath,
+        int result = XisoWriter.PackFromDirectory(src, isoPath,
             excludePatterns: ["**/*.tmp", "**/node_modules/**"]);
         Assert.Equal(0, result);
 
-        var extracted = ExtractToTemp(isoPath);
-        var files = HashTree(extracted);
+        string extracted = ExtractToTemp(isoPath);
+        Dictionary<string, string> files = HashTree(extracted);
         Assert.Contains("a.txt", files.Keys, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("sub/b.bin", files.Keys, StringComparer.OrdinalIgnoreCase);
         Assert.DoesNotContain("skip.tmp", files.Keys, StringComparer.OrdinalIgnoreCase);
@@ -126,8 +126,8 @@ public class PackFromDirectoryTests : IDisposable
     [Fact]
     public void PackFromDirectory_MissingSource_Throws()
     {
-        var outputDir = CreateTempDir();
-        var isoPath = Path.Combine(outputDir, "packed.iso");
+        string outputDir = CreateTempDir();
+        string isoPath = Path.Combine(outputDir, "packed.iso");
 
         Assert.Throws<DirectoryNotFoundException>(() =>
             XisoWriter.PackFromDirectory(Path.Combine(outputDir, "nope"), isoPath));
@@ -136,7 +136,7 @@ public class PackFromDirectoryTests : IDisposable
     [Fact]
     public void PackFromDirectory_NullOrEmptyOutputPath_Throws()
     {
-        var src = CreateSourceTree();
+        string src = CreateSourceTree();
 
         Assert.Throws<ArgumentException>(() => XisoWriter.PackFromDirectory(src, ""));
         Assert.Throws<ArgumentNullException>(() => XisoWriter.PackFromDirectory(src, null!));
@@ -145,15 +145,15 @@ public class PackFromDirectoryTests : IDisposable
     [Fact]
     public async Task PackFromDirectoryAsync_CreatesIso()
     {
-        var src = CreateSourceTree();
-        var outputDir = CreateTempDir();
-        var isoPath = Path.Combine(outputDir, "async.iso");
+        string src = CreateSourceTree();
+        string outputDir = CreateTempDir();
+        string isoPath = Path.Combine(outputDir, "async.iso");
 
-        var result = await XisoWriter.PackFromDirectoryAsync(src, isoPath);
+        int result = await XisoWriter.PackFromDirectoryAsync(src, isoPath);
         Assert.Equal(0, result);
         Assert.True(File.Exists(isoPath));
 
-        var extracted = ExtractToTemp(isoPath);
+        string extracted = ExtractToTemp(isoPath);
         Assert.Equal(HashTree(src), HashTree(extracted));
     }
 
@@ -161,12 +161,12 @@ public class PackFromDirectoryTests : IDisposable
     public void PackFromDirectory_RestoresCwd_OnSuccess()
     {
         // The create path hops CWD internally; it must not leak (#22).
-        var before = Directory.GetCurrentDirectory();
+        string before = Directory.GetCurrentDirectory();
         try
         {
-            var src = CreateSourceTree();
+            string src = CreateSourceTree();
             _tempDirs.Add(src);
-            var isoPath = Path.Combine(CreateTempDir(), "packed.iso");
+            string isoPath = Path.Combine(CreateTempDir(), "packed.iso");
 
             Assert.Equal(0, XisoWriter.PackFromDirectory(src, isoPath));
             Assert.Equal(before, Directory.GetCurrentDirectory());
@@ -189,13 +189,13 @@ public class PackFromDirectoryTests : IDisposable
     {
         // The #55 collision throws *after* chdir into the source; CWD must
         // still be restored (#22).
-        var before = Directory.GetCurrentDirectory();
-        var src = CreateSourceTree();
+        string before = Directory.GetCurrentDirectory();
+        string src = CreateSourceTree();
         _tempDirs.Add(src);
         try
         {
-            var leaf = Path.GetFileName(src);
-            var parent = Path.GetDirectoryName(src)!;
+            string leaf = Path.GetFileName(src);
+            string parent = Path.GetDirectoryName(src)!;
             Assert.Throws<ArgumentException>(() =>
                 XisoWriter.CreateXiso(src, parent, null, null, out _, leaf, null));
             Assert.Equal(before, Directory.GetCurrentDirectory());
@@ -218,22 +218,22 @@ public class PackFromDirectoryTests : IDisposable
     {
         // Creates are serialized process-wide (#22) — parallel packs must
         // all succeed with intact outputs instead of corrupting shared CWD.
-        var before = Directory.GetCurrentDirectory();
-        var cases = Enumerable.Range(0, 4).Select(_ =>
+        string before = Directory.GetCurrentDirectory();
+        List<(string src, string iso)> cases = Enumerable.Range(0, 4).Select(_ =>
         {
-            var src = CreateSourceTree();
+            string src = CreateSourceTree();
             _tempDirs.Add(src);
-            var iso = Path.Combine(CreateTempDir(), "packed.iso");
+            string iso = Path.Combine(CreateTempDir(), "packed.iso");
             return (src, iso);
         }).ToList();
 
-        var tasks = cases.Select(c => Task.Run(() => XisoWriter.PackFromDirectory(c.src, c.iso))).ToArray();
-        var results = await Task.WhenAll(tasks);
+        Task<int>[] tasks = cases.Select(c => Task.Run(() => XisoWriter.PackFromDirectory(c.src, c.iso))).ToArray();
+        int[] results = await Task.WhenAll(tasks);
 
-        foreach (var (result, (src, iso)) in results.Zip(cases))
+        foreach ((int result, (string src, string iso)) in results.Zip(cases))
         {
             Assert.Equal(0, result);
-            var extracted = ExtractToTemp(iso);
+            string extracted = ExtractToTemp(iso);
             Assert.Equal(HashTree(src), HashTree(extracted));
         }
 

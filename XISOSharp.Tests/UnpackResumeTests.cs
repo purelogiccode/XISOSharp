@@ -19,7 +19,7 @@ public class UnpackResumeTests : IDisposable
         Logger.Quiet = false;
         Logger.RealQuiet = false;
 
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -34,7 +34,7 @@ public class UnpackResumeTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -46,7 +46,7 @@ public class UnpackResumeTests : IDisposable
 
     private string CreateSourceTree()
     {
-        var root = CreateTempDir("xiso_resume_src");
+        string root = CreateTempDir("xiso_resume_src");
         Directory.CreateDirectory(Path.Combine(root, "sub"));
         Directory.CreateDirectory(Path.Combine(root, "data"));
 
@@ -54,17 +54,17 @@ public class UnpackResumeTests : IDisposable
         File.WriteAllText(Path.Combine(root, "empty.txt"), string.Empty);
         File.WriteAllText(Path.Combine(root, "sub", "b.txt"), new string('B', 5000));
 
-        var payload = new byte[20000];
-        for (var i = 0; i < payload.Length; i++) payload[i] = (byte)(i % 251);
+        byte[] payload = new byte[20000];
+        for (int i = 0; i < payload.Length; i++) payload[i] = (byte)(i % 251);
         File.WriteAllBytes(Path.Combine(root, "data", "c.bin"), payload);
         return root;
     }
 
     private string CreateIso(string srcDir, string isoName)
     {
-        var outputDir = CreateTempDir("xiso_resume_iso");
-        var isoPath = Path.Combine(outputDir, isoName);
-        var result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out var created, isoName, null);
+        string outputDir = CreateTempDir("xiso_resume_iso");
+        string isoPath = Path.Combine(outputDir, isoName);
+        int result = XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? created, isoName, null);
         Assert.Equal(0, result);
         Assert.Equal(isoPath, created);
         return isoPath;
@@ -72,12 +72,12 @@ public class UnpackResumeTests : IDisposable
 
     private static Dictionary<string, string> HashTree(string root)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        Dictionary<string, string> result = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
-            var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
-            using var sha = SHA256.Create();
-            using var fs = File.OpenRead(file);
+            string rel = Path.GetRelativePath(root, file).Replace('\\', '/');
+            using SHA256 sha = SHA256.Create();
+            using FileStream fs = File.OpenRead(file);
             result[rel] = Convert.ToHexString(sha.ComputeHash(fs));
         }
 
@@ -86,7 +86,7 @@ public class UnpackResumeTests : IDisposable
 
     private static void PinTimes(string root)
     {
-        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
             File.SetLastWriteTimeUtc(file, PinnedTime);
     }
 
@@ -105,9 +105,9 @@ public class UnpackResumeTests : IDisposable
     [Fact]
     public void SkipExisting_ResumesPartialUnpack_OnlyMissingFilesWritten()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var dest = CreateTempDir("xiso_resume_dest");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string dest = CreateTempDir("xiso_resume_dest");
 
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, dest));
         Assert.Equal(HashTree(src), HashTree(dest));
@@ -130,14 +130,14 @@ public class UnpackResumeTests : IDisposable
     [Fact]
     public void SkipExisting_LeavesSameSizeFileUntouched()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var dest = CreateTempDir("xiso_resume_dest");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string dest = CreateTempDir("xiso_resume_dest");
 
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, dest));
 
         // Same byte count, different content: size-match means "already done".
-        var target = Path.Combine(dest, "a.txt");
+        string target = Path.Combine(dest, "a.txt");
         File.WriteAllText(target, "HELLO");
 
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, dest, options: Skip()));
@@ -147,13 +147,13 @@ public class UnpackResumeTests : IDisposable
     [Fact]
     public void WithoutFlag_OverwritesExistingFiles()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var dest = CreateTempDir("xiso_resume_dest");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string dest = CreateTempDir("xiso_resume_dest");
 
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, dest));
 
-        var target = Path.Combine(dest, "a.txt");
+        string target = Path.Combine(dest, "a.txt");
         File.WriteAllText(target, "HELLO");
 
         Assert.Equal(0, XisoReader.UnpackImage(isoPath, dest));
@@ -163,18 +163,18 @@ public class UnpackResumeTests : IDisposable
     [Fact]
     public void CancelledUnpack_ThrowsOperationCanceledException_RestoresWorkingDirectory()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var dest = CreateTempDir("xiso_resume_dest");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string dest = CreateTempDir("xiso_resume_dest");
 
-        var originalCwd = Directory.GetCurrentDirectory();
+        string originalCwd = Directory.GetCurrentDirectory();
         Exception? ex;
         // Keep the progress callback (which captures cts) inside the CTS lifetime
         // so it cannot fire after disposal.
-        using (var cts = new CancellationTokenSource())
+        using (CancellationTokenSource cts = new())
         {
-            var written = 0;
-            var progress = new SyncProgress(info =>
+            int written = 0;
+            SyncProgress progress = new(info =>
             {
                 if (info.Type == ProgressInfoType.FileAdded && ++written == 2)
                 {
@@ -205,17 +205,17 @@ public class UnpackResumeTests : IDisposable
     [Fact]
     public void CopyOut_SkipExisting_SkipsIdenticalFile_ResumesMissing()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var destDir = CreateTempDir("xiso_resume_copyout");
-        var dest = Path.Combine(destDir, "b.txt");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string destDir = CreateTempDir("xiso_resume_copyout");
+        string dest = Path.Combine(destDir, "b.txt");
 
         XisoReader.CopyOut(isoPath, "/sub/b.txt", dest);
         Assert.True(File.Exists(dest));
 
         // Same-size tampering survives a skip-existing copy-out ...
-        var payload = new byte[5000];
-        for (var i = 0; i < payload.Length; i++) payload[i] = (byte)'X';
+        byte[] payload = new byte[5000];
+        for (int i = 0; i < payload.Length; i++) payload[i] = (byte)'X';
         File.WriteAllBytes(dest, payload);
 
         XisoReader.CopyOut(isoPath, "/sub/b.txt", dest, Skip());
@@ -230,9 +230,9 @@ public class UnpackResumeTests : IDisposable
     [Fact]
     public void CopyOut_SkipExisting_ResumesPartialDirectory()
     {
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var dest = CreateTempDir("xiso_resume_copydir");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string dest = CreateTempDir("xiso_resume_copydir");
 
         XisoReader.CopyOut(isoPath, "/sub", dest);
         PinTimes(dest);
@@ -250,11 +250,11 @@ public class UnpackResumeTests : IDisposable
         // destination; the caller's directory must be restored so a following
         // image (e.g. --batch without -d) resolves against the right directory
         // instead of nesting into the previous ISO's subdirectory.
-        var src = CreateSourceTree();
-        var isoPath = CreateIso(src, "game.iso");
-        var workDir = CreateTempDir("xiso_resume_cwd");
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string workDir = CreateTempDir("xiso_resume_cwd");
 
-        var originalCwd = Directory.GetCurrentDirectory();
+        string originalCwd = Directory.GetCurrentDirectory();
         try
         {
             Directory.SetCurrentDirectory(workDir);
@@ -276,11 +276,11 @@ public class UnpackResumeTests : IDisposable
     [Fact]
     public void ShouldSkip_MatchesOnlyCompleteFilesWhenEnabled()
     {
-        var dir = CreateTempDir("xiso_resume_shouldskip");
-        var file = Path.Combine(dir, "f.bin");
+        string dir = CreateTempDir("xiso_resume_shouldskip");
+        string file = Path.Combine(dir, "f.bin");
         File.WriteAllBytes(file, [1, 2, 3, 4]);
 
-        var skip = Skip();
+        UnpackOptions skip = Skip();
         Assert.True(skip.ShouldSkip(file, 4));
         Assert.False(skip.ShouldSkip(file, 3));
         Assert.False(skip.ShouldSkip(Path.Combine(dir, "missing.bin"), 4));

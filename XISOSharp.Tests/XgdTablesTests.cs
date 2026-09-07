@@ -225,11 +225,11 @@ public class XgdTablesTests
     public void GetWave_InvalidRedumpType_ReturnsMinusOne()
     {
         // Use a dummy file even if provided, invalid type should short-circuit
-        var tmp = Path.Combine(Path.GetTempPath(), $"xgd_wave_{Guid.NewGuid():N}.bin");
+        string tmp = Path.Combine(Path.GetTempPath(), $"xgd_wave_{Guid.NewGuid():N}.bin");
         File.WriteAllBytes(tmp, new byte[0x9000]);
         try
         {
-            using var fs = new FileStream(tmp, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using FileStream fs = new(tmp, FileMode.Open, FileAccess.Read, FileShare.Read);
             Assert.Equal(-1, XgdTables.GetWave(fs, 0));
             Assert.Equal(-1, XgdTables.GetWave(fs, 1));
             Assert.Equal(-1, XgdTables.GetWave(fs, 2));
@@ -245,16 +245,16 @@ public class XgdTablesTests
     [Fact]
     public void GetWave_ValidPvd_ReturnsCorrectIndex()
     {
-        var tmp = Path.Combine(Path.GetTempPath(), $"xgd_wave_pvd_{Guid.NewGuid():N}.bin");
+        string tmp = Path.Combine(Path.GetTempPath(), $"xgd_wave_pvd_{Guid.NewGuid():N}.bin");
         // Need at least 0x832D + 16 bytes
-        var data = new byte[0x9000];
+        byte[] data = new byte[0x9000];
         // Write known PVD at offset 0x832D
-        var pvd0 = "2004083110334900"u8.ToArray();
+        byte[] pvd0 = "2004083110334900"u8.ToArray();
         Array.Copy(pvd0, 0, data, 0x832D, pvd0.Length);
         File.WriteAllBytes(tmp, data);
         try
         {
-            using var fs = new FileStream(tmp, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using FileStream fs = new(tmp, FileMode.Open, FileAccess.Read, FileShare.Read);
             Assert.Equal(0, XgdTables.GetWave(fs, 5));
             Assert.Equal(0, XgdTables.GetWave(fs, 7));
         }
@@ -264,14 +264,14 @@ public class XgdTablesTests
         }
 
         // Second case: write different PVD and re-test
-        var tmp2 = Path.Combine(Path.GetTempPath(), $"xgd_wave_pvd2_{Guid.NewGuid():N}.bin");
-        var data2 = new byte[0x9000];
-        var pvd14B = "2011120716000000"u8.ToArray();
+        string tmp2 = Path.Combine(Path.GetTempPath(), $"xgd_wave_pvd2_{Guid.NewGuid():N}.bin");
+        byte[] data2 = new byte[0x9000];
+        byte[] pvd14B = "2011120716000000"u8.ToArray();
         Array.Copy(pvd14B, 0, data2, 0x832D, pvd14B.Length);
         File.WriteAllBytes(tmp2, data2);
         try
         {
-            using var fs2 = new FileStream(tmp2, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using FileStream fs2 = new(tmp2, FileMode.Open, FileAccess.Read, FileShare.Read);
             Assert.Equal(14, XgdTables.GetWave(fs2, 5));
         }
         finally
@@ -283,14 +283,14 @@ public class XgdTablesTests
     [Fact]
     public void GetWave_UnknownPvd_ReturnsMinusOne()
     {
-        var tmp = Path.Combine(Path.GetTempPath(), $"xgd_wave_unknown_{Guid.NewGuid():N}.bin");
-        var data = new byte[0x9000];
-        var unknown = "9999999999999999"u8.ToArray();
+        string tmp = Path.Combine(Path.GetTempPath(), $"xgd_wave_unknown_{Guid.NewGuid():N}.bin");
+        byte[] data = new byte[0x9000];
+        byte[] unknown = "9999999999999999"u8.ToArray();
         Array.Copy(unknown, 0, data, 0x832D, unknown.Length);
         File.WriteAllBytes(tmp, data);
         try
         {
-            using var fs = new FileStream(tmp, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using FileStream fs = new(tmp, FileMode.Open, FileAccess.Read, FileShare.Read);
             Assert.Equal(-1, XgdTables.GetWave(fs, 5));
             Assert.Equal(-1, XgdTables.GetWave(fs, 7));
         }
@@ -327,14 +327,14 @@ public class XgdTablesTests
     public void GetVideoType_WithWaveFile_ReturnsMappedValue()
     {
         // Create a file with wave 0 PVD (2004083110334900) => GetVideoType for redump 5 should be 2
-        var tmp = Path.Combine(Path.GetTempPath(), $"xgd_vtype_{Guid.NewGuid():N}.bin");
-        var data = new byte[0x9000];
-        var pvd0 = "2004083110334900"u8.ToArray(); // wave 0
+        string tmp = Path.Combine(Path.GetTempPath(), $"xgd_vtype_{Guid.NewGuid():N}.bin");
+        byte[] data = new byte[0x9000];
+        byte[] pvd0 = "2004083110334900"u8.ToArray(); // wave 0
         Array.Copy(pvd0, 0, data, 0x832D, pvd0.Length);
         File.WriteAllBytes(tmp, data);
         try
         {
-            using var fs = new FileStream(tmp, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using FileStream fs = new(tmp, FileMode.Open, FileAccess.Read, FileShare.Read);
             Assert.Equal(2, XgdTables.GetVideoType(fs, 5));
             // wave 0 for type 5 => video type 2, then GetRedumpLength => 7838111744 etc.
         }
@@ -344,24 +344,24 @@ public class XgdTablesTests
         }
 
         // Wave 23 is special case for redump 7 => returns 16
-        var tmp2 = Path.Combine(Path.GetTempPath(), $"xgd_vtype2_{Guid.NewGuid():N}.bin");
-        var data2 = new byte[0x9000];
-        var pvd23 = "2010121616000000"u8.ToArray(); // index 23
+        string tmp2 = Path.Combine(Path.GetTempPath(), $"xgd_vtype2_{Guid.NewGuid():N}.bin");
+        byte[] data2 = new byte[0x9000];
+        byte[] pvd23 = "2010121616000000"u8.ToArray(); // index 23
         Array.Copy(pvd23, 0, data2, 0x832D, pvd23.Length);
         File.WriteAllBytes(tmp2, data2);
         try
         {
-            using var fs2 = new FileStream(tmp2, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using FileStream fs2 = new(tmp2, FileMode.Open, FileAccess.Read, FileShare.Read);
             Assert.Equal(16, XgdTables.GetVideoType(fs2, 7));
             // non-23 wave for type 7 => 17
             // Test with wave 0 file for type 7 => should be 17
-            var tmp3 = Path.Combine(Path.GetTempPath(), $"xgd_vtype3_{Guid.NewGuid():N}.bin");
-            var data3 = new byte[0x9000];
+            string tmp3 = Path.Combine(Path.GetTempPath(), $"xgd_vtype3_{Guid.NewGuid():N}.bin");
+            byte[] data3 = new byte[0x9000];
             Array.Copy(pvd0, 0, data3, 0x832D, pvd0.Length);
             File.WriteAllBytes(tmp3, data3);
             try
             {
-                using var fs3 = new FileStream(tmp3, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using FileStream fs3 = new(tmp3, FileMode.Open, FileAccess.Read, FileShare.Read);
                 Assert.Equal(17, XgdTables.GetVideoType(fs3, 7));
             }
             finally

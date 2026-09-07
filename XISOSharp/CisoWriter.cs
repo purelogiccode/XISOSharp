@@ -74,12 +74,12 @@ public static class CisoWriter
         if (version != VersionDeflate && version != VersionLz4)
             throw new ArgumentOutOfRangeException(nameof(version), "CISO version must be 1 (DEFLATE) or 2 (LZ4)");
 
-        var isDir = Directory.Exists(sourcePath);
-        var isFile = File.Exists(sourcePath);
+        bool isDir = Directory.Exists(sourcePath);
+        bool isFile = File.Exists(sourcePath);
         if (!isDir && !isFile)
             throw new FileNotFoundException($"Source not found: {sourcePath}");
 
-        var output = outputCsoPath ?? DeriveDefaultCsoPath(sourcePath, isDir);
+        string output = outputCsoPath ?? DeriveDefaultCsoPath(sourcePath, isDir);
         if (XisoPaths.AreSamePath(sourcePath, output))
             throw new IOException("Source and destination paths are the same");
         if (splitBytes.HasValue && !isDir)
@@ -93,7 +93,7 @@ public static class CisoWriter
             // Pack directory to temp XISO then compress. Mirrors xdvdfs cmd_compress path for is_dir.
             tempIso = Path.Combine(Path.GetTempPath(), $"xisosh-temp-{Guid.NewGuid():N}.iso");
             // Use PackFromDirectory (1:1 mapping). Exclude none.
-            var rc = XisoWriterInternal.PackFromDirectoryForCiso(sourcePath, tempIso, ct);
+            int rc = XisoWriterInternal.PackFromDirectoryForCiso(sourcePath, tempIso, ct);
             if (rc != 0)
                 throw new IOException($"Failed to pack directory {sourcePath} to temp ISO");
             sourceFile = tempIso;
@@ -105,18 +105,18 @@ public static class CisoWriter
 
         try
         {
-            using var src = new FileStream(sourceFile, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+            using FileStream src = new(sourceFile, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
             if (splitBytes.HasValue)
             {
-                using var split = new CisoSplitOutput(output, splitBytes.Value);
+                using CisoSplitOutput split = new(output, splitBytes.Value);
                 CompressStream(src, split, level, version, progress, ct);
-                foreach (var part in split.PartPaths)
+                foreach (string part in split.PartPaths)
                     Logger.Log($"  part {part} ({new FileInfo(part).Length} bytes)\n");
                 Logger.Log($"Compressed {sourcePath} -> {output} ({split.PartPaths.Count} part(s))\n");
             }
             else
             {
-                using var dst = new FileStream(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+                using FileStream dst = new(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
                 CompressStream(src, dst, level, version, progress, ct);
                 Logger.Log($"Compressed {sourcePath} -> {output} ({new FileInfo(output).Length} bytes)\n");
             }
@@ -148,10 +148,10 @@ public static class CisoWriter
     /// </summary>
     private static void GuardSplitParts(string sourcePath, string output, long splitBytes)
     {
-        var maxPart = (new FileInfo(sourcePath).Length / splitBytes) + 2;
-        for (var i = 0L; i < maxPart; i++)
+        long maxPart = (new FileInfo(sourcePath).Length / splitBytes) + 2;
+        for (long i = 0L; i < maxPart; i++)
         {
-            var part = CisoSplitFile.PartPath(output, i);
+            string part = CisoSplitFile.PartPath(output, i);
             if (XisoPaths.AreSamePath(sourcePath, part))
                 throw new IOException($"Source and split output part paths are the same: {part}");
         }
@@ -183,14 +183,14 @@ public static class CisoWriter
         if (!source.CanSeek) throw new ArgumentException("Source must be seekable", nameof(source));
         if (!dest.CanSeek) throw new ArgumentException("Destination must be seekable", nameof(dest));
 
-        var uncompressedSize = source.Length;
+        long uncompressedSize = source.Length;
         // Also handle non-zero Position: we want whole stream
         // Ensure we start from 0
         source.Seek(0, SeekOrigin.Begin);
         dest.Seek(0, SeekOrigin.Begin);
 
-        var totalBlocks = (int)((uncompressedSize + BlockSize - 1) / BlockSize);
-        var indexLen = totalBlocks + 1;
+        int totalBlocks = (int)((uncompressedSize + BlockSize - 1) / BlockSize);
+        int indexLen = totalBlocks + 1;
 
         // ciso 0.2 (v2) fixes alignment at 2; classic v1 keeps dynamic alignment:
         // align=0 for <2GB to avoid padding overhead; align=1 for <4GB; align=2 for >=4GB.
@@ -200,7 +200,7 @@ public static class CisoWriter
         else if (uncompressedSize < 0x100000000L) align = 1;
         else align = 2;
 
-        var header = new byte[HeaderSize];
+        byte[] header = new byte[HeaderSize];
         BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(0, 4), Magic);
         BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(4, 4), HeaderSize);
         BinaryPrimitives.WriteUInt64LittleEndian(header.AsSpan(8, 8), (ulong)uncompressedSize);
@@ -213,20 +213,20 @@ public static class CisoWriter
         dest.Write(header, 0, header.Length);
 
         // Reserve index table (filled later)
-        var indexStart = dest.Position;
-        var indexBytes = new byte[indexLen * 4];
+        long indexStart = dest.Position;
+        byte[] indexBytes = new byte[indexLen * 4];
         dest.Write(indexBytes, 0, indexBytes.Length);
 
-        var dataStart = HeaderSize + (indexLen * 4L);
-        var position = dataStart;
+        long dataStart = HeaderSize + (indexLen * 4L);
+        long position = dataStart;
 
-        var indexEntries = new uint[indexLen];
+        uint[] indexEntries = new uint[indexLen];
 
-        var blockBuf = new byte[BlockSize];
+        byte[] blockBuf = new byte[BlockSize];
         // For progress
         progress?.Report(new ProgressInfo(ProgressInfoType.FileCount, Count: totalBlocks));
 
-        var compLevel = MapLevel(level);
+        CompressionLevel compLevel = MapLevel(level);
 
         // Scratch for the v2 payload: [u32 LE block info][LZ4 block data] — the LZ4 frame with
         // its 7-byte header and 4-byte end mark stripped (ciso write.rs).
@@ -235,21 +235,21 @@ public static class CisoWriter
             lz4Scratch = new byte[4 + Lz4.MaxCompressedOutputSize(BlockSize)];
 
         // --ciso-level maps inversely to LZ4 acceleration (level 9 = acceleration 1 = lz4_flex parity).
-        var acceleration = Math.Max(1, 10 - level);
+        int acceleration = Math.Max(1, 10 - level);
 
-        for (var sector = 0; sector < totalBlocks; sector++)
+        for (int sector = 0; sector < totalBlocks; sector++)
         {
             ct.ThrowIfCancellationRequested();
 
             // Align position before this block
             if (align != 0)
             {
-                var alignBytes = 1L << align;
-                var mis = position & (alignBytes - 1);
+                long alignBytes = 1L << align;
+                long mis = position & (alignBytes - 1);
                 if (mis != 0)
                 {
-                    var pad = alignBytes - mis;
-                    var padBuf = new byte[pad];
+                    long pad = alignBytes - mis;
+                    byte[] padBuf = new byte[pad];
                     dest.Seek(position, SeekOrigin.Begin);
                     dest.Write(padBuf, 0, padBuf.Length);
                     position += pad;
@@ -257,10 +257,10 @@ public static class CisoWriter
             }
 
             // Read one block (pad last block with zeros if file not multiple of BlockSize)
-            var read = 0;
+            int read = 0;
             while (read < BlockSize)
             {
-                var n = source.Read(blockBuf, read, BlockSize - read);
+                int n = source.Read(blockBuf, read, BlockSize - read);
                 if (n == 0) break;
                 read += n;
             }
@@ -281,12 +281,12 @@ public static class CisoWriter
                 }
                 else
                 {
-                    var blockLen = Lz4.Compress(blockBuf, lz4Scratch.AsSpan(4), acceleration);
+                    int blockLen = Lz4.Compress(blockBuf, lz4Scratch.AsSpan(4), acceleration);
                     // When the block does not compress, the frame stores it raw
                     // (block info carries the 0x80000000 uncompressed bit, as in lz4_flex).
-                    var sizeField = blockLen < BlockSize ? (uint)blockLen : 0x80000000u | BlockSize;
+                    uint sizeField = blockLen < BlockSize ? (uint)blockLen : 0x80000000u | BlockSize;
                     BinaryPrimitives.WriteUInt32LittleEndian(lz4Scratch, sizeField);
-                    var payloadLen = 4 + Math.Min(blockLen, BlockSize);
+                    int payloadLen = 4 + Math.Min(blockLen, BlockSize);
 
                     if (payloadLen + CompressionSavingThreshold >= BlockSize)
                     {
@@ -313,8 +313,8 @@ public static class CisoWriter
                     compressed = DeflateCompress(blockBuf, compLevel);
                 }
 
-                var usePlain = level == 0 || compressed.Length == 0 ||
-                               compressed.Length + CompressionSavingThreshold >= BlockSize;
+                bool usePlain = level == 0 || compressed.Length == 0 ||
+                                compressed.Length + CompressionSavingThreshold >= BlockSize;
                 if (usePlain)
                 {
                     dataToWrite = blockBuf;
@@ -327,11 +327,11 @@ public static class CisoWriter
                 }
             }
 
-            var posShifted = position >> align;
+            long posShifted = position >> align;
             if (posShifted > 0x7FFFFFFFL)
                 throw new IOException("CISO index overflow: image too large for the CISO format");
 
-            var entry = (uint)posShifted | flagBit;
+            uint entry = (uint)posShifted | flagBit;
             indexEntries[sector] = entry;
 
             dest.Seek(position, SeekOrigin.Begin);
@@ -345,14 +345,14 @@ public static class CisoWriter
 
         // Final index entry (end of file) — never flagged
         {
-            var posShifted = (uint)(position >> align);
+            uint posShifted = (uint)(position >> align);
             indexEntries[indexLen - 1] = posShifted & 0x7FFFFFFFu;
         }
 
         // Write index table at indexStart
         dest.Seek(indexStart, SeekOrigin.Begin);
         Span<byte> leBuf = stackalloc byte[4];
-        foreach (var e in indexEntries)
+        foreach (uint e in indexEntries)
         {
             BinaryPrimitives.WriteUInt32LittleEndian(leBuf, e);
             dest.Write(leBuf);
@@ -365,9 +365,9 @@ public static class CisoWriter
 
     private static byte[] DeflateCompress(byte[] data, CompressionLevel level)
     {
-        using var ms = new MemoryStream();
+        using MemoryStream ms = new();
         // Use optimal leaveOpen false; but we need to dispose DeflateStream before ToArray
-        using (var ds = new DeflateStream(ms, level, leaveOpen: true))
+        using (DeflateStream ds = new(ms, level, leaveOpen: true))
         {
             ds.Write(data, 0, data.Length);
         }
@@ -395,17 +395,17 @@ public static class CisoWriter
     {
         if (isDir)
         {
-            var trimmed = sourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var parent = Path.GetDirectoryName(trimmed) ?? Directory.GetCurrentDirectory();
-            var name = Path.GetFileName(trimmed);
+            string trimmed = sourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string parent = Path.GetDirectoryName(trimmed) ?? Directory.GetCurrentDirectory();
+            string name = Path.GetFileName(trimmed);
             if (string.IsNullOrEmpty(name)) name = "image";
             return Path.Combine(parent, name + ".cso");
         }
         else
         {
             // For file, replace extension with .cso (or append if no ext)
-            var dir = Path.GetDirectoryName(sourcePath) ?? "";
-            var file = Path.GetFileName(sourcePath);
+            string dir = Path.GetDirectoryName(sourcePath) ?? "";
+            string file = Path.GetFileName(sourcePath);
             // If file ends with .iso, produce .cso sibling
             if (file.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
             {
@@ -417,7 +417,7 @@ public static class CisoWriter
             }
             else
             {
-                var ext = Path.GetExtension(file);
+                string ext = Path.GetExtension(file);
                 if (!string.IsNullOrEmpty(ext))
                     file = Path.ChangeExtension(file, ".cso");
                 else
@@ -446,7 +446,7 @@ public static class CisoWriter
         public static int PackFromDirectoryForCiso(string sourceDirectory, string outputIsoPath, CancellationToken ct)
         {
             // Use XisoWriter.CreateXiso directly with explicit output name to avoid extra .iso
-            var dir = Path.GetDirectoryName(Path.GetFullPath(outputIsoPath)) ?? Directory.GetCurrentDirectory();
+            string dir = Path.GetDirectoryName(Path.GetFullPath(outputIsoPath)) ?? Directory.GetCurrentDirectory();
             Directory.CreateDirectory(dir);
             // CreateXiso expects rootDirectory + outputDirectory + inName; we want exact path
             // Use PackFromDirectory with outputIsoPath

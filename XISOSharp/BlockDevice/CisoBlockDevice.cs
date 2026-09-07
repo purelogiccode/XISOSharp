@@ -29,12 +29,12 @@ public sealed class CisoBlockDevice : IBlockDevice
     /// </remarks>
     public CisoBlockDevice(string csoPath)
     {
-        var fs = OpenCsoStream(csoPath);
+        Stream fs = OpenCsoStream(csoPath);
         try
         {
             // Field assignments stay inline: get-only/readonly members cannot be
             // assigned from a helper method.
-            var header = ReadHeader(fs);
+            (long UncompressedSize, uint BlockSize, byte Version, byte Align, int IndexEntryCount) header = ReadHeader(fs);
             _csoFs = fs;
             _leaveOpen = false;
             Length = header.UncompressedSize;
@@ -67,7 +67,7 @@ public sealed class CisoBlockDevice : IBlockDevice
         if (!csoFs.CanSeek) throw new ArgumentException("CISO stream must be seekable", nameof(csoFs));
         _leaveOpen = leaveOpen;
 
-        var header = ReadHeader(csoFs);
+        (long UncompressedSize, uint BlockSize, byte Version, byte Align, int IndexEntryCount) header = ReadHeader(csoFs);
         Length = header.UncompressedSize;
         _blockSize = header.BlockSize;
         _version = header.Version;
@@ -82,12 +82,12 @@ public sealed class CisoBlockDevice : IBlockDevice
         Span<byte> hdr = stackalloc byte[24];
         csoFs.Seek(0, SeekOrigin.Begin);
         ReadExact(csoFs, hdr);
-        var magic = BinaryPrimitives.ReadUInt32LittleEndian(hdr[..4]);
-        var hsize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
-        var claimedSize = BinaryPrimitives.ReadUInt64LittleEndian(hdr[8..16]);
-        var blockSize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[16..20]);
-        var version = hdr[20];
-        var align = hdr[21];
+        uint magic = BinaryPrimitives.ReadUInt32LittleEndian(hdr[..4]);
+        uint hsize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
+        ulong claimedSize = BinaryPrimitives.ReadUInt64LittleEndian(hdr[8..16]);
+        uint blockSize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[16..20]);
+        byte version = hdr[20];
+        byte align = hdr[21];
 
         if (magic != CisoWriter.Magic) throw new InvalidDataException("Not a CISO file (bad magic)");
         if (hsize != CisoWriter.HeaderSize) throw new InvalidDataException($"Unsupported CISO header size {hsize}");
@@ -99,14 +99,14 @@ public sealed class CisoBlockDevice : IBlockDevice
         // negative and the index math below goes negative with it.
         if (claimedSize > (ulong)long.MaxValue)
             throw new InvalidDataException($"CISO uncompressed size {claimedSize} exceeds supported range");
-        var length = (long)claimedSize;
+        long length = (long)claimedSize;
 
-        var totalBlocks = (length + blockSize - 1) / blockSize;
-        var indexLen = totalBlocks + 1;
+        long totalBlocks = (length + blockSize - 1) / blockSize;
+        long indexLen = totalBlocks + 1;
         // Array lengths are int: reject absurd claims before allocating.
         if (indexLen > int.MaxValue)
             throw new InvalidDataException($"CISO index too large ({indexLen} entries) for claimed size {length}");
-        var indexCount = (int)indexLen;
+        int indexCount = (int)indexLen;
         // The index table itself lives in this stream: 4 bytes per entry past the header.
         if ((long)indexCount * 4 > csoFs.Length - hdr.Length)
             throw new InvalidDataException("CISO index table exceeds stream length");
@@ -116,9 +116,9 @@ public sealed class CisoBlockDevice : IBlockDevice
 
     private static uint[] ReadIndex(Stream csoFs, int indexCount)
     {
-        var index = new uint[indexCount];
+        uint[] index = new uint[indexCount];
         Span<byte> leBuf = stackalloc byte[4];
-        for (var i = 0; i < indexCount; i++)
+        for (int i = 0; i < indexCount; i++)
         {
             ReadExact(csoFs, leBuf);
             index[i] = BinaryPrimitives.ReadUInt32LittleEndian(leBuf);
@@ -132,7 +132,7 @@ public sealed class CisoBlockDevice : IBlockDevice
     {
         if (CisoSplitFile.IsSplitPath(path))
         {
-            var parts = CisoSplitFile.OpenParts(path);
+            List<FileStream> parts = CisoSplitFile.OpenParts(path);
             if (parts.Count == 0) throw new FileNotFoundException($"CSO not found: {path}");
             return parts.Count == 1 ? parts[0] : new CisoSplitInputStream(parts);
         }
@@ -148,16 +148,16 @@ public sealed class CisoBlockDevice : IBlockDevice
     {
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
         if (offset >= Length) return 0;
-        var toRead = Math.Min(buffer.Length, Length - offset);
-        var sector = offset / _blockSize;
-        var sectorOff = offset % _blockSize;
-        var bufPos = 0;
-        var remaining = (int)toRead;
+        long toRead = Math.Min(buffer.Length, Length - offset);
+        long sector = offset / _blockSize;
+        long sectorOff = offset % _blockSize;
+        int bufPos = 0;
+        int remaining = (int)toRead;
 
         while (remaining > 0)
         {
-            var sectorData = GetSector(sector);
-            var copy = (int)Math.Min(remaining, _blockSize - sectorOff);
+            byte[] sectorData = GetSector(sector);
+            int copy = (int)Math.Min(remaining, _blockSize - sectorOff);
             sectorData.AsSpan((int)sectorOff, copy).CopyTo(buffer.Slice(bufPos, copy));
             bufPos += copy;
             remaining -= copy;
@@ -183,25 +183,25 @@ public sealed class CisoBlockDevice : IBlockDevice
     {
         if (_cachedSector == sector && _cachedData != null) return _cachedData;
 
-        var rawEntry = _index[sector];
-        var rawNext = _index[sector + 1];
-        var isPlain = _version == CisoWriter.VersionDeflate
+        uint rawEntry = _index[sector];
+        uint rawNext = _index[sector + 1];
+        bool isPlain = _version == CisoWriter.VersionDeflate
             ? (rawEntry & 0x80000000u) != 0
             : (rawEntry & 0x80000000u) == 0;
 
-        var off = (rawEntry & 0x7FFFFFFFu) * (ulong)(1u << _align);
-        var nextOff = (rawNext & 0x7FFFFFFFu) * (ulong)(1u << _align);
-        var dataLen = (long)(nextOff - off);
+        ulong off = (rawEntry & 0x7FFFFFFFu) * (ulong)(1u << _align);
+        ulong nextOff = (rawNext & 0x7FFFFFFFu) * (ulong)(1u << _align);
+        long dataLen = (long)(nextOff - off);
 
         byte[] data;
         if (isPlain)
         {
             data = new byte[_blockSize];
             _csoFs.Seek((long)off, SeekOrigin.Begin);
-            var n = 0;
+            int n = 0;
             while (n < _blockSize)
             {
-                var r = _csoFs.Read(data, n, (int)_blockSize - n);
+                int r = _csoFs.Read(data, n, (int)_blockSize - n);
                 if (r == 0) throw new EndOfStreamException($"Unexpected EOF at plain sector {sector}");
                 n += r;
             }
@@ -212,16 +212,16 @@ public sealed class CisoBlockDevice : IBlockDevice
 
             // The last sector's index gap can round down (final entry stores position >> align);
             // extend the read to recover the true payload.
-            var readLen = dataLen;
+            long readLen = dataLen;
             if (sector == _index.Length - 2)
                 readLen = Math.Min(dataLen + (1L << _align) - 1, _csoFs.Length - (long)off);
 
-            var compBuf = new byte[readLen];
+            byte[] compBuf = new byte[readLen];
             _csoFs.Seek((long)off, SeekOrigin.Begin);
-            var n = 0;
+            int n = 0;
             while (n < readLen)
             {
-                var r = _csoFs.Read(compBuf, n, (int)(readLen - n));
+                int r = _csoFs.Read(compBuf, n, (int)(readLen - n));
                 if (r == 0) break;
                 n += r;
             }
@@ -239,10 +239,10 @@ public sealed class CisoBlockDevice : IBlockDevice
 
     private static void ReadExact(Stream fs, Span<byte> buf)
     {
-        var off = 0;
+        int off = 0;
         while (off < buf.Length)
         {
-            var n = fs.Read(buf[off..]);
+            int n = fs.Read(buf[off..]);
             if (n == 0) throw new EndOfStreamException();
             off += n;
         }

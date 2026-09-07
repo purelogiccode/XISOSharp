@@ -16,7 +16,7 @@ public class ExtractErrorExceptionTests
     [Fact]
     public void Constructor_StoresErrorCode()
     {
-        var ex = new ExtractErrorException(ExtractError.ErrIsoNoFiles);
+        ExtractErrorException ex = new(ExtractError.ErrIsoNoFiles);
         Assert.Equal(ExtractError.ErrIsoNoFiles, ex.ErrorCode);
     }
 
@@ -27,7 +27,7 @@ public class ExtractErrorExceptionTests
     [Fact]
     public void Constructor_StoresErrorCode_ErrEndOfSector()
     {
-        var ex = new ExtractErrorException(ExtractError.ErrEndOfSector);
+        ExtractErrorException ex = new(ExtractError.ErrEndOfSector);
         Assert.Equal(ExtractError.ErrEndOfSector, ex.ErrorCode);
     }
 
@@ -38,7 +38,7 @@ public class ExtractErrorExceptionTests
     [Fact]
     public void Constructor_StoresErrorCode_ErrIsoRewritten()
     {
-        var ex = new ExtractErrorException(ExtractError.ErrIsoRewritten);
+        ExtractErrorException ex = new(ExtractError.ErrIsoRewritten);
         Assert.Equal(ExtractError.ErrIsoRewritten, ex.ErrorCode);
     }
 
@@ -48,7 +48,7 @@ public class ExtractErrorExceptionTests
     [Fact]
     public void Exception_IsException()
     {
-        var ex = new ExtractErrorException(ExtractError.ErrIsoNoFiles);
+        ExtractErrorException ex = new(ExtractError.ErrIsoNoFiles);
         Assert.IsType<Exception>(ex, exactMatch: false);
     }
 
@@ -59,7 +59,7 @@ public class ExtractErrorExceptionTests
     [Fact]
     public void Exception_HasMessage()
     {
-        var ex = new ExtractErrorException(ExtractError.ErrIsoNoFiles);
+        ExtractErrorException ex = new(ExtractError.ErrIsoNoFiles);
         Assert.NotNull(ex.Message);
     }
 }

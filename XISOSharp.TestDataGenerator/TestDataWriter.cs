@@ -53,10 +53,10 @@ public static class TestDataWriter
 
     private static IReadOnlyList<string> EnsureTestDataCore(string testDataRoot, bool force)
     {
-        var actions = new List<string>();
+        List<string> actions = new();
 
-        var sourceDir = Path.Combine(testDataRoot, "source");
-        var outputDir = Path.Combine(testDataRoot, "output");
+        string sourceDir = Path.Combine(testDataRoot, "source");
+        string outputDir = Path.Combine(testDataRoot, "output");
         Directory.CreateDirectory(sourceDir);
         Directory.CreateDirectory(Path.Combine(sourceDir, "subdir", "nested"));
         Directory.CreateDirectory(outputDir);
@@ -80,7 +80,7 @@ public static class TestDataWriter
             static data =>
             {
                 "XBEH"u8.CopyTo(data);
-                for (var i = 4; i < data.Length; i++) data[i] = (byte)(i & 0xFF);
+                for (int i = 4; i < data.Length; i++) data[i] = (byte)(i & 0xFF);
             },
             Constants.SectorSize,
             force);
@@ -88,26 +88,26 @@ public static class TestDataWriter
         // The ISO is a derived artifact: always rebuild so it matches the current writer.
         // Sources above were canonicalized, so the rebuild is deterministic.
         {
-            var isoPath = Path.Combine(outputDir, IsoFileName);
+            string isoPath = Path.Combine(outputDir, IsoFileName);
             if (File.Exists(isoPath))
             {
                 File.Delete(isoPath);
             }
 
-            var wasQuiet = Logger.Quiet;
-            var wasRealQuiet = Logger.RealQuiet;
+            bool wasQuiet = Logger.Quiet;
+            bool wasRealQuiet = Logger.RealQuiet;
             Logger.Quiet = true;
             Logger.RealQuiet = true;
             try
             {
-                var rc = XisoWriter.CreateXiso(sourceDir, outputDir, null, null, out var createdIsoPath, null, null,
+                int rc = XisoWriter.CreateXiso(sourceDir, outputDir, null, null, out string? createdIsoPath, null, null,
                     fileTime: 0UL);
                 if (rc != 0)
                 {
                     throw new InvalidOperationException($"TestData fixture: CreateXiso failed with code {rc}");
                 }
 
-                var produced = createdIsoPath ?? isoPath;
+                string produced = createdIsoPath ?? isoPath;
                 if (!string.Equals(produced, isoPath, StringComparison.OrdinalIgnoreCase) && File.Exists(produced))
                 {
                     // Tolerate writer naming drift: adopt whatever was produced.
@@ -165,7 +165,7 @@ public static class TestDataWriter
 
     private static void WriteBinary(List<string> actions, string path, Action<byte[]> fill, int length, bool force)
     {
-        var data = new byte[length];
+        byte[] data = new byte[length];
         fill(data);
         if (!force && File.Exists(path))
         {

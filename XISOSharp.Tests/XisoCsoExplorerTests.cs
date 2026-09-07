@@ -15,7 +15,7 @@ public sealed class XisoCsoExplorerTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (string dir in _tempDirs)
         {
             try
             {
@@ -30,7 +30,7 @@ public sealed class XisoCsoExplorerTests : IDisposable
 
     private string CreateTempDir(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
+        string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
         return dir;
@@ -38,13 +38,13 @@ public sealed class XisoCsoExplorerTests : IDisposable
 
     private string CreateIso()
     {
-        var src = CreateTempDir("xiso_cso_src");
+        string src = CreateTempDir("xiso_cso_src");
         File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
         File.WriteAllText(Path.Combine(src, "b.txt"), new string('x', 3000));
         Directory.CreateDirectory(Path.Combine(src, "sub"));
         File.WriteAllText(Path.Combine(src, "sub", "c.txt"), "nested");
-        var outDir = CreateTempDir("xiso_cso_iso");
-        var result = XisoWriter.CreateXiso(src, outDir, null, null, out var isoPath, null, null);
+        string outDir = CreateTempDir("xiso_cso_iso");
+        int result = XisoWriter.CreateXiso(src, outDir, null, null, out string? isoPath, null, null);
         Assert.Equal(0, result);
         Assert.NotNull(isoPath);
         return isoPath;
@@ -52,8 +52,8 @@ public sealed class XisoCsoExplorerTests : IDisposable
 
     private static string Compress(string iso, string csoName, long? splitBytes = null)
     {
-        var cso = Path.Combine(Path.GetDirectoryName(iso)!, csoName);
-        var rc = CisoWriter.CompressToCso(iso, cso, level: 0, splitBytes: splitBytes);
+        string cso = Path.Combine(Path.GetDirectoryName(iso)!, csoName);
+        int rc = CisoWriter.CompressToCso(iso, cso, level: 0, splitBytes: splitBytes);
         Assert.Equal(0, rc);
         return cso;
     }
@@ -61,14 +61,14 @@ public sealed class XisoCsoExplorerTests : IDisposable
     [Fact]
     public void Open_SingleCso_VolumeValidAndRootLists()
     {
-        var iso = CreateIso();
-        var cso = Compress(iso, "game.cso");
+        string iso = CreateIso();
+        string cso = Compress(iso, "game.cso");
 
-        var explorer = new XisoExplorer(cso);
+        XisoExplorer explorer = new(cso);
 
         Assert.True(explorer.Volume.IsValid);
         Assert.Equal(cso, explorer.IsoPath);
-        var names = explorer.ListChildren("/").Select(n => n.Name + (n.IsDirectory ? "/" : "")).ToArray();
+        string[] names = explorer.ListChildren("/").Select(n => n.Name + (n.IsDirectory ? "/" : "")).ToArray();
         Assert.Equal(new XisoExplorer(iso).ListChildren("/").Select(n => n.Name + (n.IsDirectory ? "/" : "")).ToArray(),
             names);
     }
@@ -76,11 +76,11 @@ public sealed class XisoCsoExplorerTests : IDisposable
     [Fact]
     public void Navigate_Subdirectory_MetadataMatchesIso()
     {
-        var iso = CreateIso();
-        var cso = Compress(iso, "game.cso");
+        string iso = CreateIso();
+        string cso = Compress(iso, "game.cso");
 
-        var fromCso = new XisoExplorer(cso);
-        var fromIso = new XisoExplorer(iso);
+        XisoExplorer fromCso = new(cso);
+        XisoExplorer fromIso = new(iso);
 
         Assert.Equal(fromIso.ListChildren("/sub"), fromCso.ListChildren("/sub"));
         Assert.Equal(fromIso.GetNode("/sub/c.txt"), fromCso.GetNode("/sub/c.txt"));
@@ -90,11 +90,11 @@ public sealed class XisoCsoExplorerTests : IDisposable
     [Fact]
     public void Hash_File_MatchesIsoDigest()
     {
-        var iso = CreateIso();
-        var cso = Compress(iso, "game.cso");
+        string iso = CreateIso();
+        string cso = Compress(iso, "game.cso");
 
-        var fromCso = new XisoExplorer(cso);
-        var fromIso = new XisoExplorer(iso);
+        XisoExplorer fromCso = new(cso);
+        XisoExplorer fromIso = new(iso);
 
         Assert.Equal(fromIso.ComputeHashHex("/b.txt", HashAlgorithmName.SHA256),
             fromCso.ComputeHashHex("/b.txt", HashAlgorithmName.SHA256));
@@ -106,21 +106,21 @@ public sealed class XisoCsoExplorerTests : IDisposable
     [Fact]
     public void CopyOut_FileAndDirectory_MatchIsoBytes()
     {
-        var iso = CreateIso();
-        var cso = Compress(iso, "game.cso");
-        var work = CreateTempDir("xiso_cso_out");
+        string iso = CreateIso();
+        string cso = Compress(iso, "game.cso");
+        string work = CreateTempDir("xiso_cso_out");
 
-        var fromCso = new XisoExplorer(cso);
-        var fromIso = new XisoExplorer(iso);
+        XisoExplorer fromCso = new(cso);
+        XisoExplorer fromIso = new(iso);
 
-        var csoFile = Path.Combine(work, "cso", "c.txt");
-        var isoFile = Path.Combine(work, "iso", "c.txt");
+        string csoFile = Path.Combine(work, "cso", "c.txt");
+        string isoFile = Path.Combine(work, "iso", "c.txt");
         fromCso.CopyOut("/sub/c.txt", csoFile);
         fromIso.CopyOut("/sub/c.txt", isoFile);
         Assert.Equal(File.ReadAllBytes(isoFile), File.ReadAllBytes(csoFile));
 
-        var csoDir = Path.Combine(work, "cso", "sub");
-        var isoDir = Path.Combine(work, "iso", "sub");
+        string csoDir = Path.Combine(work, "cso", "sub");
+        string isoDir = Path.Combine(work, "iso", "sub");
         fromCso.CopyOut("/sub", csoDir);
         fromIso.CopyOut("/sub", isoDir);
         Assert.Equal(File.ReadAllBytes(Path.Combine(isoDir, "c.txt")),
@@ -130,14 +130,14 @@ public sealed class XisoCsoExplorerTests : IDisposable
     [Fact]
     public void Open_SplitCso_FirstPartExplores()
     {
-        var iso = CreateIso();
+        string iso = CreateIso();
         // Force several parts: the fixture ISO is ~590 KB, so a 200 KiB split point parts it.
-        var csoBase = Compress(iso, "game.cso", splitBytes: 200L * 1024);
-        var first = Path.ChangeExtension(csoBase, ".1.cso");
+        string csoBase = Compress(iso, "game.cso", splitBytes: 200L * 1024);
+        string first = Path.ChangeExtension(csoBase, ".1.cso");
         Assert.True(File.Exists(first));
         Assert.True(File.Exists(Path.ChangeExtension(csoBase, ".2.cso")));
 
-        var explorer = new XisoExplorer(first);
+        XisoExplorer explorer = new(first);
 
         Assert.True(explorer.Volume.IsValid);
         Assert.Equal(new XisoExplorer(iso).ListChildren("/"), explorer.ListChildren("/"));
@@ -148,8 +148,8 @@ public sealed class XisoCsoExplorerTests : IDisposable
     [Fact]
     public void Open_GarbageCso_ThrowsXisoFormat()
     {
-        var work = CreateTempDir("xiso_cso_bad");
-        var bad = Path.Combine(work, "bad.cso");
+        string work = CreateTempDir("xiso_cso_bad");
+        string bad = Path.Combine(work, "bad.cso");
         File.WriteAllBytes(bad, new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 });
 
         Assert.Throws<XisoFormatException>(() => new XisoExplorer(bad));
@@ -158,7 +158,7 @@ public sealed class XisoCsoExplorerTests : IDisposable
     [Fact]
     public void Open_MissingFile_ThrowsFileNotFound()
     {
-        var missing = Path.Combine(CreateTempDir("xiso_cso_miss"), "nope.cso");
+        string missing = Path.Combine(CreateTempDir("xiso_cso_miss"), "nope.cso");
 
         Assert.Throws<FileNotFoundException>(() => new XisoExplorer(missing));
     }

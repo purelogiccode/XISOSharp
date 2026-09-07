@@ -36,8 +36,8 @@ public static class XisoSalvager
     public static string DefaultOutputPath(string sourcePath)
     {
         ArgumentException.ThrowIfNullOrEmpty(sourcePath);
-        var dir = Path.GetDirectoryName(Path.GetFullPath(sourcePath));
-        var stem = Path.GetFileNameWithoutExtension(sourcePath);
+        string? dir = Path.GetDirectoryName(Path.GetFullPath(sourcePath));
+        string stem = Path.GetFileNameWithoutExtension(sourcePath);
         return Path.Combine(dir!, stem + ".salvaged.iso");
     }
 
@@ -71,20 +71,20 @@ public static class XisoSalvager
             throw new FileNotFoundException($"Input file not found: {sourcePath}");
 
         outputPath ??= DefaultOutputPath(sourcePath);
-        var outputDir = Path.GetDirectoryName(Path.GetFullPath(outputPath));
+        string? outputDir = Path.GetDirectoryName(Path.GetFullPath(outputPath));
         if (!string.IsNullOrEmpty(outputDir))
             Directory.CreateDirectory(outputDir);
 
-        using var image = XisoReader.OpenImageStream(sourcePath);
-        var volInfo = XisoReader.GetVolumeInfo(image, sourcePath);
+        using Stream image = XisoReader.OpenImageStream(sourcePath);
+        VolumeInfo volInfo = XisoReader.GetVolumeInfo(image, sourcePath);
         if (!volInfo.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {sourcePath}");
 
-        var staging = Directory.CreateDirectory(
+        string staging = Directory.CreateDirectory(
             Path.Combine(Path.GetTempPath(), "xiso_salvage_" + Guid.NewGuid().ToString("N"))).FullName;
         try
         {
-            var state = new SalvageState();
+            SalvageState state = new();
             if (volInfo is { RootDirSector: 0, RootDirSize: 0 })
             {
                 // Empty volume: the audit passes by definition; repack the
@@ -92,8 +92,8 @@ public static class XisoSalvager
             }
             else
             {
-                var fileLength = image.Length;
-                var rootDirStart = ((long)volInfo.RootDirSector * Constants.SectorSize) + volInfo.DiscLseek;
+                long fileLength = image.Length;
+                long rootDirStart = ((long)volInfo.RootDirSector * Constants.SectorSize) + volInfo.DiscLseek;
                 if (rootDirStart < 0 || rootDirStart >= fileLength)
                 {
                     throw new XisoFormatException(
@@ -104,12 +104,12 @@ public static class XisoSalvager
                     new HashSet<long>(), state);
             }
 
-            var isoName = Path.GetFileName(outputPath);
-            var rc = XisoWriter.CreateXiso(staging, outputDir, null, null, out _, isoName, null);
+            string isoName = Path.GetFileName(outputPath);
+            int rc = XisoWriter.CreateXiso(staging, outputDir, null, null, out _, isoName, null);
             if (rc != 0)
                 throw new IOException($"Repacking salvaged files into '{outputPath}' failed.");
 
-            var reaudit = XisoReader.AuditXiso(outputPath);
+            AuditResult reaudit = XisoReader.AuditXiso(outputPath);
             return new SalvageResult(state.Copied, state.Skipped, outputPath, reaudit.Issues);
         }
         finally
@@ -165,7 +165,7 @@ public static class XisoSalvager
             return;
         }
 
-        var entriesInTable = 0;
+        int entriesInTable = 0;
         Span<byte> shortBuf = stackalloc byte[2];
         Span<byte> intBuf = stackalloc byte[4];
         Span<byte> byteBuf = stackalloc byte[1];
@@ -213,13 +213,13 @@ public static class XisoSalvager
 
             if (lOffset == Constants.EmptyDirectorySentinel && dirStart == tableStart)
             {
-                var peekPos = image.Position;
-                var isAllZeros = false;
+                long peekPos = image.Position;
+                bool isAllZeros = false;
                 try
                 {
                     ReadExact(image, headerRest);
                     isAllZeros = true;
-                    foreach (var b in headerRest)
+                    foreach (byte b in headerRest)
                     {
                         if (b != 0)
                         {
@@ -240,7 +240,7 @@ public static class XisoSalvager
 
             if (lOffset != 0 && lOffset != Constants.PadShort)
             {
-                var leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
+                long leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
                 if (leftSeek < 0 || leftSeek >= fileLength)
                 {
                     state.Skipped.Add(
@@ -274,9 +274,9 @@ public static class XisoSalvager
                 rawAttributes = byteBuf[0];
 
                 ReadExact(image, byteBuf);
-                var filenameLength = byteBuf[0];
+                byte filenameLength = byteBuf[0];
 
-                var nameBuf = new byte[filenameLength];
+                byte[] nameBuf = new byte[filenameLength];
                 ReadExact(image, nameBuf);
                 filename = Latin1Encoding.Instance.GetString(nameBuf);
             }
@@ -291,7 +291,7 @@ public static class XisoSalvager
 
             if (rOffset != 0 && rOffset != Constants.PadShort)
             {
-                var rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
+                long rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
                 if (rightSeek < 0 || rightSeek >= fileLength)
                 {
                     state.Skipped.Add(
@@ -320,15 +320,15 @@ public static class XisoSalvager
         SalvageState state,
         int depth)
     {
-        var stagedName = filename.Replace('/', '_').Replace('\\', '_');
+        string stagedName = filename.Replace('/', '_').Replace('\\', '_');
         if (stagedName.Length == 0 || stagedName is "." or "..")
         {
             state.Skipped.Add($"'{path}{filename}': name is not usable on the host filesystem (dropped).");
             return;
         }
 
-        var attributes = Constants.MaskAttributes(rawAttributes);
-        var isDir = (attributes & Constants.AttributeDir) != 0;
+        byte attributes = Constants.MaskAttributes(rawAttributes);
+        bool isDir = (attributes & Constants.AttributeDir) != 0;
 
         if (isDir && depth + 1 > Constants.MaxTocDepth)
         {
@@ -341,13 +341,13 @@ public static class XisoSalvager
             return;
         }
 
-        if (!state.StagedNames.TryGetValue(stagingDir, out var siblings))
+        if (!state.StagedNames.TryGetValue(stagingDir, out HashSet<string>? siblings))
         {
             siblings = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             state.StagedNames[stagingDir] = siblings;
         }
 
-        if (!state.StagedRawNames.TryGetValue(stagingDir, out var rawSiblings))
+        if (!state.StagedRawNames.TryGetValue(stagingDir, out HashSet<string>? rawSiblings))
         {
             rawSiblings = new HashSet<string>(StringComparer.Ordinal);
             state.StagedRawNames[stagingDir] = rawSiblings;
@@ -359,10 +359,10 @@ public static class XisoSalvager
             // order decides who stages first), so a sanitized rival counts as
             // a separator collision too — only byte-identical rivals are
             // plain duplicates.
-            var sibSanitized = rawSiblings.Any(r =>
+            bool sibSanitized = rawSiblings.Any(r =>
                 !string.Equals(r, filename, StringComparison.Ordinal) &&
                 r.Replace('/', '_').Replace('\\', '_').Equals(stagedName, StringComparison.OrdinalIgnoreCase));
-            var why = filename.Contains('/') || filename.Contains('\\') || sibSanitized
+            string why = filename.Contains('/') || filename.Contains('\\') || sibSanitized
                 ? "separator-collision"
                 : "duplicate";
             state.Skipped.Add($"'{path}{filename}': {why} name '{stagedName}' already staged (dropped).");
@@ -370,7 +370,7 @@ public static class XisoSalvager
         }
 
         rawSiblings.Add(filename);
-        var stagedPath = Path.Combine(stagingDir, stagedName);
+        string stagedPath = Path.Combine(stagingDir, stagedName);
 
         if (isDir)
         {
@@ -387,7 +387,7 @@ public static class XisoSalvager
             }
 
             state.Copied.Add($"{path}{stagedName}/");
-            var sectorOffset = ((long)startSector * Constants.SectorSize) + discLseek;
+            long sectorOffset = ((long)startSector * Constants.SectorSize) + discLseek;
             if (fileSize > 0)
             {
                 if (sectorOffset < 0 || sectorOffset >= fileLength)
@@ -404,7 +404,7 @@ public static class XisoSalvager
             return;
         }
 
-        var dataOffset = ((long)startSector * Constants.SectorSize) + discLseek;
+        long dataOffset = ((long)startSector * Constants.SectorSize) + discLseek;
         if (dataOffset < 0 || dataOffset >= fileLength)
         {
             siblings.Remove(stagedName);
@@ -427,13 +427,13 @@ public static class XisoSalvager
         try
         {
             image.Seek(dataOffset, SeekOrigin.Begin);
-            using var outFile = new FileStream(stagedPath, FileMode.Create, FileAccess.Write, FileShare.None,
+            using FileStream outFile = new(stagedPath, FileMode.Create, FileAccess.Write, FileShare.None,
                 CopyBufferSize);
-            var remaining = (long)fileSize;
-            var buffer = new byte[CopyBufferSize];
+            long remaining = (long)fileSize;
+            byte[] buffer = new byte[CopyBufferSize];
             while (remaining > 0)
             {
-                var want = (int)Math.Min(buffer.Length, remaining);
+                int want = (int)Math.Min(buffer.Length, remaining);
                 ReadExact(image, buffer.AsSpan(0, want));
                 outFile.Write(buffer, 0, want);
                 remaining -= want;
@@ -462,10 +462,10 @@ public static class XisoSalvager
 
     private static void ReadExact(Stream stream, Span<byte> buffer)
     {
-        var offset = 0;
+        int offset = 0;
         while (offset < buffer.Length)
         {
-            var read = stream.Read(buffer[offset..]);
+            int read = stream.Read(buffer[offset..]);
             if (read <= 0)
                 throw new IOException($"Read error: expected {buffer.Length} bytes, got {offset}");
 

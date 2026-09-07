@@ -82,14 +82,14 @@ public static class XisoSplitter
     {
         if (string.IsNullOrEmpty(outputBase))
             throw new ArgumentException("Output base path must not be empty.", nameof(outputBase));
-        var length = ValidateImage(isoPath);
+        long length = ValidateImage(isoPath);
         if (partSizeBytes < Constants.SectorSize)
         {
             throw new ArgumentOutOfRangeException(nameof(partSizeBytes),
                 $"Part size must be at least one sector ({Constants.SectorSize} bytes).");
         }
 
-        var aligned = (partSizeBytes / Constants.SectorSize) * Constants.SectorSize;
+        long aligned = (partSizeBytes / Constants.SectorSize) * Constants.SectorSize;
         return SplitCore(isoPath, outputBase, aligned, length, cancellationToken, progress);
     }
 
@@ -117,8 +117,8 @@ public static class XisoSplitter
     {
         if (string.IsNullOrEmpty(outputBase))
             throw new ArgumentException("Output base path must not be empty.", nameof(outputBase));
-        var length = ValidateImage(isoPath);
-        var cut = (((length + 1) / 2) + Constants.SectorSize - 1) / Constants.SectorSize * Constants.SectorSize;
+        long length = ValidateImage(isoPath);
+        long cut = (((length + 1) / 2) + Constants.SectorSize - 1) / Constants.SectorSize * Constants.SectorSize;
         if (cut <= 0 || cut >= length)
             cut = length;
         return SplitCore(isoPath, outputBase, cut, length, cancellationToken, progress);
@@ -163,18 +163,18 @@ public static class XisoSplitter
         if (!File.Exists(firstPartPath))
             throw new FileNotFoundException($"Split part not found: {firstPartPath}", firstPartPath);
 
-        var baseName = firstPartPath[..^PartSuffixLength];
-        var parts = new List<string> { firstPartPath };
-        for (var i = 1;; i++)
+        string baseName = firstPartPath[..^PartSuffixLength];
+        List<string> parts = new() { firstPartPath };
+        for (int i = 1;; i++)
         {
-            var next = PartPath(baseName, i);
+            string next = PartPath(baseName, i);
             if (!File.Exists(next))
                 break;
             parts.Add(next);
         }
 
-        var outputFull = Path.GetFullPath(outputPath);
-        foreach (var part in parts)
+        string outputFull = Path.GetFullPath(outputPath);
+        foreach (string part in parts)
         {
             if (string.Equals(Path.GetFullPath(part), outputFull, XisoPaths.PathComparison))
             {
@@ -187,22 +187,22 @@ public static class XisoSplitter
             throw new IOException($"Output already exists: {outputPath}");
 
         cancellationToken.ThrowIfCancellationRequested();
-        var total = parts.Sum(p => new FileInfo(p).Length);
-        var created = false;
+        long total = parts.Sum(p => new FileInfo(p).Length);
+        bool created = false;
         try
         {
-            using (var output = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write,
+            using (FileStream output = new(outputPath, FileMode.CreateNew, FileAccess.Write,
                        FileShare.None, 65536))
             {
                 created = true;
                 long copied = 0;
-                foreach (var part in parts)
+                foreach (string part in parts)
                 {
-                    using var input = new FileStream(part, FileMode.Open, FileAccess.Read,
+                    using FileStream input = new(part, FileMode.Open, FileAccess.Read,
                         FileShare.Read, 65536);
-                    var bytesToCopy = input.Length;
-                    var baseCopied = copied;
-                    var justCopied = XisoFileCopier.CopyExact(input, bytesToCopy,
+                    long bytesToCopy = input.Length;
+                    long baseCopied = copied;
+                    long justCopied = XisoFileCopier.CopyExact(input, bytesToCopy,
                         // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
                         (buf, count) => output.Write(buf, 0, count),
                         buffer: null,
@@ -213,7 +213,7 @@ public static class XisoSplitter
                 }
             }
 
-            var volume = XisoReader.GetVolumeInfo(outputPath);
+            VolumeInfo volume = XisoReader.GetVolumeInfo(outputPath);
             if (!volume.IsValid)
             {
                 throw new XisoFormatException(
@@ -254,7 +254,7 @@ public static class XisoSplitter
             throw new ArgumentException("Image path must not be empty.", nameof(isoPath));
         if (!File.Exists(isoPath))
             throw new FileNotFoundException($"Image not found: {isoPath}", isoPath);
-        var volume = XisoReader.GetVolumeInfo(isoPath);
+        VolumeInfo volume = XisoReader.GetVolumeInfo(isoPath);
         if (!volume.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");
         return new FileInfo(isoPath).Length;
@@ -274,37 +274,37 @@ public static class XisoSplitter
         // (ValidateImage rejects non-images, including empty files). A part
         // count past int range (tiny part size, huge image) is rejected with a
         // named IOException instead of wrapping negative into List<> (BUG-LIB-029).
-        var partCountLong = ((length - 1) / alignedPartSize) + 1;
+        long partCountLong = ((length - 1) / alignedPartSize) + 1;
         if (partCountLong > int.MaxValue)
         {
             throw new IOException(
                 $"Split would produce {partCountLong:N0} parts: part size {alignedPartSize:N0} bytes is too small for a {length:N0}-byte image.");
         }
 
-        var partCount = (int)partCountLong;
-        var parts = new List<string>(partCount);
-        for (var i = 0; i < partCount; i++)
+        int partCount = (int)partCountLong;
+        List<string> parts = new(partCount);
+        for (int i = 0; i < partCount; i++)
         {
-            var part = PartPath(outputBase, i);
+            string part = PartPath(outputBase, i);
             if (File.Exists(part))
                 throw new IOException($"Split part already exists: {part}");
             parts.Add(part);
         }
 
-        var created = new List<string>(partCount);
+        List<string> created = new(partCount);
         try
         {
-            using var input = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+            using FileStream input = new(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
             long copied = 0;
-            for (var i = 0; i < parts.Count; i++)
+            for (int i = 0; i < parts.Count; i++)
             {
-                var partPath = parts[i];
-                using var output = new FileStream(partPath, FileMode.CreateNew, FileAccess.Write,
+                string partPath = parts[i];
+                using FileStream output = new(partPath, FileMode.CreateNew, FileAccess.Write,
                     FileShare.None, 65536);
                 created.Add(partPath);
-                var remaining = Math.Min(alignedPartSize, length - input.Position);
-                var baseCopied = copied;
-                var justCopied = XisoFileCopier.CopyExact(input, remaining,
+                long remaining = Math.Min(alignedPartSize, length - input.Position);
+                long baseCopied = copied;
+                long justCopied = XisoFileCopier.CopyExact(input, remaining,
                     // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
                     (buf, count) => output.Write(buf, 0, count),
                     buffer: null,
@@ -318,7 +318,7 @@ public static class XisoSplitter
         }
         catch
         {
-            foreach (var part in created)
+            foreach (string part in created)
             {
                 try
                 {

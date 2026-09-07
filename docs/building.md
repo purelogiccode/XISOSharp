@@ -40,7 +40,7 @@ The solution contains:
 | Project | Target(s) | Output |
 |---|---|---|
 | `XISOSharp` | net8.0, net9.0, net10.0 | `XISOSharp.dll` + NuGet package |
-| `XISOSharp.Cli` | net8.0, net9.0, net10.0 (ships: net10.0) | `XISOSharp.Cli` executable |
+| `XISOSharp.Cli` | net8.0, net9.0, net10.0 (ships: net10.0) | `XISOSharp` executable |
 | `XISOSharp.Gui` | net10.0 | Avalonia GUI (shippable, shells out to the CLI) |
 | `XISOSharp.Tests` | net8.0, net9.0, net10.0 | xUnit test assembly (engine + CLI) |
 | `ZARSharp` / `ZARSharp.Tests` / `ZARSharp.Benchmarks` | — | **Moved** to the sibling `../CSharp_ZARSharp` repo (own solution); referenced here via a relative `ProjectReference` |
@@ -106,7 +106,8 @@ Supported runtime identifiers (single source of truth: `XISOSharp.Cli.csproj` /
 `win-x64; win-arm64; linux-x64; linux-arm64; osx-x64; osx-arm64`.
 
 Output lands in `XISOSharp.Cli/bin/Release/net10.0/<rid>/publish/` as a single
-`XISOSharp.Cli` (or `XISOSharp.Cli.exe`) binary.
+`XISOSharp` (or `XISOSharp.exe`) binary (renamed from the `XISOSharp.Cli`
+assembly name by the csproj `RenamePublishedExeToXisoSharp` target).
 
 ## NuGet packaging
 
