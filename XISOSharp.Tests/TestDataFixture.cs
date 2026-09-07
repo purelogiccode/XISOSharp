@@ -6,7 +6,8 @@ namespace XISOSharp.Tests;
 /// <summary>
 /// Restores the TestData fixture when the test assembly loads, so a fresh clone
 /// (or a deleted TestData folder) never breaks the suite. The generation logic
-/// lives in <see cref="TestDataWriter"/> (shared with the XISOSharp.TestDataGenerator tool).
+/// lives in <see cref="TestDataWriter"/> (XISOSharp.TestDataGenerator project,
+/// referenced — not linked — by this test project).
 /// </summary>
 internal static class TestDataFixture
 {

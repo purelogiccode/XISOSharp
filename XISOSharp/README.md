@@ -712,8 +712,8 @@ public class BoyerMoore
 |--------|-------------|
 | Constructor | Initializes a new pattern matcher with the given pattern and alphabet size. |
 | `Init()` | Builds the bad-character and good-suffix shift tables. Must be called before `Search`. |
-| `Search(byte[], int, int)` | Searches for the pattern within a subrange of the text buffer. Returns the index of the first match, or `-1`. |
-| `Search(byte[])` | Searches the entire text buffer starting at offset 0. |
+| `Search(byte[], int, int)` | Searches for the pattern within a subrange of the text buffer. Returns the index of the first match, or `-1`. Throws `InvalidOperationException` if `Init` was not called (or after `Done`). |
+| `Search(byte[])` | Searches the entire text buffer starting at offset 0. Same `InvalidOperationException` contract. |
 | `Done()` | Releases the shift tables. Re-initialize before searching again. |
 
 ---

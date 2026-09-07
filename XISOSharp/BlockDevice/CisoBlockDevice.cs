@@ -23,8 +23,31 @@ public sealed class CisoBlockDevice : IBlockDevice
     private byte[]? _cachedData;
 
     /// <summary>Opens a CISO file (single or split <c>*.1.cso</c> parts) as a block device.</summary>
-    public CisoBlockDevice(string csoPath) : this(OpenCsoStream(csoPath), leaveOpen: false)
+    /// <remarks>
+    /// The file handle opened here is owned by this device: if header validation
+    /// throws, it is disposed before the exception propagates (no handle leak).
+    /// </remarks>
+    public CisoBlockDevice(string csoPath)
     {
+        var fs = OpenCsoStream(csoPath);
+        try
+        {
+            // Field assignments stay inline: get-only/readonly members cannot be
+            // assigned from a helper method.
+            var header = ReadHeader(fs);
+            _csoFs = fs;
+            _leaveOpen = false;
+            Length = header.UncompressedSize;
+            _blockSize = header.BlockSize;
+            _version = header.Version;
+            _align = header.Align;
+            _index = ReadIndex(fs, header.IndexEntryCount);
+        }
+        catch
+        {
+            fs.Dispose();
+            throw;
+        }
     }
 
     /// <summary>Wraps an open CISO file stream.</summary>
@@ -33,37 +56,75 @@ public sealed class CisoBlockDevice : IBlockDevice
     }
 
     /// <summary>Wraps an open CISO stream (e.g. the composite stream over split parts).</summary>
+    /// <remarks>
+    /// A caller-provided stream is never disposed when validation throws — ownership
+    /// transfers only on successful construction (<see cref="Dispose"/> then honors
+    /// <paramref name="leaveOpen"/>).
+    /// </remarks>
     public CisoBlockDevice(Stream csoFs, bool leaveOpen = false)
     {
         _csoFs = csoFs ?? throw new ArgumentNullException(nameof(csoFs));
         if (!csoFs.CanSeek) throw new ArgumentException("CISO stream must be seekable", nameof(csoFs));
         _leaveOpen = leaveOpen;
 
+        var header = ReadHeader(csoFs);
+        Length = header.UncompressedSize;
+        _blockSize = header.BlockSize;
+        _version = header.Version;
+        _align = header.Align;
+        _index = ReadIndex(csoFs, header.IndexEntryCount);
+    }
+
+    /// <summary>Validated CISO header: all attacker-controlled sizes range-checked.</summary>
+    private static (long UncompressedSize, uint BlockSize, byte Version, byte Align, int IndexEntryCount)
+        ReadHeader(Stream csoFs)
+    {
         Span<byte> hdr = stackalloc byte[24];
         csoFs.Seek(0, SeekOrigin.Begin);
         ReadExact(csoFs, hdr);
         var magic = BinaryPrimitives.ReadUInt32LittleEndian(hdr[..4]);
         var hsize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[4..8]);
-        Length = (long)BinaryPrimitives.ReadUInt64LittleEndian(hdr[8..16]);
-        _blockSize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[16..20]);
-        _version = hdr[20];
-        _align = hdr[21];
+        var claimedSize = BinaryPrimitives.ReadUInt64LittleEndian(hdr[8..16]);
+        var blockSize = BinaryPrimitives.ReadUInt32LittleEndian(hdr[16..20]);
+        var version = hdr[20];
+        var align = hdr[21];
 
         if (magic != CisoWriter.Magic) throw new InvalidDataException("Not a CISO file (bad magic)");
         if (hsize != CisoWriter.HeaderSize) throw new InvalidDataException($"Unsupported CISO header size {hsize}");
-        if (_version != CisoWriter.VersionDeflate && _version != CisoWriter.VersionLz4)
-            throw new InvalidDataException($"Unsupported CISO version {_version}");
-        if (_blockSize != 2048) throw new InvalidDataException($"Unsupported CISO block size {_blockSize}");
+        if (version != CisoWriter.VersionDeflate && version != CisoWriter.VersionLz4)
+            throw new InvalidDataException($"Unsupported CISO version {version}");
+        if (blockSize != 2048) throw new InvalidDataException($"Unsupported CISO block size {blockSize}");
 
-        var totalBlocks = (Length + _blockSize - 1) / _blockSize;
+        // The u64 claim must fit a long before any arithmetic: otherwise Length wraps
+        // negative and the index math below goes negative with it.
+        if (claimedSize > (ulong)long.MaxValue)
+            throw new InvalidDataException($"CISO uncompressed size {claimedSize} exceeds supported range");
+        var length = (long)claimedSize;
+
+        var totalBlocks = (length + blockSize - 1) / blockSize;
         var indexLen = totalBlocks + 1;
-        _index = new uint[indexLen];
+        // Array lengths are int: reject absurd claims before allocating.
+        if (indexLen > int.MaxValue)
+            throw new InvalidDataException($"CISO index too large ({indexLen} entries) for claimed size {length}");
+        var indexCount = (int)indexLen;
+        // The index table itself lives in this stream: 4 bytes per entry past the header.
+        if ((long)indexCount * 4 > csoFs.Length - hdr.Length)
+            throw new InvalidDataException("CISO index table exceeds stream length");
+
+        return (length, blockSize, version, align, indexCount);
+    }
+
+    private static uint[] ReadIndex(Stream csoFs, int indexCount)
+    {
+        var index = new uint[indexCount];
         Span<byte> leBuf = stackalloc byte[4];
-        for (long i = 0; i < indexLen; i++)
+        for (var i = 0; i < indexCount; i++)
         {
             ReadExact(csoFs, leBuf);
-            _index[i] = BinaryPrimitives.ReadUInt32LittleEndian(leBuf);
+            index[i] = BinaryPrimitives.ReadUInt32LittleEndian(leBuf);
         }
+
+        return index;
     }
 
     /// <summary>Opens a CISO source: a plain <c>.cso</c> file or the composite stream over split parts.</summary>

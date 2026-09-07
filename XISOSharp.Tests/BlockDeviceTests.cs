@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using XISOSharp.BlockDevice;
@@ -198,6 +199,23 @@ public class BlockDeviceTests : IDisposable
         var r = dev.Read(0, buf);
         Assert.Equal(1024, r);
         Assert.True(buf.ToArray().All(static b => b == 0));
+    }
+
+    [Fact]
+    public void MemoryBlockDevice_Ctor_HugeCapacity_ThrowsArgumentOutOfRange()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new MemoryBlockDevice((long)Array.MaxLength + 1));
+    }
+
+    [Fact]
+    public void MemoryBlockDevice_Write_BeyondMaxLength_ThrowsInvalidOperation()
+    {
+        var dev = new MemoryBlockDevice();
+        _devices.Add(dev);
+
+        // No allocation happens: the request is rejected before growth math.
+        Assert.Throws<InvalidOperationException>(() => dev.Write(Array.MaxLength, new byte[1]));
     }
 
     // ---- FileBlockDevice ----
@@ -502,6 +520,44 @@ public class BlockDeviceTests : IDisposable
 
         Assert.Equal(all.Length, totalRead);
         Assert.Equal(expectedHash, SHA256.HashData(all));
+    }
+
+    private static string WriteFakeCso(string dir, string name, ulong claimedSize)
+    {
+        var path = Path.Combine(dir, name);
+        Span<byte> hdr = stackalloc byte[24];
+        BinaryPrimitives.WriteUInt32LittleEndian(hdr[..4], CisoReader.Magic);
+        BinaryPrimitives.WriteUInt32LittleEndian(hdr[4..8], CisoReader.HeaderSize);
+        BinaryPrimitives.WriteUInt64LittleEndian(hdr[8..16], claimedSize);
+        BinaryPrimitives.WriteUInt32LittleEndian(hdr[16..20], (uint)CisoReader.BlockSize);
+        hdr[20] = CisoWriter.VersionDeflate;
+        File.WriteAllBytes(path, hdr.ToArray());
+        return path;
+    }
+
+    [Fact]
+    public void CisoBlockDevice_BadMagic_ThrowsAndReleasesFileHandle()
+    {
+        var dir = CreateTempDir();
+        var path = Path.Combine(dir, "bad.cso");
+        File.WriteAllBytes(path, new byte[64]);
+        _tempFiles.Add(path);
+
+        Assert.Throws<InvalidDataException>(() => new CisoBlockDevice(path));
+
+        // No leaked handle: an exclusive open must succeed after the failed ctor.
+        using var exclusive = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+    }
+
+    [Fact]
+    public void CisoBlockDevice_HugeClaimedSize_ThrowsInvalidDataException()
+    {
+        var dir = CreateTempDir();
+        var path = WriteFakeCso(dir, "huge.cso", (ulong)long.MaxValue + 1);
+        _tempFiles.Add(path);
+
+        // Must not wrap Length negative (OverflowException) — documented InvalidDataException.
+        Assert.Throws<InvalidDataException>(() => new CisoBlockDevice(path));
     }
 
     [Fact]

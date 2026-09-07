@@ -24,9 +24,13 @@ public sealed class MemoryBlockDevice : IBlockDevice
     }
 
     /// <summary>Creates a device with a fixed capacity (zero-filled).</summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="capacity"/> is negative or exceeds the maximum array length.
+    /// </exception>
     public MemoryBlockDevice(long capacity)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(capacity, Array.MaxLength, nameof(capacity));
         _data = new byte[capacity];
         Length = capacity;
     }
@@ -60,8 +64,14 @@ public sealed class MemoryBlockDevice : IBlockDevice
     private void EnsureCapacity(long needed)
     {
         if (needed <= _data.Length) return;
+        // Growth doubling below is long math, but the array length is int: reject
+        // unserviceable requests instead of wrapping to a negative size.
+        if (needed > Array.MaxLength)
+            throw new InvalidOperationException(
+                $"MemoryBlockDevice cannot grow to {needed} bytes (exceeds maximum array length {Array.MaxLength}).");
         var newSize = Math.Max(needed, _data.Length == 0 ? 4096 : _data.Length * 2);
         while (newSize < needed) newSize *= 2;
+        if (newSize > Array.MaxLength) newSize = needed;
         Array.Resize(ref _data, (int)newSize);
     }
 

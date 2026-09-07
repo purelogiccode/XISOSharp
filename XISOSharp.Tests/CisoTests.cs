@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 
 namespace XISOSharp.Tests;
@@ -789,5 +790,25 @@ public class CisoTests : IDisposable
         var decPath = Path.Combine(decDir, "splitv1.iso");
         Assert.Equal(0, CisoReader.DecompressToIso(parts[0], decPath));
         Assert.Equal(origHash, ComputeSha256(decPath));
+    }
+
+    [Fact]
+    public void DecompressStream_TerabyteClaimInTinyFile_ThrowsBeforeAllocating()
+    {
+        var dir = CreateTempDir();
+        var path = Path.Combine(dir, "liar.cso");
+        Span<byte> hdr = stackalloc byte[24];
+        BinaryPrimitives.WriteUInt32LittleEndian(hdr[..4], CisoReader.Magic);
+        BinaryPrimitives.WriteUInt32LittleEndian(hdr[4..8], CisoReader.HeaderSize);
+        BinaryPrimitives.WriteUInt64LittleEndian(hdr[8..16], 1UL << 40); // 1 TiB claim
+        BinaryPrimitives.WriteUInt32LittleEndian(hdr[16..20], (uint)CisoReader.BlockSize);
+        hdr[20] = CisoWriter.VersionDeflate;
+        File.WriteAllBytes(path, hdr.ToArray());
+
+        using var src = File.OpenRead(path);
+        using var dst = new MemoryStream();
+        // 1 TiB / 2 KiB = 512M index entries (~2 GiB): the claim must be rejected
+        // by the file-size guard before any such allocation happens.
+        Assert.Throws<InvalidDataException>(() => CisoReader.DecompressStream(src, dst));
     }
 }

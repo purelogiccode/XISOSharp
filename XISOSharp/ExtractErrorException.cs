@@ -24,8 +24,8 @@ public class ExtractErrorException : Exception
 
     /// <summary>Creates a new <see cref="ExtractErrorException"/> with a message and inner exception.</summary>
     /// <param name="message">The error message.</param>
-    /// <param name="innerException">The inner exception.</param>
-    public ExtractErrorException(string message, Exception innerException) : base(message, innerException)
+    /// <param name="innerException">The inner exception (<c>null</c> when there is no underlying cause).</param>
+    public ExtractErrorException(string message, Exception? innerException) : base(message, innerException)
     {
     }
 
@@ -49,8 +49,8 @@ public class ExtractErrorException : Exception
     /// <summary>Creates a new <see cref="ExtractErrorException"/> with an error code, message, and inner exception.</summary>
     /// <param name="code">The <see cref="ExtractError"/> value describing the failure.</param>
     /// <param name="message">The error message.</param>
-    /// <param name="innerException">The inner exception.</param>
-    public ExtractErrorException(ExtractError code, string message, Exception innerException) : base(message,
+    /// <param name="innerException">The inner exception (<c>null</c> when there is no underlying cause).</param>
+    public ExtractErrorException(ExtractError code, string message, Exception? innerException) : base(message,
         innerException)
     {
         ErrorCode = code;

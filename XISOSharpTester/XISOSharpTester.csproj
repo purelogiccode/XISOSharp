@@ -4,15 +4,22 @@
         <OutputType>WinExe</OutputType>
         <TargetFramework>net10.0-windows</TargetFramework>
         <UseWPF>true</UseWPF>
-        <AssemblyVersion>1.0.0</AssemblyVersion>
-        <FileVersion>1.0.0</FileVersion>
+        <!-- Allow building the WPF Tester on Linux/macOS CI agents (NETSDK1100
+             otherwise). The app still only *runs* on Windows. -->
+        <EnableWindowsTargeting>true</EnableWindowsTargeting>
+        <!-- AssemblyVersion/FileVersion/InformationalVersion come from MinVer
+             (git tags), same as the library/CLI/GUI — shown in AboutWindow. -->
         <NeutralLanguage>en</NeutralLanguage>
+        <AssemblyName>XISOSharpTester</AssemblyName>
+        <RootNamespace>XISOSharpTester</RootNamespace>
 
         <IsPackable>false</IsPackable>
+        <!-- Embedded PDBs are intentional here (unlike the portable default
+             elsewhere): this WPF rig runs from its build folder, so debug info
+             travels inside the exe instead of a losable sidecar .pdb. -->
         <DebugType>embedded</DebugType>
         <DebugSymbols>true</DebugSymbols>
         <ApplicationIcon>Icon\icon.ico</ApplicationIcon>
-        <PackageId>XISOSharpTester</PackageId>
     </PropertyGroup>
 
     <ItemGroup>
@@ -20,33 +27,37 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Meziantou.Analyzer" Version="3.0.221">
+        <PackageReference Include="Meziantou.Analyzer">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Formatting.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.Formatting.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Serilog" Version="4.4.0" />
-        <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
-        <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
-        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-        <PackageReference Include="WPF-UI" Version="4.3.0" />
-        <PackageReference Include="QuestPDF" Version="2026.8.0" />
+        <!-- Version stamps derived from git tags, same as the library/CLI/GUI. -->
+        <PackageReference Include="MinVer" PrivateAssets="all">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Serilog" />
+        <PackageReference Include="Serilog.Sinks.Console" />
+        <PackageReference Include="Serilog.Sinks.Debug" />
+        <PackageReference Include="Serilog.Sinks.File" />
+        <PackageReference Include="WPF-UI" />
+        <PackageReference Include="QuestPDF" />
     </ItemGroup>
 
     <ItemGroup>
         <None Update="extract-xiso.exe">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>
 

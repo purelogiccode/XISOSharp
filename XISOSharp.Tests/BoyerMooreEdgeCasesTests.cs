@@ -30,17 +30,17 @@ public class BoyerMooreEdgeCasesTests
     }
 
     /// <summary>
-    /// Verifies that calling Search before Init throws a NullReferenceException.
+    /// Verifies that calling Search before Init throws an InvalidOperationException.
     /// </summary>
     [Fact]
     public void Search_BeforeInit_Throws_WhenTablesNeeded()
     {
         var bm = new BoyerMoore("AB"u8.ToArray());
-        Assert.Throws<NullReferenceException>(() => bm.Search("BA"u8.ToArray()));
+        Assert.Throws<InvalidOperationException>(() => bm.Search("BA"u8.ToArray()));
     }
 
     /// <summary>
-    /// Verifies that calling Search after Done throws a NullReferenceException.
+    /// Verifies that calling Search after Done throws an InvalidOperationException.
     /// </summary>
     [Fact]
     public void Search_AfterDone_Throws_WhenTablesNeeded()
@@ -48,7 +48,7 @@ public class BoyerMooreEdgeCasesTests
         var bm = new BoyerMoore("AB"u8.ToArray());
         bm.Init();
         bm.Done();
-        Assert.Throws<NullReferenceException>(() => bm.Search("BA"u8.ToArray()));
+        Assert.Throws<InvalidOperationException>(() => bm.Search("BA"u8.ToArray()));
     }
 
     /// <summary>

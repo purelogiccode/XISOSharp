@@ -20,7 +20,8 @@ Thanks for considering a contribution! This project is a byte-faithful port of
    dotnet test XISOSharp.Tests
    ```
 5. Make your change **with tests** (see below).
-6. Push and open a pull request against `main`.
+6. Push and open a pull request against `master` (the repo's branch; CI also
+   accepts `main`-named forks for the workflow triggers).
 
 ## Code style
 
@@ -29,8 +30,10 @@ Thanks for considering a contribution! This project is a byte-faithful port of
   at **0 warnings**).
 - The library multi-targets `net8.0`/`net9.0`/`net10.0` — do not use APIs that are
   unavailable on net8.0.
-- **XML documentation is mandatory on every new public API member** — the package
-  generates the doc file and package validation runs in strict mode.
+- **XML documentation is mandatory on every new public API member of the
+  `XISOSharp` library** — the package generates the doc file and package
+  validation runs in strict mode. (App/harness projects need no doc file;
+  document their public surface only where it aids maintenance.)
 - Prefer the existing idioms: `FileStreamOptions`, `BinaryPrimitives` little-endian
   helpers, `Span<byte>` for header I/O, thread-static scratch buffers.
 

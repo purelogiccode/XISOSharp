@@ -3,8 +3,8 @@ namespace XISOSharp.TestDataGenerator;
 /// <summary>
 /// Generates the <c>TestData</c> fixture used by the integration-style tests:
 /// a deterministic source tree plus a prebuilt XISO image.
-/// Shared source between the <c>XISOSharp.TestDataGenerator</c> tool and the
-/// <c>XISOSharp.Tests</c> module initializer (linked compile item), so both
+/// Single owner of the fixture logic: the <c>XISOSharp.TestDataGenerator</c> tool
+/// and <c>XISOSharp.Tests</c> both consume it via a project reference, so both
 /// always produce byte-identical fixtures.
 /// </summary>
 public static class TestDataWriter

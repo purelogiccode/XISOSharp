@@ -2,15 +2,24 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net10.0</TargetFramework>
+        <!-- Tool ships as a published single-file binary, never as NuGet, so no
+             EnablePackageValidation here — package compat gates apply to the
+             library (the only packable project) only. -->
+        <IsPackable>false</IsPackable>
+        <!-- Multi-target to match the library so XISOSharp.Tests (net8/9/10) can
+             reference the CLI on every TFM and exercise all lib closures. -->
+        <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
         <!-- AssemblyName matches the project identity: the XISOSharp CLI ships as
              XISOSharp.Cli(.exe). A bare "XISOSharp" is impossible — the class
              library already owns that assembly name, and two same-named
              assemblies break solution restore ("Ambiguous project name"). -->
         <AssemblyName>XISOSharp.Cli</AssemblyName>
-        <ApplicationIcon>icon/icon.ico</ApplicationIcon>
-        <!-- XboxKit RID parity (win-x86 extra; primary six: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64) -->
-        <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+        <RootNamespace>XISOSharp.Cli</RootNamespace>
+        <ApplicationIcon>icon\icon.ico</ApplicationIcon>
+        <!-- Single RID source of truth (matches publish-cli.ps1 defaults and
+             docs/building.md): win-x64, win-arm64, linux-x64, linux-arm64,
+             osx-x64, osx-arm64. XboxKit parity, no 32-bit RID. -->
+        <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
 
         <!-- Distribution defaults: every self-contained `dotnet publish -r` for a
              listed RID yields a trimmed single-file binary with no runtime to install. -->
@@ -25,15 +34,15 @@
 
     <ItemGroup>
         <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
-        <PackageReference Include="Serilog" Version="4.4.0" />
-        <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
-        <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
-        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+        <PackageReference Include="Serilog" />
+        <PackageReference Include="Serilog.Sinks.Console" />
+        <PackageReference Include="Serilog.Sinks.Debug" />
+        <PackageReference Include="Serilog.Sinks.File" />
     </ItemGroup>
 
     <!-- Version stamps (Version/InformationalVersion/FileVersion) derived from git tags, same as the library. -->
     <ItemGroup>
-        <PackageReference Include="MinVer" PrivateAssets="all" Version="8.0.0">
+        <PackageReference Include="MinVer" PrivateAssets="all">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
     </ItemGroup>
@@ -43,19 +52,19 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Meziantou.Analyzer" Version="3.0.221">
+        <PackageReference Include="Meziantou.Analyzer">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Formatting.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.Formatting.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>

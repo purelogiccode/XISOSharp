@@ -120,11 +120,23 @@ public class BoyerMoore
     /// The index of the first match relative to the start of <paramref name="text"/>,
     /// or -1 if the pattern was not found.
     /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the shift tables have not been built — call <see cref="Init"/>
+    /// first (also after <see cref="Done"/> released them).
+    /// </exception>
     public int Search(byte[] text, int startIndex, int length)
     {
+        if (_bcTable is null || _gsTable is null)
+            throw new InvalidOperationException(
+                $"{nameof(BoyerMoore)} is not initialized. Call {nameof(Init)} before {nameof(Search)}.");
+
         int j;
 
         var i = j = _patLen - 1;
+
+        // Tables are non-null here (guarded above); locals avoid re-checks in the loop.
+        var gsTable = _gsTable!;
+        var bcTable = _bcTable!;
 
         while (j < length && i >= 0)
         {
@@ -135,8 +147,8 @@ public class BoyerMoore
             }
             else
             {
-                var k = _gsTable![i + 1];
-                var l = _bcTable![text[startIndex + j]];
+                var k = gsTable[i + 1];
+                var l = bcTable[text[startIndex + j]];
 
                 j += Math.Max(k, l);
                 i = _patLen - 1;
@@ -153,6 +165,9 @@ public class BoyerMoore
     /// <returns>
     /// The index of the first match, or -1 if the pattern was not found.
     /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when <see cref="Init"/> has not been called (or after <see cref="Done"/>).
+    /// </exception>
     public int Search(byte[] text)
     {
         return Search(text, 0, text.Length);

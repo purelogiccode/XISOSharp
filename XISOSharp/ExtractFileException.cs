@@ -44,7 +44,7 @@ public sealed class ExtractFileException : ExtractErrorException
         long bytesRead = -1,
         Exception? innerException = null)
         : base(code, FormatMessage(internalPath, destPath, startSector, fileSize, detail, bytesRead),
-            innerException!)
+            innerException)
     {
         InternalPath = internalPath;
         DestPath = destPath;

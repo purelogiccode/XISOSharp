@@ -1,4 +1,50 @@
+root = true
+
+# ------------------------------------------------------------------
+# Base formatting contract (applies to every text file in the repo).
+# ------------------------------------------------------------------
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# ------------------------------------------------------------------
+# Project/build/script/data files: 2-space indent by convention.
+# ------------------------------------------------------------------
+[*.{csproj,props,targets,yml,yaml,ps1,psm1,json,config,sln}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+# ------------------------------------------------------------------
+# C# style + analyzer severities.
+# severities are suggestion-only so the IDE surfaces them without
+# breaking the 0-warning build; analyzers themselves (Meziantou +
+# Roslynator) stay at their defaults unless suppressed below.
+# ------------------------------------------------------------------
 [*.cs]
+dotnet_sort_system_directives_first = true:suggestion
+dotnet_separate_import_directive_groups = false:suggestion
+csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_style_var_elsewhere = false:suggestion
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = false:suggestion
+csharp_style_expression_bodied_methods = true:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+
+# ------------------------------------------------------------------
+# Intentional suppressions (pre-existing; keep narrow).
+# ------------------------------------------------------------------
 dotnet_diagnostic.MA0051.severity = none
 
 dotnet_diagnostic.MA0015.severity = none

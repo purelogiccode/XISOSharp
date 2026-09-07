@@ -2,12 +2,15 @@
 
     <PropertyGroup>
         <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-        <LangVersion>14</LangVersion>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
+        <!-- LangVersion/ImplicitUsings/Nullable/Deterministic/ContinuousIntegrationBuild
+             inherited from Directory.Build.props (per-TFM language default keeps the
+             net8 API guard). -->
+        <AssemblyName>XISOSharp</AssemblyName>
         <RootNamespace>XISOSharp</RootNamespace>
 
-        <!-- Strong name signing -->
+        <!-- Strong name signing. The key (XISOSharp.snk) is committed to the repo,
+             so OSS contributors get full (non-delay, non-public) signing with no
+             setup — no PublicSign/DelaySign dance needed. -->
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>XISOSharp.snk</AssemblyOriginatorKeyFile>
 
@@ -16,7 +19,7 @@
         <!-- Version is derived from git tags via MinVer. Tag format: v2.7.1 or 2.7.1 -->
         <Title>XISOSharp</Title>
         <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats.</Description>
-        <PackageDescription>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats. Provides both synchronous and asynchronous APIs with cancellation support. Strong-named, trimmable, and AOT-compatible.</PackageDescription>
+        <PackageDescription>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats. Provides both synchronous and asynchronous APIs with cancellation support. Strong-named and trimmable, with an AOT-compatible library surface.</PackageDescription>
         <PackageTags>xiso;xbox;iso;extract-xiso;xgd3;xgd1;xbe;disc-image;original-xbox</PackageTags>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageIcon>icon.png</PackageIcon>
@@ -26,20 +29,30 @@
         <!-- XML documentation -->
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
-        <!-- Trimming and AOT compatibility -->
+        <!-- Trimming and AOT compatibility. Scope note: this marks the *library
+             surface* diplomatic to trimming/AOT for NuGet consumers. No in-repo
+             project publishes AOT (BattleTests sets PublishAot false — its
+             oracle harness is reflection-heavy — and there is no AOT smoke
+             project), so the claim covers lib consumers only. -->
         <IsTrimmable>true</IsTrimmable>
         <IsAotCompatible>true</IsAotCompatible>
 
-        <!-- Source Link + reproducible builds -->
+        <!-- Surface trim/single-file incompatibilities at build time, not just
+             publish (the library ships trimmable on NuGet). -->
+        <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+        <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+
+        <!-- Source Link + reproducible builds (Deterministic /
+             ContinuousIntegrationBuild inherited from Directory.Build.props). -->
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EmbedAllSources>true</EmbedAllSources>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <DebugType>portable</DebugType>
-        <Deterministic>true</Deterministic>
-        <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
 
-        <!-- Package output -->
-        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <!-- Package output. GeneratePackageOnBuild stays false so inner-loop
+             `dotnet build`/`test` never mints .nupkg files; packaging is an
+             explicit `dotnet pack` step (CI `pack` job, releases). -->
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
 
@@ -55,29 +68,41 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- ZARSharp lives in the sibling CSharp_ZARSharp repo (separate solution). -->
-        <ProjectReference Include="..\..\CSharp_ZARSharp\ZARSharp\ZARSharp.csproj" />
+        <!-- ZARSharp lives in the sibling CSharp_ZARSharp repo (separate solution).
+             Local dev: side-by-side checkout (..\CSharp_ZARSharp) wins.
+             Clean clone / CI without the sibling: fall back to the ZARSharp NuGet
+             package (publish ZARSharp to NuGet first). -->
+        <ProjectReference Include="..\..\CSharp_ZARSharp\ZARSharp\ZARSharp.csproj"
+                          Condition="Exists('..\..\CSharp_ZARSharp\ZARSharp\ZARSharp.csproj')" />
+        <PackageReference Include="ZARSharp"
+                          Condition="!Exists('..\..\CSharp_ZARSharp\ZARSharp\ZARSharp.csproj')" />
     </ItemGroup>
 
-    <!-- Source Link + versioning -->
+    <Target Name="CheckZarSharpSource" BeforeTargets="CollectPackageReferences"
+            Condition="!Exists('..\..\CSharp_ZARSharp\ZARSharp\ZARSharp.csproj')">
+        <Warning Text="Sibling CSharp_ZARSharp checkout not found; falling back to NuGet package 'ZARSharp 1.0.0'. For local dev, clone the sibling repo side-by-side with this one." />
+    </Target>
+
+    <!-- Source Link + versioning (package versions centralized in
+         Directory.Packages.props). -->
     <ItemGroup>
-        <PackageReference Include="Meziantou.Analyzer" Version="3.0.221">
+        <PackageReference Include="Meziantou.Analyzer">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" Version="10.0.400" />
-        <PackageReference Include="MinVer" PrivateAssets="all" Version="8.0.0">
+        <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+        <PackageReference Include="MinVer" PrivateAssets="all">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Formatting.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.Formatting.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>

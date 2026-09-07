@@ -200,6 +200,30 @@ public class XisoExceptionTests
 
     #endregion
 
+    #region ExtractFileException inner-exception contract
+
+    [Fact]
+    public void ExtractFileException_NullInner_LeavesInnerExceptionNull()
+    {
+        var ex = new ExtractFileException(
+            ExtractError.ErrFileTruncated, "inner.bin", "out.bin", 0, 100, "truncated", 10, null);
+
+        Assert.Null(ex.InnerException);
+        Assert.Contains("inner.bin", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExtractFileException_WithInner_PreservesInner()
+    {
+        var inner = new IOException("disk gone");
+        var ex = new ExtractFileException(
+            ExtractError.ErrFileWrite, "inner.bin", "out.bin", 0, 100, "write failed", -1, inner);
+
+        Assert.Same(inner, ex.InnerException);
+    }
+
+    #endregion
+
     #region Exception hierarchy integration
 
     [Fact]

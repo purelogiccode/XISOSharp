@@ -26,7 +26,11 @@ internal static partial class BugReporter
     private const int MaxEnvironment = 50;
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
+#if NET9_0_OR_GREATER
     private static readonly Lock Gate = new();
+#else
+    private static readonly object Gate = new();
+#endif
     private static readonly Queue<DateTime> RecentSends = new();
     private static readonly Dictionary<string, DateTime> LastByKey = new(StringComparer.Ordinal);
 

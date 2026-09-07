@@ -16,7 +16,11 @@ namespace XISOSharp.Cli;
 internal static class Program
 {
     /// <summary>Serializes parallel <c>--zar</c> batch summaries.</summary>
+#if NET9_0_OR_GREATER
     private static readonly Lock LogLock = new();
+#else
+    private static readonly object LogLock = new();
+#endif
 
     /// <summary>
     /// Parses a <c>--policy</c> value (<c>skip</c> / <c>overwrite</c> /

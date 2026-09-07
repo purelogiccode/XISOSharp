@@ -113,15 +113,24 @@ public static class CisoReader
         if (blockSize != BlockSize)
             throw new InvalidDataException($"Unsupported CISO block size {blockSize} (expected 2048)");
 
+        // Validate the u64 size claim BEFORE allocating anything from it: a
+        // large-but-plausible claim (e.g. 1 TB in a 2 GB sparse file) would
+        // otherwise allocate gigabytes of index before the file-size guard runs.
+        if (uncompressedSize > (ulong)long.MaxValue)
+            throw new InvalidDataException($"CISO uncompressed size {uncompressedSize} exceeds supported range");
         var totalBlocks = (long)((uncompressedSize + blockSize - 1) / blockSize);
         var indexLen = totalBlocks + 1;
-        if (indexLen * 4 > source.Length - HeaderSize)
+        if (indexLen > int.MaxValue)
+            throw new InvalidDataException(
+                $"CISO index too large ({indexLen} entries) for claimed size {uncompressedSize}");
+        var indexCount = (int)indexLen;
+        if ((long)indexCount * 4 > source.Length - HeaderSize)
             throw new InvalidDataException("CISO index table exceeds file size");
 
-        var indexEntries = new uint[indexLen];
+        var indexEntries = new uint[indexCount];
         Span<byte> leBuf = stackalloc byte[4];
         // Index starts at 24
-        for (long i = 0; i < indexLen; i++)
+        for (var i = 0; i < indexCount; i++)
         {
             ReadExact(source, leBuf);
             indexEntries[i] = BinaryPrimitives.ReadUInt32LittleEndian(leBuf);

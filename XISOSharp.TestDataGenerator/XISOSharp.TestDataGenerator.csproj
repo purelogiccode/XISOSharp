@@ -2,7 +2,14 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net10.0</TargetFramework>
+        <!-- Dev tool, never packed. -->
+        <IsPackable>false</IsPackable>
+        <!-- Multi-target to match the library so XISOSharp.Tests (net8/9/10) can
+             reference the Generator project on every TFM (single owner of the
+             TestDataWriter fixture logic). -->
+        <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+        <AssemblyName>XISOSharp.TestDataGenerator</AssemblyName>
+        <RootNamespace>XISOSharp.TestDataGenerator</RootNamespace>
         <AssemblyTitle>XISOSharp TestData Generator</AssemblyTitle>
         <Description>Restores the TestData fixture (deterministic source tree + prebuilt XISO) used by the test suite.</Description>
     </PropertyGroup>
@@ -12,19 +19,23 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Meziantou.Analyzer" Version="3.0.221">
+        <PackageReference Include="Meziantou.Analyzer">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Analyzers" Version="5.0.0">
+        <!-- Version stamp derived from git tags, same as the other projects. -->
+        <PackageReference Include="MinVer" PrivateAssets="all">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Roslynator.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Formatting.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.Formatting.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>

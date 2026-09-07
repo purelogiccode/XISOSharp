@@ -4,25 +4,30 @@
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
+        <!-- ImplicitUsings/Nullable inherited from Directory.Build.props. -->
+        <AssemblyName>XISOSharp.Benchmarks</AssemblyName>
+        <RootNamespace>XISOSharp.Benchmarks</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
-        <PackageReference Include="Meziantou.Analyzer" Version="3.0.221">
+        <PackageReference Include="BenchmarkDotNet" />
+        <PackageReference Include="Meziantou.Analyzer">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Analyzers" Version="5.0.0">
+        <!-- Version stamp derived from git tags, same as the other projects. -->
+        <PackageReference Include="MinVer" PrivateAssets="all">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Roslynator.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.CodeAnalysis.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Formatting.Analyzers" Version="5.0.0">
+        <PackageReference Include="Roslynator.Formatting.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>

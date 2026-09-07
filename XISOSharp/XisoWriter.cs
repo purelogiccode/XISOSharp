@@ -517,7 +517,9 @@ public static class XisoWriter
                 AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, WriteTreeCallback, subCtx,
                     AvlTraversalMethod.Prefix, 0);
 
-                var xisoFs = (FileStream)ctx.XisoStream;
+                // Stream-typed on purpose: the output is usually a FileStream, but any
+                // seekable writable Stream works here — never downcast to FileStream.
+                var xisoFs = ctx.XisoStream;
                 xisoFs.Seek(ctx.PrependOffset + ((long)avl.StartSector * Constants.SectorSize), SeekOrigin.Begin);
                 AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, WriteDirectoryCallback, xisoFs,
                     AvlTraversalMethod.Prefix, 0);
@@ -538,7 +540,8 @@ public static class XisoWriter
             }
             else
             {
-                var xisoFs = (FileStream)ctx.XisoStream;
+                // Same as above: keep Stream-typed, not FileStream.
+                var xisoFs = ctx.XisoStream;
                 xisoFs.Seek(ctx.PrependOffset + ((long)avl.StartSector * Constants.SectorSize), SeekOrigin.Begin);
                 Span<byte> emptySector = stackalloc byte[Constants.SectorSize];
                 emptySector.Fill(Constants.PadByte);
@@ -566,7 +569,9 @@ public static class XisoWriter
     /// </summary>
     private static int WriteDirectoryCallback(AvlNode avl, object? context, int depth)
     {
-        var fs = (FileStream)context!;
+        // The traversal threads WriteTreeContext.XisoStream through as context;
+        // keep it Stream-typed (Seek/Write only), never FileStream.
+        var fs = (Stream)context!;
 
         var pos = fs.Seek(0, SeekOrigin.Current);
         var targetPos = avl.Offset + avl.DirStart;
@@ -591,7 +596,9 @@ public static class XisoWriter
     /// </summary>
     private static void WriteFileData(AvlNode avl, WriteTreeContext ctx)
     {
-        var xisoFs = (FileStream)ctx.XisoStream;
+        // Stream-typed: this function only Seeks/Writes, so MemoryStream and
+        // block-device-backed streams work as outputs, not just FileStream.
+        var xisoFs = ctx.XisoStream;
         xisoFs.Seek(ctx.PrependOffset + ((long)avl.StartSector * Constants.SectorSize), SeekOrigin.Begin);
 
         var bufSize = Math.Max(Constants.SectorSize, Constants.ReadWriteBufferSize) + 1;

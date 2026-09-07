@@ -53,8 +53,9 @@ internal class WdsafpContext
     /// <summary>
     /// Allocator shared with the owning <see cref="DataStructures.OffsetCalcContext"/>,
     /// handing out file-data sectors within the directory.
+    /// Required at construction (never left <c>null</c>).
     /// </summary>
-    public SectorAllocator Allocator = null!;
+    public required SectorAllocator Allocator;
 }
 
 /// <summary>
@@ -64,8 +65,12 @@ internal class WdsafpContext
 /// </summary>
 internal class WriteTreeContext
 {
-    /// <summary>The output XISO file stream being written to.</summary>
-    public Stream XisoStream = null!;
+    /// <summary>
+    /// The output XISO stream being written to. Any seekable writable
+    /// <see cref="Stream"/> (FileStream, MemoryStream, …) — write callbacks must
+    /// not downcast it to <see cref="FileStream"/>. Required at construction.
+    /// </summary>
+    public required Stream XisoStream;
 
     /// <summary>
     /// Current path prefix for logging and file construction.

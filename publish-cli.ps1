@@ -35,8 +35,11 @@ foreach ($r in $Rid) {
     if (Test-Path -LiteralPath $outDir) {
         Remove-Item -LiteralPath $outDir -Recurse -Force
     }
+    # NOTE: -f net10.0 is required — XISOSharp.Cli multi-targets (net8/9/10) so the
+    # shippable closure can be referenced by the test suite on every TFM, but only
+    # net10.0 ships as a self-contained binary.
     & dotnet publish (Join-Path $PSScriptRoot 'XISOSharp.Cli/XISOSharp.Cli.csproj') `
-        -c $Configuration -r $r --self-contained -o $outDir
+        -c $Configuration -f net10.0 -r $r --self-contained -o $outDir
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet publish failed for RID $r (exit $LASTEXITCODE)."
     }

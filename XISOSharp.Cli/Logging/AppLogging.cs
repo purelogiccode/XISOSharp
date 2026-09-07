@@ -11,7 +11,11 @@ namespace XISOSharp.Cli.Logging;
 internal static class AppLogging
 {
     private static bool _configured;
+#if NET9_0_OR_GREATER
     private static readonly Lock Gate = new();
+#else
+    private static readonly object Gate = new();
+#endif
 
     internal static void Configure(string applicationName)
     {

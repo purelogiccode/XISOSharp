@@ -1,9 +1,16 @@
 <Project>
 
   <PropertyGroup>
-    <LangVersion>14</LangVersion>
+    <!-- No explicit LangVersion: each TFM uses its SDK default (net8→C#12,
+         net9→C#13, net10→C#14), enforcing the net8 API guard and allowing
+         builds with co-installed 8.0.x/9.0.x SDKs. -->
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Reproducible builds repo-wide (not just the NuGet lib): deterministic
+         IL plus CI source-link paths for every shipped binary (Cli/Gui/Tester),
+         not only the packed library. -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/purelogiccode/XISOSharp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/purelogiccode/XISOSharp.git</RepositoryUrl>

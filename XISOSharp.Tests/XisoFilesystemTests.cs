@@ -101,7 +101,7 @@ public class XisoFilesystemTests : IDisposable
         var root = CreateTempDir("xiso_fs_root");
         var fs = new LocalFilesystem(root);
         var path = Path.Combine(root, "f.bin");
-        File.WriteAllBytes(path, "\t\t\t"u8);
+        File.WriteAllBytes(path, "\t\t\t"u8.ToArray());
 
         Assert.True(fs.FileExists("f.bin"));
         Assert.Equal(3, fs.FileLength("f.bin"));
@@ -192,7 +192,7 @@ public class XisoFilesystemTests : IDisposable
             s.Write([1]);
         }
 
-        Assert.Equal(["x/y/z.bin"], fs.FileNames);
+        Assert.Equal(["x/y/z.bin"], fs.FileNames, StringComparer.Ordinal);
         Assert.Contains("x", fs.DirectoryNames, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("x/y", fs.DirectoryNames, StringComparer.OrdinalIgnoreCase);
         Assert.DoesNotContain("x/y/z.bin", fs.DirectoryNames, StringComparer.OrdinalIgnoreCase);
