@@ -166,7 +166,7 @@ public class XisoSectorLayoutTests : IDisposable
 
         // Used ranges sorted and non-overlapping.
         for (var i = 1; i < layout.UsedRanges.Count; i++)
-            Assert.True((long)layout.UsedRanges[i].StartSector >=
+            Assert.True(layout.UsedRanges[i].StartSector >=
                         (long)layout.UsedRanges[i - 1].StartSector + layout.UsedRanges[i - 1].SectorCount);
 
         // Used + free cover [0, TotalSectors) exactly once.

@@ -104,6 +104,6 @@ public class XisoDiscFormatTests : IDisposable
 
         Assert.Equal(0, Program.Main(["-i", isoPath]));
 
-        Assert.Contains("Disc Format:    RAW", _logCapture.ToString());
+        Assert.Contains("Disc Format:    RAW", _logCapture.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 }

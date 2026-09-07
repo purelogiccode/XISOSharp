@@ -75,7 +75,7 @@ internal static class ExtendedBattleRunner
                 result.SubTests.Add(XkFiller(workInput, csDir, xkDir, isoOffset, xisoLength));
                 result.SubTests.Add(XkSeed(workInput, csDir, xkDir, isoOffset));
                 result.SubTests.Add(XkUpdate(csDir, xkDir));
-                result.SubTests.Add(XkPetrify(workInput, csDir, xkDir, isoOffset, xk));
+                result.SubTests.Add(XkPetrify(csDir, xk));
                 result.SubTests.Add(XkZar(workInput, csDir, xkDir, isoOffset, xk));
                 result.SubTests.Add(XkRebuildOurs(workInput, csDir, xkDir));
                 result.SubTests.Add(XkRebuildTheirs(workInput, csDir, xkDir, xk));
@@ -298,7 +298,7 @@ internal static class ExtendedBattleRunner
         });
     }
 
-    private static SubBattleResult XkPetrify(string workInput, string csDir, string? xkDir, long isoOffset, XboxKitWrapper? xk)
+    private static SubBattleResult XkPetrify(string csDir, XboxKitWrapper? xk)
     {
         return Timed("XK-Petrify", () =>
         {

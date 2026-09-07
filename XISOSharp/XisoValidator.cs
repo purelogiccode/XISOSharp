@@ -204,6 +204,8 @@ public static class XisoValidator
     /// Recursively collects entries from a directory within an XISO image.
     /// </summary>
     private static void CollectEntries(string isoPath, string currentPath, List<FileTreeEntry> entries,
+        // Threaded recursion-depth bound (#16 hardening); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
     {
         // Hardening (#16): bound subdirectory descent — a corrupt subdir cycle

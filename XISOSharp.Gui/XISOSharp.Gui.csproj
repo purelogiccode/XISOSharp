@@ -53,13 +53,13 @@
 
     <!-- Version stamps (Version/InformationalVersion/FileVersion) derived from git tags, same as the library and CLI. -->
     <ItemGroup>
-        <PackageReference Include="MinVer" PrivateAssets="all" Version="7.0.0">
+        <PackageReference Include="MinVer" PrivateAssets="all" Version="8.0.0">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Meziantou.Analyzer" Version="3.0.203">
+        <PackageReference Include="Meziantou.Analyzer" Version="3.0.221">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>

@@ -5,7 +5,7 @@ using ZARSharp;
 namespace XISOSharp.Tests;
 
 /// <summary>
-/// End-to-end tests for <see cref="XisoZarchive.CreateZar"/>:
+/// End-to-end tests for <see cref="XisoZarchive.CreateZar(string, string?, long, bool, CancellationToken, ZARSharp.IZarBlockCompressor?, IProgress{ZARSharp.Pipeline.ZarProgress}?)"/>:
 /// XISO → .zar conversion packs the image tree with real zstd blocks, so the
 /// output must round-trip through <see cref="ZArchiveTool"/> and the reference
 /// <c>zarchive.exe</c>, and must compress (not just store raw).

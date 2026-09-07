@@ -28,10 +28,10 @@ public record VolumeInfo(
     public string DiscFormat => !IsValid ? "Unknown" : DiscLseek switch
     {
         0 => "RAW",
-        (long)XISOSharp.Constants.GlobalLseekOffset => "GLOBAL (XGD2)",
-        (long)XISOSharp.Constants.Xgd3LseekOffset => "XGD3",
-        (long)XISOSharp.Constants.Xgd2HybridLseekOffset => "XGD2 Hybrid",
-        (long)XISOSharp.Constants.Xgd1LseekOffset => "XGD1",
+        Constants.GlobalLseekOffset => "GLOBAL (XGD2)",
+        Constants.Xgd3LseekOffset => "XGD3",
+        Constants.Xgd2HybridLseekOffset => "XGD2 Hybrid",
+        Constants.Xgd1LseekOffset => "XGD1",
         _ => "Unknown",
     };
 }

@@ -65,7 +65,7 @@ public class XisoCoverageTests : IDisposable
     private static long FindEntryHeader(byte[] img, long tableAbs, uint tableSize, string name)
     {
         var nameBytes = Encoding.ASCII.GetBytes(name);
-        var tableEnd = (long)(tableAbs + tableSize);
+        var tableEnd = tableAbs + tableSize;
         for (var i = tableAbs; i + 14 + nameBytes.Length <= Math.Min(tableEnd, img.Length); i++)
         {
             var match = true;
@@ -86,11 +86,11 @@ public class XisoCoverageTests : IDisposable
         return -1;
     }
 
-    private static (uint RootSector, uint RootSize, long RootAbs) RootLayout(string isoPath)
+    private static (uint RootSize, long RootAbs) RootLayout(string isoPath)
     {
         var vol = XisoReader.GetVolumeInfo(isoPath);
         Assert.True(vol.IsValid, $"fixture ISO invalid: {isoPath}");
-        return (vol.RootDirSector, vol.RootDirSize, (long)vol.RootDirSector * Constants.SectorSize + vol.DiscLseek);
+        return (vol.RootDirSize, (long)vol.RootDirSector * Constants.SectorSize + vol.DiscLseek);
     }
 
     private static bool IsNtfs(string path)
@@ -199,7 +199,7 @@ public class XisoCoverageTests : IDisposable
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
             File.WriteAllText(Path.Combine(src, "c.txt"), "!");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "c.txt");
@@ -224,7 +224,7 @@ public class XisoCoverageTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -246,7 +246,7 @@ public class XisoCoverageTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -270,7 +270,7 @@ public class XisoCoverageTests : IDisposable
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
             File.WriteAllText(Path.Combine(src, "c.txt"), "!");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var headerA = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -690,7 +690,7 @@ public class XisoCoverageTests : IDisposable
     public void ListDirectory_LeftBeyondImage_Throws()
     {
         var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -706,7 +706,7 @@ public class XisoCoverageTests : IDisposable
     public void GetSectorLayout_LeftBeyondImage_Throws()
     {
         var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -726,7 +726,7 @@ public class XisoCoverageTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "b.txt");
@@ -747,7 +747,7 @@ public class XisoCoverageTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -783,7 +783,7 @@ public class XisoCoverageTests : IDisposable
             Directory.CreateDirectory(Path.Combine(src, "sub"));
             File.WriteAllText(Path.Combine(src, "sub", "inner.txt"), "inner");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "sub");
@@ -817,7 +817,7 @@ public class XisoCoverageTests : IDisposable
             Directory.CreateDirectory(Path.Combine(src, "sub"));
             File.WriteAllText(Path.Combine(src, "sub", "inner.txt"), "inner");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "sub");
@@ -879,7 +879,7 @@ public class XisoCoverageTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "b.txt");
@@ -898,7 +898,7 @@ public class XisoCoverageTests : IDisposable
     public void Audit_LeftBeyondEof_ReportsIssue()
     {
         var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -919,7 +919,7 @@ public class XisoCoverageTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "b.txt");
@@ -936,7 +936,7 @@ public class XisoCoverageTests : IDisposable
     public void Audit_FileSectorBeyondEof_ReportsIssue()
     {
         var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -953,7 +953,7 @@ public class XisoCoverageTests : IDisposable
     public void Audit_ReservedAttributeBits_ReportsIssue()
     {
         var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -976,7 +976,7 @@ public class XisoCoverageTests : IDisposable
             Directory.CreateDirectory(Path.Combine(src, "sub"));
             File.WriteAllText(Path.Combine(src, "sub", "inner.txt"), "inner");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "sub");

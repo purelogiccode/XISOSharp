@@ -106,7 +106,7 @@ public class CorruptTocTests : IDisposable
     private static long FindEntryHeader(byte[] img, long tableAbs, uint tableSize, string name)
     {
         var nameBytes = Encoding.ASCII.GetBytes(name);
-        var tableEnd = (long)(tableAbs + tableSize);
+        var tableEnd = tableAbs + tableSize;
         Assert.True(tableEnd <= img.Length, "table runs past end of image; fixture layout unexpected");
 
         for (var i = tableAbs; i + 14 + nameBytes.Length <= Math.Min(tableEnd, img.Length); i++)
@@ -149,7 +149,7 @@ public class CorruptTocTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (rootSector, rootSize, rootAbs, _) = RootLayout(isoPath);
+        var (_, rootSize, rootAbs, _) = RootLayout(isoPath);
         Assert.Equal(2, XisoReader.ListDirectory(isoPath, "/").Count);
 
         // Patch b.txt's right-sibling pointer to itself: the old walk followed
@@ -161,7 +161,6 @@ public class CorruptTocTests : IDisposable
         BinaryPrimitives.WriteUInt16LittleEndian(img.AsSpan((int)header + 2), self);
         var bad = CopyIso(isoPath, "xiso_toc_bad");
         File.WriteAllBytes(bad, img);
-        _ = rootSector;
 
         var ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad, "/"));
         Assert.Contains("invalid TOC entry", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -327,10 +326,10 @@ public class CorruptTocTests : IDisposable
     // ------------------------------------------------------------------
 
     private static string CreateSubdirCycleIso(
-        CorruptTocTests self, string isoName, out string subName, out string innerName)
+        CorruptTocTests self, string isoName, out string subName)
     {
         var sub = "sub";
-        var inner = "inner.txt";
+        const string inner = "inner.txt";
         var isoPath = self.CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "top.txt"), "top");
@@ -356,14 +355,13 @@ public class CorruptTocTests : IDisposable
         var bad = self.CopyIso(isoPath, "xiso_toc_bad");
         File.WriteAllBytes(bad, img);
         subName = sub;
-        innerName = inner;
         return bad;
     }
 
     [Fact]
     public void SubdirCycle_Unpack_ThrowsInvalidToc()
     {
-        var bad = CreateSubdirCycleIso(this, "game.iso", out _, out _);
+        var bad = CreateSubdirCycleIso(this, "game.iso", out _);
 
         var dest = CreateTempDir("xiso_toc_dest");
         var ex = Assert.Throws<XisoFormatException>(() => XisoReader.UnpackImage(bad, dest));
@@ -373,7 +371,7 @@ public class CorruptTocTests : IDisposable
     [Fact]
     public void SubdirCycle_ContinueOnError_SkipsSubtreeAndSummarizes()
     {
-        var bad = CreateSubdirCycleIso(this, "game.iso", out _, out _);
+        var bad = CreateSubdirCycleIso(this, "game.iso", out _);
 
         var dest = CreateTempDir("xiso_toc_dest");
         var options = new UnpackOptions { ContinueOnError = true };
@@ -390,7 +388,7 @@ public class CorruptTocTests : IDisposable
     [Fact]
     public void SubdirCycle_Audit_ReportsInvalidToc()
     {
-        var bad = CreateSubdirCycleIso(this, "game.iso", out _, out _);
+        var bad = CreateSubdirCycleIso(this, "game.iso", out _);
 
         var result = XisoReader.AuditXiso(bad);
         Assert.False(result.IsValid);
@@ -402,7 +400,7 @@ public class CorruptTocTests : IDisposable
     [Fact]
     public void SubdirCycle_CopyOut_ThrowsInvalidToc()
     {
-        var bad = CreateSubdirCycleIso(this, "game.iso", out var subName, out _);
+        var bad = CreateSubdirCycleIso(this, "game.iso", out var subName);
 
         var dest = Path.Combine(CreateTempDir("xiso_toc_dest"), "out");
         var ex = Assert.Throws<XisoFormatException>(() =>

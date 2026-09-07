@@ -5,7 +5,7 @@ using XISOSharp.Cli;
 namespace XISOSharp.Tests;
 
 /// <summary>
-/// Tests for <see cref="XisoReader.GetXbeInfo"/> — original-Xbox XBEH executable
+/// Tests for <see cref="XisoReader.GetXbeInfo(string, string)"/> — original-Xbox XBEH executable
 /// header + certificate parsing.
 /// </summary>
 [Collection("Sequential")]

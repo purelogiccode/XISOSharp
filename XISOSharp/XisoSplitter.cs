@@ -83,7 +83,9 @@ public static class XisoSplitter
     public static IReadOnlyList<string> Split(string isoPath, string outputBase, long partSizeBytes,
         CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
     {
-        var length = ValidateImage(isoPath, outputBase);
+        if (string.IsNullOrEmpty(outputBase))
+            throw new ArgumentException("Output base path must not be empty.", nameof(outputBase));
+        var length = ValidateImage(isoPath);
         if (partSizeBytes < Constants.SectorSize)
             throw new ArgumentOutOfRangeException(nameof(partSizeBytes),
                 $"Part size must be at least one sector ({Constants.SectorSize} bytes).");
@@ -113,7 +115,9 @@ public static class XisoSplitter
     public static IReadOnlyList<string> SplitHalves(string isoPath, string outputBase,
         CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null)
     {
-        var length = ValidateImage(isoPath, outputBase);
+        if (string.IsNullOrEmpty(outputBase))
+            throw new ArgumentException("Output base path must not be empty.", nameof(outputBase));
+        var length = ValidateImage(isoPath);
         var cut = ((length + 1) / 2 + Constants.SectorSize - 1) / Constants.SectorSize * Constants.SectorSize;
         if (cut <= 0 || cut >= length)
             cut = length;
@@ -191,17 +195,16 @@ public static class XisoSplitter
                 {
                     using var input = new FileStream(part, FileMode.Open, FileAccess.Read,
                         FileShare.Read, 65536);
+                    var bytesToCopy = input.Length;
                     var baseCopied = copied;
-                    XisoFileCopier.CopyExact(input, input.Length,
+                    var justCopied = XisoFileCopier.CopyExact(input, bytesToCopy,
+                        // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
                         (buf, count) => output.Write(buf, 0, count),
                         buffer: null,
-                        done =>
-                        {
-                            copied = baseCopied + done;
-                            progress?.Report(new ProgressInfo(ProgressInfoType.FileProgress,
-                                Count: total, Path: outputPath, Size: copied));
-                        },
+                        done => progress?.Report(new ProgressInfo(ProgressInfoType.FileProgress,
+                            Count: total, Path: outputPath, Size: baseCopied + done)),
                         cancellationToken);
+                    copied = baseCopied + justCopied;
                 }
             }
 
@@ -230,19 +233,17 @@ public static class XisoSplitter
     }
 
     /// <summary>
-    /// Validates the image path/base pair shared by the split entries: path
+    /// Validates the image path shared by the split entries: path
     /// presence plus a <see cref="XisoReader.GetVolumeInfo(string)"/> probe. Returns
-    /// the image length in bytes.
+    /// the image length in bytes. Callers validate <c>outputBase</c> themselves.
     /// </summary>
-    /// <exception cref="ArgumentException">A path is null or empty.</exception>
+    /// <exception cref="ArgumentException">The image path is null or empty.</exception>
     /// <exception cref="FileNotFoundException">The image does not exist.</exception>
     /// <exception cref="XisoFormatException">The image is not a valid XISO.</exception>
-    private static long ValidateImage(string isoPath, string outputBase)
+    private static long ValidateImage(string isoPath)
     {
         if (string.IsNullOrEmpty(isoPath))
             throw new ArgumentException("Image path must not be empty.", nameof(isoPath));
-        if (string.IsNullOrEmpty(outputBase))
-            throw new ArgumentException("Output base path must not be empty.", nameof(outputBase));
         if (!File.Exists(isoPath))
             throw new FileNotFoundException($"Image not found: {isoPath}", isoPath);
         var volume = XisoReader.GetVolumeInfo(isoPath);
@@ -280,21 +281,20 @@ public static class XisoSplitter
             long copied = 0;
             for (var i = 0; i < parts.Count; i++)
             {
-                using var output = new FileStream(parts[i], FileMode.CreateNew, FileAccess.Write,
+                var partPath = parts[i];
+                using var output = new FileStream(partPath, FileMode.CreateNew, FileAccess.Write,
                     FileShare.None, 65536);
-                created.Add(parts[i]);
+                created.Add(partPath);
                 var remaining = Math.Min(alignedPartSize, length - input.Position);
                 var baseCopied = copied;
-                XisoFileCopier.CopyExact(input, remaining,
+                var justCopied = XisoFileCopier.CopyExact(input, remaining,
+                    // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
                     (buf, count) => output.Write(buf, 0, count),
                     buffer: null,
-                    done =>
-                    {
-                        copied = baseCopied + done;
-                        progress?.Report(new ProgressInfo(ProgressInfoType.FileProgress,
-                            Count: length, Path: parts[i], Size: copied));
-                    },
+                    done => progress?.Report(new ProgressInfo(ProgressInfoType.FileProgress,
+                        Count: length, Path: partPath, Size: baseCopied + done)),
                     cancellationToken);
+                copied = baseCopied + justCopied;
             }
 
             return parts;

@@ -4,7 +4,7 @@ using ZARSharp.Pipeline;
 namespace XISOSharp.Tests;
 
 /// <summary>
-/// Step 5 pipeline coverage on the XISO side: <see cref="XisoZarchive.CreateZar"/>
+/// Step 5 pipeline coverage on the XISO side: <see cref="XisoZarchive.CreateZar(string, string?, long, bool, CancellationToken, ZARSharp.IZarBlockCompressor?, IProgress{ZARSharp.Pipeline.ZarProgress}?)"/>
 /// progress reporting through the shared engine, and the CLI <c>--zar</c>
 /// <c>--jobs</c> / <c>--policy</c> batch flags end to end via
 /// <see cref="Program.Main"/>.

@@ -99,8 +99,8 @@ public sealed class SectorAllocator
         if (byteCount == 0)
             return 0;
 
-        var sectors = byteCount / (ulong)Constants.SectorSize;
-        if (byteCount % (ulong)Constants.SectorSize != 0)
+        var sectors = byteCount / Constants.SectorSize;
+        if (byteCount % Constants.SectorSize != 0)
             sectors++;
 
         if (sectors > uint.MaxValue)
@@ -174,7 +174,7 @@ public sealed class SectorAllocator
         {
             var existingEnd = (ulong)start + count;
             var newEnd = (ulong)startSector + sectorCount;
-            if (startSector < existingEnd && (ulong)start < newEnd)
+            if (startSector < existingEnd && start < newEnd)
             {
                 throw new ArgumentException(
                     $"Range [{startSector}, {newEnd}) overlaps tracked range [{start}, {existingEnd}).",
@@ -205,7 +205,7 @@ public sealed class SectorAllocator
         foreach (var (start, count) in _used)
         {
             var existingEnd = (ulong)start + count;
-            if (startSector < existingEnd && (ulong)start < end)
+            if (startSector < existingEnd && start < end)
                 return false;
         }
 
@@ -247,8 +247,8 @@ public sealed class SectorAllocator
             var limit = (ulong)TotalSectors.Value;
             foreach (var (start, count) in _used)
             {
-                if ((ulong)start > cursor)
-                    free.Add(new SectorRange((uint)cursor, (uint)((ulong)start - cursor)));
+                if (start > cursor)
+                    free.Add(new SectorRange((uint)cursor, (uint)(start - cursor)));
 
                 cursor = Math.Max(cursor, (ulong)start + count);
             }
@@ -293,7 +293,7 @@ public sealed class SectorAllocator
         ulong cursor = FirstFreeSector;
         foreach (var (start, count) in _used)
         {
-            if ((ulong)start >= cursor + sectorCount)
+            if (start >= cursor + sectorCount)
                 return (uint)cursor;
 
             cursor = Math.Max(cursor, (ulong)start + count);
@@ -333,7 +333,7 @@ public sealed class SectorAllocator
             if (merged.Count > 0)
             {
                 var (lastStart, lastCount) = merged[^1];
-                if ((ulong)start <= (ulong)lastStart + lastCount)
+                if (start <= (ulong)lastStart + lastCount)
                 {
                     var end = Math.Max((ulong)lastStart + lastCount, (ulong)start + count);
                     merged[^1] = (lastStart, (uint)(end - lastStart));

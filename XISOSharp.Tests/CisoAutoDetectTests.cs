@@ -2,7 +2,7 @@ namespace XISOSharp.Tests;
 
 /// <summary>
 /// Tests for transparent <c>.cso</c> input in the read/rewrite verbs
-/// (<see cref="XisoReader.Extract"/>, <c>List</c>, <c>Tree</c>, <c>UnpackImage</c>,
+/// (<see cref="XisoReader.Extract(string, string?, bool, CancellationToken, int?, XISOSharp.UnpackOptions?, IProgress{XISOSharp.Models.ProgressInfo}?)"/>, <c>List</c>, <c>Tree</c>, <c>UnpackImage</c>,
 /// <c>Rewrite</c>), mirroring <c>xdvdfs-cli/src/img.rs::open_image</c>.
 /// Each test compresses a freshly packed XISO and asserts the verb behaves
 /// identically on the <c>.iso</c> and the <c>.cso</c>.

@@ -201,7 +201,9 @@ public class XisoRepairTests : IDisposable
         // Cut the image right after the root table: file data is gone, so the
         // entry's sector exceeds the file length (class T — unfixable).
         using (var fs = new FileStream(isoPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
             fs.SetLength((long)vol.RootDirSector * Constants.SectorSize + vol.RootDirSize);
+        }
 
         Assert.NotEmpty(XisoReader.AuditXiso(isoPath).Issues);
 
@@ -399,7 +401,9 @@ public class XisoRepairTests : IDisposable
         var isoPath = CreateIsoWithFiles(("readme.txt", new byte[8192]));
         var vol = XisoReader.GetVolumeInfo(isoPath);
         using (var fs = new FileStream(isoPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
             fs.SetLength((long)vol.RootDirSector * Constants.SectorSize + vol.RootDirSize);
+        }
 
         Assert.Equal(1, Program.Main(["--repair", isoPath]));
         Assert.Contains("FAIL", _logCapture.ToString(), StringComparison.Ordinal);

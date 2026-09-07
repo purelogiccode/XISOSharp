@@ -126,7 +126,7 @@ public class DirectoryEntryTableWriterTests : IDisposable
     [Fact]
     public void SerializeTable_Empty_ReturnsSingleFFSector()
     {
-        foreach (var empty in new AvlNode?[] { null, AvlNode.EmptySubdirectory })
+        foreach (var empty in new[] { null, AvlNode.EmptySubdirectory })
         {
             var bytes = DirectoryEntryTableWriter.SerializeTable(empty);
             Assert.Equal(Constants.SectorSize, bytes.Length);

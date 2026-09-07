@@ -3,7 +3,7 @@ using ZARSharp;
 namespace XISOSharp.Tests;
 
 /// <summary>
-/// TODO #18: on-disk XISO names are WINDOWS_1252 bytes and every reader path must
+/// on-disk XISO names are WINDOWS_1252 bytes and every reader path must
 /// decode them via Latin1. <see cref="XisoRanges.CollectFileEntries"/> and
 /// <see cref="XisoZarchive"/> previously used <c>Encoding.ASCII</c>, corrupting
 /// bytes ≥ 0x80 into <c>'?'</c> (skeleton <c>.hash</c> paths, ZAR tree names).

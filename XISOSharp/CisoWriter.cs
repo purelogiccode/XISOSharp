@@ -286,7 +286,7 @@ public static class CisoWriter
                     var blockLen = Lz4.Compress(blockBuf, lz4Scratch.AsSpan(4), acceleration);
                     // When the block does not compress, the frame stores it raw
                     // (block info carries the 0x80000000 uncompressed bit, as in lz4_flex).
-                    var sizeField = blockLen < BlockSize ? (uint)blockLen : 0x80000000u | (uint)BlockSize;
+                    var sizeField = blockLen < BlockSize ? (uint)blockLen : 0x80000000u | BlockSize;
                     BinaryPrimitives.WriteUInt32LittleEndian(lz4Scratch, sizeField);
                     var payloadLen = 4 + Math.Min(blockLen, BlockSize);
 

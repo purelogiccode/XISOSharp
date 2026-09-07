@@ -61,6 +61,7 @@ public class XisoSymlinkTests : IDisposable
                 {
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
+                    UseShellExecute = false,
                     CreateNoWindow = true,
                 };
                 using var proc = Process.Start(psi);
@@ -115,7 +116,7 @@ public class XisoSymlinkTests : IDisposable
 
         var pairs = RemapFilesystem.DryRunRemap(root, CatchAllRule());
 
-        Assert.Contains(pairs, p => p.HostPath == "/sub/real.txt");
+        Assert.Contains(pairs, p => string.Equals(p.HostPath, "/sub/real.txt", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(pairs, p => p.HostPath.Contains("loop", StringComparison.Ordinal));
     }
 
@@ -129,8 +130,8 @@ public class XisoSymlinkTests : IDisposable
 
         var pairs = RemapFilesystem.DryRunRemap(root, CatchAllRule());
 
-        Assert.Contains(pairs, p => p.HostPath == "/orig.txt");
-        var alias = Assert.Single(pairs, p => p.HostPath == "/alias.txt");
+        Assert.Contains(pairs, p => string.Equals(p.HostPath, "/orig.txt", StringComparison.OrdinalIgnoreCase));
+        var alias = Assert.Single(pairs, p => string.Equals(p.HostPath, "/alias.txt", StringComparison.OrdinalIgnoreCase));
         Assert.Equal("/alias.txt", alias.ImagePath);
     }
 

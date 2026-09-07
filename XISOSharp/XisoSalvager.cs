@@ -154,6 +154,8 @@ public static class XisoSalvager
         long discLseek,
         HashSet<long> visited,
         SalvageState state,
+        // Recursion-depth bound (#16 hardening); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
     {
         if (depth > Constants.MaxTocDepth)

@@ -641,9 +641,9 @@ public class CisoTests : IDisposable
         // Index: compressed-flagged entry pointing at the payload, final entry after it.
         var index = new byte[8];
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(
-            index.AsSpan(0, 4), (uint)(dataStart >> 2) | 0x80000000u);
+            index.AsSpan(0, 4), (dataStart >> 2) | 0x80000000u);
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(
-            index.AsSpan(4, 4), (uint)((dataStart + 4 + 2048) >> 2));
+            index.AsSpan(4, 4), (dataStart + 4 + 2048) >> 2);
         cso.Write(index);
 
         var payload = new byte[4 + 2048];

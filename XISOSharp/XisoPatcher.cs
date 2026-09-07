@@ -145,7 +145,7 @@ public static class XisoPatcher
         var parent = FindDirExtent(layout, canonicalParent, internalPath);
         var oldSectors = existing.FileSize == 0
             ? 0u
-            : (uint)((existing.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize);
+            : (existing.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize;
         var need = SectorAllocator.RequiredSectors((ulong)newData.Length);
         var allocator = SectorAllocator.FromLayout(layout);
 

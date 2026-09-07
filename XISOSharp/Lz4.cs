@@ -266,7 +266,7 @@ public static class Lz4
             }
             else
             {
-                cur += (int)(BitOperations.TrailingZeroCount(diff) / 8);
+                cur += BitOperations.TrailingZeroCount(diff) / 8;
                 return cur - start;
             }
         }
@@ -282,7 +282,7 @@ public static class Lz4
             }
             else
             {
-                cur += (int)(BitOperations.TrailingZeroCount(diff) / 8);
+                cur += BitOperations.TrailingZeroCount(diff) / 8;
                 return cur - start;
             }
         }

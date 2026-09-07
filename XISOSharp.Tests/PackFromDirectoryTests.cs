@@ -160,7 +160,7 @@ public class PackFromDirectoryTests : IDisposable
     [Fact]
     public void PackFromDirectory_RestoresCwd_OnSuccess()
     {
-        // TODO #22: the create path hops CWD internally; it must not leak.
+        // The create path hops CWD internally; it must not leak (#22).
         var before = Directory.GetCurrentDirectory();
         try
         {
@@ -188,7 +188,7 @@ public class PackFromDirectoryTests : IDisposable
     public void CreateXiso_RestoresCwd_WhenOutputCollides()
     {
         // The #55 collision throws *after* chdir into the source; CWD must
-        // still be restored (TODO #22).
+        // still be restored (#22).
         var before = Directory.GetCurrentDirectory();
         var src = CreateSourceTree();
         _tempDirs.Add(src);
@@ -214,9 +214,9 @@ public class PackFromDirectoryTests : IDisposable
     }
 
     [Fact]
-    public void PackFromDirectory_ConcurrentCalls_AllSucceed()
+    public async Task PackFromDirectory_ConcurrentCalls_AllSucceed()
     {
-        // TODO #22: creates are serialized process-wide — parallel packs must
+        // Creates are serialized process-wide (#22) — parallel packs must
         // all succeed with intact outputs instead of corrupting shared CWD.
         var before = Directory.GetCurrentDirectory();
         var cases = Enumerable.Range(0, 4).Select(_ =>
@@ -228,11 +228,11 @@ public class PackFromDirectoryTests : IDisposable
         }).ToList();
 
         var tasks = cases.Select(c => Task.Run(() => XisoWriter.PackFromDirectory(c.src, c.iso))).ToArray();
-        Task.WaitAll(tasks);
+        var results = await Task.WhenAll(tasks);
 
-        foreach (var (task, (src, iso)) in tasks.Zip(cases))
+        foreach (var (result, (src, iso)) in results.Zip(cases))
         {
-            Assert.Equal(0, task.Result);
+            Assert.Equal(0, result);
             var extracted = ExtractToTemp(iso);
             Assert.Equal(HashTree(src), HashTree(extracted));
         }

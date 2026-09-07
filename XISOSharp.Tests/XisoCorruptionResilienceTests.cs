@@ -60,7 +60,7 @@ public class XisoCorruptionResilienceTests : IDisposable
     private static long FindEntryHeader(byte[] img, long tableAbs, uint tableSize, string name)
     {
         var nameBytes = Encoding.ASCII.GetBytes(name);
-        var tableEnd = (long)(tableAbs + tableSize);
+        var tableEnd = tableAbs + tableSize;
         for (var i = tableAbs; i + 14 + nameBytes.Length <= Math.Min(tableEnd, img.Length); i++)
         {
             var match = true;
@@ -81,11 +81,11 @@ public class XisoCorruptionResilienceTests : IDisposable
         return -1;
     }
 
-    private static (uint RootSector, uint RootSize, long RootAbs) RootLayout(string isoPath)
+    private static (uint RootSize, long RootAbs) RootLayout(string isoPath)
     {
         var vol = XisoReader.GetVolumeInfo(isoPath);
         Assert.True(vol.IsValid, $"fixture ISO invalid: {isoPath}");
-        return (vol.RootDirSector, vol.RootDirSize, (long)vol.RootDirSector * Constants.SectorSize + vol.DiscLseek);
+        return (vol.RootDirSize, (long)vol.RootDirSector * Constants.SectorSize + vol.DiscLseek);
     }
 
     // ------------------------------------------------------------------
@@ -161,7 +161,7 @@ public class XisoCorruptionResilienceTests : IDisposable
             Directory.CreateDirectory(Path.Combine(src, "sub"));
             File.WriteAllText(Path.Combine(src, "sub", "inner.txt"), "inner");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "sub");
@@ -184,7 +184,7 @@ public class XisoCorruptionResilienceTests : IDisposable
             new Random(7).NextBytes(payload);
             File.WriteAllBytes(Path.Combine(src, "c.bin"), payload);
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "c.bin");
@@ -205,7 +205,7 @@ public class XisoCorruptionResilienceTests : IDisposable
     public void FileSizeMaxValue_FailsFastEverywhere()
     {
         var isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "big.bin"), "small"), "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "big.bin");
@@ -265,7 +265,7 @@ public class XisoCorruptionResilienceTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -286,7 +286,7 @@ public class XisoCorruptionResilienceTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -307,7 +307,7 @@ public class XisoCorruptionResilienceTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (_, rootSize, rootAbs) = RootLayout(isoPath);
+        var (rootSize, rootAbs) = RootLayout(isoPath);
 
         var img = File.ReadAllBytes(isoPath);
         var header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
@@ -330,7 +330,7 @@ public class XisoCorruptionResilienceTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (_, _, rootAbs) = RootLayout(isoPath);
+        var rootAbs = RootLayout(isoPath).RootAbs;
 
         var img = File.ReadAllBytes(isoPath);
         img[rootAbs] = 0x00;
@@ -385,7 +385,7 @@ public class XisoCorruptionResilienceTests : IDisposable
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
-        var (_, _, rootAbs) = RootLayout(isoPath);
+        var rootAbs = RootLayout(isoPath).RootAbs;
 
         var img = File.ReadAllBytes(isoPath).ToList();
         var fileLen = img.Count;

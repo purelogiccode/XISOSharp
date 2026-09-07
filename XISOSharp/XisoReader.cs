@@ -386,6 +386,8 @@ public static class XisoReader
         IProgress<ProgressInfo>? progress = null,
         HashSet<long>? visited = null,
         long tableSize = long.MaxValue,
+        // Recursion-depth bound (#16 hardening); threaded through left-subtree and subdir recursion by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Global
         int depth = 0,
         IFilesystem? filesystem = null)
     {
@@ -920,6 +922,7 @@ public static class XisoReader
                         XisoFileCopier.CopyExact(
                             fs,
                             fileSize,
+                            // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
                             (buffer, count) =>
                             {
                                 // Write-then-count matches the old inline loop, so
@@ -2204,6 +2207,8 @@ public static class XisoReader
         HashSet<long> visited,
         ref int filesChecked,
         ref int dirsChecked,
+        // Recursion-depth bound (#16 hardening); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
     {
         // Hardening (#16): bound the audit walk like the extract walk — a corrupt
@@ -3059,6 +3064,7 @@ public static class XisoReader
                     XisoFileCopier.CopyExact(
                         fs,
                         entry.FileSize,
+                        // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
                         (buffer, count) =>
                         {
                             outFile.Write(buffer, 0, count);
@@ -3096,6 +3102,8 @@ public static class XisoReader
 
     private static void CopyOutDirectory(Stream fs, string imageName, string internalPath, string destPath,
         VolumeInfo volInfo, UnpackOptions? options = null, CancellationToken cancellationToken = default,
+        // Recursion-depth bound (#16 hardening); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0, IProgress<ProgressInfo>? progress = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -3197,6 +3205,7 @@ public static class XisoReader
             XisoFileCopier.CopyExact(
                 fs,
                 entry.FileSize,
+                // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
                 (buffer, count) => hasher.TransformBlock(buffer, 0, count, buffer, 0),
                 CopyBuffer);
         }
@@ -3545,6 +3554,8 @@ public static class XisoReader
         string currentPath,
         HashAlgorithmName algorithm,
         List<(string Path, byte[] Hash)> results,
+        // Recursion-depth bound (#16 hardening); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
     {
         // Hardening (#16): bound subdirectory descent like CopyOutDirectory above.

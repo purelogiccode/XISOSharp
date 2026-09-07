@@ -126,6 +126,8 @@ public static class XisoChecksum
 
     private static void CollectFileTree(IBlockDevice dev, long dirStart, uint dirSize, long discLseek,
         string parent, SortedDictionary<string, (bool IsDir, long Offset, uint Size)> map, CancellationToken ct,
+        // Recursion-depth bound (#16 hardening); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
     {
         ct.ThrowIfCancellationRequested();

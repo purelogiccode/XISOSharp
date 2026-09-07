@@ -438,8 +438,7 @@ internal partial class MainViewModel
         ExplorerStatusText = $"Hashing {node.FullPath}...";
         try
         {
-            var hex = await Task.Run(
-                () => explorer.ComputeHashHex(node.FullPath, HashAlgorithmName.SHA256)).ConfigureAwait(false);
+            var hex = await Task.Run(() => explorer.ComputeHashHex(node.FullPath, HashAlgorithmName.SHA256)).ConfigureAwait(false);
             OnUi(() =>
             {
                 ExplorerHashText = $"SHA-256({node.FullPath}) = {hex}";

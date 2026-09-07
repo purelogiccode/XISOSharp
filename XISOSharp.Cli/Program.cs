@@ -3478,7 +3478,7 @@ internal static class Program
         // collision policy, then pack. Returns 0 on success or skip, 1 on
         // failure. Parallel workers stay quiet; one summary line is logged
         // under a lock so batch output does not interleave.
-        int DeriveAndPackZar(string isoPath, ZarCollisionPolicy pol)
+        static int DeriveAndPackZar(string isoPath, ZarCollisionPolicy pol)
         {
             long size;
             try

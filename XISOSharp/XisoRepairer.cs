@@ -192,6 +192,8 @@ public static class XisoRepairer
         HashSet<long> visited,
         HashSet<long> trustedAttrs,
         List<RawEntry> entries,
+        // Recursion-depth bound (#16 hardening); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
     {
         if (depth > Constants.MaxTocDepth)
@@ -201,6 +203,7 @@ public static class XisoRepairer
         Span<byte> shortBuf = stackalloc byte[2];
         Span<byte> intBuf = stackalloc byte[4];
         Span<byte> byteBuf = stackalloc byte[1];
+        Span<byte> headerRest = stackalloc byte[12];
 
         while (true)
         {
@@ -222,7 +225,6 @@ public static class XisoRepairer
                 if (lOffset == Constants.EmptyDirectorySentinel && dirStart == tableStart)
                 {
                     var peekPos = fs.Position;
-                    Span<byte> headerRest = stackalloc byte[12];
                     var isAllZeros = false;
                     try
                     {

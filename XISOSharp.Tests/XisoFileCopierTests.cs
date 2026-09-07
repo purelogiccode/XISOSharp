@@ -94,6 +94,7 @@ public class XisoFileCopierTests : IDisposable
 
         var copied = XisoFileCopier.CopyExact(
             source, size,
+            // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
             (buffer, count) => dest.Write(buffer, 0, count),
             new byte[TwoMb],
             progress.Add);
@@ -151,6 +152,7 @@ public class XisoFileCopierTests : IDisposable
 
         var copied = XisoFileCopier.CopyExact(
             source, data.Length,
+            // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
             (buffer, count) => dest.Write(buffer, 0, count),
             new byte[TwoMb]);
 
@@ -167,6 +169,7 @@ public class XisoFileCopierTests : IDisposable
 
         var copied = XisoFileCopier.CopyExact(
             source, data.Length,
+            // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
             (buffer, count) => dest.Write(buffer, 0, count),
             buffer: null);
 
@@ -214,6 +217,7 @@ public class XisoFileCopierTests : IDisposable
                 source, data.Length,
                 (_, _) => { },
                 new byte[TwoMb],
+                // ReSharper disable once AccessToDisposedClosure — callback runs synchronously inside CopyExact.
                 _ => cts.Cancel(),
                 cts.Token));
     }
@@ -248,7 +252,7 @@ public class XisoFileCopierTests : IDisposable
     [Fact]
     public void CopyOut_ReportsFileProgress_PerChunk()
     {
-        var isoPath = CreateIsoWithSizedFiles(out var big, out var small);
+        var isoPath = CreateIsoWithSizedFiles(out var big, out _);
         var progress = new CollectingProgress();
         var dest = Path.Combine(CreateTempDir("xiso_copier_dest"), "big.bin");
 

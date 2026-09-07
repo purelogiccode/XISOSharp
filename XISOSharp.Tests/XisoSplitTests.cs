@@ -56,6 +56,7 @@ public class XisoSplitTests : IDisposable
     {
         var outDir = CreateTempDir("xiso_split_out");
         Assert.Equal(0, XisoWriter.CreateXiso(srcDir, outDir, null, null, out var isoPath, null, null));
+        Assert.NotNull(isoPath);
         return isoPath;
     }
 

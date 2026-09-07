@@ -8,10 +8,6 @@ namespace XISOSharp.Benchmarks;
 #pragma warning disable RCS1102
 // ReSharper disable once ClassNeverInstantiated.Global
 // ReSharper disable once ConvertToStaticClass
-/// <summary>
-/// Benchmarks <see cref="Constants.NumSectors(uint)"/> for small, exact-multiple,
-/// remainder, and maximum inputs.
-/// </summary>
 public class NumSectorsBenchmarks
 #pragma warning restore RCS1102
 {

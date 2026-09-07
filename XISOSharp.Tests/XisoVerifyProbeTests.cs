@@ -49,7 +49,7 @@ public sealed class XisoVerifyProbeTests : IDisposable
             + Constants.FileTimeSize + Constants.UnusedSize + Constants.HeaderDataLength;
         using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
-            fs.SetLength((long)Constants.Xgd2HybridLseekOffset + headerLength + Constants.SectorSize);
+            fs.SetLength(Constants.Xgd2HybridLseekOffset + headerLength + Constants.SectorSize);
             fs.Seek(partitionBase + Constants.HeaderOffset, SeekOrigin.Begin);
             fs.Write(magic, 0, magic.Length);
             Span<byte> intBuf = stackalloc byte[4];
@@ -87,21 +87,21 @@ public sealed class XisoVerifyProbeTests : IDisposable
         var (rootSector, rootSize, discLseek) = Verify(CreateProbeImage(Constants.GlobalLseekOffset));
         Assert.Equal(0x108u, rootSector);
         Assert.Equal(2048u, rootSize);
-        Assert.Equal((long)Constants.GlobalLseekOffset, discLseek);
+        Assert.Equal(Constants.GlobalLseekOffset, discLseek);
     }
 
     [Fact]
     public void VerifyXiso_Xgd3BaseMagic_ReturnsXgd3Lseek()
     {
         var (_, _, discLseek) = Verify(CreateProbeImage(Constants.Xgd3LseekOffset));
-        Assert.Equal((long)Constants.Xgd3LseekOffset, discLseek);
+        Assert.Equal(Constants.Xgd3LseekOffset, discLseek);
     }
 
     [Fact]
     public void VerifyXiso_Xgd1BaseMagic_ReturnsXgd1Lseek()
     {
         var (_, _, discLseek) = Verify(CreateProbeImage(Constants.Xgd1LseekOffset));
-        Assert.Equal((long)Constants.Xgd1LseekOffset, discLseek);
+        Assert.Equal(Constants.Xgd1LseekOffset, discLseek);
     }
 
     [Fact]

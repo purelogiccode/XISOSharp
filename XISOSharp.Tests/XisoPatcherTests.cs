@@ -148,7 +148,7 @@ public class XisoPatcherTests : IDisposable
         var oldEntry = XisoReader.GetEntryInfo(iso, "/file2.txt");
         Assert.NotNull(oldEntry);
         var parent = layout.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
-        var oldSectors = (uint)((oldEntry.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize);
+        var oldSectors = (oldEntry.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize;
 
         var host = Path.Combine(CreateTempDir("xiso_patch_host"), "new.bin");
         File.WriteAllBytes(host, new byte[100]);
@@ -208,7 +208,7 @@ public class XisoPatcherTests : IDisposable
         Assert.Equal(content, File.ReadAllBytes(CopyOutToTemp(iso, "/file1.txt")));
 
         // Old run wiped with 0xFF.
-        var oldSectors = (uint)((oldEntry.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize);
+        var oldSectors = (oldEntry.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize;
         AssertAllFf(ReadSectors(iso, layout.Volume.DiscLseek, oldEntry.StartSector, oldSectors));
 
         // Whole tree still extracts correctly.
@@ -260,7 +260,7 @@ public class XisoPatcherTests : IDisposable
         Assert.Equal(0u, updated.FileSize);
         Assert.Equal(0, new FileInfo(CopyOutToTemp(iso, "/file2.txt")).Length);
 
-        var oldSectors = (uint)((oldEntry.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize);
+        var oldSectors = (oldEntry.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize;
         AssertAllFf(ReadSectors(iso, layout.Volume.DiscLseek, oldEntry.StartSector, oldSectors));
     }
 

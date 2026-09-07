@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 namespace XISOSharp.Tests;
 
 /// <summary>
-/// Tests for <see cref="XisoReader.GetXexInfo"/> — Xbox 360 XEX2 executable header parsing.
+/// Tests for <see cref="XisoReader.GetXexInfo(string, string)"/> — Xbox 360 XEX2 executable header parsing.
 /// </summary>
 [Collection("Sequential")]
 public class XexInfoTests : IDisposable

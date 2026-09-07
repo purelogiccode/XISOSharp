@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 namespace XISOSharp.Tests;
 
 /// <summary>
-/// TODO #19: <see cref="XisoExplorer"/> over CISO containers — single
+/// <see cref="XisoExplorer"/> over CISO containers — single
 /// <c>.cso</c> and split <c>.1.cso</c> part sets must explore identically to
 /// the source ISO (navigate, metadata, hash, copy-out), and garbage containers
 /// must fail under the documented contract.

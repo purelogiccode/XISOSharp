@@ -101,7 +101,7 @@ public class XisoFilesystemTests : IDisposable
         var root = CreateTempDir("xiso_fs_root");
         var fs = new LocalFilesystem(root);
         var path = Path.Combine(root, "f.bin");
-        File.WriteAllBytes(path, [9, 9, 9]);
+        File.WriteAllBytes(path, "\t\t\t"u8);
 
         Assert.True(fs.FileExists("f.bin"));
         Assert.Equal(3, fs.FileLength("f.bin"));
@@ -483,6 +483,7 @@ public class XisoFilesystemTests : IDisposable
                 if (info.Type == ProgressInfoType.FileAdded && !cancelled)
                 {
                     cancelled = true;
+                    // ReSharper disable once AccessToDisposedClosure — callback runs synchronously inside UnpackImage.
                     cts.Cancel();
                 }
             })));

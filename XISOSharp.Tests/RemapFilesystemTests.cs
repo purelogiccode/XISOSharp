@@ -186,7 +186,7 @@ public class RemapFilesystemTests : IDisposable
         Assert.True(ok);
         Assert.NotNull(rule);
         Assert.Null(error);
-        Assert.Equal(@"my:games/**", rule.HostGlob);
+        Assert.Equal("my:games/**", rule.HostGlob);
         Assert.Equal("dest/{1}", rule.ImagePath);
     }
 
@@ -197,7 +197,7 @@ public class RemapFilesystemTests : IDisposable
         Assert.True(ok);
         Assert.NotNull(rule);
         Assert.Equal("src/**", rule.HostGlob);
-        Assert.Equal(@"dest:v2/{1}", rule.ImagePath);
+        Assert.Equal("dest:v2/{1}", rule.ImagePath);
     }
 
     [Fact]

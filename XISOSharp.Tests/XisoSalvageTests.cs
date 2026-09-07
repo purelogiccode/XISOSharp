@@ -293,7 +293,9 @@ public class XisoSalvageTests : IDisposable
             File.WriteAllBytes(Path.Combine(src, "big.bin"), payload), "game.iso");
         var bad = CopyIso(isoPath, "xiso_salv_bad");
         using (var fs = new FileStream(bad, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
             fs.SetLength(fs.Length - 50000);
+        }
 
         var result = XisoReader.Salvage(bad);
 
@@ -384,7 +386,9 @@ public class XisoSalvageTests : IDisposable
         var bad = CopyIso(isoPath, "xiso_salv_bad");
         var rootAbs = RootLayout(bad).RootAbs;
         using (var fs = new FileStream(bad, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
             fs.SetLength(rootAbs - 100);
+        }
 
         var ex = Assert.Throws<XisoFormatException>(() => XisoReader.Salvage(bad));
         Assert.Contains("no tree root", ex.Message, StringComparison.Ordinal);
@@ -474,7 +478,9 @@ public class XisoSalvageTests : IDisposable
         var isoPath = CreateIso(src =>
             File.WriteAllBytes(Path.Combine(src, "big.bin"), payload), "game.iso");
         using (var fs = new FileStream(isoPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
             fs.SetLength(fs.Length - 50000);
+        }
 
         Assert.Equal(0, Program.Main(["--salvage", isoPath]));
 
@@ -526,7 +532,7 @@ public class XisoSalvageTests : IDisposable
         Assert.Equal("sentinel", File.ReadAllText(expected));
 
         Assert.Equal(0, Program.Main(["--salvage", "-y", isoPath]));
-        Assert.NotEqual("sentinel", File.ReadAllText(expected));
+        Assert.NotEqual("sentinel", File.ReadAllText(expected), StringComparer.OrdinalIgnoreCase);
         Assert.True(XisoReader.AuditXiso(expected).IsValid);
     }
 }

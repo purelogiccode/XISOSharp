@@ -84,7 +84,7 @@ public class XisoLegacyInteropTests : IDisposable
         return isoPath;
     }
 
-    private string CreateLegacyTree(out string workDir)
+    private string CreateLegacyTree()
     {
         var src = CreateTempDir("xiso_leg_src");
         File.WriteAllText(Path.Combine(src, "hello.txt"), "hello legacy\n");
@@ -94,7 +94,7 @@ public class XisoLegacyInteropTests : IDisposable
         for (var i = 0; i < 150; i++)
             File.WriteAllText(Path.Combine(src, $"file{i:000}.txt"), $"content {i}\n");
 
-        workDir = CreateTempDir("xiso_leg_work");
+        var workDir = CreateTempDir("xiso_leg_work");
         return CreateLegacyIso(src, workDir, "legacy");
     }
 
@@ -104,7 +104,7 @@ public class XisoLegacyInteropTests : IDisposable
         if (!ReferenceAvailable())
             return;
 
-        var isoPath = CreateLegacyTree(out _);
+        var isoPath = CreateLegacyTree();
         var dest = CreateTempDir("xiso_leg_dest");
         Assert.Equal(0, XisoReader.Extract(isoPath, dest, true));
 
@@ -120,7 +120,7 @@ public class XisoLegacyInteropTests : IDisposable
         if (!ReferenceAvailable())
             return;
 
-        var isoPath = CreateLegacyTree(out _);
+        var isoPath = CreateLegacyTree();
         Assert.Equal(0, XisoReader.List(isoPath, true));
     }
 
@@ -130,7 +130,7 @@ public class XisoLegacyInteropTests : IDisposable
         if (!ReferenceAvailable())
             return;
 
-        var isoPath = CreateLegacyTree(out _);
+        var isoPath = CreateLegacyTree();
         var rewriteDir = CreateTempDir("xiso_leg_rw");
         Assert.Equal(0, XisoReader.Rewrite(isoPath, rewriteDir, out var rewritten));
         Assert.NotNull(rewritten);

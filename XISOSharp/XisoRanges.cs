@@ -68,7 +68,10 @@ public static class XisoRanges
     }
 
     private static void GetValidSectors(FileStream isoFs, long isoOffset, List<uint> sysSectors, List<uint> fileSectors,
-        long rootOffset, uint rootSize, long childOffset, HashSet<long>? visited = null, int depth = 0)
+        long rootOffset, uint rootSize, long childOffset, HashSet<long>? visited = null,
+        // Threaded recursion-depth bound (#16 hardening, proven by deep-tree tests); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
+        int depth = 0)
     {
         // Hardening (#16): bound the walk — a corrupt cycle (or DAG fanning out
         // exponentially) throws a named error instead of recursing until the
@@ -197,11 +200,11 @@ public static class XisoRanges
 
         // Hardening (#16): validate the root pointer before walking — a corrupt
         // rootSize would otherwise pre-allocate millions of sector entries.
-        var rootAbs = offset + (long)rootOffset * SectorSize;
+        var rootAbs = offset + rootOffset * SectorSize;
         if (rootAbs < 0 || rootAbs >= isoFs.Length)
             throw new XisoFormatException(
                 $"invalid TOC entry: root directory sector {rootOffset} (offset {rootAbs}) points outside the image (length {isoFs.Length}).");
-        if ((ulong)rootSize > (ulong)(isoFs.Length - rootAbs))
+        if (rootSize > (ulong)(isoFs.Length - rootAbs))
             throw new XisoFormatException(
                 $"invalid TOC entry: root directory size {rootSize} (ends at {rootAbs + rootSize}) exceeds image length {isoFs.Length}.");
 
@@ -288,7 +291,10 @@ public static class XisoRanges
 
     private static void CollectFileEntries(FileStream isoFs, long isoOffset, long dirOffset, uint dirSize,
         long childOffset, string dirPath, List<(string Path, long Offset, uint Size)> results,
-        HashSet<long>? visited = null, int depth = 0)
+        HashSet<long>? visited = null,
+        // Threaded recursion-depth bound (#16 hardening, proven by deep-tree tests); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
+        int depth = 0)
     {
         if (childOffset >= dirSize) return;
 

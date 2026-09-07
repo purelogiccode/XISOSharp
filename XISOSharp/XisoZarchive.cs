@@ -206,7 +206,10 @@ public static class XisoZarchive
 
     private static void ParseNode(FileStream isoFs, long isoOffset, long dirOffset, uint dirSize, long childOffset,
         PathNode parent, List<string> names, Dictionary<string, int> lookup,
-        HashSet<long>? visited = null, int depth = 0)
+        HashSet<long>? visited = null,
+        // Recursion-depth bound (#16 hardening); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
+        int depth = 0)
     {
         if (childOffset >= dirSize) return;
         // Hardening (#16): bound the walk — a corrupt cycle previously recursed
