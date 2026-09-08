@@ -18,11 +18,22 @@ internal sealed class BattleOptions
     /// <summary>Gets an explicit path to extract-xiso.exe (default: beside the harness).</summary>
     public string? OraclePath { get; init; }
 
+    /// <summary>Gets an explicit path to xdvdfs.exe (default: beside the harness); null = auto-resolve.</summary>
+    public string? XdvdfsPath { get; init; }
+
+    /// <summary>Gets an explicit path to xboxkit.exe (default: beside the harness); null = auto-resolve.</summary>
+    public string? XboxkitPath { get; init; }
+
     /// <summary>Gets the work root for scratch dirs (default: %TEMP%\xiso_battle_&lt;stamp&gt;).</summary>
     public string? WorkRoot { get; init; }
 
-    /// <summary>Gets the ops to battle: list, extract, rewrite (default: all three).</summary>
-    public List<string> Ops { get; init; } = ["list", "extract", "rewrite"];
+    /// <summary>
+    /// Gets the ops to battle (default: all). extract-xiso oracle: list, extract,
+    /// rewrite. xdvdfs oracle (xdvdfs-parity features): checksum, md5, unpack,
+    /// pack, cso. xboxkit oracle (XboxKit-parity archival): petrify, video,
+    /// random, seed, trim, wipe, zar, rebuild.
+    /// </summary>
+    public List<string> Ops { get; init; } = [.. ValidOps];
 
     /// <summary>Gets a value indicating whether scratch dirs are kept after the run.</summary>
     public bool KeepWork { get; init; }
@@ -46,6 +57,8 @@ internal sealed class BattleOptions
         int timeout = 60;
         string? cli = null;
         string? oracle = null;
+        string? xdvdfs = null;
+        string? xboxkit = null;
         string? work = null;
         bool keep = false;
         bool help = args.Length != 0 && args.Any(a => a is "-h" or "--help" or "/?" or "-?");
@@ -80,6 +93,12 @@ internal sealed class BattleOptions
                 case "--exe":
                 case "--native":
                     oracle = Value(args, ref i, inline);
+                    break;
+                case "--xdvdfs":
+                    xdvdfs = Value(args, ref i, inline);
+                    break;
+                case "--xboxkit":
+                    xboxkit = Value(args, ref i, inline);
                     break;
                 case "--work":
                     work = Value(args, ref i, inline);
@@ -116,12 +135,12 @@ internal sealed class BattleOptions
         ops = ops.Select(static o => o.ToLowerInvariant()).Distinct(StringComparer.Ordinal).ToList();
         if (ops.Count == 0)
         {
-            ops = validOps;
+            ops = [.. ValidOps];
         }
-        else if (ops.Except(validOps, StringComparer.Ordinal).Any())
+        else if (ops.Except(ValidOps, StringComparer.Ordinal).Any())
         {
             throw new ArgumentException(
-                $"Unknown ops: {string.Join(',', ops.Except(validOps, StringComparer.Ordinal))} (valid: {string.Join(',', validOps)})");
+                $"Unknown ops: {string.Join(',', ops.Except(ValidOps, StringComparer.Ordinal))} (valid: {string.Join(',', ValidOps)})");
         }
 
         if (dirs.Count == 0)
@@ -140,6 +159,8 @@ internal sealed class BattleOptions
             Seed = seed,
             CliPath = cli,
             OraclePath = oracle,
+            XdvdfsPath = xdvdfs,
+            XboxkitPath = xboxkit,
             WorkRoot = work,
             Ops = ops,
             KeepWork = keep,
@@ -164,13 +185,24 @@ internal sealed class BattleOptions
         }
     }
 
+    /// <summary>All battleable op names, grouped by oracle.</summary>
+    public static readonly string[] ValidOps =
+    [
+        // extract-xiso oracle (extract-xiso parity)
+        "list", "extract", "rewrite",
+        // xdvdfs oracle (xdvdfs-parity features)
+        "checksum", "md5", "unpack", "pack", "cso",
+        // xboxkit oracle (XboxKit-parity archival features)
+        "petrify", "video", "random", "seed", "trim", "wipe", "zar", "rebuild",
+    ];
+
     public static void PrintUsage() =>
         Console.WriteLine("""
 
             Usage: XISOSharp.BattleTests [options] [*.iso ...]
 
-            Battles the XISOSharp CLI against native extract-xiso.exe over a random
-            sample of ISOs (default: 3 files from H:\XBOXTest).
+            Battles the XISOSharp CLI against reference tools over a random sample of
+            ISOs (default: 3 files from H:\XBOXTest).
 
             Options:
               --dir <path>[,<path>...]  Dir(s) to scan top-level for *.iso (default: H:\XBOXTest)
@@ -178,7 +210,9 @@ internal sealed class BattleOptions
               --seed <N>                RNG seed for the sample (default: auto, reported in the report)
               --cli <path>              Path to the XISOSharp CLI exe (default: beside the harness)
               --exe <path>              Path to extract-xiso.exe (default: beside the harness)
-              --ops <a,b,c>             Ops to battle: list, extract, rewrite (default: all)
+              --xdvdfs <path>           Path to xdvdfs.exe (default: beside the harness)
+              --xboxkit <path>          Path to xboxkit.exe (default: beside the harness)
+              --ops <a,b,c>             Ops to battle (default: all; skipped when the op's oracle is missing)
               --work <dir>              Scratch dir root (default: %TEMP%\xiso_battle_<stamp>)
               --keep                    Keep scratch dirs after the run (they hold ~4x the ISO size)
               --timeout <minutes>       Per-operation timeout (default 60)
@@ -186,10 +220,35 @@ internal sealed class BattleOptions
 
             Any positional *.iso path replaces random sampling.
 
-            Per-ISO battles (CLI vs extract-xiso):
+            extract-xiso battles (CLI vs extract-xiso.exe):
               list     -l entry lines must match exactly
               extract  -x -d trees must match: same files (ordinal), same SHA-256 per file, same dirs
               rewrite  -r -d outputs must match byte-for-byte (SHA-256); staged input copies
                        protect the source ISOs from the oracle's in-place rewrite semantics
+
+            xdvdfs battles (CLI vs xdvdfs.exe — xdvdfs-parity features):
+              checksum deterministic SHA3-256 image checksums must match exactly
+              md5      per-file MD5 lists must agree (CLI ⊆ xdvdfs; extra dir entries noted)
+              unpack   --unpack vs `xdvdfs unpack`: extracted trees must match (files+SHA-256+dirs)
+              pack     -c (media patch off) vs `xdvdfs pack`: content checksums of both
+                       packed images must match (layout-agnostic content parity)
+              cso      cso round-trip: XISOSharp compress → xdvdfs cross-reads the CSO
+                       (md5 per file) → XISOSharp decompress → checksum vs source
+
+            xboxkit battles (CLI vs xboxkit.exe — XboxKit-parity archival features):
+              petrify  --petrify vs `-p`: skeleton images must match byte-for-byte
+              video    --video vs `-v`: video partition ISOs must match byte-for-byte
+              random   --random vs `-r`: filler data must match byte-for-byte
+              seed     --seed vs `-s`: XGD1 PRNG seed (4 bytes) must match
+              trim     --trim vs `-t`: trimmed images must match byte-for-byte
+              wipe     --wipe vs `-w`: wiped images must match byte-for-byte
+              zar      --zar vs `-z`: ZArchive outputs must match byte-for-byte
+              rebuild  rebuild a full redump image from components; the rebuilt image
+                       must match the original byte-for-byte (both tools)
+
+            Notes:
+              Redump-only ops (video/random/seed/trim/wipe/petrify/rebuild) auto-skip on
+              trimmed XISOs — the reference tools refuse them there. xboxkit.exe always
+              exits 0, so success is detected via output files, not exit codes.
             """);
 }

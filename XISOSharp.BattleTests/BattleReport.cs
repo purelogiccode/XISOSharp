@@ -37,6 +37,8 @@ internal static class BattleReport
         w.AppendLine(CultureInfo.InvariantCulture, $"XISOSharp Battle Report {stamp}");
         w.AppendLine(CultureInfo.InvariantCulture, $"CLI:    {s.CliPath} | {s.CliVersion}");
         w.AppendLine(CultureInfo.InvariantCulture, $"Oracle: {s.OraclePath} | {s.OracleVersion}");
+        w.AppendLine(CultureInfo.InvariantCulture, $"xdvdfs: {(s.XdvdfsPath.Length > 0 ? s.XdvdfsPath : "(not found)")} | {s.XdvdfsVersion}");
+        w.AppendLine(CultureInfo.InvariantCulture, $"xboxkit: {(s.XboxkitPath.Length > 0 ? s.XboxkitPath : "(not found)")} | {s.XboxkitVersion}");
         w.AppendLine(CultureInfo.InvariantCulture, $"Seed: {s.Seed} | Ops: {string.Join(", ", s.Ops)} | Work: {s.WorkRoot}");
         w.AppendLine(CultureInfo.InvariantCulture, $"ISOs ({picked.Count}):");
         foreach (string iso in picked)
@@ -47,6 +49,11 @@ internal static class BattleReport
         w.AppendLine(
             CultureInfo.InvariantCulture,
             $"Summary: {s.PassedSubs}/{s.TotalSubs} checks passed, {s.FailedSubs} failed, {s.SkippedSubs} skipped in {s.Elapsed.TotalSeconds:F1}s");
+        double cliTotal = s.IsoResults.SelectMany(static r => r.Subs).Sum(static x => x.CliSeconds);
+        double nativeTotal = s.IsoResults.SelectMany(static r => r.Subs).Sum(static x => x.OracleSeconds);
+        string timeLine = $"Time: cli {cliTotal:F1}s vs native {nativeTotal:F1}s" +
+                          (nativeTotal > 0.05 ? $" (cli {cliTotal / nativeTotal:F2}x native)" : string.Empty);
+        w.Append(timeLine).AppendLine();
         w.AppendLine();
         foreach (IsoResult f in s.IsoResults)
         {
@@ -57,7 +64,7 @@ internal static class BattleReport
             {
                 w.AppendLine(
                     CultureInfo.InvariantCulture,
-                    $"  {sub.Op,-8} {sub.Status,-7} {sub.Seconds,8:F1}s  {sub.Detail.Replace('\n', ' ').Trim()}");
+                    $"  {sub.Op,-8} {sub.Status,-7} {sub.Seconds,8:F1}s (cli {sub.CliSeconds,7:F1}s / native {sub.OracleSeconds,7:F1}s)  {sub.Detail.Replace('\n', ' ').Trim()}");
             }
 
             w.AppendLine();
@@ -74,6 +81,8 @@ internal static class BattleReport
             ops = s.Ops,
             cli = new { path = s.CliPath, version = s.CliVersion },
             oracle = new { path = s.OraclePath, version = s.OracleVersion },
+            xdvdfs = new { path = s.XdvdfsPath, version = s.XdvdfsVersion },
+            xboxkit = new { path = s.XboxkitPath, version = s.XboxkitVersion },
             workRoot = s.WorkRoot,
             totalIsos = s.TotalIsos,
             failedIsos = s.FailedIsos,
@@ -82,6 +91,8 @@ internal static class BattleReport
             failedChecks = s.FailedSubs,
             skippedChecks = s.SkippedSubs,
             elapsedSeconds = s.Elapsed.TotalSeconds,
+            cliSecondsTotal = s.IsoResults.SelectMany(static r => r.Subs).Sum(static x => x.CliSeconds),
+            nativeSecondsTotal = s.IsoResults.SelectMany(static r => r.Subs).Sum(static x => x.OracleSeconds),
             isos = picked,
             results = s.IsoResults.Select(f => new
             {
@@ -90,7 +101,15 @@ internal static class BattleReport
                 f.FileSize,
                 f.Seconds,
                 f.AllPassed,
-                subs = f.Subs.Select(sub => new { sub.Op, status = sub.Status.ToString(), sub.Detail, sub.Seconds }),
+                subs = f.Subs.Select(sub => new
+                {
+                    sub.Op,
+                    status = sub.Status.ToString(),
+                    sub.Detail,
+                    sub.Seconds,
+                    sub.CliSeconds,
+                    sub.OracleSeconds,
+                }),
             }),
         }, new JsonSerializerOptions { WriteIndented = true });
 }

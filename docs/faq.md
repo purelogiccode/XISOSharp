@@ -22,7 +22,9 @@ rebalancing and directory layout), and the test suite plus `Verify-Output.ps1`
 continuously verify SHA-256 equality of outputs. Rewrites (`-r`) are additionally
 SHA-256-verified byte-identical against real Redump dumps by the
 [XISOSharp.BattleTests](testing.md#the-cli-battle-harness) harness (list, extract,
-and rewrite). One deliberate divergence is opt-in: `--preserve-attrs` keeps the
+and rewrite vs `extract-xiso.exe`; `checksum`/`md5`/`unpack`/`pack`/`cso` vs
+`xdvdfs.exe`; `petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild` vs
+`xboxkit.exe`). One deliberate divergence is opt-in: `--preserve-attrs` keeps the
 source dirent attribute bits (RO/HID/SYS/NOR) on rewrite, where extract-xiso always
 re-encodes files as Archive (`0x20`) — see [XISO Format › Attributes](xiso-format.md#attributes).
 

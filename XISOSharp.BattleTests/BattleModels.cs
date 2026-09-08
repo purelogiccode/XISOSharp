@@ -8,8 +8,16 @@ internal enum BattleStatus
     Skipped,
 }
 
-/// <summary>Result of one op (list/extract/rewrite) for one ISO.</summary>
-internal sealed record SubResult(string Op, BattleStatus Status, string Detail, double Seconds);
+/// <summary>Result of one op (list/extract/rewrite) for one ISO. <see cref="Seconds"/>
+/// is the combined op wall time; <see cref="CliSeconds"/>/<see cref="OracleSeconds"/>
+/// are the per-executable times measured by the harness.</summary>
+internal sealed record SubResult(
+    string Op,
+    BattleStatus Status,
+    string Detail,
+    double Seconds,
+    double CliSeconds,
+    double OracleSeconds);
 
 /// <summary>Per-ISO battle result across all requested ops.</summary>
 internal sealed class IsoResult
@@ -41,6 +49,14 @@ internal sealed class BattleSession
     public string CliVersion { get; set; } = string.Empty;
 
     public string OracleVersion { get; set; } = string.Empty;
+
+    public string XdvdfsPath { get; set; } = string.Empty;
+
+    public string XdvdfsVersion { get; set; } = "not found";
+
+    public string XboxkitPath { get; set; } = string.Empty;
+
+    public string XboxkitVersion { get; set; } = "not found";
 
     public string WorkRoot { get; set; } = string.Empty;
 

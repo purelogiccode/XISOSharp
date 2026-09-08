@@ -244,26 +244,52 @@ It targets Windows only and is not part of CI.
 ## The CLI battle harness
 
 `XISOSharp.BattleTests` is a console harness that pits the **XISOSharp CLI** against
-the **native `extract-xiso.exe` v2.7.1** (shipped beside the harness) over real game
-dumps. It shells out to both executables — no in-process library calls — so it tests
-exactly what end users run:
+reference tools over real game dumps: the native **`extract-xiso.exe` v2.7.1**
+(beside the harness), **`xdvdfs.exe` 0.8.3** (xdvdfs-parity features), and
+**`xboxkit.exe` 0.7** (XboxKit-parity archival features). It shells out to the
+executables — no in-process library calls — so it tests exactly what end users run:
 
 - **Sampling:** picks a random sample of `*.iso` files (default **3**) from
   `H:\XBOXTest` (override with `--dir`, `--count`, explicit `*.iso` paths, or a
   `--seed` for reproducibility — the seed is reported for re-runs).
-- **Battles per ISO:**
-  - `list` — `-l` entry lines must match exactly;
-  - `extract` — `-x -d` trees must match: same file set (ordinal), same per-file
-    SHA-256, same directory set;
-  - `rewrite` — `-r -d` outputs must match byte-for-byte (SHA-256). Inputs are
-    staged to copies first (the oracle renames its input to `.old`; the sources on
-    `H:` are never touched).
+- **Battles per ISO** (select with `--ops <a,b,c>`; default = all; ops whose
+  oracle exe is missing are skipped):
+  - extract-xiso oracle:
+    - `list` — `-l` entry lines must match exactly;
+    - `extract` — `-x -d` trees must match: same file set (ordinal), same per-file
+      SHA-256, same directory set;
+    - `rewrite` — `-r -d` outputs must match byte-for-byte (SHA-256). Inputs are
+      staged to copies first (the oracle renames its input to `.old`; the sources on
+      `H:` are never touched).
+  - xdvdfs oracle (xdvdfs-parity features):
+    - `checksum` — deterministic SHA3-256 image checksums must match exactly;
+    - `md5` — per-file MD5 lists must agree (xdvdfs-only dir rows are noted, not fatal);
+    - `unpack` — `--unpack` vs `xdvdfs unpack`: extracted trees must match;
+    - `pack` — `-c -m` vs `xdvdfs pack` over the same unpacked dir: the content
+      checksums of both images must match (layout-agnostic parity);
+    - `cso` — round-trip: XISOSharp compresses, **xdvdfs reads the CSO back**
+      (md5 per file), XISOSharp decompresses, content checksum must equal the source.
+  - xboxkit oracle (XboxKit-parity archival features; each side gets a staged copy):
+    - `petrify`/`video`/`random`/`seed`/`zar` — outputs must match byte-for-byte
+      (SHA-256);
+    - `trim`/`wipe` — in-place ops, compared byte-for-byte;
+    - `rebuild` — components extracted once, both tools rebuild the full redump;
+      each rebuilt image must match the original byte-for-byte.
+  - Redump-only ops (`video`/`random`/`seed`/`trim`/`wipe`/`petrify`/`rebuild`)
+    auto-**skip** on trimmed XISOs — the reference tools refuse them there
+    (xboxkit always exits 0, so success is detected via output files).
+- **Timing:** every op reports `cli` vs `native`/`xdvdfs`/`xboxkit` seconds and a
+  ratio; the summary totals both sides (JIT caveat: XISOSharp pays warm-up on its
+  first op).
 - **Exit codes:** `0` all passed, `1` config error, `2` any check failed.
-- **Reports:** `BattleReports/battle_<stamp>.txt|.json` next to the sources.
+- **Reports:** `BattleReports/battle_<stamp>.txt|.json` next to the sources
+  (per-op `cliSeconds`/`oracleSeconds` and per-tool totals in the JSON).
 
 ```bash
 dotnet run --project XISOSharp.BattleTests -c Release -- --seed 2026
 XISOSharp.BattleTests --ops list,extract,rewrite --count 3 --dir "H:\XBOXTest"
+XISOSharp.BattleTests --ops checksum,md5,unpack,pack,cso      # xdvdfs-parity features
+XISOSharp.BattleTests --ops petrify,video,random,seed,trim,wipe,zar,rebuild  # XboxKit archival
 ```
 
 This is the regression gate for the extract-xiso byte-parity contract

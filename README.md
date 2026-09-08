@@ -15,7 +15,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) fo
 | [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1288 tests) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + extract-xiso 2.7.1 legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
-| [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-CLI battle harness: XISOSharp vs `extract-xiso.exe` v2.7.1 over a random sample of real ISOs (default 3 of `H:\XBOXTest`, seeded) — `list`/`extract`/`rewrite` outputs compared byte-for-byte |
+| [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 3 of `H:\XBOXTest`, seeded): `extract-xiso.exe` v2.7.1 (`list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
 
 ## Documentation
 

@@ -20,8 +20,9 @@ internal sealed class ToolProcess
 
     public ToolProcess(string exePath) => ExePath = Path.GetFullPath(exePath);
 
-    /// <summary>Runs the exe with args; returns exit code and captured output.</summary>
-    public (int ExitCode, string StdOut, string StdErr) Run(params string[] args)
+    /// <summary>Runs the exe with args; returns exit code, captured output, and the
+    /// exe's wall-clock seconds (start → exit, excludes harness overhead).</summary>
+    public (int ExitCode, string StdOut, string StdErr, double Seconds) Run(params string[] args)
     {
         ProcessStartInfo psi = new()
         {
@@ -38,6 +39,7 @@ internal sealed class ToolProcess
             psi.ArgumentList.Add(a);
         }
 
+        Stopwatch sw = Stopwatch.StartNew();
         using Process proc = Process.Start(psi) ?? throw new InvalidOperationException($"Failed to start {ExePath}");
         Task<string> stdoutTask = proc.StandardOutput.ReadToEndAsync();
         Task<string> stderrTask = proc.StandardError.ReadToEndAsync();
@@ -48,17 +50,28 @@ internal sealed class ToolProcess
             throw new TimeoutException($"{Path.GetFileName(ExePath)} timed out after {TimeoutMs} ms: {string.Join(' ', args)}");
         }
 
-        return (proc.ExitCode, stdoutTask.GetAwaiter().GetResult(), stderrTask.GetAwaiter().GetResult());
+        sw.Stop();
+        return (proc.ExitCode, stdoutTask.GetAwaiter().GetResult(), stderrTask.GetAwaiter().GetResult(), sw.Elapsed.TotalSeconds);
     }
 
-    /// <summary>Probes the tool banner via -v (first non-empty line).</summary>
+    /// <summary>Probes the tool banner: -v first, then --version, then --help
+    /// (first non-empty line). Tolerates CLIs with different version flags.</summary>
     public string GetVersion()
     {
         try
         {
-            (int code, string so, string se) = Run("-v");
-            string txt = string.IsNullOrWhiteSpace(so) ? se : so;
-            return txt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? $"exit:{code}";
+            foreach (string flag in new[] { "-v", "--version", "--help" })
+            {
+                (int code, string so, string se, _) = Run(flag);
+                string txt = string.IsNullOrWhiteSpace(so) ? se : so;
+                string first = txt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? string.Empty;
+                if (code == 0 && !string.IsNullOrWhiteSpace(first) && !first.StartsWith("error", StringComparison.OrdinalIgnoreCase))
+                {
+                    return first;
+                }
+            }
+
+            return "version probe failed";
         }
         catch (Exception ex)
         {

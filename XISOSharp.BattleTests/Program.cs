@@ -34,8 +34,12 @@ internal static class Program
 
         ToolProcess cli = new(ResolveCli(opt.CliPath)) { TimeoutMs = opt.TimeoutMinutes * 60_000 };
         ToolProcess oracle = new(ResolveOracle(opt.OraclePath)) { TimeoutMs = opt.TimeoutMinutes * 60_000 };
+        ToolProcess? xdvdfs = ResolveOptional(opt.XdvdfsPath, "xdvdfs.exe", opt.TimeoutMinutes * 60_000);
+        ToolProcess? xboxkit = ResolveOptional(opt.XboxkitPath, "xboxkit.exe", opt.TimeoutMinutes * 60_000);
         Console.WriteLine($"CLI exe:    {cli.ExePath} {(cli.Available ? "(found)" : "(NOT FOUND)")}");
         Console.WriteLine($"Oracle exe: {oracle.ExePath} {(oracle.Available ? "(found)" : "(NOT FOUND)")}");
+        Console.WriteLine($"xdvdfs exe: {(xdvdfs is null ? "(not provided)" : xdvdfs.ExePath)} {(xdvdfs?.Available == true ? "(found)" : "(MISSING — xdvdfs ops skipped)")}");
+        Console.WriteLine($"xboxkit:    {(xboxkit is null ? "(not provided)" : xboxkit.ExePath)} {(xboxkit?.Available == true ? "(found)" : "(MISSING — xboxkit ops skipped)")}");
         if (!cli.Available || !oracle.Available)
         {
             Console.WriteLine("[ERROR] Both executables are required for a CLI-vs-CLI battle.");
@@ -73,16 +77,22 @@ internal static class Program
             OraclePath = oracle.ExePath,
             CliVersion = cli.GetVersion(),
             OracleVersion = oracle.GetVersion(),
+            XdvdfsPath = xdvdfs?.Available == true ? xdvdfs.ExePath : string.Empty,
+            XdvdfsVersion = xdvdfs?.Available == true ? xdvdfs.GetVersion() : "not found",
+            XboxkitPath = xboxkit?.Available == true ? xboxkit.ExePath : string.Empty,
+            XboxkitVersion = xboxkit?.Available == true ? xboxkit.GetVersion() : "not found",
             WorkRoot = workRoot,
             Ops = opt.Ops,
         };
         Console.WriteLine($"CLI:       {session.CliVersion}");
-        Console.WriteLine($"Oracle:    {session.OracleVersion}\n");
+        Console.WriteLine($"Oracle:    {session.OracleVersion}");
+        Console.WriteLine($"xdvdfs:    {session.XdvdfsVersion}");
+        Console.WriteLine($"xboxkit:   {session.XboxkitVersion}\n");
 
         Stopwatch sw = Stopwatch.StartNew();
         for (int i = 0; i < picked.Count; i++)
         {
-            IsoResult r = BattleRunner.RunIso(picked[i], opt, cli, oracle, workRoot, i + 1, picked.Count);
+            IsoResult r = BattleRunner.RunIso(picked[i], opt, cli, oracle, xdvdfs, xboxkit, workRoot, i + 1, picked.Count);
             session.IsoResults.Add(r);
             Console.WriteLine();
         }
@@ -162,6 +172,18 @@ internal static class Program
         return Path.Combine(AppContext.BaseDirectory, "XISOSharp.Cli.exe");
     }
 
+    /// <summary>Resolves an optional oracle exe: explicit path, else beside the harness; null when absent.</summary>
+    private static ToolProcess? ResolveOptional(string? explicitPath, string fileName, int timeoutMs)
+    {
+        if (!string.IsNullOrEmpty(explicitPath))
+        {
+            return new ToolProcess(explicitPath) { TimeoutMs = timeoutMs };
+        }
+
+        string beside = Path.Combine(AppContext.BaseDirectory, fileName);
+        return File.Exists(beside) ? new ToolProcess(beside) { TimeoutMs = timeoutMs } : null;
+    }
+
     /// <summary>Resolves extract-xiso.exe: --exe, beside the harness, then beside the CWD.</summary>
     private static string ResolveOracle(string? explicitPath)
     {
@@ -194,6 +216,19 @@ internal static class Program
             ? "  RESULT: ALL CHECKS PASSED \u2713"
             : $"  RESULT: {s.FailedSubs} CHECK(S) FAILED \u2717");
         Console.ForegroundColor = prev;
+
+        double cliTotal = s.IsoResults.SelectMany(static r => r.Subs).Sum(static x => x.CliSeconds);
+        double nativeTotal = s.IsoResults.SelectMany(static r => r.Subs).Sum(static x => x.OracleSeconds);
+        Console.Write("  Time:   ");
+        prev = Console.ForegroundColor;
+        Console.ForegroundColor = cliTotal <= nativeTotal ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.Write($"cli {cliTotal,8:F1}s");
+        Console.ForegroundColor = prev;
+        Console.Write("  vs  ");
+        Console.ForegroundColor = nativeTotal < cliTotal ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.Write($"native {nativeTotal,8:F1}s");
+        Console.ForegroundColor = prev;
+        Console.WriteLine(nativeTotal > 0.05 ? $"  (cli {cliTotal / nativeTotal:F2}x native)" : string.Empty);
         Console.WriteLine("================================================================");
     }
 

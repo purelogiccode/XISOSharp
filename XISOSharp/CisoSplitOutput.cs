@@ -42,7 +42,7 @@ internal sealed class CisoSplitOutput : Stream
         }
         catch (IOException ex)
         {
-            throw new IOException($"Split part already exists: {path}", ex);
+            throw new IOException($"Could not create split part: {path} ({ex.Message})", ex);
         }
 
         _parts[partIndex] = part;
