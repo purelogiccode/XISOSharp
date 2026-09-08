@@ -109,7 +109,7 @@ public class RewriteAttrPolicyTests : IDisposable
     private static void SetDirentAttribute(string isoPath, string filename, byte value)
     {
         SectorLayout layout = XisoReader.GetSectorLayout(isoPath);
-        FileSectorExtent root = layout.Entries.First(static e => e.IsDirectory && e.Path == "/");
+        FileSectorExtent root = layout.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
         byte[] dirTable = ReadDirTable(isoPath, root, layout.Volume.DiscLseek);
         int idx = FindDirent(dirTable, filename);
         dirTable[idx - 2] = value;
@@ -121,7 +121,7 @@ public class RewriteAttrPolicyTests : IDisposable
     private static byte[] ReadRootDirTable(string isoPath)
     {
         SectorLayout layout = XisoReader.GetSectorLayout(isoPath);
-        FileSectorExtent root = layout.Entries.First(static e => e.IsDirectory && e.Path == "/");
+        FileSectorExtent root = layout.Entries.First(static e => e.IsDirectory && string.Equals(e.Path, "/", StringComparison.OrdinalIgnoreCase));
         return ReadDirTable(isoPath, root, layout.Volume.DiscLseek);
     }
 

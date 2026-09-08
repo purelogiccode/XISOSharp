@@ -9,25 +9,23 @@ namespace XISOSharp.BattleTests;
 /// </summary>
 internal sealed class ToolProcess
 {
-    private readonly string _exePath;
-
     /// <summary>Gets the per-run timeout in milliseconds.</summary>
     public int TimeoutMs { get; init; } = 3_600_000;
 
     /// <summary>Gets whether the exe exists on disk.</summary>
-    public bool Available => File.Exists(_exePath);
+    public bool Available => File.Exists(ExePath);
 
     /// <summary>Gets the resolved exe path.</summary>
-    public string ExePath => _exePath;
+    public string ExePath { get; }
 
-    public ToolProcess(string exePath) => _exePath = Path.GetFullPath(exePath);
+    public ToolProcess(string exePath) => ExePath = Path.GetFullPath(exePath);
 
     /// <summary>Runs the exe with args; returns exit code and captured output.</summary>
     public (int ExitCode, string StdOut, string StdErr) Run(params string[] args)
     {
         ProcessStartInfo psi = new()
         {
-            FileName = _exePath,
+            FileName = ExePath,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -40,14 +38,14 @@ internal sealed class ToolProcess
             psi.ArgumentList.Add(a);
         }
 
-        using Process proc = Process.Start(psi) ?? throw new InvalidOperationException($"Failed to start {_exePath}");
+        using Process proc = Process.Start(psi) ?? throw new InvalidOperationException($"Failed to start {ExePath}");
         Task<string> stdoutTask = proc.StandardOutput.ReadToEndAsync();
         Task<string> stderrTask = proc.StandardError.ReadToEndAsync();
         if (!proc.WaitForExit(TimeoutMs))
         {
             TryKill(proc);
             proc.WaitForExit(5000);
-            throw new TimeoutException($"{Path.GetFileName(_exePath)} timed out after {TimeoutMs} ms: {string.Join(' ', args)}");
+            throw new TimeoutException($"{Path.GetFileName(ExePath)} timed out after {TimeoutMs} ms: {string.Join(' ', args)}");
         }
 
         return (proc.ExitCode, stdoutTask.GetAwaiter().GetResult(), stderrTask.GetAwaiter().GetResult());

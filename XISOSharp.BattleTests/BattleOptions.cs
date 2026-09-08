@@ -48,22 +48,7 @@ internal sealed class BattleOptions
         string? oracle = null;
         string? work = null;
         bool keep = false;
-        bool help = args.Length == 0 ? false : args.Any(a => a is "-h" or "--help" or "/?" or "-?");
-
-        string? Value(string[] a, ref int i, string? inline)
-        {
-            if (inline is not null)
-            {
-                return inline;
-            }
-
-            if (i + 1 >= a.Length)
-            {
-                throw new ArgumentException($"Missing value for {a[i]}");
-            }
-
-            return a[++i];
-        }
+        bool help = args.Length != 0 && args.Any(a => a is "-h" or "--help" or "/?" or "-?");
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -162,11 +147,26 @@ internal sealed class BattleOptions
             ExplicitIsos = explicitIsos,
             Help = help,
         };
+
+        static string Value(string[] a, ref int i, string? inline)
+        {
+            if (inline is not null)
+            {
+                return inline;
+            }
+
+            if (i + 1 >= a.Length)
+            {
+                throw new ArgumentException($"Missing value for {a[i]}");
+            }
+
+            return a[++i];
+        }
     }
 
     public static void PrintUsage() =>
         Console.WriteLine("""
-            
+
             Usage: XISOSharp.BattleTests [options] [*.iso ...]
 
             Battles the XISOSharp CLI against native extract-xiso.exe over a random
