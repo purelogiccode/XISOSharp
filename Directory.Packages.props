@@ -17,13 +17,13 @@
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.226" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.231" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
     <!-- SourceLink is library-only (snupkg); apps carry embedded/portable PDBs.
          Its 10.0.400 band is decoupled from the SDK pin in global.json — it is a
          build-task package and works with any 10.x SDK, so the two versions move
          independently. -->
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.400" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.401" />
     <PackageVersion Include="MinVer" Version="8.0.0" />
     <PackageVersion Include="QuestPDF" Version="2026.8.0" />
     <PackageVersion Include="Roslynator.Analyzers" Version="5.0.0" />
