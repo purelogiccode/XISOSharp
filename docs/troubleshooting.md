@@ -198,7 +198,7 @@ is valid only in create (`-c`) and rewrite (`-r`).
 
 **`dotnet build` fails with a missing SDK.**
 
-The SDK version is pinned in `global.json` (10.0.301, `rollForward: latestFeature`).
+The SDK version is pinned in `global.json` (10.0.301, `rollForward: latestMinor`).
 Install .NET SDK 10.0.301+ or adjust `global.json` for your environment.
 
 **Tests fail with `The process cannot access the file because it is being used by

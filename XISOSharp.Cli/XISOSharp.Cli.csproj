@@ -13,15 +13,16 @@
              class library already owns the XISOSharp simple name, and the CLI
              references it — building the CLI as XISOSharp.dll would collide
              with the referenced XISOSharp.dll in the same output folder.
-             The *published* single-file binary is still named XISOSharp(.exe)
-             via the RenamePublishedExeToXisoSharp target below. -->
+             The exe still appears as XISOSharp(.exe) via the AliasBuiltExeAsXisoSharp
+             target below (every build) and the RenamePublishedExeToXisoSharp target
+             (published single-file). -->
     <AssemblyName>XISOSharp.Cli</AssemblyName>
     <RootNamespace>XISOSharp.Cli</RootNamespace>
     <ApplicationIcon>icon\icon.ico</ApplicationIcon>
     <!-- Single RID source of truth (matches publish-cli.ps1 defaults and
-             docs/building.md): win-x64, win-arm64, linux-x64, linux-arm64,
-             osx-x64, osx-arm64. XboxKit parity, no 32-bit RID. -->
-    <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+              docs/building.md): win-x86, win-x64, win-arm64, linux-x64,
+              linux-arm64, osx-x64, osx-arm64. XboxKit parity (incl. 32-bit). -->
+    <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
 
     <!-- Distribution defaults: every self-contained `dotnet publish -r` for a
              listed RID yields a trimmed single-file binary with no runtime to install. -->
@@ -67,6 +68,21 @@
     <Move SourceFiles="$(PublishDir)XISOSharp.Cli.pdb"
           DestinationFiles="$(PublishDir)XISOSharp.pdb"
           Condition="Exists('$(PublishDir)XISOSharp.Cli.pdb')" />
+  </Target>
+
+  <!-- Every build also yields XISOSharp.exe beside the real output: a copy of
+       the XISOSharp.Cli apphost. The apphost embeds the path to
+       XISOSharp.Cli.dll, so the alias runs the same app with no library-name
+       collision — same spirit as the publish rename above, but for plain
+       `dotnet build` output. (Flowing this alias to referencing projects via
+       CopyToOutputDirectory items is unreliable: GetCopyToOutputDirectoryItems
+       results are cached per instance before AfterBuild runs, so consumers
+       alias their own copy — see XISOSharp.BattleTests.csproj.) -->
+  <Target Name="AliasBuiltExeAsXisoSharp" AfterTargets="Build">
+    <Copy SourceFiles="$(OutDir)XISOSharp.Cli.exe"
+          DestinationFiles="$(OutDir)XISOSharp.exe"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(OutDir)XISOSharp.Cli.exe')" />
   </Target>
 
   <ItemGroup>

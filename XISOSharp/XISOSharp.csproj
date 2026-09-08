@@ -18,8 +18,7 @@
     <PackageId>XISOSharp</PackageId>
     <!-- Version is derived from git tags via MinVer. Tag format: v2.7.1 or 2.7.1 -->
     <Title>XISOSharp</Title>
-    <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats.</Description>
-    <PackageDescription>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports GLOBAL, XGD3, and XGD1 disc formats. Provides both synchronous and asynchronous APIs with cancellation support. Strong-named and trimmable, with an AOT-compatible library surface.</PackageDescription>
+    <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1. Supports RAW, GLOBAL, XGD1, XGD2, XGD3, and Hybrid disc layouts. Provides both synchronous and asynchronous APIs with cancellation support. Strong-named and trimmable, with an AOT-compatible library surface.</Description>
     <PackageTags>xiso;xbox;iso;extract-xiso;xgd3;xgd1;xbe;disc-image;original-xbox</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
@@ -81,7 +80,7 @@
   <Target Name="CheckZarSharpSource" BeforeTargets="CollectPackageReferences"
           Condition="!Exists('..\..\CSharp_ZARSharp\ZARSharp\ZARSharp.csproj')">
     <Warning
-      Text="Sibling CSharp_ZARSharp checkout not found; falling back to NuGet package 'ZARSharp 1.0.0'. For local dev, clone the sibling repo side-by-side with this one." />
+      Text="Sibling CSharp_ZARSharp checkout not found; falling back to the ZARSharp NuGet package (version from Directory.Packages.props). For local dev, clone the sibling repo side-by-side with this one." />
   </Target>
 
   <!-- Source Link + versioning (package versions centralized in

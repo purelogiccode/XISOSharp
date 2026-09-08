@@ -13,7 +13,7 @@ reference-comparison scripts, and the benchmarks.
 
 ## Test suite
 
-The xUnit suite lives in `XISOSharp.Tests` (engine + CLI, target: net10.0).
+The xUnit suite lives in `XISOSharp.Tests` (engine + CLI, targets: net8.0/net9.0/net10.0).
 `ZARSharp.Tests` (pure-C# ZArchive/zstd port) moved to the sibling
 `../CSharp_ZARSharp` repo with its own solution and CI. Run the local suite with:
 

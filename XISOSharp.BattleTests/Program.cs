@@ -130,9 +130,10 @@ internal static class Program
         return shuffled.Take(Math.Max(0, count)).ToList();
     }
 
-    /// <summary>Resolves the XISOSharp CLI exe: --cli, XISOSharp.exe beside the harness,
-    /// XISOSharp.Cli.exe beside the harness (ProjectReference copy), then the Cli
-    /// project's bin output.</summary>
+    /// <summary>Resolves the XISOSharp CLI exe: --cli, XISOSharp.exe beside the
+    /// harness (fresh alias of the ProjectReference copy), XISOSharp.Cli.exe
+    /// beside the harness (ProjectReference copy), then the Cli project's bin
+    /// output.</summary>
     private static string ResolveCli(string? explicitPath)
     {
         if (!string.IsNullOrEmpty(explicitPath))

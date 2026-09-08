@@ -30,6 +30,20 @@
     </None>
   </ItemGroup>
 
+  <!-- The ProjectReference above copies the freshly built XISOSharp.Cli.exe
+       beside the harness; alias it as XISOSharp.exe so the harness resolves the
+       CLI under its shipped name (Program.cs prefers "XISOSharp.exe beside the
+       harness") and always battles the latest build. The CLI project also
+       aliases its own bin output, but its copy-item flow to referencing
+       projects is unreliable (cached GetCopyToOutputDirectoryItems results),
+       hence the local alias here. -->
+  <Target Name="AliasCliExeAsXisoSharp" AfterTargets="Build">
+    <Copy SourceFiles="$(OutDir)XISOSharp.Cli.exe"
+          DestinationFiles="$(OutDir)XISOSharp.exe"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(OutDir)XISOSharp.Cli.exe')" />
+  </Target>
+
   <ItemGroup>
     <PackageReference Include="Meziantou.Analyzer">
       <PrivateAssets>all</PrivateAssets>

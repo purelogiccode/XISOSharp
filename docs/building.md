@@ -103,7 +103,9 @@ csproj. `publish-cli.ps1` / `publish-gui.ps1` wrap this loop for all RIDs.)
 
 Supported runtime identifiers (single source of truth: `XISOSharp.Cli.csproj` /
 `XISOSharp.Gui.csproj` `RuntimeIdentifiers`, matching the `publish-*.ps1` defaults):
-`win-x64; win-arm64; linux-x64; linux-arm64; osx-x64; osx-arm64`.
+`win-x86; win-x64; win-arm64; linux-x64; linux-arm64; osx-x64; osx-arm64` for the
+CLI (XboxKit parity, incl. the 32-bit `win-x86`); the GUI ships the six 64-bit
+RIDs only.
 
 Output lands in `XISOSharp.Cli/bin/Release/net10.0/<rid>/publish/` as a single
 `XISOSharp` (or `XISOSharp.exe`) binary (renamed from the `XISOSharp.Cli`

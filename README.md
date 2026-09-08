@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![NuGet](https://img.shields.io/nuget/v/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 
-A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2.7.1 for Xbox ISO (XISO / XDVDFS) images — **byte-identical** output, no native dependencies, no P/Invoke, just .NET. Beyond the C baseline it merges the archival power of [XboxKit 0.7](References/XboxKit-0.7/) and the modern packing of [xdvdfs 0.8.3](References/xdvdfs-0.8.3/) into one trimmable, AOT-compatible library + CLI.
+A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) for Xbox ISO (XISO / XDVDFS) images — **byte-identical** output, no native dependencies, no P/Invoke, just .NET. Beyond the C baseline it merges the archival power of [XboxKit](https://github.com/Deterous/XboxKit) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) into one trimmable, AOT-compatible library + CLI.
 
 ## Projects
 
@@ -13,9 +13,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 35+ extra modes |
 | [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1288 tests) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + extract-xiso 2.7.1 legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
-| ZARSharp.Tests | **Moved** to the sibling `../CSharp_ZARSharp` repo (own solution + CI) — xUnit suite for the pure-C# ZArchive/zstd port |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
-| ZARSharp.Benchmarks | **Moved** to the sibling `../CSharp_ZARSharp` repo — BenchmarkDotNet for ZARSharp only |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-CLI battle harness: XISOSharp vs `extract-xiso.exe` v2.7.1 over a random sample of real ISOs (default 3 of `H:\XBOXTest`, seeded) — `list`/`extract`/`rewrite` outputs compared byte-for-byte |
 
@@ -57,13 +55,13 @@ cd XISOSharp
 dotnet build XISOSharp.Cli -c Release
 # bin: XISOSharp.Cli/bin/Release/net10.0/XISOSharp.Cli(.exe)
 
-# self-contained trimmed single-file (no runtime needed) for all six RIDs
+# self-contained trimmed single-file (no runtime needed) for all seven RIDs
 ./publish-cli.ps1
 # binaries land in publish/<rid>/XISOSharp(.exe), ~14 MB each (renamed from the XISOSharp.Cli assembly name)
 
 # or one RID manually (single-file + trimmed come from the csproj defaults)
 dotnet publish XISOSharp.Cli -c Release -r linux-x64 --self-contained
-# RIDs: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 (win-x86 also builds)
+# RIDs: win-x86, win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 (XboxKit parity, incl. 32-bit)
 ```
 
 ### GUI (desktop app, Avalonia, dark-only)
@@ -545,14 +543,14 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
-dotnet test -c Release                       # 1234 tests (`XISOSharp.Tests`; ZARSharp lives in `../CSharp_ZARSharp`)
+dotnet test -c Release                       # 1288 tests (`XISOSharp.Tests`; ZARSharp lives in `../CSharp_ZARSharp`)
 ```
 
-Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net10.0`); `XISOSharp.Tests` (`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF). `ZARSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZARSharp.Tests` + `ZARSharp.Benchmarks` moved to the sibling `../CSharp_ZARSharp` repo (own solution); `XISOSharp` consumes the library via a relative `ProjectReference`. CI builds on `ubuntu`/`windows`/`macos`.
+Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net8.0`/`net9.0`/`net10.0`, ships net10.0); `XISOSharp.Tests` (`net8.0`/`net9.0`/`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF). `ZARSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZARSharp.Tests` + `ZARSharp.Benchmarks` moved to the sibling `../CSharp_ZARSharp` repo (own solution); `XISOSharp` consumes the library via a relative `ProjectReference`. CI builds on `ubuntu`/`windows`/`macos`.
 
 ## Requirements
 
-- .NET 8 SDK or newer (pinned `10.0.301` in `global.json`, `rollForward: latestFeature`)
+- .NET 8 SDK or newer (pinned `10.0.301` in `global.json`, `rollForward: latestMinor`)
 
 ## License
 

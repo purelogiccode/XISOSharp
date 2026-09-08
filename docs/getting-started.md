@@ -13,8 +13,9 @@ command-line tool or the .NET library.
 | Disk space | At least 2× the ISO size for extraction, plus workspace for creation |
 
 > [!NOTE]
-> The library targets `net8.0`, `net9.0`, and `net10.0`. The CLI targets `net10.0`
-> but can be published as a **self-contained single-file** binary for any platform,
+> The library targets `net8.0`, `net9.0`, and `net10.0`. The CLI multi-targets the
+> same three frameworks (net10.0 ships as the published binary) and can be published
+> as a **self-contained single-file** binary for any platform,
 > requiring no installed runtime — see [Building](building.md#publishing).
 
 ## Option 1 — The command-line tool
@@ -30,8 +31,8 @@ dotnet build XISOSharp.Cli -c Release
 
 # Or a self-contained single-file binary for your platform (no runtime needed)
 dotnet publish XISOSharp.Cli -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
-# Supported RIDs: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 (win-x86 also builds).
-# Or publish all six at once: ./publish-cli.ps1  (binaries land in publish/<rid>/)
+# Supported RIDs: win-x86, win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64
+# Or publish all seven at once: ./publish-cli.ps1  (binaries land in publish/<rid>/)
 ```
 
 A framework-dependent `dotnet build` produces `XISOSharp.Cli(.exe)` in

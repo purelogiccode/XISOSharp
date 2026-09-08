@@ -13,7 +13,7 @@
 
 .EXAMPLE
     ./publish-cli.ps1
-    Publishes the default six RIDs (win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64).
+    Publishes the default seven RIDs (win-x86, win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64).
 
 .EXAMPLE
     ./publish-cli.ps1 -Rid win-x64,win-x86 -Zip
@@ -21,7 +21,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string[]]$Rid = @('win-x64', 'win-arm64', 'linux-x64', 'linux-arm64', 'osx-x64', 'osx-arm64'),
+    [string[]]$Rid = @('win-x86', 'win-x64', 'win-arm64', 'linux-x64', 'linux-arm64', 'osx-x64', 'osx-arm64'),
     [string]$Configuration = 'Release',
     [string]$OutputRoot = '',
     [switch]$Zip
