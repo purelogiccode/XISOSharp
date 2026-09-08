@@ -6,8 +6,8 @@ internal sealed class BattleOptions
     /// <summary>Gets dirs scanned (top-level) for candidate *.iso files.</summary>
     public List<string> Dirs { get; init; } = [];
 
-    /// <summary>Gets how many ISOs are sampled at random (default 3).</summary>
-    public int Count { get; init; } = 3;
+    /// <summary>Gets how many ISOs are sampled at random (default 1).</summary>
+    public int Count { get; init; } = 1;
 
     /// <summary>Gets the explicit RNG seed; null = auto (reported for reproducibility).</summary>
     public int? Seed { get; init; }
@@ -24,7 +24,8 @@ internal sealed class BattleOptions
     /// <summary>Gets an explicit path to xboxkit.exe (default: beside the harness); null = auto-resolve.</summary>
     public string? XboxkitPath { get; init; }
 
-    /// <summary>Gets the work root for scratch dirs (default: %TEMP%\xiso_battle_&lt;stamp&gt;).</summary>
+    /// <summary>Gets the work root for scratch dirs (default: the drive with the
+    /// most free space among the sampled ISOs' drives and %TEMP%).</summary>
     public string? WorkRoot { get; init; }
 
     /// <summary>
@@ -53,7 +54,7 @@ internal sealed class BattleOptions
         List<string> explicitIsos = [];
         List<string> ops = [];
         int? seed = null;
-        int count = 3;
+        int count = 1;
         int timeout = 60;
         string? cli = null;
         string? oracle = null;
@@ -82,7 +83,7 @@ internal sealed class BattleOptions
                     dirs.AddRange(v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                     break;
                 case "--count":
-                    count = int.Parse(Value(args, ref i, inline) ?? "3", System.Globalization.CultureInfo.InvariantCulture);
+                    count = int.Parse(Value(args, ref i, inline) ?? "1", System.Globalization.CultureInfo.InvariantCulture);
                     break;
                 case "--seed":
                     seed = int.Parse(Value(args, ref i, inline) ?? "0", System.Globalization.CultureInfo.InvariantCulture);
@@ -201,18 +202,20 @@ internal sealed class BattleOptions
             Usage: XISOSharp.BattleTests [options] [*.iso ...]
 
             Battles the XISOSharp CLI against reference tools over a random sample of
-            ISOs (default: 3 files from H:\XBOXTest).
+            ISOs (default: 1 file from H:\XBOXTest).
 
             Options:
               --dir <path>[,<path>...]  Dir(s) to scan top-level for *.iso (default: H:\XBOXTest)
-              --count <N>               Random sample size (default 3)
+              --count <N>               Random sample size (default 1)
               --seed <N>                RNG seed for the sample (default: auto, reported in the report)
               --cli <path>              Path to the XISOSharp CLI exe (default: beside the harness)
               --exe <path>              Path to extract-xiso.exe (default: beside the harness)
               --xdvdfs <path>           Path to xdvdfs.exe (default: beside the harness)
               --xboxkit <path>          Path to xboxkit.exe (default: beside the harness)
               --ops <a,b,c>             Ops to battle (default: all; skipped when the op's oracle is missing)
-              --work <dir>              Scratch dir root (default: %TEMP%\xiso_battle_<stamp>)
+              --work <dir>              Scratch dir root (default: drive with the most free
+                                        space among the ISO drives and %TEMP%; ops skip
+                                        automatically when the drive runs low)
               --keep                    Keep scratch dirs after the run (they hold ~4x the ISO size)
               --timeout <minutes>       Per-operation timeout (default 60)
               -h, --help                Show this help

@@ -18,67 +18,79 @@ internal static partial class BattleRunner
 
         foreach (string op in opt.Ops)
         {
-            SubResult sub = op switch
+            string? work = OpWorkDir(op, workRoot, stem);
+
+            // Disk-space gate: skip before launching anything rather than letting a
+            // child CLI die with IOException when the scratch drive fills up.
+            SubResult? gate = work is null ? null : DiskSpaceGate(op, fi.Length, workRoot);
+            SubResult sub = gate ?? (op switch
             {
                 // extract-xiso oracle
                 "list" => oracle.Available
                     ? RunList(iso, cli, oracle)
                     : MissingOracle(op, "extract-xiso.exe"),
                 "extract" => oracle.Available
-                    ? RunExtract(iso, cli, oracle, Path.Combine(workRoot, stem + "_ext"))
+                    ? RunExtract(iso, cli, oracle, work!)
                     : MissingOracle(op, "extract-xiso.exe"),
                 "rewrite" => oracle.Available
-                    ? RunRewrite(iso, cli, oracle, Path.Combine(workRoot, stem + "_rw"))
+                    ? RunRewrite(iso, cli, oracle, work!)
                     : MissingOracle(op, "extract-xiso.exe"),
 
                 // xdvdfs oracle
                 "checksum" => xdvdfs?.Available == true ? RunChecksum(iso, cli, xdvdfs) : MissingOracle(op, "xdvdfs.exe"),
                 "md5" => xdvdfs?.Available == true ? RunMd5(iso, cli, xdvdfs) : MissingOracle(op, "xdvdfs.exe"),
                 "unpack" => xdvdfs?.Available == true
-                    ? RunUnpack(iso, cli, xdvdfs, Path.Combine(workRoot, stem + "_unpack"))
+                    ? RunUnpack(iso, cli, xdvdfs, work!)
                     : MissingOracle(op, "xdvdfs.exe"),
                 "pack" => xdvdfs?.Available == true
-                    ? RunPack(iso, cli, xdvdfs, Path.Combine(workRoot, stem + "_pack"))
+                    ? RunPack(iso, cli, xdvdfs, work!)
                     : MissingOracle(op, "xdvdfs.exe"),
                 "cso" => xdvdfs?.Available == true
-                    ? RunCso(iso, cli, xdvdfs, Path.Combine(workRoot, stem + "_cso"))
+                    ? RunCso(iso, cli, xdvdfs, work!)
                     : MissingOracle(op, "xdvdfs.exe"),
 
                 // xboxkit oracle
                 "petrify" => xboxkit?.Available == true
-                    ? RunStagedCompare("petrify", iso, cli, xboxkit, Path.Combine(workRoot, stem + "_petr"),
+                    ? RunStagedCompare("petrify", iso, cli, xboxkit, work!,
                         ["--petrify", "{ISO}"], ["-p", "-y", "-q", "{ISO}"], "*skeleton*")
                     : MissingOracle(op, "xboxkit.exe"),
                 "video" => xboxkit?.Available == true
-                    ? RunStagedCompare("video", iso, cli, xboxkit, Path.Combine(workRoot, stem + "_video"),
+                    ? RunStagedCompare("video", iso, cli, xboxkit, work!,
                         ["--video", "{ISO}"], ["-v", "-y", "-q", "{ISO}"], "*video*")
                     : MissingOracle(op, "xboxkit.exe"),
                 "random" => xboxkit?.Available == true
-                    ? RunStagedCompare("random", iso, cli, xboxkit, Path.Combine(workRoot, stem + "_rnd"),
+                    ? RunStagedCompare("random", iso, cli, xboxkit, work!,
                         ["--random", "{ISO}"], ["-r", "-y", "-q", "{ISO}"], "*filler*")
                     : MissingOracle(op, "xboxkit.exe"),
                 "seed" => xboxkit?.Available == true
-                    ? RunStagedCompare("seed", iso, cli, xboxkit, Path.Combine(workRoot, stem + "_seed"),
+                    ? RunStagedCompare("seed", iso, cli, xboxkit, work!,
                         ["--seed", "{ISO}"], ["-s", "-y", "-q", "{ISO}"], "*seed*")
                     : MissingOracle(op, "xboxkit.exe"),
                 "zar" => xboxkit?.Available == true
-                    ? RunStagedCompare("zar", iso, cli, xboxkit, Path.Combine(workRoot, stem + "_zar"),
+                    ? RunStagedCompare("zar", iso, cli, xboxkit, work!,
                         ["--zar", "-o", "{OUT}", "{ISO}"], ["-z", "-y", "-q", "{ISO}"], "*.zar")
                     : MissingOracle(op, "xboxkit.exe"),
                 "trim" => xboxkit?.Available == true
-                    ? RunStagedCompare("trim", iso, cli, xboxkit, Path.Combine(workRoot, stem + "_trim"),
+                    ? RunStagedCompare("trim", iso, cli, xboxkit, work!,
                         ["--trim", "-o", "{OUT}", "{ISO}"], ["-t", "-y", "-q", "{ISO}"], null)
                     : MissingOracle(op, "xboxkit.exe"),
                 "wipe" => xboxkit?.Available == true
-                    ? RunStagedCompare("wipe", iso, cli, xboxkit, Path.Combine(workRoot, stem + "_wipe"),
+                    ? RunStagedCompare("wipe", iso, cli, xboxkit, work!,
                         ["--wipe", "-o", "{OUT}", "{ISO}"], ["-w", "-y", "-q", "{ISO}"], null)
                     : MissingOracle(op, "xboxkit.exe"),
                 "rebuild" => xboxkit?.Available == true
-                    ? RunRebuild(iso, cli, xboxkit, Path.Combine(workRoot, stem + "_rb"))
+                    ? RunRebuild(iso, cli, xboxkit, work!)
                     : MissingOracle(op, "xboxkit.exe"),
 
                 _ => new SubResult(op, BattleStatus.Skipped, "unknown op (harness gap)", 0, 0, 0),
-            };
+            });
+
+            // Reclaim scratch space after each op so peak usage stays near a single
+            // op's footprint instead of accumulating over the whole ISO's ops.
+            if (work is not null && !opt.KeepWork)
+            {
+                TryDelete(work);
+            }
 
             result.Subs.Add(sub);
             PrintSub(sub);
@@ -389,6 +401,81 @@ internal static partial class BattleRunner
     }
 
     // ---- helpers ---------------------------------------------------------------
+
+    private const long Gib = 1024L * 1024 * 1024;
+
+    /// <summary>Scratch dir for an op (null for ops that write nothing on disk).</summary>
+    private static string? OpWorkDir(string op, string workRoot, string stem) => op switch
+    {
+        "extract" => Path.Combine(workRoot, stem + "_ext"),
+        "rewrite" => Path.Combine(workRoot, stem + "_rw"),
+        "unpack" => Path.Combine(workRoot, stem + "_unpack"),
+        "pack" => Path.Combine(workRoot, stem + "_pack"),
+        "cso" => Path.Combine(workRoot, stem + "_cso"),
+        "petrify" => Path.Combine(workRoot, stem + "_petr"),
+        "video" => Path.Combine(workRoot, stem + "_video"),
+        "random" => Path.Combine(workRoot, stem + "_rnd"),
+        "seed" => Path.Combine(workRoot, stem + "_seed"),
+        "zar" => Path.Combine(workRoot, stem + "_zar"),
+        "trim" => Path.Combine(workRoot, stem + "_trim"),
+        "wipe" => Path.Combine(workRoot, stem + "_wipe"),
+        "rebuild" => Path.Combine(workRoot, stem + "_rb"),
+        _ => null, // list / checksum / md5 are read-only
+    };
+
+    /// <summary>
+    /// Worst-case scratch space per op as a multiple of the ISO size (staged input
+    /// copies, extracted trees, packed/outputs). Conservative: better to skip than
+    /// to fill the drive mid-op.
+    /// </summary>
+    private static double OpSpaceMultiplier(string op) => op switch
+    {
+        "extract" or "unpack" => 2.2,
+        "rewrite" => 4.5, // cs_in + exe_in + both outputs (+ .old backups)
+        "pack" => 3.5,    // unpacked src + two packed images
+        "cso" => 2.5,     // compressed parts + decompressed image
+        "rebuild" => 7,   // 2 staged copies + components + 2 rebuilt images
+        "petrify" or "video" or "random" or "seed" or "zar" or "trim" or "wipe" => 3.2,
+        _ => 0,           // list / checksum / md5 write nothing
+    };
+
+    /// <summary>
+    /// Returns a Skipped verdict when the work-root drive has less free space than
+    /// the op's worst-case need, or null when the op may proceed.
+    /// </summary>
+    private static SubResult? DiskSpaceGate(string op, long isoSize, string workRoot)
+    {
+        double mult = OpSpaceMultiplier(op);
+        if (mult <= 0)
+        {
+            return null;
+        }
+
+        long need = (long)(isoSize * mult) + (64 << 20); // + small fixed margin
+        long free = FreeBytes(workRoot);
+        if (free >= need)
+        {
+            return null;
+        }
+
+        string drive = Path.GetPathRoot(Path.GetFullPath(workRoot)) ?? workRoot;
+        return new SubResult(op, BattleStatus.Skipped,
+            $"skipped: insufficient disk space on {drive} — need ~{need / (double)Gib:F1} GB, have {free / (double)Gib:F1} GB " +
+            "(use --work to point at a larger drive or --ops to run fewer ops)", 0, 0, 0);
+    }
+
+    internal static long FreeBytes(string path)
+    {
+        try
+        {
+            string root = Path.GetPathRoot(Path.GetFullPath(path)) ?? path;
+            return new DriveInfo(root).AvailableFreeSpace;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException)
+        {
+            return 0;
+        }
+    }
 
     private static SubResult Done(Stopwatch sw, string op, BattleStatus status, string detail, double cliSeconds,
         double oracleSeconds)

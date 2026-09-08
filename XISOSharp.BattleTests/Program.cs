@@ -5,7 +5,7 @@ namespace XISOSharp.BattleTests;
 
 /// <summary>
 /// Battle-tester entry point: drives the XISOSharp CLI against native
-/// extract-xiso.exe over a random sample of ISOs (default: 3 from H:\XBOXTest).
+/// extract-xiso.exe over a random sample of ISOs (default: 1 from H:\XBOXTest).
 /// </summary>
 internal static class Program
 {
@@ -13,6 +13,8 @@ internal static class Program
     {
         Console.WriteLine("XISOSharp.BattleTests — XISOSharp CLI vs extract-xiso (v2.7.1) CLI battle");
         Console.WriteLine("=========================================================================");
+
+        SweepStaleWorkRoots();
 
         BattleOptions opt;
         try
@@ -63,12 +65,24 @@ internal static class Program
             Console.WriteLine($"  - {f}");
         }
 
-        string workRoot = opt.WorkRoot ?? Path.Combine(
-            Path.GetTempPath(),
-            "xiso_battle_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + "_" +
-            Environment.ProcessId);
+        string workRoot = opt.WorkRoot ?? ChooseWorkRoot(picked);
         Directory.CreateDirectory(workRoot);
-        Console.WriteLine($"Work root: {workRoot}");
+        Console.WriteLine($"Work root: {workRoot} ({BattleRunner.FreeBytes(workRoot) / (1024.0 * 1024 * 1024):F1} GB free)");
+
+        // Ctrl+C: finish the current step, skip the rest, still write the report and
+        // clean up the scratch dirs (otherwise killed runs leak gigabytes in scratch).
+        bool cancelled = false;
+        Console.CancelKeyPress += (_, e) =>
+        {
+            if (cancelled)
+            {
+                return;
+            }
+
+            cancelled = true;
+            e.Cancel = true;
+            Console.WriteLine("\n[CANCEL] stopping after the current step; scratch dirs will be cleaned up…");
+        };
 
         BattleSession session = new()
         {
@@ -90,21 +104,88 @@ internal static class Program
         Console.WriteLine($"xboxkit:   {session.XboxkitVersion}\n");
 
         Stopwatch sw = Stopwatch.StartNew();
-        for (int i = 0; i < picked.Count; i++)
+        try
         {
-            IsoResult r = BattleRunner.RunIso(picked[i], opt, cli, oracle, xdvdfs, xboxkit, workRoot, i + 1, picked.Count);
-            session.IsoResults.Add(r);
-            Console.WriteLine();
+            for (int i = 0; i < picked.Count; i++)
+            {
+                if (cancelled)
+                {
+                    Console.WriteLine("[CANCEL] remaining ISO(s) skipped.");
+                    break;
+                }
+
+                IsoResult r = BattleRunner.RunIso(picked[i], opt, cli, oracle, xdvdfs, xboxkit, workRoot, i + 1, picked.Count);
+                session.IsoResults.Add(r);
+                Console.WriteLine();
+            }
+
+            sw.Stop();
+            session.Elapsed = sw.Elapsed;
+
+            PrintSummary(session);
+            BattleReport.Write(session, picked);
+            return session.FailedSubs > 0 ? 2 : 0;
         }
+        finally
+        {
+            CleanupWorkRoot(workRoot, opt.KeepWork);
+        }
+    }
 
-        sw.Stop();
-        session.Elapsed = sw.Elapsed;
+    /// <summary>
+    /// Removes leftover xiso_battle_* scratch roots older than 12 h from %TEMP%.
+    /// Runs killed before cleanup would otherwise leak gigabytes forever (issue #66775).
+    /// </summary>
+    private static void SweepStaleWorkRoots()
+    {
+        try
+        {
+            foreach (string dir in Directory.GetDirectories(Path.GetTempPath(), "xiso_battle_*"))
+            {
+                if (DateTime.UtcNow - Directory.GetLastWriteTimeUtc(dir) < TimeSpan.FromHours(12))
+                {
+                    continue;
+                }
 
-        PrintSummary(session);
-        BattleReport.Write(session, picked);
-        CleanupWorkRoot(workRoot, opt.KeepWork);
+                try
+                {
+                    Directory.Delete(dir, true);
+                    Console.WriteLine($"[CLEANUP] removed stale scratch dir from a previous run: {dir}");
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Best effort; another instance may still be using it.
+                }
+            }
+        }
+        catch (IOException)
+        {
+        }
+    }
 
-        return session.FailedSubs > 0 ? 2 : 0;
+    /// <summary>
+    /// Default work root: the drive with the most free space among the sampled ISOs'
+    /// drives and %TEMP%. The ISO drives usually have room (they already hold the
+    /// images); %TEMP% on a small system drive does not, and a full scratch drive
+    /// makes the child CLIs die with IOException mid-op.
+    /// </summary>
+    private static string ChooseWorkRoot(IReadOnlyList<string> isos)
+    {
+        string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + "_" + Environment.ProcessId;
+        var candidates = isos
+            .Select(static f => Path.GetPathRoot(Path.GetFullPath(f)))
+            .Where(static r => !string.IsNullOrEmpty(r))
+            .Cast<string>()
+            .Append(Path.GetTempPath())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(static r => (Root: r, Free: BattleRunner.FreeBytes(r)))
+            .OrderByDescending(static x => x.Free)
+            .ToList();
+        (string Root, long Free) best = candidates.Count > 0 ? candidates[0] : (Path.GetTempPath(), 0);
+        Console.WriteLine(
+            $"Work root drive: {best.Root} ({best.Free / (1024.0 * 1024 * 1024):F1} GB free; candidates: " +
+            string.Join(", ", candidates.Select(static c => $"{c.Root} {c.Free / (1024.0 * 1024 * 1024):F0} GB")) + ")");
+        return Path.Combine(best.Root, "xiso_battle_" + stamp);
     }
 
     private static List<string> CollectIsos(IEnumerable<string> dirs)
