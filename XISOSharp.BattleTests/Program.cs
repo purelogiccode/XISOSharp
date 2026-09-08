@@ -172,7 +172,9 @@ internal static class Program
         return Path.Combine(AppContext.BaseDirectory, "XISOSharp.Cli.exe");
     }
 
-    /// <summary>Resolves an optional oracle exe: explicit path, else beside the harness; null when absent.</summary>
+    /// <summary>Resolves an optional oracle exe: explicit path, beside the harness
+    /// output, beside the project sources (bin/&lt;cfg&gt;/&lt;tfm&gt; → project dir, where the
+    /// exes live in the repo), then null when absent.</summary>
     private static ToolProcess? ResolveOptional(string? explicitPath, string fileName, int timeoutMs)
     {
         if (!string.IsNullOrEmpty(explicitPath))
@@ -180,8 +182,15 @@ internal static class Program
             return new ToolProcess(explicitPath) { TimeoutMs = timeoutMs };
         }
 
-        string beside = Path.Combine(AppContext.BaseDirectory, fileName);
-        return File.Exists(beside) ? new ToolProcess(beside) { TimeoutMs = timeoutMs } : null;
+        string? beside = new[]
+            {
+                AppContext.BaseDirectory,
+                // bin/<cfg>/<tfm> → project source folder (exes live in the repo there).
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..")),
+            }
+            .Select(d => Path.Combine(d, fileName))
+            .FirstOrDefault(File.Exists);
+        return beside is null ? null : new ToolProcess(beside) { TimeoutMs = timeoutMs };
     }
 
     /// <summary>Resolves extract-xiso.exe: --exe, beside the harness, then beside the CWD.</summary>
