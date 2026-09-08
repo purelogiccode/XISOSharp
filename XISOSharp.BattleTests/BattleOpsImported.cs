@@ -328,6 +328,10 @@ internal static partial class BattleRunner
     /// redump-only ops); one side failing = Failed.
     /// </summary>
     /// <param name="op">Op name for reporting.</param>
+    /// <param name="iso">Path of the source ISO to stage a copy of per side.</param>
+    /// <param name="cli">The XISOSharp CLI process.</param>
+    /// <param name="xk">The xboxkit.exe oracle process.</param>
+    /// <param name="work">Scratch dir receiving the per-side staged copies.</param>
     /// <param name="cliTemplate">CLI args template with {ISO}/{OUT} placeholders.</param>
     /// <param name="xkTemplate">xboxkit args template with {ISO} placeholder.</param>
     /// <param name="preferredPattern">
@@ -458,7 +462,6 @@ internal static partial class BattleRunner
             }
 
             string xsOut = Path.Combine(xsDir, "rebuilt.iso");
-            string xkOut = Path.Combine(xkDir, "rebuilt.iso");
             List<string> xsArgs = ["rebuild", xsIso, video, filler];
             List<string> xkArgs = [xkIso, Path.GetFileName(video), Path.GetFileName(filler)];
             if (update is not null)

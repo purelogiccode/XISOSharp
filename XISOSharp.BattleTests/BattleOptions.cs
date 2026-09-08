@@ -131,7 +131,6 @@ internal sealed class BattleOptions
             }
         }
 
-        List<string> validOps = ["list", "extract", "rewrite"];
         ops = ops.Select(static o => o.ToLowerInvariant()).Distinct(StringComparer.Ordinal).ToList();
         if (ops.Count == 0)
         {

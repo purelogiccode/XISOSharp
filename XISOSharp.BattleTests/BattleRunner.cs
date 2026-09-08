@@ -409,16 +409,6 @@ internal static partial class BattleRunner
         return safe.Length > 60 ? safe[..60] : safe;
     }
 
-    private static void Cleanup(string work, bool keep)
-    {
-        if (keep || !Directory.Exists(work))
-        {
-            return;
-        }
-
-        TryDelete(work);
-    }
-
     private static void TryDelete(string dir)
     {
         try
