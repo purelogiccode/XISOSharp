@@ -111,6 +111,22 @@ public class SectorAllocatorTests : IDisposable
     }
 
     [Fact]
+    public void AllocateContiguous_ZeroCount_ReturnsAllocationFrontier()
+    {
+        // extract-xiso parity: an empty file's dirent start sector is the current
+        // allocation frontier (where the next write lands), not the first tracked
+        // range. With allocations present, zero-count must walk past all of them.
+        SectorAllocator allocator = new();
+        allocator.MarkUsed(Constants.RootDirectorySector, 10);
+
+        Assert.Equal((uint)Constants.RootDirectorySector + 10, allocator.AllocateContiguous(0));
+
+        uint next = allocator.AllocateContiguous(5);
+        Assert.Equal((uint)Constants.RootDirectorySector + 10, next);
+        Assert.Equal((uint)Constants.RootDirectorySector + 15, allocator.AllocateContiguous(0));
+    }
+
+    [Fact]
     public void NextFree_TopOfSpace_ThrowsInsteadOfClamping()
     {
         // BUG-LIB-031: the old uint.MaxValue clamp hid allocation overflow.

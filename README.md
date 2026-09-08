@@ -12,12 +12,12 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) v2
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 35+ extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1234 tests) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + extract-xiso 2.7.1 legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1288 tests) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + extract-xiso 2.7.1 legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
 | ZARSharp.Tests | **Moved** to the sibling `../CSharp_ZARSharp` repo (own solution + CI) — xUnit suite for the pure-C# ZArchive/zstd port |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | ZARSharp.Benchmarks | **Moved** to the sibling `../CSharp_ZARSharp` repo — BenchmarkDotNet for ZARSharp only |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
-| [XISOSharp.BattleTests](XISOSharp.BattleTests/) | Battle harness vs `References/extract-xiso-build-202505152050/extract-xiso.c` |
+| [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-CLI battle harness: XISOSharp vs `extract-xiso.exe` v2.7.1 over a random sample of real ISOs (default 3 of `H:\XBOXTest`, seeded) — `list`/`extract`/`rewrite` outputs compared byte-for-byte |
 
 ## Documentation
 
@@ -475,6 +475,9 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | Empty dir → 1 sector `0xFF` sentinel | ✅ | ✅ | ❌ | ✅ |
 | `.xbe` media patch `E8…7D→EB` (Boyer-Moore, overlap 7) | ✅ | ✅ | ❌ | ❌ |
 | Media patch disable `-m` | ✅ | ✅ | ❌ | ❌ |
+| Rewrite byte-parity (`-r` SHA-256 identical on real dumps: DIR/ARC attr defaults + empty-file frontier sectors) | ✅ | ✅ (reference) | ❌ | ❌ |
+| Source attribute preservation on rewrite (`--preserve-attrs`, RO/HID/SYS/NOR) | ✅ | ❌ (always normalizes) | ❌ | ❌ |
+| Empty-file start sector = allocation frontier (`SectorAllocator` zero-count) | ✅ | ✅ (reference) | ❌ | ❌ |
 | Custom `-o` filename | ✅ | ❌ | — | — |
 | **Redump / Archival** | | | | |
 | `--video` L0 head + L1 tail (PVD `0x832D`) | ✅ | ❌ | ✅ | ❌ |

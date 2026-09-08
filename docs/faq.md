@@ -19,7 +19,12 @@ The C sources under `References/` are used only for cross-checking during develo
 
 Yes, by design. The port reproduces the C tool's algorithms exactly (including AVL
 rebalancing and directory layout), and the test suite plus `Verify-Output.ps1`
-continuously verify SHA-256 equality of outputs.
+continuously verify SHA-256 equality of outputs. Rewrites (`-r`) are additionally
+SHA-256-verified byte-identical against real Redump dumps by the
+[XISOSharp.BattleTests](testing.md#the-cli-battle-harness) harness (list, extract,
+and rewrite). One deliberate divergence is opt-in: `--preserve-attrs` keeps the
+source dirent attribute bits (RO/HID/SYS/NOR) on rewrite, where extract-xiso always
+re-encodes files as Archive (`0x20`) — see [XISO Format › Attributes](xiso-format.md#attributes).
 
 **Which disc formats are supported?**
 

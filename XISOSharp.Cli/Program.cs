@@ -129,6 +129,7 @@ internal static class Program
         string? hashAlgo = null;
         bool xSeen = false;
         bool deleteOld = false;
+        bool preserveAttrs = false;
         bool assumeYes = false;
         bool assumeNo = false;
         string? path = null;
@@ -555,6 +556,9 @@ internal static class Program
                             return 1;
                         }
 
+                        break;
+                    case "--preserve-attrs":
+                        preserveAttrs = true;
                         break;
                     case "--file-time":
                         if (i + 1 < args.Length &&
@@ -2048,7 +2052,8 @@ internal static class Program
                 {
                     File.Move(xisoPath, oldPath);
                     XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out string? newIsoPath, true,
-                        outputName: outputName, skipSectors: skipSectors, prependSectors: prependSectors);
+                        outputName: outputName, skipSectors: skipSectors, prependSectors: prependSectors,
+                        preserveAttributes: preserveAttrs);
 
                     if (err == 0)
                     {
@@ -2174,6 +2179,12 @@ internal static class Program
             if (deleteOld)
             {
                 Logger.LogErr("Error: -D is only used with -r (rewrite)\n");
+                return true;
+            }
+
+            if (preserveAttrs)
+            {
+                Logger.LogErr("Error: --preserve-attrs is only used with -r (rewrite)\n");
                 return true;
             }
 
@@ -4532,10 +4543,16 @@ internal static class Program
                                                                            partition precedes the game partition.
                                                                            Valid in extract, list, tree, rewrite, unpack, and filetime modes.
                                                      --prepend-sectors N  Write the output image with N empty sectors
-                                                                          before the XISO filesystem, leaving room for
-                                                                          a video partition. Valid in create (-c) and
-                                                                          rewrite (-r) mode. Combine with --skip-sectors
-                                                                          for round-trip Redump-style reconstruction.
+                                                                           before the XISO filesystem, leaving room for
+                                                                           a video partition. Valid in create (-c) and
+                                                                           rewrite (-r) mode. Combine with --skip-sectors
+                                                                           for round-trip Redump-style reconstruction.
+                                                     --preserve-attrs     In rewrite (-r) mode, re-encode the source
+                                                                           dirent attribute bits (RO/HID/SYS/NOR) into
+                                                                           the output. Default is extract-xiso parity:
+                                                                           entries are re-encoded with the DIR/ARC
+                                                                           defaults (dir=0x10, file=0x20) so rewritten
+                                                                           images are byte-identical to extract-xiso.
                                                      --file-time <value>  Fixed FILETIME for the volume descriptor
                                                                           (value: ISO-8601, decimal raw, 0x hex,
                                                                           'now', '0'). '0' writes the xdvdfs

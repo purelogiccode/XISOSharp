@@ -393,6 +393,12 @@ public static class XisoReader
     /// path prefixes chain with <c>/</c>. When <c>null</c>, the legacy chdir-based
     /// extraction into the current directory runs and prefixes keep the host separator.
     /// </param>
+    /// <param name="preserveAttributes">
+    /// Rewrite-mode (GenerateAvl) only. When <c>false</c> (default), the source
+    /// dirent attribute byte is dropped so entries re-encode with the DIR/ARC
+    /// defaults, matching extract-xiso byte-for-byte; when <c>true</c>, source
+    /// RO/HID/SYS/NOR bits are re-encoded into the rewritten image.
+    /// </param>
     /// <exception cref="XisoFormatException">
     /// Thrown naming the offending path and offset when the table is
     /// structurally corrupt. Under <c>UnpackOptions.ContinueOnError</c> in
@@ -416,7 +422,10 @@ public static class XisoReader
         // Recursion-depth bound (#16 hardening); threaded through left-subtree and subdir recursion by design.
         // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Global
         int depth = 0,
-        IFilesystem? filesystem = null)
+        IFilesystem? filesystem = null,
+        // Rewrite-mode only: when false (default, extract-xiso parity) the source
+        // attribute byte is dropped and entries re-encode with the DIR/ARC defaults.
+        bool preserveAttributes = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (depth > Constants.MaxTocDepth)
@@ -599,12 +608,15 @@ public static class XisoReader
 
             if (mode == ExtractMode.GenerateAvl)
             {
-                // BUG-LIB-034: carry the masked attribute bits so a rewrite
-                // re-encodes RO/HID/SYS instead of normalizing to Archive.
+                // Attribute policy (BUG-LIB-034 revisited): extract-xiso discards the
+                // source attribute byte and re-encodes DIR/ARC defaults unconditionally
+                // (extract-xiso.c:2252), so byte parity with the oracle requires the
+                // same normalization. `preserveAttributes: true` restores the richer
+                // behavior and re-encodes RO/HID/SYS/NOR from the source image.
                 AvlNode avl = new()
                 {
                     Filename = filename, FileSize = fileSize, OldStartSector = startSector,
-                    Attributes = attributes
+                    Attributes = preserveAttributes ? attributes : (byte)0
                 };
                 dir.AvlNode = avl;
 
@@ -1085,6 +1097,12 @@ public static class XisoReader
     /// Optional structured progress channel; receives <see cref="ProgressInfo"/> events
     /// during the rewrite write phase.
     /// </param>
+    /// <param name="preserveAttributes">
+    /// When <c>true</c>, dirent attribute bits from the source image (RO/HID/SYS/NOR)
+    /// are re-encoded into the output. The default (<c>false</c>) matches extract-xiso,
+    /// which re-encodes every entry with the DIR/ARC defaults
+    /// (<c>dir=0x10, file=0x20</c>) for byte-identical rewrite output.
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     public static int Rewrite(
         string xisoPath,
@@ -1094,9 +1112,10 @@ public static class XisoReader
         string? outputName = null,
         int? skipSectors = null,
         int? prependSectors = null,
-        IProgress<ProgressInfo>? progress = null) =>
+        IProgress<ProgressInfo>? progress = null,
+        bool preserveAttributes = false) =>
         DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken,
-            outputName, skipSectors, prependSectors, progress);
+            outputName, skipSectors, prependSectors, progress, preserveAttributes: preserveAttributes);
 
     /// <summary>
     /// Extracts files from an XISO image to a directory.
@@ -1508,6 +1527,12 @@ public static class XisoReader
     /// is set, files already on disk with the same size are skipped (TODO #13, xdvdfs #190).
     /// Ignored in non-extract modes.
     /// </param>
+    /// <param name="preserveAttributes">
+    /// Rewrite mode only. When <c>false</c> (default), dirent attribute bits are
+    /// re-encoded with the DIR/ARC defaults (extract-xiso byte parity); when
+    /// <c>true</c>, source RO/HID/SYS/NOR bits are preserved into the output.
+    /// Ignored in non-rewrite modes.
+    /// </param>
     /// <returns>0 on success, non-zero on error.</returns>
     /// <exception cref="XisoFormatException">
     /// Thrown when the file is not a valid XISO image.
@@ -1528,12 +1553,14 @@ public static class XisoReader
         int? skipSectors = null,
         int? prependSectors = null,
         IProgress<ProgressInfo>? progress = null,
-        UnpackOptions? unpackOptions = null)
+        UnpackOptions? unpackOptions = null,
+        bool preserveAttributes = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         using Stream fs = OpenImageStream(xisoPath);
         return DecodeXisoCore(fs, xisoPath, outputPath, mode, out outIsoPath, llCompat,
-            cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions);
+            cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions,
+            preserveAttributes: preserveAttributes);
     }
 
     /// <summary>
@@ -1637,7 +1664,8 @@ public static class XisoReader
         int? prependSectors = null,
         IProgress<ProgressInfo>? progress = null,
         UnpackOptions? unpackOptions = null,
-        IFilesystem? filesystem = null)
+        IFilesystem? filesystem = null,
+        bool preserveAttributes = false)
     {
         outIsoPath = null;
 
@@ -1766,7 +1794,8 @@ public static class XisoReader
                     AvlNode? avlRoot = null;
                     TraverseXiso(fs, null, ((long)rootDirSect * Constants.SectorSize) + discLseek,
                         buf, ExtractMode.GenerateAvl, ref avlRoot, llCompat, discLseek,
-                        cancellationToken: cancellationToken, tableSize: rootDirSize);
+                        cancellationToken: cancellationToken, tableSize: rootDirSize,
+                        preserveAttributes: preserveAttributes);
 
                     XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null,
                         cancellationToken, prependSectors: prependSectors, progress: progress,
@@ -1845,6 +1874,12 @@ public static class XisoReader
     /// Optional resume options for extract mode (TODO #13, xdvdfs #190).
     /// Ignored in non-extract modes.
     /// </param>
+    /// <param name="preserveAttributes">
+    /// Rewrite mode only. When <c>false</c> (default), dirent attribute bits are
+    /// re-encoded with the DIR/ARC defaults (extract-xiso byte parity); when
+    /// <c>true</c>, source RO/HID/SYS/NOR bits are preserved into the output.
+    /// Ignored in non-rewrite modes.
+    /// </param>
     /// <returns>A task that completes with the result code (0 on success, non-zero on error) and the output ISO path when in rewrite mode.</returns>
     public static async Task<(int Result, string? OutIsoPath)> DecodeXisoAsync(
         string xisoPath,
@@ -1856,11 +1891,12 @@ public static class XisoReader
         int? skipSectors = null,
         int? prependSectors = null,
         IProgress<ProgressInfo>? progress = null,
-        UnpackOptions? unpackOptions = null) =>
+        UnpackOptions? unpackOptions = null,
+        bool preserveAttributes = false) =>
         await Task.Run(() =>
         {
             int result = DecodeXiso(xisoPath, outputPath, mode, out string? outPath, llCompat, cancellationToken,
-                outputName, skipSectors, prependSectors, progress, unpackOptions);
+                outputName, skipSectors, prependSectors, progress, unpackOptions, preserveAttributes);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
 

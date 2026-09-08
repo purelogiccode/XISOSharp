@@ -97,7 +97,7 @@ public static int Rewrite(
     string xisoPath, string? outputPath, out string? outIsoPath,
     CancellationToken cancellationToken = default,
     string? outputName = null, int? skipSectors = null, int? prependSectors = null,
-    IProgress<ProgressInfo>? progress = null)
+    IProgress<ProgressInfo>? progress = null, bool preserveAttributes = false)
 ```
 
 | Parameter | Meaning |
@@ -108,6 +108,7 @@ public static int Rewrite(
 | `outputName` | Rewrite only: custom output filename (default: original name with `.iso`) |
 | `skipSectors` | Read offset (Redump video partition), in 2048-byte sectors |
 | `prependSectors` | Rewrite only: reserve zero-filled sectors before the filesystem |
+| `preserveAttributes` | Rewrite only: re-encode the source dirent attribute bits (RO/HID/SYS/NOR). Default `false` — extract-xiso byte parity (entries re-encoded with DIR/ARC defaults, `dir=0x10`/`file=0x20`) |
 | `progress` | Rewrite: structured progress channel (`IProgress<ProgressInfo>`) — see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo). Extract: a `FileAdded` event per file actually written (skipped/excluded files are silent), plus a per-chunk `FileProgress` event (`Size` = bytes copied so far, `Count` = total file bytes) while each file copies |
 | `options` | Extract/unpack only: resume options — see [Resume interrupted unpacks](#resume-interrupted-unpacks) |
 

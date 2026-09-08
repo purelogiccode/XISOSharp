@@ -69,7 +69,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--copy-out <iso> <path> <dest>` | Copy a single file **or an entire directory** out of an ISO to `<dest>`. Supports `--skip-existing` (resume) and `--continue-on-error`. |
 | `--copy-in <iso> <host> <path>` | Copy a host file **into** an ISO, modifying it in place: replaces `<path>` when it exists, adds it as a new file otherwise. A host directory is rejected fast (`InvalidDataException`, nothing written). Writes an `<iso>.old` backup first unless `--no-backup`. See [CopyIn](api-xisoreader.md#copyin). |
 | `--no-backup` | With `--copy-in` or `--repair`, skip the `<iso>.old` backup (rejected without either). |
-| `-r` | **Rewrite** each ISO as an optimized ISO (see [Optimized-tag detection](#optimized-tag-detection)). Already-optimized images are skipped. |
+| `-r` | **Rewrite** each ISO as an optimized ISO (see [Optimized-tag detection](#optimized-tag-detection)). Already-optimized images are skipped. Output is **byte-identical** to `extract-xiso -r` (SHA-256 verified on real dumps): dirent attributes are re-encoded with the DIR/ARC defaults; pass `--preserve-attrs` to keep the source bits instead. |
 | `validate <src> <out>` | Standalone **validation** command — must be the **first** token. See [Validation](validation.md). |
 | `--video` | **Redump:** extract video partition (`L0` head + `L1` tail) via `XisoRedump.TryExtractVideo` + `XgdTables` wave tables; writes `*.video.iso`. Fails gracefully when `videoType==-1`. See [Archival](archival.md#video). |
 | `--random` | **Redump:** extract random filler/padding (`XisoOperations.ExtractFiller` via `GetXisoRanges`/`MergeRanges`); writes `*.filler`. See [Archival](archival.md#random). |
@@ -110,6 +110,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `-n`, `--no` | Never overwrite: refuse when an output file exists (prints `[ERROR] File already exists`, skips the operation). Cannot be combined with `-y`. |
 | `--skip-sectors N` | Treat the image as if the XISO filesystem starts `N` sectors (2048 bytes each) into the file — for Redump images with a video partition. Valid in extract, list, tree, rewrite (`-r`), `--unpack`, `--filetime`, and `--set-filetime` modes. Rejected with `-c` and with `-i`, `--ls`, `--xex-info`, `--xbe-info`, `--md5`/`--sha256`, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, and `checksum`. See [Redump & Disc Layouts](redump-workflows.md). |
 | `--prepend-sectors N` | Write the output image with `N` empty sectors before the XISO filesystem, reserving room for a video partition. Valid in create (`-c`) and rewrite (`-r`) modes. See [Redump & Disc Layouts](redump-workflows.md). |
+| `--preserve-attrs` | Rewrite (`-r`) mode: re-encode the source dirent attribute bits (RO/HID/SYS/NOR) into the output instead of the extract-xiso parity default (DIR/ARC defaults, `dir=0x10`/`file=0x20`). Default off so rewritten images stay byte-identical to `extract-xiso -r`. |
 | `--file-time <value>` | Fixed FILETIME for the volume descriptor on create (`-c`), `--pack`, and `build-image` (values: ISO-8601, decimal raw, `0x` hex, `'now'`, `'0'`). `'0'` writes the xdvdfs deterministic timestamp so identical input produces byte-identical output. See [XisoWriter API](api-xisowriter.md#deterministic-output). |
 | `--filetime <image>` | Show the FILETIME volume-descriptor field (ISO-8601 + raw u64; `0` = 1601-01-01, xdvdfs compatible). See [FILETIME](api-xisoreader.md#filetime). |
 | `--set-filetime <image> <value>` | Set the FILETIME field (values: ISO-8601, decimal raw, `0x` hex, `'now'`, or `'0'`). Cannot be combined with other modes. See [FILETIME](api-xisoreader.md#filetime). |
@@ -285,6 +286,7 @@ Enforced at parse time; violations print an error and exit 1:
 |---|---|
 | `--skip-sectors` with `-c` | Error |
 | `--prepend-sectors` without `-c` or `-r` | Error |
+| `--preserve-attrs` without `-r` | Error |
 | `--skip-sectors`/`--prepend-sectors` with `-i`, `--ls`, `--xex-info`, `--xbe-info`, hash, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, or `checksum` | Error |
 | `--validate`/`--validate-checksums`/`--validate-strict`/`--validate-report` without `-r` or `validate` | Error |
 | `-X` without `-c` | Error |

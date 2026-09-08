@@ -126,8 +126,11 @@ public sealed class SectorAllocator
     /// Allocates a contiguous run of <paramref name="sectorCount"/> sectors and returns
     /// its first sector. First-fit at or above <see cref="FirstFreeSector"/>: gaps left by
     /// <see cref="MarkUsed"/>/seeded ranges are reused before extending past the end.
-    /// A zero count returns the first free position without recording anything (mirrors
-    /// the writer assigning a start sector to empty files without consuming space).
+    /// A zero count returns the current allocation frontier (end of tracked allocations)
+    /// without recording anything — the start sector an extract-xiso-style writer
+    /// records for empty files, i.e. where the next real allocation will land
+    /// (extract-xiso parity: its monotonic sector counter gives empty-file dirents
+    /// the same start as the following write).
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// Thrown when a bounded image has no fitting gap, or the run would exceed the
@@ -300,7 +303,11 @@ public sealed class SectorAllocator
         ulong cursor = FirstFreeSector;
         foreach ((uint start, uint count) in _used)
         {
-            if (start >= cursor + sectorCount)
+            // Zero-count (empty-file start sector) must walk the whole list: the
+            // frontier is where the next real allocation lands, never a gap before
+            // tracked space (a `start >= cursor` early-return would hand back the
+            // first used range's start — e.g. the root table sector).
+            if (sectorCount > 0 && start >= cursor + sectorCount)
                 return (uint)cursor;
 
             cursor = Math.Max(cursor, (ulong)start + count);

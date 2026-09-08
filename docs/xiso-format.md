@@ -88,6 +88,15 @@ Each entry in a directory table is 14 bytes plus the filename, padded to a multi
 
 Bits `0x08` and `0x40` are reserved; audit mode (`-V`) flags them (`Reserved attribute bits set: 0x…`) and all readers mask via `Constants.AttributeValidMask 0xB7` / `MaskAttributes(byte)` (`TraverseXiso` at `XisoReader.cs:408`, `ReadDirectoryEntries:1906`, `XisoChecksum:204` read `hdr[12]` masked; `AuditWalk:1310` flags raw before masking). `IsDirectory` derived from masked `0x10`.
 
+**Writer policy.** Real dumps typically carry `0x80` (Normal) on files; extract-xiso
+discards the source byte and re-encodes every entry as `0x10` (dirs) / `0x20` (files)
+(`extract-xiso.c:2252`). The writer matches that by default, so `extract-xiso -r` and
+`XISOSharp -r` outputs are byte-identical (SHA-256 verified against Redump dumps).
+`Rewrite(..., preserveAttributes: true)` / CLI `--preserve-attrs` opts out and
+re-encodes the source bits instead. Empty files (0 bytes) get the current allocation
+frontier as their start sector — the same value extract-xiso's monotonic sector
+counter records — never a back-reference into the directory-table area.
+
 ## Directory tables and the AVL tree
 
 Each directory's entries form a **case-insensitive AVL (self-balancing binary search)

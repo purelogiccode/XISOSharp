@@ -234,13 +234,42 @@ Its main page also has an **Explore** section: an in-process image browser
 (`TreeView` with lazy directory loading over `XisoExplorer` — no extraction)
 with per-node copy-out, SHA-256 display, and an XEX2 info panel.
 
-All three runners share one core implementation: the single shared
+All GUI runners share one core implementation: the single shared
 `XISOSharp.ProcessRunner` (async drains, timeout, tree-kill) + `XISOSharp.ToolLocator`
-(override → sibling of the app → `PATH`, plus a `-v` probe) back the GUI
-(`XISOSharp`), the Tester (`extract-xiso`/`extract-xiso.exe`, extensionless
-accepted), and the battle harness — replacing the old per-app runners.
+(override → sibling of the app → `PATH`, plus a `-v` probe) — replacing the old
+per-app runners.
 
 It targets Windows only and is not part of CI.
+
+## The CLI battle harness
+
+`XISOSharp.BattleTests` is a console harness that pits the **XISOSharp CLI** against
+the **native `extract-xiso.exe` v2.7.1** (shipped beside the harness) over real game
+dumps. It shells out to both executables — no in-process library calls — so it tests
+exactly what end users run:
+
+- **Sampling:** picks a random sample of `*.iso` files (default **3**) from
+  `H:\XBOXTest` (override with `--dir`, `--count`, explicit `*.iso` paths, or a
+  `--seed` for reproducibility — the seed is reported for re-runs).
+- **Battles per ISO:**
+  - `list` — `-l` entry lines must match exactly;
+  - `extract` — `-x -d` trees must match: same file set (ordinal), same per-file
+    SHA-256, same directory set;
+  - `rewrite` — `-r -d` outputs must match byte-for-byte (SHA-256). Inputs are
+    staged to copies first (the oracle renames its input to `.old`; the sources on
+    `H:` are never touched).
+- **Exit codes:** `0` all passed, `1` config error, `2` any check failed.
+- **Reports:** `BattleReports/battle_<stamp>.txt|.json` next to the sources.
+
+```bash
+dotnet run --project XISOSharp.BattleTests -c Release -- --seed 2026
+XISOSharp.BattleTests --ops list,extract,rewrite --count 3 --dir "H:\XBOXTest"
+```
+
+This is the regression gate for the extract-xiso byte-parity contract
+([xdvdfs Compat](xdvdfs-compat.md) covers the packing layer; the format details —
+attribute normalization and empty-file frontier sectors — are in
+[XISO Format](xiso-format.md#attributes)).
 
 See also: [Building](building.md) · [Contributing](contributing.md) ·
 [Conversion plan](../ConversionPlan.md)

@@ -1,0 +1,96 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+
+namespace XISOSharp.BattleTests;
+
+/// <summary>Writes the battle report (txt + json) under BattleReports\.</summary>
+internal static class BattleReport
+{
+    public static void Write(BattleSession s, IReadOnlyList<string> picked)
+    {
+        try
+        {
+            string outDir = Path.Combine(Directory.GetCurrentDirectory(), "BattleReports");
+            Directory.CreateDirectory(outDir);
+            // Sub-second + PID component so concurrent runs never overwrite each
+            // other's reports (second-granularity stamps collide).
+            string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture)
+                           + "_" + Environment.ProcessId.ToString(CultureInfo.InvariantCulture);
+            string txtPath = Path.Combine(outDir, $"battle_{stamp}.txt");
+            string jsonPath = Path.Combine(outDir, $"battle_{stamp}.json");
+
+            File.WriteAllText(txtPath, BuildText(s, picked, stamp), new UTF8Encoding(false));
+            Console.WriteLine($"Report: {txtPath}");
+            File.WriteAllText(jsonPath, BuildJson(s, picked, stamp), new UTF8Encoding(false));
+            Console.WriteLine($"        {jsonPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARN] Failed to write reports: {ex.Message}");
+        }
+    }
+
+    private static string BuildText(BattleSession s, IReadOnlyList<string> picked, string stamp)
+    {
+        StringBuilder w = new();
+        w.AppendLine(CultureInfo.InvariantCulture, $"XISOSharp Battle Report {stamp}");
+        w.AppendLine(CultureInfo.InvariantCulture, $"CLI:    {s.CliPath} | {s.CliVersion}");
+        w.AppendLine(CultureInfo.InvariantCulture, $"Oracle: {s.OraclePath} | {s.OracleVersion}");
+        w.AppendLine(CultureInfo.InvariantCulture, $"Seed: {s.Seed} | Ops: {string.Join(", ", s.Ops)} | Work: {s.WorkRoot}");
+        w.AppendLine(CultureInfo.InvariantCulture, $"ISOs ({picked.Count}):");
+        foreach (string iso in picked)
+        {
+            w.AppendLine(CultureInfo.InvariantCulture, $"  {iso}");
+        }
+
+        w.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"Summary: {s.PassedSubs}/{s.TotalSubs} checks passed, {s.FailedSubs} failed, {s.SkippedSubs} skipped in {s.Elapsed.TotalSeconds:F1}s");
+        w.AppendLine();
+        foreach (IsoResult f in s.IsoResults)
+        {
+            w.AppendLine(
+                CultureInfo.InvariantCulture,
+                $"{f.FileName} ({f.FileSize} bytes) - {(f.HasFailures ? "FAIL" : f.AllPassed ? "PASS" : "OK/SKIP")} {f.Seconds:F1}s");
+            foreach (SubResult sub in f.Subs)
+            {
+                w.AppendLine(
+                    CultureInfo.InvariantCulture,
+                    $"  {sub.Op,-8} {sub.Status,-7} {sub.Seconds,8:F1}s  {sub.Detail.Replace('\n', ' ').Trim()}");
+            }
+
+            w.AppendLine();
+        }
+
+        return w.ToString();
+    }
+
+    private static string BuildJson(BattleSession s, IReadOnlyList<string> picked, string stamp) =>
+        JsonSerializer.Serialize(new
+        {
+            timestamp = stamp,
+            seed = s.Seed,
+            ops = s.Ops,
+            cli = new { path = s.CliPath, version = s.CliVersion },
+            oracle = new { path = s.OraclePath, version = s.OracleVersion },
+            workRoot = s.WorkRoot,
+            totalIsos = s.TotalIsos,
+            failedIsos = s.FailedIsos,
+            totalChecks = s.TotalSubs,
+            passedChecks = s.PassedSubs,
+            failedChecks = s.FailedSubs,
+            skippedChecks = s.SkippedSubs,
+            elapsedSeconds = s.Elapsed.TotalSeconds,
+            isos = picked,
+            results = s.IsoResults.Select(f => new
+            {
+                f.FileName,
+                f.FilePath,
+                f.FileSize,
+                f.Seconds,
+                f.AllPassed,
+                subs = f.Subs.Select(sub => new { sub.Op, status = sub.Status.ToString(), sub.Detail, sub.Seconds }),
+            }),
+        }, new JsonSerializerOptions { WriteIndented = true });
+}
