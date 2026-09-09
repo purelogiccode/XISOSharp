@@ -753,23 +753,21 @@ internal static partial class BattleRunner
             }
 
             string part = Path.Combine(work, "part.iso");
-            using (FileStream src = new(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
-            using (FileStream dst = new(part, FileMode.Create, FileAccess.Write, FileShare.None, 65536))
+            using FileStream src = new(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+            using FileStream dst = new(part, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+            src.Seek(isoOffset, SeekOrigin.Begin);
+            byte[] buf = new byte[1024 * 1024];
+            long remaining = xisoLen;
+            while (remaining > 0)
             {
-                src.Seek(isoOffset, SeekOrigin.Begin);
-                byte[] buf = new byte[1024 * 1024];
-                long remaining = xisoLen;
-                while (remaining > 0)
+                int n = src.Read(buf, 0, (int)Math.Min(buf.Length, remaining));
+                if (n == 0)
                 {
-                    int n = src.Read(buf, 0, (int)Math.Min(buf.Length, remaining));
-                    if (n == 0)
-                    {
-                        return null;
-                    }
-
-                    dst.Write(buf, 0, n);
-                    remaining -= n;
+                    return null;
                 }
+
+                dst.Write(buf, 0, n);
+                remaining -= n;
             }
 
             return part;

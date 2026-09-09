@@ -477,7 +477,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         // unlistable skeleton (Conker petrify battle: only 5 sectors survived).
         const int sector = 2048;
         byte[] img = new byte[110 * sector];
-        System.Text.Encoding.ASCII.GetBytes("MICROSOFT*XBOX*MEDIA").CopyTo(img, 32 * sector);
+        "MICROSOFT*XBOX*MEDIA"u8.ToArray().CopyTo(img, 32 * sector);
         BitConverter.GetBytes((uint)40).CopyTo(img, 32 * sector + 20); // rootOffset (sectors)
         BitConverter.GetBytes((uint)2048).CopyTo(img, 32 * sector + 24); // rootSize (bytes)
         WriteDirEntry(img, (40 * sector) + 0, left: 0, right: 4, entrySector: 98, entrySize: 4096, attr: 0x20, "F1");
