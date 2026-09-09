@@ -46,10 +46,17 @@ public static class XisoSkeleton
     /// <param name="skeletonPath">Destination skeleton path. If null, derives <c>.skeleton.xiso</c>.</param>
     /// <param name="hashPath">Optional hash file path (<c>sha1 hex + space + path</c> per line). If null, derives <c>.hash</c>.</param>
     /// <param name="isoOffset">Byte offset of the XISO partition within the file (for Redump).</param>
+    /// <param name="xisoLength">
+    /// Byte length of the XISO partition. When set (Redump inputs), the skeleton is the
+    /// partition only — no Redump prefix is emitted — matching XboxKit <c>-p</c>
+    /// (<c>ProcessXISO(isoFS, XISO_OFFSET, XISO_LENGTH, …)</c>). When null, the file
+    /// remainder after <paramref name="isoOffset"/> is walked (standalone XISOs, and the
+    /// legacy prefix-verbatim behavior when <paramref name="isoOffset"/> is set without it).
+    /// </param>
     /// <param name="quiet">Suppress info.</param>
     /// <param name="ct">Cancellation token.</param>
     public static bool Petrify(string inputPath, string? skeletonPath = null, string? hashPath = null,
-        long isoOffset = 0, bool quiet = false, CancellationToken ct = default)
+        long isoOffset = 0, long? xisoLength = null, bool quiet = false, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -58,12 +65,11 @@ public static class XisoSkeleton
 
         using FileStream isoFs = new(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
         long isoLen = isoFs.Length;
-        long xisoLength = isoLen - isoOffset;
-        if (xisoLength <= 0) return false;
+        long partLength = xisoLength ?? (isoLen - isoOffset);
+        if (partLength <= 0) return false;
 
-        (List<(uint Start, uint End)> bones, List<(uint Start, uint End)> fileRanges) =
+        (List<(uint Start, uint End)> bones, _) =
             XisoRanges.GetXisoRanges(isoFs, isoOffset, quiet);
-        List<(uint Start, uint End)> ranges = XisoRanges.MergeRanges(bones, fileRanges);
         List<(string Path, long Offset, uint Size)> fileEntries = XisoRanges.GetFileEntries(isoFs, isoOffset);
 
         // Open outputs
@@ -98,97 +104,77 @@ public static class XisoSkeleton
 
         hashWriter.Flush();
 
-        // Skeleton creation: copy isoOffset prefix verbatim (for Redump), then walk XISO partition
-        if (isoOffset > 0)
+        // Skeleton creation: with an explicit partition length (Redump) only the
+        // partition is emitted (XboxKit parity — no Redump prefix). Otherwise the
+        // isoOffset prefix is copied verbatim, then the remainder is walked.
+        if (isoOffset > 0 && xisoLength is null)
         {
             isoFs.Seek(0, SeekOrigin.Begin);
             if (!WriteBytes(isoFs, skelFs, -1, isoOffset)) return false;
         }
 
         isoFs.Seek(isoOffset, SeekOrigin.Begin);
-        long numBytes = 0;
-        while (numBytes < xisoLength)
+
+        // Boundary-aware segment walk: every filesystem (bone) sector is copied
+        // verbatim, everything else is zeroed. Bone ranges are walked as keep
+        // segments — never zero to the end of a merged file+bone extent, which
+        // would pave over bone islands sharing the extent with file data and
+        // leave an unlistable skeleton. Copies use absolute seeks so the input
+        // position can never desync from the output position.
+        long baseSector = isoOffset / SectorSize; // XGD offsets and plain XISOs are sector-aligned
+        List<(long Start, long End)> keep = []; // partition-relative [start, end) byte ranges
+        foreach ((uint s, uint e) in bones)
         {
-            ct.ThrowIfCancellationRequested();
-            long currentByte = isoOffset + numBytes;
-            long currentSector = (currentByte + SectorSize - 1) / SectorSize;
-            long bytesUntilEndOfExtent = 0;
-            long bytesToWipe = 0;
-            bool isBone = false;
-
-            if (ranges.Count > 0 && currentSector > ranges[^1].End)
+            long cs = Math.Max((long)s, baseSector);
+            long ce = Math.Min((long)e, baseSector + ((partLength + SectorSize - 1) / SectorSize) - 1);
+            if (ce < cs)
             {
-                bytesToWipe = xisoLength - numBytes;
+                continue;
+            }
+
+            long bs = (cs - baseSector) * SectorSize;
+            long be = Math.Min((ce - baseSector + 1) * SectorSize, partLength);
+            if (bs >= be)
+            {
+                continue;
+            }
+
+            if (keep.Count > 0 && bs <= keep[^1].End)
+            {
+                keep[^1] = (keep[^1].Start, Math.Max(keep[^1].End, be));
             }
             else
             {
-                for (int i = 0; i < ranges.Count; i++)
-                {
-                    if (currentSector >= ranges[i].Start && currentSector <= ranges[i].End)
-                    {
-                        bytesUntilEndOfExtent = ((ranges[i].End + 1) * SectorSize) - currentByte;
-                        // Check bone
-                        for (int b = 0; b < bones.Count; b++)
-                        {
-                            if (currentSector >= bones[b].Start && currentSector <= bones[b].End)
-                            {
-                                isBone = true;
-                                break;
-                            }
-                        }
-
-                        // bones include this sector => bytesUntil uses bone extent if present
-                        if (isBone)
-                        {
-                            // find bone extent that contains currentSector
-                            for (int b = 0; b < bones.Count; b++)
-                            {
-                                if (currentSector >= bones[b].Start && currentSector <= bones[b].End)
-                                {
-                                    bytesUntilEndOfExtent = ((bones[b].End + 1) * SectorSize) - currentByte;
-                                    break;
-                                }
-                            }
-                        }
-
-                        break;
-                    }
-                    else if (currentSector < ranges[i].Start && (i == 0 || currentSector > ranges[i - 1].End))
-                    {
-                        bytesToWipe = (ranges[i].Start * SectorSize) - currentByte;
-                        break;
-                    }
-                }
-            }
-
-            // If filler region (bytesToWipe>0) then we need to decide: in skeleton, filler gaps are zeroed too?
-            // XboxKit skeleton zeros file data but also zeros filler? ProcessXISO skeleton zeroes non-bone extents.
-            // So both filler and file data are zeroed unless it's a bone.
-            if (bytesToWipe > 0)
-            {
-                // Filler gap — already zero in skeleton
-                WriteZeroes(skelFs, -1, bytesToWipe);
-                numBytes += bytesToWipe;
-                isoFs.Seek(bytesToWipe, SeekOrigin.Current);
-            }
-            else
-            {
-                long bytesToRead = bytesUntilEndOfExtent > 0 ? bytesUntilEndOfExtent : xisoLength - numBytes;
-                if (isBone)
-                {
-                    if (!WriteBytes(isoFs, skelFs, -1, bytesToRead)) return false;
-                }
-                else
-                {
-                    WriteZeroes(skelFs, -1, bytesToRead);
-                    isoFs.Seek(bytesToRead, SeekOrigin.Current);
-                }
-
-                numBytes += bytesToRead;
+                keep.Add((bs, be));
             }
         }
 
-        return numBytes == xisoLength;
+        long numBytes = 0;
+        foreach ((long ks, long ke) in keep)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (ks > numBytes)
+            {
+                WriteZeroes(skelFs, -1, ks - numBytes);
+                numBytes = ks;
+            }
+
+            if (ke > numBytes)
+            {
+                isoFs.Seek(isoOffset + numBytes, SeekOrigin.Begin);
+                if (!WriteBytes(isoFs, skelFs, -1, ke - numBytes)) return false;
+                numBytes = ke;
+            }
+        }
+
+        if (numBytes < partLength)
+        {
+            ct.ThrowIfCancellationRequested();
+            WriteZeroes(skelFs, -1, partLength - numBytes);
+            numBytes = partLength;
+        }
+
+        return numBytes == partLength;
     }
 
     private static string DeriveSkeletonPath(string input)

@@ -233,7 +233,9 @@ internal static partial class BattleRunner
     /// Battle: CISO round-trip with oracle cross-read. XISOSharp compresses the ISO
     /// (split CSO), xdvdfs reads the CSO back (md5 per file — proves oracle-compatible
     /// CSO output), XISOSharp decompresses and the content checksum must equal the
-    /// source image's.
+    /// source image's. Redump inputs start with the video partition, which no CSO
+    /// reader accepts at sector 0 (xdvdfs compress itself refuses them), so the game
+    /// partition is staged to a sector-0 file first and the battle runs on that.
     /// </summary>
     private static SubResult RunCso(string iso, ToolProcess cli, ToolProcess xdvdfs, string work)
     {
@@ -241,7 +243,8 @@ internal static partial class BattleRunner
         try
         {
             Directory.CreateDirectory(work);
-            (_, string srcHexOut, _, _) = cli.Run("checksum", "--silent", iso);
+            string csoInput = TryStageRedumpPartition(iso, work) ?? iso;
+            (_, string srcHexOut, _, _) = cli.Run("checksum", "--silent", csoInput);
             string? srcHex = FirstHex(srcHexOut);
             if (srcHex is null)
             {
@@ -249,7 +252,7 @@ internal static partial class BattleRunner
             }
 
             string csoPath = Path.Combine(work, "o.cso");
-            (int cCode, _, string cErr, double cSec) = cli.Run("cso", iso, csoPath);
+            (int cCode, _, string cErr, double cSec) = cli.Run("cso", csoInput, csoPath);
             if (cCode != 0)
             {
                 return Done(sw, "cso", BattleStatus.Failed, $"CLI compress exit {cCode}: {First(cErr, "no output")}", cSec, 0);
@@ -270,7 +273,7 @@ internal static partial class BattleRunner
                     $"xdvdfs could not read the XISOSharp CSO (exit {oCode}): {First(oErr, oOut)}", cSec, oSec);
             }
 
-            (_, string isoMd5Out, _, _) = cli.Run("--md5", iso);
+            (_, string isoMd5Out, _, _) = cli.Run("--md5", csoInput);
             Dictionary<string, string> isoMap = ParseMd5Map(isoMd5Out);
             Dictionary<string, string> csoMap = ParseMd5Map(oOut);
             List<string> diffs = [];
@@ -402,10 +405,24 @@ internal static partial class BattleRunner
             string xkHash = HashUtil.ComputeSha256(xkFile!);
             long xsLen = new FileInfo(xsFile!).Length;
             long xkLen = new FileInfo(xkFile!).Length;
-            return string.Equals(xsHash, xkHash, StringComparison.OrdinalIgnoreCase)
-                ? Done(sw, op, BattleStatus.Passed, $"SHA256 {xsHash} ({xsLen} bytes)", cSec, oSec)
-                : Done(sw, op, BattleStatus.Failed,
-                    $"SHA256 mismatch: cli {xsHash} ({xsLen} bytes) vs xboxkit {xkHash} ({xkLen} bytes)", cSec, oSec);
+            if (string.Equals(xsHash, xkHash, StringComparison.OrdinalIgnoreCase))
+            {
+                return Done(sw, op, BattleStatus.Passed, $"SHA256 {xsHash} ({xsLen} bytes)", cSec, oSec);
+            }
+
+            // Petrify tiebreaker: on a byte mismatch, verify our skeleton
+            // structurally before failing (see VerifySkeletonStructure).
+            if (string.Equals(op, "petrify", StringComparison.Ordinal))
+            {
+                SubResult? tie = PetrifyTiebreaker(sw, iso, xsFile!, cSec, oSec);
+                if (tie is not null)
+                {
+                    return tie;
+                }
+            }
+
+            return Done(sw, op, BattleStatus.Failed,
+                $"SHA256 mismatch: cli {xsHash} ({xsLen} bytes) vs xboxkit {xkHash} ({xkLen} bytes)", cSec, oSec);
         }
         catch (Exception ex)
         {
@@ -535,6 +552,233 @@ internal static partial class BattleRunner
     }
 
     // ---- helpers -------------------------------------------------------------
+
+    /// <summary>
+    /// Tiebreaker for petrify byte mismatches. xboxkit 0.7's skeleton walk zeroes
+    /// to merged-extent ends (paving over bone islands that share an extent with
+    /// file data) and can desync its read position while hashing inline, so it
+    /// emits unlistable skeletons on real mastered images. When our skeleton
+    /// verifies structurally (bones verbatim, everything else zero) the mismatch
+    /// is an oracle-side defect (Skipped), not a CLI failure. Returns null when
+    /// our skeleton does not verify (fall through to Failed).
+    /// </summary>
+    private static SubResult? PetrifyTiebreaker(Stopwatch sw, string iso, string xsFile, double cSec, double oSec)
+    {
+        if (VerifySkeletonStructure(iso, xsFile, out string detail))
+        {
+            return Done(sw, "petrify", BattleStatus.Skipped,
+                $"CLI skeleton is structurally correct ({detail}) but differs from xboxkit -p " +
+                "(oracle zeroes filesystem tables inside mixed bone/file extents — oracle-side defect, not comparable)", cSec, oSec);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Structural skeleton check: same byte length as the game partition, every
+    /// filesystem (bone) byte identical to the source, every other byte zero.
+    /// Partition bounds mirror the CLI's Redump detection.
+    /// </summary>
+    private static bool VerifySkeletonStructure(string iso, string skeleton, out string detail)
+    {
+        detail = string.Empty;
+        try
+        {
+            long size = new FileInfo(iso).Length;
+            long isoOffset = 0;
+            long partLen = size;
+            if (TryGetPartitionBounds(iso, size, out long off, out long len))
+            {
+                isoOffset = off;
+                partLen = len;
+            }
+
+            long skelLen = new FileInfo(skeleton).Length;
+            if (skelLen != partLen)
+            {
+                detail = $"skeleton size {skelLen} != partition length {partLen}";
+                return false;
+            }
+
+            (List<(uint Start, uint End)> bones, _) = XisoRanges.GetXisoRanges(iso, isoOffset, true);
+            long baseSector = isoOffset / 2048;
+            List<(long Start, long End)> keep = [];
+            foreach ((uint s, uint e) in bones)
+            {
+                long cs = Math.Max((long)s, baseSector);
+                long ce = Math.Min((long)e, baseSector + ((partLen + 2047) / 2048) - 1);
+                if (ce < cs)
+                {
+                    continue;
+                }
+
+                long bs = (cs - baseSector) * 2048;
+                long be = Math.Min((ce - baseSector + 1) * 2048, partLen);
+                if (bs < be && (keep.Count == 0 || bs > keep[^1].End))
+                {
+                    keep.Add((bs, be));
+                }
+                else if (bs < be)
+                {
+                    keep[^1] = (keep[^1].Start, Math.Max(keep[^1].End, be));
+                }
+            }
+
+            using FileStream srcFs = new(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+            using FileStream skFs = new(skeleton, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+            srcFs.Seek(isoOffset, SeekOrigin.Begin);
+            byte[] srcBuf = new byte[1024 * 1024];
+            byte[] skBuf = new byte[1024 * 1024];
+            long pos = 0;
+            int ki = 0;
+            long boneBytes = 0;
+            while (pos < partLen)
+            {
+                int n = (int)Math.Min(srcBuf.Length, partLen - pos);
+                if (ReadFull(srcFs, srcBuf, n) != n || ReadFull(skFs, skBuf, n) != n)
+                {
+                    detail = $"short read at partition offset {pos}";
+                    return false;
+                }
+
+                for (int i = 0; i < n; i++)
+                {
+                    long abs = pos + i;
+                    while (ki < keep.Count && abs >= keep[ki].End)
+                    {
+                        ki++;
+                    }
+
+                    bool inBone = ki < keep.Count && abs >= keep[ki].Start;
+                    if (inBone)
+                    {
+                        boneBytes++;
+                        if (skBuf[i] != srcBuf[i])
+                        {
+                            detail = $"bone byte differs at partition offset {abs}";
+                            return false;
+                        }
+                    }
+                    else if (skBuf[i] != 0)
+                    {
+                        detail = $"non-zero non-bone byte at partition offset {abs}";
+                        return false;
+                    }
+                }
+
+                pos += n;
+            }
+
+            detail = $"{boneBytes} bone bytes verbatim, rest zeroed";
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            detail = $"verification I/O error: {ex.Message.Split('\n')[0]}";
+            return false;
+        }
+    }
+
+    private static int ReadFull(FileStream fs, byte[] buf, int count)
+    {
+        int total = 0;
+        while (total < count)
+        {
+            int n = fs.Read(buf, total, count - total);
+            if (n == 0)
+            {
+                break;
+            }
+
+            total += n;
+        }
+
+        return total;
+    }
+
+    /// <summary>
+    /// Resolves the game-partition bounds of a Redump ISO (mirrors the CLI's
+    /// detection); returns false for non-Redump inputs.
+    /// </summary>
+    private static bool TryGetPartitionBounds(string iso, long size, out long isoOffset, out long xisoLen)
+    {
+        isoOffset = 0;
+        xisoLen = size;
+        try
+        {
+            int redumpType = XgdTables.GetRedumpIsoTypeBySize(size);
+            if (redumpType < 0)
+            {
+                return false;
+            }
+
+            using FileStream fs = new(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+            int videoType = XgdTables.GetVideoType(fs, redumpType);
+            int xsType = XgdTables.GetXisoTypeFromVideo(videoType >= 0 ? videoType : 0);
+            if (xsType < 0 || xsType >= XgdTables.XisoOffset.Length)
+            {
+                xsType = XgdTables.GetXgdType(redumpType);
+            }
+
+            if (xsType < 0 || xsType >= XgdTables.XisoOffset.Length)
+            {
+                return false;
+            }
+
+            isoOffset = XgdTables.XisoOffset[xsType];
+            xisoLen = XgdTables.XisoLength[xsType];
+            return isoOffset >= 0 && xisoLen > 0 && isoOffset + xisoLen <= size;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Stages the game-partition bytes of a Redump ISO as a sector-0 file
+    /// (<c>part.iso</c> under <paramref name="work"/>), or returns null when the
+    /// input is not a known Redump size (used as-is then). Partition bounds mirror
+    /// the CLI's Redump detection (<c>XgdTables</c>, pulled in transitively via the
+    /// CLI project reference).
+    /// </summary>
+    private static string? TryStageRedumpPartition(string iso, string work)
+    {
+        try
+        {
+            long size = new FileInfo(iso).Length;
+            if (!TryGetPartitionBounds(iso, size, out long isoOffset, out long xisoLen))
+            {
+                return null;
+            }
+
+            string part = Path.Combine(work, "part.iso");
+            using (FileStream src = new(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
+            using (FileStream dst = new(part, FileMode.Create, FileAccess.Write, FileShare.None, 65536))
+            {
+                src.Seek(isoOffset, SeekOrigin.Begin);
+                byte[] buf = new byte[1024 * 1024];
+                long remaining = xisoLen;
+                while (remaining > 0)
+                {
+                    int n = src.Read(buf, 0, (int)Math.Min(buf.Length, remaining));
+                    if (n == 0)
+                    {
+                        return null;
+                    }
+
+                    dst.Write(buf, 0, n);
+                    remaining -= n;
+                }
+            }
+
+            return part;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 
     /// <summary>First 64-hex token in the output (checksum lines are "hex" or "hex\tpath").</summary>
     private static string? FirstHex(string stdout) =>

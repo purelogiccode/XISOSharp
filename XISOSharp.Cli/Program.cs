@@ -3944,7 +3944,8 @@ internal static class Program
                 {
                     // Skipped by user choice (-n refusal already failed this file above).
                 }
-                else if (!XisoSkeleton.Petrify(iso, outSkel, outHash, isRedump ? isoOffset : 0, Logger.Quiet))
+                else if (!XisoSkeleton.Petrify(iso, outSkel, outHash, isRedump ? isoOffset : 0,
+                    isRedump ? xisoLen : null, Logger.Quiet))
                 {
                     Logger.LogErr($"[ERROR] Failed petrifying {iso}\n");
                     exit = 1;

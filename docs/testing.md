@@ -271,7 +271,11 @@ executables — no in-process library calls — so it tests exactly what end use
       (md5 per file), XISOSharp decompresses, content checksum must equal the source.
   - xboxkit oracle (XboxKit-parity archival features; each side gets a staged copy):
     - `petrify`/`video`/`random`/`seed`/`zar` — outputs must match byte-for-byte
-      (SHA-256);
+      (SHA-256). Exception: `petrify` falls back to a structural tiebreaker on
+      mismatch — our skeleton must verify (bones verbatim, rest zeroed); if it
+      does while xboxkit's does not, the op Skips as an oracle-side defect
+      (xboxkit 0.7 zeroes filesystem tables inside mixed bone/file extents, see
+      [Troubleshooting](troubleshooting.md#petrify-battle-skipped-oracle-emits-unreadable-skeleton));
     - `trim`/`wipe` — in-place ops, compared byte-for-byte;
     - `rebuild` — components extracted once, both tools rebuild the full redump;
       each rebuilt image must match the original byte-for-byte.

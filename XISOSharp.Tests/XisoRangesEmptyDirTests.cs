@@ -104,7 +104,7 @@ public sealed class XisoRangesEmptyDirTests : IDisposable
         string hash = Path.ChangeExtension(path, ".hash");
         _tempFiles.Add(hash);
 
-        Assert.True(XisoSkeleton.Petrify(path, skel, hash, 0, true));
+        Assert.True(XisoSkeleton.Petrify(path, skel, hash, 0, quiet: true));
         Assert.True(new FileInfo(skel).Length > 0);
     }
 }

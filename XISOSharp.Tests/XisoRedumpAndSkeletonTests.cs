@@ -411,7 +411,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string skel = Path.Combine(outDir, "out.skeleton.xiso");
         string hash = Path.Combine(outDir, "out.hash");
 
-        Assert.Throws<FileNotFoundException>(() => XisoSkeleton.Petrify(missing, skel, hash, 0, true));
+        Assert.Throws<FileNotFoundException>(() => XisoSkeleton.Petrify(missing, skel, hash, 0, quiet: true));
     }
 
     [Fact]
@@ -423,7 +423,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string skel = Path.Combine(outDir, "bad.skeleton.xiso");
         string hash = Path.Combine(outDir, "bad.hash");
 
-        Assert.Throws<EndOfStreamException>(() => XisoSkeleton.Petrify(bad, skel, hash, 0, true));
+        Assert.Throws<EndOfStreamException>(() => XisoSkeleton.Petrify(bad, skel, hash, 0, quiet: true));
     }
 
     [Fact]
@@ -437,7 +437,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        Assert.Throws<OperationCanceledException>(() => XisoSkeleton.Petrify(iso, skel, hash, 0, true, cts.Token));
+        Assert.Throws<OperationCanceledException>(() => XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: true, ct: cts.Token));
     }
 
     [Fact]
@@ -469,6 +469,65 @@ public class XisoRedumpAndSkeletonTests : IDisposable
     }
 
     [Fact]
+    public void Petrify_KeepsBoneIslandsInsideMixedExtents()
+    {
+        // Fragmented layout: dir table for D (sector 100) sits between file data
+        // (F1 at 98-99, G at 101), so merged extent [98-101] mixes bones and files.
+        // Zeroing to the merged-extent end would pave over sector 100 and leave an
+        // unlistable skeleton (Conker petrify battle: only 5 sectors survived).
+        const int sector = 2048;
+        byte[] img = new byte[110 * sector];
+        System.Text.Encoding.ASCII.GetBytes("MICROSOFT*XBOX*MEDIA").CopyTo(img, 32 * sector);
+        BitConverter.GetBytes((uint)40).CopyTo(img, 32 * sector + 20); // rootOffset (sectors)
+        BitConverter.GetBytes((uint)2048).CopyTo(img, 32 * sector + 24); // rootSize (bytes)
+        WriteDirEntry(img, (40 * sector) + 0, left: 0, right: 4, entrySector: 98, entrySize: 4096, attr: 0x20, "F1");
+        WriteDirEntry(img, (40 * sector) + 16, left: 0, right: 0, entrySector: 100, entrySize: 2048, attr: 0x10, "D");
+        WriteDirEntry(img, (100 * sector) + 0, left: 0, right: 0, entrySector: 101, entrySize: 100, attr: 0x20, "G");
+        for (int i = 0; i < 4096; i++)
+        {
+            img[(98 * sector) + i] = 0xAB;
+        }
+
+        for (int i = 0; i < sector; i++)
+        {
+            img[(101 * sector) + i] = 0xCD;
+        }
+
+        string outDir = CreateTempDir();
+        string iso = Path.Combine(outDir, "frag.iso");
+        File.WriteAllBytes(iso, img);
+        string skel = Path.Combine(outDir, "frag.skeleton.xiso");
+        string hash = Path.Combine(outDir, "frag.hash");
+
+        bool ok = XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: true);
+
+        Assert.True(ok);
+        Assert.Equal(img.Length, new FileInfo(skel).Length);
+        byte[] skelBytes = File.ReadAllBytes(skel);
+        // Bone islands preserved verbatim (root table + D's table between file data).
+        Assert.True(skelBytes.AsSpan(40 * sector, sector).SequenceEqual(img.AsSpan(40 * sector, sector)));
+        Assert.True(skelBytes.AsSpan(100 * sector, sector).SequenceEqual(img.AsSpan(100 * sector, sector)));
+        // File data zeroed.
+        Assert.All(skelBytes.AsSpan(98 * sector, 4096).ToArray(), b => Assert.Equal(0, b));
+        Assert.All(skelBytes.AsSpan(101 * sector, sector).ToArray(), b => Assert.Equal(0, b));
+        // Both files hashed.
+        Assert.Equal(2, File.ReadAllLines(hash).Length);
+    }
+
+    private static void WriteDirEntry(byte[] img, int offset, ushort left, ushort right, uint entrySector,
+        uint entrySize, byte attr, string name)
+    {
+        BitConverter.GetBytes(left).CopyTo(img, offset);
+        BitConverter.GetBytes(right).CopyTo(img, offset + 2);
+        BitConverter.GetBytes(entrySector).CopyTo(img, offset + 4);
+        BitConverter.GetBytes(entrySize).CopyTo(img, offset + 8);
+        img[offset + 12] = attr;
+        byte[] nb = System.Text.Encoding.ASCII.GetBytes(name);
+        img[offset + 13] = (byte)nb.Length;
+        nb.CopyTo(img, offset + 14);
+    }
+
+    [Fact]
     public void Petrify_WithPrependedIso_Succeeds()
     {
         string src = CreateSourceDir(PopulateSimple);
@@ -482,6 +541,44 @@ public class XisoRedumpAndSkeletonTests : IDisposable
 
         Assert.True(ok);
         Assert.True(File.Exists(skel));
+        Assert.True(File.Exists(hash));
+    }
+
+    [Fact]
+    public void Petrify_WithOffsetAndLength_EmitsPartitionOnly()
+    {
+        // Simulates a Redump layout (prefix before + tail past the partition):
+        // with an explicit partition length the skeleton must contain the
+        // partition only — no prefix (XboxKit -p parity).
+        string src = CreateSourceDir(PopulateSimple);
+        string iso = CreateIso(src, prependSectors: 16);
+        const long offset = 16L * Constants.SectorSize;
+        const int tailSectors = 8;
+        using (FileStream fs = new(iso, FileMode.Append, FileAccess.Write, FileShare.None))
+        {
+            byte[] tail = new byte[tailSectors * Constants.SectorSize];
+            new Random(42).NextBytes(tail);
+            fs.Write(tail, 0, tail.Length);
+        }
+
+        long partLen = new FileInfo(iso).Length - offset - (tailSectors * Constants.SectorSize);
+        string outDir = CreateTempDir();
+        string skel = Path.Combine(outDir, "part.skeleton.xiso");
+        string hash = Path.Combine(outDir, "part.hash");
+
+        bool ok = XisoSkeleton.Petrify(iso, skel, hash, offset, partLen, quiet: true);
+
+        Assert.True(ok);
+        Assert.Equal(partLen, new FileInfo(skel).Length);
+        // Skeleton starts at the partition (XISO magic at 0x10000), not at the prefix.
+        byte[] magic = new byte["MICROSOFT*XBOX*MEDIA".Length];
+        using (FileStream skelFs = new(skel, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            skelFs.Seek(0x10000, SeekOrigin.Begin);
+            Assert.Equal(magic.Length, skelFs.Read(magic, 0, magic.Length));
+        }
+
+        Assert.Equal("MICROSOFT*XBOX*MEDIA", System.Text.Encoding.ASCII.GetString(magic));
         Assert.True(File.Exists(hash));
     }
 

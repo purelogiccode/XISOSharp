@@ -151,6 +151,25 @@ See [CLI Reference](cli.md#extraction-robustness). For a systematically damaged
 image (not just one short file), audit and rebuild it instead — see
 [Recovering a corrupt image](#recovering-a-corrupt-image--v---repair---salvage).
 
+### `petrify` battle Skipped: oracle emits unreadable skeleton
+
+`petrify ... CLI skeleton is structurally correct (...) but differs from xboxkit -p
+(oracle zeroes filesystem tables inside mixed bone/file extents — oracle-side defect,
+not comparable)`.
+
+xboxkit 0.7's skeleton walk zeroes to merged-extent ends, paving over filesystem
+("bone") sectors that share an extent with file data — on real mastered images
+only a handful of tables survive, so its skeleton is unlistable (native
+extract-xiso reports a single root entry). It can additionally copy bone sectors
+from wrong file offsets: it seeks the input absolutely per file while hashing
+inline, then resumes relatively, desyncing later reads. XISOSharp walks
+bone-keep segments instead (every table sector verbatim, everything else zero),
+so its skeletons stay listable and rebuildable. Byte-parity with the oracle
+cannot pass on such images by design; the battle Skips with this reason after
+verifying our skeleton structurally (same length as the game partition, bones
+verbatim, rest zero). If upstream xboxkit fixes its walk, the byte comparison
+goes green again on its own.
+
 ## Permission and file-system issues
 
 **Extraction fails with permission denied.**

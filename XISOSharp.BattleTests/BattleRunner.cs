@@ -433,7 +433,7 @@ internal static partial class BattleRunner
         "extract" or "unpack" => 2.2,
         "rewrite" => 4.5, // cs_in + exe_in + both outputs (+ .old backups)
         "pack" => 3.5,    // unpacked src + two packed images
-        "cso" => 2.5,     // compressed parts + decompressed image
+        "cso" => 3.5,     // staged partition + compressed parts + decompressed image
         "rebuild" => 7,   // 2 staged copies + components + 2 rebuilt images
         "petrify" or "video" or "random" or "seed" or "zar" or "trim" or "wipe" => 3.2,
         _ => 0,           // list / checksum / md5 write nothing

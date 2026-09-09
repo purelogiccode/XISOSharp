@@ -74,7 +74,7 @@ XISOSharp --trim <input.iso> [trimmed.xiso]
 XISOSharp --petrify <input.iso> [skeleton.xiso] [hashFile]
 ```
 
-`XisoSkeleton.Petrify` — XISO with file extents zeroed + SHA-1 hex per file (`CollectFileEntries` sorted by `Offset`, `SHA1` streaming `sector*SectorSize+isoOffset`, line `hex + " " + path`). Skeleton = copy XISO with `WriteZeroes` over `FileRanges`. Mirrors `ProcessXISO(skeleton:true, hashWriter)`.
+`XisoSkeleton.Petrify` — XISO with file extents zeroed + SHA-1 hex per file (`CollectFileEntries` sorted by `Offset`, `SHA1` streaming `sector*SectorSize+isoOffset`, line `hex + " " + path`). Skeleton = every filesystem (bone) sector verbatim, everything else zeroed, walked as keep-segments so bone islands inside mixed bone/file extents survive (zeroing to merged-extent ends would pave over them and leave an unlistable skeleton — see [Troubleshooting](troubleshooting.md#petrify-battle-skipped-oracle-emits-unreadable-skeleton)). On Redump inputs only the game partition is emitted (no Redump prefix), matching `xboxkit -p` sizing.
 
 ## Update
 
