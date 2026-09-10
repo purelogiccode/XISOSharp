@@ -320,11 +320,82 @@ internal static partial class BattleRunner
         }
     }
 
+    // ---- trim / wipe (xboxkit oracle) ----------------------------------------
+
+    /// <summary>
+    /// Battle: trim/wipe the game partition. xboxkit 0.7 cannot trim/wipe a full
+    /// Redump at all — <c>ExtractRedump</c> only writes XISOs for <c>-x</c>/<c>-p</c>/<c>-r</c>
+    /// and its <c>-t</c>/<c>-w</c>-alone warning is suppressed by <c>-y</c>, so it exits 0
+    /// with no output (KOTOR battle: "no trim output"). Like <c>cso</c>, the game
+    /// partition is staged to a sector-0 file first and both tools run on that in
+    /// xboxkit's ProcessXISO mode, which writes <c>&lt;name&gt;.xiso</c> beside the input.
+    /// Outputs are compared byte-for-byte: trim copies merged extents verbatim and
+    /// truncates after the last one; wipe zeroes the gaps and copies extents
+    /// verbatim (both tools use merged bone+file ranges).
+    /// </summary>
+    private static SubResult RunTrimWipe(string op, string iso, ToolProcess cli, ToolProcess xk, string work,
+        string cliFlag, string xkFlag)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+        try
+        {
+            Directory.CreateDirectory(work);
+            string? stagedPart = TryStageRedumpPartition(iso, work);
+            bool staged = stagedPart is not null;
+            string part = stagedPart ?? Path.Combine(work, "src.iso");
+            if (!staged)
+            {
+                File.Copy(iso, part, true);
+            }
+
+            string xsOut = Path.Combine(work, "out.iso");
+            string xkOut = Path.Combine(work, Path.GetFileNameWithoutExtension(part) + ".xiso");
+            (int cCode, _, string cErr, double cSec) = cli.Run(cliFlag, "-o", xsOut, part);
+            (int oCode, string oOut, string oErr, double oSec) = xk.Run(xkFlag, "-y", "-q", part);
+
+            bool cliOk = cCode == 0 && File.Exists(xsOut);
+            bool xkOk = oCode == 0 && File.Exists(xkOut);
+            if (!cliOk && !xkOk)
+            {
+                return Done(sw, op, BattleStatus.Skipped,
+                    $"both tools refused: cli: {First(cErr, $"no {op} output")}, xboxkit: {First(oErr, oOut)}", cSec, oSec);
+            }
+
+            // Only comparable outputs can pass or fail; an asymmetric refusal is a
+            // capability difference surfaced in the detail, not a hash mismatch.
+            if (!xkOk)
+            {
+                return Done(sw, op, BattleStatus.Skipped,
+                    $"xboxkit refused (exit {oCode}, no {op} output — trimmed/unsupported input?); CLI produced {Path.GetFileName(xsOut)} — nothing to compare", cSec, oSec);
+            }
+
+            if (!cliOk)
+            {
+                return Done(sw, op, BattleStatus.Skipped,
+                    $"CLI refused (exit {cCode}: {First(cErr, $"no {op} output")}); xboxkit produced {Path.GetFileName(xkOut)} — nothing to compare", cSec, oSec);
+            }
+
+            string xsHash = HashUtil.ComputeSha256(xsOut);
+            string xkHash = HashUtil.ComputeSha256(xkOut);
+            long xsLen = new FileInfo(xsOut).Length;
+            long xkLen = new FileInfo(xkOut).Length;
+            return string.Equals(xsHash, xkHash, StringComparison.OrdinalIgnoreCase)
+                ? Done(sw, op, BattleStatus.Passed,
+                    $"{(staged ? "staged partition; " : string.Empty)}SHA256 {xsHash} ({xsLen} bytes)", cSec, oSec)
+                : Done(sw, op, BattleStatus.Failed,
+                    $"SHA256 mismatch: cli {xsHash} ({xsLen} bytes) vs xboxkit {xkHash} ({xkLen} bytes)", cSec, oSec);
+        }
+        catch (Exception ex)
+        {
+            return Done(sw, op, BattleStatus.Failed, $"{ex.GetType().Name}: {ex.Message}", 0, 0);
+        }
+    }
+
     // ---- xboxkit oracle ------------------------------------------------------
 
     /// <summary>
     /// Shared runner for the staged-copy, hash-compare xboxkit ops (petrify, video,
-    /// random, seed, zar, trim, wipe). Each side works on its own staged copy of the
+    /// random, seed, zar). Each side works on its own staged copy of the
     /// ISO (xboxkit writes beside / in-place on its input), outputs are discovered
     /// (xboxkit always exits 0, so presence is the success signal), and the files are
     /// compared by SHA-256. Both sides refusing = Skipped (e.g. trimmed ISOs for
@@ -337,10 +408,7 @@ internal static partial class BattleRunner
     /// <param name="work">Scratch dir receiving the per-side staged copies.</param>
     /// <param name="cliTemplate">CLI args template with {ISO}/{OUT} placeholders.</param>
     /// <param name="xkTemplate">xboxkit args template with {ISO} placeholder.</param>
-    /// <param name="preferredPattern">
-    /// Output glob hint for both sides (e.g. "*video*"), or null for in-place ops
-    /// (trim/wipe: xboxkit's output is its staged input itself).
-    /// </param>
+    /// <param name="preferredPattern">Output glob hint for both sides (e.g. "*video*").</param>
     private static SubResult RunStagedCompare(string op, string iso, ToolProcess cli, ToolProcess xk, string work,
         string[] cliTemplate, string[] xkTemplate, string? preferredPattern)
     {

@@ -71,12 +71,10 @@ internal static partial class BattleRunner
                         ["--zar", "-o", "{OUT}", "{ISO}"], ["-z", "-y", "-q", "{ISO}"], "*.zar")
                     : MissingOracle(op, "xboxkit.exe"),
                 "trim" => xboxkit?.Available == true
-                    ? RunStagedCompare("trim", iso, cli, xboxkit, work!,
-                        ["--trim", "-o", "{OUT}", "{ISO}"], ["-t", "-y", "-q", "{ISO}"], null)
+                    ? RunTrimWipe("trim", iso, cli, xboxkit, work!, "--trim", "-t")
                     : MissingOracle(op, "xboxkit.exe"),
                 "wipe" => xboxkit?.Available == true
-                    ? RunStagedCompare("wipe", iso, cli, xboxkit, work!,
-                        ["--wipe", "-o", "{OUT}", "{ISO}"], ["-w", "-y", "-q", "{ISO}"], null)
+                    ? RunTrimWipe("wipe", iso, cli, xboxkit, work!, "--wipe", "-w")
                     : MissingOracle(op, "xboxkit.exe"),
                 "rebuild" => xboxkit?.Available == true
                     ? RunRebuild(iso, cli, xboxkit, work!)

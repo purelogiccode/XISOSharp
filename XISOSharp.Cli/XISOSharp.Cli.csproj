@@ -2,37 +2,19 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- Tool ships as a published single-file binary, never as NuGet, so no
-             EnablePackageValidation here — package compat gates apply to the
-             library (the only packable project) only. -->
     <IsPackable>false</IsPackable>
-    <!-- Multi-target to match the library so XISOSharp.Tests (net8/9/10) can
-             reference the CLI on every TFM and exercise all lib closures. -->
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-    <!-- AssemblyName stays XISOSharp.Cli (project identity + RootNamespace): the
-             class library already owns the XISOSharp simple name, and the CLI
-             references it — building the CLI as XISOSharp.dll would collide
-             with the referenced XISOSharp.dll in the same output folder.
-             The exe still appears as XISOSharp(.exe) via the AliasBuiltExeAsXisoSharp
-             target below (every build) and the RenamePublishedExeToXisoSharp target
-             (published single-file). -->
     <AssemblyName>XISOSharp.Cli</AssemblyName>
     <RootNamespace>XISOSharp.Cli</RootNamespace>
     <ApplicationIcon>icon\icon.ico</ApplicationIcon>
-    <!-- Single RID source of truth (matches publish-cli.ps1 defaults and
-              docs/building.md): win-x86, win-x64, win-arm64, linux-x64,
-              linux-arm64, osx-x64, osx-arm64. XboxKit parity (incl. 32-bit). -->
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
-
-    <!-- Distribution defaults: every self-contained `dotnet publish -r` for a
-             listed RID yields a trimmed single-file binary with no runtime to install. -->
     <PublishSingleFile>true</PublishSingleFile>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>partial</TrimMode>
-
-    <!-- Surface trim/single-file incompatibilities at build time, not just publish. -->
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>

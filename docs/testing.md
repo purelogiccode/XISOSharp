@@ -278,7 +278,10 @@ executables — no in-process library calls — so it tests exactly what end use
       does while xboxkit's does not, the op Skips as an oracle-side defect
       (xboxkit 0.7 zeroes filesystem tables inside mixed bone/file extents, see
       [Troubleshooting](troubleshooting.md#petrify-battle-skipped-oracle-emits-unreadable-skeleton));
-    - `trim`/`wipe` — in-place ops, compared byte-for-byte;
+    - `trim`/`wipe` — the game partition is staged to a sector-0 file first
+      (xboxkit 0.7 cannot trim/wipe a full Redump: `-t`/`-w` alone write nothing
+      there and `-y` silences the warning), then both tools run on it and the
+      outputs are compared byte-for-byte;
     - `rebuild` — components extracted once, then the game partition is staged
       to a sector-0 file as the `<xiso>` input for both tools (neither
       rebuilder accepts a full Redump there — both validate the XISO header at

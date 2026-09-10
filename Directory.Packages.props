@@ -1,28 +1,18 @@
 <Project>
-  <!-- Central Package Management: single source of truth for every NuGet version
-       in this repo (BUG-CFG-019). Projects must reference packages WITHOUT a
-       Version= attribute; versions resolve from the PackageVersion items below.
-       Bump a version here once instead of in N project files. -->
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Avalonia" Version="12.1.2" />
     <PackageVersion Include="Avalonia.Desktop" Version="12.1.2" />
-    <!-- No 12.x build of Avalonia.Diagnostics is published yet; Gui keeps it
-         Debug-only until one ships (see XISOSharp.Gui.csproj). -->
     <PackageVersion Include="Avalonia.Diagnostics" Version="11.3.20" />
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.2" />
     <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.2" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.231" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
-    <!-- SourceLink is library-only (snupkg); apps carry embedded/portable PDBs.
-         Its 10.0.400 band is decoupled from the SDK pin in global.json — it is a
-         build-task package and works with any 10.x SDK, so the two versions move
-         independently. -->
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.234" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.401" />
     <PackageVersion Include="MinVer" Version="8.0.0" />
     <PackageVersion Include="QuestPDF" Version="2026.8.0" />
@@ -34,12 +24,8 @@
     <PackageVersion Include="Serilog.Sinks.Debug" Version="3.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageVersion Include="WPF-UI" Version="4.3.0" />
-    <!-- xunit 2.9.3 pairs with the universal xunit.runner.visualstudio 4.x,
-         which runs v1/v2/v3 tests (see XISOSharp.Tests.csproj). -->
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
-    <!-- Clean-clone fallback when the sibling CSharp_ZARSharp checkout is absent
-         (see XISOSharp.csproj). Publish ZARSharp to NuGet to activate. -->
     <PackageVersion Include="ZARSharp" Version="1.0.0" />
   </ItemGroup>
 </Project>
