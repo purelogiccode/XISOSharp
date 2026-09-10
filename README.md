@@ -485,7 +485,7 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | `--trim` truncate after last extent | ✅ | ❌ | ✅ | ❌ |
 | `--petrify` skeleton + SHA-1 per file | ✅ | ❌ | ✅ | ❌ |
 | `--update` tail `su20076000_00000000` (XGD3) | ✅ | ❌ | ✅ | ❌ |
-| `--zar` ZArchive/zstd | ✅ | ❌ | ✅ | ❌ |
+| `--zar` ZArchive/zstd (byte-identical to xboxkit: discovery-order name table) | ✅ | ❌ | ✅ | ❌ |
 | ZArchive read/write/pack/extract library (`ZARSharp`, pure C#, zero packages, incl. RFC 8878 zstd encoder + decoder) | ✅ | ❌ | ❌ | ❌ |
 | `rebuild` from `.zar` sidecar (XboxKit roadmap "coming soon") | ✅ | ❌ | ❌ | ❌ |
 | `rebuild` lossless (L0/`l0Padding`+game+`l1Padding`+L1) | ✅ | ❌ | ✅ | ❌ |

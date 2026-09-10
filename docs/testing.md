@@ -271,14 +271,21 @@ executables — no in-process library calls — so it tests exactly what end use
       (md5 per file), XISOSharp decompresses, content checksum must equal the source.
   - xboxkit oracle (XboxKit-parity archival features; each side gets a staged copy):
     - `petrify`/`video`/`random`/`seed`/`zar` — outputs must match byte-for-byte
-      (SHA-256). Exception: `petrify` falls back to a structural tiebreaker on
+      (SHA-256). `zar` parity holds because our name table follows btree
+      discovery order like xboxkit's (not pack order — see
+      [Archival](archival.md#zar)). Exception: `petrify` falls back to a structural tiebreaker on
       mismatch — our skeleton must verify (bones verbatim, rest zeroed); if it
       does while xboxkit's does not, the op Skips as an oracle-side defect
       (xboxkit 0.7 zeroes filesystem tables inside mixed bone/file extents, see
       [Troubleshooting](troubleshooting.md#petrify-battle-skipped-oracle-emits-unreadable-skeleton));
     - `trim`/`wipe` — in-place ops, compared byte-for-byte;
-    - `rebuild` — components extracted once, both tools rebuild the full redump;
-      each rebuilt image must match the original byte-for-byte.
+    - `rebuild` — components extracted once, then the game partition is staged
+      to a sector-0 file as the `<xiso>` input for both tools (neither
+      rebuilder accepts a full Redump there — both validate the XISO header at
+      `0x10000`); both tools rebuild the full redump and each rebuilt image
+      must match the original byte-for-byte. xboxkit's output is read at its
+      deterministic `<stem>.iso` path beside its staged input, never by
+      newest-file guess (the staged component copies share that directory);
   - Redump-only ops (`video`/`random`/`seed`/`trim`/`wipe`/`petrify`/`rebuild`)
     auto-**skip** on trimmed XISOs — the reference tools refuse them there
     (xboxkit always exits 0, so success is detected via output files).

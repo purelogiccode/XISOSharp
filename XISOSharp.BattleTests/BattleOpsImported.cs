@@ -478,8 +478,20 @@ internal static partial class BattleRunner
                 File.Copy(update, Path.Combine(xkDir, Path.GetFileName(update)), true);
             }
 
+            // Both rebuilders validate the XISO header at 0x10000, so the full
+            // Redump staged copies are not usable as the <xiso> component —
+            // stage the game partition (sector-0 file) as the rebuild input for
+            // both sides; for non-Redump inputs the staged copy already is it.
+            string? stagedPart = TryStageRedumpPartition(iso, xsDir);
+            if (stagedPart is not null)
+            {
+                File.Copy(stagedPart, xkIso, true);
+            }
+
+            string gameXiso = stagedPart ?? xsIso;
+
             string xsOut = Path.Combine(xsDir, "rebuilt.iso");
-            List<string> xsArgs = ["rebuild", xsIso, video, filler];
+            List<string> xsArgs = ["rebuild", gameXiso, video, filler];
             List<string> xkArgs = [xkIso, Path.GetFileName(video), Path.GetFileName(filler)];
             if (update is not null)
             {
@@ -513,10 +525,11 @@ internal static partial class BattleRunner
             string originalHash = HashUtil.ComputeSha256(iso);
             long originalLen = new FileInfo(iso).Length;
             string? xsFile = File.Exists(xsOut) ? xsOut : FindOutput(xsDir, xsIso, "rebuilt*");
-            string? xkFile = Directory.GetFiles(xkDir, "*.iso", SearchOption.TopDirectoryOnly)
-                .Where(static f => !f.EndsWith(".old", StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(static f => new FileInfo(f).LastWriteTimeUtc)
-                .FirstOrDefault();
+            // xboxkit's rebuild default output is <stem>.iso beside the staged
+            // input (RebuildISO.ResolvePaths); never guess by timestamp here —
+            // the component copies (video/filler/update) also land in xkDir.
+            string xkExpected = Path.Combine(xkDir, stem + ".iso");
+            string? xkFile = File.Exists(xkExpected) ? xkExpected : null;
             List<string> verdicts = [];
             bool xsOk = false;
             bool xkOk = false;

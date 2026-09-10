@@ -158,6 +158,10 @@ public static class XisoZarchive
                 Compressor = compressor,
                 // Historical behavior: the destination is truncated.
                 CollisionPolicy = ZarCollisionPolicy.Overwrite,
+                // XboxKit writes the name table in btree discovery order (its
+                // names list), not pack order — seed the writer with our
+                // discovery list so the archives match byte-for-byte.
+                NameOrder = names,
             };
             ZarPipeline.PackSource(source, zarPath, options, progress, ct);
             return true;
@@ -191,7 +195,9 @@ public static class XisoZarchive
         out PathNode rootNode, out List<string> names)
     {
         List<string> nameList = new();
-        Dictionary<string, int> lookup = new(StringComparer.OrdinalIgnoreCase);
+        // XboxKit dedups names case-sensitively (default Dictionary); mirror it
+        // so case-differing duplicates stay separate name-table entries.
+        Dictionary<string, int> lookup = new(StringComparer.Ordinal);
         rootNode = new PathNode();
         ParseNode(isoFs, isoOffset, dirOffset, dirSize, 0, rootNode, nameList, lookup);
         if (removeUpdate)

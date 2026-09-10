@@ -106,7 +106,9 @@ XISOSharp --zar -o game.zar game.iso   # load game.zar directly in Xenia canary
 
 Notes: empty directories survive the conversion; `--zar` also runs inside the
 Redump batch (zar of the XISO component); pass-through `removeUpdate` drops
-`$SystemUpdate` from the archive tree.
+`$SystemUpdate` from the archive tree. The name table follows the XDVDFS btree
+discovery order (not pack order), so output is byte-identical to xboxkit's
+(`--zar` battle-verified SHA-256 match).
 
 ## Security sectors
 
