@@ -40,6 +40,12 @@ A framework-dependent `dotnet build` produces `XISOSharp.Cli(.exe)` in
 `./publish-cli.ps1`, whose output lands in `publish/<rid>/`) ships the same tool
 renamed to **`XISOSharp`** (Windows: `XISOSharp.exe`).
 
+> [!TIP]
+> Double-clicking `XISOSharp.exe` in Explorer prints the usage text and keeps the
+> window open until you press a key. The pause only happens on an interactive
+> no-argument launch — scripts and pipes are never blocked (`XISO_NO_PAUSE=1`
+> disables it explicitly).
+
 ### First extraction
 
 ```bash

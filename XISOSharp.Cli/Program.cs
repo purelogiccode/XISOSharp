@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using Serilog;
@@ -61,6 +62,10 @@ internal static class Program
     internal static int Main(string[] args)
     {
         AppLogging.Configure("XISOSharp");
+        // Launched by double-click (Explorer: no arguments on an interactive
+        // console): keep the window open at the end so the usage text stays
+        // readable instead of flashing away.
+        bool pauseBeforeExit = args.Length == 0 && IsInteractiveConsoleLaunch();
         try
         {
             return MainInner(args);
@@ -94,6 +99,56 @@ internal static class Program
             }
 
             AppLogging.CloseAndFlush();
+
+            if (pauseBeforeExit)
+                PauseBeforeExit();
+        }
+    }
+
+    /// <summary>
+    /// Reports whether the process was launched interactively with no console
+    /// redirection — the double-click-from-Explorer case. Never true under test
+    /// hosts (which drive <see cref="Main"/> directly) or when I/O is piped.
+    /// </summary>
+    private static bool IsInteractiveConsoleLaunch()
+    {
+        try
+        {
+            if (!Environment.UserInteractive)
+                return false;
+            if (Console.IsInputRedirected || Console.IsOutputRedirected)
+                return false;
+            if (string.Equals(Environment.GetEnvironmentVariable("XISO_NO_PAUSE"), "1",
+                    StringComparison.Ordinal))
+                return false;
+            string? entry = Assembly.GetEntryAssembly()?.GetName().Name;
+            if (entry?.Contains("test", StringComparison.OrdinalIgnoreCase) == true)
+                return false;
+            if (AppDomain.CurrentDomain.FriendlyName.Contains("test", StringComparison.OrdinalIgnoreCase))
+                return false;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Waits for a key press before exiting so a double-clicked console window
+    /// stays readable. Never throws.
+    /// </summary>
+    private static void PauseBeforeExit()
+    {
+        try
+        {
+            Console.WriteLine();
+            Console.WriteLine("Press any key to exit...");
+            _ = Console.ReadKey(intercept: true);
+        }
+        catch
+        {
+            // No console to pause on — exit normally.
         }
     }
 

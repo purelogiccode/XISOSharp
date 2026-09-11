@@ -86,7 +86,7 @@ back via `Dispatcher.UIThread`, and commands gate on `CanExecute` while a run is
 
 ## Using the CLI
 
-The CLI binary is `XISOSharp(.exe)`. It is `extract-xiso`-compatible (`-c`/`-x`/`-l`/`-r`/`-d`/`-D`/`-m`/`-q`/`-Q`/`-s`/`-X`/`-h`/`-v`) plus XboxKit + xdvdfs verbs. Flags must precede positionals; `-h`/`-v` exit 0. Help is `-h` ONLY — `--help` is treated as a filename. `-v` still prints the `extract-xiso v2.7.1` baseline banner for compatibility.
+The CLI binary is `XISOSharp(.exe)`. It is `extract-xiso`-compatible (`-c`/`-x`/`-l`/`-r`/`-d`/`-D`/`-m`/`-q`/`-Q`/`-s`/`-X`/`-h`/`-v`) plus XboxKit + xdvdfs verbs. Flags must precede positionals; `-h`/`-v` exit 0. Help is `-h` ONLY — `--help` is treated as a filename. `-v` still prints the `extract-xiso v2.7.1` baseline banner for compatibility. Double-clicking the exe prints usage and waits for a keypress instead of closing. Full project readme (all args + examples): [`XISOSharp.Cli/`](XISOSharp.Cli/) — deep reference: [`docs/cli.md`](docs/cli.md).
 
 ### Basics
 
