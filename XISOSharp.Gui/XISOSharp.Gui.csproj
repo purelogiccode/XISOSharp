@@ -61,7 +61,7 @@
     <!-- DevTools only: no 12.x build of Avalonia.Diagnostics is published yet
              (latest is 11.x), so keep it Debug-only and out of the Release closure
              entirely. Upgrade to 12.x when available. -->
-    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.21" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.22" Condition="'$(Configuration)' == 'Debug'" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 
@@ -73,7 +73,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.235">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.236">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

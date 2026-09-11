@@ -68,25 +68,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- ZArchiveSharp lives in the sibling CSharp_ZArchiveSharp repo (separate solution).
-             Local dev: side-by-side checkout (..\CSharp_ZArchiveSharp) wins.
-             Clean clone / CI without the sibling: fall back to the ZArchiveSharp NuGet
-             package (https://www.nuget.org/packages/ZArchiveSharp). -->
-    <ProjectReference Include="..\..\CSharp_ZArchiveSharp\ZArchiveSharp\ZArchiveSharp.csproj"
-                      Condition="Exists('..\..\CSharp_ZArchiveSharp\ZArchiveSharp\ZArchiveSharp.csproj')" />
-    <PackageReference Include="ZArchiveSharp" Version="1.0.1"
-                      Condition="!Exists('..\..\CSharp_ZArchiveSharp\ZArchiveSharp\ZArchiveSharp.csproj')" />
+    <!-- ZArchiveSharp is consumed as a NuGet package (https://www.nuget.org/packages/ZArchiveSharp).
+              The library lives in the sibling CSharp_ZArchiveSharp repo (separate solution);
+              local changes there are consumed here by publishing a new package version. -->
+    <PackageReference Include="ZArchiveSharp" Version="1.0.2" />
   </ItemGroup>
-
-  <Target Name="CheckZArchiveSharpSource" BeforeTargets="CollectPackageReferences"
-          Condition="!Exists('..\..\CSharp_ZArchiveSharp\ZArchiveSharp\ZArchiveSharp.csproj')">
-    <Warning
-      Text="Sibling CSharp_ZArchiveSharp checkout not found; falling back to the ZArchiveSharp NuGet package. For local dev, clone the sibling repo side-by-side with this one." />
-  </Target>
 
   <!-- Source Link + versioning. -->
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.235">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.236">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

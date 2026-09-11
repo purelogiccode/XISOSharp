@@ -18,7 +18,10 @@ internal sealed class ToolProcess
     /// <summary>Gets the resolved exe path.</summary>
     public string ExePath { get; }
 
-    public ToolProcess(string exePath) => ExePath = Path.GetFullPath(exePath);
+    public ToolProcess(string exePath)
+    {
+        ExePath = Path.GetFullPath(exePath);
+    }
 
     /// <summary>Runs the exe with args; returns exit code, captured output, and the
     /// exe's wall-clock seconds (start → exit, excludes harness overhead).</summary>
