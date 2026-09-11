@@ -62,6 +62,10 @@ internal static class Program
     internal static int Main(string[] args)
     {
         AppLogging.Configure("XISOSharp");
+        // Daily GitHub update check (stderr notice + optional browser
+        // redirect). Skipped for quiet/version runs, test hosts, offline
+        // machines pay at most one short timeout per day — never fails the run.
+        UpdateChecker.CheckForUpdates(args);
         // Launched by double-click (Explorer: no arguments on an interactive
         // console): keep the window open at the end so the usage text stays
         // readable instead of flashing away.

@@ -493,6 +493,14 @@ XISOSharp --checksum game.iso
 - xdvdfs verbs (`build-image`/`image-spec`/`compress`/`decompress`/`checksum`/`split`/`join`) are detected as first token and handled before `getopt` parsing.
 - Output progress uses carriage returns when writing to a terminal and newlines when
   stdout is redirected, so logs stay readable in CI.
+- **Automatic update checks:** every launch compares the running version against
+  the latest GitHub release (at most one request per 24 h, cached in
+  `%LocalAppData%/XISOSharp/update-check.json`). A newer release prints an
+  `[UPDATE]` notice to stderr with the release URL and the matching
+  `release_<version>_<rid>.zip` asset (`win-x64`, `win-arm64`, `linux-x64`,
+  `linux-arm64`, `MacOsX-x64`, `MacOsX-arm64`), and offers to open the release
+  page on interactive consoles. Skipped for `-q`/`-Q`/`-v`, test hosts, and
+  `XISO_NO_UPDATE_CHECK=1`; never fails the run, never files a bug report.
 
 See also: [Getting Started](getting-started.md) · [Validation](validation.md) ·
 [Redump & Disc Layouts](redump-workflows.md) · [Archival](archival.md) ·

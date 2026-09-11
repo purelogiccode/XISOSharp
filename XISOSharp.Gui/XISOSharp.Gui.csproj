@@ -26,10 +26,16 @@
          and does not survive trimming. -->
     <PublishSingleFile>true</PublishSingleFile>
     <PublishTrimmed>false</PublishTrimmed>
+    <!-- Bundle content + package native libraries (Skia/HarfBuzz) into the
+         single file for self-extraction, so the publish output stays one
+         binary per app instead of a folder of loose DLLs. -->
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <!-- Surface single-file incompatibilities at build time, not just publish.
              (No EnableTrimAnalyzer: the app intentionally ships untrimmed, so trim
              analysis would flag the entire Avalonia closure by design.) -->
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>

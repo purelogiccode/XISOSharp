@@ -23,8 +23,28 @@ dotnet publish XISOSharp.Cli -c Release -f net10.0 -r win-x64 --self-contained
 > [!TIP]
 > Double-clicking `XISOSharp.exe` in Explorer prints the usage text and **keeps the
 > window open** (`Press any key to exit...`) instead of flashing away. The pause only
-> happens on an interactive no-argument launch — scripts, pipes, and `XISO_NO_PAUSE=1`
-> are never blocked.
+> happens on an interactive no-argument launch — scripts, pipes, test hosts, and
+> `XISO_NO_PAUSE=1` are never blocked.
+
+## Automatic update checks
+
+On every launch the CLI compares its version against the latest GitHub release
+(at most one network request per 24 hours — the result is cached under
+`%LocalAppData%/XISOSharp/update-check.json`). When a newer release exists you get
+a stderr notice with the release URL and the matching platform asset
+(`release_<version>_<rid>.zip`, e.g. `release_1.0.0_win-x64.zip`), and on an
+interactive console you are offered to open the release page in your browser.
+
+```text
+[UPDATE] XISOSharp 1.0.2 is available (you have 1.0.1).
+[UPDATE] Download: https://github.com/purelogiccode/XISOSharp/releases/download/1.0.2/release_1.0.2_win-x64.zip
+[UPDATE] Release notes: https://github.com/purelogiccode/XISOSharp/releases/tag/1.0.2
+Open the release page in your browser now? [y/N]:
+```
+
+Skipped (no network, no output) for `-q`/`-Q`/`-v` runs and under test hosts.
+Set `XISO_NO_UPDATE_CHECK=1` to disable the check entirely. The check never
+fails the run and never files a bug report.
 
 ## Usage
 
