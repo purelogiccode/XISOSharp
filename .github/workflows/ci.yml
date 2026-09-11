@@ -63,17 +63,21 @@ jobs:
         run: dotnet build --no-restore --configuration Release -m:1
 
       - name: Test
-        # Scoped to the test project (its lib/CLI/TestDataGenerator references
-        # build the needed closure); the solution build above already compiled
-        # the Windows-only Tester/GUI harnesses. Runs net8.0 + net9.0 + net10.0.
+        # windows-latest only: the suite mutates the process-wide current
+        # directory, which races on Linux/macOS runners (getcwd fails once a
+        # test's directory is deleted). The 3-OS matrix still compile-checks
+        # every project. Scoped to the test project; the solution build above
+        # already compiled the Windows-only Tester/GUI harnesses.
+        if: matrix.os == 'windows-latest'
         run: >-
           dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj
           --no-build --configuration Release
           --collect:"XPlat Code Coverage"
           --results-directory TestResults
+          --blame-hang-timeout 15m
 
       - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
