@@ -63,7 +63,7 @@ internal static class SkipConditions
             OracleKind.Xdvdfs => Path.Combine(root, "References", "xdvdfs-0.8.3", "xdvdfs.exe"),
             OracleKind.ExtractXiso => Path.Combine(root, "References",
                 "extract-xiso-build-202505152050", "extract-xiso-Win64_Release", "artifacts", "extract-xiso.exe"),
-            OracleKind.Zarchive => Path.Combine(root, "..", "CSharp_ZARSharp", "References", "ZArchive-0.1.2",
+            OracleKind.Zarchive => Path.Combine(root, "..", "CSharp_ZArchiveSharp", "References", "ZArchive-0.1.2",
                 "zarchive.exe"),
             _ => null,
         };
