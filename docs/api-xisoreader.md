@@ -449,7 +449,7 @@ public static byte[] ComputeImageChecksum(string isoPath, CancellationToken ct =
 public static string ComputeImageChecksumHex(string isoPath, CancellationToken ct = default);
 ```
 
-In `XISOSharp` namespace via `XisoChecksum` (xdvdfs `checksum` compat): deterministic **SHA3-256** over `SortedDictionary Ordinal` `/DIR/FILE` UTF-8 path bytes + streamed file data (`IncrementalHash SHA3_256`, BCL on .NET 8+). NOT SHA256 of full image. CLI `checksum` prints `hex tab path`. See [xdvdfs Compat](xdvdfs-compat.md#checksum).
+In `XISOSharp` namespace via `XisoChecksum` (xdvdfs `checksum` compat): deterministic **SHA3-256** over `SortedDictionary Ordinal` `/DIR/FILE` UTF-8 path bytes + streamed file data (BCL `SHA3_256` when the OS supports it, else the pure-managed FIPS 202 fallback in `Sha3.cs` — identical digests, no extra dependency). NOT SHA256 of full image. CLI `checksum` prints `hex tab path`. See [xdvdfs Compat](xdvdfs-compat.md#checksum).
 
 ## Archival (Redump) — via XisoRedump / XisoOperations / XisoRanges / XboxPrng
 

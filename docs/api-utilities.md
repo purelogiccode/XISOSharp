@@ -113,7 +113,7 @@ Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)`, `ListDirectory
 | `XisoRedump` | `TryExtractVideo` (L0 head + L1 tail), `TryExtractUpdate` (`FindUpdateOffset` `ABCDABCD`, `l1Trimmed` split), `RebuildRedump` (full `l0Padding`/`l1Padding` + PRNG/`securitySectors`) |
 | `SecuritySectors` | `Parse(path)` → `int[]` sorted, `4096`-sector `start-end` validation (`4095` length) |
 | `XisoZarchive` | `CreateZar` (XISO → `.zar` via `ZArchiveSharp.ZArchiveWriter`: zstd L6 blocks, raw fallback, optional `IZarBlockCompressor`, `removeUpdate`, partition offsets) |
-| `XisoChecksum` | `ComputeImageChecksum` / `ComputeImageChecksumHex` — SHA3-256 `SortedDictionary Ordinal` (`/path` UTF-8 + streamed data, `xdvdfs` compat, `IncrementalHash SHA3_256`) |
+| `XisoChecksum` | `ComputeImageChecksum` / `ComputeImageChecksumHex` — SHA3-256 `SortedDictionary Ordinal` (`/path` UTF-8 + streamed data, `xdvdfs` compat; BCL `SHA3_256` when supported, else pure-managed fallback) |
 | `CisoWriter` / `CisoReader` | `CompressToCso` (BCL DEFLATE v1 `0x80000000`, `align` 0/1/2, threshold `+12`, `--ciso-split` shim) / `DecompressToIso` (v1 DEFLATE + v2 LZ4) |
 
 See [Archival](archival.md) and [Compression](compression.md).

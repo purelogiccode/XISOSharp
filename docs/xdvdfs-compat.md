@@ -86,7 +86,7 @@ Output: `hex tab path` (silent → hex only). Exit `0` on all, deterministic hex
 
 **Gap it closes:** XISOSharp previously only had per-file `MD5`/`SHA-256` (`ComputeFileHash` + `--md5`/`--sha256`) and `XisoValidator.ValidateConversion` (`--validate-checksums` `SHA-256`). No deterministic image-level checksum.
 
-**Implementation:** `XISOSharp.Core/XisoChecksum.cs:13` `ComputeImageChecksum` / `ComputeImageChecksumHex` via `IncrementalHash.CreateHash(HashAlgorithmName.SHA3_256)` (.NET 8+, streaming), `SortedDictionary<string,Node> StringComparer.Ordinal` (`/`-prefixed paths e.g. `/DIR/FILE` UTF-8 Latin1/`WINDOWS_1252` path bytes + streamed file data via `ReadData`). No `SHA3.Net`/`NSec` dep — BCL `SHA3_256` (FIPS) on .NET 10. Documented `NOT SHA256 of full image` parity warning.
+**Implementation:** `XISOSharp.Core/XisoChecksum.cs` `ComputeImageChecksum` / `ComputeImageChecksumHex` (streaming) over `SortedDictionary<string,Node> StringComparer.Ordinal` (`/`-prefixed paths e.g. `/DIR/FILE` UTF-8 Latin1/`WINDOWS_1252` path bytes + streamed file data via `ReadData`). No `SHA3.Net`/`NSec` dep — BCL `SHA3_256` when `SHA3_256.IsSupported`, otherwise the pure-managed FIPS 202 fallback (`XISOSharp/Sha3.cs`); digests are identical either way (OSes without a SHA3 provider — Windows 10 CNG, OpenSSL 1.x — threw `PlatformNotSupportedException` before the fallback). Documented `NOT SHA256 of full image` parity warning.
 
 **Also:** `--checksum` as CLI flag `Program.cs:533` + `checksumFlagMode` supports `checksum a.iso b.iso` and `--silent`.
 

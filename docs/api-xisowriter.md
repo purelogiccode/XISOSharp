@@ -115,6 +115,11 @@ Rewrite mode is normally driven through `XisoReader.Rewrite`, which calls
 Because `inRoot` is non-null, the file system is **not** walked and `excludePatterns`
 is ignored.
 
+Zero-size directory entries (seen in the wild, e.g. Marvel vs Capcom 2) map to
+`AvlNode.EmptySubdirectory` instead of being written back as files — parity with
+upstream `extract-xiso` build `202609111233`, which fixed `traverse_xiso()` leaving
+`subdirectory` NULL for them.
+
 ## Exclusion patterns
 
 `excludePatterns` accepts shell-style globs matched against paths relative to

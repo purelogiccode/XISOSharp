@@ -111,7 +111,11 @@ tree** keyed by filename:
   `RightSkew`), ported exactly from the C implementation for byte-identical output.
 - **Empty directories** are represented by the `AvlNode.EmptySubdirectory` sentinel and
   written as a single sector of `0xFF` with a table size of one sector (2048 bytes).
-  On read, an empty table is detected by its leading `0xFFFF`.
+  On read, an empty table is detected by its leading `0xFFFF`. A directory entry whose
+  table size is zero (rather than one sector, as seen in e.g. Marvel vs Capcom 2) is
+  likewise treated as empty on rewrite — `TraverseXiso` assigns the sentinel instead of
+  a file node, matching upstream `extract-xiso` build `202609111233` (previously such
+  entries came back as files and broke the game).
 
 When creating an image the writer performs a **three-pass layout**:
 
