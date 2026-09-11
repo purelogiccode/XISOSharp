@@ -437,7 +437,8 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        Assert.Throws<OperationCanceledException>(() => XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: true, ct: cts.Token));
+        Assert.Throws<OperationCanceledException>(() =>
+            XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: true, ct: cts.Token));
     }
 
     [Fact]
@@ -478,8 +479,8 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         const int sector = 2048;
         byte[] img = new byte[110 * sector];
         "MICROSOFT*XBOX*MEDIA"u8.ToArray().CopyTo(img, 32 * sector);
-        BitConverter.GetBytes((uint)40).CopyTo(img, 32 * sector + 20); // rootOffset (sectors)
-        BitConverter.GetBytes((uint)2048).CopyTo(img, 32 * sector + 24); // rootSize (bytes)
+        BitConverter.GetBytes((uint)40).CopyTo(img, (32 * sector) + 20); // rootOffset (sectors)
+        BitConverter.GetBytes((uint)2048).CopyTo(img, (32 * sector) + 24); // rootSize (bytes)
         WriteDirEntry(img, (40 * sector) + 0, left: 0, right: 4, entrySector: 98, entrySize: 4096, attr: 0x20, "F1");
         WriteDirEntry(img, (40 * sector) + 16, left: 0, right: 0, entrySector: 100, entrySize: 2048, attr: 0x10, "D");
         WriteDirEntry(img, (100 * sector) + 0, left: 0, right: 0, entrySector: 101, entrySize: 100, attr: 0x20, "G");

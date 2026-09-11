@@ -358,9 +358,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private static bool IsImage(string path) => ImageExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
+    private static bool IsImage(string path) =>
+        ImageExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
-    private static bool IsCso(string path) => CsoExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
+    private static bool IsCso(string path) =>
+        CsoExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
     private static string AppendDistinctLines(string current, IEnumerable<string> added)
     {
@@ -462,7 +464,8 @@ public partial class MainWindow : Window
         try
         {
             MainViewModel vm = Vm;
-            List<string> picked = await PickFilesAsync([ImageFilter], "Add images", allowMultiple: true).ConfigureAwait(false);
+            List<string> picked = await PickFilesAsync([ImageFilter], "Add images", allowMultiple: true)
+                .ConfigureAwait(false);
             if (picked.Count != 0)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.RwImages = AppendLines(vm.RwImages, picked));
@@ -880,7 +883,8 @@ public partial class MainWindow : Window
         try
         {
             MainViewModel vm = Vm;
-            List<string> picked = await PickFilesAsync([ImageFilter], "Add images", allowMultiple: true).ConfigureAwait(false);
+            List<string> picked = await PickFilesAsync([ImageFilter], "Add images", allowMultiple: true)
+                .ConfigureAwait(false);
             if (picked.Count != 0)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.CsImages = AppendLines(vm.CsImages, picked));

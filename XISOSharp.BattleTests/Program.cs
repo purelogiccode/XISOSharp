@@ -40,8 +40,10 @@ internal static class Program
         ToolProcess? xboxkit = ResolveOptional(opt.XboxkitPath, "xboxkit.exe", opt.TimeoutMinutes * 60_000);
         Console.WriteLine($"CLI exe:    {cli.ExePath} {(cli.Available ? "(found)" : "(NOT FOUND)")}");
         Console.WriteLine($"Oracle exe: {oracle.ExePath} {(oracle.Available ? "(found)" : "(NOT FOUND)")}");
-        Console.WriteLine($"xdvdfs exe: {(xdvdfs is null ? "(not provided)" : xdvdfs.ExePath)} {(xdvdfs?.Available == true ? "(found)" : "(MISSING — xdvdfs ops skipped)")}");
-        Console.WriteLine($"xboxkit:    {(xboxkit is null ? "(not provided)" : xboxkit.ExePath)} {(xboxkit?.Available == true ? "(found)" : "(MISSING — xboxkit ops skipped)")}");
+        Console.WriteLine(
+            $"xdvdfs exe: {(xdvdfs is null ? "(not provided)" : xdvdfs.ExePath)} {(xdvdfs?.Available == true ? "(found)" : "(MISSING — xdvdfs ops skipped)")}");
+        Console.WriteLine(
+            $"xboxkit:    {(xboxkit is null ? "(not provided)" : xboxkit.ExePath)} {(xboxkit?.Available == true ? "(found)" : "(MISSING — xboxkit ops skipped)")}");
         if (!cli.Available || !oracle.Available)
         {
             Console.WriteLine("[ERROR] Both executables are required for a CLI-vs-CLI battle.");
@@ -59,7 +61,8 @@ internal static class Program
             return 1;
         }
 
-        Console.WriteLine($"\nSeed: {seed} | Sample: {picked.Count} of {pool.Count} ISO(s) | Ops: {string.Join(", ", opt.Ops)}");
+        Console.WriteLine(
+            $"\nSeed: {seed} | Sample: {picked.Count} of {pool.Count} ISO(s) | Ops: {string.Join(", ", opt.Ops)}");
         foreach (string f in picked)
         {
             Console.WriteLine($"  - {f}");
@@ -67,7 +70,8 @@ internal static class Program
 
         string workRoot = opt.WorkRoot ?? ChooseWorkRoot(picked);
         Directory.CreateDirectory(workRoot);
-        Console.WriteLine($"Work root: {workRoot} ({BattleRunner.FreeBytes(workRoot) / (1024.0 * 1024 * 1024):F1} GB free)");
+        Console.WriteLine(
+            $"Work root: {workRoot} ({BattleRunner.FreeBytes(workRoot) / (1024.0 * 1024 * 1024):F1} GB free)");
 
         // Ctrl+C: finish the current step, skip the rest, still write the report and
         // clean up the scratch dirs (otherwise killed runs leak gigabytes in scratch).
@@ -114,7 +118,8 @@ internal static class Program
                     break;
                 }
 
-                IsoResult r = BattleRunner.RunIso(picked[i], opt, cli, oracle, xdvdfs, xboxkit, workRoot, i + 1, picked.Count);
+                IsoResult r = BattleRunner.RunIso(picked[i], opt, cli, oracle, xdvdfs, xboxkit, workRoot, i + 1,
+                    picked.Count);
                 session.IsoResults.Add(r);
                 Console.WriteLine();
             }
@@ -171,7 +176,8 @@ internal static class Program
     /// </summary>
     private static string ChooseWorkRoot(IReadOnlyList<string> isos)
     {
-        string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + "_" + Environment.ProcessId;
+        string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + "_" +
+                       Environment.ProcessId;
         var candidates = isos
             .Select(static f => Path.GetPathRoot(Path.GetFullPath(f)))
             .Where(static r => !string.IsNullOrEmpty(r))
@@ -184,7 +190,8 @@ internal static class Program
         (string Root, long Free) best = candidates.Count > 0 ? candidates[0] : (Path.GetTempPath(), 0);
         Console.WriteLine(
             $"Work root drive: {best.Root} ({best.Free / (1024.0 * 1024 * 1024):F1} GB free; candidates: " +
-            string.Join(", ", candidates.Select(static c => $"{c.Root} {c.Free / (1024.0 * 1024 * 1024):F0} GB")) + ")");
+            string.Join(", ", candidates.Select(static c => $"{c.Root} {c.Free / (1024.0 * 1024 * 1024):F0} GB")) +
+            ")");
         return Path.Combine(best.Root, "xiso_battle_" + stamp);
     }
 
@@ -221,6 +228,8 @@ internal static class Program
         return shuffled.Take(Math.Max(0, count)).ToList();
     }
 
+    internal static readonly string[] SourceArray = new[] { "XISOSharp.exe", "XISOSharp.Cli.exe" };
+
     /// <summary>Resolves the XISOSharp CLI exe: --cli, XISOSharp.exe beside the
     /// harness (fresh alias of the ProjectReference copy), XISOSharp.Cli.exe
     /// beside the harness (ProjectReference copy), then the Cli project's bin
@@ -232,8 +241,7 @@ internal static class Program
             return explicitPath;
         }
 
-        string? beside = new[] { "XISOSharp.exe", "XISOSharp.Cli.exe" }
-            .Select(static n => Path.Combine(AppContext.BaseDirectory, n))
+        string? beside = SourceArray.Select(static n => Path.Combine(AppContext.BaseDirectory, n))
             .FirstOrDefault(static p => File.Exists(p));
         if (beside is not null)
         {

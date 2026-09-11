@@ -279,7 +279,8 @@ public class XisoReaderTests : IDisposable
     /// Verifies that DecodeXiso throws an IOException when given a small non-ISO binary file.
     /// </summary>
     [Fact]
-    public void DecodeXiso_SmallFile_Throws() => Assert.Throws<IOException>(() => XisoReader.DecodeXiso(InvalidFilePath, null, ExtractMode.List, out _, true));
+    public void DecodeXiso_SmallFile_Throws() => Assert.Throws<IOException>(() =>
+        XisoReader.DecodeXiso(InvalidFilePath, null, ExtractMode.List, out _, true));
 
     /// <summary>
     /// Verifies that DecodeXiso throws a FileNotFoundException for a path that does not exist.

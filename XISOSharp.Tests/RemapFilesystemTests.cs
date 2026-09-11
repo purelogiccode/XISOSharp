@@ -443,7 +443,8 @@ public class RemapFilesystemTests : IDisposable
         // For DryRun, exclusion should null out rewritten if later rule is exclusion but IsExclusion clears.
         // Let's test with mapping all then excluding skip
         List<RemapRule> rulesInclusionFirst = new() { all!, excl! };
-        IReadOnlyList<(string HostPath, string ImagePath)> mappings = RemapFilesystem.DryRunRemap(src, rulesInclusionFirst);
+        IReadOnlyList<(string HostPath, string ImagePath)> mappings =
+            RemapFilesystem.DryRunRemap(src, rulesInclusionFirst);
         // Depending on implementation, exclusion after inclusion with same prefix should exclude?
         // The logic: for each prefix, loop rules idx 0..count-1, if caps matches and IsExclusion -> rewritten=null; continue;
         // if already rewritten != null -> continue (skip)
@@ -466,7 +467,8 @@ public class RemapFilesystemTests : IDisposable
 
         // Map directory srcdir to destdir (no wildcard)
         Assert.True(RemapRule.TryParse("srcdir:destdir", out RemapRule? rule, out _));
-        IReadOnlyList<(string HostPath, string ImagePath)> mappings = RemapFilesystem.DryRunRemap(src, new List<RemapRule> { rule! });
+        IReadOnlyList<(string HostPath, string ImagePath)> mappings =
+            RemapFilesystem.DryRunRemap(src, new List<RemapRule> { rule! });
 
         Assert.Contains(mappings,
             m => string.Equals(m.HostPath, "/srcdir/file.txt", StringComparison.OrdinalIgnoreCase) &&
@@ -490,7 +492,8 @@ public class RemapFilesystemTests : IDisposable
     {
         string src = CreateTempDir();
         CreateFile(src, "a.txt", "x");
-        IReadOnlyList<(string HostPath, string ImagePath)> mappings = RemapFilesystem.DryRunRemap(src, new List<RemapRule>());
+        IReadOnlyList<(string HostPath, string ImagePath)> mappings =
+            RemapFilesystem.DryRunRemap(src, new List<RemapRule>());
         Assert.Empty(mappings);
     }
 
@@ -503,7 +506,8 @@ public class RemapFilesystemTests : IDisposable
 
         Assert.True(RemapRule.TryParse("a.txt:dest.txt", out RemapRule? r1, out _));
         Assert.True(RemapRule.TryParse("b.txt:dest.txt", out RemapRule? r2, out _));
-        IReadOnlyList<(string HostPath, string ImagePath)> mappings = RemapFilesystem.DryRunRemap(src, new List<RemapRule> { r1!, r2! });
+        IReadOnlyList<(string HostPath, string ImagePath)> mappings =
+            RemapFilesystem.DryRunRemap(src, new List<RemapRule> { r1!, r2! });
         // Both host files map to same guest dest.txt, but first wins, second omitted via guestSeen dedup
         Assert.Single(mappings);
         Assert.Equal("/a.txt", mappings[0].HostPath);

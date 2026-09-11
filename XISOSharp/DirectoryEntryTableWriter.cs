@@ -252,7 +252,8 @@ public static class DirectoryEntryTableWriter
         }
     }
 
-    private static uint NumSectors(uint size) => (size / Constants.SectorSize) + (size % Constants.SectorSize != 0 ? 1u : 0u);
+    private static uint NumSectors(uint size) =>
+        (size / Constants.SectorSize) + (size % Constants.SectorSize != 0 ? 1u : 0u);
 
     private sealed class TableSizeAccumulator
     {

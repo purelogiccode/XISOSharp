@@ -28,11 +28,11 @@ internal sealed class Sha3256 : IDisposable
     // Rotation offsets r[x + 5*y] (FIPS 202 Table 2).
     private static readonly int[] RotationOffsets =
     [
-         0,  1, 62, 28, 27,
-        36, 44,  6, 55, 20,
-         3, 10, 43, 25, 39,
-        41, 45, 15, 21,  8,
-        18,  2, 61, 56, 14,
+        0, 1, 62, 28, 27,
+        36, 44, 6, 55, 20,
+        3, 10, 43, 25, 39,
+        41, 45, 15, 21, 8,
+        18, 2, 61, 56, 14,
     ];
 
     private readonly ulong[] _state = new ulong[25];
@@ -89,7 +89,7 @@ internal sealed class Sha3256 : IDisposable
 
         // Pad10*1 with SHA3 domain separation: 0x06 ... 0x80.
         Span<byte> pad = stackalloc byte[RateBytes - _buffered];
-        pad.Fill(0);
+        pad.Clear();
         pad[0] = DomainSuffix;
         pad[^1] |= 0x80;
         for (int i = 0; i < pad.Length; i++)
@@ -103,14 +103,14 @@ internal sealed class Sha3256 : IDisposable
         for (int i = 0; i < 4; i++)
         {
             ulong lane = _state[i];
-            digest[i * 8 + 0] = (byte)lane;
-            digest[i * 8 + 1] = (byte)(lane >> 8);
-            digest[i * 8 + 2] = (byte)(lane >> 16);
-            digest[i * 8 + 3] = (byte)(lane >> 24);
-            digest[i * 8 + 4] = (byte)(lane >> 32);
-            digest[i * 8 + 5] = (byte)(lane >> 40);
-            digest[i * 8 + 6] = (byte)(lane >> 48);
-            digest[i * 8 + 7] = (byte)(lane >> 56);
+            digest[(i * 8) + 0] = (byte)lane;
+            digest[(i * 8) + 1] = (byte)(lane >> 8);
+            digest[(i * 8) + 2] = (byte)(lane >> 16);
+            digest[(i * 8) + 3] = (byte)(lane >> 24);
+            digest[(i * 8) + 4] = (byte)(lane >> 32);
+            digest[(i * 8) + 5] = (byte)(lane >> 40);
+            digest[(i * 8) + 6] = (byte)(lane >> 48);
+            digest[(i * 8) + 7] = (byte)(lane >> 56);
         }
 
         Reset();
@@ -146,14 +146,14 @@ internal sealed class Sha3256 : IDisposable
         // XOR the 136-byte (17-lane) block into the state, little-endian.
         for (int i = 0; i < RateBytes / 8; i++)
         {
-            ulong lane = (ulong)block[i * 8 + 0]
-                | ((ulong)block[i * 8 + 1] << 8)
-                | ((ulong)block[i * 8 + 2] << 16)
-                | ((ulong)block[i * 8 + 3] << 24)
-                | ((ulong)block[i * 8 + 4] << 32)
-                | ((ulong)block[i * 8 + 5] << 40)
-                | ((ulong)block[i * 8 + 6] << 48)
-                | ((ulong)block[i * 8 + 7] << 56);
+            ulong lane = (ulong)block[(i * 8) + 0]
+                         | ((ulong)block[(i * 8) + 1] << 8)
+                         | ((ulong)block[(i * 8) + 2] << 16)
+                         | ((ulong)block[(i * 8) + 3] << 24)
+                         | ((ulong)block[(i * 8) + 4] << 32)
+                         | ((ulong)block[(i * 8) + 5] << 40)
+                         | ((ulong)block[(i * 8) + 6] << 48)
+                         | ((ulong)block[(i * 8) + 7] << 56);
             _state[i] ^= lane;
         }
 
@@ -205,7 +205,7 @@ internal sealed class Sha3256 : IDisposable
                 for (int y = 0; y < 5; y++)
                 {
                     a[x + (5 * y)] = b[x + (5 * y)]
-                        ^ ((~b[((x + 1) % 5) + (5 * y)]) & b[((x + 2) % 5) + (5 * y)]);
+                                     ^ ((~b[((x + 1) % 5) + (5 * y)]) & b[((x + 2) % 5) + (5 * y)]);
                 }
             }
 

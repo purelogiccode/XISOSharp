@@ -1716,7 +1716,8 @@ internal static class Program
 
                     if (entry.IsDirectory)
                     {
-                        IReadOnlyList<(string Path, byte[] Hash)> results = XisoReader.ComputeDirectoryHashes(xisoPath, internalPath, algorithm);
+                        IReadOnlyList<(string Path, byte[] Hash)> results =
+                            XisoReader.ComputeDirectoryHashes(xisoPath, internalPath, algorithm);
                         foreach ((string filePath, byte[] hash) in results)
                         {
                             Logger.Log($"{Convert.ToHexString(hash).ToLowerInvariant()}  {filePath}\n");
@@ -1732,7 +1733,8 @@ internal static class Program
                 else
                 {
                     // Hash all files
-                    IReadOnlyList<(string Path, byte[] Hash)> results = XisoReader.ComputeDirectoryHashes(xisoPath, "/", algorithm);
+                    IReadOnlyList<(string Path, byte[] Hash)> results =
+                        XisoReader.ComputeDirectoryHashes(xisoPath, "/", algorithm);
                     foreach ((string filePath, byte[] hash) in results)
                     {
                         Logger.Log($"{Convert.ToHexString(hash).ToLowerInvariant()}  {filePath}\n");
@@ -2065,7 +2067,8 @@ internal static class Program
                     if (err == 0 && validateFlag && newIsoPath != null)
                     {
                         Logger.Log("\n");
-                        ValidationResult valResult = XisoValidator.ValidateConversion(oldPath, newIsoPath, validateChecksums);
+                        ValidationResult valResult =
+                            XisoValidator.ValidateConversion(oldPath, newIsoPath, validateChecksums);
                         XisoValidator.LogResult(valResult, oldPath, newIsoPath, validateChecksums);
 
                         if (validateReport != null)
@@ -3945,7 +3948,7 @@ internal static class Program
                     // Skipped by user choice (-n refusal already failed this file above).
                 }
                 else if (!XisoSkeleton.Petrify(iso, outSkel, outHash, isRedump ? isoOffset : 0,
-                    isRedump ? xisoLen : null, Logger.Quiet))
+                             isRedump ? xisoLen : null, Logger.Quiet))
                 {
                     Logger.LogErr($"[ERROR] Failed petrifying {iso}\n");
                     exit = 1;

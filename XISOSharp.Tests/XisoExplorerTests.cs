@@ -110,7 +110,8 @@ public class XisoExplorerTests : IDisposable
         Assert.True(explorer.Volume.IsValid);
         Assert.True(explorer.Volume.FileLength > 0);
 
-        HashSet<string> names = explorer.ListChildren("/").Select(n => n.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> names = explorer.ListChildren("/").Select(n => n.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         Assert.Contains("readme.txt", names);
         Assert.Contains("empty.bin", names);
         Assert.Contains("default.xex", names);

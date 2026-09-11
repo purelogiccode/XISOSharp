@@ -17,7 +17,8 @@ internal static class CisoSplitFile
     /// mirroring Rust <c>Path::with_extension(format!("{n}.cso"))</c>:
     /// <c>game.cso</c> → <c>game.1.cso</c>, <c>game</c> → <c>game.1.cso</c>, <c>a.b.cso</c> → <c>a.b.1.cso</c>.
     /// </summary>
-    public static string PartPath(string outputCsoPath, long partIndex) => Path.ChangeExtension(outputCsoPath, $"{partIndex + 1}.cso");
+    public static string PartPath(string outputCsoPath, long partIndex) =>
+        Path.ChangeExtension(outputCsoPath, $"{partIndex + 1}.cso");
 
     /// <summary>
     /// Returns true when <paramref name="path"/> refers to the first part of a split CSO

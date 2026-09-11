@@ -305,7 +305,8 @@ internal sealed partial class MainViewModel : ObservableObject
 
             CliPath = resolved;
             AppendLog($"[GUI] Using CLI: {resolved}");
-            string? version = await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
+            string? version =
+                await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
             string status = version is null ? $"Found but -v failed: {resolved}" : $"Ready — {version}";
             SetOnUi(() => CliStatus = status);
             AppendLog(version is null ? "[GUI] CLI -v probe failed." : $"[GUI] {version}");
@@ -398,15 +399,18 @@ internal sealed partial class MainViewModel : ObservableObject
 
     private bool CanRunTrim() => !IsRunning && !string.IsNullOrWhiteSpace(WpImage);
 
-    private bool CanRunRebuild() => !IsRunning && !string.IsNullOrWhiteSpace(RbParts) && !string.IsNullOrWhiteSpace(RbOutput);
+    private bool CanRunRebuild() =>
+        !IsRunning && !string.IsNullOrWhiteSpace(RbParts) && !string.IsNullOrWhiteSpace(RbOutput);
 
     private bool CanRunCompress() => !IsRunning && !string.IsNullOrWhiteSpace(CpSource);
 
     private bool CanRunDecompress() => !IsRunning && !string.IsNullOrWhiteSpace(DcCso);
 
-    private bool CanRunValidate() => !IsRunning && !string.IsNullOrWhiteSpace(VaSource) && !string.IsNullOrWhiteSpace(VaOutput);
+    private bool CanRunValidate() =>
+        !IsRunning && !string.IsNullOrWhiteSpace(VaSource) && !string.IsNullOrWhiteSpace(VaOutput);
 
-    private bool CanRunChecksum() => !IsRunning && (!string.IsNullOrWhiteSpace(CsImages) || !string.IsNullOrWhiteSpace(VaSource));
+    private bool CanRunChecksum() =>
+        !IsRunning && (!string.IsNullOrWhiteSpace(CsImages) || !string.IsNullOrWhiteSpace(VaSource));
 
     private bool CanRunBatch() => !IsRunning && !string.IsNullOrWhiteSpace(BaDir);
 

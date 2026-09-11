@@ -121,7 +121,8 @@ public class XisoValidatorTests : IDisposable
         Directory.CreateDirectory(Path.Combine(partialDir, "partial"));
         File.WriteAllText(Path.Combine(partialDir, "partial", "only_file.txt"), "hello");
         string partialIsoDir = CreateTempDir();
-        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out string? iso2, null, null);
+        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out string? iso2, null,
+            null);
         Assert.NotNull(iso2);
 
         ValidationResult result = XisoValidator.ValidateConversion(iso1, iso2);
@@ -250,7 +251,8 @@ public class XisoValidatorTests : IDisposable
         Directory.CreateDirectory(Path.Combine(partialDir, "partial"));
         File.WriteAllText(Path.Combine(partialDir, "partial", "only_file.txt"), "hello");
         string partialIsoDir = CreateTempDir();
-        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out string? iso2, null, null);
+        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out string? iso2, null,
+            null);
         Assert.NotNull(iso2);
 
         ValidationResult result = XisoValidator.ValidateConversion(iso1, iso2);
@@ -281,7 +283,8 @@ public class XisoValidatorTests : IDisposable
         Directory.CreateDirectory(Path.Combine(partialDir, "partial"));
         File.WriteAllText(Path.Combine(partialDir, "partial", "only_file.txt"), "hello");
         string partialIsoDir = CreateTempDir();
-        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out string? iso2, null, null);
+        XisoWriter.CreateXiso(Path.Combine(partialDir, "partial"), partialIsoDir, null, null, out string? iso2, null,
+            null);
         Assert.NotNull(iso2);
 
         ValidationResult result = XisoValidator.ValidateConversion(iso1, iso2);
@@ -308,5 +311,6 @@ public class XisoValidatorTests : IDisposable
     }
 
     [Fact]
-    public void Cli_Create_WithSkipSectors_ReturnsOne() => Assert.Equal(1, Program.Main(["-c", SourceDir, "--skip-sectors", "1"]));
+    public void Cli_Create_WithSkipSectors_ReturnsOne() =>
+        Assert.Equal(1, Program.Main(["-c", SourceDir, "--skip-sectors", "1"]));
 }

@@ -1287,7 +1287,8 @@ public static class XisoWriter
         DirectoryEntryTableWriter.PlaceEntry(avl, ref outSize);
 
     /// <summary>Local helper for sector count calculation (ceiling division).</summary>
-    private static uint NumSectors(uint size) => (size / Constants.SectorSize) + (size % Constants.SectorSize != 0 ? 1u : 0u);
+    private static uint NumSectors(uint size) =>
+        (size / Constants.SectorSize) + (size % Constants.SectorSize != 0 ? 1u : 0u);
 
     /// <summary>
     /// Traversal callback that assigns sector positions to directory entries

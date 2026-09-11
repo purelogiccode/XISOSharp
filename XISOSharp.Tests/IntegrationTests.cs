@@ -597,7 +597,8 @@ public class IntegrationTests : IDisposable
         Assert.Equal(0, createResult);
         Assert.NotNull(isoPath);
 
-        IReadOnlyList<(string Path, byte[] Hash)> results = XisoReader.ComputeDirectoryHashes(isoPath, "/", HashAlgorithmName.SHA256);
+        IReadOnlyList<(string Path, byte[] Hash)> results =
+            XisoReader.ComputeDirectoryHashes(isoPath, "/", HashAlgorithmName.SHA256);
 
         Assert.NotEmpty(results);
         Assert.Contains(results, static r => string.Equals(r.Path, "/file1.txt", StringComparison.Ordinal));
@@ -616,7 +617,8 @@ public class IntegrationTests : IDisposable
         Assert.Equal(0, createResult);
         Assert.NotNull(isoPath);
 
-        IReadOnlyList<(string Path, byte[] Hash)> results = XisoReader.ComputeDirectoryHashes(isoPath, "/subdir", HashAlgorithmName.MD5);
+        IReadOnlyList<(string Path, byte[] Hash)> results =
+            XisoReader.ComputeDirectoryHashes(isoPath, "/subdir", HashAlgorithmName.MD5);
 
         Assert.NotEmpty(results);
         Assert.Contains(results, static r => string.Equals(r.Path, "/subdir/subfile.txt", StringComparison.Ordinal));

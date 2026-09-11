@@ -101,7 +101,8 @@ public class XisoSalvageTests : IDisposable
 
     private static string Sha256(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
 
-    private static List<string> Sorted(IReadOnlyList<string> paths) => paths.OrderBy(static p => p, StringComparer.Ordinal).ToList();
+    private static List<string> Sorted(IReadOnlyList<string> paths) =>
+        paths.OrderBy(static p => p, StringComparer.Ordinal).ToList();
 
     [Fact]
     public void DefaultOutputPath_ReplacesExtensionWithSalvagedIso()
@@ -502,7 +503,8 @@ public class XisoSalvageTests : IDisposable
     public void SalvageCli_MissingOperand_UsageError() => Assert.Equal(1, Program.Main(["--salvage"]));
 
     [Fact]
-    public void SalvageCli_MissingFile_Fails() => Assert.Equal(1, Program.Main(["--salvage", Path.Combine(CreateTempDir("xiso_salv_cli"), "no.iso")]));
+    public void SalvageCli_MissingFile_Fails() => Assert.Equal(1,
+        Program.Main(["--salvage", Path.Combine(CreateTempDir("xiso_salv_cli"), "no.iso")]));
 
     [Fact]
     public void SalvageCli_ExistingOutput_AssumeNoRefusesAssumeYesOverwrites()

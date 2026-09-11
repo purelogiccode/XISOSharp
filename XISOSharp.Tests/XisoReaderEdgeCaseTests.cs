@@ -210,7 +210,8 @@ public class XisoReaderEdgeCaseTests : IDisposable
         XisoWriter.CreateXiso(srcDir, outputDir, null, null, out string? isoPath, null, null);
         Assert.NotNull(isoPath);
 
-        IReadOnlyList<(string Path, byte[] Hash)> hashes = XisoReader.ComputeDirectoryHashes(isoPath, "/", HashAlgorithmName.SHA256);
+        IReadOnlyList<(string Path, byte[] Hash)> hashes =
+            XisoReader.ComputeDirectoryHashes(isoPath, "/", HashAlgorithmName.SHA256);
 
         // Should have no file hashes (only empty dir exists)
         Assert.Empty(hashes);
@@ -221,7 +222,8 @@ public class XisoReaderEdgeCaseTests : IDisposable
     {
         string isoPath = CreateTestIso();
 
-        IReadOnlyList<(string Path, byte[] Hash)> hashes = XisoReader.ComputeDirectoryHashes(isoPath, "/subdir", HashAlgorithmName.SHA256);
+        IReadOnlyList<(string Path, byte[] Hash)> hashes =
+            XisoReader.ComputeDirectoryHashes(isoPath, "/subdir", HashAlgorithmName.SHA256);
 
         Assert.NotEmpty(hashes);
         // Should include subfile.txt and nested/deep.txt

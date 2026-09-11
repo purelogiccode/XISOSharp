@@ -14,14 +14,16 @@ public class GlobMatcherTests
     [InlineData("*.txt", "file.md", false)]
     [InlineData("*", "file.txt", true)]
     [InlineData("*", "dir/file.txt", false)]
-    public void Star_MatchesWithinSingleSegment(string pattern, string path, bool expected) => Assert.Equal(expected, Matches(pattern, path));
+    public void Star_MatchesWithinSingleSegment(string pattern, string path, bool expected) =>
+        Assert.Equal(expected, Matches(pattern, path));
 
     [Theory]
     [InlineData("a?c", "abc", true)]
     [InlineData("a?c", "ac", false)]
     [InlineData("a?c", "a/c", false)]
     [InlineData("a?c", "abdc", false)]
-    public void QuestionMark_MatchesSingleCharacter(string pattern, string path, bool expected) => Assert.Equal(expected, Matches(pattern, path));
+    public void QuestionMark_MatchesSingleCharacter(string pattern, string path, bool expected) =>
+        Assert.Equal(expected, Matches(pattern, path));
 
     [Theory]
     [InlineData("**/node_modules/**", "node_modules", true)]
@@ -32,7 +34,8 @@ public class GlobMatcherTests
     [InlineData("**/node_modules/**", "node_modules2", false)]
     [InlineData("**/node_modules/**", "a/node_modules_extra", false)]
     [InlineData("**/node_modules/**", "a/b/c.txt", false)]
-    public void DoubleStar_MatchesAnyDepth(string pattern, string path, bool expected) => Assert.Equal(expected, Matches(pattern, path));
+    public void DoubleStar_MatchesAnyDepth(string pattern, string path, bool expected) =>
+        Assert.Equal(expected, Matches(pattern, path));
 
     [Theory]
     [InlineData("build/**", "build", true)] // trailing /** matches the directory itself
@@ -42,7 +45,8 @@ public class GlobMatcherTests
     [InlineData("build/**", "a/build", false)] // anchored to root
     [InlineData("build/", "build", true)] // trailing slash == /**
     [InlineData("build/", "build/x", true)]
-    public void TrailingDoubleStar_MatchesDirectoryAndContents(string pattern, string path, bool expected) => Assert.Equal(expected, Matches(pattern, path));
+    public void TrailingDoubleStar_MatchesDirectoryAndContents(string pattern, string path, bool expected) =>
+        Assert.Equal(expected, Matches(pattern, path));
 
     [Theory]
     [InlineData("**/*.tmp", "a.tmp", true)]
@@ -51,7 +55,8 @@ public class GlobMatcherTests
     [InlineData("**/*.tmp", "a.tmpx", false)]
     [InlineData("**", "anything", true)]
     [InlineData("**", "a/b/c", true)]
-    public void DoubleStar_PrefixOrAlone(string pattern, string path, bool expected) => Assert.Equal(expected, Matches(pattern, path));
+    public void DoubleStar_PrefixOrAlone(string pattern, string path, bool expected) =>
+        Assert.Equal(expected, Matches(pattern, path));
 
     [Theory]
     [InlineData("$SystemUpdate/**", "$SystemUpdate", true)]
@@ -60,7 +65,8 @@ public class GlobMatcherTests
     [InlineData("**/$SystemUpdate/**", "a/$SystemUpdate", true)]
     [InlineData("**/$SystemUpdate/**", "a/b/$SystemUpdate/c", true)]
     [InlineData("**/$SystemUpdate/**", "a/other/f", false)]
-    public void SystemUpdatePatterns(string pattern, string path, bool expected) => Assert.Equal(expected, Matches(pattern, path));
+    public void SystemUpdatePatterns(string pattern, string path, bool expected) =>
+        Assert.Equal(expected, Matches(pattern, path));
 
     [Theory]
     [InlineData("a/**/b", "a/b", true)]
@@ -68,7 +74,8 @@ public class GlobMatcherTests
     [InlineData("a/**/b", "a/x/y/b", true)]
     [InlineData("a/**/b", "a/x/b/c", false)]
     [InlineData("a/**/b", "b", false)]
-    public void DoubleStar_InMiddle(string pattern, string path, bool expected) => Assert.Equal(expected, Matches(pattern, path));
+    public void DoubleStar_InMiddle(string pattern, string path, bool expected) =>
+        Assert.Equal(expected, Matches(pattern, path));
 
     [Theory]
     [InlineData("[abc].txt", "a.txt", true)]
@@ -79,7 +86,8 @@ public class GlobMatcherTests
     [InlineData("[a-c]*", "a1", true)]
     [InlineData("[a-c]*", "c2", true)]
     [InlineData("[a-c]*", "d1", false)]
-    public void CharClasses(string pattern, string path, bool expected) => Assert.Equal(expected, Matches(pattern, path));
+    public void CharClasses(string pattern, string path, bool expected) =>
+        Assert.Equal(expected, Matches(pattern, path));
 
     [Theory]
     [InlineData("a\\*b", "a*b", true)]
@@ -129,7 +137,8 @@ public class GlobMatcherTests
     [InlineData("a/b**/", "a/b", true)] // segment ending in '**' keeps directory semantics
     [InlineData("a/b**/", "a/b1/x", true)]
     [InlineData("a/b**/", "a/c", false)]
-    public void TrailingSlash_AfterDoubleStar(string pattern, string path, bool expected) => Assert.Equal(expected, Matches(pattern, path));
+    public void TrailingSlash_AfterDoubleStar(string pattern, string path, bool expected) =>
+        Assert.Equal(expected, Matches(pattern, path));
 
     [Theory]
     [InlineData("[\\z].txt", "z.txt", true)] // escaped char inside class is a literal

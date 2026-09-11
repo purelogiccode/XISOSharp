@@ -93,7 +93,8 @@ internal sealed class Program
             }
 
             Console.WriteLine($"CLI: {resolved}");
-            string? version = await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
+            string? version =
+                await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
             if (version is null)
             {
                 Console.WriteLine("CLI -v probe failed.");

@@ -83,10 +83,12 @@ internal sealed class BattleOptions
                     dirs.AddRange(v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                     break;
                 case "--count":
-                    count = int.Parse(Value(args, ref i, inline) ?? "1", System.Globalization.CultureInfo.InvariantCulture);
+                    count = int.Parse(Value(args, ref i, inline) ?? "1",
+                        System.Globalization.CultureInfo.InvariantCulture);
                     break;
                 case "--seed":
-                    seed = int.Parse(Value(args, ref i, inline) ?? "0", System.Globalization.CultureInfo.InvariantCulture);
+                    seed = int.Parse(Value(args, ref i, inline) ?? "0",
+                        System.Globalization.CultureInfo.InvariantCulture);
                     break;
                 case "--cli":
                     cli = Value(args, ref i, inline);
@@ -112,7 +114,8 @@ internal sealed class BattleOptions
                     keep = true;
                     break;
                 case "--timeout":
-                    timeout = int.Parse(Value(args, ref i, inline) ?? "60", System.Globalization.CultureInfo.InvariantCulture);
+                    timeout = int.Parse(Value(args, ref i, inline) ?? "60",
+                        System.Globalization.CultureInfo.InvariantCulture);
                     break;
                 default:
                     if (a.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
@@ -199,58 +202,58 @@ internal sealed class BattleOptions
     public static void PrintUsage() =>
         Console.WriteLine("""
 
-            Usage: XISOSharp.BattleTests [options] [*.iso ...]
+                          Usage: XISOSharp.BattleTests [options] [*.iso ...]
 
-            Battles the XISOSharp CLI against reference tools over a random sample of
-            ISOs (default: 1 file from H:\XBOXTest).
+                          Battles the XISOSharp CLI against reference tools over a random sample of
+                          ISOs (default: 1 file from H:\XBOXTest).
 
-            Options:
-              --dir <path>[,<path>...]  Dir(s) to scan top-level for *.iso (default: H:\XBOXTest)
-              --count <N>               Random sample size (default 1)
-              --seed <N>                RNG seed for the sample (default: auto, reported in the report)
-              --cli <path>              Path to the XISOSharp CLI exe (default: beside the harness)
-              --exe <path>              Path to extract-xiso.exe (default: beside the harness)
-              --xdvdfs <path>           Path to xdvdfs.exe (default: beside the harness)
-              --xboxkit <path>          Path to xboxkit.exe (default: beside the harness)
-              --ops <a,b,c>             Ops to battle (default: all; skipped when the op's oracle is missing)
-              --work <dir>              Scratch dir root (default: drive with the most free
-                                        space among the ISO drives and %TEMP%; ops skip
-                                        automatically when the drive runs low)
-              --keep                    Keep scratch dirs after the run (they hold ~4x the ISO size)
-              --timeout <minutes>       Per-operation timeout (default 60)
-              -h, --help                Show this help
+                          Options:
+                            --dir <path>[,<path>...]  Dir(s) to scan top-level for *.iso (default: H:\XBOXTest)
+                            --count <N>               Random sample size (default 1)
+                            --seed <N>                RNG seed for the sample (default: auto, reported in the report)
+                            --cli <path>              Path to the XISOSharp CLI exe (default: beside the harness)
+                            --exe <path>              Path to extract-xiso.exe (default: beside the harness)
+                            --xdvdfs <path>           Path to xdvdfs.exe (default: beside the harness)
+                            --xboxkit <path>          Path to xboxkit.exe (default: beside the harness)
+                            --ops <a,b,c>             Ops to battle (default: all; skipped when the op's oracle is missing)
+                            --work <dir>              Scratch dir root (default: drive with the most free
+                                                      space among the ISO drives and %TEMP%; ops skip
+                                                      automatically when the drive runs low)
+                            --keep                    Keep scratch dirs after the run (they hold ~4x the ISO size)
+                            --timeout <minutes>       Per-operation timeout (default 60)
+                            -h, --help                Show this help
 
-            Any positional *.iso path replaces random sampling.
+                          Any positional *.iso path replaces random sampling.
 
-            extract-xiso battles (CLI vs extract-xiso.exe):
-              list     -l entry lines must match exactly
-              extract  -x -d trees must match: same files (ordinal), same SHA-256 per file, same dirs
-              rewrite  -r -d outputs must match byte-for-byte (SHA-256); staged input copies
-                       protect the source ISOs from the oracle's in-place rewrite semantics
+                          extract-xiso battles (CLI vs extract-xiso.exe):
+                            list     -l entry lines must match exactly
+                            extract  -x -d trees must match: same files (ordinal), same SHA-256 per file, same dirs
+                            rewrite  -r -d outputs must match byte-for-byte (SHA-256); staged input copies
+                                     protect the source ISOs from the oracle's in-place rewrite semantics
 
-            xdvdfs battles (CLI vs xdvdfs.exe — xdvdfs-parity features):
-              checksum deterministic SHA3-256 image checksums must match exactly
-              md5      per-file MD5 lists must agree (CLI ⊆ xdvdfs; extra dir entries noted)
-              unpack   --unpack vs `xdvdfs unpack`: extracted trees must match (files+SHA-256+dirs)
-              pack     -c (media patch off) vs `xdvdfs pack`: content checksums of both
-                       packed images must match (layout-agnostic content parity)
-              cso      cso round-trip: XISOSharp compress → xdvdfs cross-reads the CSO
-                       (md5 per file) → XISOSharp decompress → checksum vs source
+                          xdvdfs battles (CLI vs xdvdfs.exe — xdvdfs-parity features):
+                            checksum deterministic SHA3-256 image checksums must match exactly
+                            md5      per-file MD5 lists must agree (CLI ⊆ xdvdfs; extra dir entries noted)
+                            unpack   --unpack vs `xdvdfs unpack`: extracted trees must match (files+SHA-256+dirs)
+                            pack     -c (media patch off) vs `xdvdfs pack`: content checksums of both
+                                     packed images must match (layout-agnostic content parity)
+                            cso      cso round-trip: XISOSharp compress → xdvdfs cross-reads the CSO
+                                     (md5 per file) → XISOSharp decompress → checksum vs source
 
-            xboxkit battles (CLI vs xboxkit.exe — XboxKit-parity archival features):
-              petrify  --petrify vs `-p`: skeleton images must match byte-for-byte
-              video    --video vs `-v`: video partition ISOs must match byte-for-byte
-              random   --random vs `-r`: filler data must match byte-for-byte
-              seed     --seed vs `-s`: XGD1 PRNG seed (4 bytes) must match
-              trim     --trim vs `-t`: trimmed images must match byte-for-byte
-              wipe     --wipe vs `-w`: wiped images must match byte-for-byte
-              zar      --zar vs `-z`: ZArchive outputs must match byte-for-byte
-              rebuild  rebuild a full redump image from components; the rebuilt image
-                       must match the original byte-for-byte (both tools)
+                          xboxkit battles (CLI vs xboxkit.exe — XboxKit-parity archival features):
+                            petrify  --petrify vs `-p`: skeleton images must match byte-for-byte
+                            video    --video vs `-v`: video partition ISOs must match byte-for-byte
+                            random   --random vs `-r`: filler data must match byte-for-byte
+                            seed     --seed vs `-s`: XGD1 PRNG seed (4 bytes) must match
+                            trim     --trim vs `-t`: trimmed images must match byte-for-byte
+                            wipe     --wipe vs `-w`: wiped images must match byte-for-byte
+                            zar      --zar vs `-z`: ZArchive outputs must match byte-for-byte
+                            rebuild  rebuild a full redump image from components; the rebuilt image
+                                     must match the original byte-for-byte (both tools)
 
-            Notes:
-              Redump-only ops (video/random/seed/trim/wipe/petrify/rebuild) auto-skip on
-              trimmed XISOs — the reference tools refuse them there. xboxkit.exe always
-              exits 0, so success is detected via output files, not exit codes.
-            """);
+                          Notes:
+                            Redump-only ops (video/random/seed/trim/wipe/petrify/rebuild) auto-skip on
+                            trimmed XISOs — the reference tools refuse them there. xboxkit.exe always
+                            exits 0, so success is detected via output files, not exit codes.
+                          """);
 }

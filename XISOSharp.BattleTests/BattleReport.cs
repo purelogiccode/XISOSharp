@@ -37,9 +37,12 @@ internal static class BattleReport
         w.AppendLine(CultureInfo.InvariantCulture, $"XISOSharp Battle Report {stamp}");
         w.AppendLine(CultureInfo.InvariantCulture, $"CLI:    {s.CliPath} | {s.CliVersion}");
         w.AppendLine(CultureInfo.InvariantCulture, $"Oracle: {s.OraclePath} | {s.OracleVersion}");
-        w.AppendLine(CultureInfo.InvariantCulture, $"xdvdfs: {(s.XdvdfsPath.Length > 0 ? s.XdvdfsPath : "(not found)")} | {s.XdvdfsVersion}");
-        w.AppendLine(CultureInfo.InvariantCulture, $"xboxkit: {(s.XboxkitPath.Length > 0 ? s.XboxkitPath : "(not found)")} | {s.XboxkitVersion}");
-        w.AppendLine(CultureInfo.InvariantCulture, $"Seed: {s.Seed} | Ops: {string.Join(", ", s.Ops)} | Work: {s.WorkRoot}");
+        w.AppendLine(CultureInfo.InvariantCulture,
+            $"xdvdfs: {(s.XdvdfsPath.Length > 0 ? s.XdvdfsPath : "(not found)")} | {s.XdvdfsVersion}");
+        w.AppendLine(CultureInfo.InvariantCulture,
+            $"xboxkit: {(s.XboxkitPath.Length > 0 ? s.XboxkitPath : "(not found)")} | {s.XboxkitVersion}");
+        w.AppendLine(CultureInfo.InvariantCulture,
+            $"Seed: {s.Seed} | Ops: {string.Join(", ", s.Ops)} | Work: {s.WorkRoot}");
         w.AppendLine(CultureInfo.InvariantCulture, $"ISOs ({picked.Count}):");
         foreach (string iso in picked)
         {
@@ -53,7 +56,7 @@ internal static class BattleReport
         double nativeTotal = s.IsoResults.SelectMany(static r => r.Subs).Sum(static x => x.OracleSeconds);
         string timeLine = $"Time: cli {cliTotal:F1}s vs native {nativeTotal:F1}s" +
                           (nativeTotal > 0.05 ? $" (cli {cliTotal / nativeTotal:F2}x native)" : string.Empty);
-        w.Append(timeLine).AppendLine();
+        w.AppendLine(timeLine);
         w.AppendLine();
         foreach (IsoResult f in s.IsoResults)
         {

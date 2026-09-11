@@ -40,7 +40,8 @@ public static class XisoChecksum
     }
 
     /// <summary>True when <paramref name="path"/> has a <c>.cso</c> extension (covers split <c>*.1.cso</c>).</summary>
-    private static bool IsCsoPath(string path) => Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
+    private static bool IsCsoPath(string path) =>
+        Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Computes checksum from an open stream with known disc name (for error reporting).</summary>
     public static byte[] ComputeImageChecksum(FileStream fs, string isoName, int? skipSectors = null,

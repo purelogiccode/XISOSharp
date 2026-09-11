@@ -78,14 +78,16 @@ public class AvlTreeBenchmarks
     /// Returns the traversal result so it cannot be eliminated (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public int TraversePrefix() => AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Prefix, 0);
+    public int TraversePrefix() =>
+        AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Prefix, 0);
 
     /// <summary>
     /// Measures an infix-order depth-first traversal of the tree.
     /// Returns the traversal result so it cannot be eliminated (BUG-BEN-002).
     /// </summary>
     [Benchmark]
-    public int TraverseInfix() => AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Infix, 0);
+    public int TraverseInfix() =>
+        AvlTree.AvlTraverseDepthFirst(_root, CountCallback, null, AvlTraversalMethod.Infix, 0);
 
     /// <summary>
     /// Measures key comparisons between adjacent file names. Accumulates into a returned

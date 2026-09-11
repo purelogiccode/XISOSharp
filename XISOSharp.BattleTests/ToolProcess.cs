@@ -50,11 +50,13 @@ internal sealed class ToolProcess
         {
             TryKill(proc);
             proc.WaitForExit(5000);
-            throw new TimeoutException($"{Path.GetFileName(ExePath)} timed out after {TimeoutMs} ms: {string.Join(' ', args)}");
+            throw new TimeoutException(
+                $"{Path.GetFileName(ExePath)} timed out after {TimeoutMs} ms: {string.Join(' ', args)}");
         }
 
         sw.Stop();
-        return (proc.ExitCode, stdoutTask.GetAwaiter().GetResult(), stderrTask.GetAwaiter().GetResult(), sw.Elapsed.TotalSeconds);
+        return (proc.ExitCode, stdoutTask.GetAwaiter().GetResult(), stderrTask.GetAwaiter().GetResult(),
+            sw.Elapsed.TotalSeconds);
     }
 
     /// <summary>Probes the tool banner: -v first, then --version, then --help
@@ -67,8 +69,10 @@ internal sealed class ToolProcess
             {
                 (int code, string so, string se, _) = Run(flag);
                 string txt = string.IsNullOrWhiteSpace(so) ? se : so;
-                string first = txt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? string.Empty;
-                if (code == 0 && !string.IsNullOrWhiteSpace(first) && !first.StartsWith("error", StringComparison.OrdinalIgnoreCase))
+                string first = txt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ??
+                               string.Empty;
+                if (code == 0 && !string.IsNullOrWhiteSpace(first) &&
+                    !first.StartsWith("error", StringComparison.OrdinalIgnoreCase))
                 {
                     return first;
                 }

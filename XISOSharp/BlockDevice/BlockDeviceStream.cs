@@ -86,7 +86,8 @@ public sealed class BlockDeviceStream : Stream
     public override void SetLength(long value) => throw new NotSupportedException("Block device stream is read-only.");
 
     /// <inheritdoc/>
-    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException("Block device stream is read-only.");
+    public override void Write(byte[] buffer, int offset, int count) =>
+        throw new NotSupportedException("Block device stream is read-only.");
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)

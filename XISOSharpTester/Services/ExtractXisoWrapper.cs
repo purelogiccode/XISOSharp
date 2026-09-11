@@ -62,7 +62,8 @@ public class XisoSharpWrapper : IDisposable
     /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
     /// <param name="args">Command-line arguments to pass.</param>
     /// <returns>A <see cref="Result"/> containing exit code and output.</returns>
-    public Result Run(CancellationToken cancellationToken, params string[] args) => RunAsync(args, cancellationToken).GetAwaiter().GetResult();
+    public Result Run(CancellationToken cancellationToken, params string[] args) =>
+        RunAsync(args, cancellationToken).GetAwaiter().GetResult();
 
     /// <summary>
     /// Runs the extract-xiso tool with the specified arguments and
@@ -83,7 +84,8 @@ public class XisoSharpWrapper : IDisposable
             ProcessRunResult core = await ProcessRunner
                 .RunAsync(_exePath, args, ProcessTimeout, cancellationToken)
                 .ConfigureAwait(false);
-            Result result = new() { ExitCode = core.ExitCode, StdOut = core.StandardOutput, StdErr = core.StandardError };
+            Result result = new()
+                { ExitCode = core.ExitCode, StdOut = core.StandardOutput, StdErr = core.StandardError };
             if (result.ExitCode != 0)
             {
                 Log.Warning("extract-xiso exited with code {Exit}: {Args}", result.ExitCode,
@@ -123,7 +125,8 @@ public class XisoSharpWrapper : IDisposable
     /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
     /// <param name="args">Command-line arguments to pass.</param>
     /// <returns>A <see cref="Result"/> containing exit code and output.</returns>
-    public Result RunQuiet(CancellationToken cancellationToken, params string[] args) => RunQuietAsync(args, cancellationToken).GetAwaiter().GetResult();
+    public Result RunQuiet(CancellationToken cancellationToken, params string[] args) =>
+        RunQuietAsync(args, cancellationToken).GetAwaiter().GetResult();
 
     /// <summary>
     /// Runs the extract-xiso tool with the specified arguments, appending
@@ -152,7 +155,8 @@ public class XisoSharpWrapper : IDisposable
     /// <param name="isoPath">Path to the XISO file.</param>
     /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
     /// <returns>A <see cref="Result"/> containing the file listing.</returns>
-    public Result ListFiles(string isoPath, CancellationToken cancellationToken) => ListFilesAsync(isoPath, cancellationToken).GetAwaiter().GetResult();
+    public Result ListFiles(string isoPath, CancellationToken cancellationToken) =>
+        ListFilesAsync(isoPath, cancellationToken).GetAwaiter().GetResult();
 
     /// <summary>
     /// Lists the contents of an XISO image asynchronously.
@@ -160,7 +164,8 @@ public class XisoSharpWrapper : IDisposable
     /// <param name="isoPath">Path to the XISO file.</param>
     /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
     /// <returns>A <see cref="Result"/> containing the file listing.</returns>
-    public Task<Result> ListFilesAsync(string isoPath, CancellationToken cancellationToken = default) => RunAsync(["-l", isoPath], cancellationToken);
+    public Task<Result> ListFilesAsync(string isoPath, CancellationToken cancellationToken = default) =>
+        RunAsync(["-l", isoPath], cancellationToken);
 
     /// <summary>
     /// Extracts all files from an XISO image to the specified
@@ -169,7 +174,8 @@ public class XisoSharpWrapper : IDisposable
     /// <param name="isoPath">Path to the XISO file.</param>
     /// <param name="outputDir">Directory to extract files into.</param>
     /// <returns>A <see cref="Result"/> containing extraction output.</returns>
-    public Result ExtractFiles(string isoPath, string outputDir) => ExtractFiles(isoPath, outputDir, CancellationToken.None);
+    public Result ExtractFiles(string isoPath, string outputDir) =>
+        ExtractFiles(isoPath, outputDir, CancellationToken.None);
 
     /// <summary>
     /// Extracts all files from an XISO image, observing cancellation.
@@ -178,7 +184,8 @@ public class XisoSharpWrapper : IDisposable
     /// <param name="outputDir">Directory to extract files into.</param>
     /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
     /// <returns>A <see cref="Result"/> containing extraction output.</returns>
-    public Result ExtractFiles(string isoPath, string outputDir, CancellationToken cancellationToken) => ExtractFilesAsync(isoPath, outputDir, cancellationToken).GetAwaiter().GetResult();
+    public Result ExtractFiles(string isoPath, string outputDir, CancellationToken cancellationToken) =>
+        ExtractFilesAsync(isoPath, outputDir, cancellationToken).GetAwaiter().GetResult();
 
     /// <summary>
     /// Extracts all files from an XISO image asynchronously.
@@ -207,7 +214,8 @@ public class XisoSharpWrapper : IDisposable
     /// <param name="outputDir">Directory to write the rewritten ISO into.</param>
     /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
     /// <returns>A <see cref="Result"/> containing rewrite output.</returns>
-    public Result Rewrite(string isoPath, string outputDir, CancellationToken cancellationToken) => RewriteAsync(isoPath, outputDir, cancellationToken).GetAwaiter().GetResult();
+    public Result Rewrite(string isoPath, string outputDir, CancellationToken cancellationToken) =>
+        RewriteAsync(isoPath, outputDir, cancellationToken).GetAwaiter().GetResult();
 
     /// <summary>
     /// Rewrites (optimizes) an XISO image asynchronously.
@@ -232,7 +240,8 @@ public class XisoSharpWrapper : IDisposable
     /// </summary>
     /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
     /// <returns>The version string, or <c>null</c> if unavailable.</returns>
-    public string? GetVersion(CancellationToken cancellationToken) => GetVersionAsync(cancellationToken).GetAwaiter().GetResult();
+    public string? GetVersion(CancellationToken cancellationToken) =>
+        GetVersionAsync(cancellationToken).GetAwaiter().GetResult();
 
     /// <summary>
     /// Retrieves the version string of the extract-xiso tool asynchronously.

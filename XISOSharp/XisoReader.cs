@@ -34,7 +34,8 @@ public static class XisoReader
     /// True when <paramref name="path"/> has a <c>.cso</c> extension; covers split
     /// <c>*.1.cso</c> part sets (mirroring <c>xdvdfs-cli/src/img.rs::open_image</c>).
     /// </summary>
-    internal static bool IsCsoPath(string path) => Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
+    internal static bool IsCsoPath(string path) =>
+        Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Opens an image for reading: <c>.cso</c> paths (single or split parts) are routed
@@ -664,7 +665,8 @@ public static class XisoReader
                                            ex is not OperationCanceledException)
                 {
                     ExtractFileException failure = ex as ExtractFileException
-                                                   ?? ExtractFileException.ForToc(string.Concat(path, filename), filename, 0, 0, ex);
+                                                   ?? ExtractFileException.ForToc(string.Concat(path, filename),
+                                                       filename, 0, 0, ex);
                     unpackOptions.RecordFailure(failure);
                     Logger.LogErr($"Error: {failure.Message}\n");
                 }
@@ -709,8 +711,11 @@ public static class XisoReader
                                                    ex is not OperationCanceledException)
                         {
                             ExtractFileException failure = ex as ExtractFileException
-                                                           ?? ExtractFileException.ForDirectory(string.Concat(path, filename),
-                                                               filesystem != null ? string.Concat(path, filename) : filename,
+                                                           ?? ExtractFileException.ForDirectory(
+                                                               string.Concat(path, filename),
+                                                               filesystem != null
+                                                                   ? string.Concat(path, filename)
+                                                                   : filename,
                                                                ex);
                             unpackOptions.RecordFailure(failure);
                             Logger.LogErr($"Error: {failure.Message}\n");
@@ -783,8 +788,9 @@ public static class XisoReader
                                                        ex is not OperationCanceledException)
                             {
                                 ExtractFileException failure = ex as ExtractFileException
-                                                               ?? ExtractFileException.ForToc(subPath, filename, startSector,
-                                                                    fileSize, ex);
+                                                               ?? ExtractFileException.ForToc(subPath, filename,
+                                                                   startSector,
+                                                                   fileSize, ex);
                                 unpackOptions.RecordFailure(failure);
                                 Logger.LogErr($"Error: {failure.Message}\n");
                             }
@@ -826,7 +832,8 @@ public static class XisoReader
                                                    ex is not OperationCanceledException)
                         {
                             ExtractFileException failure = ex as ExtractFileException
-                                                           ?? ExtractFileException.ForWrite(string.Concat(path, filename), filename,
+                                                           ?? ExtractFileException.ForWrite(
+                                                               string.Concat(path, filename), filename,
                                                                startSector, fileSize, -1, ex);
                             unpackOptions.RecordFailure(failure);
                             Logger.LogErr($"Error: {failure.Message}\n");
@@ -1828,7 +1835,8 @@ public static class XisoReader
                         // summary (TODO #16 over #9) instead of an unhandled
                         // structural failure.
                         ExtractFileException failure = ex as ExtractFileException
-                                                       ?? ExtractFileException.ForToc("/", outputPath ?? isoName, rootDirSect,
+                                                       ?? ExtractFileException.ForToc("/", outputPath ?? isoName,
+                                                           rootDirSect,
                                                            rootDirSize, ex);
                         unpackOptions.RecordFailure(failure);
                         Logger.LogErr($"Error: {failure.Message}\n");
@@ -2140,7 +2148,8 @@ public static class XisoReader
     /// <param name="isoPath">Path to the XISO file.</param>
     /// <param name="dateTime">UTC time to write (offset normalized).</param>
     /// <param name="skipSectors">Optional skip sectors for Redump images.</param>
-    public static void SetFileTime(string isoPath, DateTimeOffset dateTime, int? skipSectors = null) => SetFileTime(isoPath, FileTimeHelper.ToFileTimeRaw(dateTime), skipSectors);
+    public static void SetFileTime(string isoPath, DateTimeOffset dateTime, int? skipSectors = null) =>
+        SetFileTime(isoPath, FileTimeHelper.ToFileTimeRaw(dateTime), skipSectors);
 
     /// <summary>
     /// Probes the header magic at known disc offsets (or the skip offset when provided)
@@ -2501,7 +2510,8 @@ public static class XisoReader
     /// <exception cref="XisoFormatException">Thrown when the ISO is not a valid XISO image.</exception>
     /// <exception cref="InvalidDataException">Thrown when the path does not exist in the ISO.</exception>
     /// <exception cref="IOException">Thrown on read errors.</exception>
-    public static IReadOnlyList<string> ListDirectoryFlat(string isoPath, string internalPath = "/") => ListDirectory(isoPath, internalPath).Select(static e => e.Name).ToArray();
+    public static IReadOnlyList<string> ListDirectoryFlat(string isoPath, string internalPath = "/") =>
+        ListDirectory(isoPath, internalPath).Select(static e => e.Name).ToArray();
 
     /// <summary>
     /// Returns metadata about all entries in the specified directory within an XISO image.
@@ -3059,7 +3069,8 @@ public static class XisoReader
     /// The image is a CISO container or a split part; neither is patch-stable.
     /// </exception>
     /// <exception cref="IOException">Thrown on read/write errors.</exception>
-    public static RepairResult Repair(string isoPath, bool createBackup = true, bool dryRun = false) => XisoRepairer.RepairInPlace(isoPath, createBackup, dryRun);
+    public static RepairResult Repair(string isoPath, bool createBackup = true, bool dryRun = false) =>
+        XisoRepairer.RepairInPlace(isoPath, createBackup, dryRun);
 
     /// <summary>
     /// Rebuilds a readable image from a corrupt one (TODO #26, Phase 2;
@@ -3081,7 +3092,8 @@ public static class XisoReader
     /// Not a valid XISO image, or the tree root itself is unreachable.
     /// </exception>
     /// <exception cref="IOException">Thrown on read/write errors.</exception>
-    public static SalvageResult Salvage(string sourcePath, string? outputPath = null) => XisoSalvager.Salvage(sourcePath, outputPath);
+    public static SalvageResult Salvage(string sourcePath, string? outputPath = null) =>
+        XisoSalvager.Salvage(sourcePath, outputPath);
 
     /// <summary>
     /// Splits an XISO image into sector-aligned parts of at most
@@ -3264,7 +3276,8 @@ public static class XisoReader
             catch (Exception ex) when (options?.ContinueOnError == true && ex is not OperationCanceledException)
             {
                 ExtractFileException failure = ex as ExtractFileException
-                                               ?? ExtractFileException.ForWrite(entryInternalPath, entryDestPath, entry.StartSector,
+                                               ?? ExtractFileException.ForWrite(entryInternalPath, entryDestPath,
+                                                   entry.StartSector,
                                                    entry.FileSize, -1, ex);
                 options.RecordFailure(failure);
                 Logger.LogErr($"Error: {failure.Message}\n");

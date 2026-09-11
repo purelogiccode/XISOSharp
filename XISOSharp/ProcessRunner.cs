@@ -97,21 +97,21 @@ public static class ProcessRunner
             // Static callback with state avoids capturing the outer `using var process`
             // (disposed-capture analyzer) and guarantees unregistration before dispose.
             await using (effectiveToken.Register(static state =>
-                   {
-                       Process proc = (Process)state!;
-                       try
-                       {
-                           if (!proc.HasExited)
-                           {
-                               proc.Kill(entireProcessTree: true);
-                           }
-                       }
-                       catch (Exception ex) when (ex is InvalidOperationException or Win32Exception
-                                                      or NotSupportedException or ObjectDisposedException)
-                       {
-                           // Already exited, disposed, or cannot kill — the wait below still completes.
-                       }
-                   }, process))
+                         {
+                             Process proc = (Process)state!;
+                             try
+                             {
+                                 if (!proc.HasExited)
+                                 {
+                                     proc.Kill(entireProcessTree: true);
+                                 }
+                             }
+                             catch (Exception ex) when (ex is InvalidOperationException or Win32Exception
+                                                            or NotSupportedException or ObjectDisposedException)
+                             {
+                                 // Already exited, disposed, or cannot kill — the wait below still completes.
+                             }
+                         }, process))
             {
                 StringBuilder stdoutBuilder = new();
                 StringBuilder stderrBuilder = new();

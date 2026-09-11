@@ -282,7 +282,8 @@ public class XisoFileCopierTests : IDisposable
         XisoReader.CopyOut(isoPath, "/small.txt", smallDest, progress: progress);
         Assert.Equal(small, File.ReadAllBytes(smallDest));
 
-        List<ProgressInfo> smallEvents = progress.Events.Where(static e => e.Type == ProgressInfoType.FileProgress).ToList();
+        List<ProgressInfo> smallEvents =
+            progress.Events.Where(static e => e.Type == ProgressInfoType.FileProgress).ToList();
         ProgressInfo single = Assert.Single(smallEvents);
         Assert.Equal(small.Length, single.Size);
         Assert.Equal(small.Length, single.Count);

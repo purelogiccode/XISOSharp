@@ -839,7 +839,8 @@ public class CisoTests : IDisposable
     [Fact]
     public void CompressToCso_SplitVersion1_RoundTrips()
     {
-        (string isoPath, string csoPath, _) = CreateSplitCso(splitBytes: 16384, level: 6, version: CisoWriter.VersionDeflate);
+        (string isoPath, string csoPath, _) =
+            CreateSplitCso(splitBytes: 16384, level: 6, version: CisoWriter.VersionDeflate);
         List<string> parts = SplitParts(csoPath);
         Assert.True(parts.Count >= 2);
 

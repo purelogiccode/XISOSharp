@@ -204,8 +204,9 @@ public class DirectoryEntryTableWriterTests : IDisposable
     {
         // BUG-LIB-035: must fail fast with a named error, not mid-write with a
         // generic ArgumentException after sizing already ran.
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => DirectoryEntryTableWriter.BuildTable(
-            [new DirectoryEntryTableWriter.DirectoryTableEntry("😀.txt", false, 10, 100)]));
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            DirectoryEntryTableWriter.BuildTable(
+                [new DirectoryEntryTableWriter.DirectoryTableEntry("😀.txt", false, 10, 100)]));
         Assert.Contains("Latin-1", ex.Message, StringComparison.Ordinal);
     }
 
@@ -269,5 +270,6 @@ public class DirectoryEntryTableWriterTests : IDisposable
         }
     }
 
-    private static string JoinPath(string dir, string name) => dir.Equals("/", StringComparison.Ordinal) ? "/" + name : dir + "/" + name;
+    private static string JoinPath(string dir, string name) =>
+        dir.Equals("/", StringComparison.Ordinal) ? "/" + name : dir + "/" + name;
 }

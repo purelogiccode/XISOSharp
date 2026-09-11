@@ -212,7 +212,8 @@ public class XbeInfoTests : IDisposable
     }
 
     [Fact]
-    public void GetXbeInfo_MissingIsoFile_Throws() => Assert.Throws<FileNotFoundException>(() => XisoReader.GetXbeInfo("no_such_file.iso", "/default.xbe"));
+    public void GetXbeInfo_MissingIsoFile_Throws() =>
+        Assert.Throws<FileNotFoundException>(() => XisoReader.GetXbeInfo("no_such_file.iso", "/default.xbe"));
 
     [Fact]
     public void Explorer_GetXbeInfo_ParsesCert()

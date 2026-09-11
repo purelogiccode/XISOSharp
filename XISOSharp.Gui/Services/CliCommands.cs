@@ -100,7 +100,8 @@ internal static class CliCommands
     /// <param name="imagePath">Path of the file inside the image.</param>
     /// <param name="dest">Destination path on disk.</param>
     /// <returns>The copy-out argument list.</returns>
-    internal static string[] CopyOut(string image, string imagePath, string dest) => ["--copy-out", image, imagePath, dest];
+    internal static string[] CopyOut(string image, string imagePath, string dest) =>
+        ["--copy-out", image, imagePath, dest];
 
     /// <summary>
     /// Builds the create argv (<c>-c</c> source, optional name, <c>-X</c> excludes, <c>-s</c>/<c>-m</c>).

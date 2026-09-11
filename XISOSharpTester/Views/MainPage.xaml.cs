@@ -94,5 +94,6 @@ public class StatusIconConverter : IValueConverter
     /// Not supported. Throws <see cref="NotSupportedException"/>.
     /// </summary>
     [SuppressMessage("ReSharper", "NullnessAnnotationConflictWithJetBrainsAnnotations")]
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
 }

@@ -431,7 +431,8 @@ public static class XisoTestRunner
                 // extract-xiso extraction
                 if (wrapper is { Available: true })
                 {
-                    XisoSharpWrapper.Result exeResult = await wrapper.ExtractFilesAsync(entry.FilePath, exeTempDir, cancellationToken)
+                    XisoSharpWrapper.Result exeResult = await wrapper
+                        .ExtractFilesAsync(entry.FilePath, exeTempDir, cancellationToken)
                         .ConfigureAwait(false);
                     if (exeResult.ExitCode != 0)
                     {
@@ -791,8 +792,10 @@ public static class XisoTestRunner
             details.Add($"File count: C#={csEntries.Count} extract-xiso={exeEntries.Count}");
         }
 
-        Dictionary<string, ListEntry> csByPath = csEntries.ToDictionary(static e => e.Path, StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, ListEntry> exeByPath = exeEntries.ToDictionary(static e => e.Path, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, ListEntry> csByPath =
+            csEntries.ToDictionary(static e => e.Path, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, ListEntry> exeByPath =
+            exeEntries.ToDictionary(static e => e.Path, StringComparer.OrdinalIgnoreCase);
 
         int matchCount = 0;
         int mismatchCount = 0;
@@ -844,11 +847,13 @@ public static class XisoTestRunner
         int mismatchCount = 0;
         int matchCount = 0;
 
-        Dictionary<string, (string FullPath, string Relative)> csFiles = Directory.GetFiles(csDir, "*", SearchOption.AllDirectories)
+        Dictionary<string, (string FullPath, string Relative)> csFiles = Directory
+            .GetFiles(csDir, "*", SearchOption.AllDirectories)
             .Select(f => (FullPath: f, Relative: Path.GetRelativePath(csDir, f)))
             .ToDictionary(static x => x.Relative, StringComparer.OrdinalIgnoreCase);
 
-        Dictionary<string, (string FullPath, string Relative)> exeFiles = Directory.GetFiles(exeDir, "*", SearchOption.AllDirectories)
+        Dictionary<string, (string FullPath, string Relative)> exeFiles = Directory
+            .GetFiles(exeDir, "*", SearchOption.AllDirectories)
             .Select(f => (FullPath: f, Relative: Path.GetRelativePath(exeDir, f)))
             .ToDictionary(static x => x.Relative, StringComparer.OrdinalIgnoreCase);
 

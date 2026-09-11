@@ -37,10 +37,12 @@ public static class TestDataLocator
     }
 
     /// <summary>Resolves the <c>TestData/source</c> fixture source tree.</summary>
-    public static string GetSourceDir(string? testDataRoot = null) => Path.Combine(testDataRoot ?? GetTestDataRoot(), "source");
+    public static string GetSourceDir(string? testDataRoot = null) =>
+        Path.Combine(testDataRoot ?? GetTestDataRoot(), "source");
 
     /// <summary>Resolves the prebuilt <c>TestData/output/source.iso</c> fixture image.</summary>
-    public static string GetOutputIsoPath(string? testDataRoot = null) => Path.Combine(testDataRoot ?? GetTestDataRoot(), "output", TestDataWriter.IsoFileName);
+    public static string GetOutputIsoPath(string? testDataRoot = null) =>
+        Path.Combine(testDataRoot ?? GetTestDataRoot(), "output", TestDataWriter.IsoFileName);
 
     /// <summary>
     /// Resolves the solution root by walking up to <c>CSharp_XISOSharp.sln</c>.

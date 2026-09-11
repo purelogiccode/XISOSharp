@@ -287,7 +287,8 @@ public static class CisoReader
     /// <param name="csoFs">Open CISO file stream (seekable, readable).</param>
     /// <param name="offset">Byte offset in the uncompressed image.</param>
     /// <param name="buffer">Destination buffer to fill.</param>
-    public static void ReadFromCso(FileStream csoFs, long offset, Span<byte> buffer) => ReadFromCsoCore(csoFs, offset, buffer);
+    public static void ReadFromCso(FileStream csoFs, long offset, Span<byte> buffer) =>
+        ReadFromCsoCore(csoFs, offset, buffer);
 
     private static void ReadFromCsoCore(Stream csoFs, long offset, Span<byte> buffer)
     {

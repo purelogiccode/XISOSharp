@@ -256,5 +256,6 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
     /// <summary>Occurs when a bound property value changes.</summary>
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    private void OnPropertyChanged([CallerMemberName] string? name = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }

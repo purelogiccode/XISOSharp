@@ -105,7 +105,8 @@ public class ListDirectoryFlatTests : IDisposable
     }
 
     [Fact]
-    public void ListDirectoryFlat_MissingFile_Throws() => Assert.Throws<FileNotFoundException>(() => XisoReader.ListDirectoryFlat("no_such_file.iso"));
+    public void ListDirectoryFlat_MissingFile_Throws() =>
+        Assert.Throws<FileNotFoundException>(() => XisoReader.ListDirectoryFlat("no_such_file.iso"));
 
     [Fact]
     public void ListDirectoryFlat_InvalidIso_Throws()

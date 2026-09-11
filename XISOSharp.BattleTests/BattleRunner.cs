@@ -37,7 +37,9 @@ internal static partial class BattleRunner
                     : MissingOracle(op, "extract-xiso.exe"),
 
                 // xdvdfs oracle
-                "checksum" => xdvdfs?.Available == true ? RunChecksum(iso, cli, xdvdfs) : MissingOracle(op, "xdvdfs.exe"),
+                "checksum" => xdvdfs?.Available == true
+                    ? RunChecksum(iso, cli, xdvdfs)
+                    : MissingOracle(op, "xdvdfs.exe"),
                 "md5" => xdvdfs?.Available == true ? RunMd5(iso, cli, xdvdfs) : MissingOracle(op, "xdvdfs.exe"),
                 "unpack" => xdvdfs?.Available == true
                     ? RunUnpack(iso, cli, xdvdfs, work!)
@@ -99,7 +101,10 @@ internal static partial class BattleRunner
             // extract-xiso: _ext, _rw; xdvdfs: _unpack, _pack, _cso; xboxkit: _petr,
             // _video, _rnd, _seed, _zar, _trim, _wipe, _rb.
             foreach (string suffix in new[]
-                     { "_ext", "_rw", "_unpack", "_pack", "_cso", "_petr", "_video", "_rnd", "_seed", "_zar", "_trim", "_wipe", "_rb" })
+                     {
+                         "_ext", "_rw", "_unpack", "_pack", "_cso", "_petr", "_video", "_rnd", "_seed", "_zar", "_trim",
+                         "_wipe", "_rb"
+                     })
             {
                 string dir = Path.Combine(workRoot, stem + suffix);
                 if (Directory.Exists(dir))
@@ -126,7 +131,8 @@ internal static partial class BattleRunner
             BattleStatus.Failed => ConsoleColor.Red,
             _ => ConsoleColor.Yellow,
         };
-        Console.WriteLine($"  {sub.Op,-8} {sub.Status,-7} {sub.Seconds,7:F1}s  {sub.Detail.Split('\n').FirstOrDefault()?.Trim()}");
+        Console.WriteLine(
+            $"  {sub.Op,-8} {sub.Status,-7} {sub.Seconds,7:F1}s  {sub.Detail.Split('\n').FirstOrDefault()?.Trim()}");
         Console.ForegroundColor = prev;
         Console.WriteLine(
             $"           time: cli {sub.CliSeconds,7:F1}s | native {sub.OracleSeconds,7:F1}s | cli/native {(sub.OracleSeconds > 0.05 ? sub.CliSeconds / sub.OracleSeconds : double.NaN),5:F2}x");
@@ -149,17 +155,21 @@ internal static partial class BattleRunner
 
             if (cCode != 0 && oCode != 0)
             {
-                return Done(sw, "list", BattleStatus.Skipped, $"both tools failed: cli exit {cCode} ({First(cErr, cOut)}), native exit {oCode} ({First(oErr, oOut)})", cSec, oSec);
+                return Done(sw, "list", BattleStatus.Skipped,
+                    $"both tools failed: cli exit {cCode} ({First(cErr, cOut)}), native exit {oCode} ({First(oErr, oOut)})",
+                    cSec, oSec);
             }
 
             if (cCode != 0)
             {
-                return Done(sw, "list", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr, cOut)} (native exit 0)", cSec, oSec);
+                return Done(sw, "list", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr, cOut)} (native exit 0)",
+                    cSec, oSec);
             }
 
             if (oCode != 0)
             {
-                return Done(sw, "list", BattleStatus.Failed, $"native exit {oCode}: {First(oErr, oOut)} (CLI exit 0)", cSec, oSec);
+                return Done(sw, "list", BattleStatus.Failed, $"native exit {oCode}: {First(oErr, oOut)} (CLI exit 0)",
+                    cSec, oSec);
             }
 
             List<string> cEntries = ExtractEntries(cOut);
@@ -176,7 +186,8 @@ internal static partial class BattleRunner
                 if (!string.Equals(c, o, StringComparison.Ordinal))
                 {
                     return Done(sw, "list", BattleStatus.Failed,
-                        $"entry {i + 1} differs:\n           cli: {c ?? "<none>"}\n           native: {o ?? "<none>"}", cSec, oSec);
+                        $"entry {i + 1} differs:\n           cli: {c ?? "<none>"}\n           native: {o ?? "<none>"}",
+                        cSec, oSec);
                 }
             }
 
@@ -213,17 +224,20 @@ internal static partial class BattleRunner
 
             if (cCode != 0 && oCode != 0)
             {
-                return Done(sw, "extract", BattleStatus.Skipped, $"both tools failed: cli: {First(cErr)}, native: {First(oErr)}", cSec, oSec);
+                return Done(sw, "extract", BattleStatus.Skipped,
+                    $"both tools failed: cli: {First(cErr)}, native: {First(oErr)}", cSec, oSec);
             }
 
             if (cCode != 0)
             {
-                return Done(sw, "extract", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr)} (native exit 0)", cSec, oSec);
+                return Done(sw, "extract", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr)} (native exit 0)",
+                    cSec, oSec);
             }
 
             if (oCode != 0)
             {
-                return Done(sw, "extract", BattleStatus.Failed, $"native exit {oCode}: {First(oErr)} (CLI exit 0)", cSec, oSec);
+                return Done(sw, "extract", BattleStatus.Failed, $"native exit {oCode}: {First(oErr)} (CLI exit 0)",
+                    cSec, oSec);
             }
 
             (bool equal, string detail) = CompareTrees(csDir, exDir);
@@ -289,7 +303,8 @@ internal static partial class BattleRunner
             return (true, $"{csMap.Count} files, {csDirs.Count} dirs, all SHA-256 match");
         }
 
-        string head = $"{csMap.Count} files/{csDirs.Count} dirs (cli) vs {exMap.Count} files/{exDirs.Count} dirs (native)";
+        string head =
+            $"{csMap.Count} files/{csDirs.Count} dirs (cli) vs {exMap.Count} files/{exDirs.Count} dirs (native)";
         if (diffs.Count == 0)
         {
             foreach (string onlyCs in csDirs.Except(exDirs, StringComparer.Ordinal).Take(3))
@@ -335,24 +350,28 @@ internal static partial class BattleRunner
 
             if (cCode != 0 && oCode != 0)
             {
-                return Done(sw, "rewrite", BattleStatus.Skipped, $"both tools refused: cli: {First(cErr)}, native: {First(oErr)}", cSec, oSec);
+                return Done(sw, "rewrite", BattleStatus.Skipped,
+                    $"both tools refused: cli: {First(cErr)}, native: {First(oErr)}", cSec, oSec);
             }
 
             if (cCode != 0)
             {
-                return Done(sw, "rewrite", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr)} (native exit 0)", cSec, oSec);
+                return Done(sw, "rewrite", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr)} (native exit 0)",
+                    cSec, oSec);
             }
 
             if (oCode != 0)
             {
-                return Done(sw, "rewrite", BattleStatus.Failed, $"native exit {oCode}: {First(oErr)} (CLI exit 0)", cSec, oSec);
+                return Done(sw, "rewrite", BattleStatus.Failed, $"native exit {oCode}: {First(oErr)} (CLI exit 0)",
+                    cSec, oSec);
             }
 
             string? csOutIso = FindRewriteOutput(work, csOut, csIn);
             string? exOutIso = FindRewriteOutput(work, exOut, exIn);
             if (csOutIso is null || exOutIso is null)
             {
-                return Done(sw, "rewrite", BattleStatus.Failed, $"rewritten ISO not found: cli={csOutIso ?? "null"}, native={exOutIso ?? "null"}", cSec, oSec);
+                return Done(sw, "rewrite", BattleStatus.Failed,
+                    $"rewritten ISO not found: cli={csOutIso ?? "null"}, native={exOutIso ?? "null"}", cSec, oSec);
             }
 
             string csHash = HashUtil.ComputeSha256(csOutIso);
@@ -430,11 +449,11 @@ internal static partial class BattleRunner
     {
         "extract" or "unpack" => 2.2,
         "rewrite" => 4.5, // cs_in + exe_in + both outputs (+ .old backups)
-        "pack" => 3.5,    // unpacked src + two packed images
-        "cso" => 3.5,     // staged partition + compressed parts + decompressed image
-        "rebuild" => 7,   // 2 staged copies + components + 2 rebuilt images
+        "pack" => 3.5, // unpacked src + two packed images
+        "cso" => 3.5, // staged partition + compressed parts + decompressed image
+        "rebuild" => 7, // 2 staged copies + components + 2 rebuilt images
         "petrify" or "video" or "random" or "seed" or "zar" or "trim" or "wipe" => 3.2,
-        _ => 0,           // list / checksum / md5 write nothing
+        _ => 0, // list / checksum / md5 write nothing
     };
 
     /// <summary>

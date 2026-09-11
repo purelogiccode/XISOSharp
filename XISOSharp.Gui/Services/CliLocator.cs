@@ -31,5 +31,6 @@ internal static class CliLocator
     /// <param name="cliPath">Resolved path to the CLI executable.</param>
     /// <param name="ct">Cancellation token for the probe process.</param>
     /// <returns>The version banner line, or <c>null</c> when the probe fails.</returns>
-    internal static Task<string?> ProbeVersionAsync(string cliPath, CancellationToken ct) => ToolLocator.ProbeVersionAsync(cliPath, TimeSpan.FromSeconds(15), ct);
+    internal static Task<string?> ProbeVersionAsync(string cliPath, CancellationToken ct) =>
+        ToolLocator.ProbeVersionAsync(cliPath, TimeSpan.FromSeconds(15), ct);
 }

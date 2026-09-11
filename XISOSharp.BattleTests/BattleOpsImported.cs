@@ -31,17 +31,20 @@ internal static partial class BattleRunner
 
             if (cCode != 0 && oCode != 0)
             {
-                return Done(sw, "checksum", BattleStatus.Skipped, $"both tools failed: cli: {First(cErr, cOut)}, xdvdfs: {First(oErr, oOut)}", cSec, oSec);
+                return Done(sw, "checksum", BattleStatus.Skipped,
+                    $"both tools failed: cli: {First(cErr, cOut)}, xdvdfs: {First(oErr, oOut)}", cSec, oSec);
             }
 
             if (cCode != 0)
             {
-                return Done(sw, "checksum", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr, cOut)} (xdvdfs exit 0)", cSec, oSec);
+                return Done(sw, "checksum", BattleStatus.Failed,
+                    $"CLI exit {cCode}: {First(cErr, cOut)} (xdvdfs exit 0)", cSec, oSec);
             }
 
             if (oCode != 0)
             {
-                return Done(sw, "checksum", BattleStatus.Failed, $"xdvdfs exit {oCode}: {First(oErr, oOut)} (CLI exit 0)", cSec, oSec);
+                return Done(sw, "checksum", BattleStatus.Failed,
+                    $"xdvdfs exit {oCode}: {First(oErr, oOut)} (CLI exit 0)", cSec, oSec);
             }
 
             string? cHex = FirstHex(cOut);
@@ -49,12 +52,13 @@ internal static partial class BattleRunner
             if (cHex is null || oHex is null)
             {
                 return Done(sw, "checksum", BattleStatus.Skipped,
-                    $"could not parse hex checksums: cli={(cHex ?? "null")}, xdvdfs={(oHex ?? "null")}", cSec, oSec);
+                    $"could not parse hex checksums: cli={cHex ?? "null"}, xdvdfs={oHex ?? "null"}", cSec, oSec);
             }
 
             return string.Equals(cHex, oHex, StringComparison.OrdinalIgnoreCase)
                 ? Done(sw, "checksum", BattleStatus.Passed, $"SHA3-256 {cHex}", cSec, oSec)
-                : Done(sw, "checksum", BattleStatus.Failed, $"SHA3-256 mismatch: cli {cHex} vs xdvdfs {oHex}", cSec, oSec);
+                : Done(sw, "checksum", BattleStatus.Failed, $"SHA3-256 mismatch: cli {cHex} vs xdvdfs {oHex}", cSec,
+                    oSec);
         }
         catch (Exception ex)
         {
@@ -75,17 +79,20 @@ internal static partial class BattleRunner
 
             if (cCode != 0 && oCode != 0)
             {
-                return Done(sw, "md5", BattleStatus.Skipped, $"both tools failed: cli: {First(cErr, cOut)}, xdvdfs: {First(oErr, oOut)}", cSec, oSec);
+                return Done(sw, "md5", BattleStatus.Skipped,
+                    $"both tools failed: cli: {First(cErr, cOut)}, xdvdfs: {First(oErr, oOut)}", cSec, oSec);
             }
 
             if (cCode != 0)
             {
-                return Done(sw, "md5", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr, cOut)} (xdvdfs exit 0)", cSec, oSec);
+                return Done(sw, "md5", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr, cOut)} (xdvdfs exit 0)",
+                    cSec, oSec);
             }
 
             if (oCode != 0)
             {
-                return Done(sw, "md5", BattleStatus.Failed, $"xdvdfs exit {oCode}: {First(oErr, oOut)} (CLI exit 0)", cSec, oSec);
+                return Done(sw, "md5", BattleStatus.Failed, $"xdvdfs exit {oCode}: {First(oErr, oOut)} (CLI exit 0)",
+                    cSec, oSec);
             }
 
             Dictionary<string, string> cMap = ParseMd5Map(cOut);
@@ -117,11 +124,13 @@ internal static partial class BattleRunner
             if (diffs.Count > 0)
             {
                 return Done(sw, "md5", BattleStatus.Failed,
-                    $"{cMap.Count} cli entries vs {oMap.Count} xdvdfs entries\n           " + string.Join("\n           ", diffs), cSec, oSec);
+                    $"{cMap.Count} cli entries vs {oMap.Count} xdvdfs entries\n           " +
+                    string.Join("\n           ", diffs), cSec, oSec);
             }
 
             return Done(sw, "md5", BattleStatus.Passed,
-                $"{cMap.Count} files agree" + (onlyXdvdfs > 0 ? $" ({onlyXdvdfs} xdvdfs-only dir/extra entries)" : string.Empty), cSec, oSec);
+                $"{cMap.Count} files agree" +
+                (onlyXdvdfs > 0 ? $" ({onlyXdvdfs} xdvdfs-only dir/extra entries)" : string.Empty), cSec, oSec);
         }
         catch (Exception ex)
         {
@@ -146,17 +155,20 @@ internal static partial class BattleRunner
 
             if (cCode != 0 && oCode != 0)
             {
-                return Done(sw, "unpack", BattleStatus.Skipped, $"both tools failed: cli: {First(cErr)}, xdvdfs: {First(oErr)}", cSec, oSec);
+                return Done(sw, "unpack", BattleStatus.Skipped,
+                    $"both tools failed: cli: {First(cErr)}, xdvdfs: {First(oErr)}", cSec, oSec);
             }
 
             if (cCode != 0)
             {
-                return Done(sw, "unpack", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr)} (xdvdfs exit 0)", cSec, oSec);
+                return Done(sw, "unpack", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr)} (xdvdfs exit 0)", cSec,
+                    oSec);
             }
 
             if (oCode != 0)
             {
-                return Done(sw, "unpack", BattleStatus.Failed, $"xdvdfs exit {oCode}: {First(oErr)} (CLI exit 0)", cSec, oSec);
+                return Done(sw, "unpack", BattleStatus.Failed, $"xdvdfs exit {oCode}: {First(oErr)} (CLI exit 0)", cSec,
+                    oSec);
             }
 
             (bool equal, string detail) = CompareTrees(csDir, xdDir);
@@ -194,17 +206,20 @@ internal static partial class BattleRunner
 
             if (cCode != 0 && oCode != 0)
             {
-                return Done(sw, "pack", BattleStatus.Skipped, $"both tools failed: cli: {First(cErr)}, xdvdfs: {First(oErr)}", cSec, oSec);
+                return Done(sw, "pack", BattleStatus.Skipped,
+                    $"both tools failed: cli: {First(cErr)}, xdvdfs: {First(oErr)}", cSec, oSec);
             }
 
             if (cCode != 0)
             {
-                return Done(sw, "pack", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr)} (xdvdfs exit 0)", cSec, oSec);
+                return Done(sw, "pack", BattleStatus.Failed, $"CLI exit {cCode}: {First(cErr)} (xdvdfs exit 0)", cSec,
+                    oSec);
             }
 
             if (oCode != 0)
             {
-                return Done(sw, "pack", BattleStatus.Failed, $"xdvdfs exit {oCode}: {First(oErr)} (CLI exit 0)", cSec, oSec);
+                return Done(sw, "pack", BattleStatus.Failed, $"xdvdfs exit {oCode}: {First(oErr)} (CLI exit 0)", cSec,
+                    oSec);
             }
 
             (_, string cHex, _, _) = cli.Run("checksum", "--silent", pIso);
@@ -213,15 +228,18 @@ internal static partial class BattleRunner
             string? xHex = FirstHex(oHex);
             if (pHex is null || xHex is null)
             {
-                return Done(sw, "pack", BattleStatus.Skipped, "could not parse content checksums of the packed images", cSec, oSec);
+                return Done(sw, "pack", BattleStatus.Skipped, "could not parse content checksums of the packed images",
+                    cSec, oSec);
             }
 
             long pLen = new FileInfo(pIso).Length;
             long xLen = new FileInfo(xIso).Length;
             return string.Equals(pHex, xHex, StringComparison.OrdinalIgnoreCase)
-                ? Done(sw, "pack", BattleStatus.Passed, $"content parity: SHA3-256 {pHex} (cli {pLen} B, xdvdfs {xLen} B)", cSec, oSec)
+                ? Done(sw, "pack", BattleStatus.Passed,
+                    $"content parity: SHA3-256 {pHex} (cli {pLen} B, xdvdfs {xLen} B)", cSec, oSec)
                 : Done(sw, "pack", BattleStatus.Failed,
-                    $"content mismatch: cli SHA3-256 {pHex} ({pLen} B) vs xdvdfs {xHex} ({xLen} B) over the same source dir", cSec, oSec);
+                    $"content mismatch: cli SHA3-256 {pHex} ({pLen} B) vs xdvdfs {xHex} ({xLen} B) over the same source dir",
+                    cSec, oSec);
         }
         catch (Exception ex)
         {
@@ -255,7 +273,8 @@ internal static partial class BattleRunner
             (int cCode, _, string cErr, double cSec) = cli.Run("cso", csoInput, csoPath);
             if (cCode != 0)
             {
-                return Done(sw, "cso", BattleStatus.Failed, $"CLI compress exit {cCode}: {First(cErr, "no output")}", cSec, 0);
+                return Done(sw, "cso", BattleStatus.Failed, $"CLI compress exit {cCode}: {First(cErr, "no output")}",
+                    cSec, 0);
             }
 
             string[] parts = Directory.GetFiles(work, "*.cso", SearchOption.TopDirectoryOnly)
@@ -358,7 +377,8 @@ internal static partial class BattleRunner
             if (!cliOk && !xkOk)
             {
                 return Done(sw, op, BattleStatus.Skipped,
-                    $"both tools refused: cli: {First(cErr, $"no {op} output")}, xboxkit: {First(oErr, oOut)}", cSec, oSec);
+                    $"both tools refused: cli: {First(cErr, $"no {op} output")}, xboxkit: {First(oErr, oOut)}", cSec,
+                    oSec);
             }
 
             // Only comparable outputs can pass or fail; an asymmetric refusal is a
@@ -366,13 +386,15 @@ internal static partial class BattleRunner
             if (!xkOk)
             {
                 return Done(sw, op, BattleStatus.Skipped,
-                    $"xboxkit refused (exit {oCode}, no {op} output — trimmed/unsupported input?); CLI produced {Path.GetFileName(xsOut)} — nothing to compare", cSec, oSec);
+                    $"xboxkit refused (exit {oCode}, no {op} output — trimmed/unsupported input?); CLI produced {Path.GetFileName(xsOut)} — nothing to compare",
+                    cSec, oSec);
             }
 
             if (!cliOk)
             {
                 return Done(sw, op, BattleStatus.Skipped,
-                    $"CLI refused (exit {cCode}: {First(cErr, $"no {op} output")}); xboxkit produced {Path.GetFileName(xkOut)} — nothing to compare", cSec, oSec);
+                    $"CLI refused (exit {cCode}: {First(cErr, $"no {op} output")}); xboxkit produced {Path.GetFileName(xkOut)} — nothing to compare",
+                    cSec, oSec);
             }
 
             string xsHash = HashUtil.ComputeSha256(xsOut);
@@ -427,9 +449,12 @@ internal static partial class BattleRunner
 
             string outExt = string.Equals(op, "zar", StringComparison.Ordinal) ? ".zar" : ".iso";
             string xsOut = Path.Combine(xsDir, "out" + outExt);
-            string[] cliArgs = [.. cliTemplate.Select(a => a
-                .Replace("{ISO}", xsIso)
-                .Replace("{OUT}", xsOut))];
+            string[] cliArgs =
+            [
+                .. cliTemplate.Select(a => a
+                    .Replace("{ISO}", xsIso)
+                    .Replace("{OUT}", xsOut))
+            ];
             string[] xkArgs = [.. xkTemplate.Select(a => a.Replace("{ISO}", xkIso))];
 
             (int cCode, _, string cErr, double cSec) = cli.Run(cliArgs);
@@ -439,20 +464,24 @@ internal static partial class BattleRunner
             string? xsFile = cliTemplate.Any(static a => string.Equals(a, "{OUT}", StringComparison.Ordinal))
                 ? (File.Exists(xsOut) ? xsOut : null)
                 : FindOutput(xsDir, xsIso, preferredPattern);
-            string? xkFile = preferredPattern is null ? (File.Exists(xkIso) ? xkIso : null) : FindOutput(xkDir, xkIso, preferredPattern);
+            string? xkFile = preferredPattern is null
+                ? (File.Exists(xkIso) ? xkIso : null)
+                : FindOutput(xkDir, xkIso, preferredPattern);
 
             bool cliOk = cCode == 0 && xsFile is not null;
             // In-place ops (trim/wipe): xboxkit always exits 0, so require an actual
             // change — a different hash or an .old backup beside the staged input.
             bool xkChanged = xkFile is not null &&
                              (preferredPattern is not null ||
-                              !string.Equals(HashUtil.ComputeSha256(xkFile), xkPreHash, StringComparison.OrdinalIgnoreCase) ||
+                              !string.Equals(HashUtil.ComputeSha256(xkFile), xkPreHash,
+                                  StringComparison.OrdinalIgnoreCase) ||
                               Directory.GetFiles(xkDir, "*.old", SearchOption.TopDirectoryOnly).Length > 0);
             bool xkOk = xkChanged;
             if (!cliOk && !xkOk)
             {
                 return Done(sw, op, BattleStatus.Skipped,
-                    $"both tools refused: cli: {First(cErr, $"no {op} output")}, xboxkit: {First(oErr, $"no {op} output")}", cSec, oSec);
+                    $"both tools refused: cli: {First(cErr, $"no {op} output")}, xboxkit: {First(oErr, $"no {op} output")}",
+                    cSec, oSec);
             }
 
             // Only comparable outputs can pass or fail; an asymmetric refusal is a
@@ -460,13 +489,15 @@ internal static partial class BattleRunner
             if (!xkOk)
             {
                 return Done(sw, op, BattleStatus.Skipped,
-                    $"xboxkit refused (exit {oCode}, no {op} output — trimmed/unsupported input?); CLI produced {Path.GetFileName(xsFile)} — nothing to compare", cSec, oSec);
+                    $"xboxkit refused (exit {oCode}, no {op} output — trimmed/unsupported input?); CLI produced {Path.GetFileName(xsFile)} — nothing to compare",
+                    cSec, oSec);
             }
 
             if (!cliOk)
             {
                 return Done(sw, op, BattleStatus.Skipped,
-                    $"CLI refused (exit {cCode}: {First(cErr, $"no {op} output")}); xboxkit produced {Path.GetFileName(xkFile)} — nothing to compare", cSec, oSec);
+                    $"CLI refused (exit {cCode}: {First(cErr, $"no {op} output")}); xboxkit produced {Path.GetFileName(xkFile)} — nothing to compare",
+                    cSec, oSec);
             }
 
             string xsHash = HashUtil.ComputeSha256(xsFile!);
@@ -524,14 +555,16 @@ internal static partial class BattleRunner
             if (vCode != 0 || rCode != 0)
             {
                 return Done(sw, "rebuild", BattleStatus.Skipped,
-                    $"component extraction refused (trimmed ISO?): video {vCode} {First(vErr)}, random {rCode} {First(rErr)}", 0, 0);
+                    $"component extraction refused (trimmed ISO?): video {vCode} {First(vErr)}, random {rCode} {First(rErr)}",
+                    0, 0);
             }
 
             string? video = FindOutput(xsDir, xsIso, "*video*");
             string? filler = FindOutput(xsDir, xsIso, "*filler*");
             if (video is null || filler is null)
             {
-                return Done(sw, "rebuild", BattleStatus.Skipped, "video/filler components not found after extraction", 0, 0);
+                return Done(sw, "rebuild", BattleStatus.Skipped, "video/filler components not found after extraction",
+                    0, 0);
             }
 
             (_, string uOut, _, _) = cli.Run("--update", xsIso);
@@ -587,7 +620,8 @@ internal static partial class BattleRunner
 
             if (cCode != 0 && oCode != 0)
             {
-                return Done(sw, "rebuild", BattleStatus.Skipped, $"both tools failed: cli: {First(cErr)}, xboxkit: {First(oErr)}", cSec, oSec);
+                return Done(sw, "rebuild", BattleStatus.Skipped,
+                    $"both tools failed: cli: {First(cErr)}, xboxkit: {First(oErr)}", cSec, oSec);
             }
 
             string originalHash = HashUtil.ComputeSha256(iso);
@@ -609,7 +643,8 @@ internal static partial class BattleRunner
             {
                 string h = HashUtil.ComputeSha256(xsFile);
                 xsOk = string.Equals(h, originalHash, StringComparison.OrdinalIgnoreCase);
-                verdicts.Add($"cli rebuilt {(xsOk ? "MATCH" : "MISMATCH")} vs original ({h} vs {originalHash}, {new FileInfo(xsFile).Length}/{originalLen} B)");
+                verdicts.Add(
+                    $"cli rebuilt {(xsOk ? "MATCH" : "MISMATCH")} vs original ({h} vs {originalHash}, {new FileInfo(xsFile).Length}/{originalLen} B)");
             }
 
             if (oCode != 0 || xkFile is null)
@@ -620,7 +655,8 @@ internal static partial class BattleRunner
             {
                 string h = HashUtil.ComputeSha256(xkFile);
                 xkOk = string.Equals(h, originalHash, StringComparison.OrdinalIgnoreCase);
-                verdicts.Add($"xboxkit rebuilt {(xkOk ? "MATCH" : "MISMATCH")} vs original ({h} vs {originalHash}, {new FileInfo(xkFile).Length}/{originalLen} B)");
+                verdicts.Add(
+                    $"xboxkit rebuilt {(xkOk ? "MATCH" : "MISMATCH")} vs original ({h} vs {originalHash}, {new FileInfo(xkFile).Length}/{originalLen} B)");
             }
 
             BattleStatus status = xsOk && xkOk ? BattleStatus.Passed : BattleStatus.Failed;
@@ -649,7 +685,8 @@ internal static partial class BattleRunner
         {
             return Done(sw, "petrify", BattleStatus.Skipped,
                 $"CLI skeleton is structurally correct ({detail}) but differs from xboxkit -p " +
-                "(oracle zeroes filesystem tables inside mixed bone/file extents — oracle-side defect, not comparable)", cSec, oSec);
+                "(oracle zeroes filesystem tables inside mixed bone/file extents — oracle-side defect, not comparable)",
+                cSec, oSec);
         }
 
         return null;

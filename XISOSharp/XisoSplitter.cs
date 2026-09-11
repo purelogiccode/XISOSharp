@@ -52,7 +52,8 @@ public static class XisoSplitter
     /// Returns true when <paramref name="path"/> refers to the first part of a
     /// split image (<c>*.1.iso</c>, case-insensitive).
     /// </summary>
-    public static bool IsSplitPath(string? path) => path?.EndsWith(".1.iso", StringComparison.OrdinalIgnoreCase) == true;
+    public static bool IsSplitPath(string? path) =>
+        path?.EndsWith(".1.iso", StringComparison.OrdinalIgnoreCase) == true;
 
     /// <summary>
     /// Splits an XISO image into parts of at most

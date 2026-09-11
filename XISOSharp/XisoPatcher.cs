@@ -542,5 +542,6 @@ public static class XisoPatcher
         }
     }
 
-    private static string JoinPath(string dir, string name) => dir.Equals("/", StringComparison.Ordinal) ? "/" + name : dir + "/" + name;
+    private static string JoinPath(string dir, string name) =>
+        dir.Equals("/", StringComparison.Ordinal) ? "/" + name : dir + "/" + name;
 }

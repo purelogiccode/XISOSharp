@@ -167,7 +167,8 @@ public sealed class XboxPrng
     }
 
     /// <summary>Brute-force seed from the first 4096 bytes (2 sectors). Mirrors <c>TryGetSeed</c>.</summary>
-    public static bool TryGetSeed(byte[] sector, out uint outSeed) => TryGetSeed(sector, out outSeed, CancellationToken.None);
+    public static bool TryGetSeed(byte[] sector, out uint outSeed) =>
+        TryGetSeed(sector, out outSeed, CancellationToken.None);
 
     /// <summary>
     /// Brute-force seed from the first 4096 bytes (2 sectors), honoring

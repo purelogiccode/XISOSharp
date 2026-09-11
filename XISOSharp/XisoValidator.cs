@@ -276,14 +276,16 @@ public static class XisoValidator
             Logger.Log($"[VALIDATE] File paths: MISMATCH — {pathIssues.Count} path difference(s)\n");
 
         // File sizes
-        List<ValidationIssue> sizeIssues = result.Issues.Where(static i => i.Type == ValidationIssueType.SizeMismatch).ToList();
+        List<ValidationIssue> sizeIssues =
+            result.Issues.Where(static i => i.Type == ValidationIssueType.SizeMismatch).ToList();
         if (sizeIssues.Count == 0)
             Logger.Log("[VALIDATE] File sizes: MATCH\n");
         else
             Logger.Log($"[VALIDATE] File sizes: MISMATCH — {sizeIssues.Count} size difference(s)\n");
 
         // Checksums
-        List<ValidationIssue> checksumIssues = result.Issues.Where(static i => i.Type == ValidationIssueType.ChecksumMismatch).ToList();
+        List<ValidationIssue> checksumIssues =
+            result.Issues.Where(static i => i.Type == ValidationIssueType.ChecksumMismatch).ToList();
         if (checksumIssues.Count > 0)
         {
             Logger.Log($"[VALIDATE] Checksums: FAIL — {checksumIssues.Count} checksum difference(s) (SHA-256)\n");

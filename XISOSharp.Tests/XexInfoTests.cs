@@ -229,5 +229,6 @@ public class XexInfoTests : IDisposable
     }
 
     [Fact]
-    public void GetXexInfo_MissingIsoFile_Throws() => Assert.Throws<FileNotFoundException>(() => XisoReader.GetXexInfo("no_such_file.iso", "/default.xex"));
+    public void GetXexInfo_MissingIsoFile_Throws() =>
+        Assert.Throws<FileNotFoundException>(() => XisoReader.GetXexInfo("no_such_file.iso", "/default.xex"));
 }

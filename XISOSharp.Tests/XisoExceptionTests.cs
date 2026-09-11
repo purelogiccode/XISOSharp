@@ -46,6 +46,7 @@ public class XisoExceptionTests
     {
         Assert.ThrowsAny<IOException>(ThrowFormat);
         return;
+
         static void ThrowFormat()
         {
             throw new XisoFormatException("test");
@@ -101,6 +102,7 @@ public class XisoExceptionTests
     {
         Assert.ThrowsAny<ExtractErrorException>(ThrowEmpty);
         return;
+
         static void ThrowEmpty()
         {
             throw new XisoEmptyException();
@@ -186,6 +188,7 @@ public class XisoExceptionTests
     {
         Assert.ThrowsAny<IOException>(ThrowTooLarge);
         return;
+
         static void ThrowTooLarge()
         {
             throw new XisoFileTooLargeException("f", 1);

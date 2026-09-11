@@ -83,7 +83,8 @@ public sealed class MemoryFilesystem : IFilesystem
     public bool FileExists(string path) => _files.ContainsKey(Normalize(path));
 
     /// <inheritdoc/>
-    public long FileLength(string path) => _files.TryGetValue(Normalize(path), out byte[]? bytes) ? bytes.LongLength : -1;
+    public long FileLength(string path) =>
+        _files.TryGetValue(Normalize(path), out byte[]? bytes) ? bytes.LongLength : -1;
 
     /// <summary>
     /// Returns a snapshot of the bytes stored at <paramref name="path"/>

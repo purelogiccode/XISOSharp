@@ -403,7 +403,8 @@ public class XisoCoverageTests : IDisposable
     public void VerifyXiso_Device_SkipGarbage_ThrowsNoHeader()
     {
         using MemoryBlockDevice dev = new(new byte[Constants.HeaderOffset + 1024]);
-        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.VerifyXiso(dev, "x.iso", skipSectors: 0));
+        XisoFormatException ex =
+            Assert.Throws<XisoFormatException>(() => XisoReader.VerifyXiso(dev, "x.iso", skipSectors: 0));
         Assert.Contains("no header at sector 0", ex.Message, StringComparison.Ordinal);
     }
 
@@ -614,7 +615,8 @@ public class XisoCoverageTests : IDisposable
     {
         string path = Path.Combine(CreateTempDir("xiso_cov_bad"), "bad.iso");
         File.WriteAllBytes(path, new byte[Constants.HeaderOffset + 1024]);
-        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.GetFileTimeRaw(path, skipSectors: 0));
+        XisoFormatException ex =
+            Assert.Throws<XisoFormatException>(() => XisoReader.GetFileTimeRaw(path, skipSectors: 0));
         Assert.Contains("no header at sector 0", ex.Message, StringComparison.Ordinal);
     }
 
@@ -1122,7 +1124,8 @@ public class XisoCoverageTests : IDisposable
     }
 
     [Fact]
-    public void ComputeDirectoryHashes_HeaderCorrupt_ReturnsEmpty() => Assert.Empty(XisoReader.ComputeDirectoryHashes(CreateHeaderCorruptIso(), "/", HashAlgorithmName.SHA256));
+    public void ComputeDirectoryHashes_HeaderCorrupt_ReturnsEmpty() =>
+        Assert.Empty(XisoReader.ComputeDirectoryHashes(CreateHeaderCorruptIso(), "/", HashAlgorithmName.SHA256));
 
     [Fact]
     public void GetXexInfo_NonXex_ReturnsNull()
@@ -1180,7 +1183,8 @@ public class XisoCoverageTests : IDisposable
     }
 
     [Fact]
-    public void ZeroRoot_ListDirectory_ReturnsEmpty() => Assert.Empty(XisoReader.ListDirectory(CreateZeroRootIso(), "/"));
+    public void ZeroRoot_ListDirectory_ReturnsEmpty() =>
+        Assert.Empty(XisoReader.ListDirectory(CreateZeroRootIso(), "/"));
 
     [Fact]
     public void ZeroRoot_GetSectorLayout_ReturnsHeaderOnly()

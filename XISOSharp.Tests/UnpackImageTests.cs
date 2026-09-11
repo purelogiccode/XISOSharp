@@ -192,7 +192,8 @@ public class UnpackImageTests : IDisposable
     }
 
     [Fact]
-    public void UnpackImage_MissingFile_Throws() => Assert.Throws<FileNotFoundException>(() => XisoReader.UnpackImage("no_such_file.iso"));
+    public void UnpackImage_MissingFile_Throws() =>
+        Assert.Throws<FileNotFoundException>(() => XisoReader.UnpackImage("no_such_file.iso"));
 
     [Fact]
     public void Rewrite_PrependedImage_IgnoresStaleGlobalLseek()

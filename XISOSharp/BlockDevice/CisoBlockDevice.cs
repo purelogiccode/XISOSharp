@@ -34,7 +34,8 @@ public sealed class CisoBlockDevice : IBlockDevice
         {
             // Field assignments stay inline: get-only/readonly members cannot be
             // assigned from a helper method.
-            (long UncompressedSize, uint BlockSize, byte Version, byte Align, int IndexEntryCount) header = ReadHeader(fs);
+            (long UncompressedSize, uint BlockSize, byte Version, byte Align, int IndexEntryCount) header =
+                ReadHeader(fs);
             _csoFs = fs;
             _leaveOpen = false;
             Length = header.UncompressedSize;
@@ -67,7 +68,8 @@ public sealed class CisoBlockDevice : IBlockDevice
         if (!csoFs.CanSeek) throw new ArgumentException("CISO stream must be seekable", nameof(csoFs));
         _leaveOpen = leaveOpen;
 
-        (long UncompressedSize, uint BlockSize, byte Version, byte Align, int IndexEntryCount) header = ReadHeader(csoFs);
+        (long UncompressedSize, uint BlockSize, byte Version, byte Align, int IndexEntryCount) header =
+            ReadHeader(csoFs);
         Length = header.UncompressedSize;
         _blockSize = header.BlockSize;
         _version = header.Version;
@@ -171,7 +173,8 @@ public sealed class CisoBlockDevice : IBlockDevice
     }
 
     /// <inheritdoc/>
-    public void Write(long offset, ReadOnlySpan<byte> buffer) => throw new NotSupportedException("CISO block device is read-only");
+    public void Write(long offset, ReadOnlySpan<byte> buffer) =>
+        throw new NotSupportedException("CISO block device is read-only");
 
     /// <inheritdoc/>
     public void Dispose()

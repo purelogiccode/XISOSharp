@@ -258,7 +258,8 @@ public sealed class XisoZarConvertTests : IDisposable
     public void Interop_ReferenceExeExtractsOurZar()
     {
         // zarchive.exe moved with ZArchiveSharp to the sibling CSharp_ZArchiveSharp repo.
-        string exe = Path.Combine(SolutionRoot(), "..", "CSharp_ZArchiveSharp", "References", "ZArchive-0.1.2", "zarchive.exe");
+        string exe = Path.Combine(SolutionRoot(), "..", "CSharp_ZArchiveSharp", "References", "ZArchive-0.1.2",
+            "zarchive.exe");
         Assert.True(File.Exists(exe), "Missing reference oracle 'Zarchive'.");
 
         string src = CreateSourceDir(PopulateRich);

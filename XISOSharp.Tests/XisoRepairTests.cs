@@ -226,7 +226,8 @@ public class XisoRepairTests : IDisposable
     }
 
     [Fact]
-    public void Repair_MissingFile_Throws() => Assert.Throws<FileNotFoundException>(() => XisoReader.Repair("no_such_file.iso"));
+    public void Repair_MissingFile_Throws() =>
+        Assert.Throws<FileNotFoundException>(() => XisoReader.Repair("no_such_file.iso"));
 
     [Fact]
     public void Repair_NullPath_Throws() => Assert.Throws<ArgumentException>(() => XisoReader.Repair(""));

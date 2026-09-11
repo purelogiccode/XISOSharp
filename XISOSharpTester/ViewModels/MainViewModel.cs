@@ -627,7 +627,8 @@ internal partial class MainViewModel : INotifyPropertyChanged
 
         try
         {
-            TestSessionResult session = await XisoTestRunner.RunAsync(Files.ToList(), exePath, progress).ConfigureAwait(false);
+            TestSessionResult session =
+                await XisoTestRunner.RunAsync(Files.ToList(), exePath, progress).ConfigureAwait(false);
             OnUiAfterRun(session);
         }
         catch (Exception ex)
@@ -878,7 +879,8 @@ internal partial class MainViewModel : INotifyPropertyChanged
     /// Raises <see cref="PropertyChanged"/> for the caller property.
     /// </summary>
     /// <param name="name">Property name; defaults to the caller member name.</param>
-    protected void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    protected void OnPropertyChanged([CallerMemberName] string? name = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
 /// <summary>
