@@ -70,7 +70,7 @@
     <!-- ZArchiveSharp lives in the sibling CSharp_ZArchiveSharp repo (separate solution).
              Local dev: side-by-side checkout (..\CSharp_ZArchiveSharp) wins.
              Clean clone / CI without the sibling: fall back to the ZArchiveSharp NuGet
-             package (publish ZArchiveSharp to NuGet first). -->
+             package (https://www.nuget.org/packages/ZArchiveSharp). -->
     <ProjectReference Include="..\..\CSharp_ZArchiveSharp\ZArchiveSharp\ZArchiveSharp.csproj"
                       Condition="Exists('..\..\CSharp_ZArchiveSharp\ZArchiveSharp\ZArchiveSharp.csproj')" />
     <PackageReference Include="ZArchiveSharp"
