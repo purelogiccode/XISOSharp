@@ -21,7 +21,7 @@ dependencies.
 | Dependencies | none (runtime) |
 | Signing | strong-named assembly |
 | Trimming / AOT | `IsTrimmable`, `IsAotCompatible` |
-| Versioning | MinVer from git tags (format `v2.7.1` / `2.7.1`) |
+| Versioning | MinVer from git tags (format `v1.0.2` / `1.0.2`) |
 | Symbols | `snupkg` via SourceLink |
 | Docs | XML documentation generated; package README; MIT license |
 | API validation | Package validation (strict) across target frameworks |
@@ -53,7 +53,7 @@ Everything lives in the `XISOSharp` namespace, except the internal data structur
 
 ## Design notes
 
-- **Faithful port**: the engine mirrors `extract-xiso.c` v2.7.1 operation-for-operation
+- **Faithful port**: the engine mirrors `extract-xiso.c` (reference build `202609111233`) operation-for-operation
   so output is byte-identical to the reference tool (verified by the test suite and
   `Verify-Output.ps1`).
 - **Directory layout** is an AVL tree; the writer performs a three-pass layout

@@ -2,7 +2,7 @@
 
 Command-line tool for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. Ships as `XISOSharp(.exe)` (see [Install](#install) below).
 
-This project is a direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) CLI tool (v2.7.1) from C to C#. It provides the same interface and produces byte-identical output for all operations, plus 35+ extra modes (Redump archival, xdvdfs parity, audit/repair/salvage, CISO, checksums).
+This project is a direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) CLI tool (reference build [202609111233](https://github.com/XboxDev/extract-xiso/releases/tag/build-202609111233)) from C to C#. It provides the same interface and produces byte-identical output for all operations, plus 35+ extra modes (Redump archival, xdvdfs parity, audit/repair/salvage, CISO, checksums).
 
 ## Install
 

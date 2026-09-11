@@ -2,7 +2,7 @@
 
 XISO (also called **XDVDFS**, the Xbox DVD filesystem) is the filesystem used on Xbox
 game discs. This page documents the on-disk format as implemented by XISOSharp — a
-faithful port of the reference implementation in `extract-xiso.c` v2.7.1, cross-checked
+faithful port of the reference implementation in `extract-xiso.c` (reference build `202609111233`), cross-checked
 against [xdvdfs](https://github.com/antangelo/xdvdfs) and
 [XboxKit](https://github.com/Deterous/XboxKit).
 

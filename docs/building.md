@@ -117,7 +117,7 @@ The library package (`XISOSharp`) is configured in `XISOSharp.csproj`:
 
 | Setting | Value |
 |---|---|
-| Version | Derived from git tags via **MinVer** (`v2.7.1` / `2.7.1`) |
+| Version | Derived from git tags via **MinVer** (`v1.0.2` / `1.0.2`) |
 | Symbols | `snupkg` with SourceLink (`EmbedAllSources`, `EmbedUntrackedSources`; library only — apps carry embedded/portable PDBs) |
 | Reproducibility | `Deterministic` + `ContinuousIntegrationBuild` on CI (repo-wide, incl. CLI/GUI binaries) |
 | Signing | Strong-named (`XISOSharp.snk`, committed — contributors sign with no setup) |

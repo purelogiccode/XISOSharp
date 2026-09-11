@@ -1378,7 +1378,7 @@ The library targets `net8.0`, `net9.0`, and `net10.0`. Its only runtime dependen
 - **Boyer-Moore search** for efficient `.xbe` media-enable pattern matching.
 - **AVL balanced tree** for O(log n) directory lookups during create/rewrite.
 - **Synchronous I/O** for maximum throughput; async overloads are provided for UI responsiveness, not I/O concurrency.
-- The library produces **byte-identical output** to the original C `extract-xiso` tool v2.7.1.
+- The library produces **byte-identical output** to the original C `extract-xiso` tool (reference build [`202609111233`](https://github.com/XboxDev/extract-xiso/releases/tag/build-202609111233)).
 
 ---
 

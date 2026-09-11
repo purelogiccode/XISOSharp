@@ -17,9 +17,9 @@
     <!-- NuGet metadata -->
     <PackageId>XISOSharp</PackageId>
     <Authors>purelogiccode</Authors>
-    <!-- Version is derived from git tags via MinVer. Tag format: v2.7.1 or 2.7.1 -->
+    <!-- Version is derived from git tags via MinVer. Tag format: v1.0.2 or 1.0.2 -->
     <Title>XISOSharp</Title>
-    <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso v2.7.1, extended with XboxKit archival (Redump video/filler/seed/wipe/trim/petrify/rebuild, ZAR) and xdvdfs packing (build-image, CISO). Supports RAW, GLOBAL, XGD1, XGD2, XGD3, and Hybrid disc layouts. Provides both synchronous and asynchronous APIs with cancellation support. Strong-named and trimmable, with an AOT-compatible library surface.</Description>
+    <Description>A library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. C# port of extract-xiso (reference build 202609111233), extended with XboxKit archival (Redump video/filler/seed/wipe/trim/petrify/rebuild, ZAR) and xdvdfs packing (build-image, CISO). Supports RAW, GLOBAL, XGD1, XGD2, XGD3, and Hybrid disc layouts. Provides both synchronous and asynchronous APIs with cancellation support. Strong-named and trimmable, with an AOT-compatible library surface.</Description>
     <PackageTags>xiso;xbox;iso;extract-xiso;xdvdfs;xgd1;xgd2;xgd3;redump;ciso;xbe;xex;disc-image;original-xbox;xbox-360</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>

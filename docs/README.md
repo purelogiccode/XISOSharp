@@ -5,7 +5,7 @@
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
 
 **XISOSharp** is a pure C# implementation of [extract-xiso](https://github.com/XboxDev/extract-xiso)
-v2.7.1 — the tool and library for creating, extracting, listing, auditing, and rewriting
+build [`202609111233`](https://github.com/XboxDev/extract-xiso/releases/tag/build-202609111233) — the tool and library for creating, extracting, listing, auditing, and rewriting
 Xbox ISO (XISO / XDVDFS) disc images. It is a direct, byte-identical port of the original
 C codebase into idiomatic managed C# — no native dependencies, no P/Invoke.
 
@@ -104,7 +104,7 @@ See [Getting Started](getting-started.md) for details.
 | `XISOSharp.Tests` | xUnit test suite |
 | `XISOSharp.Benchmarks` | BenchmarkDotNet benchmarks (AVL tree, Boyer–Moore, sector math) |
 | `XISOSharpTester` | WPF GUI for batch regression testing against the reference C tool |
-| `References/` | Reference sources: `extract-xiso.c` v2.7.1 (plus `extract-xiso-build-202609111233`, same version + empty-dir rewrite fix), xdvdfs 0.8.3, XboxKit 0.7 |
+| `References/` | Reference sources: `extract-xiso` build `202609111233` (`extract-xiso.c`, same internal version 2.7.1, empty-dir rewrite fix), xdvdfs 0.8.3, XboxKit 0.7 |
 | `TestData/` | Fixtures used by tests and the output-comparison scripts |
 | `XISOSharp.Tests/Fixtures/` | Checked-in `test_fixture.iso` snapshot reference (see [Testing](testing.md#test-suite)) |
 

@@ -47,7 +47,7 @@ Highlights:
 | Snapshot (`Fixtures/test_fixture.iso` byte-identity; extract/rewrite SHA-256 per file) | `XisoSnapshotTests.cs` |
 | Corruption resilience (truncated tables, bad pointers, huge sizes, bad names, >4 GB) | `XisoCorruptionResilienceTests.cs` |
 | Reader gap-closers (multi-sector tables, disc probes, device errors, sentinels) | `XisoCoverageTests.cs` |
-| Legacy interop (extract-xiso 2.7.1 images via `llCompat` extract/list/rewrite) | `XisoLegacyInteropTests.cs` |
+| Legacy interop (reference extract-xiso legacy-layout images via `llCompat` extract/list/rewrite) | `XisoLegacyInteropTests.cs` |
 | In-place patching (replace/add, table moves, errors, backup, `.xbe`, `--copy-in` CLI) | `XisoPatcherTests.cs` |
 | Extraction robustness (truncation errors, file context, `--continue-on-error`, CLI) | `ExtractRobustnessTests.cs` |
 | XISO → ZAR conversion (extract round-trip, zstd ratio gate, reader hashes, `removeUpdate`, offsets, `zarchive.exe` interop) | `XisoZarConvertTests.cs` |
@@ -244,7 +244,7 @@ It targets Windows only and is not part of CI.
 ## The CLI battle harness
 
 `XISOSharp.BattleTests` is a console harness that pits the **XISOSharp CLI** against
-reference tools over real game dumps: the native **`extract-xiso.exe` v2.7.1**
+reference tools over real game dumps: the native **`extract-xiso.exe`** (reference build `202609111233`)
 (beside the harness), **`xdvdfs.exe` 0.8.3** (xdvdfs-parity features), and
 **`xboxkit.exe` 0.7** (XboxKit-parity archival features). It shells out to the
 executables — no in-process library calls — so it tests exactly what end users run:

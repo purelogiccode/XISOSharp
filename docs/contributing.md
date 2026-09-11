@@ -1,7 +1,7 @@
 # Contributing
 
 Thanks for considering a contribution! This project is a byte-faithful port of
-`extract-xiso.c` v2.7.1, and that goal shapes every rule below.
+`extract-xiso.c` (reference build `202609111233`), and that goal shapes every rule below.
 
 - [Workflow](#workflow)
 - [Code style](#code-style)
@@ -58,7 +58,7 @@ The original conversion followed a strict rule (from `ConversionPlan.md`):
 **never proceed to the next step without a 100% hash match** against the reference C
 tool. Preserve that spirit:
 
-- Output ISOs must stay **byte-identical** to `extract-xiso` v2.7.1 for the same input.
+- Output ISOs must stay **byte-identical** to `extract-xiso` (reference build `202609111233`) for the same input.
 - Do not "improve" AVL rebalancing or directory layout — the existing behavior is the
   compatibility contract.
 - When changing the reader, keep `llCompat` semantics intact (legacy vs. optimized

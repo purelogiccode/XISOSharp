@@ -36,7 +36,7 @@ XISOSharp join [--output <file>] <first.1.iso> [...]
 - Flags must precede positional arguments; the first non-flag token ends option parsing (except verbs above which are detected as first token).
 - Flags are matched exactly — combined shorts such as `-lr` are **not** supported.
 - An unknown flag is treated as a filename (it will then fail with an "open error"); a *known* flag in a filename slot fails fast with `must come before ISO filenames` (see [Misplaced flags](#misplaced-flags-upstream-61)).
-- `-h` prints help; `-v` prints the banner (`extract-xiso v2.7.1 (01.11.14)`); both exit 0. Help is `-h` ONLY — `--help` is treated as a filename (it will fail with an "open error"), never as help.
+- `-h` prints help; `-v` prints the banner (`XISOSharp v<version> for <platform> - https://github.com/purelogiccode/XISOSharp`); both exit 0. Help is `-h` ONLY — `--help` is treated as a filename (it will fail with an "open error"), never as help.
 - With no arguments at all, usage is printed and the tool exits 1. On an interactive
   double-click launch (Explorer, no redirection) the window additionally waits for a
   keypress (`Press any key to exit...`) instead of closing; scripts, pipes, and

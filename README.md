@@ -12,10 +12,10 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) fo
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 35+ extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1338 tests) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + extract-xiso 2.7.1 legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1338 tests) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
-| [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 3 of `H:\XBOXTest`, seeded): `extract-xiso.exe` v2.7.1 (`list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
+| [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 3 of `H:\XBOXTest`, seeded): `extract-xiso.exe` (reference build `202609111233`; `list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
 
 ## Documentation
 
@@ -443,9 +443,9 @@ Errors are typed: `XisoFormatException` (corrupt), `XisoEmptyException` (no file
 
 ## Comparison
 
-File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`extract-xiso.c`, incl. build `202609111233` with the empty-subdirectory rewrite fix), `XboxKit-0.7` (`LibXGD/`), `xdvdfs-0.8.3` (`xdvdfs-core`/`cli`). Single matrix (✅ native, 🟡 partial/opt-in, ❌ absent, — n/a):
+File-by-file against [`References/`](References/) — `extract-xiso` build `202609111233` (`extract-xiso.c`, same internal version 2.7.1, with the empty-subdirectory rewrite fix), `XboxKit-0.7` (`LibXGD/`), `xdvdfs-0.8.3` (`xdvdfs-core`/`cli`). Single matrix (✅ native, 🟡 partial/opt-in, ❌ absent, — n/a):
 
-| Capability | XISOSharp | `extract-xiso` v2.7.1 | XboxKit 0.7 | `xdvdfs` 0.8.3 |
+| Capability | XISOSharp | `extract-xiso` 202609111233 | XboxKit 0.7 | `xdvdfs` 0.8.3 |
 |---|:---:|:---:|:---:|:---:|
 | **Reading** | | | | |
 | Extract / Unpack | ✅ | ✅ | ✅ | ✅ |
@@ -526,7 +526,7 @@ File-by-file against [`References/`](References/) — `extract-xiso v2.7.1` (`ex
 | Batch `--batch` sorted + `--batch-recursive` | ✅ | 🟡 explicit args only | ❌ | 🟡 `checksum` multi |
 | Input==output safety guard (refuse `-o` onto input/`.old`/split part) | ✅ | — (no `-o` flag) | ❌ | ❌ (open #36) |
 | Quiet `-q` / silent `-Q` (`checksum --silent` → hex only) | ✅ | ✅ | 🟡 | ❌ |
-| Help `-h` ONLY (`--help` is a filename) / banner `-v` `2.7.1 (01.11.14)` | ✅ | ✅ | 🟡 `-h` only | 🟡 `clap` |
+| Help `-h` ONLY (`--help` is a filename) / banner `-v` `XISOSharp v<version>` | ✅ | ✅ | 🟡 `-h` only | 🟡 `clap` |
 | Exit `0`/`1` + `2` for `validate --strict` | ✅ | 🟡 `0`/`1` only | ❌ | ❌ |
 | **Extras** | | | | |
 | Extraction to dir | ✅ | ✅ | ✅ | ✅ |

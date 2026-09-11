@@ -24,7 +24,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Snapshot** — `Fixtures/test_fixture.iso`: deterministic create (`fileTime: 0`) is byte-identical across runs and to the reference; extract/rewrite round-trips match SHA-256 per file
 - **Corruption resilience** — truncated tables, manipulated header pointers, out-of-image extents, `uint.MaxValue` sizes, invalid filenames, >4 GB inputs fail fast with named errors
 - **Reader gap-closers** — multi-sector tables, disc-layout probes, block-device errors, sentinel shapes (line coverage: `XisoReader` 95.9%, `XisoWriter` 86.6%, `AvlTree` 100%)
-- **Legacy interop** — images created by reference extract-xiso 2.7.1 round-trip through `llCompat` extract/list/rewrite
+- **Legacy interop** — images created by the reference extract-xiso (legacy layout) round-trip through `llCompat` extract/list/rewrite
 - **File copier** — `XisoFileCopier.CopyExact` size matrix, truncation counts, short-read stitching, pooled buffers, mid-copy cancel, per-chunk `FileProgress` on copy-out/unpack
 - **Filesystem destinations** — `IFilesystem`/`LocalFilesystem`/`MemoryFilesystem` semantics, generic `UnpackImage` byte-parity with the legacy disk unpack, resume/continue-on-error/cancel/truncation through custom destinations
 - **Image explorer** — `XisoExplorer` load/navigate/copy-out/hash/XEX/path helpers over `.iso` and `.cso` (engine behind the Tester's Explore tab)

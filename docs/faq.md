@@ -12,7 +12,7 @@ simple, sector-based filesystem with an AVL-tree directory structure — see
 
 **Is XISOSharp a wrapper around the C tool?**
 
-No. It is a **pure C# port** of `extract-xiso.c` v2.7.1 — no native code, no P/Invoke.
+No. It is a **pure C# port** of `extract-xiso.c` (reference build `202609111233`) — no native code, no P/Invoke.
 The C sources under `References/` are used only for cross-checking during development.
 
 **Is the output byte-identical to the original extract-xiso?**
