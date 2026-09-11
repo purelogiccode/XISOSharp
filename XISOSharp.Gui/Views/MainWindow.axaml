@@ -4,6 +4,7 @@
         x:Class="XISOSharp.Gui.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="XISOSharp"
+        Icon="avares://XISOSharp.Gui/icon/icon.ico"
         Width="1020" Height="780" MinWidth="760" MinHeight="600"
         DragDrop.AllowDrop="True">
 

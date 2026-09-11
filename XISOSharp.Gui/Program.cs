@@ -98,8 +98,8 @@ internal sealed class Program
             string? resolved = CliLocator.Resolve(overridePath);
             if (resolved is null)
             {
-                Console.WriteLine("CLI not found (override, app folder, or PATH).");
-                Log.Warning("CLI probe: not found (override, app folder, or PATH)");
+                Console.WriteLine($"CLI ({CliLocator.CliFileName}) not found (override, app folder, or PATH).");
+                Log.Warning("CLI probe: {CliFile} not found (override, app folder, or PATH)", CliLocator.CliFileName);
                 return 1;
             }
 

@@ -14,6 +14,8 @@
     <RootNamespace>XISOSharp.Gui</RootNamespace>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Win32 exe icon, same file the CLI embeds (ignored on non-Windows RIDs). -->
+    <ApplicationIcon>icon\icon.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <!-- Single RID source of truth (matches publish-gui.ps1 defaults and
              docs/building.md): win-x64, win-arm64, linux-x64, linux-arm64,
@@ -40,6 +42,8 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <!-- Window/runtime icon (MainWindow Icon=avares://...); same art as the exe icon. -->
+    <AvaloniaResource Include="icon\icon.ico" />
   </ItemGroup>
 
   <ItemGroup>
@@ -56,6 +60,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
+    <!-- Build ordering only (no compile assets flow): guarantees the CLI is
+         built before StageCliBesideGui below copies it beside the GUI. -->
+    <ProjectReference Include="..\XISOSharp.Cli\XISOSharp.Cli.csproj" ReferenceOutputAssembly="false" />
     <PackageReference Include="Serilog" Version="4.4.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
@@ -98,5 +105,23 @@
     <Compile Include="..\XISOSharp.Cli\Logging\BugReportSink.cs" Link="Logging\BugReportSink.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\EnvironmentInfo.cs" Link="Logging\EnvironmentInfo.cs" />
   </ItemGroup>
+
+  <!-- Dev-loop convenience (best effort, never fails the build): stage the
+       CLI's shipped XISOSharp binary (plus its dll/runtimeconfig) beside the
+       GUI so the sibling lookup (CliLocator → XISOSharp(.exe), legacy
+       XISOSharp.Cli fallback) resolves from plain `dotnet build` output,
+       mirroring the bundle layouts. Every entry is Exists-guarded, so a
+       missing CLI build is a silent no-op, not a build break. -->
+  <Target Name="StageCliBesideGui" AfterTargets="Build">
+    <ItemGroup>
+      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.exe" Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.exe')" />
+      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp" Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp')" />
+      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli" Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli')" />
+      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.dll" Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.dll')" />
+      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.runtimeconfig.json" Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.runtimeconfig.json')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CliStageFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Exec Command="chmod +x &quot;$(OutDir)XISOSharp&quot;" Condition="Exists('$(OutDir)XISOSharp') and !$([MSBuild]::IsOSPlatform('Windows'))" ContinueOnError="true" />
+  </Target>
 
 </Project>

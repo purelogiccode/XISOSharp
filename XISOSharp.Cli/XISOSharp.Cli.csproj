@@ -52,19 +52,29 @@
           Condition="Exists('$(PublishDir)XISOSharp.Cli.pdb')" />
   </Target>
 
-  <!-- Every build also yields XISOSharp.exe beside the real output: a copy of
+  <!-- Every build also yields XISOSharp beside the real output: a copy of
        the XISOSharp.Cli apphost. The apphost embeds the path to
        XISOSharp.Cli.dll, so the alias runs the same app with no library-name
        collision — same spirit as the publish rename above, but for plain
        `dotnet build` output. (Flowing this alias to referencing projects via
        CopyToOutputDirectory items is unreliable: GetCopyToOutputDirectoryItems
        results are cached per instance before AfterBuild runs, so consumers
-       alias their own copy — see XISOSharp.BattleTests.csproj.) -->
+       alias their own copy — see XISOSharp.BattleTests.csproj.)
+       The extensionless Unix apphost gets the same alias so the GUI sibling
+       lookup (CliLocator → XISOSharp, XISOSharp.Cli fallback) resolves from
+       build output on every OS, mirroring the bundle layouts. -->
   <Target Name="AliasBuiltExeAsXisoSharp" AfterTargets="Build">
     <Copy SourceFiles="$(OutDir)XISOSharp.Cli.exe"
           DestinationFiles="$(OutDir)XISOSharp.exe"
           SkipUnchangedFiles="true"
           Condition="Exists('$(OutDir)XISOSharp.Cli.exe')" />
+    <Copy SourceFiles="$(OutDir)XISOSharp.Cli"
+          DestinationFiles="$(OutDir)XISOSharp"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(OutDir)XISOSharp.Cli')" />
+    <Exec Command="chmod +x &quot;$(OutDir)XISOSharp&quot;"
+          Condition="Exists('$(OutDir)XISOSharp') and !$([MSBuild]::IsOSPlatform('Windows'))"
+          ContinueOnError="true" />
   </Target>
 
   <ItemGroup>
