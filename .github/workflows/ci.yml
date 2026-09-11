@@ -1,0 +1,159 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+    # Version tags pack + publish the library to NuGet (`1.0.2` or `v1.0.2`).
+    tags: ['v*', '[0-9]*']
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+# Least privilege by default. The tag-only publish job pushes to nuget.org via
+# the `nuget` environment secret and needs no write access to this repository.
+permissions:
+  contents: read
+
+# Cancel superseded PR runs; never cancel a tag run that may be mid-publish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build-and-test:
+    name: build-and-test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      # Report every OS even when one fails.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # MinVer derives Version/InformationalVersion from git tags; a
+          # shallow clone reports the wrong version.
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.Build.props
+            global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        # Full solution. The WPF Tester compiles on Linux/macOS through
+        # EnableWindowsTargeting=true (it still only runs on Windows).
+        # -m:1 serializes project builds: XISOSharp.Gui stages the CLI via an
+        # out-of-band MSBuild call (BuildCliForStaging), and a parallel
+        # solution build can race writes to the CLI output.
+        run: dotnet build --no-restore --configuration Release -m:1
+
+      - name: Test
+        # Scoped to the test project (its lib/CLI/TestDataGenerator references
+        # build the needed closure); the solution build above already compiled
+        # the Windows-only Tester/GUI harnesses. Runs net8.0 + net9.0 + net10.0.
+        run: >-
+          dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj
+          --no-build --configuration Release
+          --collect:"XPlat Code Coverage"
+          --results-directory TestResults
+
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: TestResults/**/coverage.cobertura.xml
+          if-no-files-found: warn
+
+  pack:
+    name: pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.Build.props
+            global.json
+
+      - name: Restore
+        run: dotnet restore XISOSharp/XISOSharp.csproj
+
+      - name: Build library
+        run: dotnet build XISOSharp/XISOSharp.csproj --no-restore --configuration Release
+
+      - name: Pack
+        # The library is the only packable project. Strict package validation
+        # (EnablePackageValidation) runs as part of pack; .snupkg holds symbols.
+        run: dotnet pack XISOSharp/XISOSharp.csproj --no-build --configuration Release --output artifacts
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error
+
+  publish-nuget:
+    name: publish to NuGet
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: pack
+    # Tag pushes only; branch/PR runs stop at pack.
+    if: startsWith(github.ref, 'refs/tags/')
+    environment: nuget
+    steps:
+      # checkout supplies global.json for setup-dotnet.
+      - uses: actions/checkout@v4
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # --skip-duplicate makes re-runs safe (e.g. a manual push already landed).
+      - name: Push package
+        run: >-
+          dotnet nuget push ./artifacts/*.nupkg
+          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+      - name: Push symbols
+        run: >-
+          dotnet nuget push ./artifacts/*.snupkg
+          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
