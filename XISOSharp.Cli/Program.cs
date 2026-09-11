@@ -4,7 +4,7 @@ using System.Text;
 using Serilog;
 using XISOSharp.Cli.Logging;
 using XISOSharp.Models;
-using ZARSharp.Pipeline;
+using ZArchiveSharp.Pipeline;
 
 namespace XISOSharp.Cli;
 

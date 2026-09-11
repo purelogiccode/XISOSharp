@@ -91,7 +91,7 @@ XISOSharp --zar <input.iso|redump.iso> [output.zar]
 XISOSharp rebuild <game.zar> [video.iso] [filler|seed] [su...] -o <redump.iso>
 ```
 
-`XisoZarchive.CreateZar` — streams the XISO file tree straight into `ZARSharp.ZArchiveWriter`
+`XisoZarchive.CreateZar` — streams the XISO file tree straight into `ZArchiveSharp.ZArchiveWriter`
 (no intermediate directory): every 64 KiB block is compressed with the pure-C# zstd
 encoder (level 6 by default, `IZarBlockCompressor` overridable, raw fallback for
 incompressible blocks — all BCL-only, trimmable/AOT-safe). Output is byte-compatible

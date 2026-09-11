@@ -56,7 +56,7 @@
              references the project instead of linked-compiling the file, so new
              Generator sources always propagate. -->
     <ProjectReference Include="..\XISOSharp.TestDataGenerator\XISOSharp.TestDataGenerator.csproj" />
-    <!-- ZARSharp resolves transitively via XISOSharp lib (ProjectReference when
+    <!-- ZArchiveSharp resolves transitively via XISOSharp lib (ProjectReference when
              sibling checkout exists, NuGet fallback otherwise). No direct
              out-of-repo reference here. -->
   </ItemGroup>

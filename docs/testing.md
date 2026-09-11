@@ -14,7 +14,7 @@ reference-comparison scripts, and the benchmarks.
 ## Test suite
 
 The xUnit suite lives in `XISOSharp.Tests` (engine + CLI, targets: net8.0/net9.0/net10.0).
-`ZARSharp.Tests` (pure-C# ZArchive/zstd port) moved to the sibling
+`ZArchiveSharp.Tests` (pure-C# ZArchive/zstd port) moved to the sibling
 `../CSharp_ZARSharp` repo with its own solution and CI. Run the local suite with:
 
 ```bash
@@ -124,9 +124,9 @@ Parameters (all optional):
 
 `XISOSharp.Tests/CisoSplitInteropTests.cs` (split-CSO golden vectors vs the
 reference `xdvdfs-cli 0.8.3`) and (in the sibling `../CSharp_ZARSharp` repo)
-`ZARSharp.Tests/ZArchiveSharpTests.cs` (`zarchive.exe` both-directions interop) shell out to reference binaries that live
+`ZArchiveSharp.Tests/ZArchiveSharpTests.cs` (`zarchive.exe` both-directions interop) shell out to reference binaries that live
 in the gitignored `References/` folder (`References/xdvdfs-0.8.3/xdvdfs.exe`;
-the ZARSharp-side `zarchive.exe` now lives in the sibling `../CSharp_ZARSharp`
+the ZArchiveSharp-side `zarchive.exe` now lives in the sibling `../CSharp_ZARSharp`
 repo at `References/ZArchive-0.1.2/zarchive.exe`). The convention, mirroring the
 `zarchive.exe` pattern:
 
@@ -207,12 +207,12 @@ shapes neither writer emits.
 dotnet run --project XISOSharp.Benchmarks -c Release
 ```
 
-`ZARSharp.Benchmarks` (zstd L1/L6/L19 compress + decode, `.zar` pack/extract
+`ZArchiveSharp.Benchmarks` (zstd L1/L6/L19 compress + decode, `.zar` pack/extract
 over memory streams) moved with the library to the sibling `../CSharp_ZARSharp`
 repo — run it there:
 
 ```bash
-dotnet run --project ZARSharp.Benchmarks -c Release -- --filter *
+dotnet run --project ZArchiveSharp.Benchmarks -c Release -- --filter *
 ```
 
 ## The GUI regression tester

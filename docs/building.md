@@ -43,7 +43,7 @@ The solution contains:
 | `XISOSharp.Cli` | net8.0, net9.0, net10.0 (ships: net10.0) | `XISOSharp` executable |
 | `XISOSharp.Gui` | net10.0 | Avalonia GUI (shippable, shells out to the CLI) |
 | `XISOSharp.Tests` | net8.0, net9.0, net10.0 | xUnit test assembly (engine + CLI) |
-| `ZARSharp` / `ZARSharp.Tests` / `ZARSharp.Benchmarks` | — | **Moved** to the sibling `../CSharp_ZARSharp` repo (own solution); referenced here via a relative `ProjectReference` |
+| `ZArchiveSharp` / `ZArchiveSharp.Tests` / `ZArchiveSharp.Benchmarks` | — | **Moved** to the sibling `../CSharp_ZARSharp` repo (own solution); referenced here via a relative `ProjectReference` |
 | `XISOSharp.Benchmarks` | net10.0 | BenchmarkDotNet harness |
 | `XISOSharpTester` | net10.0-windows | WPF regression-test rig (Windows-only, runs from build output) |
 

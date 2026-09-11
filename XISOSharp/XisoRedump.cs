@@ -1,5 +1,5 @@
 using System.Text;
-using ZARSharp;
+using ZArchiveSharp;
 
 namespace XISOSharp;
 
@@ -670,7 +670,7 @@ public static class XisoRedump
     private static List<string> ExtractZarTree(ZArchiveReader reader, string outputDir,
         CancellationToken cancellationToken) =>
         // Shared engine: same walk, same files, same errors as before.
-        ZARSharp.Pipeline.ZarPackEngine
+        ZArchiveSharp.Pipeline.ZarPackEngine
             .ExtractOpen(reader, outputDir, outputDir, null, null, cancellationToken).ToList();
 
     private static bool HasXisoMagic(string path)

@@ -1,12 +1,12 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using XISOSharp.TestDataGenerator;
-using ZARSharp;
+using ZArchiveSharp;
 
 namespace XISOSharp.Tests;
 
 /// <summary>
-/// End-to-end tests for <see cref="XisoZarchive.CreateZar(string, string?, long, bool, CancellationToken, ZARSharp.IZarBlockCompressor?, IProgress{ZARSharp.Pipeline.ZarProgress}?)"/>:
+/// End-to-end tests for <see cref="XisoZarchive.CreateZar(string, string?, long, bool, CancellationToken, ZArchiveSharp.IZarBlockCompressor?, IProgress{ZArchiveSharp.Pipeline.ZarProgress}?)"/>:
 /// XISO → .zar conversion packs the image tree with real zstd blocks, so the
 /// output must round-trip through <see cref="ZArchiveTool"/> and the reference
 /// <c>zarchive.exe</c>, and must compress (not just store raw).
@@ -257,7 +257,7 @@ public sealed class XisoZarConvertTests : IDisposable
     [RequiresOracleFact(OracleKind.Zarchive)]
     public void Interop_ReferenceExeExtractsOurZar()
     {
-        // zarchive.exe moved with ZARSharp to the sibling CSharp_ZARSharp repo.
+        // zarchive.exe moved with ZArchiveSharp to the sibling CSharp_ZARSharp repo.
         string exe = Path.Combine(SolutionRoot(), "..", "CSharp_ZARSharp", "References", "ZArchive-0.1.2", "zarchive.exe");
         Assert.True(File.Exists(exe), "Missing reference oracle 'Zarchive'.");
 

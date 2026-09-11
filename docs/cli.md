@@ -78,7 +78,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--trim` | **Redump:** truncate after last file extent (`ranges[^1].End+1 * SectorSize`); writes `*.trim.xiso`. See [Archival](archival.md#trim). |
 | `--petrify` | **Redump:** skeleton — XISO with file extents zeroed + SHA-1 per file (`XisoSkeleton.Petrify`, `CollectFileEntries` sorted); writes skeleton + `*.hash`. See [Archival](archival.md#petrify). |
 | `--update` | **Redump:** extract system update `su20076000_00000000` from XGD3 video `L1` tail (`XisoRedump.TryExtractUpdate`, `FindUpdateOffset` `ABCDABCD`); warns on XGD1/2. See [Archival](archival.md#update). |
-| `--zar` | Create ZArchive/zstd (`XisoZarchive.CreateZar` → `ZARSharp.ZArchiveWriter`, L6 blocks + raw fallback; standalone `--zar <iso> [out.zar]` or Redump-batch zar of the XISO component). Load the result directly in Xenia canary. See [Archival](archival.md#zar). |
+| `--zar` | Create ZArchive/zstd (`XisoZarchive.CreateZar` → `ZArchiveSharp.ZArchiveWriter`, L6 blocks + raw fallback; standalone `--zar <iso> [out.zar]` or Redump-batch zar of the XISO component). Load the result directly in Xenia canary. See [Archival](archival.md#zar). |
 | `--jobs <n>` | With a lone `--zar` over several inputs, pack up to `<n>` archives in parallel (default `1`). |
 | `--policy <p>` | `--zar` overwrite handling without prompting: `skip` \| `overwrite` \| `auto-rename`. |
 | `--all` | Alias: `--random --seed --trim --update --video --wipe` (→ `--xiso` as batch). Mirrors XboxKit `-a`. |

@@ -1,4 +1,4 @@
-using ZARSharp;
+using ZArchiveSharp;
 
 namespace XISOSharp.Tests;
 

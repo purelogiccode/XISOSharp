@@ -2,7 +2,7 @@
 
 Pure-managed **CISO** (Compressed ISO) writer/reader with BCL DEFLATE (version 1) + LZ4 (version 2) — port of xdvdfs `ciso` crate (`SectorLinearBlockDevice` + `CisoSectorInput` → `ciso::write::write_ciso_image` + `SplitOutput`), including split `.1.cso`/`.2.cso`… output and input (`ciso::split` parity).
 
-Also covered here: **ZAR/ZArchive block compression** (`ZARSharp`, pure-C# zstd) — see [ZArchive / zstd block compression](#zarchive--zstd-block-compression).
+Also covered here: **ZAR/ZArchive block compression** (`ZArchiveSharp`, pure-C# zstd) — see [ZArchive / zstd block compression](#zarchive--zstd-block-compression).
 
 - [Format](#format)
 - [CISO v2 (LZ4) writer](#ciso-v2-lz4-writer)
@@ -196,7 +196,7 @@ XISOSharp checksum source.iso rebuilt.iso --silent  # hex match
 
 ## ZArchive / zstd block compression
 
-`ZARSharp` packs directories into `.zar` archives (ZArchive 0.1.2 format),
+`ZArchiveSharp` packs directories into `.zar` archives (ZArchive 0.1.2 format),
 compressing every 64 KiB block with a dependency-free pure-C# zstd encoder
 (RFC 8878), level 6 by default — the same rule as upstream
 `src/zarchivewriter.cpp::StoreBlock` (`ZSTD_compress(..., 6)`, store raw when
@@ -218,7 +218,7 @@ byte[] frame = c.CompressBlock(data);
 - **Ratio**: within ~1% of native libzstd at the same level on text-like input
   (measured: 64 KiB source blob L6 2573 B vs native 2572 B); incompressible
   blocks are stored raw with zero expansion beyond the frame header.
-- **Interop**: archives written by `ZARSharp` open in `zarchive.exe` and vice
+- **Interop**: archives written by `ZArchiveSharp` open in `zarchive.exe` and vice
   versa; raw frames additionally decode with native `zstd -d`.
 - **Limits**: single-shot 64 KiB blocks only; no dictionaries, legacy frames,
   multithreading, or streaming API. Decoder caps default to 512 MiB window /

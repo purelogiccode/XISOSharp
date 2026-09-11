@@ -67,20 +67,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- ZARSharp lives in the sibling CSharp_ZARSharp repo (separate solution).
+    <!-- ZArchiveSharp lives in the sibling CSharp_ZARSharp repo (separate solution).
              Local dev: side-by-side checkout (..\CSharp_ZARSharp) wins.
-             Clean clone / CI without the sibling: fall back to the ZARSharp NuGet
-             package (publish ZARSharp to NuGet first). -->
-    <ProjectReference Include="..\..\CSharp_ZARSharp\ZARSharp\ZARSharp.csproj"
-                      Condition="Exists('..\..\CSharp_ZARSharp\ZARSharp\ZARSharp.csproj')" />
-    <PackageReference Include="ZARSharp"
-                      Condition="!Exists('..\..\CSharp_ZARSharp\ZARSharp\ZARSharp.csproj')" />
+             Clean clone / CI without the sibling: fall back to the ZArchiveSharp NuGet
+             package (publish ZArchiveSharp to NuGet first). -->
+    <ProjectReference Include="..\..\CSharp_ZARSharp\ZArchiveSharp\ZArchiveSharp.csproj"
+                      Condition="Exists('..\..\CSharp_ZARSharp\ZArchiveSharp\ZArchiveSharp.csproj')" />
+    <PackageReference Include="ZArchiveSharp"
+                      Condition="!Exists('..\..\CSharp_ZARSharp\ZArchiveSharp\ZArchiveSharp.csproj')" />
   </ItemGroup>
 
   <Target Name="CheckZarSharpSource" BeforeTargets="CollectPackageReferences"
-          Condition="!Exists('..\..\CSharp_ZARSharp\ZARSharp\ZARSharp.csproj')">
+          Condition="!Exists('..\..\CSharp_ZARSharp\ZArchiveSharp\ZArchiveSharp.csproj')">
     <Warning
-      Text="Sibling CSharp_ZARSharp checkout not found; falling back to the ZARSharp NuGet package (version from Directory.Packages.props). For local dev, clone the sibling repo side-by-side with this one." />
+      Text="Sibling CSharp_ZARSharp checkout not found; falling back to the ZArchiveSharp NuGet package (version from Directory.Packages.props). For local dev, clone the sibling repo side-by-side with this one." />
   </Target>
 
   <!-- Source Link + versioning (package versions centralized in
