@@ -69,17 +69,28 @@ public static class XisoChecksum
 
         CollectFileTree(dev, dirStart, rootSize, discLseek, "", map, ct);
 
-        // SHA3-256 over sorted map
-        using IncrementalHash hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA3_256);
-        // For older runtimes fallback: SHA3_256.Create()
-        // IncrementalHash works on net8+.
+        // SHA3-256 over sorted map. Prefer the BCL (native CNG/OpenSSL speed)
+        // when the OS supports it; otherwise use the pure-managed fallback
+        // (Windows 10 CNG and OpenSSL 1.x throw PlatformNotSupportedException).
+        // Both are NIST FIPS 202, so digests are identical everywhere.
+        using IncrementalHash? nativeHasher = SHA3_256.IsSupported
+            ? IncrementalHash.CreateHash(HashAlgorithmName.SHA3_256)
+            : null;
+        using Sha3256? managedHasher = nativeHasher == null ? new Sha3256() : null;
 
         foreach (KeyValuePair<string, (bool IsDir, long Offset, uint Size)> kv in map)
         {
             ct.ThrowIfCancellationRequested();
             string path = kv.Key; // already "/name" or "/dir/file"
             byte[] pathBytes = Encoding.UTF8.GetBytes(path);
-            hasher.AppendData(pathBytes);
+            if (nativeHasher != null)
+            {
+                nativeHasher.AppendData(pathBytes);
+            }
+            else
+            {
+                managedHasher!.AppendData(pathBytes);
+            }
 
             (bool IsDir, long Offset, uint Size) entry = kv.Value;
             if (!entry.IsDir && entry.Size > 0)
@@ -94,7 +105,15 @@ public static class XisoChecksum
                     int toRead = (int)Math.Min(buf.Length, remaining);
                     int n = dev.Read(fileOffset + consumed, buf.AsSpan(0, toRead));
                     if (n == 0) break;
-                    hasher.AppendData(buf, 0, n);
+                    if (nativeHasher != null)
+                    {
+                        nativeHasher.AppendData(buf, 0, n);
+                    }
+                    else
+                    {
+                        managedHasher!.AppendData(buf, 0, n);
+                    }
+
                     consumed += n;
                     remaining -= n;
                 }
@@ -107,7 +126,7 @@ public static class XisoChecksum
             }
         }
 
-        return hasher.GetHashAndReset();
+        return nativeHasher != null ? nativeHasher.GetHashAndReset() : managedHasher!.GetHashAndReset();
     }
 
     /// <summary>Returns the hex (lowercase) representation of the checksum.</summary>
