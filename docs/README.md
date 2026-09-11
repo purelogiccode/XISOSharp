@@ -52,6 +52,7 @@ The site is rendered with **Docsify** — a fixed **left sidebar** is provided b
 | [Testing](testing.md) | Test suite, TestData, reference-tool comparison, benchmarks, BattleTests |
 | [Contributing](contributing.md) | Contribution workflow, code style, PR guidelines |
 | [Troubleshooting](troubleshooting.md) | Common errors and how to resolve them |
+| [Release Notes](release-notes.md) | What changed in each release |
 
 ---
 

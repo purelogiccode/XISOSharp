@@ -26,3 +26,4 @@
   - [Testing](testing.md)
   - [Contributing](contributing.md)
   - [Troubleshooting](troubleshooting.md)
+  - [Release Notes](release-notes.md)
