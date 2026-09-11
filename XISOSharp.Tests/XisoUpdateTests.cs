@@ -78,12 +78,12 @@ public class XisoUpdateTests : IDisposable
         Assert.Equal(expected, UpdateChecker.MapRid(OSPlatform.Create(platform), architecture));
 
     [Fact]
-    public void AssetName_FollowsReleaseConvention() =>
-        Assert.Equal("release_1.0.0_win-x64.zip", UpdateChecker.AssetName("1.0.0", "win-x64"));
+    public void BuildAssetName_FollowsReleaseConvention() =>
+        Assert.Equal("release_1.0.0_win-x64.zip", UpdateChecker.BuildAssetName("1.0.0", "win-x64"));
 
     [Fact]
-    public void AssetName_StripsLeadingV() =>
-        Assert.Equal("release_1.0.0_MacOsX-arm64.zip", UpdateChecker.AssetName("v1.0.0", "MacOsX-arm64"));
+    public void BuildAssetName_StripsLeadingV() =>
+        Assert.Equal("release_1.0.0_MacOsX-arm64.zip", UpdateChecker.BuildAssetName("v1.0.0", "MacOsX-arm64"));
 
     private static JsonElement ReleasePayload() =>
         JsonDocument.Parse("""

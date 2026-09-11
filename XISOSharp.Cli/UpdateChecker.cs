@@ -141,7 +141,7 @@ internal static class UpdateChecker
     /// (<c>release_1.0.0_win-x64.zip</c>). A leading <c>v</c> on the tag is
     /// stripped to match the convention.
     /// </summary>
-    internal static string AssetName(string tag, string rid) =>
+    internal static string BuildAssetName(string tag, string rid) =>
         $"release_{tag.TrimStart('v', 'V')}_{rid}.zip";
 
     /// <summary>
@@ -153,8 +153,8 @@ internal static class UpdateChecker
     /// </summary>
     internal static bool IsUpdateAvailable(string? localVersion, string? remoteTag)
     {
-        if (!TryParseVersion(localVersion, out Version? localCore, out bool localPre) ||
-            !TryParseVersion(remoteTag, out Version? remoteCore, out bool remotePre))
+        if (!TryParseVersion(localVersion, out Version localCore, out bool localPre) ||
+            !TryParseVersion(remoteTag, out Version remoteCore, out bool remotePre))
         {
             return false;
         }
@@ -203,7 +203,7 @@ internal static class UpdateChecker
     {
         try
         {
-            string expected = AssetName(tag, rid);
+            string expected = BuildAssetName(tag, rid);
             if (!release.TryGetProperty("assets", out JsonElement assets) ||
                 assets.ValueKind != JsonValueKind.Array)
             {
@@ -315,16 +315,17 @@ internal static class UpdateChecker
     }
 
     private static string Escape(string value) =>
-        value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
+        value.Replace("\\", @"\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
 
     private static ReleaseInfo? FetchLatest(string cachePath)
     {
         try
         {
-            using System.Net.Http.HttpClient http = new() { Timeout = HttpTimeout };
+            using HttpClient http = new();
+            http.Timeout = HttpTimeout;
             http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
             http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-            using System.Net.Http.HttpResponseMessage response =
+            using HttpResponseMessage response =
                 http.GetAsync(LatestReleaseUrl).GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
             {
@@ -345,7 +346,7 @@ internal static class UpdateChecker
                 return null;
 
             string? rid = MapCurrentRid();
-            string? assetName = rid is null ? null : AssetName(tag, rid);
+            string? assetName = rid is null ? null : BuildAssetName(tag, rid);
             string? assetUrl = rid is null ? null : FindAssetUrl(root, tag, rid);
             ReleaseInfo info = new(DateTime.UtcNow, tag, url, assetName, assetUrl);
             WriteCache(cachePath, info);
