@@ -212,8 +212,8 @@ public library surface. Core algorithms are unchanged.
 
 **Where can I report bugs or request features?**
 
-Open an issue on the repository. Feature ideas are tracked in
-[`ProposedEnhancements.md`](../ProposedEnhancements.md).
+Open an issue on the repository. The open research epics are listed under
+[Areas to contribute](contributing.md#areas-to-contribute).
 
 See also: [Getting Started](getting-started.md) · [CLI Reference](cli.md) ·
 [Troubleshooting](troubleshooting.md)

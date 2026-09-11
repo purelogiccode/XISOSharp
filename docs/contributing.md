@@ -68,8 +68,7 @@ tool. Preserve that spirit:
 
 ## Areas to contribute
 
-Good starting points (see [`ProposedEnhancements.md`](../ProposedEnhancements.md) for
-the tracked backlog):
+Good starting points (the open research epics are tracked below):
 
 - Open research epics only (repair/salvage are DONE): GOD/STFS/CON
   (Xbox 360 Games-on-Demand containers) read/write and XRD Redump metadata
@@ -82,4 +81,4 @@ the tracked backlog):
 - Batch-script edge cases for `-d` on Windows.
 
 See also: [Building](building.md) · [Testing](testing.md) ·
-[Troubleshooting](troubleshooting.md) · [Proposed Enhancements](../ProposedEnhancements.md)
+[Troubleshooting](troubleshooting.md)
