@@ -44,6 +44,18 @@ public class CliHelpFlagTests : IDisposable
     }
 
     [Fact]
+    public void Cli_Version_ShortFlag_PrintsXisoSharpBanner()
+    {
+        int rc = Program.Main(["-v"]);
+
+        Assert.Equal(0, rc);
+        string outText = _outCapture.ToString();
+        Assert.StartsWith("XISOSharp v", outText, StringComparison.Ordinal);
+        Assert.DoesNotContain("extract-xiso", outText, StringComparison.Ordinal);
+        Assert.Matches(@"^XISOSharp v\S+ for (win|linux|macos|cross-platform)", outText.TrimEnd());
+    }
+
+    [Fact]
     public void Cli_Help_LongFlag_PrintsUsageAndExitsZero()
     {
         int rc = Program.Main(["--help"]);

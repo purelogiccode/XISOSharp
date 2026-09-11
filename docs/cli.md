@@ -483,7 +483,7 @@ XISOSharp --checksum game.iso
 
 ## Notes
 
-- The banner is `extract-xiso v2.7.1 (01.11.14) for <win|linux|macos|cross-platform> - written by in <in@fishtank.com>`.
+- The banner is `XISOSharp v<version> for <win|linux|macos|cross-platform> - https://github.com/purelogiccode/XISOSharp` (version from the MinVer build stamp, `+build` metadata trimmed).
 - `-v` prints the banner to stdout even under `-Q`; usage (`-h`) goes to stderr and is
   never suppressed by quiet modes.
 - Info/hash/copy-out/copy-in/audit/validate/checksum/filetime dispatch happens **before** the batch loop, so those

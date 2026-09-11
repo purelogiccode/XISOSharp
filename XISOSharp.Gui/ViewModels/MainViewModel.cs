@@ -305,19 +305,23 @@ internal sealed partial class MainViewModel : ObservableObject
 
             CliPath = resolved;
             AppendLog($"[GUI] Using CLI: {resolved}");
-            string? version =
+            string? banner =
                 await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
-            string status = version is null ? $"Found but -v failed: {resolved}" : $"Ready — {version}";
-            SetOnUi(() => CliStatus = status);
-            AppendLog(version is null ? "[GUI] CLI -v probe failed." : $"[GUI] {version}");
-            if (version is null)
+            if (banner is null)
             {
+                SetOnUi(() => CliStatus = $"Found but -v failed: {resolved}");
+                AppendLog("[GUI] CLI -v probe failed.");
                 Log.Warning("CLI -v probe failed for {Cli}", resolved);
+                return;
             }
-            else
-            {
-                Log.Information("CLI ready: {Cli} ({Version})", resolved, version);
-            }
+
+            // Probe with -v for validation; display the product label read from
+            // the CLI binary's version metadata for stable, branded status text.
+            string label = CliLocator.ProductLabel(resolved);
+            SetOnUi(() => CliStatus = $"Ready — {label}");
+            AppendLog($"[GUI] {label} ready.");
+            Log.Information("CLI ready: {Cli} ({Label})", resolved, label);
+            Log.Debug("CLI -v banner: {Banner}", banner);
         }
         catch (Exception ex)
         {

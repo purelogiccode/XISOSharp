@@ -1,4 +1,6 @@
-﻿namespace XISOSharp;
+﻿using System.Reflection;
+
+namespace XISOSharp;
 
 /// <summary>
 /// All constants for XISO image processing, including magic numbers, sector sizes,
@@ -207,7 +209,10 @@ public static class Constants
     /// <returns>Attribute byte with reserved bits cleared.</returns>
     public static byte MaskAttributes(byte attrs) => (byte)(attrs & AttributeValidMask);
 
-    /// <summary>Version string reported by the tool and written into the optimized tag.</summary>
+    /// <summary>
+    /// extract-xiso baseline version this port tracks. Kept for source
+    /// provenance/parity references; no longer printed by the banner.
+    /// </summary>
     public const string ExisoVersion = "2.7.1 (01.11.14)";
 
     /// <summary>Length of the version string.</summary>
@@ -221,7 +226,36 @@ public static class Constants
             string platform = OperatingSystem.IsWindows() ? "win" :
                 OperatingSystem.IsLinux() ? "linux" :
                 OperatingSystem.IsMacOS() ? "macos" : "cross-platform";
-            return $"extract-xiso v{ExisoVersion} for {platform} - written by in <in@fishtank.com>\n";
+            return $"XISOSharp v{ProductVersion} for {platform} - https://github.com/purelogiccode/XISOSharp\n";
+        }
+    }
+
+    /// <summary>
+    /// Gets the XISOSharp product version from this assembly's informational
+    /// version (MinVer), trimming any <c>+build</c> metadata. Untagged builds
+    /// report the prerelease form (e.g. <c>1.0.2-alpha.0.10</c>).
+    /// </summary>
+    private static string ProductVersion
+    {
+        get
+        {
+            try
+            {
+                string? info = typeof(Constants).Assembly
+                    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+                if (!string.IsNullOrWhiteSpace(info))
+                {
+                    int plus = info.IndexOf('+', StringComparison.Ordinal);
+                    return (plus >= 0 ? info[..plus] : info).Trim();
+                }
+
+                Version? version = typeof(Constants).Assembly.GetName().Version;
+                return version is null ? "unknown" : version.ToString(3);
+            }
+            catch
+            {
+                return "unknown";
+            }
         }
     }
 

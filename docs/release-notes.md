@@ -1,5 +1,92 @@
 # Release Notes
 
+## 1.0.2
+
+Release tag [`1.0.2`](https://github.com/purelogiccode/XISOSharp/releases).
+Targets remain `net8.0` / `net9.0` / `net10.0`; full suite green on all three
+(1338 tests: 1334 passed, 4 pre-existing skips, 0 failed).
+
+### CLI
+
+#### `-v` banner is XISOSharp-branded
+
+`-v` (and the usage header) now prints
+`XISOSharp v<version> for <win|linux|macos|cross-platform> - https://github.com/purelogiccode/XISOSharp`
+instead of the `extract-xiso` compatibility line. The version is the MinVer
+build stamp with `+build` metadata trimmed, so it matches the package/assembly
+version. `Constants.ExisoVersion` is kept for provenance and the on-disk
+optimized tag (`in!xiso!2.7.1 (01.11.14)`) is unchanged, so image compatibility
+is unaffected. The extract-xiso BSD-4-clause acknowledgement remains in the
+shipped `LICENSE`.
+
+#### Automatic update check
+
+Every interactive launch compares the running version against the latest
+GitHub release — at most one request per 24 hours, cached at
+`%LocalAppData%/XISOSharp/update-check.json`. A newer release prints an
+`[UPDATE]` notice with the release page and the matching
+`release_<version>_<rid>.zip` asset, and on an interactive console you are
+offered to open the release page in your browser. The check is skipped for
+`-q`/`-Q`/`-v` runs and test hosts, never fails the run, and can be disabled
+with `XISO_NO_UPDATE_CHECK=1`.
+
+#### New inspection verbs
+
+`--sector-layout` (volume summary, per-file extents, used/free ranges),
+`--ranges` (system/bone vs file sector ranges), and `--is-optimized`
+(optimized-tag probe, `--skip-sectors` aware).
+
+#### Interactive launch pause
+
+Double-clicking `XISOSharp.exe` with no arguments prints usage and waits for a
+keypress instead of closing the console window. Scripts, pipes, test hosts, and
+`XISO_NO_PAUSE=1` are never blocked.
+
+#### Warning+ logs forwarded to the bug-report service
+
+The shared Serilog pipeline in the CLI, GUI, and Tester forwards
+Warning-and-above events to the bug-report API with environment, error, and
+exception sections; opt out with `XISO_DISABLE_BUGREPORT=1`.
+
+### GUI (Avalonia)
+
+- **CLI discovery fix for single-file bundles**: `ToolLocator` now also probes
+  the directory of the real executable (`Environment.ProcessPath`) after
+  `AppContext.BaseDirectory`, since self-extracting bundles run from
+  `%TEMP%\.net\...`. This resolves the "CLI not found" state when the GUI runs
+  from a published bundle.
+- The legacy `XISOSharp.Cli` file-name fallback was removed; resolution is
+  `XISOSharp(.exe)` only.
+- Status bar and log show a branded product label (`XISOSharp <version>`) read
+  from the CLI binary's version metadata instead of echoing the `-v` banner.
+- The app icon is embedded in both the executable and the window.
+- Framework-dependent publish builds and stages the CLI beside the GUI
+  automatically (previous attempts failed with `NETSDK1151`).
+
+### Library
+
+- `ToolLocator` is now the shared resolver/probe used by the GUI, Tester, and
+  BattleTests: explicit override → app directory → process directory → `PATH`,
+  with a bounded, tree-killed `-v` probe via `ProcessRunner`, plus a new
+  `ToolLocatorTests` suite.
+- `Constants.Banner` reports the XISOSharp product version; the extract-xiso
+  baseline constant is retained for provenance.
+
+### Repository & docs
+
+- GitHub Pages publishes the Docsify documentation, and a workflow syncs the
+  wiki (sidebar included).
+- `LICENSE` now carries the full third-party notices (extract-xiso BSD-4-clause,
+  xdvdfs, XboxKit, ZArchiveSharp); distributed bundles include `LICENSE` and
+  `README.md`.
+- Docs and readmes refreshed for the branded banner, the new inspection verbs,
+  update checks, the GUI bundle layout, and the shared tool locator.
+
+### Dependencies
+
+No library dependency changes: `ZArchiveSharp` stays at 1.0.2, analyzer/Roslynator
+versions are unchanged from 1.0.1.
+
 ## 1.0.1
 
 Release tag [`1.0.1`](https://github.com/purelogiccode/XISOSharp/releases).

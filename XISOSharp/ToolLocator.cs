@@ -36,16 +36,51 @@ public static class ToolLocator
             }
 
             string fileName = OperatingSystem.IsWindows() ? windowsFileName : unixFileName;
+
+            // Published single-file bundles with IncludeAllContentForSelfExtract
+            // run from a %TEMP%\.net extraction directory, so AppContext.BaseDirectory
+            // is NOT where the shipped binaries sit. The real app directory comes
+            // from the process executable, which is checked as a second sibling
+            // location (the common non-bundled case resolves either way).
             string sibling = Path.Combine(AppContext.BaseDirectory, fileName);
             if (File.Exists(sibling))
             {
                 return sibling;
             }
 
+            string? processDirectory = GetProcessDirectory();
+            if (processDirectory is not null)
+            {
+                sibling = Path.Combine(processDirectory, fileName);
+                if (File.Exists(sibling))
+                {
+                    return sibling;
+                }
+            }
+
             return FindOnPath(fileName);
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException
                                        or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the directory of the running executable
+    /// (<see cref="Environment.ProcessPath"/>), or <c>null</c> when unavailable.
+    /// For single-file published bundles this is the directory the user launched,
+    /// unlike <see cref="AppContext.BaseDirectory"/> (the extraction directory).
+    /// </summary>
+    private static string? GetProcessDirectory()
+    {
+        try
+        {
+            string? processPath = Environment.ProcessPath;
+            return string.IsNullOrWhiteSpace(processPath) ? null : Path.GetDirectoryName(processPath);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
             return null;
         }

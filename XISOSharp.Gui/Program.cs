@@ -104,17 +104,19 @@ internal sealed class Program
             }
 
             Console.WriteLine($"CLI: {resolved}");
-            string? version =
+            string? banner =
                 await CliLocator.ProbeVersionAsync(resolved, CancellationToken.None).ConfigureAwait(false);
-            if (version is null)
+            if (banner is null)
             {
                 Console.WriteLine("CLI -v probe failed.");
                 Log.Warning("CLI -v probe failed for {Cli}", resolved);
                 return 1;
             }
 
-            Console.WriteLine($"Version: {version}");
-            Log.Information("CLI probe OK: {Cli} ({Version})", resolved, version);
+            // Print the product label read from the CLI binary's own metadata.
+            string label = CliLocator.ProductLabel(resolved);
+            Console.WriteLine(label);
+            Log.Information("CLI probe OK: {Cli} ({Label})", resolved, label);
             return 0;
         }
         catch (Exception ex)

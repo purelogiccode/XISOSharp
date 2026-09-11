@@ -56,7 +56,7 @@ XISOSharp -d ./extracted game.iso
 - `game.iso` — any XISO image; GLOBAL/XGD2/XGD3/XGD1 formats are detected automatically
 
 ```text
-extract-xiso v2.7.1 (01.11.14) for win - written by in <in@fishtank.com>
+XISOSharp v1.0.2 for win - https://github.com/purelogiccode/XISOSharp
 
 extracting game.iso:
 

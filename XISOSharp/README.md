@@ -56,6 +56,8 @@ dotnet add package XISOSharp
 
 The package is strong-name signed and includes XML documentation, Source Link for debugging, and `.snupkg` symbol packages for all target frameworks.
 
+Release history: [Release Notes](https://github.com/purelogiccode/XISOSharp/blob/master/docs/release-notes.md) · [What's New](https://github.com/purelogiccode/XISOSharp/blob/master/WhatsNew.md).
+
 ---
 
 ## Supported Disc Formats
@@ -752,6 +754,8 @@ Key constants include:
 | `Xgd3LseekOffset` | `0x02080000` | Sector offset for XGD3 layout |
 | `Xgd1LseekOffset` | `0x18300000` | Sector offset for XGD1 layout |
 | `ReadWriteBufferSize` | `0x00200000` | 2 MB buffer for file copy operations |
+| `ExisoVersion` | `"2.7.1 (01.11.14)"` | extract-xiso baseline this port tracks (provenance only; not printed) |
+| `Banner` | — | Startup banner: XISOSharp product version (MinVer stamp) + platform + repository URL |
 | `NumSectors(uint size)` | — | Computes the number of sectors required to hold `size` bytes |
 
 ---

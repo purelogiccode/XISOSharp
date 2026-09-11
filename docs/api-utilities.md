@@ -178,9 +178,9 @@ writes the current Windows FILETIME (8 bytes, little-endian) into the header are
 | `EmptyDirectorySentinel` | `0xFFFF` and `0x0000` + 12-byte `0x00` header (`IsEmptyDirectoryHeader`, `xdvdfs` compat) |
 | `MediaEnable` / `MediaEnableByte` | `E8 CA FD FF FF 85 C0 7D` / `0xEB` (`Length 8`, overlap `7`) |
 | `CisoMagic` / `Ciso*` | `CISO` / `BlockSize 2048` / `HeaderSize 24` / `VersionDeflate 1` `0x80000000` vs `VersionLz4 2` / `align` 0/1/2 / `CompressionSavingThreshold 12` |
-| `ExisoVersion` | `"2.7.1 (01.11.14)"` |
+| `ExisoVersion` | `"2.7.1 (01.11.14)"` — extract-xiso baseline this port tracks (provenance only; not printed) |
 | `NumSectors(uint size)` | Ceiling sector count |
-| `Banner` | `extract-xiso v2.7.1 (01.11.14) for <os> - written by in <in@fishtank.com>` (`OperatingSystem.Is*()`) |
+| `Banner` | `XISOSharp v<version> for <os> - https://github.com/purelogiccode/XISOSharp` (`OperatingSystem.Is*()`; version from the assembly informational version) |
 
 ## XisoValidator
 

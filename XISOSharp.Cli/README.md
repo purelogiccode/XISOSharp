@@ -36,9 +36,9 @@ a stderr notice with the release URL and the matching platform asset
 interactive console you are offered to open the release page in your browser.
 
 ```text
-[UPDATE] XISOSharp 1.0.2 is available (you have 1.0.1).
-[UPDATE] Download: https://github.com/purelogiccode/XISOSharp/releases/download/1.0.2/release_1.0.2_win-x64.zip
-[UPDATE] Release notes: https://github.com/purelogiccode/XISOSharp/releases/tag/1.0.2
+[UPDATE] XISOSharp 1.0.3 is available (you have 1.0.2).
+[UPDATE] Download: https://github.com/purelogiccode/XISOSharp/releases/download/1.0.3/release_1.0.3_win-x64.zip
+[UPDATE] Release notes: https://github.com/purelogiccode/XISOSharp/releases/tag/1.0.3
 Open the release page in your browser now? [y/N]:
 ```
 
