@@ -119,6 +119,9 @@ XISOSharp --copy-in game.iso ./my-config.ini /config.ini  # patch one file in (k
 XISOSharp --md5 game.iso                 # or --sha256
 XISOSharp --xex-info game360.iso /default.xex
 XISOSharp --xbe-info game.iso /default.xbe  # title ID/name, media, region
+XISOSharp --sector-layout game.iso          # full sector map (extents, used/free ranges)
+XISOSharp --ranges game.iso                 # system vs file sector spans
+XISOSharp --is-optimized game.iso           # optimized-tag probe (supports --skip-sectors)
 XISOSharp --batch -d ./out ./isos        # all *.iso sorted (extract/list/tree/rewrite/audit only)
 XISOSharp --batch --batch-recursive -r ./isos
 

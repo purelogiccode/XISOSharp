@@ -212,6 +212,9 @@ internal static class Program
 
         bool filetimeMode = false;
         bool setFiletimeMode = false;
+        bool sectorLayoutMode = false;
+        bool rangesMode = false;
+        bool isOptimizedMode = false;
 
         // XboxKit redump / archival modes
         bool videoMode = false;
@@ -844,6 +847,36 @@ internal static class Program
                         extract = false;
                         setFiletimeMode = true;
                         break;
+                    case "--sector-layout":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        sectorLayoutMode = true;
+                        break;
+                    case "--ranges":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        rangesMode = true;
+                        break;
+                    case "--is-optimized":
+                        if (xSeen || rewrite || createList.Count > 0)
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        extract = false;
+                        isOptimizedMode = true;
+                        break;
                     case "--silent":
                         // --silent is an alias for checksum --silent when --checksum is active;
                         // otherwise it is a checksum-specific flag handled by the verb subcommand.
@@ -894,6 +927,7 @@ internal static class Program
         if (TranslatePackInput(packInput, packName, batchDir, rewrite, info, lsMode, xexInfoMode, xbeInfoMode,
                 repairMode, salvageMode,
                 unpackMode, hashMode, copyOut, copyIn, auditMode, validateMode, tree, extract, checksumFlagMode,
+                filetimeMode, setFiletimeMode, sectorLayoutMode, rangesMode, isOptimizedMode,
                 optind, args.Length, createList, ref rewrite, ref packIsoFile, ref path) != 0)
         {
             return 1;
@@ -902,7 +936,7 @@ internal static class Program
         if (checksumFlagMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree ||
                                  hashMode || copyOut || copyIn || auditMode ||
                                  validateMode || unpackMode || createList.Count > 0 || rewrite || filetimeMode ||
-                                 setFiletimeMode))
+                                 setFiletimeMode || sectorLayoutMode || rangesMode || isOptimizedMode))
         {
             Logger.LogErr("Error: --checksum cannot be combined with other modes\n");
             return 1;
@@ -911,7 +945,7 @@ internal static class Program
         if (filetimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree ||
                              hashMode || copyOut || copyIn || auditMode ||
                              validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
-                             setFiletimeMode))
+                             setFiletimeMode || sectorLayoutMode || rangesMode || isOptimizedMode))
         {
             Logger.LogErr("Error: --filetime cannot be combined with other modes\n");
             return 1;
@@ -920,7 +954,7 @@ internal static class Program
         if (setFiletimeMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree ||
                                 hashMode || copyOut || copyIn || auditMode ||
                                 validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
-                                filetimeMode))
+                                filetimeMode || sectorLayoutMode || rangesMode || isOptimizedMode))
         {
             Logger.LogErr("Error: --set-filetime cannot be combined with other modes\n");
             return 1;
@@ -949,7 +983,7 @@ internal static class Program
 
         if ((skipSectors.HasValue || prependSectors.HasValue) &&
             (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || hashMode || copyOut ||
-             copyIn || auditMode || validateMode || validateFlag ||
+             copyIn || auditMode || validateMode || validateFlag || sectorLayoutMode || rangesMode ||
              // CLI-015: --skip-sectors is also ignored by the redump batch
              // (RunRedumpBatch takes no offset) and by --checksum
              // (ComputeImageChecksum takes no offset). --filetime/--set-filetime
@@ -958,7 +992,7 @@ internal static class Program
              allMode || bestMode || compressAlias || checksumFlagMode))
         {
             Logger.LogErr(
-                "Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, filetime, set-filetime, and create (-c) modes\n");
+                "Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, filetime, set-filetime, --is-optimized, and create (-c) modes\n");
             return 1;
         }
 
@@ -977,7 +1011,7 @@ internal static class Program
         if (batchDir != null && (createList.Count > 0 || info || lsMode || xexInfoMode || xbeInfoMode || repairMode ||
                                  salvageMode || unpackMode || hashMode ||
                                  copyOut || copyIn || validateMode || checksumFlagMode || filetimeMode ||
-                                 setFiletimeMode))
+                                 setFiletimeMode || sectorLayoutMode || rangesMode || isOptimizedMode))
         {
             Logger.LogErr(
                 "Error: --batch is only supported in extract, list, tree, rewrite (-r), and audit (-V) modes\n");
@@ -1021,7 +1055,8 @@ internal static class Program
 
         if (unpackMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree ||
                            hashMode || copyOut || copyIn || auditMode || validateMode ||
-                           checksumFlagMode || filetimeMode || setFiletimeMode))
+                           checksumFlagMode || filetimeMode || setFiletimeMode || sectorLayoutMode || rangesMode ||
+                           isOptimizedMode))
         {
             Logger.LogErr("Error: --unpack cannot be combined with other modes\n");
             return 1;
@@ -1033,12 +1068,12 @@ internal static class Program
         int classicModes = new[]
         {
             listMode, tree, info, lsMode, xexInfoMode, xbeInfoMode, repairMode, salvageMode, hashMode, copyOut,
-            copyIn, auditMode, validateMode
+            copyIn, auditMode, validateMode, sectorLayoutMode, rangesMode, isOptimizedMode
         }.Count(b => b);
         if (classicModes > 1)
         {
             Logger.LogErr(
-                "Error: -l/-t/-i/--ls/--xex-info/--xbe-info/--repair/--salvage/--md5/--sha256/-V/validate/--copy-out/--copy-in cannot be combined with other modes\n");
+                "Error: -l/-t/-i/--ls/--xex-info/--xbe-info/--repair/--salvage/--md5/--sha256/-V/validate/--copy-out/--copy-in/--sector-layout/--ranges/--is-optimized cannot be combined with other modes\n");
             return 1;
         }
 
@@ -1048,7 +1083,7 @@ internal static class Program
         if (anyRedumpMode && (info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || tree ||
                               hashMode || copyOut || copyIn || auditMode ||
                               validateMode || unpackMode || createList.Count > 0 || rewrite || checksumFlagMode ||
-                              filetimeMode || setFiletimeMode))
+                              filetimeMode || setFiletimeMode || sectorLayoutMode || rangesMode || isOptimizedMode))
         {
             Logger.LogErr(
                 "Error: --video/--random/--seed/--wipe/--trim/--petrify/--update/--zar/--all/--best/--compress/rebuild cannot be combined with other modes\n");
@@ -1191,6 +1226,155 @@ internal static class Program
                                            or UnauthorizedAccessException)
             {
                 Logger.LogErr($"Error setting filetime for {isoPath}: {ex.Message}\n");
+                return 1;
+            }
+        }
+
+        if (sectorLayoutMode)
+        {
+            // CLI-012: exactly one <iso>. CLI-017: -d/-o/-D ignored.
+            if (RejectIgnoredOutputFlags("--sector-layout"))
+                return 1;
+
+            if (optind >= args.Length)
+            {
+                Logger.LogErr("Error: --sector-layout requires <iso>\n");
+                PrintUsage();
+                return 1;
+            }
+
+            if (optind + 1 < args.Length)
+            {
+                Logger.LogErr("Error: --sector-layout takes exactly one <iso> (extra arguments not allowed)\n");
+                PrintUsage();
+                return 1;
+            }
+
+            string isoPath = args[optind];
+            try
+            {
+                SectorLayout layout = XisoReader.GetSectorLayout(isoPath);
+                VolumeInfo volume = layout.Volume;
+                int fileCount = 0;
+                int dirCount = 0;
+                foreach (FileSectorExtent entry in layout.Entries)
+                {
+                    if (entry.IsDirectory)
+                        dirCount++;
+                    else
+                        fileCount++;
+                }
+
+                Logger.Log($"Sector layout: {isoPath}\n");
+                Logger.Log($"  Format:         {volume.DiscFormat}\n");
+                Logger.Log($"  Root dir:       sector {volume.RootDirSector} ({volume.RootDirSize} bytes)\n");
+                Logger.Log($"  Total sectors:  {volume.TotalSectors} ({volume.FileLength} bytes)\n");
+                Logger.Log($"  Entries:        {fileCount} file(s), {dirCount} dir(s)\n");
+                foreach (FileSectorExtent entry in layout.Entries)
+                {
+                    string kind = entry.IsDirectory ? "dir " : "file";
+                    Logger.Log(
+                        $"    [{kind}] {entry.Path}  sector {entry.StartSector} (+{entry.SectorCount})  {entry.FileSize} bytes\n");
+                }
+
+                Logger.Log($"  Used ranges:    {layout.UsedRanges.Count}\n");
+                foreach (SectorRange range in layout.UsedRanges)
+                {
+                    Logger.Log($"    {range.StartSector}-{range.StartSector + range.SectorCount - 1}\n");
+                }
+
+                Logger.Log($"  Free ranges:    {layout.FreeRanges.Count}\n");
+                foreach (SectorRange range in layout.FreeRanges)
+                {
+                    Logger.Log($"    {range.StartSector}-{range.StartSector + range.SectorCount - 1}\n");
+                }
+
+                return 0;
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IOException or ExtractErrorException)
+            {
+                Logger.LogErr($"Error reading sector layout from {isoPath}: {ex.Message}\n");
+                return 1;
+            }
+        }
+
+        if (rangesMode)
+        {
+            // CLI-012: exactly one <iso>. CLI-017: -d/-o/-D ignored.
+            if (RejectIgnoredOutputFlags("--ranges"))
+                return 1;
+
+            if (optind >= args.Length)
+            {
+                Logger.LogErr("Error: --ranges requires <iso>\n");
+                PrintUsage();
+                return 1;
+            }
+
+            if (optind + 1 < args.Length)
+            {
+                Logger.LogErr("Error: --ranges takes exactly one <iso> (extra arguments not allowed)\n");
+                PrintUsage();
+                return 1;
+            }
+
+            string isoPath = args[optind];
+            try
+            {
+                (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> files) =
+                    XisoRanges.GetXisoRanges(isoPath, quiet: Logger.Quiet);
+                Logger.Log($"Sector ranges: {isoPath}\n");
+                Logger.Log($"  System ({sys.Count} range(s)):\n");
+                foreach ((uint start, uint end) in sys)
+                {
+                    Logger.Log($"    {start}-{end}\n");
+                }
+
+                Logger.Log($"  Files ({files.Count} range(s)):\n");
+                foreach ((uint start, uint end) in files)
+                {
+                    Logger.Log($"    {start}-{end}\n");
+                }
+
+                return 0;
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IOException or ExtractErrorException)
+            {
+                Logger.LogErr($"Error reading sector ranges from {isoPath}: {ex.Message}\n");
+                return 1;
+            }
+        }
+
+        if (isOptimizedMode)
+        {
+            // CLI-012: exactly one <iso>. CLI-017: -d/-o/-D ignored.
+            if (RejectIgnoredOutputFlags("--is-optimized"))
+                return 1;
+
+            if (optind >= args.Length)
+            {
+                Logger.LogErr("Error: --is-optimized requires <iso>\n");
+                PrintUsage();
+                return 1;
+            }
+
+            if (optind + 1 < args.Length)
+            {
+                Logger.LogErr("Error: --is-optimized takes exactly one <iso> (extra arguments not allowed)\n");
+                PrintUsage();
+                return 1;
+            }
+
+            string isoPath = args[optind];
+            try
+            {
+                bool optimized = XisoReader.IsOptimizedImage(isoPath, skipSectors);
+                Logger.Log($"{isoPath}: {(optimized ? "optimized" : "not optimized")}\n");
+                return 0;
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IOException)
+            {
+                Logger.LogErr($"Error probing {isoPath}: {ex.Message}\n");
                 return 1;
             }
         }
@@ -2214,7 +2398,8 @@ internal static class Program
         bool ClassicModeSelected()
         {
             return listMode || tree || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode ||
-                   hashMode || copyOut || copyIn || auditMode || validateMode;
+                   hashMode || copyOut || copyIn || auditMode || validateMode || sectorLayoutMode || rangesMode ||
+                   isOptimizedMode;
         }
 
         // CLI-017: -d (path), -o (outputName) and -D (deleteOld) are consumed by
@@ -4210,6 +4395,11 @@ internal static class Program
         bool tree,
         bool extract,
         bool checksumFlagMode,
+        bool filetimeMode,
+        bool setFiletimeMode,
+        bool sectorLayoutMode,
+        bool rangesMode,
+        bool isOptimizedMode,
         int optind,
         int argsLength,
         List<(string Dir, string? Name)> createList,
@@ -4224,7 +4414,8 @@ internal static class Program
 
         if (rewrite || info || lsMode || xexInfoMode || xbeInfoMode || repairMode || salvageMode || unpackMode ||
             hashMode || copyOut || copyIn || auditMode ||
-            validateMode || tree || !extract || checksumFlagMode)
+            validateMode || tree || !extract || checksumFlagMode || filetimeMode || setFiletimeMode ||
+            sectorLayoutMode || rangesMode || isOptimizedMode)
         {
             Logger.LogErr("Error: --pack cannot be combined with other modes\n");
             return 1;
@@ -4568,6 +4759,9 @@ internal static class Program
                                                        join <first.1.iso> [...] [--output <file>]  Reassemble split parts (output validated as XISO).
                                                        --filetime <image>             Show FILETIME header field (human-readable + raw, supports --skip-sectors).
                                                        --set-filetime <image> <value> Set FILETIME header field (value: ISO-8601, decimal raw, 0x hex, 'now', '0').
+                                                       --sector-layout <image>      Show the full sector map: volume summary, per-file extents, used/free ranges.
+                                                       --ranges <image>             List system (bone) vs file sector ranges (inclusive spans).
+                                                       --is-optimized <image>       Print whether the image carries the optimized tag (supports --skip-sectors).
 
                                                        XDVDFS / Packing modes (ordered remapping):
 

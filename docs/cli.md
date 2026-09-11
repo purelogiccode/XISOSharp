@@ -111,12 +111,15 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `-X <glob_pattern>` | **Create mode only.** Exclude files/directories matching the glob pattern. Repeatable. See [Exclude patterns](#exclude-patterns). `WaxGlob` engine also supports `{0}`/`{n}` captures for `build-image`. |
 | `-y`, `--yes` | Always overwrite output files without prompting (`rebuild`, rewrite `-o`, `compress`, `decompress`, redump batch outputs). |
 | `-n`, `--no` | Never overwrite: refuse when an output file exists (prints `[ERROR] File already exists`, skips the operation). Cannot be combined with `-y`. |
-| `--skip-sectors N` | Treat the image as if the XISO filesystem starts `N` sectors (2048 bytes each) into the file — for Redump images with a video partition. Valid in extract, list, tree, rewrite (`-r`), `--unpack`, `--filetime`, and `--set-filetime` modes. Rejected with `-c` and with `-i`, `--ls`, `--xex-info`, `--xbe-info`, `--md5`/`--sha256`, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, and `checksum`. See [Redump & Disc Layouts](redump-workflows.md). |
+| `--skip-sectors N` | Treat the image as if the XISO filesystem starts `N` sectors (2048 bytes each) into the file — for Redump images with a video partition. Valid in extract, list, tree, rewrite (`-r`), `--unpack`, `--filetime`, `--set-filetime`, and `--is-optimized` modes. Rejected with `-c` and with `-i`, `--ls`, `--xex-info`, `--xbe-info`, `--md5`/`--sha256`, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, `checksum`, `--sector-layout`, and `--ranges`. See [Redump & Disc Layouts](redump-workflows.md). |
 | `--prepend-sectors N` | Write the output image with `N` empty sectors before the XISO filesystem, reserving room for a video partition. Valid in create (`-c`) and rewrite (`-r`) modes. See [Redump & Disc Layouts](redump-workflows.md). |
 | `--preserve-attrs` | Rewrite (`-r`) mode: re-encode the source dirent attribute bits (RO/HID/SYS/NOR) into the output instead of the extract-xiso parity default (DIR/ARC defaults, `dir=0x10`/`file=0x20`). Default off so rewritten images stay byte-identical to `extract-xiso -r`. |
 | `--file-time <value>` | Fixed FILETIME for the volume descriptor on create (`-c`), `--pack`, and `build-image` (values: ISO-8601, decimal raw, `0x` hex, `'now'`, `'0'`). `'0'` writes the xdvdfs deterministic timestamp so identical input produces byte-identical output. See [XisoWriter API](api-xisowriter.md#deterministic-output). |
 | `--filetime <image>` | Show the FILETIME volume-descriptor field (ISO-8601 + raw u64; `0` = 1601-01-01, xdvdfs compatible). See [FILETIME](api-xisoreader.md#filetime). |
 | `--set-filetime <image> <value>` | Set the FILETIME field (values: ISO-8601, decimal raw, `0x` hex, `'now'`, or `'0'`). Cannot be combined with other modes. See [FILETIME](api-xisoreader.md#filetime). |
+| `--sector-layout <image>` | **Sector layout** — full on-disk map (`XisoReader.GetSectorLayout`): volume summary (format, root dir sector/size, total sectors), per-file extents (`path`, start sector, sector count, bytes), and used/free sector ranges (inclusive spans). Offset-0 only (`--skip-sectors` rejected). |
+| `--ranges <image>` | **Sector ranges** (`XisoRanges.GetXisoRanges`): system (bone) vs file sector ranges as inclusive `start-end` spans, with counts. Offset-0 only (`--skip-sectors` rejected). |
+| `--is-optimized <image>` | Print `<iso>: optimized` or `<iso>: not optimized` (`XisoReader.IsOptimizedImage` tag probe at offset 31337); supports `--skip-sectors`. Always exits 0 on a readable image. |
 | `--skip-existing` | In extract, `--unpack`, and `--copy-out` modes, skip files already on disk with matching sizes (logged as `skip: <path>`) instead of overwriting them. Re-run an interrupted unpack to resume it; pairs with `--batch`. See [Resume interrupted unpacks](#resume-interrupted-unpacks). |
 | `--continue-on-error` | In extract, `--unpack`, and `--copy-out` modes, log per-file failures (`Error: Failed to extract ...`) and continue with the next entry instead of aborting. An uncreatable directory skips its subtree. The run still ends with a `Failed to unpack image` summary and a non-zero exit code. See [Extraction robustness](#extraction-robustness). |
 | `--ciso-level 0..9` | CISO compression level (`compress`/`cso`, default `9`). v1: maps to `CompressionLevel` for BCL DEFLATE (`0` NoCompression, `1..3` Fastest, `4..6` Optimal, `7..9` SmallestSize). v2: `0` = store all plain, `1..9` = LZ4 acceleration `10 - level` (level 9 byte-identical to xdvdfs). |
@@ -290,12 +293,12 @@ Enforced at parse time; violations print an error and exit 1:
 | `--skip-sectors` with `-c` | Error |
 | `--prepend-sectors` without `-c` or `-r` | Error |
 | `--preserve-attrs` without `-r` | Error |
-| `--skip-sectors`/`--prepend-sectors` with `-i`, `--ls`, `--xex-info`, `--xbe-info`, hash, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, or `checksum` | Error |
+| `--skip-sectors`/`--prepend-sectors` with `-i`, `--ls`, `--xex-info`, `--xbe-info`, hash, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, `checksum`, `--sector-layout`, or `--ranges` | Error |
 | `--validate`/`--validate-checksums`/`--validate-strict`/`--validate-report` without `-r` or `validate` | Error |
 | `-X` without `-c` | Error |
 | `--skip-existing` without extract/`--unpack`/`--copy-out` (e.g. with `-l`, `-t`, `-r`, `-c`, redump verbs) | Error |
 | `--continue-on-error` without extract/`--unpack`/`--copy-out` | Error |
-| `--batch` without extract/list/tree/rewrite/audit (e.g. with `--copy-out`, `--copy-in`, `validate`, redump, `checksum`, `--filetime`) | Error |
+| `--batch` without extract/list/tree/rewrite/audit (e.g. with `--copy-out`, `--copy-in`, `validate`, redump, `checksum`, `--filetime`, `--sector-layout`, `--ranges`, `--is-optimized`) | Error |
 | `--batch-recursive` without `--batch` | Error |
 | `--no-backup` without `--copy-in` or `--repair` | Error |
 | `--dry-run` without `--repair` | Error |
@@ -409,6 +412,11 @@ XISOSharp --ls game.iso
 
 # List a subdirectory
 XISOSharp --ls game.iso /media
+
+# Sector map, sector ranges, optimized-tag probe
+XISOSharp --sector-layout game.iso
+XISOSharp --ranges game.iso
+XISOSharp --is-optimized game.iso
 
 # Show the Xbox 360 executable header of a game
 # (title ID, entry point, region, media types, ...)

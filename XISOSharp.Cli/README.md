@@ -74,6 +74,9 @@ is printed and the tool exits 1.
 | `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum (`--silent` → hex only) |
 | `split` / `join` (`joinsplit`) | Split into `<base>.1.iso`… parts / reassemble (`--size`, `--output`) |
 | `--filetime <image>` / `--set-filetime <image> <value>` | Show / set the FILETIME volume field |
+| `--sector-layout <image>` | Full sector map: volume summary, per-file extents, used/free ranges |
+| `--ranges <image>` | System (bone) vs file sector ranges (inclusive spans) |
+| `--is-optimized <image>` | Print whether the image carries the optimized tag (supports `--skip-sectors`) |
 | `--batch <dir>` (+ `--batch-recursive`) | Process all `.iso` in `<dir>` (extract/list/tree/rewrite/audit only) |
 | `compress` (`cso`) / `decompress` (`uncso`, `decso`) | CISO v2 LZ4 (default) / v1 DEFLATE round-trip (`--ciso-level`, `--ciso-version`, `--ciso-split`) |
 | `build-image` / `image-spec` | xdvdfs-parity ordered packing from globs / TOML spec generation |
@@ -148,6 +151,11 @@ XISOSharp --copy-out game.iso /media ./media_out
 XISOSharp --copy-in game.iso ./my-config.ini /config.ini
 XISOSharp --sha256 game.iso
 XISOSharp --xbe-info game.iso /default.xbe
+
+# Sector map, sector ranges, optimized-tag probe
+XISOSharp --sector-layout game.iso
+XISOSharp --ranges game.iso
+XISOSharp --is-optimized game.iso
 
 # Batch a folder of ISOs
 XISOSharp --batch ./isos -d ./extracted
