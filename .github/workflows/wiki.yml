@@ -1,0 +1,40 @@
+name: Wiki
+
+# Mirrors docs/ into the GitHub wiki (Home + sidebar + pages) on every docs
+# change, via .github/sync-wiki.ps1. Commits only when content differs.
+
+on:
+  push:
+    branches: [master]
+    paths: ['docs/**', '.github/sync-wiki.ps1', '.github/workflows/wiki.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: main
+
+      - uses: actions/checkout@v4
+        with:
+          repository: purelogiccode/XISOSharp.wiki
+          path: wiki
+
+      - name: Regenerate wiki pages
+        shell: pwsh
+        run: ./main/.github/sync-wiki.ps1 -DocsDir ./main/docs -WikiDir ./wiki
+
+      - name: Push if changed
+        run: |
+          cd wiki
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "docs: sync wiki from docs/ (${{ github.sha }})"
+          git push
