@@ -784,10 +784,18 @@ public static class XisoReader
                             {
                                 ExtractFileException failure = ex as ExtractFileException
                                                                ?? ExtractFileException.ForToc(subPath, filename, startSector,
-                                                                   fileSize, ex);
+                                                                    fileSize, ex);
                                 unpackOptions.RecordFailure(failure);
                                 Logger.LogErr($"Error: {failure.Message}\n");
                             }
+                        }
+                        else if (mode == ExtractMode.GenerateAvl && dir.AvlNode != null)
+                        {
+                            // Parity with extract-xiso build-202609111233: a zero-size
+                            // directory is an empty directory, not a file. Without this,
+                            // Subdirectory stays null and the rewrite writer emits the
+                            // entry as a file (ARC + file data) instead of a directory.
+                            dir.AvlNode.Subdirectory = AvlNode.EmptySubdirectory;
                         }
 
                         if (mode == ExtractMode.Extract && filesystem == null)
@@ -1056,7 +1064,7 @@ public static class XisoReader
 
             // Post-write integrity: the bytes written must equal the reported size.
             // Catches torn writes and anything that truncated the file behind us.
-            long writtenLength = filesystem != null ? filesystem.FileLength(dest) : new FileInfo(filename).Length;
+            long writtenLength = filesystem?.FileLength(dest) ?? new FileInfo(filename).Length;
             if (writtenLength != fileSize)
                 throw ExtractFileException.ForTruncated(internalPath, dest, startSector, fileSize, totalSize);
         }
