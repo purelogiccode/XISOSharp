@@ -3,7 +3,9 @@
 [![NuGet](https://img.shields.io/nuget/v/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 [![NuGet](https://img.shields.io/nuget/dt/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 
-A pure C# class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. A direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool (v2.7.1) from C to C#. All logic — including the AVL tree, Boyer-Moore search, XISO header verification, directory traversal, format rewriting, and media-enable patching — is ported directly from the reference C implementation to produce byte-identical output.
+A pure C# class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. A direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool (v2.7.1) from C to C# — byte-identical output, no native dependencies — extended with the archival power of [XboxKit](https://github.com/Deterous/XboxKit) (Redump video/filler/seed/wipe/trim/petrify/update/rebuild, ZAR) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) (build-image remapping, CISO compress/decompress, checksums). All logic — including the AVL tree, Boyer-Moore search, XISO header verification, directory traversal, format rewriting, and media-enable patching — is ported directly from the reference C implementation.
+
+Full documentation (getting started, CLI reference, archival workflows, library API) lives in the [docs folder on GitHub](https://github.com/purelogiccode/XISOSharp/tree/master/docs).
 
 ---
 
@@ -1362,7 +1364,7 @@ The core processing engine is **not thread-safe** for concurrent operations on t
 | .NET 9 | `net9.0` |
 | .NET 10 | `net10.0` |
 
-The library has zero external dependencies beyond the .NET runtime.
+The library targets `net8.0`, `net9.0`, and `net10.0`. Its only runtime dependency beyond the .NET runtime is [ZArchiveSharp](https://www.nuget.org/packages/ZArchiveSharp) (for ZAR archive support); everything else is BCL-only.
 
 ---
 
