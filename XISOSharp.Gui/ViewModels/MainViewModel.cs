@@ -313,7 +313,6 @@ internal sealed partial class MainViewModel : ObservableObject
             if (version is null)
             {
                 Log.Warning("CLI -v probe failed for {Cli}", resolved);
-                BugReporter.ReportWarning($"CLI -v probe failed for {resolved}");
             }
             else
             {
@@ -824,7 +823,6 @@ internal sealed partial class MainViewModel : ObservableObject
             if (exit != 0)
             {
                 Log.Warning("Job {Title} exited with code {Exit}", title, exit);
-                BugReporter.ReportWarning($"GUI job '{title}' exited with code {exit}: XISOSharp {Quote(args)}");
             }
             else
             {

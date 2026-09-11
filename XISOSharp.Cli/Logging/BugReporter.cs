@@ -15,13 +15,15 @@ namespace XISOSharp.Cli.Logging;
 #endif
 
 /// <summary>
-/// Forwards error-and-above reports to the PureLogicCode bug-report API.
+/// Forwards Warning-and-above reports to the PureLogicCode bug-report API.
 /// See <c>InstructionsToSendBugs.md</c> (AspNet_BugReportEmailService repo).
 /// Every report embeds the required Environment / Error / Exception sections.
 /// Fire-and-forget (see <see cref="Flush"/> for synchronous shutdown): never throws,
-/// throttled to stay under the 10 req/min limit. Warning-level routine events are
-/// never filed (BUG-X-002). Shared single source of truth compiled into the CLI,
-/// GUI, and Tester via linked items with per-host namespaces (BUG-X-001).
+/// throttled to stay under the 10 req/min limit. The only Warning+ events never
+/// filed are CLI user-feedback lines bridged from <c>XISOSharp.Logger</c> and tagged
+/// <c>NoBugReport</c> (usage/validation text, not bugs). Shared single source of
+/// truth compiled into the CLI, GUI, and Tester via linked items with per-host
+/// namespaces (BUG-X-001).
 /// </summary>
 internal static partial class BugReporter
 {
@@ -52,13 +54,8 @@ internal static partial class BugReporter
     internal static string ApplicationName { get; set; } = "XISOSharp";
 #endif
 
-    internal static void ReportWarning(string message) =>
-        // BUG-X-002: Warning-level routine events (user-error probes, non-zero exits,
-        // missing files) are operational noise, not crashes. Never file a bug report
-        // for them and never consume the 8/min throttle budget reserved for real
-        // crashes (ReportError/ReportException). Kept as a sink so existing call
-        // sites need no edits; visible in the debugger log only.
-        Debug.WriteLine($"BugReporter warning suppressed (no report filed): {message}");
+    internal static void ReportWarning(string message, Exception? ex = null) =>
+        Report(ex, message, "Warning");
 
     internal static void ReportError(string message, Exception? ex = null) => Report(ex, message, "Error");
 

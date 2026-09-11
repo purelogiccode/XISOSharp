@@ -11,8 +11,9 @@ namespace XISOSharp.Cli.Logging;
 
 /// <summary>
 /// Single Serilog bootstrap for the CLI. Configures file/debug/console sinks plus
-/// the <see cref="BugReportSink"/> (Error+ -&gt; bug-report API), bridges the
-/// shared <c>XISOSharp.Logger</c> through Serilog, and installs global crash handlers.
+/// the <see cref="BugReportSink"/> (Warning+ -&gt; bug-report API, except events
+/// tagged <c>NoBugReport</c>), bridges the shared <c>XISOSharp.Logger</c> through
+/// Serilog, and installs global crash handlers.
 /// </summary>
 internal static class AppLogging
 {
@@ -86,14 +87,12 @@ internal static class AppLogging
             // usage/validation refusals (invalid flag combinations, misplaced
             // flags), missing-file probes, and non-zero CLI exits. Filing each
             // one as a bug report flooded the API with 32 expected-behaviour
-            // reports in a single session. They are exactly the "routine
-            // operational noise" BUG-X-002 already excludes, so log them as
-            // Warning: the file log keeps them, while the BugReportSink
-            // (Error+) stays reserved for real crashes, which reach the
-            // reporter through the unhandled-exception handlers and explicit
-            // ReportException call sites instead.
+            // reports in a single session. They stay local-only: logged as
+            // Warning (the file log keeps them) and tagged NoBugReport so the
+            // Warning+ BugReportSink skips them, while every other Warning —
+            // plus all Error/Fatal events — still forwards to the API.
             string text = msg.TrimEnd('\r', '\n');
-            Log.Warning("{Message}", text);
+            Log.ForContext(BugReportSink.NoBugReportProperty, true).Warning("{Message}", text);
         };
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>

@@ -58,7 +58,6 @@ internal sealed class GuiSettings
                                        or NotSupportedException)
         {
             Log.Warning(ex, "GUI settings load failed; using defaults");
-            BugReporter.ReportWarning($"GUI settings load failed; using defaults: {ex.Message}");
             return new GuiSettings();
         }
         catch (Exception ex)
@@ -87,12 +86,10 @@ internal sealed class GuiSettings
             }
 
             Log.Warning(ex, "GUI settings file was corrupt; moved aside to {Backup}; using defaults", backup);
-            BugReporter.ReportWarning($"GUI settings file was corrupt; backed up to {backup}; using defaults.");
         }
         catch (Exception backupEx)
         {
             Log.Warning(backupEx, "GUI settings corrupt-file backup failed; using defaults");
-            BugReporter.ReportWarning($"GUI settings corrupt-file backup failed; using defaults: {backupEx.Message}");
         }
     }
 

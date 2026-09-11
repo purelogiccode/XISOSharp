@@ -67,7 +67,6 @@ internal static class SelfTest
             if (failures != 0)
             {
                 Log.Warning("GUI self-test: {Failures} failure(s)", failures);
-                BugReporter.ReportWarning($"GUI self-test: {failures} failure(s)");
                 return 1;
             }
 
@@ -83,7 +82,6 @@ internal static class SelfTest
                     if (!ok)
                     {
                         Log.Warning("GUI self-test runner-e2e failed (exit {Exit})", exit);
-                        BugReporter.ReportWarning($"GUI self-test runner-e2e failed (exit {exit})");
                         return 1;
                     }
                 }

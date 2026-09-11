@@ -55,6 +55,16 @@ public partial class App
         }
         finally
         {
+            // Deliver pending bug-report sends before the process exits.
+            try
+            {
+                BugReporter.Flush(TimeSpan.FromSeconds(2));
+            }
+            catch
+            {
+                // Reporting must never fail shutdown.
+            }
+
             AppLogging.CloseAndFlush();
             try
             {

@@ -378,7 +378,6 @@ public static class XisoTestRunner
                 {
                     tSw.Stop();
                     Log.Warning("Extract test skipped for {File}: {Reason}", entry.FileName, skip);
-                    BugReporter.ReportWarning($"Extract test skipped for {entry.FileName}: {skip}");
                     Report(progress, entry.FileName, fileIndex + 1, totalFiles, "Extract", $"WARNING: {skip}");
                     result.SubTests.Add(new SubTestResult
                     {
@@ -530,7 +529,6 @@ public static class XisoTestRunner
             {
                 tSw.Stop();
                 Log.Warning("Rewrite test skipped for {File}: {Reason}", entry.FileName, skip);
-                BugReporter.ReportWarning($"Rewrite test skipped for {entry.FileName}: {skip}");
                 Report(progress, entry.FileName, fileIndex + 1, totalFiles, "Rewrite", $"WARNING: {skip}");
                 result.SubTests.Add(new SubTestResult
                 {
@@ -940,7 +938,6 @@ public static class XisoTestRunner
             string sizeText = leakedBytes >= 0 ? FormatByteCount(leakedBytes) : "unknown size";
             Log.Warning(ex, "Temp cleanup failed for {Path} ({Size} left behind); manual cleanup may be needed", path,
                 sizeText);
-            BugReporter.ReportWarning($"Temp cleanup failed for {path} ({sizeText} left behind)");
             if (progress is not null && !string.IsNullOrEmpty(file))
             {
                 try

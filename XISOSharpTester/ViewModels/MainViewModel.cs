@@ -582,7 +582,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         {
             AddLog("WARNING: extract-xiso not selected. Comparison tests will be skipped.");
             Log.Warning("Test run without extract-xiso; comparison tests will be skipped");
-            BugReporter.ReportWarning("Test run without extract-xiso; comparison tests will be skipped");
         }
         else
         {

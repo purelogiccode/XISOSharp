@@ -35,6 +35,17 @@ internal sealed class Program
         }
         finally
         {
+            // Deliver pending bug-report sends before the process exits;
+            // a short-lived --self-test/--probe-cli run would otherwise drop them.
+            try
+            {
+                BugReporter.Flush(TimeSpan.FromSeconds(2));
+            }
+            catch
+            {
+                // Reporting must never fail shutdown.
+            }
+
             AppLogging.CloseAndFlush();
         }
     }
@@ -99,7 +110,6 @@ internal sealed class Program
             {
                 Console.WriteLine("CLI -v probe failed.");
                 Log.Warning("CLI -v probe failed for {Cli}", resolved);
-                BugReporter.ReportWarning($"CLI -v probe failed for {resolved}");
                 return 1;
             }
 
