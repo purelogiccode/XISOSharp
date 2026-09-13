@@ -51,7 +51,7 @@
   </Target>
 
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.248">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.257">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

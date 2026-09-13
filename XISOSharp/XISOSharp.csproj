@@ -71,12 +71,12 @@
     <!-- ZArchiveSharp is consumed as a NuGet package (https://www.nuget.org/packages/ZArchiveSharp).
               The library lives in the sibling CSharp_ZArchiveSharp repo (separate solution);
               local changes there are consumed here by publishing a new package version. -->
-    <PackageReference Include="ZArchiveSharp" Version="1.0.2" />
+    <PackageReference Include="ZArchiveSharp" Version="1.2.2" />
   </ItemGroup>
 
   <!-- Source Link + versioning. -->
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.248">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.257">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
