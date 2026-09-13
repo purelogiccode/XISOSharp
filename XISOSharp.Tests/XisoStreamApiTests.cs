@@ -5,7 +5,7 @@ namespace XISOSharp.Tests;
 
 /// <summary>
 /// Tests for the public stream-based read API (TODO #12, third bullet):
-/// <see cref="XisoReader.OpenImageStream"/>, the <c>Stream</c> overloads of
+/// <see cref="XisoReader.OpenImageStream(string)"/>, the <c>Stream</c> overloads of
 /// <c>Extract</c>/<c>UnpackImage</c>/<c>List</c>/<c>Tree</c>/<c>DecodeXiso</c>,
 /// and <see cref="XisoReader.IsOptimizedImage(Stream, int?)"/>.
 /// </summary>
