@@ -2,6 +2,10 @@ using BenchmarkDotNet.Attributes;
 
 namespace XISOSharp.Benchmarks;
 
+/// <summary>
+/// BenchmarkDotNet suite for <see cref="BoyerMoore"/> searches across
+/// tail-hit, head-hit, and guaranteed-miss haystacks at three haystack sizes.
+/// </summary>
 [MemoryDiagnoser]
 [MinIterationCount(5)]
 [MaxIterationCount(20)]

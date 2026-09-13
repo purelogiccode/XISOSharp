@@ -29,6 +29,7 @@ public sealed class MemoryFilesystem : IFilesystem
         private readonly MemoryFilesystem _owner = owner;
         private readonly string _key = key;
 
+        /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
             if (disposing)

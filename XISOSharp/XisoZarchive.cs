@@ -333,8 +333,16 @@ public static class XisoZarchive
         private readonly List<string> _names = names;
         private readonly long _xisoOffset = xisoOffset;
         private readonly FileStream _isoFs = isoFs;
+        /// <summary>Source image path shown in pack progress output.</summary>
         public string DisplayPath { get; } = displayPath;
 
+        /// <summary>
+        /// Enumerates the parsed XISO tree in <c>WriteNode</c> order (directories
+        /// before children), opening each file as a bounded slice of the shared
+        /// image stream.
+        /// </summary>
+        /// <param name="cancellationToken">Cancels the walk before the next entry is emitted.</param>
+        /// <returns>The entries to pack, in emission order.</returns>
         public IReadOnlyList<ZarPackEntry> Collect(CancellationToken cancellationToken = default)
         {
             List<ZarPackEntry> entries = new();
@@ -382,20 +390,30 @@ public static class XisoZarchive
         private readonly long _offset = offset;
         private readonly string _path = path;
 
+        /// <inheritdoc/>
         public override bool CanRead => true;
+
+        /// <inheritdoc/>
         public override bool CanSeek => true;
+
+        /// <inheritdoc/>
         public override bool CanWrite => false;
+
+        /// <inheritdoc/>
         public override long Length { get; } = length;
 
+        /// <inheritdoc/>
         public override long Position
         {
             get => _position;
             set => _position = Math.Clamp(value, 0, Length);
         }
 
+        /// <inheritdoc/>
         public override int Read(byte[] buffer, int offset, int count) =>
             Read(buffer.AsSpan(offset, count));
 
+        /// <inheritdoc/>
         public override int Read(Span<byte> buffer)
         {
             long remaining = Length - _position;
@@ -421,6 +439,7 @@ public static class XisoZarchive
             return n;
         }
 
+        /// <inheritdoc/>
         public override long Seek(long offset, SeekOrigin origin) => Position = origin switch
         {
             SeekOrigin.Begin => offset,
@@ -429,14 +448,18 @@ public static class XisoZarchive
             _ => throw new ArgumentOutOfRangeException(nameof(origin)),
         };
 
+        /// <inheritdoc/>
         public override void Flush()
         {
         }
 
+        /// <inheritdoc/>
         public override void SetLength(long value) => throw new NotSupportedException();
 
+        /// <inheritdoc/>
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 
+        /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
             // The image stream stays open; the owner disposes it.

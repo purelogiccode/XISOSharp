@@ -308,6 +308,10 @@ internal static partial class BugReporter
         [property: JsonPropertyName("stackTrace")]
         string StackTrace);
 
+    /// <summary>
+    /// Source-generated JSON context for <see cref="BugReportPayload"/>, keeping
+    /// bug-report serialization trim- and AOT-safe.
+    /// </summary>
     [JsonSerializable(typeof(BugReportPayload))]
     private sealed partial class BugReportJsonContext : JsonSerializerContext;
 }

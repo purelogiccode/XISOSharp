@@ -25,6 +25,11 @@ internal sealed class BugReportSink : ILogEventSink
     /// </summary>
     internal const string NoBugReportProperty = "NoBugReport";
 
+    /// <summary>
+    /// Forwards Warning-and-above events to <see cref="BugReporter"/>, skipping
+    /// events tagged with <see cref="NoBugReportProperty"/>.
+    /// </summary>
+    /// <param name="logEvent">The Serilog event to inspect.</param>
     public void Emit(LogEvent logEvent)
     {
         try

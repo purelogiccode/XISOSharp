@@ -731,6 +731,11 @@ public static class XisoTestRunner
         }
     }
 
+    /// <summary>One entry parsed from a list/tree output line.</summary>
+    /// <param name="Path">Entry path as printed by the CLI.</param>
+    /// <param name="IsDirectory">Whether the entry is a directory.</param>
+    /// <param name="Size">File size in bytes (0 for directories).</param>
+    /// <param name="StartSector">File start sector (0 for directories).</param>
     private sealed record ListEntry(
         string Path,
         bool IsDirectory,
@@ -779,6 +784,9 @@ public static class XisoTestRunner
         }
     }
 
+    /// <summary>Result of comparing C# and extract-xiso list output.</summary>
+    /// <param name="AllMatch">Whether every entry matched.</param>
+    /// <param name="Detail">Human-readable diff summary for logging.</param>
     private sealed record ListComparison(bool AllMatch, string Detail);
 
     private static ListComparison CompareListEntries(List<ListEntry> csEntries, List<ListEntry> exeEntries)
@@ -837,6 +845,9 @@ public static class XisoTestRunner
         return new ListComparison(allMatch, string.Join("\n", details));
     }
 
+    /// <summary>Result of comparing C# and extract-xiso extracted directory trees.</summary>
+    /// <param name="AllMatch">Whether every extracted file matched.</param>
+    /// <param name="Detail">Human-readable diff summary for logging.</param>
     private sealed record DirComparison(bool AllMatch, string Detail);
 
     private static DirComparison CompareExtractedDirs(string csDir, string exeDir)

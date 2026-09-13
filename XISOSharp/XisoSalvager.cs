@@ -126,11 +126,22 @@ public static class XisoSalvager
         }
     }
 
+    /// <summary>
+    /// Mutable bookkeeping threaded through one salvage walk: the entries staged
+    /// for the rebuilt image and the reasons other entries were dropped.
+    /// </summary>
     private sealed class SalvageState
     {
+        /// <summary>Image-root-relative paths staged so far (directories suffixed with <c>/</c>).</summary>
         public List<string> Copied { get; } = [];
+
+        /// <summary>Human-readable reasons entries were skipped during the walk.</summary>
         public List<string> Skipped { get; } = [];
+
+        /// <summary>Staged sanitized names per directory (sets compare case-insensitively).</summary>
         public Dictionary<string, HashSet<string>> StagedNames { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>Original pre-sanitization names per directory, kept to classify separator collisions.</summary>
         public Dictionary<string, HashSet<string>> StagedRawNames { get; } = new(StringComparer.Ordinal);
     }
 

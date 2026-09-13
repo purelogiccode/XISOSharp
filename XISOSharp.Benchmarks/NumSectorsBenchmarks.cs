@@ -2,6 +2,10 @@ using BenchmarkDotNet.Attributes;
 
 namespace XISOSharp.Benchmarks;
 
+/// <summary>
+/// BenchmarkDotNet suite for <c>Constants.NumSectors</c> sector rounding,
+/// measuring the single-call and 256-entry batch shapes.
+/// </summary>
 [MemoryDiagnoser]
 [MinIterationCount(5)]
 [MaxIterationCount(20)]

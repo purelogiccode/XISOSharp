@@ -4,6 +4,10 @@ using XISOSharp.Models;
 
 namespace XISOSharp.Benchmarks;
 
+/// <summary>
+/// BenchmarkDotNet suite for the <see cref="AvlTree"/> insert, fetch,
+/// traversal, and key-comparison primitives on a 1000-node file-name tree.
+/// </summary>
 [MemoryDiagnoser]
 [MinIterationCount(5)]
 [MaxIterationCount(20)]

@@ -125,6 +125,10 @@ internal sealed class Sha3256 : IDisposable
         return hasher.GetHashAndReset();
     }
 
+    /// <summary>
+    /// Clears the internal state and marks the hasher disposed; further appends
+    /// or digest calls throw <see cref="ObjectDisposedException"/>.
+    /// </summary>
     public void Dispose()
     {
         if (!_disposed)

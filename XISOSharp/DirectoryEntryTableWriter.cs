@@ -255,8 +255,13 @@ public static class DirectoryEntryTableWriter
     private static uint NumSectors(uint size) =>
         (size / Constants.SectorSize) + (size % Constants.SectorSize != 0 ? 1u : 0u);
 
+    /// <summary>
+    /// Mutable box the recursive table-size walk accumulates into
+    /// (reference semantics across recursive calls).
+    /// </summary>
     private sealed class TableSizeAccumulator
     {
+        /// <summary>Total directory-table bytes accumulated so far.</summary>
         public uint Size;
     }
 }
