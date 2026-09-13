@@ -275,7 +275,7 @@ Reads the volume descriptor **without throwing** on validation errors. Returns a
 | `TotalSectors` | `long` | Total sectors |
 | `CreationTime` | `DateTimeOffset?` | Descriptor FILETIME as UTC time; `null` when invalid (raw 0 = 1601-01-01). Agrees with `GetFileTime` |
 | `FileTimeRaw` | `ulong` | Raw FILETIME field as stored |
-| `DescriptorSector` | `int` | Sector the descriptor was found at, partition-relative (32 normally, 0 for sector-0/rebuilt images, −1 when invalid) |
+| `DescriptorSector` | `int` | Partition-relative descriptor sector: `32` for every supported layout (the partition shift is `DiscLseek`); `-1` when invalid |
 
 ## ReadFileBytes
 

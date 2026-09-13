@@ -309,7 +309,7 @@ Paths are destination-root-relative, forward-slash separated, case-insensitive
 
 | Record | Members |
 |---|---|
-| `VolumeInfo` | `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name), `FileLength`, `TotalSectors`, `CreationTime` (`DateTimeOffset?` from the descriptor FILETIME), `FileTimeRaw`, `DescriptorSector` (32 normally, 0 for rebuilt images, −1 when invalid) |
+| `VolumeInfo` | `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name), `FileLength`, `TotalSectors`, `CreationTime` (`DateTimeOffset?` from the descriptor FILETIME), `FileTimeRaw`, `DescriptorSector` (partition-relative `32` for all supported layouts — the partition shift is `DiscLseek`; −1 when invalid) |
 | `EntryInfo` | `Name`, `IsDirectory`, `StartSector`, `FileSize`, `Attributes` (masked `0xB7`), `LeftChildOffset`, `RightChildOffset` |
 | `AuditResult` | `IsValid`, `FilesChecked`, `DirsChecked`, `Issues` (incl. `Reserved attribute bits set: 0x…`) |
 | `RepairResult` | `Fixed`, `Remaining`, `BackupPath`, `DryRun`, `Success` — outcome of `XisoReader.Repair` (see [Repair](api-xisoreader.md#repair)) |

@@ -233,4 +233,17 @@ public sealed class XisoOpenReadStreamTests : IDisposable
         Assert.Throws<ObjectDisposedException>(() => a.Read(new byte[4]));
         Assert.Throws<ObjectDisposedException>(() => a.Seek(0, SeekOrigin.Begin));
     }
+
+    [Fact]
+    public void OpenReadStream_SeekBeforeStart_Throws()
+    {
+        string iso = CreateIso(out _, out _);
+        XisoExplorer explorer = new(iso);
+        using Stream b = explorer.OpenReadStream("/b.bin");
+
+        Assert.Throws<IOException>(() => b.Seek(-1, SeekOrigin.Begin));
+        Assert.Throws<IOException>(() => b.Seek(-1, SeekOrigin.Current));
+        Assert.Throws<IOException>(() => b.Seek(-(b.Length + 1), SeekOrigin.End));
+        Assert.Throws<IOException>(() => b.Position = -1);
+    }
 }

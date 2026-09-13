@@ -141,5 +141,25 @@ public sealed class VolumeInfoCreationTimeTests : IDisposable
         string iso = CreateIso();
         Assert.Equal(Constants.HeaderOffset / Constants.SectorSize,
             XisoReader.GetVolumeInfo(iso).DescriptorSector);
+
+        // An XGD3-style image shifts the partition by Xgd3LseekOffset; the
+        // descriptor must still report partition sector 32, with the shift
+        // surfaced through DiscLseek instead.
+        string work = CreateTempDir("xiso_vol_xgd3");
+        string shifted = Path.Combine(work, "shifted.iso");
+        byte[] isoBytes = File.ReadAllBytes(iso);
+        using (FileStream fs = new(shifted, FileMode.Create, FileAccess.Write, FileShare.None, 65536))
+        {
+            fs.SetLength(Constants.Xgd3LseekOffset);
+            fs.Seek(Constants.Xgd3LseekOffset, SeekOrigin.Begin);
+            fs.Write(isoBytes);
+        }
+
+        VolumeInfo partitioned = XisoReader.GetVolumeInfo(shifted);
+
+        Assert.True(partitioned.IsValid);
+        Assert.Equal((long)Constants.Xgd3LseekOffset, partitioned.DiscLseek);
+        Assert.Equal("XGD3", partitioned.DiscFormat);
+        Assert.Equal(Constants.HeaderOffset / Constants.SectorSize, partitioned.DescriptorSector);
     }
 }

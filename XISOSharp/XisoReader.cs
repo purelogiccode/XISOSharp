@@ -1994,51 +1994,36 @@ public static class XisoReader
 
         try
         {
-            fs.Seek(Constants.HeaderOffset, SeekOrigin.Begin);
-            ReadExact(fs, buffer);
+            // Same candidate order as FindDiscLseekForFileTime. Probes past EOF
+            // are skipped instead of aborting the search, so a later candidate
+            // can still match (e.g. a trimmed XGD3 image whose file is smaller
+            // than the XGD2/global candidate offset).
+            ReadOnlySpan<long> probes =
+            [
+                0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
+                Constants.Xgd1LseekOffset
+            ];
+            foreach (long probe in probes)
+            {
+                long probeOffset = Constants.HeaderOffset + probe;
+                if (probeOffset + Constants.HeaderDataLength > fileLength)
+                    continue;
 
-            if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
-            {
-                isValid = true;
-            }
-            else
-            {
-                fs.Seek((long)Constants.HeaderOffset + Constants.GlobalLseekOffset, SeekOrigin.Begin);
-                ReadExact(fs, buffer);
-                if (buffer.SequenceEqual(HeaderDataBytes))
+                fs.Seek(probeOffset, SeekOrigin.Begin);
+                try
                 {
-                    discLseek = Constants.GlobalLseekOffset;
-                    isValid = true;
-                }
-                else
-                {
-                    fs.Seek((long)Constants.HeaderOffset + Constants.Xgd3LseekOffset, SeekOrigin.Begin);
                     ReadExact(fs, buffer);
-                    if (buffer.SequenceEqual(HeaderDataBytes))
-                    {
-                        discLseek = Constants.Xgd3LseekOffset;
-                        isValid = true;
-                    }
-                    else
-                    {
-                        fs.Seek((long)Constants.HeaderOffset + Constants.Xgd2HybridLseekOffset, SeekOrigin.Begin);
-                        ReadExact(fs, buffer);
-                        if (buffer.SequenceEqual(HeaderDataBytes))
-                        {
-                            discLseek = Constants.Xgd2HybridLseekOffset;
-                            isValid = true;
-                        }
-                        else
-                        {
-                            fs.Seek((long)Constants.HeaderOffset + Constants.Xgd1LseekOffset, SeekOrigin.Begin);
-                            ReadExact(fs, buffer);
-                            if (buffer.SequenceEqual(HeaderDataBytes))
-                            {
-                                discLseek = Constants.Xgd1LseekOffset;
-                                isValid = true;
-                            }
-                        }
-                    }
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+                {
+                    discLseek = probe;
+                    isValid = true;
+                    break;
                 }
             }
 
@@ -2071,7 +2056,11 @@ public static class XisoReader
             {
                 CreationTime = FileTimeHelper.FromFileTimeRaw(fileTimeRaw),
                 FileTimeRaw = fileTimeRaw,
-                DescriptorSector = (int)((Constants.HeaderOffset + discLseek) / Constants.SectorSize),
+                // Partition-relative, matching SimpleXisoDrive's VolumeDescriptor.Sector:
+                // the partition shift is reported separately by DiscLseek, so the
+                // descriptor always sits at partition sector HeaderOffset/2048 (32)
+                // for every layout this probe supports.
+                DescriptorSector = Constants.HeaderOffset / Constants.SectorSize,
             };
         }
         catch (IOException)
@@ -3422,7 +3411,10 @@ public static class XisoReader
     /// <param name="internalPath">File path within the ISO (e.g. <c>"/sub/file.bin"</c>).</param>
     /// <param name="buffer">Destination buffer.</param>
     /// <param name="fileOffset">Byte offset within the file's data extent.</param>
-    /// <returns>Bytes actually read (0 at or past the file end).</returns>
+    /// <returns>
+    /// Bytes actually read (0 at or past the file end, or when the buffer is
+    /// empty — the path is validated either way).
+    /// </returns>
     /// <exception cref="ArgumentException">
     /// Thrown when <paramref name="fileOffset"/> is negative.
     /// </exception>
@@ -3448,7 +3440,10 @@ public static class XisoReader
     /// <param name="internalPath">File path within the image.</param>
     /// <param name="buffer">Destination buffer.</param>
     /// <param name="fileOffset">Byte offset within the file's data extent.</param>
-    /// <returns>Bytes actually read (0 at or past the file end).</returns>
+    /// <returns>
+    /// Bytes actually read (0 at or past the file end, or when the buffer is
+    /// empty — the path is validated either way).
+    /// </returns>
     /// <exception cref="ArgumentException">
     /// Thrown when <paramref name="fileOffset"/> is negative.
     /// </exception>
@@ -3461,14 +3456,12 @@ public static class XisoReader
     {
         ArgumentNullException.ThrowIfNull(imageStream);
         ArgumentOutOfRangeException.ThrowIfNegative(fileOffset);
-        if (buffer.IsEmpty)
-            return 0;
 
         EntryInfo entry = GetEntryInfo(imageStream, imageName, internalPath)
                           ?? throw new InvalidDataException($"Path not found: {internalPath}");
         if (entry.IsDirectory)
             throw new InvalidDataException($"Cannot read a directory: {internalPath}");
-        if (fileOffset >= entry.FileSize)
+        if (buffer.IsEmpty || fileOffset >= entry.FileSize)
             return 0;
 
         VolumeInfo volInfo = GetVolumeInfo(imageStream);

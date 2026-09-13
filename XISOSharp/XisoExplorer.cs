@@ -123,6 +123,13 @@ public sealed class XisoExplorer : IDisposable
             _heldStream = null;
             throw new XisoFormatException($"Not a valid XISO: {isoPath}", ex);
         }
+        catch
+        {
+            // Any other probe failure still must not leak the held handle.
+            _heldStream?.Dispose();
+            _heldStream = null;
+            throw;
+        }
 
         if (!Volume.IsValid)
         {
@@ -185,16 +192,21 @@ public sealed class XisoExplorer : IDisposable
         }
 
         Stream stream = XisoReader.OpenImageStream(IsoPath, Options.Share);
-        EntryInfo? entry2 = XisoReader.GetEntryInfo(stream, IsoPath, path);
-        if (entry2 is null || entry2.IsDirectory)
+        try
+        {
+            EntryInfo? entry = XisoReader.GetEntryInfo(stream, IsoPath, path);
+            if (entry is null)
+                throw new InvalidDataException($"Path not found: {internalPath}");
+            if (entry.IsDirectory)
+                throw new InvalidDataException($"Cannot read a directory: {internalPath}");
+
+            return OpenReadStreamCore(stream, entry, ownsParent: true);
+        }
+        catch
         {
             stream.Dispose();
-            throw new InvalidDataException(entry2 is null
-                ? $"Path not found: {internalPath}"
-                : $"Cannot read a directory: {internalPath}");
+            throw;
         }
-
-        return OpenReadStreamCore(stream, entry2, ownsParent: true);
     }
 
     /// <summary>

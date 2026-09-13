@@ -333,7 +333,7 @@ Reads the XISO volume descriptor and returns metadata about the image without th
 public static VolumeInfo GetVolumeInfo(string isoPath)
 ```
 
-**Returns**: A `VolumeInfo` record containing `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name: `RAW`, `GLOBAL (XGD2)`, `XGD3`, `XGD2 Hybrid`, `XGD1`, `Unknown`), `FileLength`, `TotalSectors`, `CreationTime` (descriptor FILETIME as `DateTimeOffset?`, from the same probe), `FileTimeRaw`, and `DescriptorSector` (32 normally, 0 for sector-0/rebuilt images, −1 when invalid).
+**Returns**: A `VolumeInfo` record containing `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name: `RAW`, `GLOBAL (XGD2)`, `XGD3`, `XGD2 Hybrid`, `XGD1`, `Unknown`), `FileLength`, `TotalSectors`, `CreationTime` (descriptor FILETIME as `DateTimeOffset?`, from the same probe), `FileTimeRaw`, and `DescriptorSector` (partition-relative sector `32` for every supported layout — the partition shift is `DiscLseek`; −1 when invalid).
 
 #### `ReadFileBytes`
 
@@ -877,7 +877,7 @@ Metadata about an XISO volume descriptor.
 | `TotalSectors` | `long` | Total number of sectors in the ISO. |
 | `CreationTime` | `DateTimeOffset?` | Descriptor FILETIME as UTC time (`null` when invalid; raw 0 = 1601-01-01); agrees with `XisoReader.GetFileTime`. |
 | `FileTimeRaw` | `ulong` | Raw FILETIME field as stored in the descriptor. |
-| `DescriptorSector` | `int` | Sector the descriptor was found at, partition-relative (32 normally, 0 for sector-0/rebuilt images, −1 when invalid). |
+| `DescriptorSector` | `int` | Partition-relative descriptor sector: `32` for every supported layout (the partition shift is `DiscLseek`); `-1` when invalid. |
 
 #### `EntryInfo`
 

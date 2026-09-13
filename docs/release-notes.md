@@ -6,7 +6,7 @@ Additive release for VFS-consumer parity (SimpleXisoDrive/Dokan): the public API
 gains bounded in-place file reads, a keep-open explorer mode, descriptor
 creation-time/sector surfacing, `FileShare` control, and Windows attribute
 mapping — no behavior change to existing APIs. Targets remain `net8.0` /
-`net9.0` / `net10.0`; full suite green on all three (1398 tests: 1394 passed,
+`net9.0` / `net10.0`; full suite green on all three (1400 tests: 1396 passed,
 4 pre-existing skips, 0 failed).
 
 ### Library
@@ -46,8 +46,9 @@ mapping — no behavior change to existing APIs. Targets remain `net8.0` /
 #### Volume descriptor timestamps and sector
 
 - `VolumeInfo` gains `CreationTime` (`DateTimeOffset?`, `null` when invalid;
-  raw 0 maps to 1601-01-01), `FileTimeRaw`, and `DescriptorSector` (32 normally,
-  0 for sector-0/rebuilt images, −1 when invalid) — all populated by the same
+  raw 0 maps to 1601-01-01), `FileTimeRaw`, and `DescriptorSector`
+  (partition-relative sector `32` for every supported layout — the partition
+  shift is `DiscLseek`; −1 when invalid) — all populated by the same
   probe `GetVolumeInfo` already performs, so no second open is needed.
   `GetVolumeInfo` agrees with `GetFileTime` for the same image.
 
@@ -59,11 +60,35 @@ mapping — no behavior change to existing APIs. Targets remain `net8.0` /
   else applies; reserved bits masked), matching SimpleXisoDrive's locked
   expectations.
 
+### GUI (Avalonia)
+
+- Modern dark theme: left navigation rail with an accent pill, card layout,
+  green accent palette, rounded inputs and log console, and a dark native
+  title bar on Windows.
+- New **ZAR** tab: packs an ISO/XISO/Redump image into a `.zar` (ZArchive/zstd,
+  loadable in Xenia canary) with overwrite/skip/auto-rename collision policies;
+  drop routing and tab-order shortcuts account for the new tab.
+
+### Fixes
+
+- `XisoExplorer.OpenReadStream(string)` and the keep-open constructor no longer
+  leak the image handle when a lookup or probe throws.
+- `BoundedSubStream` rejects seeks before the window start with `IOException`
+  (per `Stream` conventions) instead of reading preceding image bytes.
+- `ReadFileBytes` validates the path even when the buffer is empty.
+- `GetVolumeInfo` skips probe candidates past EOF instead of aborting, so a
+  trimmed XGD3 image (smaller than the global candidate offset) is detected.
+
 ### Docs
 
 - Library/Getting-Started quick samples for the VFS use case, and the Utilities
   page documents explorer options, the read-bounds contract, and
   `XisoAttributes`.
+
+### Dependencies
+
+- `ZArchiveSharp` NuGet dependency updated 1.0.2 → 1.3.0 (mount-friendly reader
+  API, specific open-failure reasons; additive, no wire-format changes).
 
 ## 1.0.2
 

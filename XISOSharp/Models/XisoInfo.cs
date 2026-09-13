@@ -34,8 +34,12 @@ public record VolumeInfo(
     public ulong FileTimeRaw { get; init; }
 
     /// <summary>
-    /// Sector index the volume descriptor was found at, partition-relative
-    /// (32 normally, 0 for sector-0/rebuilt images). <c>-1</c> when invalid.
+    /// Partition-relative sector the volume descriptor was found at: <c>32</c>
+    /// for every layout <see cref="XisoReader.GetVolumeInfo(string)"/> probes
+    /// (plain, <c>GLOBAL (XGD2)</c>, <c>XGD3</c>, <c>XGD2 Hybrid</c>, <c>XGD1</c>);
+    /// the partition shift itself is reported by <see cref="DiscLseek"/>.
+    /// <c>-1</c> when invalid. The sector-0 descriptor of rebuilt XISOs is not
+    /// probed, so <c>0</c> is never reported.
     /// </summary>
     public int DescriptorSector { get; init; } = -1;
 

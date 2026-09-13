@@ -106,13 +106,17 @@ internal sealed class BoundedSubStream : Stream
     public override long Seek(long offset, SeekOrigin origin)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        _position = origin switch
+        long position = origin switch
         {
             SeekOrigin.Begin => offset,
             SeekOrigin.Current => _position + offset,
             SeekOrigin.End => Length + offset,
             _ => throw new ArgumentOutOfRangeException(nameof(origin), origin, "Invalid seek origin."),
         };
+        if (position < 0)
+            throw new IOException("An attempt was made to move the position before the beginning of the stream.");
+
+        _position = position;
         return _position;
     }
 

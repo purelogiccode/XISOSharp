@@ -60,7 +60,7 @@ reproducible or re-downloadable. Never delete them.
      `202609111233`), not `v2.7.1`. Never change the on-disk optimized tag
      `in!xiso!2.7.1 (01.11.14)` or `Constants.ExisoVersion`.
 2. Run the full suite: `dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release`
-   (currently 1338 tests: 1334 passed / 4 skipped, across net8.0, net9.0, net10.0).
+   (currently 1400 tests: 1396 passed / 4 skipped, across net8.0, net9.0, net10.0).
 3. Commit + push `master` (only when the user asks), then tag and push:
    `git tag <version> && git push origin <version>`.
 4. The tag push triggers CI pack + publish. If the `nuget` environment has

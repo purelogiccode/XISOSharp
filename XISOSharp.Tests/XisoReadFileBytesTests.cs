@@ -176,4 +176,16 @@ public sealed class XisoReadFileBytesTests : IDisposable
         Assert.Equal(fileA.Length, n);
         Assert.Equal(fileA, buffer);
     }
+
+    [Fact]
+    public void ReadFileBytes_EmptyBuffer_StillValidatesPath()
+    {
+        string iso = CreateIso(out _, out _);
+
+        Assert.Throws<InvalidDataException>(() =>
+            XisoReader.ReadFileBytes(iso, "/nope.bin", Span<byte>.Empty, 0));
+        Assert.Throws<InvalidDataException>(() =>
+            XisoReader.ReadFileBytes(iso, "/sub", Span<byte>.Empty, 0));
+        Assert.Equal(0, XisoReader.ReadFileBytes(iso, "/b.bin", Span<byte>.Empty, 0));
+    }
 }
