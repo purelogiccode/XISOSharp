@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
@@ -39,8 +40,8 @@ public partial class MainWindow : Window
     private const int ExtractTab = 0;
     private const int CreateTab = 1;
     private const int RewriteTab = 2;
-    private const int DecompressTab = 5;
-    private const int BatchTab = 7;
+    private const int DecompressTab = 6;
+    private const int BatchTab = 8;
 
     /// <summary>
     /// Initializes the window and subscribes drag-over/drop handlers.
@@ -63,6 +64,47 @@ public partial class MainWindow : Window
     }
 
     private MainViewModel Vm => (MainViewModel)DataContext!;
+
+    /// <summary>
+    /// Applies the immersive dark title bar on Windows so the native frame matches
+    /// the pinned dark theme. Best effort: unsupported builds keep the OS default.
+    /// </summary>
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        TryApplyDarkTitleBar();
+    }
+
+    private void TryApplyDarkTitleBar()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            IntPtr hwnd = TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+            if (hwnd == IntPtr.Zero)
+            {
+                return;
+            }
+
+            int enabled = 1;
+            // DWMWA_USE_IMMERSIVE_DARK_MODE: 20 on Windows 10 20H1+, 19 on 1809-1909.
+            if (DwmSetWindowAttribute(hwnd, 20, ref enabled, sizeof(int)) != 0)
+            {
+                DwmSetWindowAttribute(hwnd, 19, ref enabled, sizeof(int));
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Dark title bar is unavailable on this system");
+        }
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     // Null-safe VM access for catch blocks: never throws, so exception handling
     // cannot itself crash the async void method.
@@ -737,6 +779,58 @@ public partial class MainWindow : Window
         {
             Log.Error(ex, "Browse compress output failed");
             BugReporter.ReportException(ex, "Browse compress output failed");
+            try
+            {
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+    }
+
+    private async void BrowseZaSourceFile_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            MainViewModel vm = Vm;
+            string? picked = await PickSingleFileAsync([IsoFilter], "Select source image").ConfigureAwait(false);
+            if (picked is not null)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => vm.ZaSource = picked);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Browse ZAR source failed");
+            BugReporter.ReportException(ex, "Browse ZAR source failed");
+            try
+            {
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+    }
+
+    private async void BrowseZaOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            MainViewModel vm = Vm;
+            string? picked = await PickSaveAsync("ZAR output", "game.zar").ConfigureAwait(false);
+            if (picked is not null)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => vm.ZaOutput = picked);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Browse ZAR output failed");
+            BugReporter.ReportException(ex, "Browse ZAR output failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");

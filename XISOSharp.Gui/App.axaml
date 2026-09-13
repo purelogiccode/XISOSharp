@@ -1,11 +1,240 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fluent="using:Avalonia.Themes.Fluent"
+             xmlns:sys="using:System"
              x:Class="XISOSharp.Gui.App"
              RequestedThemeVariant="Dark">
              <!-- Dark-only UI: the variant is pinned, never follows the OS theme. -->
 
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- Brand palette (accent matches the app icon's green). -->
+            <Color x:Key="AppAccentColor">#6CC24A</Color>
+            <SolidColorBrush x:Key="AppAccentBrush" Color="{StaticResource AppAccentColor}" />
+            <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#FF7ED35E" />
+            <SolidColorBrush x:Key="AppAccentPressedBrush" Color="#FF57A83B" />
+            <SolidColorBrush x:Key="AppAccentForegroundBrush" Color="#FF0B140A" />
+            <SolidColorBrush x:Key="AppAccentDisabledBrush" Color="#FF2E3B2A" />
+            <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#2E6CC24A" />
+            <SolidColorBrush x:Key="AppAccentSoftHoverBrush" Color="#3F6CC24A" />
+            <SolidColorBrush x:Key="AppAccentBorderBrush" Color="#596CC24A" />
+            <SolidColorBrush x:Key="AppRailBrush" Color="#FF0F1620" />
+            <SolidColorBrush x:Key="AppSurfaceBrush" Color="#FF121A25" />
+            <SolidColorBrush x:Key="AppSurfaceHoverBrush" Color="#FF1B2634" />
+            <SolidColorBrush x:Key="AppBorderBrush" Color="#FF22303F" />
+            <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#FFE9EEF6" />
+            <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#FF9AA7B8" />
+            <SolidColorBrush x:Key="AppTextMutedBrush" Color="#FF6B7889" />
+            <SolidColorBrush x:Key="AppLogBrush" Color="#FF0B1017" />
+
+            <LinearGradientBrush x:Key="AppWindowBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+                <GradientStop Offset="0" Color="#FF101823" />
+                <GradientStop Offset="1" Color="#FF090D13" />
+            </LinearGradientBrush>
+
+            <!-- Shape + density overrides for the Fluent control set. -->
+            <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
+            <CornerRadius x:Key="OverlayCornerRadius">12</CornerRadius>
+            <Thickness x:Key="ButtonPadding">14,7,14,7</Thickness>
+            <Thickness x:Key="TextControlThemePadding">10,7,8,7</Thickness>
+            <sys:Double x:Key="TextControlThemeMinHeight">34</sys:Double>
+
+            <!-- Input surfaces: one elevated fill across rest/hover/focus. -->
+            <SolidColorBrush x:Key="TextControlBackground" Color="#FF161F2C" />
+            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FF1B2634" />
+            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FF161F2C" />
+            <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#FF10161F" />
+            <SolidColorBrush x:Key="TextControlBorderBrush" Color="#FF2A3646" />
+            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#FF3D4D62" />
+            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="{StaticResource AppAccentColor}" />
+            <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#FF1D2634" />
+            <SolidColorBrush x:Key="TextControlForeground" Color="#FFE9EEF6" />
+            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#FFE9EEF6" />
+            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#FF6B7889" />
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#FF7C899A" />
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#FF7C899A" />
+            <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#806CC24A" />
+
+            <!-- Combo boxes follow the same input surface. -->
+            <SolidColorBrush x:Key="ComboBoxBackground" Color="#FF161F2C" />
+            <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#FF1B2634" />
+            <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#FF202C3C" />
+            <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#FF10161F" />
+            <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#FF2A3646" />
+            <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#FF3D4D62" />
+            <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#FF3D4D62" />
+            <SolidColorBrush x:Key="ComboBoxForeground" Color="#FFE9EEF6" />
+            <SolidColorBrush x:Key="ComboBoxForegroundFocused" Color="#FFE9EEF6" />
+            <SolidColorBrush x:Key="ComboBoxForegroundFocusedPressed" Color="#FFE9EEF6" />
+            <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#FF141C28" />
+            <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#FF2A3646" />
+            <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#FF9AA7B8" />
+            <SolidColorBrush x:Key="ComboBoxDropDownGlyphForegroundFocused" Color="#FFE9EEF6" />
+
+            <!-- Modern left-rail TabControl: nav card + content card. -->
+            <ControlTheme x:Key="{x:Type TabControl}" TargetType="TabControl">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Padding" Value="18" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Grid.Column="0"
+                                    MinWidth="184"
+                                    Margin="0,0,14,0"
+                                    Padding="8"
+                                    Background="{DynamicResource AppRailBrush}"
+                                    BorderBrush="{DynamicResource AppBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="16">
+                                <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                              VerticalScrollBarVisibility="Auto">
+                                    <ItemsPresenter Name="PART_ItemsPresenter"
+                                                    ItemsPanel="{TemplateBinding ItemsPanel}" />
+                                </ScrollViewer>
+                            </Border>
+                            <Border Grid.Column="1"
+                                    Padding="{TemplateBinding Padding}"
+                                    Background="{DynamicResource AppSurfaceBrush}"
+                                    BorderBrush="{DynamicResource AppBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="16">
+                                <ContentPresenter Name="PART_SelectedContentHost"
+                                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter>
+            </ControlTheme>
+
+            <!-- Nav item: rounded pill, accent bar + tint when selected. -->
+            <ControlTheme x:Key="{x:Type TabItem}" TargetType="TabItem">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+                <Setter Property="Padding" Value="8,9,14,9" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border Name="PART_LayoutRoot"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Border Name="PART_SelectedPipe"
+                                        Width="3" Height="16"
+                                        Margin="0,0,9,0"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        Background="{DynamicResource AppAccentBrush}"
+                                        CornerRadius="2"
+                                        IsVisible="False" />
+                                <ContentPresenter Name="PART_ContentPresenter"
+                                                  Grid.Column="1"
+                                                  Content="{TemplateBinding Header}"
+                                                  ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                                  VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </Setter>
+                <Style Selector="^:selected">
+                    <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+                </Style>
+                <Style Selector="^:selected /template/ Border#PART_SelectedPipe">
+                    <Setter Property="IsVisible" Value="True" />
+                </Style>
+                <Style Selector="^:pointerover">
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+                </Style>
+                <Style Selector="^:selected:pointerover">
+                    <Setter Property="Background" Value="{DynamicResource AppAccentSoftHoverBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+                </Style>
+                <Style Selector="^:pressed">
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}" />
+                </Style>
+            </ControlTheme>
+        </ResourceDictionary>
+    </Application.Resources>
+
     <Application.Styles>
-        <!-- No Mode attribute: FluentTheme follows RequestedThemeVariant="Dark" above. -->
-        <FluentTheme />
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <fluent:ColorPaletteResources x:Key="Dark"
+                                              Accent="#6CC24A"
+                                              RegionColor="#0A0E14"
+                                              ChromeLow="#0E131B"
+                                              ChromeMedium="#121924"
+                                              ChromeMediumLow="#17202D"
+                                              ChromeHigh="#2C3A4C"
+                                              ChromeDisabledHigh="#232F3E"
+                                              ChromeDisabledLow="#5E6B7C"
+                                              ChromeGray="#7E8B9C"
+                                              ChromeAltLow="#DCE4EE"
+                                              ChromeBlackHigh="#000000"
+                                              ChromeBlackLow="#33000000"
+                                              ChromeBlackMedium="#CC000000"
+                                              ChromeBlackMediumLow="#66000000"
+                                              ChromeWhite="#FFFFFF"
+                                              AltHigh="#0A0E14"
+                                              AltLow="#330A0E14"
+                                              AltMedium="#990A0E14"
+                                              AltMediumHigh="#CC0A0E14"
+                                              AltMediumLow="#66141C28"
+                                              BaseHigh="#E9EEF6"
+                                              BaseLow="#26FFFFFF"
+                                              BaseMedium="#9AA7B8"
+                                              BaseMediumHigh="#C3CDD9"
+                                              BaseMediumLow="#7C899A"
+                                              ErrorText="#FF7A7A"
+                                              ListLow="#14FFFFFF"
+                                              ListMedium="#24000000" />
+            </FluentTheme.Palettes>
+        </FluentTheme>
+
+        <Style Selector="Button">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Button.accent /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AppAccentForegroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+        </Style>
+
+        <Style Selector="Button.accent:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AppAccentHoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AppAccentForegroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentHoverBrush}" />
+        </Style>
+
+        <Style Selector="Button.accent:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AppAccentPressedBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AppAccentForegroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentPressedBrush}" />
+        </Style>
+
+        <Style Selector="Button.accent:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AppAccentDisabledBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextMutedBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentDisabledBrush}" />
+        </Style>
+
+        <Style Selector="CheckBox">
+            <Setter Property="MinHeight" Value="28" />
+        </Style>
+
+        <Style Selector="ProgressBar">
+            <Setter Property="MinHeight" Value="6" />
+            <Setter Property="CornerRadius" Value="3" />
+        </Style>
     </Application.Styles>
 </Application>

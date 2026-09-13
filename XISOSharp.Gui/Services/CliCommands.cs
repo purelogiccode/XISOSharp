@@ -331,6 +331,32 @@ internal static class CliCommands
     }
 
     /// <summary>
+    /// Builds the ZAR argv (<c>--zar</c> with optional collision policy and <c>-o</c> output).
+    /// </summary>
+    /// <param name="source">Source ISO/XISO/Redump image.</param>
+    /// <param name="output">Optional <c>.zar</c> output path (auto-derived when null).</param>
+    /// <param name="policy">Optional non-interactive policy: <c>overwrite</c>, <c>skip</c>, or <c>auto-rename</c>.</param>
+    /// <returns>The ZAR argument list.</returns>
+    internal static string[] Zar(string source, string? output, string? policy)
+    {
+        List<string> args = new() { "--zar" };
+        if (!string.IsNullOrWhiteSpace(policy))
+        {
+            args.Add("--policy");
+            args.Add(policy);
+        }
+
+        if (!string.IsNullOrWhiteSpace(output))
+        {
+            args.Add("-o");
+            args.Add(output);
+        }
+
+        args.Add(source);
+        return [.. args];
+    }
+
+    /// <summary>
     /// Builds the decompress argv (<c>decompress</c> CSO plus optional output).
     /// </summary>
     /// <param name="cso">Source CSO path.</param>

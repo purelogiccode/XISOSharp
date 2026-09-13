@@ -73,11 +73,14 @@ dotnet publish XISOSharp.Cli -c Release -r linux-x64 --self-contained
 # binaries land in publish-gui/<rid>/XISOSharp.Gui(.exe), ~80 MB each
 ```
 
-`XISOSharp.Gui` is a dark-theme front-end that drives the `XISOSharp` CLI as a child
+`XISOSharp.Gui` is a modern dark-theme front-end (left navigation rail, card layout,
+green accent) that drives the `XISOSharp` CLI as a child
 process via the shared core `ProcessRunner` + `ToolLocator` (override → sibling →
-`PATH` + `-v` probe; extract/create/rewrite/rebuild/compress/decompress/validate/batch plus
+`PATH` + `-v` probe; extract/create/rewrite/rebuild/compress/zar/decompress/validate/batch plus
 list/tree/info/unpack/copy-out/checksum, live log, cancel, overwrite `-y`/`-n`
-switch). Files and folders can be **dragged onto the window**: a single image queues
+switch). The **ZAR** tab packs an ISO/XISO/Redump image into a `.zar`
+(ZArchive/zstd, loadable in Xenia canary) and offers overwrite/skip/auto-rename
+collision policies. Files and folders can be **dragged onto the window**: a single image queues
 Extract, a single `.cso` queues Decompress, multiple images queue Rewrite, and a folder
 queues Batch (when it contains `*.iso`) or Create. Input==output mistakes are refused
 before the CLI runs. It finds the CLI next to itself, on `PATH`, or via the Settings tab

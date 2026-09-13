@@ -5,59 +5,135 @@
         x:DataType="vm:MainViewModel"
         Title="XISOSharp"
         Icon="avares://XISOSharp.Gui/icon/icon.ico"
-        Width="1020" Height="780" MinWidth="760" MinHeight="600"
+        Width="1060" Height="820" MinWidth="800" MinHeight="620"
+        Background="{DynamicResource AppWindowBrush}"
         DragDrop.AllowDrop="True">
 
   <Window.Styles>
     <Style Selector="TextBlock.section">
       <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="FontSize" Value="14" />
-      <Setter Property="Margin" Value="0,12,0,4" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="Margin" Value="0,14,0,6" />
     </Style>
     <Style Selector="TextBlock.hint">
-      <Setter Property="Opacity" Value="0.65" />
+      <Setter Property="Foreground" Value="{DynamicResource AppTextMutedBrush}" />
       <Setter Property="FontSize" Value="12" />
       <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="Grid.row">
-      <Setter Property="Margin" Value="0,3" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+    </Style>
+
+    <!-- Header -->
+    <Style Selector="TextBlock.apptitle">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.appsubtitle">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource AppTextMutedBrush}" />
+    </Style>
+    <Style Selector="Border.logomark">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="Height" Value="40" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="TextBlock.logomarktext">
+      <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontWeight" Value="ExtraBold" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Cards -->
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="16" />
+      <Setter Property="Padding" Value="14" />
+      <Setter Property="BoxShadow" Value="0 10 24 0 #59000000" />
+    </Style>
+    <Style Selector="Border.statusbar">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="12,9" />
+    </Style>
+    <Style Selector="TextBox.log">
+      <Setter Property="Background" Value="{DynamicResource AppLogBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+      <Setter Property="FontFamily" Value="Consolas,Menlo,monospace" />
+      <Setter Property="FontSize" Value="12" />
     </Style>
   </Window.Styles>
 
-  <DockPanel Margin="10">
+  <DockPanel Margin="16">
     <!-- Header -->
-    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
-      <TextBlock Text="XISOSharp" FontSize="20" FontWeight="Bold" VerticalAlignment="Center" />
-      <TextBlock Text="desktop front-end for the XISOSharp CLI" VerticalAlignment="Center" Opacity="0.65" />
-      <TextBlock Text="Tip: drop .iso/.cso/.zar files or folders anywhere — the matching tab fills in."
-                 VerticalAlignment="Center" Opacity="0.65" FontSize="12" />
-    </StackPanel>
+    <Border DockPanel.Dock="Top" Margin="2,0,2,14">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <Border Classes="logomark">
+            <TextBlock Classes="logomarktext" Text="X" />
+          </Border>
+          <StackPanel VerticalAlignment="Center" Spacing="1">
+            <TextBlock Classes="apptitle" Text="XISOSharp" />
+            <TextBlock Classes="appsubtitle"
+                       Text="Extract, create, rewrite and archive Xbox disc images" />
+          </StackPanel>
+        </StackPanel>
+        <TextBlock Grid.Column="2" Classes="hint" VerticalAlignment="Center" MaxWidth="360"
+                   TextAlignment="Right"
+                   Text="Drop .iso / .xiso / .cso / .zar files or folders anywhere — the matching tab fills in." />
+      </Grid>
+    </Border>
 
     <!-- Status bar -->
-    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="10" Margin="0,6,0,0" VerticalAlignment="Center">
-      <ProgressBar IsVisible="{Binding IsRunning}" IsIndeterminate="True" Width="140" VerticalAlignment="Center" />
-      <Button Content="Cancel" Command="{Binding CancelRunCommand}" IsEnabled="{Binding IsRunning}" />
-      <TextBlock Text="{Binding LastExit}" VerticalAlignment="Center" />
-      <TextBlock Text="{Binding CliStatus}" VerticalAlignment="Center" Opacity="0.8" TextWrapping="Wrap" />
-    </StackPanel>
+    <Border DockPanel.Dock="Bottom" Classes="statusbar" Margin="0,14,0,0">
+      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+        <ProgressBar IsVisible="{Binding IsRunning}" IsIndeterminate="True" Width="160" VerticalAlignment="Center" />
+        <Button Classes="accent" Content="Cancel" Command="{Binding CancelRunCommand}" IsEnabled="{Binding IsRunning}" />
+        <TextBlock Text="{Binding LastExit}" VerticalAlignment="Center" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding CliStatus}" VerticalAlignment="Center"
+                   Foreground="{DynamicResource AppTextMutedBrush}" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
 
     <!-- Log console -->
-    <StackPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
-      <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,4">
-        <TextBlock Text="CLI output" FontWeight="Bold" VerticalAlignment="Center" />
-        <Button Content="Clear" Command="{Binding ClearLogCommand}" />
-        <CheckBox Content="Overwrite existing outputs (-y, else -n)" IsChecked="{Binding OverwriteExisting}" VerticalAlignment="Center" />
-      </StackPanel>
-      <TextBox Name="LogBox" Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True"
-               FontFamily="Consolas,Menlo,monospace" FontSize="12" Height="170"
-               ScrollViewer.VerticalScrollBarVisibility="Auto" TextChanged="LogBox_TextChanged" />
-    </StackPanel>
+    <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,14,0,0">
+      <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,10">
+          <TextBlock Text="CLI output" Classes="section" Margin="0" VerticalAlignment="Center" />
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12">
+            <Button Content="Clear" Command="{Binding ClearLogCommand}" />
+            <CheckBox Content="Overwrite existing outputs (-y, else -n)" IsChecked="{Binding OverwriteExisting}"
+                      VerticalAlignment="Center" />
+          </StackPanel>
+        </Grid>
+        <TextBox Name="LogBox" Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True"
+                 Classes="log" Height="170"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto" TextChanged="LogBox_TextChanged" />
+      </DockPanel>
+    </Border>
 
     <!-- Operation tabs -->
-    <TabControl Name="OpTabs" Margin="0,0,0,6">
+    <TabControl Name="OpTabs" TabStripPlacement="Left">
+      <TabControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <StackPanel Spacing="3" />
+        </ItemsPanelTemplate>
+      </TabControl.ItemsPanel>
+
       <TabItem Header="Extract">
         <ScrollViewer>
-          <StackPanel Margin="4">
+          <StackPanel>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Image (.iso/.cso/.zar)" VerticalAlignment="Center" />
               <TextBox Grid.Column="1" Text="{Binding ExImage}" PlaceholderText="game.iso" />
@@ -68,8 +144,8 @@
               <TextBox Grid.Column="1" Text="{Binding ExDest}" PlaceholderText="(same folder as image)" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseExDest_Click" Margin="6,0,0,0" />
             </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-              <Button Content="Extract" Command="{Binding RunExtractCommand}" IsEnabled="{Binding CanRun}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+              <Button Classes="accent" Content="Extract" Command="{Binding RunExtractCommand}" IsEnabled="{Binding CanRun}" />
               <Button Content="List" Command="{Binding RunListCommand}" IsEnabled="{Binding CanRun}" />
               <Button Content="Tree" Command="{Binding RunTreeCommand}" IsEnabled="{Binding CanRun}" />
               <Button Content="Unpack" Command="{Binding RunUnpackCommand}" IsEnabled="{Binding CanRun}" />
@@ -96,7 +172,7 @@
 
       <TabItem Header="Create">
         <ScrollViewer>
-          <StackPanel Margin="4">
+          <StackPanel>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Source directory" VerticalAlignment="Center" />
               <TextBox Grid.Column="1" Text="{Binding CrSource}" />
@@ -106,20 +182,20 @@
               <TextBlock Text="Image name" VerticalAlignment="Center" />
               <TextBox Grid.Column="1" Text="{Binding CrName}" PlaceholderText="(defaults to directory name)" />
             </Grid>
-            <TextBlock Text="Exclude globs (-X, one per line)" Margin="0,6,0,2" />
+            <TextBlock Text="Exclude globs (-X, one per line)" Margin="0,8,0,2" />
             <TextBox Text="{Binding CrExcludes}" AcceptsReturn="True" Height="70" PlaceholderText="*.tmp&#x0a;screenshots/**" />
-            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,10,0,0">
               <CheckBox Content="Skip $SystemUpdate (-s)" IsChecked="{Binding CrSkipSystemUpdate}" />
               <CheckBox Content="Disable .xbe media patch (-m)" IsChecked="{Binding CrDisableXbePatch}" />
             </StackPanel>
-            <Button Content="Create image" Command="{Binding RunCreateCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
+            <Button Classes="accent" Content="Create image" Command="{Binding RunCreateCommand}" IsEnabled="{Binding CanRun}" Margin="0,12,0,0" HorizontalAlignment="Left" />
           </StackPanel>
         </ScrollViewer>
       </TabItem>
 
       <TabItem Header="Rewrite">
         <ScrollViewer>
-          <StackPanel Margin="4">
+          <StackPanel>
             <TextBlock Text="Images (one per line)" Margin="0,0,0,2" />
             <TextBox Text="{Binding RwImages}" AcceptsReturn="True" Height="70" PlaceholderText="game.iso" />
             <Button Content="Add images…" Click="AddRwImages_Click" HorizontalAlignment="Left" Margin="0,4,0,0" />
@@ -133,7 +209,7 @@
               <TextBox Grid.Column="1" Text="{Binding RwWorkDir}" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseRwWorkDir_Click" Margin="6,0,0,0" />
             </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,10,0,0">
               <CheckBox Content="Delete old (-D)" IsChecked="{Binding RwDeleteOld}" />
               <CheckBox Content="Disable .xbe patch (-m)" IsChecked="{Binding RwDisableXbePatch}" />
             </StackPanel>
@@ -148,7 +224,7 @@
               <TextBox Grid.Column="1" Text="{Binding RwReport}" PlaceholderText="(optional) report.json" />
               <Button Grid.Column="2" Content="Save as…" Click="BrowseRwReport_Click" Margin="6,0,0,0" />
             </Grid>
-            <Button Content="Rewrite" Command="{Binding RunRewriteCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
+            <Button Classes="accent" Content="Rewrite" Command="{Binding RunRewriteCommand}" IsEnabled="{Binding CanRun}" Margin="0,12,0,0" HorizontalAlignment="Left" />
             <TextBlock Classes="section" Text="Wipe / trim (Redump archival)" />
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Image" VerticalAlignment="Center" />
@@ -159,7 +235,7 @@
               <TextBlock Text="Output" VerticalAlignment="Center" />
               <TextBox Grid.Column="1" Text="{Binding WpOutput}" PlaceholderText="(optional)" />
             </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
               <Button Content="Wipe filler" Command="{Binding RunWipeCommand}" IsEnabled="{Binding CanRun}" />
               <Button Content="Trim" Command="{Binding RunTrimCommand}" IsEnabled="{Binding CanRun}" />
             </StackPanel>
@@ -169,7 +245,7 @@
 
       <TabItem Header="Rebuild">
         <ScrollViewer>
-          <StackPanel Margin="4">
+          <StackPanel>
             <TextBlock Text="Components, one per line: &lt;xiso|game.zar&gt; [video.iso] [filler|seed] [su…]" Margin="0,0,0,2" />
             <TextBox Text="{Binding RbParts}" AcceptsReturn="True" Height="90" PlaceholderText="game.xiso&#x0a;video.iso" />
             <Button Content="Add files…" Click="AddRbParts_Click" HorizontalAlignment="Left" Margin="0,4,0,0" />
@@ -183,14 +259,14 @@
               <TextBox Grid.Column="1" Text="{Binding RbSectors}" PlaceholderText="(optional) sectors.txt" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseRbSectors_Click" Margin="6,0,0,0" />
             </Grid>
-            <Button Content="Rebuild" Command="{Binding RunRebuildCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
+            <Button Classes="accent" Content="Rebuild" Command="{Binding RunRebuildCommand}" IsEnabled="{Binding CanRun}" Margin="0,12,0,0" HorizontalAlignment="Left" />
           </StackPanel>
         </ScrollViewer>
       </TabItem>
 
       <TabItem Header="Compress">
         <ScrollViewer>
-          <StackPanel Margin="4">
+          <StackPanel>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Source (dir or ISO)" VerticalAlignment="Center" />
               <TextBox Grid.Column="1" Text="{Binding CpSource}" />
@@ -217,14 +293,40 @@
               <TextBox Grid.Column="1" Text="{Binding CpSplit}" PlaceholderText="(default ~4 GiB; 0 = single .cso)" />
             </Grid>
             <TextBlock Classes="hint" Text="Level 0 = store, 9 = smallest (default). Version 2 writes LZ4 sectors, version 1 classic DEFLATE." />
-            <Button Content="Compress" Command="{Binding RunCompressCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
+            <Button Classes="accent" Content="Compress" Command="{Binding RunCompressCommand}" IsEnabled="{Binding CanRun}" Margin="0,12,0,0" HorizontalAlignment="Left" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="ZAR">
+        <ScrollViewer>
+          <StackPanel>
+            <TextBlock Text="Source (ISO / XISO / Redump .iso) — one file" Margin="0,0,0,2" />
+            <Grid Classes="row" ColumnDefinitions="150,*,Auto">
+              <TextBlock Text="Source image" VerticalAlignment="Center" />
+              <TextBox Grid.Column="1" Text="{Binding ZaSource}" PlaceholderText="game.iso" />
+              <Button Grid.Column="2" Content="File…" Click="BrowseZaSourceFile_Click" Margin="6,0,0,0" />
+            </Grid>
+            <Grid Classes="row" ColumnDefinitions="150,*,Auto">
+              <TextBlock Text="Output .zar" VerticalAlignment="Center" />
+              <TextBox Grid.Column="1" Text="{Binding ZaOutput}" PlaceholderText="(auto-derived next to the source)" />
+              <Button Grid.Column="2" Content="Save as…" Click="BrowseZaOutput_Click" Margin="6,0,0,0" />
+            </Grid>
+            <Grid Classes="row" ColumnDefinitions="150,*,Auto">
+              <TextBlock Text="If output exists" VerticalAlignment="Center" />
+              <ComboBox Grid.Column="1" ItemsSource="{Binding ZarPolicies}" SelectedItem="{Binding ZaPolicy}"
+                        HorizontalAlignment="Left" Width="170" />
+            </Grid>
+            <TextBlock Classes="hint" Margin="0,8,0,0"
+                       Text="Packs the image tree with zstd blocks (level 6, raw fallback) into a single .zar that loads directly in Xenia canary. Redump ISOs are auto-detected and packed from the game partition." />
+            <Button Classes="accent" Content="Create ZAR" Command="{Binding RunZarCommand}" IsEnabled="{Binding CanRun}" Margin="0,12,0,0" HorizontalAlignment="Left" />
           </StackPanel>
         </ScrollViewer>
       </TabItem>
 
       <TabItem Header="Decompress">
         <ScrollViewer>
-          <StackPanel Margin="4">
+          <StackPanel>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="CSO file" VerticalAlignment="Center" />
               <TextBox Grid.Column="1" Text="{Binding DcCso}" PlaceholderText="game.cso" />
@@ -235,14 +337,14 @@
               <TextBox Grid.Column="1" Text="{Binding DcOutput}" PlaceholderText="(auto-derived)" />
               <Button Grid.Column="2" Content="Save as…" Click="BrowseDcOutput_Click" Margin="6,0,0,0" />
             </Grid>
-            <Button Content="Decompress" Command="{Binding RunDecompressCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
+            <Button Classes="accent" Content="Decompress" Command="{Binding RunDecompressCommand}" IsEnabled="{Binding CanRun}" Margin="0,12,0,0" HorizontalAlignment="Left" />
           </StackPanel>
         </ScrollViewer>
       </TabItem>
 
       <TabItem Header="Validate">
         <ScrollViewer>
-          <StackPanel Margin="4">
+          <StackPanel>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Source ISO" VerticalAlignment="Center" />
               <TextBox Grid.Column="1" Text="{Binding VaSource}" />
@@ -261,12 +363,12 @@
               <TextBox Grid.Column="1" Text="{Binding VaReport}" PlaceholderText="(optional) report.json" />
               <Button Grid.Column="2" Content="Save as…" Click="BrowseVaReport_Click" Margin="6,0,0,0" />
             </Grid>
-            <Button Content="Validate conversion" Command="{Binding RunValidateCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
+            <Button Classes="accent" Content="Validate conversion" Command="{Binding RunValidateCommand}" IsEnabled="{Binding CanRun}" Margin="0,12,0,0" HorizontalAlignment="Left" />
             <TextBlock Classes="section" Text="Image checksums (SHA3-256)" />
             <TextBlock Text="Images (one per line; empty = validate-tab source)" Margin="0,0,0,2" />
             <TextBox Text="{Binding CsImages}" AcceptsReturn="True" Height="70" />
             <Button Content="Add images…" Click="AddCsImages_Click" HorizontalAlignment="Left" Margin="0,4,0,0" />
-            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,10,0,0">
               <CheckBox Content="Silent (hashes only)" IsChecked="{Binding CsSilent}" />
               <Button Content="Checksum" Command="{Binding RunChecksumCommand}" IsEnabled="{Binding CanRun}" />
             </StackPanel>
@@ -276,7 +378,7 @@
 
       <TabItem Header="Batch">
         <ScrollViewer>
-          <StackPanel Margin="4">
+          <StackPanel>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Directory" VerticalAlignment="Center" />
               <TextBox Grid.Column="1" Text="{Binding BaDir}" />
@@ -295,22 +397,22 @@
               <Button Grid.Column="2" Content="Browse…" Click="BrowseBaDest_Click" Margin="6,0,0,0" />
             </Grid>
             <TextBlock Classes="hint" Text="Processes every .iso in the directory (extract, list, tree, rewrite, audit)." />
-            <Button Content="Run batch" Command="{Binding RunBatchCommand}" IsEnabled="{Binding CanRun}" Margin="0,10,0,0" HorizontalAlignment="Left" />
+            <Button Classes="accent" Content="Run batch" Command="{Binding RunBatchCommand}" IsEnabled="{Binding CanRun}" Margin="0,12,0,0" HorizontalAlignment="Left" />
           </StackPanel>
         </ScrollViewer>
       </TabItem>
 
       <TabItem Header="Settings">
         <ScrollViewer>
-          <StackPanel Margin="4">
+          <StackPanel>
             <TextBlock Classes="section" Text="XISOSharp CLI" />
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="CLI path" VerticalAlignment="Center" />
               <TextBox Grid.Column="1" Text="{Binding CliPath}" PlaceholderText="(auto-detect)" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseCliPath_Click" Margin="6,0,0,0" />
             </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-              <Button Content="Detect + probe" Command="{Binding DetectCliCommand}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+              <Button Classes="accent" Content="Detect + probe" Command="{Binding DetectCliCommand}" />
               <Button Content="Save settings" Command="{Binding SaveSettingsCommand}" />
             </StackPanel>
             <TextBlock Text="{Binding CliStatus}" Margin="0,8,0,0" TextWrapping="Wrap" />

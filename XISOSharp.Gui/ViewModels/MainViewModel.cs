@@ -52,6 +52,7 @@ internal sealed partial class MainViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(RunTrimCommand))]
     [NotifyCanExecuteChangedFor(nameof(RunRebuildCommand))]
     [NotifyCanExecuteChangedFor(nameof(RunCompressCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunZarCommand))]
     [NotifyCanExecuteChangedFor(nameof(RunDecompressCommand))]
     [NotifyCanExecuteChangedFor(nameof(RunValidateCommand))]
     [NotifyCanExecuteChangedFor(nameof(RunChecksumCommand))]
@@ -206,6 +207,20 @@ internal sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial string CpSplit { get; set; } = string.Empty;
 
+    // ZAR tab
+    /// <summary>Gets or sets the source image (ISO/XISO/Redump) to pack into a <c>.zar</c>.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunZarCommand))]
+    public partial string ZaSource { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the optional <c>.zar</c> output path (auto-derived when empty).</summary>
+    [ObservableProperty]
+    public partial string ZaOutput { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the selected overwrite policy label (<see cref="ZarPolicies"/>).</summary>
+    [ObservableProperty]
+    public partial string ZaPolicy { get; set; } = "Overwrite";
+
     // Decompress tab
     /// <summary>Gets or sets the source CSO path for decompression.</summary>
     [ObservableProperty]
@@ -268,6 +283,9 @@ internal sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the CISO version choices offered in the UI.</summary>
     internal IReadOnlyList<string> CisoVersions { get; } = ["1", "2"];
+
+    /// <summary>Gets the ZAR output-exists policies offered in the UI.</summary>
+    internal IReadOnlyList<string> ZarPolicies { get; } = ["Overwrite", "Skip", "Auto-rename"];
 
     /// <summary>
     /// Loads persisted settings and probes for the CLI at startup.
@@ -407,6 +425,8 @@ internal sealed partial class MainViewModel : ObservableObject
 
     private bool CanRunCompress() => !IsRunning && !string.IsNullOrWhiteSpace(CpSource);
 
+    private bool CanRunZar() => !IsRunning && !string.IsNullOrWhiteSpace(ZaSource);
+
     private bool CanRunDecompress() => !IsRunning && !string.IsNullOrWhiteSpace(DcCso);
 
     private bool CanRunValidate() =>
@@ -510,6 +530,26 @@ internal sealed partial class MainViewModel : ObservableObject
             return RunJobAsync("compress", CliCommands.Compress(source, NullIfEmpty(CpOutput),
                 Math.Clamp(CpLevel, 0, 9), string.Equals(CpVersion, "1", StringComparison.Ordinal) ? 1 : 2,
                 NullIfEmpty(CpSplit), OverwriteExisting));
+        });
+
+    [RelayCommand(CanExecute = nameof(CanRunZar))]
+    private Task RunZarAsync() =>
+        GuardedAsync(() =>
+        {
+            string source = RequireValue(ZaSource, "source image");
+            string? output = NullIfEmpty(ZaOutput);
+            if (output is not null)
+            {
+                ThrowIfSameOutput(output, [source], "ZAR output");
+            }
+
+            string policy = ZaPolicy switch
+            {
+                "Skip" => "skip",
+                "Auto-rename" => "auto-rename",
+                _ => "overwrite",
+            };
+            return RunJobAsync("zar", CliCommands.Zar(source, output, policy));
         });
 
     [RelayCommand(CanExecute = nameof(CanRunDecompress))]
