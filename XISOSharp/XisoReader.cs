@@ -46,15 +46,27 @@ public static class XisoReader
     /// <c>.old</c> — still resolve to the decompressed view.
     /// The caller owns the returned stream.
     /// </summary>
-    public static Stream OpenImageStream(string path)
+    public static Stream OpenImageStream(string path) => OpenImageStream(path, FileShare.Read);
+
+    /// <summary>
+    /// Opens an image for reading with a caller-chosen share mode. Plain ISO
+    /// files pass <paramref name="share"/> straight to the <see cref="FileStream"/>,
+    /// so a host process that coexists with writers (AV scanners, sync clients)
+    /// can request <see cref="FileShare.ReadWrite"/>. CISO inputs thread the share
+    /// mode through <see cref="CisoBlockDevice"/> to the underlying part files.
+    /// The caller owns the returned stream.
+    /// </summary>
+    /// <param name="path">Path to the image (plain <c>.iso</c> or <c>.cso</c>).</param>
+    /// <param name="share">File sharing mode for the underlying plain-ISO <see cref="FileStream"/>.</param>
+    public static Stream OpenImageStream(string path, FileShare share)
     {
         if (IsCsoPath(path) || CisoReader.IsCso(path))
-            return new BlockDeviceStream(new CisoBlockDevice(path), leaveOpen: false);
+            return new BlockDeviceStream(new CisoBlockDevice(path, share), leaveOpen: false);
         return new FileStream(
             path,
             new FileStreamOptions
             {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
+                Mode = FileMode.Open, Access = FileAccess.Read, Share = share, BufferSize = 65536
             });
     }
 
@@ -2040,7 +2052,27 @@ public static class XisoReader
             ReadExact(fs, intBuf);
             uint rootDirSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
 
-            return new VolumeInfo(true, rootDirSector, rootDirSize, discLseek, fileLength, totalSectors);
+            // The probe already positioned us right after the root fields, so the
+            // descriptor FILETIME comes straight off the same read (2.3) — no
+            // second open/probe like GetFileTime needs.
+            ulong fileTimeRaw = 0;
+            try
+            {
+                Span<byte> timeBuf = stackalloc byte[8];
+                ReadExact(fs, timeBuf);
+                fileTimeRaw = BinaryPrimitives.ReadUInt64LittleEndian(timeBuf);
+            }
+            catch (IOException)
+            {
+                // Truncated descriptor tail: leave the raw value at 0.
+            }
+
+            return new VolumeInfo(true, rootDirSector, rootDirSize, discLseek, fileLength, totalSectors)
+            {
+                CreationTime = FileTimeHelper.FromFileTimeRaw(fileTimeRaw),
+                FileTimeRaw = fileTimeRaw,
+                DescriptorSector = (int)((Constants.HeaderOffset + discLseek) / Constants.SectorSize),
+            };
         }
         catch (IOException)
         {
@@ -3376,6 +3408,87 @@ public static class XisoReader
             return SHA512.Create();
 
         throw new NotSupportedException($"Hash algorithm '{algorithm.Name}' is not supported.");
+    }
+
+    /// <summary>
+    /// Reads up to <paramref name="buffer"/>.Length bytes of a file's data
+    /// starting at <paramref name="fileOffset"/>; returns the bytes actually read
+    /// (0 when <paramref name="fileOffset"/> is at/after the file end). The read
+    /// is clamped to the entry's own <c>FileSize</c>, never the image length, so
+    /// a corrupt TOC cannot leak the next file's sectors. No extraction to disk:
+    /// the image is opened with <see cref="FileShare.Read"/> for the call.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file (plain <c>.iso</c> or <c>.cso</c>).</param>
+    /// <param name="internalPath">File path within the ISO (e.g. <c>"/sub/file.bin"</c>).</param>
+    /// <param name="buffer">Destination buffer.</param>
+    /// <param name="fileOffset">Byte offset within the file's data extent.</param>
+    /// <returns>Bytes actually read (0 at or past the file end).</returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="fileOffset"/> is negative.
+    /// </exception>
+    /// <exception cref="InvalidDataException">
+    /// Thrown when the path does not exist or names a directory.
+    /// </exception>
+    /// <exception cref="XisoFormatException">Thrown when the ISO is not a valid XISO image.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static int ReadFileBytes(string isoPath, string internalPath, Span<byte> buffer, long fileOffset)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(fileOffset);
+        using Stream fs = OpenImageStream(isoPath);
+        return ReadFileBytes(fs, isoPath, internalPath, buffer, fileOffset);
+    }
+
+    /// <summary>
+    /// Stream overload of <see cref="ReadFileBytes(string, string, Span{byte}, long)"/>
+    /// over an already-open image (plain or CISO-backed). The stream must be
+    /// readable + seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name of the image (used in error messages).</param>
+    /// <param name="internalPath">File path within the image.</param>
+    /// <param name="buffer">Destination buffer.</param>
+    /// <param name="fileOffset">Byte offset within the file's data extent.</param>
+    /// <returns>Bytes actually read (0 at or past the file end).</returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="fileOffset"/> is negative.
+    /// </exception>
+    /// <exception cref="InvalidDataException">
+    /// Thrown when the path does not exist or names a directory.
+    /// </exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static int ReadFileBytes(
+        Stream imageStream, string imageName, string internalPath, Span<byte> buffer, long fileOffset)
+    {
+        ArgumentNullException.ThrowIfNull(imageStream);
+        ArgumentOutOfRangeException.ThrowIfNegative(fileOffset);
+        if (buffer.IsEmpty)
+            return 0;
+
+        EntryInfo entry = GetEntryInfo(imageStream, imageName, internalPath)
+                          ?? throw new InvalidDataException($"Path not found: {internalPath}");
+        if (entry.IsDirectory)
+            throw new InvalidDataException($"Cannot read a directory: {internalPath}");
+        if (fileOffset >= entry.FileSize)
+            return 0;
+
+        VolumeInfo volInfo = GetVolumeInfo(imageStream);
+        if (!volInfo.IsValid)
+            throw new XisoFormatException($"Not a valid XISO: {imageName}");
+
+        int toRead = (int)Math.Min(buffer.Length, entry.FileSize - fileOffset);
+        imageStream.Seek(((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek + fileOffset,
+            SeekOrigin.Begin);
+
+        int total = 0;
+        while (total < toRead)
+        {
+            int read = imageStream.Read(buffer[total..toRead]);
+            if (read <= 0)
+                break;
+            total += read;
+        }
+
+        return total;
     }
 
     /// <summary>

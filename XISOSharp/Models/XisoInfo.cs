@@ -20,6 +20,26 @@ public record VolumeInfo(
     long TotalSectors)
 {
     /// <summary>
+    /// Volume descriptor FILETIME as a timestamp (UTC). <c>null</c> when the
+    /// volume is invalid; raw 0 maps to 1601-01-01. Agrees with
+    /// <see cref="XisoReader.GetFileTime(string, int?)"/> for the same image.
+    /// </summary>
+    public DateTimeOffset? CreationTime { get; init; }
+
+    /// <summary>
+    /// Raw FILETIME field as stored in the descriptor (0 = 1601-01-01).
+    /// Populated by <see cref="XisoReader.GetVolumeInfo(string)"/> from the same
+    /// descriptor read that probes validity.
+    /// </summary>
+    public ulong FileTimeRaw { get; init; }
+
+    /// <summary>
+    /// Sector index the volume descriptor was found at, partition-relative
+    /// (32 normally, 0 for sector-0/rebuilt images). <c>-1</c> when invalid.
+    /// </summary>
+    public int DescriptorSector { get; init; } = -1;
+
+    /// <summary>
     /// Friendly name of the detected disc layout derived from
     /// <see cref="DiscLseek"/>: <c>RAW</c> (plain, offset 0), <c>GLOBAL (XGD2)</c>,
     /// <c>XGD3</c>, <c>XGD2 Hybrid</c>, or <c>XGD1</c>. Returns <c>Unknown</c> when

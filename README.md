@@ -226,7 +226,7 @@ Exit codes: `0` success/`-v`/`-h`/`validate` pass, `1` usage/I/O, `2` validation
 
 ## Using the Library
 
-All in `XISOSharp` namespace (`XISOSharp.Core`). Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), repair types (`XisoRepairer`, `XisoSalvager`), explorer/split/validate (`XisoExplorer`, `XisoSplitter`, `XisoValidator`, `XisoPatcher`), safety types (`UnpackOptions`, `XisoPaths`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `RepairResult`, `SalvageResult`, `XexInfo`, `XbeInfo`, `ValidationResult`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
+All in `XISOSharp` namespace (`XISOSharp.Core`). Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), repair types (`XisoRepairer`, `XisoSalvager`), explorer/split/validate (`XisoExplorer`, `XisoAttributes`, `XisoSplitter`, `XisoValidator`, `XisoPatcher`), safety types (`UnpackOptions`, `XisoPaths`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `RepairResult`, `SalvageResult`, `XexInfo`, `XbeInfo`, `ValidationResult`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
 
 ### Extract / list / info
 
@@ -264,8 +264,12 @@ IReadOnlyList<string> names = XisoReader.ListDirectoryFlat("game.iso", "/media")
 EntryInfo? e = XisoReader.GetEntryInfo("game.iso", "/default.xbe");
 
 // Volume & copy-out
-VolumeInfo vol = XisoReader.GetVolumeInfo("game.iso"); // IsValid, RootDirSector/Size, DiscLseek, DiscFormat, FileLength
+VolumeInfo vol = XisoReader.GetVolumeInfo("game.iso"); // IsValid, RootDirSector/Size, DiscLseek, DiscFormat, FileLength, CreationTime, DescriptorSector
 XisoReader.CopyOut("game.iso", "/media", "./media_out");
+
+// In-place file reads (no extraction; .iso or .cso; bounded to the file size)
+byte[] header = new byte[512];
+int n = XisoReader.ReadFileBytes("game.iso", "/default.xbe", header, fileOffset: 0);
 
 // Copy-in: patch one host file into the image in place (replace or add;
 // keeps game.iso.old backup unless createBackup: false)

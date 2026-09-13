@@ -8,6 +8,7 @@ helpers, format constants, records, enums, delegates, and exceptions.
 - [AvlTree](#avltree)
 - [BoyerMoore](#boyermoore)
 - [FileTimeHelper](#filetimehelper)
+- [XisoExplorer & XisoAttributes](#xisoexplorer--xisoattributes)
 - [Constants](#constants)
 - [XisoValidator](#xisovalidator)
 - [Unpack & path safety](#unpack--path-safety)
@@ -159,6 +160,64 @@ bm.Done();
 `public static class FileTimeHelper` — `void WriteFileTimeNow(Span<byte> destination)`
 writes the current Windows FILETIME (8 bytes, little-endian) into the header area.
 
+## XisoExplorer & XisoAttributes
+
+`public sealed class XisoExplorer` — UI-agnostic explorer over one image (`.iso`,
+single `.cso`, or split `.1.cso`). Stateless by default; `XisoExplorerOptions`
+switches it to keep-open for VFS/mount consumers.
+
+| Member | Description |
+|---|---|
+| `XisoExplorer(string isoPath)` | Opens and probes eagerly; throws `XisoFormatException` on a bad image |
+| `XisoExplorer(string, XisoExplorerOptions)` | Same, with `KeepOpen`/`Share` control |
+| `Volume` | Probed `VolumeInfo` (see records below) |
+| `ListChildren(string)` | Direct children, on-disc order |
+| `GetNode(string)` | Exact-path node or `null`; `"/"` is the synthetic root |
+| `OpenReadStream(string)` / `OpenReadStream(ExplorerNode)` | Bounded seekable `Stream` over a file's extent; directories throw `InvalidDataException` |
+| `CopyOut`, `ComputeHashHex`, `GetXexInfo`, `GetXbeInfo` | Per-node extraction/hashing/XEX/XBE parsing |
+| `Normalize` / `Combine` | Static image-internal path helpers |
+| `Dispose()` | Releases the held stream (keep-open); a no-op in stateless mode |
+
+`XisoExplorerOptions`: `KeepOpen` (hold one stream for the explorer's lifetime) and
+`Share` (plain-ISO `FileShare`, default `FileShare.Read`; use `FileShare.ReadWrite`
+so AV scanners/sync clients can touch the image while mounted).
+
+**Read-bounds contract.** `OpenReadStream`/`ReadFileBytes` expose only a file's own
+`[0, Size)` extent: the offset is `DiscLseek + StartSector * 2048` and the length is
+the entry's `FileSize`, never the image's remaining bytes. A corrupt TOC therefore
+cannot leak the next file's sectors. Seeking at/after the end and reading returns 0
+bytes (standard `Stream` semantics), and short image data simply returns fewer bytes —
+no copy is made, so 4 GB files stream in place. CISO/split-CISO inputs work
+transparently because the stream rides the decompressed block device. A stateless
+explorer's read stream owns the image handle (dispose it); a keep-open explorer's read
+streams stay valid until the explorer is disposed. Operations on a keep-open explorer
+are serialized by an internal lock (mirrors a VFS mounter's single-handle design).
+
+```csharp
+using var explorer = new XisoExplorer("game.cso", new XisoExplorerOptions { KeepOpen = true });
+VolumeInfo vol = explorer.Volume;
+using Stream s = explorer.OpenReadStream("/default.xex");
+s.Seek(0x100, SeekOrigin.Begin);
+int n = s.Read(buffer);                       // 0 at/past the file end
+int oneShot = XisoReader.ReadFileBytes("game.iso", "/default.xbe", buffer, fileOffset: 0);
+```
+
+`XisoReader.ReadFileBytes` has string and stream overloads; the stream overload leaves
+the caller's stream open. Both throw `InvalidDataException` for a missing path or a
+directory target, and `ArgumentOutOfRangeException` for a negative offset.
+
+`public static class XisoAttributes` — pure bit math (no Win32 calls) mapping a raw
+XDVDFS attribute byte to `System.IO.FileAttributes`:
+
+| Raw bit | Windows flag |
+|---|---|
+| always set | `ReadOnly` (images are read-only) |
+| `0x10` / `0x02` / `0x04` / `0x20` | `Directory` / `Hidden` / `System` / `Archive` |
+| none of the above | `Normal` added |
+
+Reserved bits (`0x48`) are masked first, so raw on-disk bytes map identically to the
+already-masked `ExplorerNode.Attributes` / `EntryInfo.Attributes`.
+
 ## Constants
 
 `public static class Constants` — all format constants (see
@@ -250,7 +309,7 @@ Paths are destination-root-relative, forward-slash separated, case-insensitive
 
 | Record | Members |
 |---|---|
-| `VolumeInfo` | `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name), `FileLength`, `TotalSectors` |
+| `VolumeInfo` | `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name), `FileLength`, `TotalSectors`, `CreationTime` (`DateTimeOffset?` from the descriptor FILETIME), `FileTimeRaw`, `DescriptorSector` (32 normally, 0 for rebuilt images, −1 when invalid) |
 | `EntryInfo` | `Name`, `IsDirectory`, `StartSector`, `FileSize`, `Attributes` (masked `0xB7`), `LeftChildOffset`, `RightChildOffset` |
 | `AuditResult` | `IsValid`, `FilesChecked`, `DirsChecked`, `Issues` (incl. `Reserved attribute bits set: 0x…`) |
 | `RepairResult` | `Fixed`, `Remaining`, `BackupPath`, `DryRun`, `Success` — outcome of `XisoReader.Repair` (see [Repair](api-xisoreader.md#repair)) |

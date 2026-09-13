@@ -27,9 +27,24 @@ public sealed class CisoBlockDevice : IBlockDevice
     /// The file handle opened here is owned by this device: if header validation
     /// throws, it is disposed before the exception propagates (no handle leak).
     /// </remarks>
-    public CisoBlockDevice(string csoPath)
+    public CisoBlockDevice(string csoPath) : this(csoPath, FileShare.Read)
     {
-        Stream fs = OpenCsoStream(csoPath);
+    }
+
+    /// <summary>
+    /// Opens a CISO file with a caller-chosen share mode for the underlying
+    /// <c>.cso</c> part files (single-file containers only; split part sets are
+    /// always opened read-shared).
+    /// </summary>
+    /// <param name="csoPath">Path to a <c>.cso</c> file or split <c>*.1.cso</c> part set.</param>
+    /// <param name="share">File sharing mode for the container file.</param>
+    /// <remarks>
+    /// The file handle opened here is owned by this device: if header validation
+    /// throws, it is disposed before the exception propagates (no handle leak).
+    /// </remarks>
+    public CisoBlockDevice(string csoPath, FileShare share)
+    {
+        Stream fs = OpenCsoStream(csoPath, share);
         try
         {
             // Field assignments stay inline: get-only/readonly members cannot be
@@ -130,7 +145,7 @@ public sealed class CisoBlockDevice : IBlockDevice
     }
 
     /// <summary>Opens a CISO source: a plain <c>.cso</c> file or the composite stream over split parts.</summary>
-    private static Stream OpenCsoStream(string path)
+    private static Stream OpenCsoStream(string path, FileShare share)
     {
         if (CisoSplitFile.IsSplitPath(path))
         {
@@ -139,7 +154,7 @@ public sealed class CisoBlockDevice : IBlockDevice
             return parts.Count == 1 ? parts[0] : new CisoSplitInputStream(parts);
         }
 
-        return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        return new FileStream(path, FileMode.Open, FileAccess.Read, share, 65536);
     }
 
     /// <inheritdoc/>

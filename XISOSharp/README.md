@@ -202,18 +202,26 @@ XisoReader.UnpackImage("game.iso", new LocalFilesystem(@"D:\games\out")); // dis
 #### Image explorer (`XisoExplorer`, TODO #11)
 
 UI-agnostic explorer over one `.iso` or `.cso` image (the engine behind the Tester's
-Explore tab). The constructor probes the volume eagerly; every operation opens
-and closes the image, so instances are safe for concurrent background use.
-Paths are image-internal, `/`-separated, case-insensitive.
+Explore tab). The constructor probes the volume eagerly; by default every operation
+opens and closes the image, so instances are safe for concurrent background use.
+Pass `XisoExplorerOptions { KeepOpen = true }` to hold one stream for the explorer's
+lifetime (VFS/mount mode), where operations are serialized by an internal lock and
+`Dispose()` releases the stream. Paths are image-internal, `/`-separated,
+case-insensitive.
 
 ```csharp
-public sealed class XisoExplorer
+public sealed class XisoExplorer : IDisposable
 {
     public XisoExplorer(string isoPath); // fail fast: ArgumentException / FileNotFoundException / XisoFormatException
+    public XisoExplorer(string isoPath, XisoExplorerOptions options); // KeepOpen / Share (FileShare)
     public string IsoPath { get; }
+    public XisoExplorerOptions Options { get; }
     public VolumeInfo Volume { get; }
+    public bool IsKeepOpen { get; }
     public IReadOnlyList<ExplorerNode> ListChildren(string internalPath);
     public ExplorerNode? GetNode(string internalPath); // synthetic "/" root; null when missing
+    public Stream OpenReadStream(string internalPath); // bounded to the file size; InvalidDataException on dir/missing
+    public Stream OpenReadStream(ExplorerNode node);   // ArgumentException when the node is a directory
     public void CopyOut(string internalPath, string destPath, UnpackOptions? options = null,
         CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null);
     public string? ComputeHashHex(string internalPath, HashAlgorithmName algorithm); // null when missing
@@ -221,6 +229,12 @@ public sealed class XisoExplorer
     public XbeInfo? GetXbeInfo(string internalPath); // null when missing/dir/not XBEH
     public static string Combine(string directory, string name);
     public static string Normalize(string? internalPath);
+}
+
+public sealed record XisoExplorerOptions
+{
+    public bool KeepOpen { get; init; }                       // default false
+    public FileShare Share { get; init; } = FileShare.Read;   // FileShare.ReadWrite for writer coexistence
 }
 
 public sealed record ExplorerNode(
@@ -233,6 +247,18 @@ foreach (var node in explorer.ListChildren("/sub"))
     Console.WriteLine($"{node.FullPath} ({node.Size} B)");
 explorer.CopyOut("/docs/readme.txt", "./readme.txt");
 string? sha256 = explorer.ComputeHashHex("/default.xbe", HashAlgorithmName.SHA256);
+
+// In-place reads (VFS/Dokan ReadFile hot path; no extraction, .cso-aware)
+using Stream data = explorer.OpenReadStream("/default.xex");
+data.Seek(0x100, SeekOrigin.Begin);
+int n = data.Read(buffer);                          // 0 at/past the file end
+int oneShot = XisoReader.ReadFileBytes("game.iso", "/default.xbe", buffer, fileOffset: 0);
+
+// Keep-open mount mode: one held handle, serialized ops, read streams die with Dispose
+using var mounted = new XisoExplorer("game.iso",
+    new XisoExplorerOptions { KeepOpen = true, Share = FileShare.ReadWrite });
+VolumeInfo vol = mounted.Volume;                    // CreationTime, DescriptorSector, DiscFormat, ...
+FileAttributes attrs = XisoAttributes.ToWindowsFileAttributes(mounted.GetNode("/default.xbe")!.Attributes);
 ```
 
 #### Image splitting (`XisoSplitter`, TODO #17)
@@ -307,7 +333,19 @@ Reads the XISO volume descriptor and returns metadata about the image without th
 public static VolumeInfo GetVolumeInfo(string isoPath)
 ```
 
-**Returns**: A `VolumeInfo` record containing `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name: `RAW`, `GLOBAL (XGD2)`, `XGD3`, `XGD2 Hybrid`, `XGD1`, `Unknown`), `FileLength`, and `TotalSectors`.
+**Returns**: A `VolumeInfo` record containing `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name: `RAW`, `GLOBAL (XGD2)`, `XGD3`, `XGD2 Hybrid`, `XGD1`, `Unknown`), `FileLength`, `TotalSectors`, `CreationTime` (descriptor FILETIME as `DateTimeOffset?`, from the same probe), `FileTimeRaw`, and `DescriptorSector` (32 normally, 0 for sector-0/rebuilt images, −1 when invalid).
+
+#### `ReadFileBytes`
+
+Reads up to `buffer.Length` bytes of a file's data starting at `fileOffset` without extracting to disk. The read is clamped to the entry's own `FileSize` (not the image length), so a corrupt TOC cannot leak the next file's sectors; an offset at/past the file end returns 0.
+
+```csharp
+public static int ReadFileBytes(string isoPath, string internalPath, Span<byte> buffer, long fileOffset)
+public static int ReadFileBytes(Stream imageStream, string imageName, string internalPath,
+    Span<byte> buffer, long fileOffset) // stream left open
+```
+
+**Returns**: Bytes actually read. **Throws**: `InvalidDataException` for a missing path or directory target; `ArgumentOutOfRangeException` for a negative offset.
 
 #### `ListDirectory`
 
@@ -837,6 +875,9 @@ Metadata about an XISO volume descriptor.
 | `DiscFormat` | `string` | Friendly disc-layout identity from `DiscLseek` (`RAW`, `GLOBAL (XGD2)`, `XGD3`, `XGD2 Hybrid`, `XGD1`, `Unknown`; `Unknown` when invalid). |
 | `FileLength` | `long` | Total size of the ISO file in bytes. |
 | `TotalSectors` | `long` | Total number of sectors in the ISO. |
+| `CreationTime` | `DateTimeOffset?` | Descriptor FILETIME as UTC time (`null` when invalid; raw 0 = 1601-01-01); agrees with `XisoReader.GetFileTime`. |
+| `FileTimeRaw` | `ulong` | Raw FILETIME field as stored in the descriptor. |
+| `DescriptorSector` | `int` | Sector the descriptor was found at, partition-relative (32 normally, 0 for sector-0/rebuilt images, −1 when invalid). |
 
 #### `EntryInfo`
 

@@ -34,6 +34,7 @@ Everything lives in the `XISOSharp` namespace, except the internal data structur
 | Type | Purpose |
 |---|---|
 | [`XisoReader`](api-xisoreader.md) | Verify, extract, list, tree, rewrite, info, `ls`, audit, repair, salvage, hash, copy-out, copy-in, checksum, filetime, split/join, XEX/XBE info, BlockDevice overloads |
+| [`XisoExplorer`](api-utilities.md#xisoexplorer--xisoattributes) / [`XisoAttributes`](api-utilities.md#xisoexplorer--xisoattributes) | In-place exploration (list/get/copy/hash/XEX/XBE, bounded `OpenReadStream`, keep-open VFS mode) + Windows attribute mapping |
 | [`XisoWriter`](api-xisowriter.md) | Create and rewrite images + `build-image` remap (`CreateFromRemapTree`) |
 | [`XisoPatcher`](api-xisoreader.md#copyin) / [`DirectoryEntryTableWriter`](api-xisowriter.md#directoryentrytablewriter) | In-place file patching (`CopyIntoImage`) + single-table build/serialize primitive |
 | [`Logger`](api-utilities.md#logger) | Configurable text output with quiet/silent modes |
@@ -98,6 +99,7 @@ totalBytes`) and the structured `IProgress<ProgressInfo>` channel (`FileCount`,
 
 ```csharp
 using XISOSharp;
+using System.IO;                    // FileShare, FileAttributes
 using System.Security.Cryptography; // HashAlgorithmName (explorer hashing)
 
 // Extract
@@ -142,6 +144,23 @@ explorer.CopyOut("/docs/readme.txt", "./readme.txt");
 string? sha256 = explorer.ComputeHashHex("/default.xbe", HashAlgorithmName.SHA256);
 XexInfo? xex = explorer.GetXexInfo("/default.xex");
 XbeInfo? xbe = explorer.GetXbeInfo("/default.xbe"); // OG-Xbox cert, no reference tool parses this
+
+// Read file bytes in place — no extraction (VFS/Dokan ReadFile hot path)
+using (Stream data = explorer.OpenReadStream("/default.xex"))
+{
+    data.Seek(0x100, SeekOrigin.Begin);
+    int n = data.Read(buffer);                 // bounded to the file's Size (.cso-aware)
+}
+int read = XisoReader.ReadFileBytes("game.iso", "/default.xbe", buffer, fileOffset: 0x200);
+
+// Keep-open explorer for an app that hammers one image (mount/VFS mode):
+// one held stream, serialized calls, read streams die with Dispose.
+using var mounted = new XisoExplorer("game.iso",
+    new XisoExplorerOptions { KeepOpen = true, Share = FileShare.ReadWrite });
+VolumeInfo vol = mounted.Volume;               // IsValid, DiscFormat, FileLength, CreationTime, DescriptorSector
+ExplorerNode? node = mounted.GetNode("/sub/file.bin");
+using Stream nodeData = mounted.OpenReadStream(node);
+FileAttributes attrs = XisoAttributes.ToWindowsFileAttributes(node.Attributes);
 
 // Split for FATX (4 GiB default cap) and reassemble (CLI: split / join)
 IReadOnlyList<string> parts = XisoReader.SplitXiso("game.iso", "game", 4L * 1024 * 1024 * 1024);

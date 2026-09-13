@@ -1,5 +1,70 @@
 # Release Notes
 
+## 1.1.0
+
+Additive release for VFS-consumer parity (SimpleXisoDrive/Dokan): the public API
+gains bounded in-place file reads, a keep-open explorer mode, descriptor
+creation-time/sector surfacing, `FileShare` control, and Windows attribute
+mapping — no behavior change to existing APIs. Targets remain `net8.0` /
+`net9.0` / `net10.0`; full suite green on all three (1398 tests: 1394 passed,
+4 pre-existing skips, 0 failed).
+
+### Library
+
+#### Read file bytes in place — no extraction
+
+- `XisoExplorer.OpenReadStream(string)` / `OpenReadStream(ExplorerNode)` return a
+  read-only, seekable `Stream` over a file's data extent inside the image. Reads
+  are clamped to the entry's `FileSize` (not the image length), so a corrupt TOC
+  cannot leak the next file's sectors; seeking at/past the end reads 0 bytes per
+  `Stream` conventions; CISO/split-CISO images work transparently through the
+  decompressed block device. No copy is made, so 4 GB files stream in place.
+- `XisoReader.ReadFileBytes(isoPath, internalPath, Span<byte>, fileOffset)` and
+  the stream overload are one-shot conveniences over the same bounds; the stream
+  overload leaves the caller's stream open, and missing paths/directories throw
+  `InvalidDataException`.
+- A stateless explorer's read stream owns the image handle (dispose it); a
+  keep-open explorer's read streams stay valid until the explorer is disposed.
+
+#### Keep-open explorer mode
+
+- New `XisoExplorerOptions { KeepOpen, Share }` and
+  `XisoExplorer(string, XisoExplorerOptions)`: `KeepOpen` holds one image stream
+  for the explorer's lifetime (metadata calls use the held stream), serializes
+  operations with an internal lock, and `Dispose()` closes the stream — the
+  mount/VFS shape that avoids re-opening the image for every lookup.
+  `KeepOpen: false` stays byte-for-byte identical to 1.0.2.
+
+#### FileShare control on image opens
+
+- `XisoReader.OpenImageStream(path, FileShare)` and
+  `XisoExplorerOptions.Share`: plain-ISO streams pass the share mode through
+  (default `FileShare.Read`, unchanged), and CISO inputs thread it to the
+  container file. `FileShare.ReadWrite` lets a mounted image coexist with AV
+  scanners or sync clients that open the `.iso` for write.
+
+#### Volume descriptor timestamps and sector
+
+- `VolumeInfo` gains `CreationTime` (`DateTimeOffset?`, `null` when invalid;
+  raw 0 maps to 1601-01-01), `FileTimeRaw`, and `DescriptorSector` (32 normally,
+  0 for sector-0/rebuilt images, −1 when invalid) — all populated by the same
+  probe `GetVolumeInfo` already performs, so no second open is needed.
+  `GetVolumeInfo` agrees with `GetFileTime` for the same image.
+
+#### Windows attribute mapping
+
+- New `XisoAttributes.ToWindowsFileAttributes(byte)`: pure bit math mapping the
+  raw XDVDFS attribute byte to `System.IO.FileAttributes` (`ReadOnly` always
+  set; `Directory`/`Hidden`/`System`/`Archive` OR'd in; `Normal` when nothing
+  else applies; reserved bits masked), matching SimpleXisoDrive's locked
+  expectations.
+
+### Docs
+
+- Library/Getting-Started quick samples for the VFS use case, and the Utilities
+  page documents explorer options, the read-bounds contract, and
+  `XisoAttributes`.
+
 ## 1.0.2
 
 Release tag [`1.0.2`](https://github.com/purelogiccode/XISOSharp/releases).

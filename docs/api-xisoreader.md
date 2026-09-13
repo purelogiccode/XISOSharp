@@ -11,6 +11,7 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 - [DecodeXiso (main entry)](#decodexiso-main-entry)
 - [DecodeXisoAsync](#decodexisoasync)
 - [GetVolumeInfo](#getvolumeinfo)
+- [ReadFileBytes](#readfilebytes)
 - [ListDirectory / GetEntryInfo](#listdirectory--getentryinfo)
 - [GetSectorLayout](#getsectorlayout)
 - [CopyOut](#copyout)
@@ -41,6 +42,7 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 | `ListDirectory` | Metadata of entries in a directory |
 | `ListDirectoryFlat` | Entry **names** of a directory (non-recursive convenience) |
 | `GetEntryInfo` | Metadata of one entry by path |
+| `ReadFileBytes` | In-place read of a file's bytes at an offset (no extraction; bounded to the file size) |
 | `GetSectorLayout` | Explicit sector layout: files/tables → sector ranges + used/free ranges |
 | `CopyOut` | Copy one file or directory out of an image |
 | `CopyIn` | Copy one host file into an image (replace or add, in place) |
@@ -271,6 +273,33 @@ Reads the volume descriptor **without throwing** on validation errors. Returns a
 | `DiscFormat` | `string` | Friendly disc-layout identity from `DiscLseek`: `RAW`, `GLOBAL (XGD2)`, `XGD3`, `XGD2 Hybrid`, `XGD1`, or `Unknown` (invalid volumes always report `Unknown`) |
 | `FileLength` | `long` | File size |
 | `TotalSectors` | `long` | Total sectors |
+| `CreationTime` | `DateTimeOffset?` | Descriptor FILETIME as UTC time; `null` when invalid (raw 0 = 1601-01-01). Agrees with `GetFileTime` |
+| `FileTimeRaw` | `ulong` | Raw FILETIME field as stored |
+| `DescriptorSector` | `int` | Sector the descriptor was found at, partition-relative (32 normally, 0 for sector-0/rebuilt images, −1 when invalid) |
+
+## ReadFileBytes
+
+```csharp
+public static int ReadFileBytes(string isoPath, string internalPath, Span<byte> buffer, long fileOffset)
+public static int ReadFileBytes(Stream imageStream, string imageName, string internalPath,
+    Span<byte> buffer, long fileOffset) // stream left open
+```
+
+One-shot in-place file read with no extraction to disk (VFS/Dokan `ReadFile` shape).
+The read is clamped to the entry's own `FileSize`, never the image length, so a
+corrupt TOC cannot leak the next file's sectors; `fileOffset` at/past the file end
+returns 0. Plain `.iso`, `.cso`, and split `.1.cso` inputs all work. Throws
+`InvalidDataException` for a missing path or a directory target, and
+`ArgumentOutOfRangeException` for a negative offset.
+
+```csharp
+byte[] buf = new byte[512];
+int n = XisoReader.ReadFileBytes("game.iso", "/default.xbe", buf, fileOffset: 0x100);
+```
+
+For repeated reads, see `XisoExplorer.OpenReadStream` in
+[Utilities](api-utilities.md#xisoexplorer--xisoattributes) — it returns a bounded,
+seekable `Stream` over the file's extent.
 
 ## ListDirectory / ListDirectoryFlat / GetEntryInfo
 

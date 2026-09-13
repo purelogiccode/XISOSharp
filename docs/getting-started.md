@@ -147,6 +147,22 @@ int result = XisoReader.List("game.iso", llCompat: false);
 > `false` for optimized images. The CLI decides automatically by probing the
 > optimized-tag marker — see [XISO Format](xiso-format.md#optimized-tag).
 
+### Virtual filesystem (VFS mounter / Dokan)
+
+Mounting an image as a drive letter calls the same paths over and over, so use the
+keep-open explorer: one held image stream, serialized operations, and bounded
+per-file read streams that never extract to disk.
+
+```csharp
+using var explorer = new XisoExplorer(isoPath,
+    new XisoExplorerOptions { KeepOpen = true, Share = FileShare.ReadWrite });
+VolumeInfo vol = explorer.Volume;                       // CreationTime, DescriptorSector, DiscFormat
+ExplorerNode? node = explorer.GetNode("/sub/file.bin"); // size, sector, attrs, is-dir
+using Stream data = explorer.OpenReadStream(node);      // .cso-aware, bounded to node.Size
+int read = data.Read(buffer);                           // Dokan ReadFile hot path
+FileAttributes attrs = XisoAttributes.ToWindowsFileAttributes(node.Attributes);
+```
+
 ### Archival (Redump lossless)
 
 ```bash
