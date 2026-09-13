@@ -231,7 +231,11 @@ public static class XisoPatcher
         }
         else if (canonicalParent.Equals("/", StringComparison.Ordinal))
         {
-            PatchVolumeHeaderRoot(fs, discLseek, tableTarget, newTableSize);
+            // Header base follows the layout: standard sector-32 images keep
+            // HeaderOffset; rebuilt sector-0 images carry the header at offset 0.
+            long headerBase = layout.Volume.DiscLseek +
+                              ((long)layout.Volume.DescriptorSector * Constants.SectorSize);
+            PatchVolumeHeaderRoot(fs, headerBase, tableTarget, newTableSize);
         }
         else
         {
@@ -391,11 +395,11 @@ public static class XisoPatcher
         fs.Write(buf);
     }
 
-    private static void PatchVolumeHeaderRoot(FileStream fs, long discLseek, uint rootSector,
+    private static void PatchVolumeHeaderRoot(FileStream fs, long headerBase, uint rootSector,
         uint rootSize)
     {
         // Same field offsets the reader uses (volume header + 20/+ 24).
-        fs.Seek(Constants.HeaderOffset + discLseek + Constants.HeaderDataLength, SeekOrigin.Begin);
+        fs.Seek(headerBase + Constants.HeaderDataLength, SeekOrigin.Begin);
         Span<byte> buf = stackalloc byte[8];
         BinaryPrimitives.WriteUInt32LittleEndian(buf[..4], rootSector);
         BinaryPrimitives.WriteUInt32LittleEndian(buf[4..], rootSize);

@@ -60,7 +60,8 @@ public sealed class OffsetBlockDevice : IBlockDevice
     /// <summary>
     /// Probes known XDVDFS offsets (0, Global, XGD3, Hybrid, XGD1) similar to
     /// <c>OffsetWrapper::new</c> in <c>blockdev.rs</c>, returning the first
-    /// view whose header validates, or throws if none match.
+    /// view whose header validates, or throws if none match. Also accepts a
+    /// rebuilt sector-0 image (descriptor at the very start of the device).
     /// </summary>
     public static OffsetBlockDevice Probe(IBlockDevice inner, string isoName)
     {
@@ -90,6 +91,20 @@ public sealed class OffsetBlockDevice : IBlockDevice
             view.Dispose();
         }
 
+        // Rebuilt XISO: descriptor at the very start of the device (no 32-sector pad).
+        OffsetBlockDevice rootView = new(inner, 0, leaveOpen: true);
+        try
+        {
+            int n = rootView.Read(0, buf);
+            if (n == Constants.HeaderDataLength && buf.SequenceEqual(magic))
+                return rootView;
+        }
+        catch
+        {
+            // ignored
+        }
+
+        rootView.Dispose();
         throw new XisoFormatException($"Invalid XISO: {isoName} — no header found at any known offset");
     }
 }

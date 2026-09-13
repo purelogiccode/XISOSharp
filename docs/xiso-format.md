@@ -31,6 +31,11 @@ Sector numbers stored in the image are **partition-relative**: offset 0 is the s
 the game partition. Tools that read a full disc dump add the disc offset (see
 [Redump & Disc Layouts](redump-workflows.md)).
 
+> **Rebuilt XISO variant.** Readers also accept images whose volume descriptor sits at
+> the very start of the file (absolute offset 0) instead of partition sector 32.
+> Sectors remain partition-relative; `DiscLseek`/`DescriptorSector` report `0` for this
+> layout. Writers emit the standard sector-32 layout.
+
 ## Volume header (sector 32)
 
 The header occupies exactly one sector at offset `0x10000`:

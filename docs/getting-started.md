@@ -53,10 +53,10 @@ XISOSharp -d ./extracted game.iso
 ```
 
 - `-d ./extracted` — output directory (created if missing)
-- `game.iso` — any XISO image; GLOBAL/XGD2/XGD3/XGD1 formats are detected automatically
+- `game.iso` — any XISO image; GLOBAL/XGD2/XGD3/Hybrid/XGD1 and rebuilt sector-0 formats are detected automatically
 
 ```text
-XISOSharp v1.0.2 for win - https://github.com/purelogiccode/XISOSharp
+XISOSharp v1.2.0 for win - https://github.com/purelogiccode/XISOSharp
 
 extracting game.iso:
 

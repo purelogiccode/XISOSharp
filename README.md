@@ -12,7 +12,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) fo
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 35+ extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1400 tests) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1412 tests) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 3 of `H:\XBOXTest`, seeded): `extract-xiso.exe` (reference build `202609111233`; `list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
@@ -95,7 +95,7 @@ The CLI binary is `XISOSharp(.exe)`. It is `extract-xiso`-compatible (`-c`/`-x`/
 ### Basics
 
 ```bash
-# Extract (auto-detects RAW/GLOBAL/XGD2/XGD3/Hybrid/XGD1)
+# Extract (auto-detects RAW/GLOBAL/XGD2/XGD3/Hybrid/XGD1 + rebuilt sector-0)
 XISOSharp -d ./out game.iso
 XISOSharp --unpack game.iso              # auto-named ./game/
 XISOSharp --unpack game.iso ./out
@@ -230,6 +230,8 @@ Exit codes: `0` success/`-v`/`-h`/`validate` pass, `1` usage/I/O, `2` validation
 ## Using the Library
 
 All in `XISOSharp` namespace (`XISOSharp.Core`). Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), repair types (`XisoRepairer`, `XisoSalvager`), explorer/split/validate (`XisoExplorer`, `XisoAttributes`, `XisoSplitter`, `XisoValidator`, `XisoPatcher`), safety types (`UnpackOptions`, `XisoPaths`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `RepairResult`, `SalvageResult`, `XexInfo`, `XbeInfo`, `ValidationResult`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
+
+Layouts: readers auto-detect RAW, GLOBAL/XGD2, XGD3, XGD2 Hybrid, and XGD1 by probing known disc offsets, and also accept rebuilt "sector-0" XISOs whose descriptor sits at absolute offset 0 (`DiscLseek = 0`, `DescriptorSector = 0`) — supported end-to-end by explorer, reads, `XisoRanges`, `CreateZar`, and in-place `CopyIn`. Writers emit the standard sector-32 layout; `RebuildRedump` rejects sector-0 inputs (repack to the standard layout first).
 
 ### Extract / list / info
 
@@ -554,7 +556,7 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
-dotnet test -c Release                       # 1400 tests (`XISOSharp.Tests`; ZArchiveSharp comes from NuGet)
+dotnet test -c Release                       # 1412 tests (`XISOSharp.Tests`; ZArchiveSharp comes from NuGet)
 ```
 
 Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net8.0`/`net9.0`/`net10.0`, ships net10.0); `XISOSharp.Tests` (`net8.0`/`net9.0`/`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF). `ZArchiveSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZArchiveSharp.Tests` + `ZArchiveSharp.Benchmarks` moved to the sibling `../CSharp_ZArchiveSharp` repo (own solution); `XISOSharp` consumes the library as NuGet package `ZArchiveSharp` 1.3.0. CI builds on `ubuntu`/`windows`/`macos`.

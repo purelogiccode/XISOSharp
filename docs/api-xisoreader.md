@@ -64,6 +64,8 @@ public static (uint rootDirSector, uint rootDirSize, long discLseek) VerifyXiso(
 
 Verifies the header magic at all known disc offsets (or at the `skipSectors` offset
 when given) and returns the root directory table location and the detected disc offset.
+Rebuilt sector-0 images (descriptor at absolute offset 0) are detected as well and
+report `discLseek = 0`.
 
 | Parameter | Meaning |
 |---|---|
@@ -275,7 +277,7 @@ Reads the volume descriptor **without throwing** on validation errors. Returns a
 | `TotalSectors` | `long` | Total sectors |
 | `CreationTime` | `DateTimeOffset?` | Descriptor FILETIME as UTC time; `null` when invalid (raw 0 = 1601-01-01). Agrees with `GetFileTime` |
 | `FileTimeRaw` | `ulong` | Raw FILETIME field as stored |
-| `DescriptorSector` | `int` | Partition-relative descriptor sector: `32` for every supported layout (the partition shift is `DiscLseek`); `-1` when invalid |
+| `DescriptorSector` | `int` | Partition-relative descriptor sector: `32` for every standard layout (the partition shift is `DiscLseek`), `0` for rebuilt sector-0 images; `-1` when invalid |
 
 ## ReadFileBytes
 
@@ -654,6 +656,12 @@ or `'0'`); `--file-time <value>` fixes the stamp at create time (`-c`,
 | 3 | `0x02080000` | XGD3 |
 | 4 | `0x89D80000` | **Hybrid (XGD2-Hybrid)** — native since 2026-08-26 (`Xgd2HybridLseekOffset`) |
 | 5 | `0x18300000` | XGD1 |
+
+The rebuilt XISO layout is also accepted: the volume descriptor sits at the very
+start of the file (absolute offset 0) instead of partition sector 32. It reports
+`DiscLseek = 0` and `DescriptorSector = 0`, and sector numbers stay
+partition-relative. Standard images keep offset 0 zeroed, so the candidates
+never collide.
 
 When `skipSectors` is provided, probing is skipped and the header must be at
 `skipSectors × 2048 + 0x10000`.

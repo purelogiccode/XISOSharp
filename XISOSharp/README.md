@@ -65,13 +65,14 @@ Release history: [Release Notes](https://github.com/purelogiccode/XISOSharp/blob
 | Format | Description | Lseek Offset |
 |--------|-------------|--------------|
 | **RAW** | Raw XISO (no offset) | `0` |
+| **Rebuilt (sector 0)** | Rebuilt XISO without the 32-sector pad; descriptor at absolute offset 0 (`DescriptorSector = 0`) | `0` |
 | **GLOBAL** | Retail/Xbox Live discs | `0x0FD90000` |
 | **XGD2** | Xbox 360 XGD2 discs (same as GLOBAL) | `0x0FD90000` |
 | **XGD3** | Xbox 360 XGD3 discs | `0x02080000` |
 | **XGD2 Hybrid** | Xbox 360 hybrid discs | `0x89D80000` |
 | **XGD1** | Xbox 360 XGD1 discs | `0x18300000` |
 
-The library automatically detects the disc format during verification by probing each known offset.
+The library automatically detects the disc format during verification by probing each known offset, plus the rebuilt sector-0 layout (descriptor at absolute offset 0). Standard images keep offset 0 zeroed, so the candidates never collide.
 
 ---
 
@@ -333,7 +334,7 @@ Reads the XISO volume descriptor and returns metadata about the image without th
 public static VolumeInfo GetVolumeInfo(string isoPath)
 ```
 
-**Returns**: A `VolumeInfo` record containing `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name: `RAW`, `GLOBAL (XGD2)`, `XGD3`, `XGD2 Hybrid`, `XGD1`, `Unknown`), `FileLength`, `TotalSectors`, `CreationTime` (descriptor FILETIME as `DateTimeOffset?`, from the same probe), `FileTimeRaw`, and `DescriptorSector` (partition-relative sector `32` for every supported layout — the partition shift is `DiscLseek`; −1 when invalid).
+**Returns**: A `VolumeInfo` record containing `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name: `RAW`, `GLOBAL (XGD2)`, `XGD3`, `XGD2 Hybrid`, `XGD1`, `Unknown`), `FileLength`, `TotalSectors`, `CreationTime` (descriptor FILETIME as `DateTimeOffset?`, from the same probe), `FileTimeRaw`, and `DescriptorSector` (partition-relative descriptor sector: `32` for standard layouts, `0` for rebuilt sector-0 images — the partition shift is `DiscLseek`; −1 when invalid).
 
 #### `ReadFileBytes`
 
@@ -877,7 +878,7 @@ Metadata about an XISO volume descriptor.
 | `TotalSectors` | `long` | Total number of sectors in the ISO. |
 | `CreationTime` | `DateTimeOffset?` | Descriptor FILETIME as UTC time (`null` when invalid; raw 0 = 1601-01-01); agrees with `XisoReader.GetFileTime`. |
 | `FileTimeRaw` | `ulong` | Raw FILETIME field as stored in the descriptor. |
-| `DescriptorSector` | `int` | Partition-relative descriptor sector: `32` for every supported layout (the partition shift is `DiscLseek`); `-1` when invalid. |
+| `DescriptorSector` | `int` | Partition-relative descriptor sector: `32` for standard layouts, `0` for rebuilt sector-0 images (the partition shift is `DiscLseek`); `-1` when invalid. |
 
 #### `EntryInfo`
 

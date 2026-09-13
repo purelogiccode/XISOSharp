@@ -35,11 +35,11 @@ public record VolumeInfo(
 
     /// <summary>
     /// Partition-relative sector the volume descriptor was found at: <c>32</c>
-    /// for every layout <see cref="XisoReader.GetVolumeInfo(string)"/> probes
-    /// (plain, <c>GLOBAL (XGD2)</c>, <c>XGD3</c>, <c>XGD2 Hybrid</c>, <c>XGD1</c>);
-    /// the partition shift itself is reported by <see cref="DiscLseek"/>.
-    /// <c>-1</c> when invalid. The sector-0 descriptor of rebuilt XISOs is not
-    /// probed, so <c>0</c> is never reported.
+    /// for every standard layout <see cref="XisoReader.GetVolumeInfo(string)"/>
+    /// probes (plain, <c>GLOBAL (XGD2)</c>, <c>XGD3</c>, <c>XGD2 Hybrid</c>,
+    /// <c>XGD1</c>); the partition shift itself is reported by
+    /// <see cref="DiscLseek"/>. Rebuilt sector-0 images (descriptor at the very
+    /// start of the file) report <c>0</c>. <c>-1</c> when invalid.
     /// </summary>
     public int DescriptorSector { get; init; } = -1;
 

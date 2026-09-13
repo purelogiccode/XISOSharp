@@ -1,5 +1,69 @@
 # Release Notes
 
+## 1.2.0
+
+Additive release for VFS-consumer parity (SimpleXisoDrive/Dokan): the probe and
+read stack now accepts the rebuilt "sector-0" XISO layout (volume descriptor at
+the very start of the image instead of partition sector 32), and the in-place
+patcher, sector ranges, and ZAR packing understand it end-to-end. Targets remain
+`net8.0` / `net9.0` / `net10.0`; full suite green on all three (1412 tests:
+1408 passed, 4 pre-existing skips, 0 failed).
+
+### Library
+
+#### Rebuilt sector-0 XISO support
+
+- `VerifyXiso` (stream and block-device overloads), `GetVolumeInfo`,
+  `GetFileTimeRaw`/`SetFileTime` (both overloads), and `OffsetBlockDevice.Probe`
+  detect a volume descriptor at absolute offset 0. Such images report
+  `DiscLseek = 0` and `DescriptorSector = 0`; sector numbers stay
+  partition-relative, so `XisoExplorer`, directory listing, and bounded file
+  reads work unchanged on them.
+- `XisoReader.TryFindHeaderBase` resolves the descriptor base for callers that
+  take a partition offset (standard sector-32 candidate first, then sector-0).
+- `GetSectorLayout` marks the detected descriptor sector as used instead of
+  hardcoding partition sector 32, so `SectorAllocator.FromLayout` can no longer
+  hand out the live header to the in-place patcher.
+- `PatchVolumeHeaderRoot` writes the relocated root pointer to the active header
+  base (`DiscLseek + DescriptorSector * 2048`), fixing a silent-corruption path
+  where `CopyIn` on a sector-0 image overwrote the descriptor or left the header
+  pointing at the old root table.
+- `XisoRanges.GetXisoRanges`/`GetFileEntries` and `XisoZarchive.CreateZar`
+  resolve the descriptor with the same helper; invalid images keep the
+  historical fallback base and failure behavior.
+- `XisoRedump.RebuildRedump` rejects sector-0 inputs with an explicit error
+  (repack to the standard sector-32 layout first) because a verbatim embed would
+  place the descriptor at partition sector 0; `HasXisoMagic` recognizes sector-0
+  images so they keep working as `.zar` sidecar inputs.
+
+#### Prompt cancellation in `XboxPrng.TryGetSeed`
+
+- The brute-force seed search now checks the cancellation token inside each
+  worker's candidate chunk. A canceled search stops promptly instead of grinding
+  through the rest of the chunk — removing the coverage-instrumented stall that
+  tripped CI's 15-minute blame-hang watchdog on the net8.0 test host.
+
+### Tests
+
+- New `XisoRebuiltSector0Tests` (12 tests): probe/verify/volume-info parity,
+  explorer listing + `OpenReadStream`, filetime read/write, block-device probe,
+  sector layout used/free ranges, in-place add/replace/root-table-move, and
+  `GetXisoRanges`/`CreateZar` round-trips on sector-0 images.
+
+### Docs
+
+- `docs/xiso-format.md` documents the rebuilt sector-0 variant; the
+  `api-xisoreader.md` probe table, `DescriptorSector` contract, and the
+  library/CLI READMEs cover the accepted layout and the Redump rebuild
+  restriction.
+
+### CI
+
+- Test runs always publish a `.trx` artifact for post-mortems and skip
+  hang-dump collection (`--blame-hang-dump-type none`); the instrumented
+  seed-search stall that aborted the net8.0 job is gone (windows tests dropped
+  from ~15 min to ~1.5 min per TFM).
+
 ## 1.1.0
 
 Additive release for VFS-consumer parity (SimpleXisoDrive/Dokan): the public API

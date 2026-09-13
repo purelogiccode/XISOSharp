@@ -36,6 +36,10 @@ automatically and reported by friendly name (`VolumeInfo.DiscFormat`, the
 with a video partition are supported via `--skip-sectors` / `--prepend-sectors` (see
 [Redump & Disc Layouts](redump-workflows.md)).
 
+Rebuilt "sector-0" XISOs (volume descriptor at absolute offset 0, no 32-sector pad)
+are also accepted by every reader and reporter as `DiscLseek = 0` /
+`DescriptorSector = 0`; writers still emit the standard sector-32 layout.
+
 ## Usage
 
 **Why does `extract-xiso` say a Redump image is invalid?**

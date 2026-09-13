@@ -33,6 +33,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Salvage rebuild** — `XisoSalvager` carry/drop exactness (forged sizes/sectors, real truncation, cycles, depth gate), CISO→plain ISO, re-salvage stability, `--salvage`/`--repair-out` CLI
 - **Executable info** — `GetXexInfo`/`GetXbeInfo` path + stream overloads, all-fields parsing, cert bounds, explorer surface, CLI end-to-end
 - **Disc identity** — `VolumeInfo.DiscFormat` across RAW/GLOBAL/XGD3/Hybrid/XGD1/unknown layouts
+- **Rebuilt sector-0 images** — descriptor at absolute offset 0: probe/verify/volume-info, explorer listing + read stream, filetime, block-device probe, sector-layout used ranges, in-place `CopyIn` add/replace/root-table-move, and `GetXisoRanges`/`CreateZar` round-trips
 - **Tool locator** — `ToolLocator` resolution chain (override → app directory → process directory → `PATH`), OS-aware file names, blank/unknown handling, bounded `-v` probe
 - **CLI surface** — `-h`/`-v` flags and the branded banner, `--sector-layout`/`--ranges`/`--is-optimized` verbs, update-check asset naming
 

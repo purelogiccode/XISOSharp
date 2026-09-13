@@ -188,7 +188,11 @@ public static class XisoRanges
         _ = quiet;
         List<uint> sysSectors = [];
         List<uint> fileSectors = [];
-        long headerOffset = offset + HeaderOffset;
+        // Standard sector-32 descriptor, or the rebuilt sector-0 layout. Invalid
+        // images keep the historical base so downstream reads fail as before.
+        long headerOffset = XisoReader.TryFindHeaderBase(isoFs, offset, out long detectedHeader)
+            ? detectedHeader
+            : offset + HeaderOffset;
         long headerOffsetSector = headerOffset / SectorSize;
         sysSectors.Add((uint)headerOffsetSector);
 
@@ -286,7 +290,9 @@ public static class XisoRanges
     /// </summary>
     public static List<(string Path, long Offset, uint Size)> GetFileEntries(FileStream isoFs, long isoOffset)
     {
-        long headerOffset = isoOffset + HeaderOffset;
+        long headerOffset = XisoReader.TryFindHeaderBase(isoFs, isoOffset, out long detectedHeader)
+            ? detectedHeader
+            : isoOffset + HeaderOffset;
         isoFs.Seek(headerOffset + 20, SeekOrigin.Begin);
         uint rootOffset = ReadUInt(isoFs);
         uint rootSize = ReadUInt(isoFs);

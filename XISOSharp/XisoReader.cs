@@ -153,26 +153,40 @@ public static class XisoReader
         }
         else
         {
-            // Probe the header magic at every known partition base (mirrors the
-            // IBlockDevice overload below and extract-xiso's verify_xiso chain:
-            // plain XISO, XGD2/Redump-360, XGD3, XGD2-hybrid, XGD1). The first
-            // match wins and its base becomes discLseek for all later I/O.
-            long[] probes =
-            [
-                0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
-                Constants.Xgd1LseekOffset
-            ];
+            // Rebuilt XISO first: the descriptor sits at the very start of the
+            // image (no 32-sector pad). Standard images keep offset 0 zeroed, so
+            // this candidate never shadows them, and out-of-range probes below
+            // keep their previous (IOException) failure behavior.
             bool found = false;
-            foreach (long probe in probes)
+            if (fs.Length >= Constants.HeaderDataLength)
             {
-                fs.Seek(Constants.HeaderOffset + probe, SeekOrigin.Begin);
+                fs.Seek(0, SeekOrigin.Begin);
                 ReadExact(fs, buffer);
-
                 if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
                 {
-                    discLseek = probe;
+                    discLseek = 0;
                     found = true;
-                    break;
+                }
+            }
+
+            if (!found)
+            {
+                long[] probes =
+                [
+                    0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
+                    Constants.Xgd1LseekOffset
+                ];
+                foreach (long probe in probes)
+                {
+                    fs.Seek(Constants.HeaderOffset + probe, SeekOrigin.Begin);
+                    ReadExact(fs, buffer);
+
+                    if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+                    {
+                        discLseek = probe;
+                        found = true;
+                        break;
+                    }
                 }
             }
 
@@ -248,6 +262,7 @@ public static class XisoReader
         Span<byte> buffer = stackalloc byte[Constants.HeaderDataLength];
         Span<byte> intBuf = stackalloc byte[4];
         long discLseek = 0;
+        long headerBase = 0;
 
         if (skipSectors.HasValue)
         {
@@ -258,6 +273,7 @@ public static class XisoReader
             }
 
             discLseek = (long)skipSectors.Value * Constants.SectorSize;
+            headerBase = Constants.HeaderOffset + discLseek;
             if (dev.Read(Constants.HeaderOffset + discLseek, buffer) != buffer.Length)
                 throw new IOException("Failed to read header");
             if (!buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
@@ -277,26 +293,36 @@ public static class XisoReader
                 if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
                 {
                     discLseek = probe;
+                    headerBase = Constants.HeaderOffset + probe;
                     ok = true;
                     break;
                 }
+            }
+
+            // Rebuilt XISO: descriptor at the very start of the device.
+            if (!ok && dev.Read(0, buffer) == buffer.Length &&
+                buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+            {
+                discLseek = 0;
+                headerBase = 0;
+                ok = true;
             }
 
             if (!ok)
                 throw new XisoFormatException($"Invalid XISO: {isoName}");
         }
 
-        if (dev.Read(Constants.HeaderOffset + discLseek + Constants.HeaderDataLength, intBuf) != 4)
+        if (dev.Read(headerBase + Constants.HeaderDataLength, intBuf) != 4)
             throw new IOException("Failed to read root sector");
         uint rootDirSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
-        if (dev.Read(Constants.HeaderOffset + discLseek + Constants.HeaderDataLength + 4, intBuf) != 4)
+        if (dev.Read(headerBase + Constants.HeaderDataLength + 4, intBuf) != 4)
             throw new IOException("Failed to read root size");
         uint rootDirSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
 
         // skip filetime + unused (8 + 0x7C8)
         Span<byte> tail = stackalloc byte[Constants.HeaderDataLength];
         if (dev.Read(
-                Constants.HeaderOffset + discLseek + Constants.HeaderDataLength + 4 + 4 + Constants.FileTimeSize +
+                headerBase + Constants.HeaderDataLength + 4 + 4 + Constants.FileTimeSize +
                 Constants.UnusedSize, tail) != tail.Length)
         {
             throw new IOException("Failed to read trailing magic");
@@ -1985,16 +2011,17 @@ public static class XisoReader
         long fileLength = fs.Length;
         long totalSectors = fileLength / Constants.SectorSize;
 
-        if (fileLength < Constants.HeaderOffset + Constants.HeaderDataLength)
+        if (fileLength < Constants.HeaderDataLength)
             return new VolumeInfo(false, 0, 0, 0, fileLength, totalSectors);
 
         Span<byte> buffer = stackalloc byte[Constants.HeaderDataLength];
         long discLseek = 0;
+        long headerBase = 0;
         bool isValid = false;
 
         try
         {
-            // Same candidate order as FindDiscLseekForFileTime. Probes past EOF
+            // Same candidate order as FindHeaderBaseForFileTime. Probes past EOF
             // are skipped instead of aborting the search, so a later candidate
             // can still match (e.g. a trimmed XGD3 image whose file is smaller
             // than the XGD2/global candidate offset).
@@ -2022,8 +2049,29 @@ public static class XisoReader
                 if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
                 {
                     discLseek = probe;
+                    headerBase = probeOffset;
                     isValid = true;
                     break;
+                }
+            }
+
+            // Rebuilt XISO: descriptor at the very start of the image.
+            if (!isValid && fileLength >= Constants.HeaderDataLength)
+            {
+                fs.Seek(0, SeekOrigin.Begin);
+                try
+                {
+                    ReadExact(fs, buffer);
+                    if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+                    {
+                        discLseek = 0;
+                        headerBase = 0;
+                        isValid = true;
+                    }
+                }
+                catch
+                {
+                    // No descriptor at offset 0; the image is invalid below.
                 }
             }
 
@@ -2057,10 +2105,9 @@ public static class XisoReader
                 CreationTime = FileTimeHelper.FromFileTimeRaw(fileTimeRaw),
                 FileTimeRaw = fileTimeRaw,
                 // Partition-relative, matching SimpleXisoDrive's VolumeDescriptor.Sector:
-                // the partition shift is reported separately by DiscLseek, so the
-                // descriptor always sits at partition sector HeaderOffset/2048 (32)
-                // for every layout this probe supports.
-                DescriptorSector = Constants.HeaderOffset / Constants.SectorSize,
+                // 32 for every standard layout (the partition shift is reported
+                // separately by DiscLseek) and 0 for rebuilt sector-0 images.
+                DescriptorSector = (int)((headerBase - discLseek) / Constants.SectorSize),
             };
         }
         catch (IOException)
@@ -2092,9 +2139,9 @@ public static class XisoReader
             {
                 Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
             });
-        long discLseek = FindDiscLseekForFileTime(fs, isoPath, skipSectors);
+        long headerBase = FindHeaderBaseForFileTime(fs, isoPath, skipSectors);
         Span<byte> buf = stackalloc byte[8];
-        fs.Seek(Constants.HeaderOffset + discLseek + Constants.HeaderDataLength + 4 + 4, SeekOrigin.Begin);
+        fs.Seek(headerBase + Constants.HeaderDataLength + 4 + 4, SeekOrigin.Begin);
         ReadExact(fs, buf);
         return BinaryPrimitives.ReadUInt64LittleEndian(buf);
     }
@@ -2123,9 +2170,9 @@ public static class XisoReader
     /// <returns>Raw FILETIME.</returns>
     public static ulong GetFileTimeRaw(IBlockDevice dev, string isoName = "memory", int? skipSectors = null)
     {
-        long discLseek = FindDiscLseekForFileTime(dev, isoName, skipSectors);
+        long headerBase = FindHeaderBaseForFileTime(dev, isoName, skipSectors);
         Span<byte> buf = stackalloc byte[8];
-        long off = Constants.HeaderOffset + discLseek + Constants.HeaderDataLength + 4 + 4;
+        long off = headerBase + Constants.HeaderDataLength + 4 + 4;
         if (dev.Read(off, buf) != 8)
             throw new IOException("Failed to read FILETIME");
         return BinaryPrimitives.ReadUInt64LittleEndian(buf);
@@ -2155,10 +2202,10 @@ public static class XisoReader
             {
                 Mode = FileMode.Open, Access = FileAccess.ReadWrite, Share = FileShare.None, BufferSize = 256
             });
-        long discLseek = FindDiscLseekForFileTime(fs, isoPath, skipSectors);
+        long headerBase = FindHeaderBaseForFileTime(fs, isoPath, skipSectors);
         Span<byte> buf = stackalloc byte[8];
         BinaryPrimitives.WriteUInt64LittleEndian(buf, fileTime);
-        fs.Seek(Constants.HeaderOffset + discLseek + Constants.HeaderDataLength + 4 + 4, SeekOrigin.Begin);
+        fs.Seek(headerBase + Constants.HeaderDataLength + 4 + 4, SeekOrigin.Begin);
         fs.Write(buf);
         fs.Flush();
     }
@@ -2174,10 +2221,12 @@ public static class XisoReader
 
     /// <summary>
     /// Probes the header magic at known disc offsets (or the skip offset when provided)
-    /// and returns the detected <c>discLseek</c>, throwing if no valid header is found.
+    /// and returns the detected header base (the absolute byte offset of the volume
+    /// descriptor), throwing if no valid header is found. Includes the rebuilt
+    /// sector-0 layout (descriptor at file offset 0).
     /// Shared by <see cref="GetFileTimeRaw(string,int?)"/> and <see cref="SetFileTime(string,ulong,int?)"/>.
     /// </summary>
-    private static long FindDiscLseekForFileTime(FileStream fs, string isoName, int? skipSectors)
+    private static long FindHeaderBaseForFileTime(FileStream fs, string isoName, int? skipSectors)
     {
         Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
         if (skipSectors.HasValue)
@@ -2193,7 +2242,7 @@ public static class XisoReader
             ReadExact(fs, buf);
             if (!buf.SequenceEqual(HeaderDataBytes.AsSpan()))
                 throw new XisoFormatException($"Invalid XISO: {isoName} — no header at sector {skipSectors.Value}");
-            return discLseek;
+            return Constants.HeaderOffset + discLseek;
         }
 
         long[] probes =
@@ -2214,13 +2263,29 @@ public static class XisoReader
             }
 
             if (buf.SequenceEqual(HeaderDataBytes.AsSpan()))
-                return probe;
+                return Constants.HeaderOffset + probe;
+        }
+
+        // Rebuilt XISO: descriptor at the very start of the image.
+        if (fs.Length >= Constants.HeaderDataLength)
+        {
+            fs.Seek(0, SeekOrigin.Begin);
+            try
+            {
+                ReadExact(fs, buf);
+                if (buf.SequenceEqual(HeaderDataBytes.AsSpan()))
+                    return 0;
+            }
+            catch
+            {
+                // Fall through to the invalid-image error.
+            }
         }
 
         throw new XisoFormatException($"Invalid XISO: {isoName}");
     }
 
-    private static long FindDiscLseekForFileTime(IBlockDevice dev, string isoName, int? skipSectors)
+    private static long FindHeaderBaseForFileTime(IBlockDevice dev, string isoName, int? skipSectors)
     {
         Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
         if (skipSectors.HasValue)
@@ -2238,7 +2303,7 @@ public static class XisoReader
                 throw new XisoFormatException($"Invalid XISO: {isoName} — no header at sector {skipSectors.Value}");
             }
 
-            return discLseek;
+            return Constants.HeaderOffset + discLseek;
         }
 
         long[] probes =
@@ -2250,10 +2315,53 @@ public static class XisoReader
         {
             if (dev.Read(Constants.HeaderOffset + probe, buf) != buf.Length) continue;
             if (buf.SequenceEqual(HeaderDataBytes.AsSpan()))
-                return probe;
+                return Constants.HeaderOffset + probe;
         }
 
+        // Rebuilt XISO: descriptor at the very start of the device.
+        if (dev.Read(0, buf) == buf.Length && buf.SequenceEqual(HeaderDataBytes.AsSpan()))
+            return 0;
+
         throw new XisoFormatException($"Invalid XISO: {isoName}");
+    }
+
+    /// <summary>
+    /// Resolves the absolute byte offset of the volume descriptor for an image
+    /// whose partition starts at <paramref name="partitionOffset"/>: the standard
+    /// <c>partitionOffset + HeaderOffset</c> candidate (partition sector 32)
+    /// first, then the rebuilt sector-0 layout (<paramref name="partitionOffset"/>
+    /// itself). Returns <c>false</c> with <paramref name="headerBase"/> set to
+    /// <c>-1</c> when neither carries the header magic.
+    /// </summary>
+    internal static bool TryFindHeaderBase(Stream fs, long partitionOffset, out long headerBase)
+    {
+        Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
+        long standard = partitionOffset + Constants.HeaderOffset;
+        if (standard >= 0 && standard + Constants.HeaderDataLength <= fs.Length)
+        {
+            fs.Seek(standard, SeekOrigin.Begin);
+            ReadExact(fs, buf);
+            if (buf.SequenceEqual(HeaderDataBytes.AsSpan()))
+            {
+                headerBase = standard;
+                return true;
+            }
+        }
+
+        if (partitionOffset >= 0 &&
+            partitionOffset + Constants.HeaderDataLength <= fs.Length)
+        {
+            fs.Seek(partitionOffset, SeekOrigin.Begin);
+            ReadExact(fs, buf);
+            if (buf.SequenceEqual(HeaderDataBytes.AsSpan()))
+            {
+                headerBase = partitionOffset;
+                return true;
+            }
+        }
+
+        headerBase = -1;
+        return false;
     }
 
     /// <summary>
@@ -2680,8 +2788,10 @@ public static class XisoReader
         long discLseek = volInfo.DiscLseek;
         long totalSectors = (fileLength - discLseek) / Constants.SectorSize;
 
-        // Partition-relative sector of the volume descriptor (always sector 32).
-        const uint headerSector = (uint)(Constants.HeaderOffset / Constants.SectorSize);
+        // Partition-relative sector of the volume descriptor: 32 for standard
+        // layouts, 0 for rebuilt sector-0 images. (DescriptorSector is only -1
+        // when the image is invalid, which was rejected above.)
+        uint headerSector = (uint)volInfo.DescriptorSector;
         List<SectorRange> used = new() { new SectorRange(headerSector, 1) };
         List<FileSectorExtent> entries = new();
 

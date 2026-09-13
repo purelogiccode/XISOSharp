@@ -4,6 +4,8 @@ Command-line tool for creating, extracting, listing, and rewriting Xbox ISO (XIS
 
 This project is a direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) CLI tool (reference build [202609111233](https://github.com/XboxDev/extract-xiso/releases/tag/build-202609111233)) from C to C#. It provides the same interface and produces byte-identical output for all operations, plus 35+ extra modes (Redump archival, xdvdfs parity, audit/repair/salvage, CISO, checksums).
 
+Reader probing also accepts rebuilt "sector-0" XISOs (volume descriptor at absolute offset 0, `DescriptorSector = 0`): extract/list/tree/info, `--filetime`, `--sector-layout`, `--ranges`, `--copy-in`, and ZAR packing all work on them. `rebuild` rejects them with a clear error — repack to the standard sector-32 layout first.
+
 ## Install
 
 ```bash

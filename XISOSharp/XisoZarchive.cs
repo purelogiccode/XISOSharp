@@ -138,7 +138,11 @@ public static class XisoZarchive
         IProgress<ZarProgress>? progress = null)
     {
         ct.ThrowIfCancellationRequested();
-        long headerOffset = xisoOffset + Constants.HeaderOffset;
+        // Standard sector-32 descriptor, or the rebuilt sector-0 layout. Invalid
+        // inputs keep the historical base so downstream reads fail as before.
+        long headerOffset = XisoReader.TryFindHeaderBase(isoFs, xisoOffset, out long detectedHeader)
+            ? detectedHeader
+            : xisoOffset + Constants.HeaderOffset;
         isoFs.Seek(headerOffset + 20, SeekOrigin.Begin);
         uint rootOffset = ReadUInt(isoFs);
         uint rootSize = ReadUInt(isoFs);

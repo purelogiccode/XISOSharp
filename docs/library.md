@@ -223,6 +223,11 @@ string hex = XisoChecksum.ComputeImageChecksumHex("game.iso");
 XisoRedump.RebuildRedump("game.xiso", "game.video.iso", "filler.bin", "su20076000_00000000", "rebuilt.redump.iso");
 ```
 
+All reader paths also accept rebuilt "sector-0" XISOs (descriptor at absolute
+offset 0): probes report `DiscLseek = 0` / `DescriptorSector = 0`, and explorer
+mounts, reads, sector ranges, ZAR packing, and in-place `CopyIn` work on them.
+`RebuildRedump` rejects sector-0 inputs (repack to the standard layout first).
+
 See: [CLI](cli.md) · [Archival](archival.md) · [xdvdfs Compat](xdvdfs-compat.md) · [Compression](compression.md)
 
 ## Async and cancellation

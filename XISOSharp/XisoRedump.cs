@@ -321,10 +321,22 @@ public static class XisoRedump
 
         {
             Span<byte> magic = stackalloc byte[Constants.HeaderDataLength];
-            if (!TryReadAt(isoFs, Constants.HeaderOffset, magic) ||
-                !magic.SequenceEqual(Encoding.ASCII.GetBytes(Constants.HeaderData)))
+            bool standardHeader = TryReadAt(isoFs, Constants.HeaderOffset, magic) &&
+                                  magic.SequenceEqual(Encoding.ASCII.GetBytes(Constants.HeaderData));
+            if (!standardHeader)
             {
-                if (!quiet) Logger.LogErr($"[ERROR] Invalid XISO file: {xisoPath}\n");
+                // A rebuilt sector-0 XISO cannot be embedded verbatim: the disc
+                // layout expects the descriptor at partition sector 32, and
+                // sector-0 images may pack data without the 32-sector pad.
+                bool sector0Header = TryReadAt(isoFs, 0, magic) &&
+                                     magic.SequenceEqual(Encoding.ASCII.GetBytes(Constants.HeaderData));
+                if (!quiet)
+                {
+                    Logger.LogErr(sector0Header
+                        ? $"[ERROR] {xisoPath} is a rebuilt sector-0 XISO and cannot be embedded into a Redump image; repack it to the standard sector-32 layout first\n"
+                        : $"[ERROR] Invalid XISO file: {xisoPath}\n");
+                }
+
                 return false;
             }
         }
@@ -678,18 +690,8 @@ public static class XisoRedump
         try
         {
             using FileStream fs = new(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096);
-            if (fs.Length < Constants.HeaderOffset + Constants.HeaderDataLength) return false;
-            fs.Seek(Constants.HeaderOffset, SeekOrigin.Begin);
-            Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
-            int total = 0;
-            while (total < buf.Length)
-            {
-                int n = fs.Read(buf[total..]);
-                if (n == 0) break;
-                total += n;
-            }
-
-            return total == buf.Length && buf.SequenceEqual(Encoding.ASCII.GetBytes(Constants.HeaderData));
+            // Accepts the standard sector-32 descriptor and the rebuilt sector-0 layout.
+            return XisoReader.TryFindHeaderBase(fs, 0, out _);
         }
         catch
         {

@@ -53,6 +53,9 @@ For most dumps no flag is needed: `VerifyXiso` probes the header magic
 (`MICROSOFT*XBOX*MEDIA`) at `0x10000`, then at each known offset above, and selects the
 matching layout. Every subsequent sector read adds the detected offset.
 
+Rebuilt sector-0 images (descriptor at absolute offset 0, no 32-sector pad) are also
+accepted by every reader and report `DiscLseek = 0` / `DescriptorSector = 0`.
+
 `--skip-sectors` exists for the cases probing cannot cover — most importantly XGD2,
 whose **video partition size varies between discs**, so the game partition does not
 always sit at exactly `0x0FD90000`.
@@ -141,6 +144,11 @@ XISOSharp rebuild game.zar video.iso filler.bin su20076000_00000000 -o game.redu
 XISOSharp --zar --jobs 4 --policy auto-rename game1.iso game2.iso  # parallel ZAR pack
 XISOSharp --zar -o game.zar game.iso
 ```
+
+> [!NOTE]
+> `rebuild` rejects rebuilt sector-0 inputs with a clear error: embedding one verbatim
+> would place the descriptor at partition sector 0 instead of sector 32. Repack to the
+> standard layout first (e.g. extract and recreate, or `-r` after conversion).
 
 ## Sector math reference
 
