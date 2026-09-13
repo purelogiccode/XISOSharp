@@ -193,6 +193,15 @@ public sealed class XboxPrng
                 {
                     for (long i = chunk.Item1; i < chunk.Item2; i++)
                     {
+                        if ((i & 0x3FFF) == 0)
+                        {
+                            // A static range partition hands each worker a
+                            // multi-million-candidate chunk; without this check
+                            // a canceled search keeps crunching until the chunk
+                            // runs out (minutes under coverage instrumentation).
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
+
                         if (Volatile.Read(ref seedFound))
                             break;
                         uint seedGuess = (uint)i;

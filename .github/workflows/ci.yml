@@ -68,13 +68,27 @@ jobs:
         # test's directory is deleted). The 3-OS matrix still compile-checks
         # every project. Scoped to the test project; the solution build above
         # already compiled the Windows-only Tester/GUI harnesses.
+        # --blame-hang-dump-type none: hang dumps are not uploaded (too large),
+        # so skip collecting them and abort faster on a hung test host.
         if: matrix.os == 'windows-latest'
         run: >-
           dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj
           --no-build --configuration Release
           --collect:"XPlat Code Coverage"
+          --logger "trx;LogFileName=results.trx"
           --results-directory TestResults
           --blame-hang-timeout 15m
+          --blame-hang-dump-type none
+
+      - name: Upload test results
+        # Always: the trx of a crashed/hung run carries the last-running-test
+        # and per-test timings for post-mortems.
+        if: always() && matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
 
       - name: Upload coverage
         if: matrix.os == 'windows-latest'

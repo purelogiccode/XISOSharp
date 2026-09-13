@@ -365,9 +365,13 @@ public class SecurityAndPrngTests : IDisposable
     {
         byte[] random = new byte[Constants.SectorSize * 2];
         new Random(123).NextBytes(random);
-        // It's astronomically unlikely that random data matches any seed's PRNG output for 4096 bytes.
-        // Should return false.
-        bool ok = XboxPrng.TryGetSeed(random, out _);
+
+        // The brute-force sweep is 2^32 candidates: a full run takes seconds on
+        // a fast host and tens of minutes when coverage-instrumented (CI's
+        // blame-hang watchdog killed the net8.0 host over it). Budget the
+        // search instead; the fixed-seed recovery tests cover positive matches.
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(2));
+        bool ok = XboxPrng.TryGetSeed(random, out _, cts.Token);
         Assert.False(ok);
     }
 
