@@ -83,12 +83,7 @@ internal static partial class BugReporter
                 LastByKey[key] = now;
             }
 
-            string envBlock = EnvironmentInfo.Collect(ApplicationName);
-            string errorBlock = "=== Error Details ===\n" + safeMessage;
-            string exceptionBlock = BuildExceptionBlock(ex);
-
-            string fullMessage = $"{kind}: {safeMessage}\n\n{envBlock}\n\n{errorBlock}\n\n{exceptionBlock}";
-            string stackTrace = ex is null ? $"{kind}: {safeMessage}" : ex.ToString();
+            string fullMessage = ComposeReport(kind, safeMessage, ex, out string stackTrace);
 
             // BUG-X-003: track the in-flight send so Flush can wait for delivery.
             Task sendTask = Task.Run(async () =>
@@ -187,7 +182,30 @@ internal static partial class BugReporter
         return false;
     }
 
-    private static string BuildExceptionBlock(Exception? ex)
+    /// <summary>
+    /// Builds the full bug-report message. Every report carries the three
+    /// sections required by <c>InstructionsToSendBugs.md</c> — Environment
+    /// (Date, app name/version, OS version, architecture, bitness, Windows
+    /// version, processor count, base directory, temp path), Error (the
+    /// message), and Exception (type, message, source, stack trace) — plus the
+    /// standalone stack-trace field. Internal so format tests can lock the wire
+    /// contract.
+    /// </summary>
+    /// <param name="kind">Report kind label (<c>Warning</c>/<c>Error</c>/<c>Exception</c>).</param>
+    /// <param name="message">Error message already trimmed and defaulted by <see cref="Report"/>.</param>
+    /// <param name="ex">Exception to describe, or <c>null</c> for message-only reports.</param>
+    /// <param name="stackTrace">Standalone stack-trace field value for the API payload.</param>
+    /// <returns>The composed report message.</returns>
+    internal static string ComposeReport(string kind, string message, Exception? ex, out string stackTrace)
+    {
+        string envBlock = EnvironmentInfo.Collect(ApplicationName);
+        string errorBlock = "=== Error Details ===\n" + message;
+        string exceptionBlock = BuildExceptionBlock(ex);
+        stackTrace = ex is null ? $"{kind}: {message}" : ex.ToString();
+        return $"{kind}: {message}\n\n{envBlock}\n\n{errorBlock}\n\n{exceptionBlock}";
+    }
+
+    internal static string BuildExceptionBlock(Exception? ex)
     {
         if (ex is null)
             return "=== Exception Details ===\nType: (none)\nMessage: (none)\nSource: (none)\nStackTrace: (none)";

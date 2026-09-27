@@ -1,6 +1,7 @@
 namespace XISOSharp.Gui.Services;
 
 using System.Diagnostics;
+using Serilog;
 
 /// <summary>
 /// Finds the <c>XISOSharp</c> CLI: explicit override, then a sibling of the
@@ -79,6 +80,9 @@ internal static class CliLocator
         catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException
                                        or NotSupportedException)
         {
+            // Best effort: callers fall back to "XISOSharp CLI". Debug-only, so
+            // an unreadable file never files a bug report.
+            Log.Debug(ex, "Could not read product version from {Cli}", cliPath);
             return null;
         }
     }

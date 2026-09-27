@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using Serilog;
 
 namespace XISOSharp.Cli;
 
@@ -75,9 +76,12 @@ internal static class UpdateChecker
 
             Notify(local, latest, rid);
         }
-        catch
+        catch (Exception ex)
         {
-            // Update checks must never fail the CLI.
+            // Update checks must never fail the CLI. Debug-only: an offline
+            // machine is expected behaviour, so this never reaches the
+            // Warning+ bug-report sink.
+            Log.Debug(ex, "Update check failed");
         }
     }
 
@@ -230,8 +234,9 @@ internal static class UpdateChecker
 
             return null;
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Debug(ex, "Update check: release asset lookup failed");
             return null;
         }
     }
@@ -245,8 +250,9 @@ internal static class UpdateChecker
                 baseDir = Path.GetTempPath();
             return Path.Combine(baseDir, "XISOSharp", "update-check.json");
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Debug(ex, "Update check: cache path resolution failed; using the temp path");
             return Path.Combine(Path.GetTempPath(), "XISOSharp", "update-check.json");
         }
     }
@@ -296,8 +302,9 @@ internal static class UpdateChecker
                 assetUrlEl.ValueKind == JsonValueKind.String ? assetUrlEl.GetString() : null;
             return new ReleaseInfo(checkedUtc, tag, url, assetName, assetUrl);
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Debug(ex, "Update check: cache read failed for {CachePath}", cachePath);
             return null;
         }
     }
@@ -318,9 +325,10 @@ internal static class UpdateChecker
             sb.Append("\"assetUrl\":").Append(info.AssetUrl is null ? "null" : $"\"{Escape(info.AssetUrl)}\"").Append('}');
             File.WriteAllText(cachePath, sb.ToString());
         }
-        catch
+        catch (Exception ex)
         {
             // Cache is best effort.
+            Log.Debug(ex, "Update check: cache write failed for {CachePath}", cachePath);
         }
     }
 
@@ -362,8 +370,9 @@ internal static class UpdateChecker
             WriteCache(cachePath, info);
             return info;
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Debug(ex, "Update check: latest-release fetch failed");
             return null;
         }
     }
@@ -410,9 +419,10 @@ internal static class UpdateChecker
                 Logger.LogErr("[UPDATE] Opening the release page.\n");
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Notification must never fail the run.
+            Log.Debug(ex, "Update check: notification failed");
         }
     }
 
@@ -426,9 +436,9 @@ internal static class UpdateChecker
             if (AppDomain.CurrentDomain.FriendlyName.Contains("test", StringComparison.OrdinalIgnoreCase))
                 return true;
         }
-        catch
+        catch (Exception ex)
         {
-            // ignored
+            Log.Debug(ex, "Update check: test-host detection failed");
         }
 
         return false;
