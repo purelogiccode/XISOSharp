@@ -209,7 +209,7 @@ public static class XisoWriter
         else
         {
             isoDir = rootDirectory;
-            isoName = rootDirectory;
+            isoName = inName ?? rootDirectory;
         }
 
         if (string.IsNullOrEmpty(isoDir))

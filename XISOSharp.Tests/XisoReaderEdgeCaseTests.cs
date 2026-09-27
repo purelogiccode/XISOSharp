@@ -434,6 +434,7 @@ public class XisoReaderEdgeCaseTests : IDisposable
 
         Assert.NotNull(rewrittenPath);
         // The outputName controls the ISO filename within the output directory
+        Assert.Equal("rewritten_custom", Path.GetFileName(rewrittenPath));
         Assert.True(File.Exists(rewrittenPath), $"Rewritten ISO not found at {rewrittenPath}");
     }
 
