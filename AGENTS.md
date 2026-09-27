@@ -126,11 +126,12 @@ dotnet publish XISOSharp.Cli/XISOSharp.Cli.csproj -c Release -f net10.0 -r <rid>
 Get-ChildItem $stage -Include *.pdb,*.xml -Recurse | Remove-Item -Force
 Copy-Item README.md $stage
 Copy-Item LICENSE $stage
+Copy-Item WhatsNew.md $stage
 Compress-Archive "$stage\*" "XISOSharp.Gui\bin\Release\release_<version>_<rid>.zip" -Force
 ```
 
-Each zip must contain exactly the GUI app, `XISOSharp(.exe)`, `README.md`, and
-`LICENSE` — no `*.pdb` / `*.xml`.
+Each zip must contain exactly the GUI app, `XISOSharp(.exe)`, `README.md`,
+`LICENSE`, and `WhatsNew.md` — no `*.pdb` / `*.xml`.
 
 Smoke-test from an extracted zip:
 
