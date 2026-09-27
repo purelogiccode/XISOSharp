@@ -2296,9 +2296,16 @@ internal static class Program
                 try
                 {
                     File.Move(xisoPath, oldPath);
-                    XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite, out string? newIsoPath, true,
-                        outputName: outputName, skipSectors: skipSectors, prependSectors: prependSectors,
-                        preserveAttributes: preserveAttrs);
+                    int rewriteResult = XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite,
+                        out string? newIsoPath, true, outputName: outputName, skipSectors: skipSectors,
+                        prependSectors: prependSectors, preserveAttributes: preserveAttrs);
+
+                    // The input now lives at <input>.old; a failed rewrite must
+                    // not print success or exit 0.
+                    if (rewriteResult != 0)
+                    {
+                        err = rewriteResult;
+                    }
 
                     if (err == 0)
                     {

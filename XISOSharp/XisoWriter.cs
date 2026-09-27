@@ -68,7 +68,9 @@ public static class XisoWriter
     /// Receives the full path of the created output ISO file.
     /// </param>
     /// <param name="inName">
-    /// Explicit output filename. When <c>null</c>, the directory name plus <c>.iso</c> is used.
+    /// Explicit output filename, used verbatim: relative names resolve against
+    /// <paramref name="outputDirectory"/>, rooted paths are kept as-is. When
+    /// <c>null</c>, the directory name plus <c>.iso</c> is used.
     /// </param>
     /// <param name="progressCallback">
     /// Optional callback invoked with (<c>currentBytes</c>, <c>totalBytes</c>) during write.
@@ -228,8 +230,11 @@ public static class XisoWriter
         {
             isoName = "root";
         }
-        else if (OperatingSystem.IsWindows() && isoName.Length > 1 && isoName[1] == ':')
+        else if (OperatingSystem.IsWindows() && !Path.IsPathRooted(isoName) && isoName.Length > 1 && isoName[1] == ':')
         {
+            // A custom -o name is used verbatim: rooted paths keep their drive
+            // letter (Path.Combine already replaces the output directory), while
+            // the historical drive-relative form is normalized as before.
             isoName = isoName[1..];
         }
 

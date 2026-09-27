@@ -104,7 +104,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `-d <directory>` | Extract mode: output directory (created if missing). Rewrite mode: directory for the rewritten ISO. Ignored by list/tree. Tolerant of batch-script artifacts: trailing separators, UNC paths, spaces — see [Destination directory edge cases](#destination-directory-edge-cases--d). |
 | `-D` | Rewrite mode: delete the `.old` source file after a successful rewrite. Also `build-image --dry-run` alias (`-D`/`--dry-run`/`--dryrun` preview host→image pairs without writing). |
 | `-m` | In create or rewrite mode, disable automatic `.xbe` media enable patching (not recommended). |
-| `-o <filename>` | Rewrite/rebuild/compress output filename (default: original name with `.iso`/`.cso` extension). For `rebuild` must be `-o <redump.iso>`; for `compress` optional positional. |
+| `-o <filename>` | Rewrite/rebuild/compress output filename (default: original name with `.iso`/`.cso` extension). Relative names resolve against `-d`; rooted (absolute) paths are used as-is. For `rebuild` must be `-o <redump.iso>`; for `compress` optional positional. |
 | `-q` | Quiet — suppress all non-error output. |
 | `-Q` | Silent — suppress all output, including errors. |
 | `-s` | Skip `$SystemUpdate` entries. On create this is equivalent to `-X "**/$SystemUpdate/**"`; on extract/rewrite it filters `$SystemUpdate` paths while reading. |
@@ -392,6 +392,10 @@ XISOSharp --skip-sectors 129824 -d ./out redump.iso
 
 # Optimize (rewrite) an ISO, then validate the result
 XISOSharp -r --validate --validate-strict game.iso
+
+# Rewrite to a custom output name (relative to -d, or rooted and used as-is)
+XISOSharp -r -d ./optimized -o game_opt.iso game.iso
+XISOSharp -r -o /archive/game_opt.iso game.iso
 
 # Validate two images against each other
 XISOSharp validate --validate-checksums --validate-report report.json source.iso rebuilt.iso

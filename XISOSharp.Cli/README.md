@@ -124,7 +124,7 @@ is printed and the tool exits 1.
 | `-m` | Disable automatic `.xbe` media-enable patching (create/rewrite; not recommended) |
 | `-n`, `--no` | Never overwrite: refuse when an output exists (cannot combine with `-y`) |
 | `-y`, `--yes` | Always overwrite without prompting |
-| `-o <filename>` | Custom output filename (rewrite/rebuild/compress) |
+| `-o <filename>` | Custom output filename (rewrite/rebuild/compress); relative or rooted paths used as-is |
 | `-q` | Quiet (suppress non-error output) |
 | `-Q` | Silent (suppress all output) |
 | `-s` | Skip `$SystemUpdate` folder (create: implies `-X "**/$SystemUpdate/**"`) |

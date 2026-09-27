@@ -438,5 +438,39 @@ public class XisoReaderEdgeCaseTests : IDisposable
         Assert.True(File.Exists(rewrittenPath), $"Rewritten ISO not found at {rewrittenPath}");
     }
 
+    [Fact]
+    public void Rewrite_WithAbsoluteOutputName_UsesProvidedName()
+    {
+        string createDir = CreateTempDir();
+        string rewriteDir = CreateTempDir();
+
+        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out string? isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        // A rooted -o path must be honored verbatim: the Windows drive-letter
+        // strip used to rewrite C:\... into :\... and fail the write.
+        string absoluteName = Path.Combine(rewriteDir, "abs_custom.iso");
+        XisoReader.Rewrite(isoPath, null, out string? rewrittenPath, outputName: absoluteName);
+
+        Assert.Equal(absoluteName, rewrittenPath);
+        Assert.True(File.Exists(rewrittenPath), $"Rewritten ISO not found at {rewrittenPath}");
+    }
+
+    [Fact]
+    public void Rewrite_UnwritableOutput_ReturnsError()
+    {
+        string createDir = CreateTempDir();
+
+        XisoWriter.CreateXiso(SourceDir, createDir, null, null, out string? isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        string missingDir = $"missing_{Guid.NewGuid():N}";
+        int result = XisoReader.Rewrite(isoPath, null, out string? rewrittenPath,
+            outputName: Path.Combine(missingDir, "out.iso"));
+
+        Assert.NotEqual(0, result);
+        Assert.Null(rewrittenPath);
+    }
+
     #endregion
 }

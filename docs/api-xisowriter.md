@@ -62,7 +62,7 @@ public static int CreateXiso(
 | `inRoot` | Pre-built AVL tree root; `null` = build the tree from the file system |
 | `sourceStream` | Source ISO stream for rewrite mode; `null` for create mode |
 | `outIsoPath` | Receives the full path of the created ISO |
-| `inName` | Output filename; `null` = directory name + `.iso` |
+| `inName` | Output filename, used verbatim (rooted paths kept as-is); `null` = directory name + `.iso` |
 | `progressCallback` | Optional `(currentBytes, totalBytes)` callback during file writes |
 | `cancellationToken` | Cancellation support |
 | `prependSectors` | Reserve `N` zero-filled sectors before the filesystem (Redump layouts) |

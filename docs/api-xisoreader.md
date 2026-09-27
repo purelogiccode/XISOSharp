@@ -109,7 +109,7 @@ public static int Rewrite(
 | `xisoPath` | Path of the ISO (for `Rewrite`, the source; the `.old` rename is internal) |
 | `outputPath` | `null` → extract into an ISO-named subdirectory of the current directory; otherwise the target directory |
 | `llCompat` | `true` = legacy linked-list right-offset calculation; `false` = optimized layout |
-| `outputName` | Rewrite only: custom output filename (default: original name with `.iso`) |
+| `outputName` | Rewrite only: custom output filename, used verbatim (rooted paths kept as-is; default: original name with `.iso`) |
 | `skipSectors` | Read offset (Redump video partition), in 2048-byte sectors |
 | `prependSectors` | Rewrite only: reserve zero-filled sectors before the filesystem |
 | `preserveAttributes` | Rewrite only: re-encode the source dirent attribute bits (RO/HID/SYS/NOR). Default `false` — extract-xiso byte parity (entries re-encoded with DIR/ARC defaults, `dir=0x10`/`file=0x20`) |

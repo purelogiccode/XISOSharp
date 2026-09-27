@@ -1,6 +1,11 @@
 MIT License
 
-Copyright (c) purelogiccode
+XISOSharp — https://github.com/purelogiccode/XISOSharp
+
+Developed by PureLogicCode.com (https://purelogiccode.com).
+Lead developer: Peterson Fernandes.
+
+Copyright (c) PureLogicCode.com
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -119,5 +124,5 @@ distributions, so they are reproduced here verbatim.
 
 4) ZArchiveSharp (https://github.com/purelogiccode/CSharp_ZArchiveSharp,
    consumed as a NuGet dependency and bundled into the single-file binaries)
-   MIT License, Copyright (c) purelogiccode, under the same terms as this
+   MIT License, Copyright (c) PureLogicCode.com, under the same terms as this
    project's own license above.

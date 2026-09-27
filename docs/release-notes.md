@@ -1,5 +1,81 @@
 # Release Notes
 
+## 1.3.0
+
+Correctness and maintenance release. The rewrite `-o` output name is now
+honored for real — including rooted/absolute paths — and a rewrite that fails
+to write reports an error instead of exiting 0. Wrapped exceptions carry their
+cause, the reference-binary interop tests resolve the current `References/`
+drop again, and the bug-report wire format is locked by tests. Targets remain
+`net8.0` / `net9.0` / `net10.0`; full suite green on all three (1419 tests:
+1418 passed, 1 opt-in skip, 0 failed).
+
+### Library
+
+#### Rewrite output naming
+
+- `XisoWriter.CreateXiso` ignored `inName` in rewrite mode, so
+  `XisoReader.Rewrite(..., outputName:)` (CLI `-o`) had no effect on the output
+  filename. The name is now used verbatim: relative names resolve against the
+  `-d` directory, and rooted names are kept intact. The Windows drive-letter
+  strip used for legacy names no longer applies to a rooted `-o`, which turned
+  `C:\out\game.iso` into `:\out\game.iso` and failed with a path-syntax error.
+- `XisoReader.DecodeXiso` (and therefore `Rewrite`) now returns the writer's
+  non-zero result when the output cannot be written. Previously the writer
+  logged the failure but the rewrite still reported success and returned 0.
+- Regression tests: `Rewrite_WithAbsoluteOutputName_UsesProvidedName`,
+  `Rewrite_UnwritableOutput_ReturnsError`.
+
+#### Exception causality
+
+- Wrapped rethrows embed the caught exception as `InnerException` (Meziantou
+  MA0054): `ProcessRunner` timeout → `TimeoutException`, `XisoReader` truncated
+  file copy → `IOException`, GUI `MainViewModel` output-verification failures →
+  `InvalidOperationException`. Message text is unchanged, so existing
+  diagnostics and exception filters keep working.
+
+### CLI
+
+- Rewrite (`-r`) now checks the decode result: a failed rewrite exits 1 and
+  does not print `successfully rewritten` (the input stays at `<name>.old`,
+  exactly as before the fix).
+- `-o` accepts relative and rooted paths and uses them as-is.
+
+### Logging
+
+- `UpdateChecker` debug-logs every previously silent catch (offline checks and
+  API/cache failures stay below `Warning`, so they never file bug reports); GUI
+  `CliLocator.ProductVersion` debug-logs unreadable CLI metadata.
+- `BugReporter` extracts `ComposeReport` and exposes `BuildExceptionBlock` to
+  tests; new `BugReportFormatTests` (5) lock the Environment / Error /
+  Exception sections required by the bug-report service.
+
+### Tests
+
+- 1419 tests across `net8.0` / `net9.0` / `net10.0`: 1418 passed, 1 opt-in skip
+  (`XISO_UPDATE_FIXTURE=1` fixture validator), 0 failed.
+- `TestConditions` resolves the compiled `extract-xiso.exe` from the current
+  `References/` drop (canonical `References/extract-xiso.exe`, dated drop root,
+  or in-tree CMake build) instead of the removed `202505152050` artifact path;
+  the legacy `llCompat` interop tests run and pass again.
+- `RegenerateFixtureIso_WhenRequested` renamed to
+  `ValidateFixtureIso_WhenRequested` (it validates only; regeneration stays
+  manual) — `docs/testing.md` updated.
+
+### Dependencies
+
+- `Meziantou.Analyzer` 3.0.257 → 3.0.290 (all projects), `Avalonia` 12.1.2 →
+  12.1.3 (GUI), `QuestPDF` 2026.8.0 → 2026.9.1 (Tester),
+  `Microsoft.NET.Test.Sdk` 18.10.0 → 18.10.1 (Tests). No library dependency
+  changes.
+
+### Docs
+
+- Badge rows (CI, NuGet version/downloads, release, .NET, platform/RIDs,
+  license, docs site, per-project) added to the root, library, CLI, Tests,
+  Tester, and docs READMEs; suite counts refreshed; `-o` rooted-path behavior
+  documented in the CLI reference.
+
 ## 1.2.0
 
 Additive release for VFS-consumer parity (SimpleXisoDrive/Dokan): the probe and

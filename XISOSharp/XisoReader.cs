@@ -1136,7 +1136,9 @@ public static class XisoReader
     /// <param name="outIsoPath">Receives the path to the output ISO file.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <param name="outputName">
-    /// Custom output filename. When <c>null</c>, the original filename with <c>.iso</c> extension is used.
+    /// Custom output filename, used verbatim (relative names resolve against
+    /// <paramref name="outputPath"/>; rooted paths are kept as-is). When <c>null</c>,
+    /// the original filename with <c>.iso</c> extension is used.
     /// </param>
     /// <param name="skipSectors">
     /// Optional number of 2048-byte sectors to skip in the source file before the XISO
@@ -1850,9 +1852,17 @@ public static class XisoReader
                         cancellationToken: cancellationToken, tableSize: rootDirSize,
                         preserveAttributes: preserveAttributes);
 
-                    XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath, outputName, null,
-                        cancellationToken, prependSectors: prependSectors, progress: progress,
+                    int rewriteResult = XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath,
+                        outputName, null, cancellationToken, prependSectors: prependSectors, progress: progress,
                         sourceDiscLseek: discLseek);
+
+                    // Surface write failures: callers (CLI, Rewrite) promise a
+                    // non-zero result and must not report success for a rewrite
+                    // that produced no file.
+                    if (rewriteResult != 0)
+                    {
+                        return rewriteResult;
+                    }
                 }
                 else
                 {

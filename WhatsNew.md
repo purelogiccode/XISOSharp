@@ -1,58 +1,72 @@
-# What's New in 1.2.0 (since 1.1.0)
+# What's New in 1.3.0 (since 1.2.0)
 
-Release tag [`1.2.0`](https://github.com/purelogiccode/XISOSharp/releases).
+Release tag [`1.3.0`](https://github.com/purelogiccode/XISOSharp/releases).
 Targets remain `net8.0` / `net9.0` / `net10.0`; full suite green on all three
-(1412 tests: 1408 passed, 4 pre-existing skips, 0 failed).
+(1419 tests: 1418 passed, 1 opt-in skip, 0 failed).
 
-Additive release for VFS-consumer parity (SimpleXisoDrive/Dokan): the probe and
-read stack accepts the rebuilt "sector-0" XISO layout (volume descriptor at the
-very start of the image instead of partition sector 32), and the in-place
-patcher, sector ranges, and ZAR packing understand it end-to-end.
+Correctness and maintenance release: the rewrite `-o` output name is honored
+(including rooted paths), failed rewrites now exit non-zero instead of
+reporting success, wrapped exceptions carry their cause, and the logging
+surface is under test.
 
-## Library
+## Fixes
 
-### Rebuilt sector-0 XISO support
+### Rewrite output name (`-o`) honored, rooted paths kept
 
-- `VerifyXiso` (stream and block-device overloads), `GetVolumeInfo`,
-  `GetFileTimeRaw`/`SetFileTime`, and `OffsetBlockDevice.Probe` detect a
-  descriptor at absolute offset 0. Such images report `DiscLseek = 0` and
-  `DescriptorSector = 0`; sector numbers stay partition-relative, so
-  `XisoExplorer`, directory listing, and bounded file reads work unchanged.
-- `GetSectorLayout` marks the detected descriptor sector as used instead of
-  hardcoding sector 32, and `PatchVolumeHeaderRoot` updates the active header
-  base when a root table relocates — fixing a silent-corruption path where
-  `CopyIn` on a sector-0 image could overwrite the descriptor or leave the
-  volume header pointing at the old root table.
-- `XisoRanges.GetXisoRanges`/`GetFileEntries` and `XisoZarchive.CreateZar`
-  resolve the descriptor through the new `XisoReader.TryFindHeaderBase` helper
-  (standard sector 32 first, then sector 0).
-- `RebuildRedump` rejects sector-0 inputs with a clear error (repack to the
-  standard layout first); `HasXisoMagic` recognizes them in the `.zar` sidecar
-  path.
+- `XisoWriter.CreateXiso` used the source name in rewrite mode and ignored
+  `inName`, so `XisoReader.Rewrite`'s `outputName` (CLI `-o`) had no effect on
+  the output filename. It is now used verbatim, and the Windows drive-letter
+  strip no longer rewrites an absolute `-o C:\out\game.iso` into the invalid
+  `:\out\game.iso` (relative names still resolve against `-d`).
+- A failed rewrite is no longer silent: `XisoReader.DecodeXiso`/`Rewrite`
+  return the writer's non-zero result and the CLI checks it — a rewrite that
+  produced no file exits 1 without printing `successfully rewritten`.
+- Regressions locked by `Rewrite_WithAbsoluteOutputName_UsesProvidedName` and
+  `Rewrite_UnwritableOutput_ReturnsError`.
 
-### Prompt cancellation in `XboxPrng.TryGetSeed`
+### Exception causality (MA0054)
 
-- The brute-force seed search now checks the cancellation token inside each
-  worker's candidate chunk, so a canceled search stops promptly instead of
-  finishing millions of candidates first. This removes the coverage-instrumented
-  stall that aborted the net8.0 CI test host under the blame-hang watchdog.
+- Wrapped rethrows embed the caught exception as `InnerException`:
+  `ProcessRunner` timeout → `TimeoutException`, `XisoReader` truncated file
+  copy → `IOException`, GUI `MainViewModel` output-verification failures →
+  `InvalidOperationException`. Message text is unchanged.
+
+### Reference-oracle test paths
+
+- `TestConditions` resolves the compiled `extract-xiso.exe` from the current
+  `References/` drop (canonical `References/extract-xiso.exe`, dated drop root,
+  or in-tree CMake build) instead of the removed `202505152050` artifact path —
+  the legacy `llCompat` interop tests run and pass again.
+- `RegenerateFixtureIso_WhenRequested` is now
+  `ValidateFixtureIso_WhenRequested`: it compares against a temp copy and never
+  overwrites the fixture; regeneration stays a manual out-of-band step
+  (`docs/testing.md` updated).
+
+## Logging
+
+- `UpdateChecker` debug-logs every previously silent catch (offline/API/cache
+  failures stay below `Warning`, so they never file bug reports); GUI
+  `CliLocator.ProductVersion` debug-logs unreadable CLI metadata.
+- `BugReporter` extracts `ComposeReport` and exposes `BuildExceptionBlock` to
+  tests. New `BugReportFormatTests` lock the Environment / Error / Exception
+  sections required by the bug-report service.
 
 ## Tests
 
-- New `XisoRebuiltSector0Tests` (12 tests): probe/verify/volume-info parity,
-  explorer listing + `OpenReadStream`, filetime read/write, block-device probe,
-  sector layout used/free ranges, in-place add/replace/root-table-move, and
-  `GetXisoRanges`/`CreateZar` round-trips on sector-0 images.
+- 1419 tests across `net8.0` / `net9.0` / `net10.0`: 1418 passed, 1 opt-in skip
+  (`XISO_UPDATE_FIXTURE=1` fixture validator), 0 failed. New since 1.2.0:
+  `BugReportFormatTests` (5) and the two rewrite regressions above; the three
+  legacy extract-xiso interop tests now execute instead of skipping.
+
+## Dependencies
+
+- `Meziantou.Analyzer` 3.0.257 → 3.0.290 (all projects), `Avalonia` 12.1.2 →
+  12.1.3 (GUI), `QuestPDF` 2026.8.0 → 2026.9.1 (Tester),
+  `Microsoft.NET.Test.Sdk` 18.10.0 → 18.10.1 (Tests). No library dependency
+  changes.
 
 ## Docs
 
-- [`xiso-format.md`](docs/xiso-format.md) documents the rebuilt sector-0
-  variant; [`api-xisoreader.md`](docs/api-xisoreader.md) covers the probe
-  table, the `DescriptorSector` contract, and the Redump rebuild restriction;
-  the root/library/CLI/Tests READMEs note the extra accepted layout.
-
-## CI
-
-- Test runs always publish a `.trx` artifact and skip hang-dump collection
-  (`--blame-hang-dump-type none`); the seed-search stall that caused the
-  recurring net8.0 failure is fixed.
+- Badge rows (CI, NuGet, release, .NET, platform/RIDs, license, docs site,
+  per-project) added to the root, library, CLI, Tests, Tester, and docs
+  READMEs; suite counts and the `-o` rooted-path behavior refreshed.
