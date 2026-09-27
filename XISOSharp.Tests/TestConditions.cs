@@ -61,12 +61,41 @@ internal static class SkipConditions
         return kind switch
         {
             OracleKind.Xdvdfs => Path.Combine(root, "References", "xdvdfs-0.8.3", "xdvdfs.exe"),
-            OracleKind.ExtractXiso => Path.Combine(root, "References",
-                "extract-xiso-build-202505152050", "extract-xiso-Win64_Release", "artifacts", "extract-xiso.exe"),
+            OracleKind.ExtractXiso => ExtractXisoPath(root),
             OracleKind.Zarchive => Path.Combine(root, "..", "CSharp_ZArchiveSharp", "References", "ZArchive-0.1.2",
                 "zarchive.exe"),
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// Locates the compiled reference <c>extract-xiso.exe</c> for the dated
+    /// reference drop <c>References/extract-xiso-build-202609111233</c> (the
+    /// parity build named in AGENTS.md). The binary may sit at the
+    /// <c>References/</c> root, at the drop root (extracted release), or under
+    /// an in-tree CMake build. When nothing exists, returns the canonical
+    /// expected path so the skip message names a concrete location.
+    /// </summary>
+    private static string ExtractXisoPath(string root)
+    {
+        string drop = Path.Combine(root, "References", "extract-xiso-build-202609111233");
+        string[] candidates =
+        [
+            Path.Combine(root, "References", "extract-xiso.exe"),
+            Path.Combine(drop, "extract-xiso.exe"),
+            Path.Combine(drop, "extract-xiso-Win64_Release", "artifacts", "extract-xiso.exe"),
+            Path.Combine(drop, "build", "Release", "extract-xiso.exe"),
+            Path.Combine(drop, "build", "extract-xiso.exe"),
+        ];
+        foreach (string candidate in candidates)
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return candidates[0];
     }
 
     internal static bool OracleAvailable(OracleKind kind)
@@ -290,7 +319,7 @@ public sealed class RequiresOracleFactAttribute : FactAttribute
     {
         if (!SkipConditions.OracleAvailable(kind))
         {
-            Skip = $"Missing reference oracle '{kind}' (References/ checkout absent).";
+            Skip = $"Missing reference oracle '{kind}' binary under References/.";
         }
     }
 }

@@ -150,8 +150,8 @@ public class XisoSnapshotTests : IDisposable
     public void Snapshot_MatchesCheckedInFixture()
     {
         Assert.True(File.Exists(FixtureIsoPath),
-            $"Reference fixture missing: {FixtureIsoPath}. Regenerate with XISO_UPDATE_FIXTURE=1 " +
-            "dotnet test --filter FullyQualifiedName~RegenerateFixtureIso_WhenRequested");
+            $"Reference fixture missing: {FixtureIsoPath}. Validate with XISO_UPDATE_FIXTURE=1 " +
+            "dotnet test --filter FullyQualifiedName~ValidateFixtureIso_WhenRequested");
 
         string src = CreateTempDir("xiso_snap_src");
         BuildSnapshotTree(src);
@@ -220,12 +220,12 @@ public class XisoSnapshotTests : IDisposable
     /// Validates that a fresh <see cref="BuildSnapshotTree"/> pack matches the
     /// checked-in <c>Fixtures/test_fixture.iso</c> reference. Runs only when
     /// <c>XISO_UPDATE_FIXTURE=1</c> is set (otherwise skipped at discovery);
-    /// it validates against a temp copy and never overwrites the fixture binary.
+    /// it compares against a temp copy and never overwrites the fixture binary.
     /// After a legitimate writer change, regenerate the binary out of band,
     /// inspect the diff and commit it.
     /// </summary>
     [RequiresUpdateFixtureFact]
-    public void RegenerateFixtureIso_WhenRequested()
+    public void ValidateFixtureIso_WhenRequested()
     {
         string src = CreateTempDir("xiso_snap_src");
         BuildSnapshotTree(src);

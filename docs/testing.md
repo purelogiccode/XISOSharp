@@ -69,8 +69,9 @@ Conventions:
 - A snapshot-style round-trip (create → extract → compare SHA-256 of every file) is
   the standard correctness pattern, locked by the checked-in reference
   `XISOSharp.Tests/Fixtures/test_fixture.iso` (built deterministically with
-  `fileTime: 0`; regenerate with `XISO_UPDATE_FIXTURE=1 dotnet test --filter
-  FullyQualifiedName~RegenerateFixtureIso_WhenRequested`).
+  `fileTime: 0`; validate with `XISO_UPDATE_FIXTURE=1 dotnet test --filter
+  FullyQualifiedName~ValidateFixtureIso_WhenRequested`, then regenerate the
+  binary out of band after a legitimate writer change and commit it).
 - Reference-binary interop tests (`CisoSplitInteropTests.cs`,
   `XisoLegacyInteropTests.cs`) silently pass when the binary under `References/`
   is absent, so CI and clean checkouts stay green.

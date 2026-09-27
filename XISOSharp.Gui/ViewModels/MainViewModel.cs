@@ -647,7 +647,7 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             throw new InvalidOperationException(
-                $"{what} could not be verified against its inputs ({ex.Message}); refusing to overwrite.");
+                $"{what} could not be verified against its inputs ({ex.Message}); refusing to overwrite.", ex);
         }
     }
 
@@ -689,7 +689,7 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             throw new InvalidOperationException(
-                $"Rewrite output could not be verified ({ex.Message}); refusing to overwrite.");
+                $"Rewrite output could not be verified ({ex.Message}); refusing to overwrite.", ex);
         }
     }
 
@@ -714,7 +714,7 @@ internal sealed partial class MainViewModel : ObservableObject
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
                     throw new InvalidOperationException(
-                        $"Could not verify compress output against {src} ({ex.Message}); refusing to overwrite.");
+                        $"Could not verify compress output against {src} ({ex.Message}); refusing to overwrite.", ex);
                 }
 
                 try
@@ -724,7 +724,7 @@ internal sealed partial class MainViewModel : ObservableObject
                 catch (Exception ex)
                 {
                     throw new InvalidOperationException(
-                        $"Could not verify compress output against {src} ({ex.Message}); refusing to overwrite.");
+                        $"Could not verify compress output against {src} ({ex.Message}); refusing to overwrite.", ex);
                 }
             }
             else
@@ -750,7 +750,8 @@ internal sealed partial class MainViewModel : ObservableObject
                 catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
                 {
                     throw new InvalidOperationException(
-                        $"Could not verify compress split output {outputBase} ({ex.Message}); refusing to overwrite.");
+                        $"Could not verify compress split output {outputBase} ({ex.Message}); refusing to overwrite.",
+                        ex);
                 }
 
                 if (firstPart is not null && XisoPaths.AreSamePath(src, firstPart))
@@ -767,7 +768,7 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             throw new InvalidOperationException(
-                $"Compress output could not be verified ({ex.Message}); refusing to overwrite.");
+                $"Compress output could not be verified ({ex.Message}); refusing to overwrite.", ex);
         }
     }
 
@@ -790,7 +791,7 @@ internal sealed partial class MainViewModel : ObservableObject
                 catch (Exception ex)
                 {
                     throw new InvalidOperationException(
-                        $"Could not verify decompress output against {src} ({ex.Message}); refusing to overwrite.");
+                        $"Could not verify decompress output against {src} ({ex.Message}); refusing to overwrite.", ex);
                 }
             }
             else
@@ -811,7 +812,7 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             throw new InvalidOperationException(
-                $"Decompress output could not be verified ({ex.Message}); refusing to overwrite.");
+                $"Decompress output could not be verified ({ex.Message}); refusing to overwrite.", ex);
         }
     }
 

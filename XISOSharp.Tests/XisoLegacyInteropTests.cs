@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text;
-using XISOSharp.TestDataGenerator;
 
 namespace XISOSharp.Tests;
 
@@ -14,13 +13,10 @@ namespace XISOSharp.Tests;
 [Collection("Sequential")]
 public class XisoLegacyInteropTests : IDisposable
 {
-    // Resolved via TestDataLocator (BUG-TEST-006): no fragile 4x ".." literal.
-    private static readonly string RepoRoot = TestDataLocator.GetSolutionRoot(AppContext.BaseDirectory)
-                                              ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..",
-                                                  "..", ".."));
-
-    private static readonly string ExtractXisoExe = Path.Combine(RepoRoot, "References",
-        "extract-xiso-build-202505152050", "extract-xiso-Win64_Release", "artifacts", "extract-xiso.exe");
+    // Single source of truth: the discovery-time oracle path in SkipConditions
+    // (dated reference drop References/extract-xiso-build-202609111233).
+    private static readonly string ExtractXisoExe =
+        SkipConditions.OraclePath(OracleKind.ExtractXiso) ?? string.Empty;
 
     private readonly List<string> _tempDirs = [];
 

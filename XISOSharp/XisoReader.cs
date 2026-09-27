@@ -3480,9 +3480,9 @@ public static class XisoReader
                 (buffer, count) => hasher.TransformBlock(buffer, 0, count, buffer, 0),
                 hashBuffer);
         }
-        catch (TruncatedCopyException)
+        catch (TruncatedCopyException ex)
         {
-            throw new IOException($"Unexpected end of file data at sector {entry.StartSector}");
+            throw new IOException($"Unexpected end of file data at sector {entry.StartSector}", ex);
         }
         finally
         {

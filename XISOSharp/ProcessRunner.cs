@@ -122,12 +122,13 @@ public static class ProcessRunner
                 {
                     await process.WaitForExitAsync(effectiveToken).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
                     TryKill(process);
                     cancellationToken.ThrowIfCancellationRequested();
                     throw new TimeoutException(
-                        $"Process timed out after {timeout!.Value.TotalSeconds:N0} seconds: {fileName} {string.Join(" ", args)}");
+                        $"Process timed out after {timeout!.Value.TotalSeconds:N0} seconds: {fileName} {string.Join(" ", args)}",
+                        ex);
                 }
 
                 await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
