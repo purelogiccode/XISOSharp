@@ -1,5 +1,12 @@
 # XISOSharpTester
 
+[![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
+![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
+[![.NET](https://img.shields.io/badge/.NET-10.0%20%2B%20WPF-512BD4)](https://dotnet.microsoft.com/)
+[![WPF-UI](https://img.shields.io/badge/WPF--UI-4.3.0-blueviolet)](https://github.com/lepoco/wpfui)
+[![QuestPDF](https://img.shields.io/badge/QuestPDF-2026.9.1-blueviolet)](https://www.questpdf.com/)
+[![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/purelogiccode/XISOSharp/blob/master/LICENSE)
+
 A WPF desktop application for regression testing the XISOSharp C# implementation against the original C extract-xiso tool. Runs batch comparisons across multiple XISO images and reports pass/fail status with SHA-256 hash verification.
 
 ## Features
