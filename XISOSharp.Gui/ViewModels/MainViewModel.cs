@@ -315,7 +315,8 @@ internal sealed partial class MainViewModel : ObservableObject
             string? resolved = CliLocator.Resolve(string.IsNullOrWhiteSpace(CliPath) ? null : CliPath);
             if (resolved is null)
             {
-                CliStatus = $"XISOSharp CLI ({CliLocator.CliFileName}) not found — set the CLI path on the Settings tab.";
+                CliStatus =
+                    $"XISOSharp CLI ({CliLocator.CliFileName}) not found — set the CLI path on the Settings tab.";
                 AppendLog($"[GUI] XISOSharp CLI ({CliLocator.CliFileName}) not found (override, app folder, or PATH).");
                 Log.Warning("CLI {CliFile} not found (override, app folder, or PATH)", CliLocator.CliFileName);
                 return;
@@ -845,7 +846,8 @@ internal sealed partial class MainViewModel : ObservableObject
         if (cli is null)
         {
             Log.Warning("Run {Title} refused: CLI {CliFile} not found", title, CliLocator.CliFileName);
-            AppendLog($"[GUI] XISOSharp CLI ({CliLocator.CliFileName}) not found — set the CLI path on the Settings tab.");
+            AppendLog(
+                $"[GUI] XISOSharp CLI ({CliLocator.CliFileName}) not found — set the CLI path on the Settings tab.");
             return;
         }
 

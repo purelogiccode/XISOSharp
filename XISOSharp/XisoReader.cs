@@ -370,17 +370,35 @@ public static class XisoReader
     /// <param name="isoName">Display name for error messages.</param>
     public static AuditResult AuditXiso(IBlockDevice dev, string isoName = "memory")
     {
+        return AuditXiso(dev, isoName, requireOptimizedTag: true);
+    }
+
+    /// <summary>
+    /// Block-device overload of <see cref="AuditXiso(string, bool)"/>. When
+    /// <paramref name="requireOptimizedTag"/> is <c>false</c> the audit checks
+    /// filesystem integrity only: a missing optimized tag is reported through
+    /// <see cref="AuditResult.IsOptimized"/> instead of failing the audit, so
+    /// raw (unconverted) images audit as valid.
+    /// </summary>
+    /// <param name="dev">Block device to audit. Left open.</param>
+    /// <param name="isoName">Display name for error messages.</param>
+    /// <param name="requireOptimizedTag">
+    /// Whether a missing optimized tag is an audit issue (default <c>true</c>).
+    /// </param>
+    public static AuditResult AuditXiso(IBlockDevice dev, string isoName, bool requireOptimizedTag)
+    {
         try
         {
             (uint rootDirSector, _, long discLseek) = VerifyXiso(dev, isoName);
             using BlockDeviceStream stream = new(dev, leaveOpen: true);
-            return AuditStream(stream, stream.Length, rootDirSector, discLseek);
+            return AuditStream(stream, stream.Length, rootDirSector, discLseek, requireOptimizedTag);
         }
         catch (XisoEmptyException)
         {
             // Parity with AuditXiso(string): an empty (header-only, no files)
-            // image is valid with nothing checked.
-            return new AuditResult(true, 0, 0, []);
+            // image is valid with nothing checked; the tag is still reported.
+            using BlockDeviceStream stream = new(dev, leaveOpen: true);
+            return new AuditResult(true, 0, 0, []) { IsOptimized = ProbeOptimizedTag(stream, out _) };
         }
         catch (Exception ex)
         {
@@ -2385,6 +2403,25 @@ public static class XisoReader
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public static AuditResult AuditXiso(string isoPath)
     {
+        return AuditXiso(isoPath, requireOptimizedTag: true);
+    }
+
+    /// <summary>
+    /// Performs a deep audit of an XISO image with control over the optimized-tag
+    /// requirement. When <paramref name="requireOptimizedTag"/> is <c>false</c> the
+    /// audit checks filesystem integrity only: a missing optimized tag is reported
+    /// through <see cref="AuditResult.IsOptimized"/> instead of failing the audit,
+    /// so raw (unconverted) images audit as valid.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file to audit (plain or <c>.cso</c>).</param>
+    /// <param name="requireOptimizedTag">
+    /// Whether a missing optimized tag is an audit issue (default <c>true</c>).
+    /// </param>
+    /// <returns>An <see cref="AuditResult"/> describing the outcome.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static AuditResult AuditXiso(string isoPath, bool requireOptimizedTag)
+    {
         VolumeInfo volInfo = GetVolumeInfo(isoPath);
         if (!volInfo.IsValid)
         {
@@ -2393,16 +2430,41 @@ public static class XisoReader
 
         if (volInfo is { RootDirSector: 0, RootDirSize: 0 })
         {
-            return new AuditResult(true, 0, 0, []);
+            // Empty (header-only) image: valid with nothing walked, but the
+            // optimized tag is still reported through IsOptimized.
+            using Stream emptyFs = OpenImageStream(isoPath);
+            return new AuditResult(true, 0, 0, []) { IsOptimized = ProbeOptimizedTag(emptyFs, out _) };
         }
 
-        using FileStream fs = new(
-            isoPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
-            });
-        return AuditStream(fs, fs.Length, volInfo.RootDirSector, volInfo.DiscLseek);
+        // CISO-aware opener, matching GetVolumeInfo: a plain FileStream would audit
+        // compressed bytes as if they were sectors.
+        using Stream fs = OpenImageStream(isoPath);
+        return AuditStream(fs, fs.Length, volInfo.RootDirSector, volInfo.DiscLseek, requireOptimizedTag);
+    }
+
+    /// <summary>
+    /// Probes the optimized tag at offset 31337 without affecting audit validity.
+    /// Returns <c>false</c> when the tag is absent; <paramref name="readFailed"/>
+    /// additionally reports a too-short image (the caller decides whether either
+    /// is an audit issue).
+    /// </summary>
+    private static bool ProbeOptimizedTag(Stream stream, out bool readFailed)
+    {
+        readFailed = false;
+        try
+        {
+            stream.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
+            Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];
+            ReadExact(stream, tagBuf);
+            string tag = Encoding.ASCII.GetString(tagBuf);
+            return tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin],
+                StringComparison.Ordinal);
+        }
+        catch (IOException)
+        {
+            readFailed = true;
+            return false;
+        }
     }
 
     /// <summary>
@@ -2411,26 +2473,17 @@ public static class XisoReader
     /// read stream (file or <see cref="BlockDeviceStream"/>).
     /// </summary>
     private static AuditResult AuditStream(
-        Stream stream, long length, uint rootDirSector, long discLseek)
+        Stream stream, long length, uint rootDirSector, long discLseek, bool requireOptimizedTag)
     {
         List<string> issues = new();
         int filesChecked = 0;
         int dirsChecked = 0;
-
-        try
+        bool isOptimized = ProbeOptimizedTag(stream, out bool tagReadFailed);
+        if (!isOptimized && requireOptimizedTag)
         {
-            stream.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
-            Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];
-            ReadExact(stream, tagBuf);
-            string tag = Encoding.ASCII.GetString(tagBuf);
-            if (!tag.StartsWith(Constants.OptimizedTag[..Constants.OptimizedTagLengthMin], StringComparison.Ordinal))
-            {
-                issues.Add("Optimized tag not found at offset 31337.");
-            }
-        }
-        catch (IOException)
-        {
-            issues.Add("Could not read optimized tag (file too short).");
+            issues.Add(tagReadFailed
+                ? "Could not read optimized tag (file too short)."
+                : "Optimized tag not found at offset 31337.");
         }
 
         long rootDirStart = ((long)rootDirSector * Constants.SectorSize) + discLseek;
@@ -2439,7 +2492,7 @@ public static class XisoReader
         {
             issues.Add(
                 $"Root directory sector {rootDirSector} (offset {rootDirStart}) exceeds file length {length}.");
-            return new AuditResult(false, 0, 0, issues);
+            return new AuditResult(false, 0, 0, issues) { IsOptimized = isOptimized };
         }
 
         HashSet<long> visited = new();
@@ -2447,7 +2500,7 @@ public static class XisoReader
         AuditWalk(stream, rootDirStart, rootDirStart, "/", length, discLseek, issues, visited, ref filesChecked,
             ref dirsChecked);
 
-        return new AuditResult(issues.Count == 0, filesChecked, dirsChecked, issues);
+        return new AuditResult(issues.Count == 0, filesChecked, dirsChecked, issues) { IsOptimized = isOptimized };
     }
 
     private static void AuditWalk(

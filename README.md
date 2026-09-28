@@ -18,7 +18,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) fo
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 35+ extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1419 tests) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1427 tests) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 3 of `H:\XBOXTest`, seeded): `extract-xiso.exe` (reference build `202609111233`; `list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
@@ -111,7 +111,7 @@ XISOSharp -l game.iso
 XISOSharp -t game.iso                     # recursive with sizes
 XISOSharp -i game.iso /                  # volume + dir entries
 XISOSharp --ls game.iso /media           # flat directory
-XISOSharp -V game.iso game2.iso         # deep audit (header/tag/cycles/bounds/0x48)
+XISOSharp -V game.iso game2.iso         # deep audit (header/cycles/bounds/0x48 + tag status)
 
 # Create / pack / rewrite
 XISOSharp -c ./game_files                # -> ./game_files.iso
@@ -147,7 +147,7 @@ XISOSharp -r -o game.iso game.iso        # Error: ... is the same file as the in
 ### Audit, repair & salvage (no reference tool does this)
 
 ```bash
-# Diagnose first: header, tag, full tree walk, sector bounds, cycles, names
+# Diagnose first: header, full tree walk, sector bounds, cycles, names
 XISOSharp -V game.iso                    # Result: PASS, or FAIL + issue list
 
 # Fixable in place (reserved bits, missing tag, separators in names; keeps .old)
@@ -289,7 +289,7 @@ XisoReader.CopyIn("game.iso", "./my-config.ini", "/config.ini");
 // Hash / audit / validate
 byte[]? md5 = XisoReader.ComputeFileHash("game.iso", "/default.xbe", System.Security.Cryptography.HashAlgorithmName.MD5);
 var hashes = XisoReader.ComputeDirectoryHashes("game.iso", "/", System.Security.Cryptography.HashAlgorithmName.SHA256);
-AuditResult audit = XisoReader.AuditXiso("game.iso"); // header/tag/cycles/bounds/0x48/0x0000
+AuditResult audit = XisoReader.AuditXiso("game.iso"); // header/cycles/bounds/0x48/0x0000; IsOptimized reports the tag
 ValidationResult vr = XisoValidator.ValidateConversion("src.iso", "out.iso", verifyChecksums: true);
 XisoValidator.LogResult(vr, "src.iso", "out.iso");
 XisoValidator.WriteReport(vr, "src.iso", "out.iso", "report.json");
@@ -471,7 +471,7 @@ File-by-file against [`References/`](References/) — `extract-xiso` build `2026
 | `copy-out` single file/dir | ✅ | ❌ | ❌ | ✅ |
 | `copy-in` single file (in-place patch + `.old` backup) | ✅ | ❌ | ❌ | ❌ (open #165) |
 | Resume interrupted unpack (`--skip-existing` / `UnpackOptions.SkipExisting`) | ✅ | ❌ | ❌ | ❌ (open #190) |
-| Deep audit `-V` (header/tag/cycles/bounds/0x48/0x0000) | ✅ | ❌ | ❌ | ❌ |
+| Deep audit `-V` (header/cycles/bounds/0x48/0x0000 + tag status) | ✅ | ❌ | ❌ | ❌ |
 | In-place repair `--repair` (reserved bits/tag/separators + `.old` backup) | ✅ | ❌ | ❌ | ❌ |
 | Salvage rebuild `--salvage` (carry reachable entries into fresh `.iso` + re-audit) | ✅ | ❌ | ❌ | ❌ |
 | `validate` + `--validate*` JSON report | ✅ | ❌ | ❌ | ❌ |
@@ -562,7 +562,7 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
-dotnet test -c Release                       # 1419 tests (`XISOSharp.Tests`; ZArchiveSharp comes from NuGet)
+dotnet test -c Release                       # 1427 tests (`XISOSharp.Tests`; ZArchiveSharp comes from NuGet)
 ```
 
 Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net8.0`/`net9.0`/`net10.0`, ships net10.0); `XISOSharp.Tests` (`net8.0`/`net9.0`/`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF). `ZArchiveSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZArchiveSharp.Tests` + `ZArchiveSharp.Benchmarks` moved to the sibling `../CSharp_ZArchiveSharp` repo (own solution); `XISOSharp` consumes the library as NuGet package `ZArchiveSharp` 1.3.0. CI builds on `ubuntu`/`windows`/`macos`.

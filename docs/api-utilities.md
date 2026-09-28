@@ -100,7 +100,7 @@ Manual `xdvdfs.toml` subset parser — see [xdvdfs Compat — Build-Image](xdvdf
 | `OffsetBlockDevice` | `OffsetWrapper` parity — probes `[0, Global, Xgd3, Hybrid, Xgd1]` skip-sectors & CISO offset |
 | `CisoBlockDevice` | CISO random-access, `index[totalBlocks+1]` LE u32 + single-sector cache, DEFLATE v1 + LZ4 v2 on-demand |
 
-Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)`, `ListDirectory(IBlockDevice, path)`. FileStream overloads delegate thinly.
+Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXiso(IBlockDevice, isoName, requireOptimizedTag)`), `ListDirectory(IBlockDevice, path)`. FileStream overloads delegate thinly.
 
 ## Redump / Ranges / Archival
 
@@ -311,7 +311,7 @@ Paths are destination-root-relative, forward-slash separated, case-insensitive
 |---|---|
 | `VolumeInfo` | `IsValid`, `RootDirSector`, `RootDirSize`, `DiscLseek`, `DiscFormat` (friendly layout name), `FileLength`, `TotalSectors`, `CreationTime` (`DateTimeOffset?` from the descriptor FILETIME), `FileTimeRaw`, `DescriptorSector` (partition-relative: `32` for standard layouts, `0` for rebuilt sector-0 images — the partition shift is `DiscLseek`; −1 when invalid) |
 | `EntryInfo` | `Name`, `IsDirectory`, `StartSector`, `FileSize`, `Attributes` (masked `0xB7`), `LeftChildOffset`, `RightChildOffset` |
-| `AuditResult` | `IsValid`, `FilesChecked`, `DirsChecked`, `Issues` (incl. `Reserved attribute bits set: 0x…`) |
+| `AuditResult` | `IsValid`, `FilesChecked`, `DirsChecked`, `Issues` (incl. `Reserved attribute bits set: 0x…`), `IsOptimized` (optimized tag present) |
 | `RepairResult` | `Fixed`, `Remaining`, `BackupPath`, `DryRun`, `Success` — outcome of `XisoReader.Repair` (see [Repair](api-xisoreader.md#repair)) |
 | `SalvageResult` | `Copied`, `Skipped`, `OutputPath`, `OutputIssues`, `Success` — outcome of `XisoReader.Salvage` (see [Salvage](api-xisoreader.md#salvage)) |
 | `ValidationIssue` | `Type`, `Path`, `SourceSize`, `OutputSize`, `SourceHash`, `OutputHash` |

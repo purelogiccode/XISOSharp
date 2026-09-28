@@ -87,17 +87,17 @@ public class XisoUpdateTests : IDisposable
 
     private static JsonElement ReleasePayload() =>
         JsonDocument.Parse("""
-            {
-              "tag_name": "1.0.2",
-              "html_url": "https://github.com/purelogiccode/XISOSharp/releases/tag/1.0.2",
-              "assets": [
-                { "name": "release_1.0.2_win-x64.zip",
-                  "browser_download_url": "https://github.com/purelogiccode/XISOSharp/releases/download/1.0.2/release_1.0.2_win-x64.zip" },
-                { "name": "release_1.0.2_linux-x64.zip",
-                  "browser_download_url": "https://github.com/purelogiccode/XISOSharp/releases/download/1.0.2/release_1.0.2_linux-x64.zip" }
-              ]
-            }
-            """).RootElement;
+                           {
+                             "tag_name": "1.0.2",
+                             "html_url": "https://github.com/purelogiccode/XISOSharp/releases/tag/1.0.2",
+                             "assets": [
+                               { "name": "release_1.0.2_win-x64.zip",
+                                 "browser_download_url": "https://github.com/purelogiccode/XISOSharp/releases/download/1.0.2/release_1.0.2_win-x64.zip" },
+                               { "name": "release_1.0.2_linux-x64.zip",
+                                 "browser_download_url": "https://github.com/purelogiccode/XISOSharp/releases/download/1.0.2/release_1.0.2_linux-x64.zip" }
+                             ]
+                           }
+                           """).RootElement;
 
     [Fact]
     public void FindAssetUrl_Match_ReturnsDownloadUrl()

@@ -467,17 +467,19 @@ public static XbeInfo? GetXbeInfo(Stream imageStream, string imageName, string i
 
 #### `AuditXiso`
 
-Performs a deep integrity audit of an XISO image. Validates the header, walks the entire directory tree, checks sector bounds, detects cycles, validates filenames and attributes, and verifies the optimized tag.
+Performs a deep integrity audit of an XISO image. Validates the header, walks the entire directory tree, checks sector bounds, detects cycles, and validates filenames and attributes. By default the audit also requires the optimized tag; pass `requireOptimizedTag: false` to audit raw (unconverted) images, where tag presence is reported through `IsOptimized` instead of failing the audit. Plain `.iso` and `.cso` images are both accepted.
 
 ```csharp
 public static AuditResult AuditXiso(string isoPath)
+public static AuditResult AuditXiso(string isoPath, bool requireOptimizedTag)
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `isoPath` | `string` | Path to the XISO file to audit. |
+| `requireOptimizedTag` | `bool` | When `false`, a missing optimized tag is not an audit issue (default `true`). |
 
-**Returns**: An `AuditResult` record with `IsValid`, `FilesChecked`, `DirsChecked`, and `Issues`.
+**Returns**: An `AuditResult` record with `IsValid`, `FilesChecked`, `DirsChecked`, `Issues`, and `IsOptimized`.
 
 **Exceptions**:
 - `FileNotFoundException` — input file does not exist
@@ -911,6 +913,7 @@ Result of a deep integrity audit of an XISO image.
 | `FilesChecked` | `int` | Number of file entries audited. |
 | `DirsChecked` | `int` | Number of directory entries audited. |
 | `Issues` | `IReadOnlyList<string>` | List of human-readable issues found during the audit. |
+| `IsOptimized` | `bool` | Whether the optimized tag was found (audit does not fail on it when `requireOptimizedTag` is `false`). |
 
 #### `RepairResult`
 
@@ -1215,11 +1218,13 @@ No reference tool repairs images — these APIs diagnose and recover corrupt one
 ```csharp
 using XISOSharp;
 
-// Diagnose: header, tag, full tree walk, sector bounds, cycles, names
+// Diagnose: header, full tree walk, sector bounds, cycles, names; the optimized
+// tag is required by default — pass requireOptimizedTag: false for raw images.
 AuditResult audit = XisoReader.AuditXiso("game.iso");
 if (!audit.IsValid)
     foreach (var issue in audit.Issues)
         Console.WriteLine($"  - {issue}");
+Console.WriteLine($"optimized: {audit.IsOptimized}");
 
 // Repair what is safely patchable in place (keeps game.iso.old unless disabled)
 RepairResult repaired = XisoReader.Repair("game.iso");

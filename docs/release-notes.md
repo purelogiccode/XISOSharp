@@ -1,5 +1,61 @@
 # Release Notes
 
+## 1.4.0
+
+Integrity-audit release. The CLI's `-V` audit no longer fails a structurally
+sound image just because the optimized tag is missing: it reports the tag
+(`Optimized: yes/no`) and passes raw/unconverted dumps, while structural damage
+still fails. Audits now accept `.cso` images (previously compressed bytes were
+read as sectors), the library gains a `requireOptimizedTag` overload plus the
+`AuditResult.IsOptimized` property, and empty (zero-root) images report tag
+presence instead of always `false`. Targets remain `net8.0` / `net9.0` /
+`net10.0`; full suite green on all three (1427 tests: 1426 passed, 1 opt-in
+skip, 0 failed).
+
+### Library
+
+#### Audit control and tag reporting
+
+- New overloads `AuditXiso(string isoPath, bool requireOptimizedTag)` and
+  `AuditXiso(IBlockDevice dev, string isoName, bool requireOptimizedTag)`.
+  With `requireOptimizedTag: false` a missing tag is not an audit issue, so raw
+  (unconverted) images audit as valid; the 1-arg overloads keep the original
+  strict behavior (`true`).
+- New `AuditResult.IsOptimized` property reports whether the tag was found.
+  The empty/zero-root early-return paths previously skipped the tag probe, so
+  an image whose root fields are zero but whose tag is intact reported `false`;
+  both the path and block-device overloads now probe and report it.
+- `AuditXiso(string)` now opens through `OpenImageStream` (CISO-aware) instead
+  of a plain `FileStream`, matching `GetVolumeInfo`. A `.cso` input used to be
+  audited as compressed bytes, producing bogus tree/bounds issues.
+
+### CLI
+
+- `-V` is an integrity audit: it prints `Optimized: yes/no`, a missing tag no
+  longer fails the run, and raw/unconverted images exit 0. Use
+  `--is-optimized` for the strict tag-only probe or `--repair` to write a
+  missing tag. Help text updated.
+
+### Tests
+
+- 1427 tests across `net8.0` / `net9.0` / `net10.0`: 1426 passed, 1 opt-in skip
+  (`XISO_UPDATE_FIXTURE=1` fixture validator), 0 failed.
+- New: `CliAuditTests` (3 end-to-end `-V` runs: optimized, raw passing with
+  `Optimized: no`, corrupt tree failing), `AuditXisoTests` integrity/tag/CISO
+  cases (4, incl. plain-vs-CISO parity), and device empty-root tag coverage.
+
+### Dependencies
+
+- `coverlet.collector` 10.0.1 → 10.1.0 (Tests). No library dependency changes.
+
+### Docs
+
+- `README.md`, `XISOSharp/README.md`, `XISOSharp.Cli/README.md`, `docs/cli.md`,
+  and `docs/api-xisoreader.md` document the integrity audit, the
+  `requireOptimizedTag` overload, and `IsOptimized`; `docs/troubleshooting.md`
+  and `docs/getting-started.md` refreshed; suite counts updated.
+- Release bundles now include `WhatsNew.md` next to `README.md` and `LICENSE`.
+
 ## 1.3.0
 
 Correctness and maintenance release. The rewrite `-o` output name is now

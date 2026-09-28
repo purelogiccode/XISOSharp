@@ -137,7 +137,15 @@ public record AuditResult(
     bool IsValid,
     int FilesChecked,
     int DirsChecked,
-    IReadOnlyList<string> Issues);
+    IReadOnlyList<string> Issues)
+{
+    /// <summary>
+    /// Whether the image carries the optimized tag. Populated by
+    /// <see cref="XISOSharp.XisoReader.AuditXiso(string)"/> and its overloads;
+    /// <c>false</c> when the tag was not found or could not be read.
+    /// </summary>
+    public bool IsOptimized { get; init; }
+}
 
 /// <summary>
 /// Type of validation issue found during conversion validation.

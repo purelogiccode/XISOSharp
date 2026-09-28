@@ -58,8 +58,8 @@ public sealed class XisoAttributesTests
     [Fact]
     public void CombinedAttributes_MapsAllFlags()
     {
-        byte raw = Constants.AttributeRo | Constants.AttributeHid | Constants.AttributeSys |
-                   Constants.AttributeDir;
+        const byte raw = Constants.AttributeRo | Constants.AttributeHid | Constants.AttributeSys |
+                         Constants.AttributeDir;
 
         FileAttributes result = XisoAttributes.ToWindowsFileAttributes(raw);
 
@@ -74,8 +74,8 @@ public sealed class XisoAttributesTests
     [Fact]
     public void AllFlags_MapsEveryStandardAttribute()
     {
-        byte raw = Constants.AttributeRo | Constants.AttributeHid | Constants.AttributeSys |
-                   Constants.AttributeDir | Constants.AttributeArc | Constants.AttributeNor;
+        const byte raw = Constants.AttributeRo | Constants.AttributeHid | Constants.AttributeSys |
+                         Constants.AttributeDir | Constants.AttributeArc | Constants.AttributeNor;
 
         FileAttributes result = XisoAttributes.ToWindowsFileAttributes(raw);
 

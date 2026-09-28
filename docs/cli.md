@@ -62,7 +62,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--xbe-info <file> <path>` | **XBE info** — parse and display the original-Xbox XBEH header + certificate of a `.xbe` file inside the image (base, entry point, sections, title ID/name, media, region, ratings, disc, version). No reference tool offers this. |
 | `--md5 <file> [path]` | Compute **MD5** hashes of files **inside** the image. No `path` → hash every file in the image; directory → recursive; file → single hash. Output: lowercase hex + two spaces + path. |
 | `--sha256 <file> [path]` | Compute **SHA-256** hashes of files inside the image (same semantics as `--md5`). |
-| `-V <file1.xiso> ...` | **Audit** — deep integrity check of one or more images: header, tree walk, sector bounds, cycle detection, reserved attribute bits `0x48` masked, `0x0000` sentinel, optimized tag. Prints `Files checked` / `Dirs checked` / `Result: PASS|FAIL (N issue(s))`. |
+| `-V <file1.xiso> ...` | **Audit** — deep integrity check of one or more images: header, tree walk, sector bounds, cycle detection, reserved attribute bits `0x48` masked, `0x0000` sentinel. The optimized tag is reported (`Optimized: yes/no`) but is **not required**, so raw/unconverted dumps pass; run `--is-optimized` for a strict tag-only check. Prints `Files checked` / `Dirs checked` / `Optimized` / `Result: PASS|FAIL (N issue(s))`. |
 | `--repair <file>` | **Repair** — fix the audit's safely-patchable issues in place: reserved attribute bits, missing optimized tag, separators in filenames. Writes `<file>.old` backup first unless `--no-backup`. Prints `Fixed:` / `Result: PASS|FAIL`. Truncation/structural issues are reported, never patched. See [Repair](api-xisoreader.md#repair). |
 | `--dry-run` | With `--repair`, preview the fixes without changing anything (exit mirrors the audit: `1` when fixes would apply). Rejected without `--repair`. |
 | `--salvage <file>` | **Salvage** — rebuild a readable image from a corrupt one: carry every entry reachable without tripping a truncation/structural gate into `<file>` without its extension plus `.salvaged.iso` (CISO input allowed; source never modified). Prints `Carried:` / `Dropped:` / `Result: PASS|FAIL`. See [Salvage](api-xisoreader.md#salvage). |
@@ -355,6 +355,8 @@ sufficient). Consequences:
 - **Extract/list/tree/checksum**: the tag selects the directory right-offset calculation
   (`llCompat = !optimized`). Images without the tag use the legacy linked-list-compatible
   layout; images with the tag use the optimized layout.
+- **Audit (`-V`)**: the tag is reported (`Optimized: yes/no`) but does **not** fail the
+  audit, so raw/unconverted dumps pass; `--is-optimized` is the strict tag check.
 - With `--prepend-sectors`, the tag shifts together with the game partition.
 
 ## Examples

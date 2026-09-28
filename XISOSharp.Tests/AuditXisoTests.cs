@@ -41,6 +41,13 @@ public class AuditXisoTests : IDisposable
         return dir;
     }
 
+    private static void RemoveOptimizedTag(string isoPath)
+    {
+        using FileStream fs = new(isoPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
+        fs.Write(new byte[Constants.OptimizedTagLength]);
+    }
+
     [Fact]
     public void AuditXiso_ValidIso_ReturnsValid()
     {
@@ -53,7 +60,80 @@ public class AuditXisoTests : IDisposable
         Assert.True(result.IsValid, $"Audit failed: {string.Join("; ", result.Issues)}");
         Assert.True(result.FilesChecked > 0);
         Assert.True(result.DirsChecked > 0);
+        Assert.True(result.IsOptimized);
         Assert.Empty(result.Issues);
+    }
+
+    [Fact]
+    public void AuditXiso_IntegrityOnly_MissingTag_ReturnsValidNotOptimized()
+    {
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out string? isoPath, null, null);
+        Assert.NotNull(isoPath);
+        RemoveOptimizedTag(isoPath);
+
+        AuditResult result = XisoReader.AuditXiso(isoPath, requireOptimizedTag: false);
+
+        Assert.True(result.IsValid, $"Audit failed: {string.Join("; ", result.Issues)}");
+        Assert.False(result.IsOptimized);
+        Assert.Empty(result.Issues);
+        Assert.True(result.FilesChecked > 0);
+    }
+
+    [Fact]
+    public void AuditXiso_Default_MissingTag_StillFails()
+    {
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out string? isoPath, null, null);
+        Assert.NotNull(isoPath);
+        RemoveOptimizedTag(isoPath);
+
+        AuditResult result = XisoReader.AuditXiso(isoPath);
+
+        Assert.False(result.IsValid);
+        Assert.False(result.IsOptimized);
+        Assert.Contains(result.Issues, static i => i.Contains("Optimized tag", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AuditXiso_IntegrityOnly_CorruptTree_StillFails()
+    {
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out string? isoPath, null, null);
+        Assert.NotNull(isoPath);
+        RemoveOptimizedTag(isoPath);
+
+        // Point the volume descriptor's root directory at a sector far past EOF.
+        using (FileStream fs = new(isoPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            fs.Seek(Constants.HeaderOffset + 20, SeekOrigin.Begin);
+            fs.Write(BitConverter.GetBytes(0xFFFFFFF0u));
+        }
+
+        AuditResult result = XisoReader.AuditXiso(isoPath, requireOptimizedTag: false);
+
+        Assert.False(result.IsValid);
+        Assert.NotEmpty(result.Issues);
+    }
+
+    [Fact]
+    public void AuditXiso_Cso_MatchesPlainIso()
+    {
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out string? isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        string csoPath = Path.Combine(CreateTempDir(), "game.cso");
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, csoPath));
+
+        AuditResult plain = XisoReader.AuditXiso(isoPath);
+        AuditResult compressed = XisoReader.AuditXiso(csoPath);
+
+        Assert.True(compressed.IsValid, $"CISO audit failed: {string.Join("; ", compressed.Issues)}");
+        Assert.Equal(plain.IsValid, compressed.IsValid);
+        Assert.Equal(plain.FilesChecked, compressed.FilesChecked);
+        Assert.Equal(plain.DirsChecked, compressed.DirsChecked);
+        Assert.Equal(plain.IsOptimized, compressed.IsOptimized);
     }
 
     [Fact]
@@ -181,8 +261,9 @@ public class AuditXisoTests : IDisposable
 
         AuditResult result = XisoReader.AuditXiso(isoPath);
 
-        // Empty ISO should still be structurally valid
+        // Empty ISO should still be structurally valid, and CreateXiso wrote the tag.
         Assert.True(result.IsValid, $"Empty ISO audit failed: {string.Join("; ", result.Issues)}");
+        Assert.True(result.IsOptimized);
     }
 
     [Fact]

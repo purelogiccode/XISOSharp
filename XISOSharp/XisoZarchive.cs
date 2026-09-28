@@ -337,6 +337,7 @@ public static class XisoZarchive
         private readonly List<string> _names = names;
         private readonly long _xisoOffset = xisoOffset;
         private readonly FileStream _isoFs = isoFs;
+
         /// <summary>Source image path shown in pack progress output.</summary>
         public string DisplayPath { get; } = displayPath;
 

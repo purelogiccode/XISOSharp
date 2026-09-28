@@ -122,14 +122,20 @@
   </Target>
   <Target Name="StageCliBesideGui" AfterTargets="Build">
     <ItemGroup>
-      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.exe" Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.exe')" />
-      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp" Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp')" />
-      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli" Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli')" />
-      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.dll" Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.dll')" />
-      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.runtimeconfig.json" Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.runtimeconfig.json')" />
+      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.exe"
+                     Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.exe')" />
+      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp"
+                     Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp')" />
+      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli"
+                     Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli')" />
+      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.dll"
+                     Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.dll')" />
+      <CliStageFiles Include="..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.runtimeconfig.json"
+                     Condition="Exists('..\XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.runtimeconfig.json')" />
     </ItemGroup>
     <Copy SourceFiles="@(CliStageFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-    <Exec Command="chmod +x &quot;$(OutDir)XISOSharp&quot;" Condition="Exists('$(OutDir)XISOSharp') and !$([MSBuild]::IsOSPlatform('Windows'))" ContinueOnError="true" />
+    <Exec Command="chmod +x &quot;$(OutDir)XISOSharp&quot;"
+          Condition="Exists('$(OutDir)XISOSharp') and !$([MSBuild]::IsOSPlatform('Windows'))" ContinueOnError="true" />
   </Target>
 
 </Project>

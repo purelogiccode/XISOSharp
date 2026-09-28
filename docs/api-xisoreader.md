@@ -511,7 +511,8 @@ All ported from `LibXGD/XGD.cs:11` tables (`XgdTables.cs`) + `XDVDFS.cs` (`GetVa
 
 ```csharp
 public static (uint rootDirSector, uint rootDirSize, long discLseek) VerifyXiso(IBlockDevice dev, string isoName, int? skipSectors = null);
-public static AuditResult AuditXiso(IBlockDevice dev);
+public static AuditResult AuditXiso(IBlockDevice dev, string isoName = "memory");
+public static AuditResult AuditXiso(IBlockDevice dev, string isoName, bool requireOptimizedTag);
 public static IReadOnlyList<EntryInfo> ListDirectory(IBlockDevice dev, string internalPath = "/");
 ```
 
@@ -521,18 +522,25 @@ public static IReadOnlyList<EntryInfo> ListDirectory(IBlockDevice dev, string in
 
 ```csharp
 public static AuditResult AuditXiso(string isoPath)
+public static AuditResult AuditXiso(string isoPath, bool requireOptimizedTag)
 ```
 
 Deep integrity audit — the library behind the CLI's `-V` flag:
 
 - header magic at all known offsets
-- optimized-tag presence at offset 31337
+- optimized-tag presence at offset 31337 (an issue only when
+  `requireOptimizedTag` is true; otherwise reported via `IsOptimized`)
 - full directory tree walk with **cycle detection**
 - sector bounds for every entry (file and directory)
 - reserved attribute bits (`0x08`, `0x40`)
 - filename validity
 
-Returns `AuditResult` (`IsValid`, `FilesChecked`, `DirsChecked`, `Issues`).
+`requireOptimizedTag` defaults to `true` (the 1-arg overload), preserving the
+original behavior. Pass `false` to audit raw (unconverted) images: a missing
+optimized tag no longer fails the audit, so structurally valid Redump-style
+dumps pass. Both overloads accept plain `.iso` and `.cso` images.
+
+Returns `AuditResult` (`IsValid`, `FilesChecked`, `DirsChecked`, `Issues`, `IsOptimized`).
 
 ## Repair
 

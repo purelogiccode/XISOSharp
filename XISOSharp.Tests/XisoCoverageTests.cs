@@ -514,6 +514,20 @@ public class XisoCoverageTests : IDisposable
         Assert.True(result.IsValid);
         // Deep walk, not header-only (BUG-LIB-012): the file must be counted.
         Assert.True(result.FilesChecked > 0);
+        Assert.True(result.IsOptimized);
+        Assert.Empty(result.Issues);
+    }
+
+    [Fact]
+    public void AuditXiso_Device_EmptyRoot_ReportsTag()
+    {
+        string isoPath = CreateIsoBytes(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+        byte[] bytes = File.ReadAllBytes(isoPath);
+        Array.Clear(bytes, Constants.HeaderOffset + Constants.HeaderDataLength, 8);
+        using MemoryBlockDevice dev = new(bytes);
+        AuditResult result = XisoReader.AuditXiso(dev, "game.iso");
+        Assert.True(result.IsValid);
+        Assert.True(result.IsOptimized);
         Assert.Empty(result.Issues);
     }
 
@@ -1200,6 +1214,8 @@ public class XisoCoverageTests : IDisposable
         AuditResult result = XisoReader.AuditXiso(CreateZeroRootIso());
         Assert.True(result.IsValid);
         Assert.Empty(result.Issues);
+        // Only the root fields were zeroed; the optimized tag is intact.
+        Assert.True(result.IsOptimized);
     }
 
     [Fact]

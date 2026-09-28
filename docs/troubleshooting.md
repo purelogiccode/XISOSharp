@@ -46,15 +46,18 @@ No reference tool repairs images — XISOSharp does. Diagnose first, then pick t
 matching verb:
 
 ```bash
-XISOSharp -V game.iso          # deep audit: header, tag, tree, bounds, cycles
+XISOSharp -V game.iso          # deep audit: header, tree, bounds, cycles (+ Optimized: yes/no)
 XISOSharp --repair game.iso    # fixable in place (keeps game.iso.old backup)
 XISOSharp --salvage game.iso   # rebuild game.salvaged.iso from the rest
 ```
 
-- `-V` lists every issue found. Fixable-in-place issues (reserved attribute
-  bits, a missing optimized tag, path separators in filenames) are exactly what
-  `--repair` patches, byte for byte, with a `<file>.old` backup first
-  (`--no-backup` skips it; `--dry-run` previews without changing anything).
+- `-V` lists every issue found and prints the tag status (`Optimized: yes/no`);
+  a missing tag is reported but does not fail the audit (run `--is-optimized`
+  for the strict tag-only check). Fixable-in-place issues (reserved attribute
+  bits, path separators in filenames — and a missing optimized tag, which
+  `--repair` writes) are exactly what `--repair` patches, byte for byte, with a
+  `<file>.old` backup first (`--no-backup` skips it; `--dry-run` previews
+  without changing anything).
 - Truncation and structural damage (cut-off data, broken offset chains, cycles,
   depth overflows) cannot be patched — `--salvage` carries every still-reachable
   entry into a fresh `game.salvaged.iso` (or `--repair-out <path>`), reports

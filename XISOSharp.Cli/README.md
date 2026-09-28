@@ -97,7 +97,7 @@ is printed and the tool exits 1.
 | `--xbe-info <file> <path>` | Original-Xbox XBEH header + certificate (title ID/name, media, region) |
 | `--copy-out <iso> <path> <dest>` | Copy a file or directory out of an image |
 | `--copy-in <iso> <host> <path>` | Patch a host file into an image (replace or add; writes `<iso>.old` unless `--no-backup`) |
-| `-V <file1.xiso> ...` | Deep audit: header, tree, sector bounds, cycles, attributes, optimized tag |
+| `-V <file1.xiso> ...` | Deep integrity audit: header, tree, sector bounds, cycles, attributes; prints `Optimized: yes/no` (the tag is reported, not required) |
 | `--repair <file>` | Fix audit issues in place (`.old` backup; `--dry-run` previews; `--no-backup` skips) |
 | `--salvage <file>` | Rebuild reachable entries from a corrupt image (`--repair-out` overrides output) |
 | `-r` | Rewrite as optimized ISO (byte-identical to `extract-xiso -r`) |

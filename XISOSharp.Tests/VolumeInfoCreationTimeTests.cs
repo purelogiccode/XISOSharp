@@ -104,7 +104,7 @@ public sealed class VolumeInfoCreationTimeTests : IDisposable
     public void GetVolumeInfo_GarbageFileTime_ClampsWithoutThrowing()
     {
         string iso = CreateIso(fileTime: 0);
-        long offset = Constants.HeaderOffset + Constants.HeaderDataLength + 4 + 4;
+        const long offset = Constants.HeaderOffset + Constants.HeaderDataLength + 4 + 4;
         using (FileStream fs = new(iso, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
             Span<byte> garbage = stackalloc byte[8];

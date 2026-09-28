@@ -293,13 +293,21 @@ internal static class UpdateChecker
             }
 
             string tag = root.TryGetProperty("tag", out JsonElement tagEl) &&
-                tagEl.ValueKind == JsonValueKind.String ? tagEl.GetString() ?? string.Empty : string.Empty;
+                         tagEl.ValueKind == JsonValueKind.String
+                ? tagEl.GetString() ?? string.Empty
+                : string.Empty;
             string url = root.TryGetProperty("url", out JsonElement urlEl) &&
-                urlEl.ValueKind == JsonValueKind.String ? urlEl.GetString() ?? string.Empty : string.Empty;
+                         urlEl.ValueKind == JsonValueKind.String
+                ? urlEl.GetString() ?? string.Empty
+                : string.Empty;
             string? assetName = root.TryGetProperty("asset", out JsonElement assetEl) &&
-                assetEl.ValueKind == JsonValueKind.String ? assetEl.GetString() : null;
+                                assetEl.ValueKind == JsonValueKind.String
+                ? assetEl.GetString()
+                : null;
             string? assetUrl = root.TryGetProperty("assetUrl", out JsonElement assetUrlEl) &&
-                assetUrlEl.ValueKind == JsonValueKind.String ? assetUrlEl.GetString() : null;
+                               assetUrlEl.ValueKind == JsonValueKind.String
+                ? assetUrlEl.GetString()
+                : null;
             return new ReleaseInfo(checkedUtc, tag, url, assetName, assetUrl);
         }
         catch (Exception ex)
@@ -321,8 +329,10 @@ internal static class UpdateChecker
             sb.Append("{\"checkedUtc\":\"").Append(info.CheckedUtc.ToString("o")).Append("\",");
             sb.Append("\"tag\":\"").Append(Escape(info.Tag)).Append("\",");
             sb.Append("\"url\":\"").Append(Escape(info.Url)).Append("\",");
-            sb.Append("\"asset\":").Append(info.AssetName is null ? "null" : $"\"{Escape(info.AssetName)}\"").Append(',');
-            sb.Append("\"assetUrl\":").Append(info.AssetUrl is null ? "null" : $"\"{Escape(info.AssetUrl)}\"").Append('}');
+            sb.Append("\"asset\":").Append(info.AssetName is null ? "null" : $"\"{Escape(info.AssetName)}\"")
+                .Append(',');
+            sb.Append("\"assetUrl\":").Append(info.AssetUrl is null ? "null" : $"\"{Escape(info.AssetUrl)}\"")
+                .Append('}');
             File.WriteAllText(cachePath, sb.ToString());
         }
         catch (Exception ex)
@@ -357,9 +367,13 @@ internal static class UpdateChecker
             using JsonDocument doc = JsonDocument.Parse(json);
             JsonElement root = doc.RootElement;
             string tag = root.TryGetProperty("tag_name", out JsonElement tagEl) &&
-                tagEl.ValueKind == JsonValueKind.String ? tagEl.GetString() ?? string.Empty : string.Empty;
+                         tagEl.ValueKind == JsonValueKind.String
+                ? tagEl.GetString() ?? string.Empty
+                : string.Empty;
             string url = root.TryGetProperty("html_url", out JsonElement urlEl) &&
-                urlEl.ValueKind == JsonValueKind.String ? urlEl.GetString() ?? string.Empty : string.Empty;
+                         urlEl.ValueKind == JsonValueKind.String
+                ? urlEl.GetString() ?? string.Empty
+                : string.Empty;
             if (string.IsNullOrWhiteSpace(tag))
                 return null;
 

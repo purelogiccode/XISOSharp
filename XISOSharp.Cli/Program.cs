@@ -124,7 +124,10 @@ internal static class Program
                 return false;
             if (string.Equals(Environment.GetEnvironmentVariable("XISO_NO_PAUSE"), "1",
                     StringComparison.Ordinal))
+            {
                 return false;
+            }
+
             string? entry = Assembly.GetEntryAssembly()?.GetName().Name;
             if (entry?.Contains("test", StringComparison.OrdinalIgnoreCase) == true)
                 return false;
@@ -2120,10 +2123,14 @@ internal static class Program
                 string xisoPath = isoFiles[i];
                 try
                 {
-                    AuditResult result = XisoReader.AuditXiso(xisoPath);
+                    // Integrity audit: a missing optimized tag is reported through
+                    // IsOptimized but does not fail the audit, so raw (unconverted)
+                    // images pass. Use --is-optimized to require the tag.
+                    AuditResult result = XisoReader.AuditXiso(xisoPath, requireOptimizedTag: false);
                     Logger.Log($"Auditing {xisoPath}:\n\n");
                     Logger.Log($"  Files checked:  {result.FilesChecked}\n");
                     Logger.Log($"  Dirs checked:   {result.DirsChecked}\n");
+                    Logger.Log($"  Optimized:      {(result.IsOptimized ? "yes" : "no")}\n");
 
                     if (result.Issues.Count == 0)
                     {
@@ -4690,7 +4697,10 @@ internal static class Program
                                                      -r                  Rewrite xiso(s) as optimized xiso(s).
                                                      --sha256 <file> [path] Compute SHA-256 hash of file(s) in xiso.
                                                       -t                  List all files recursively with sizes (tree).
-                                                      -V <file1.xiso> ...  Deep-audit xiso(s): validate header, tree, sectors.
+                                                      -V <file1.xiso> ...  Deep-audit xiso(s): validate header, tree,
+                                                                           sectors, and attributes; the optimized tag
+                                                                           is reported but not required (see
+                                                                           --is-optimized).
                                                      --repair <file>     Repair fixable issues in place (reserved
                                                                            attribute bits, missing optimized tag,
                                                                            separators in names); writes <file>.old

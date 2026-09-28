@@ -44,7 +44,9 @@ internal sealed class BugReportSink : ILogEventSink
             // it is expected behaviour, not a bug, and would flood the API.
             if (logEvent.Properties.TryGetValue(NoBugReportProperty, out LogEventPropertyValue? marker)
                 && marker is ScalarValue { Value: true })
+            {
                 return;
+            }
 
             string message = logEvent.RenderMessage();
             if (string.IsNullOrWhiteSpace(message) && logEvent.Exception != null)
