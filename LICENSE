@@ -124,5 +124,7 @@ distributions, so they are reproduced here verbatim.
 
 4) ZArchiveSharp (https://github.com/purelogiccode/CSharp_ZArchiveSharp,
    consumed as a NuGet dependency and bundled into the single-file binaries)
-   MIT License, Copyright (c) PureLogicCode.com, under the same terms as this
-   project's own license above.
+   MIT License, Copyright (c) 2026 PureLogicCode.com; Lead developer: Peterson
+   Fernandes. All of ZArchiveSharp — including the `ZArchiveSharp.Pipeline`
+   pack/extract layer used here — is original MIT work as of v1.4.0; the terms
+   are the same as this project's own license above.

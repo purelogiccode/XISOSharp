@@ -1,5 +1,37 @@
 # Release Notes
 
+## 1.4.1
+
+Dependency and legal maintenance release. `ZArchiveSharp` moves 1.3.0 → 1.4.0
+(drop-in: upstream rewrote its pipeline layer as original MIT work with no
+public-surface, wire-format, or CLI changes), and the ZArchiveSharp notice is
+refreshed — the library, including the `ZArchiveSharp.Pipeline` pack/extract
+layer XISOSharp uses, is fully MIT. No XISOSharp API or CLI behavior changes;
+targets remain `net8.0` / `net9.0` / `net10.0`; full suite green on all three
+(1427 tests: 1426 passed, 1 opt-in skip, 0 failed).
+
+### Dependencies
+
+- `ZArchiveSharp` 1.3.0 → 1.4.0. Upstream highlights: original MIT pipeline
+  layer (`ZarPipeline`, `ZarPackEngine`, `ProcessRunner`), stricter per-item
+  batch isolation, and a robust stderr drain that no longer stalls on an
+  inherited pipe. The public surface is unchanged, so ZAR output, CLI
+  semantics, and exit codes are untouched.
+
+### License
+
+- `LICENSE` item 4 records ZArchiveSharp as fully MIT as of v1.4.0
+  (Copyright (c) 2026 PureLogicCode.com; lead developer Peterson Fernandes),
+  including `ZArchiveSharp.Pipeline`.
+- The packaged library license (`XISOSharp/LICENSE`) is synced with the root
+  `LICENSE`, so the NuGet package now carries the full third-party notices
+  (extract-xiso BSD-4-clause, xdvdfs, XboxKit, ZArchiveSharp).
+
+### Docs
+
+- Root `README.md` and `docs/building.md` dependency references updated
+  1.3.0 → 1.4.0.
+
 ## 1.4.0
 
 Integrity-audit release. The CLI's `-V` audit no longer fails a structurally
