@@ -33,7 +33,9 @@ internal static class CisoSplitFile
         List<FileStream> parts = new();
         for (int i = 0;; i++)
         {
-            string partPath = PartPath(baseName, i);
+            // Append rather than ChangeExtension: a dotted base (`My.Game.1.cso`
+            // -> `My.Game`) must yield `My.Game.2.cso`, not `My.2.cso`.
+            string partPath = $"{baseName}.{i + 1}.cso";
             if (!File.Exists(partPath)) break;
             parts.Add(new FileStream(partPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536));
         }

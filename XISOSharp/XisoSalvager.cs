@@ -100,8 +100,8 @@ public static class XisoSalvager
                         $"Root directory sector {volInfo.RootDirSector} (offset {rootDirStart}) exceeds file length {fileLength}: no tree root to salvage from {sourcePath} (wrong file or decapitated image).");
                 }
 
-                SalvageWalk(image, rootDirStart, rootDirStart, "/", staging, fileLength, volInfo.DiscLseek,
-                    new HashSet<long>(), state);
+                SalvageWalk(image, rootDirStart, rootDirStart, volInfo.RootDirSize, "/", staging, fileLength,
+                    volInfo.DiscLseek, new HashSet<long>(), state);
             }
 
             string isoName = Path.GetFileName(outputPath);
@@ -159,6 +159,7 @@ public static class XisoSalvager
         Stream image,
         long dirStart,
         long tableStart,
+        long tableSize,
         string path,
         string stagingDir,
         long fileLength,
@@ -191,9 +192,10 @@ public static class XisoSalvager
                 return;
             }
 
-            if (dirStart < 0 || dirStart >= fileLength)
+            if (dirStart < 0 || dirStart >= fileLength || dirStart >= tableStart + tableSize)
             {
-                state.Skipped.Add($"Directory offset {dirStart} ({path}) exceeds file length {fileLength} (dropped).");
+                state.Skipped.Add(
+                    $"Directory offset {dirStart} ({path}) exceeds the directory table (table at {tableStart}, size {tableSize}) (dropped).");
                 return;
             }
 
@@ -252,14 +254,14 @@ public static class XisoSalvager
             if (lOffset != 0 && lOffset != Constants.PadShort)
             {
                 long leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
-                if (leftSeek < 0 || leftSeek >= fileLength)
+                if (leftSeek < 0 || leftSeek >= fileLength || leftSeek >= tableStart + tableSize)
                 {
                     state.Skipped.Add(
-                        $"Left child offset {lOffset} (seek {leftSeek}) exceeds file length in {path} (subtree dropped).");
+                        $"Left child offset {lOffset} (seek {leftSeek}) exceeds the directory table in {path} (subtree dropped).");
                 }
                 else
                 {
-                    SalvageWalk(image, leftSeek, tableStart, path, stagingDir, fileLength, discLseek,
+                    SalvageWalk(image, leftSeek, tableStart, tableSize, path, stagingDir, fileLength, discLseek,
                         new HashSet<long>(visited), state, depth + 1);
                 }
             }
@@ -297,16 +299,20 @@ public static class XisoSalvager
                 return;
             }
 
-            StageEntry(image, filename, rawAttributes, startSector, fileSize, path, stagingDir,
-                fileLength, discLseek, state, depth);
+            // Structural "." / ".." records are skipped (children still traversed).
+            if (filename is not ("." or ".."))
+            {
+                StageEntry(image, filename, rawAttributes, startSector, fileSize, path, stagingDir,
+                    fileLength, discLseek, state, depth);
+            }
 
             if (rOffset != 0 && rOffset != Constants.PadShort)
             {
                 long rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
-                if (rightSeek < 0 || rightSeek >= fileLength)
+                if (rightSeek < 0 || rightSeek >= fileLength || rightSeek >= tableStart + tableSize)
                 {
                     state.Skipped.Add(
-                        $"Right child offset {rOffset} (seek {rightSeek}) exceeds file length in {path} (rest of table dropped).");
+                        $"Right child offset {rOffset} (seek {rightSeek}) exceeds the directory table in {path} (rest of table dropped).");
                     break;
                 }
 
@@ -331,7 +337,7 @@ public static class XisoSalvager
         SalvageState state,
         int depth)
     {
-        string stagedName = filename.Replace('/', '_').Replace('\\', '_');
+        string stagedName = XisoEntryNames.SanitizeEntryName(filename);
         if (stagedName.Length == 0 || stagedName is "." or "..")
         {
             state.Skipped.Add($"'{path}{filename}': name is not usable on the host filesystem (dropped).");
@@ -372,7 +378,7 @@ public static class XisoSalvager
             // plain duplicates.
             bool sibSanitized = rawSiblings.Any(r =>
                 !string.Equals(r, filename, StringComparison.Ordinal) &&
-                r.Replace('/', '_').Replace('\\', '_').Equals(stagedName, StringComparison.OrdinalIgnoreCase));
+                XisoEntryNames.SanitizeEntryName(r).Equals(stagedName, StringComparison.OrdinalIgnoreCase));
             string why = filename.Contains('/') || filename.Contains('\\') || sibSanitized
                 ? "separator-collision"
                 : "duplicate";
@@ -409,7 +415,7 @@ public static class XisoSalvager
                     return;
                 }
 
-                SalvageWalk(image, sectorOffset, sectorOffset, $"{path}{stagedName}/", stagedPath,
+                SalvageWalk(image, sectorOffset, sectorOffset, fileSize, $"{path}{stagedName}/", stagedPath,
                     fileLength, discLseek, new HashSet<long>(), state, depth + 1);
             }
 

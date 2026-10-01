@@ -170,7 +170,7 @@ public static class XisoRepairer
         long rootDirStart = ((long)volInfo.RootDirSector * Constants.SectorSize) + volInfo.DiscLseek;
         if (rootDirStart < fileLength)
         {
-            CollectWalk(fs, rootDirStart, rootDirStart, "/", fileLength, volInfo.DiscLseek,
+            CollectWalk(fs, rootDirStart, rootDirStart, volInfo.RootDirSize, "/", fileLength, volInfo.DiscLseek,
                 new HashSet<long>(), trustedAttrs, entries);
         }
 
@@ -190,6 +190,7 @@ public static class XisoRepairer
         FileStream fs,
         long dirStart,
         long tableStart,
+        long tableSize,
         string path,
         long fileLength,
         long discLseek,
@@ -214,7 +215,7 @@ public static class XisoRepairer
             if (++entriesInTable > Constants.MaxTocEntriesPerTable)
                 return;
 
-            if (dirStart >= fileLength || !visited.Add(dirStart))
+            if (dirStart >= fileLength || dirStart >= tableStart + tableSize || !visited.Add(dirStart))
                 return;
 
             try
@@ -256,9 +257,9 @@ public static class XisoRepairer
                 if (lOffset != 0 && lOffset != Constants.PadShort)
                 {
                     long leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
-                    if (leftSeek >= 0 && leftSeek < fileLength)
+                    if (leftSeek >= 0 && leftSeek < fileLength && leftSeek < tableStart + tableSize)
                     {
-                        CollectWalk(fs, leftSeek, tableStart, path, fileLength, discLseek,
+                        CollectWalk(fs, leftSeek, tableStart, tableSize, path, fileLength, discLseek,
                             new HashSet<long>(visited), trustedAttrs, entries, depth + 1);
                     }
                 }
@@ -283,25 +284,30 @@ public static class XisoRepairer
                 ReadExact(fs, nameBuf);
                 string filename = Latin1Encoding.Instance.GetString(nameBuf);
 
-                entries.Add(new RawEntry(dirStart + 12, rawAttributes, dirStart + 14, filename, tableStart, path));
-
-                byte attributes = Constants.MaskAttributes(rawAttributes);
-                bool trusted = (rawAttributes & Constants.AttributeReservedMask) == 0 ||
-                               trustedAttrs.Contains(dirStart + 12);
-                if (trusted && (attributes & Constants.AttributeDir) != 0 && fileSize > 0)
+                // Structural "." / ".." records are skipped (children still walked).
+                if (filename is not ("." or ".."))
                 {
-                    long sectorOffset = ((long)startSector * Constants.SectorSize) + discLseek;
-                    if (sectorOffset >= 0 && sectorOffset < fileLength)
+                    entries.Add(new RawEntry(dirStart + 12, rawAttributes, dirStart + 14, filename, tableStart,
+                        path));
+
+                    byte attributes = Constants.MaskAttributes(rawAttributes);
+                    bool trusted = (rawAttributes & Constants.AttributeReservedMask) == 0 ||
+                                   trustedAttrs.Contains(dirStart + 12);
+                    if (trusted && (attributes & Constants.AttributeDir) != 0 && fileSize > 0)
                     {
-                        CollectWalk(fs, sectorOffset, sectorOffset, path + filename + "/", fileLength, discLseek,
-                            new HashSet<long>(), trustedAttrs, entries, depth + 1);
+                        long sectorOffset = ((long)startSector * Constants.SectorSize) + discLseek;
+                        if (sectorOffset >= 0 && sectorOffset < fileLength)
+                        {
+                            CollectWalk(fs, sectorOffset, sectorOffset, fileSize, path + filename + "/",
+                                fileLength, discLseek, new HashSet<long>(), trustedAttrs, entries, depth + 1);
+                        }
                     }
                 }
 
                 if (rOffset != 0 && rOffset != Constants.PadShort)
                 {
                     long rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
-                    if (rightSeek < 0 || rightSeek >= fileLength)
+                    if (rightSeek < 0 || rightSeek >= fileLength || rightSeek >= tableStart + tableSize)
                         break;
 
                     dirStart = rightSeek;
@@ -340,7 +346,9 @@ public static class XisoRepairer
         // order so two entries sanitizing to the same name collide safely.
         foreach (IGrouping<long, RawEntry> table in entries.GroupBy(static e => e.TableStart))
         {
-            HashSet<string> names = new(StringComparer.Ordinal);
+            // XISO names are case-insensitive, so a rename collision check must
+            // be too: `A/B` -> `A_B` collides with an existing `a_b`.
+            HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
             foreach (RawEntry e in table)
                 names.Add(e.Name);
 
@@ -361,11 +369,16 @@ public static class XisoRepairer
                         }));
                 }
 
-                if (e.Name.Contains('/') || e.Name.Contains('\\'))
+                if (XisoEntryNames.IsInvalidEntryName(e.Name))
                 {
-                    string sanitized = e.Name.Replace('/', '_').Replace('\\', '_');
+                    string sanitized = XisoEntryNames.SanitizeEntryName(e.Name);
                     names.Remove(e.Name);
-                    if (names.Add(sanitized))
+                    if (string.Equals(sanitized, e.Name, StringComparison.Ordinal))
+                    {
+                        // The sanitizer preserved the name: nothing to patch.
+                        names.Add(e.Name);
+                    }
+                    else if (names.Add(sanitized))
                     {
                         byte[] nameBytes = Latin1Encoding.Instance.GetBytes(sanitized);
                         long nameOffset = e.NameOffset;
@@ -374,7 +387,7 @@ public static class XisoRepairer
                             string oldRef = $"{e.DirPath}{e.Name}";
                             fixes.Add(new PendingFix(
                                 $"name:{nameOffset}",
-                                $"'{oldRef}' renamed to '{sanitized}' (replaced path separator)",
+                                $"'{oldRef}' renamed to '{sanitized}' (sanitized invalid character(s))",
                                 fs =>
                                 {
                                     fs.Seek(nameOffset, SeekOrigin.Begin);

@@ -113,10 +113,30 @@ public static class XisoRanges
             // require offset == 0). Deeper nodes use it as "no left child" and
             // must still be processed, or their right siblings get dropped.
             if (leftChildOffset == 0xFFFF && childOffset == 0) return;
+
+            // All-zero empty-table sentinel (parity with the other walkers):
+            // without this the 14 zero bytes parse as a bogus entry.
+            if (leftChildOffset == 0 && childOffset == 0 && IsAllZeroEntryHeader(isoFs))
+                return;
+
             ushort rightChildOffset = ReadUShort(isoFs);
             long entryOffset = ReadUInt(isoFs) * SectorSize;
             uint entrySize = ReadUInt(isoFs);
             bool isDirectory = ((byte)isoFs.ReadByte() & 0x10) != 0;
+            byte nameLength = (byte)isoFs.ReadByte();
+            byte[] nameBuf = new byte[nameLength];
+            if (nameLength > 0)
+            {
+                int read = 0;
+                while (read < nameLength)
+                {
+                    int n = isoFs.Read(nameBuf, read, nameLength - read);
+                    if (n == 0) return;
+                    read += n;
+                }
+            }
+
+            string name = Latin1Encoding.Instance.GetString(nameBuf);
 
             if (leftChildOffset != 0 && leftChildOffset != 0xFFFF)
             {
@@ -124,7 +144,11 @@ public static class XisoRanges
                     (long)leftChildOffset * 4, visited, depth + 1);
             }
 
-            if (isDirectory)
+            if (name is "." or "..")
+            {
+                // Structural entry: not a real extent; children still walked.
+            }
+            else if (isDirectory)
             {
                 GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, entryOffset, entrySize, 0, null,
                     depth + 1);
@@ -144,6 +168,45 @@ public static class XisoRanges
 
             break;
         }
+    }
+
+    /// <summary>
+    /// Peeks the 12 bytes after a left-child offset and reports whether they are
+    /// all zero (the xdvdfs all-zero empty-table sentinel). Restores the stream
+    /// position; a short read counts as not-all-zero.
+    /// </summary>
+    private static bool IsAllZeroEntryHeader(FileStream isoFs)
+    {
+        long peekPos = isoFs.Position;
+        Span<byte> rest = stackalloc byte[12];
+        bool allZeros = true;
+        int read = 0;
+        while (read < rest.Length)
+        {
+            int n = isoFs.Read(rest[read..]);
+            if (n == 0)
+            {
+                allZeros = false;
+                break;
+            }
+
+            read += n;
+        }
+
+        if (allZeros)
+        {
+            foreach (byte b in rest)
+            {
+                if (b != 0)
+                {
+                    allZeros = false;
+                    break;
+                }
+            }
+        }
+
+        isoFs.Seek(peekPos, SeekOrigin.Begin);
+        return allZeros;
     }
 
     /// <summary>
@@ -363,6 +426,11 @@ public static class XisoRanges
         if (leftChild == 0xFFFF && childOffset == 0)
             return;
 
+        // All-zero empty-table sentinel (parity with the other walkers):
+        // without this the 14 zero bytes parse as a phantom file entry.
+        if (leftChild == 0 && childOffset == 0 && IsAllZeroEntryHeader(isoFs))
+            return;
+
         ushort rightChild = ReadUShort(isoFs);
         uint entrySector = ReadUInt(isoFs);
         uint entrySize = ReadUInt(isoFs);
@@ -393,7 +461,11 @@ public static class XisoRanges
                 visited, depth + 1);
         }
 
-        if (isDirectory)
+        if (name is "." or "..")
+        {
+            // Structural entry: not a real file; children still walked below.
+        }
+        else if (isDirectory)
             CollectFileEntries(isoFs, isoOffset, entryOffset, entrySize, 0, entryPath, results, null, depth + 1);
         else
             results.Add((Path: entryPath, Offset: isoOffset + entryOffset, Size: entrySize));

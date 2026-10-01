@@ -168,7 +168,9 @@ public static class XisoSplitter
         List<string> parts = new() { firstPartPath };
         for (int i = 1;; i++)
         {
-            string next = PartPath(baseName, i);
+            // Append rather than ChangeExtension: a dotted base
+            // (`My.Game.1.iso` -> `My.Game`) must yield `My.Game.2.iso`.
+            string next = $"{baseName}.{i + 1}.iso";
             if (!File.Exists(next))
                 break;
             parts.Add(next);

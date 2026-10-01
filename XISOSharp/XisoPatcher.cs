@@ -154,7 +154,7 @@ public static class XisoPatcher
         FileSectorExtent parent = FindDirExtent(layout, canonicalParent, internalPath);
         uint oldSectors = existing.FileSize == 0
             ? 0u
-            : (existing.FileSize + (Constants.SectorSize - 1)) / Constants.SectorSize;
+            : (uint)(((ulong)existing.FileSize + Constants.SectorSize - 1) / Constants.SectorSize);
         uint need = SectorAllocator.RequiredSectors((ulong)newData.Length);
         SectorAllocator allocator = SectorAllocator.FromLayout(layout);
 
@@ -229,7 +229,11 @@ public static class XisoPatcher
             WipeRange(fs, tableAbs + tableBytes.Length,
                 ((long)parent.SectorCount * Constants.SectorSize) - tableBytes.Length);
         }
-        else if (canonicalParent.Equals("/", StringComparison.Ordinal))
+
+        // Record the new table size even when the table stayed in place: every
+        // bounded walker trusts the recorded size, so a stale value would make
+        // the appended entry unreachable.
+        if (canonicalParent.Equals("/", StringComparison.Ordinal))
         {
             // Header base follows the layout: standard sector-32 images keep
             // HeaderOffset; rebuilt sector-0 images carry the header at offset 0.

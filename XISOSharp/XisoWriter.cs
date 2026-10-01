@@ -134,9 +134,27 @@ public static class XisoWriter
     {
         lock (CreateLock)
         {
-            return CreateXisoCore(rootDirectory, outputDirectory, inRoot, sourceStream,
-                out outIsoPath, inName, progressCallback, cancellationToken, prependSectors,
-                excludePatterns, progress, fileTime, sourceDiscLseek);
+            string cwd = Directory.GetCurrentDirectory();
+            try
+            {
+                return CreateXisoCore(rootDirectory, outputDirectory, inRoot, sourceStream,
+                    out outIsoPath, inName, progressCallback, cancellationToken, prependSectors,
+                    excludePatterns, progress, fileTime, sourceDiscLseek);
+            }
+            finally
+            {
+                // Safety net for the pre-write throw paths (validation, tree
+                // generation, cancellation): CreateXisoCore only restores the
+                // working directory on its own success/error returns.
+                try
+                {
+                    Directory.SetCurrentDirectory(cwd);
+                }
+                catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
+                {
+                    // Best effort: never mask the original failure.
+                }
+            }
         }
     }
 
@@ -206,6 +224,17 @@ public static class XisoWriter
 
             int slashPos = dir.LastIndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) + 1;
             isoDir = dir[slashPos..];
+            if (isoDir is "." or "..")
+            {
+                // A relative source such as `-c .` / `-c ..` has no usable last
+                // component. The write phase chdirs to ".." and then re-enters
+                // the source by name (root.Filename), so using the literal "."
+                // would make it read files from the source's parent directory.
+                isoDir = Path.GetFileName(Directory.GetCurrentDirectory());
+                if (isoDir.Length == 0)
+                    isoDir = Constants.PathCharStr;
+            }
+
             isoName = inName ?? isoDir;
         }
         else
