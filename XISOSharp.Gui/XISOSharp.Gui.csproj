@@ -44,6 +44,7 @@
     <AvaloniaResource Include="Assets\**" />
     <!-- Window/runtime icon (MainWindow Icon=avares://...); same art as the exe icon. -->
     <AvaloniaResource Include="icon\icon.ico" />
+    <AvaloniaResource Include="icon\icon.png" />
   </ItemGroup>
 
   <ItemGroup>

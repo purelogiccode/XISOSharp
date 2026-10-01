@@ -5,6 +5,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Serilog;
 using XISOSharp.Gui.Logging;
+using XISOSharp.Gui.Services;
 using XISOSharp.Gui.ViewModels;
 
 namespace XISOSharp.Gui.Views;
@@ -109,6 +110,46 @@ public partial class MainWindow : Window
     // Null-safe VM access for catch blocks: never throws, so exception handling
     // cannot itself crash the async void method.
     private MainViewModel? VmOrNull => DataContext as MainViewModel;
+
+    private void Donate_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!UrlOpener.TryOpen("https://www.purelogiccode.com/donate"))
+        {
+            VmOrNull?.LogMessage("[GUI] Could not open the donation page in the default browser.");
+        }
+    }
+
+    private async void About_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            AboutWindow about = new();
+            await about.ShowDialog(this);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "About dialog failed");
+            BugReporter.ReportException(ex, "About dialog failed");
+        }
+    }
+
+    private void Exit_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            if (VmOrNull is { IsRunning: true } vm)
+            {
+                vm.CancelRunCommand.Execute(null);
+            }
+
+            Close();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Exit failed");
+            BugReporter.ReportException(ex, "Exit failed");
+        }
+    }
 
     private void LogBox_TextChanged(object? sender, TextChangedEventArgs e)
     {

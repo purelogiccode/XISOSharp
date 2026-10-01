@@ -91,7 +91,9 @@ Extract, a single `.cso` queues Decompress, multiple images queue Rewrite, and a
 queues Batch (when it contains `*.iso`) or Create. Input==output mistakes are refused
 before the CLI runs. It finds the CLI next to itself, on `PATH`, or via the Settings tab
 (persisted atomically to `%AppData%/XISOSharp/gui-settings.json`). Picker results marshal
-back via `Dispatcher.UIThread`, and commands gate on `CanExecute` while a run is active. Headless helpers:
+back via `Dispatcher.UIThread`, and commands gate on `CanExecute` while a run is active. Header
+actions open the PureLogicCode donation page (**Donate**), an About dialog with the version,
+description, credits, and project links (**About**), or close the app (**Exit**). Headless helpers:
 `XISOSharp.Gui --probe-cli [path]` and `XISOSharp.Gui --self-test [cliPath]`.
 
 ## Using the CLI

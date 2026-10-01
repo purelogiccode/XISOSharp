@@ -1,0 +1,184 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="XISOSharp.Gui.Views.AboutWindow"
+        Title="About XISOSharp"
+        Icon="avares://XISOSharp.Gui/icon/icon.ico"
+        Width="680" Height="720"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppWindowBrush}">
+
+  <Window.Styles>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="16" />
+      <Setter Property="Padding" Value="18" />
+      <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+      <Setter Property="Margin" Value="0,0,0,10" />
+    </Style>
+    <Style Selector="TextBlock.body">
+      <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="LineHeight" Value="20" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{DynamicResource AppTextMutedBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.link">
+      <Setter Property="Padding" Value="2,0" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.link /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource AppAccentHoverBrush}" />
+    </Style>
+  </Window.Styles>
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+
+      <!-- Logo -->
+      <Border Grid.Row="0" Classes="card">
+        <StackPanel HorizontalAlignment="Center">
+          <Image Width="120" Height="120"
+                 Source="avares://XISOSharp.Gui/icon/icon.png"
+                 ToolTip.Tip="XISOSharp application logo" />
+        </StackPanel>
+      </Border>
+
+      <!-- Title & version -->
+      <Border Grid.Row="1" Classes="card">
+        <StackPanel>
+          <TextBlock Text="XISOSharp"
+                     FontSize="22" FontWeight="Bold"
+                     Foreground="{DynamicResource AppTextPrimaryBrush}"
+                     HorizontalAlignment="Center"
+                     ToolTip.Tip="A pure C# port of extract-xiso for Xbox ISO (XISO/XDVDFS) images" />
+          <TextBlock Name="AppVersionTextBlock"
+                     Text=""
+                     Margin="0,8,0,0"
+                     HorizontalAlignment="Center"
+                     FontWeight="SemiBold" FontSize="14"
+                     Foreground="{DynamicResource AppAccentBrush}"
+                     ToolTip.Tip="Current application version" />
+        </StackPanel>
+      </Border>
+
+      <!-- Description -->
+      <Border Grid.Row="2" Classes="card">
+        <StackPanel>
+          <TextBlock Classes="section" Text="Description"
+                     ToolTip.Tip="About XISOSharp" />
+          <TextBlock Classes="body"
+                     Margin="0,0,0,12"
+                     Text="XISOSharp is a pure C# port of extract-xiso for Xbox ISO (XISO/XDVDFS) images — byte-identical output, no native dependencies, no P/Invoke, just .NET. It runs on Windows, Linux, and macOS."
+                     ToolTip.Tip="XISOSharp extracts, creates, rewrites, and archives Xbox disc images with byte-identical extract-xiso output" />
+          <TextBlock Classes="body"
+                     Text="Features include extract/create/rewrite, CISO and ZArchive compression, Redump archival workflows (video/filler/seed/wipe/trim/rebuild), integrity validation with SHA3-256 checksums, and a batch mode — all driving the same engine as the XISOSharp CLI."
+                     ToolTip.Tip="Key features: extract, create, rewrite, CISO/ZAR compression, Redump archival, validation, checksums, and batch processing" />
+        </StackPanel>
+      </Border>
+
+      <!-- Acknowledgements -->
+      <Border Grid.Row="3" Classes="card">
+        <StackPanel>
+          <TextBlock Classes="section" Text="Acknowledgements"
+                     ToolTip.Tip="Open-source projects and tools used by this application" />
+          <TextBlock Classes="body"
+                     Margin="0,0,0,12"
+                     Text="This application uses the following open-source projects and tools:"
+                     ToolTip.Tip="Click any link to visit the project's repository" />
+
+          <StackPanel Margin="10,0,0,0" Spacing="8">
+            <StackPanel Orientation="Horizontal"
+                        ToolTip.Tip="The core XISO engine is a direct C-to-C# conversion of extract-xiso">
+              <Button Classes="link" Content="extract-xiso"
+                      Tag="https://github.com/XboxDev/extract-xiso"
+                      Click="Hyperlink_Click" />
+              <TextBlock Classes="muted" Text=" - core XISO engine ported from C to C#" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        ToolTip.Tip="Build-image remapping, CISO, and checksum logic ported from xdvdfs">
+              <Button Classes="link" Content="xdvdfs"
+                      Tag="https://github.com/antangelo/xdvdfs"
+                      Click="Hyperlink_Click" />
+              <TextBlock Classes="muted" Text=" - build-image remapping, CISO, and checksums" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        ToolTip.Tip="Redump archival logic (video/filler/seed/wipe/trim/petrify/update/zar/rebuild) ported from XboxKit">
+              <Button Classes="link" Content="XboxKit"
+                      Tag="https://github.com/Deterous/XboxKit"
+                      Click="Hyperlink_Click" />
+              <TextBlock Classes="muted" Text=" - Redump archival workflows" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        ToolTip.Tip="ZArchive/zstd compression library">
+              <Button Classes="link" Content="ZArchiveSharp"
+                      Tag="https://github.com/purelogiccode/CSharp_ZArchiveSharp"
+                      Click="Hyperlink_Click" />
+              <TextBlock Classes="muted" Text=" - ZArchive/zstd compression" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        ToolTip.Tip="Cross-platform desktop UI framework">
+              <Button Classes="link" Content="Avalonia"
+                      Tag="https://avaloniaui.net"
+                      Click="Hyperlink_Click" />
+              <TextBlock Classes="muted" Text=" - cross-platform desktop framework" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        ToolTip.Tip="Structured logging library">
+              <Button Classes="link" Content="Serilog"
+                      Tag="https://serilog.net"
+                      Click="Hyperlink_Click" />
+              <TextBlock Classes="muted" Text=" - structured logging" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Links & close -->
+      <Grid Grid.Row="4" ColumnDefinitions="*,Auto">
+        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+          <Button Classes="link" Content="www.purelogiccode.com"
+                  HorizontalAlignment="Left"
+                  Tag="https://www.purelogiccode.com"
+                  Click="Hyperlink_Click"
+                  ToolTip.Tip="Visit the official website: www.purelogiccode.com" />
+          <Button Classes="link" Content="GitHub Repository"
+                  HorizontalAlignment="Left" Margin="0,6,0,0"
+                  Tag="https://github.com/purelogiccode/XISOSharp"
+                  Click="Hyperlink_Click"
+                  ToolTip.Tip="Visit the project's GitHub repository" />
+        </StackPanel>
+        <Button Grid.Column="1"
+                Classes="accent"
+                Width="100" Height="36"
+                HorizontalAlignment="Center"
+                HorizontalContentAlignment="Center"
+                VerticalAlignment="Center"
+                VerticalContentAlignment="Center"
+                Content="Close"
+                Click="CloseButton_Click"
+                ToolTip.Tip="Close the about window" />
+      </Grid>
+    </Grid>
+  </ScrollViewer>
+</Window>
