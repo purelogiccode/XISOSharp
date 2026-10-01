@@ -137,6 +137,9 @@ because create/extract mutate the process-wide current directory.
   (mismatches exit 2 either way), the `--skip-sectors` wording matches what
   create mode accepts, and the redump modes show `-o <output>` instead of a
   positional second file (which is parsed as another input).
+- stdout/stderr are always UTF-8 rather than the host console code page, so
+  Latin-1 filenames (`café.txt`) render and pipe identically on every platform
+  and match xdvdfs's UTF-8 output.
 
 ## GUI
 

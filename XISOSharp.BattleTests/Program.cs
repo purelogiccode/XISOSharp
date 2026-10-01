@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 
 namespace XISOSharp.BattleTests;
 
@@ -34,8 +35,10 @@ internal static class Program
             return 0;
         }
 
+        // Decode each tool with its actual stdout encoding (see ToolProcess.OutputEncoding):
+        // the CLI and xdvdfs/xboxkit emit UTF-8, extract-xiso writes raw Latin-1 bytes.
         ToolProcess cli = new(ResolveCli(opt.CliPath)) { TimeoutMs = opt.TimeoutMinutes * 60_000 };
-        ToolProcess oracle = new(ResolveOracle(opt.OraclePath)) { TimeoutMs = opt.TimeoutMinutes * 60_000 };
+        ToolProcess oracle = new(ResolveOracle(opt.OraclePath), Encoding.Latin1) { TimeoutMs = opt.TimeoutMinutes * 60_000 };
         ToolProcess? xdvdfs = ResolveOptional(opt.XdvdfsPath, "xdvdfs.exe", opt.TimeoutMinutes * 60_000);
         ToolProcess? xboxkit = ResolveOptional(opt.XboxkitPath, "xboxkit.exe", opt.TimeoutMinutes * 60_000);
         Console.WriteLine($"CLI exe:    {cli.ExePath} {(cli.Available ? "(found)" : "(NOT FOUND)")}");

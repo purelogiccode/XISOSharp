@@ -59,6 +59,11 @@ mutate the process CWD.
   failed file no longer suppresses a later file's success or keeps its backup.
 - Help shows `-o <output>` for the redump modes instead of a positional second
   file (which is parsed as another input).
+- stdout/stderr are always UTF-8 instead of the host console code page, so
+  Latin-1 filenames (`café.txt`) render and pipe identically on every platform
+  (matching xdvdfs's UTF-8 output); the battle harness now decodes each tool
+  with its real encoding (extract-xiso Latin-1; xdvdfs, xboxkit, and the CLI
+  UTF-8) so non-ASCII names compare equal instead of collapsing to `U+FFFD`.
 
 ### GUI
 

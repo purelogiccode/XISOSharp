@@ -53,6 +53,24 @@ internal static class Program
     }
 
     /// <summary>
+    /// Emits UTF-8 on stdout/stderr regardless of the host console code page so
+    /// Latin-1 filenames render and pipe identically on every platform (and match
+    /// xdvdfs's UTF-8 output). Best-effort: hosts that refuse the change keep the
+    /// default encoding.
+    /// </summary>
+    private static void ConfigureConsoleEncoding()
+    {
+        try
+        {
+            Console.OutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        }
+        catch (Exception ex) when (ex is IOException or PlatformNotSupportedException)
+        {
+            // Redirected/no-console hosts that reject the code-page change.
+        }
+    }
+
+    /// <summary>
     /// Entry point. Parses command-line flags and positional arguments,
     /// then invokes the appropriate XISO operation.
     /// Internal (not private) so the test suite can drive end-to-end CLI runs.
@@ -61,6 +79,7 @@ internal static class Program
     /// <returns>0 on success, 1 on error.</returns>
     internal static int Main(string[] args)
     {
+        ConfigureConsoleEncoding();
         AppLogging.Configure("XISOSharp");
         // Launch ping for usage stats (fire-and-forget, opt out with
         // XISO_DISABLE_STATS=1; test hosts are skipped).

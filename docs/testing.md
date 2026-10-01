@@ -229,7 +229,10 @@ solution on every CI OS (`EnableWindowsTargeting`), it just never runs there.
 reference tools over real game dumps: the native **`extract-xiso.exe`** (reference build `202609111233`)
 (beside the harness), **`xdvdfs.exe` 0.8.3** (xdvdfs-parity features), and
 **`xboxkit.exe` 0.7** (XboxKit-parity archival features). It shells out to the
-executables — no in-process library calls — so it tests exactly what end users run:
+executables — no in-process library calls — so it tests exactly what end users
+run. Each tool's stdout is decoded with its real encoding (extract-xiso Latin-1;
+xdvdfs, xboxkit, and the XISOSharp CLI UTF-8), so non-ASCII names compare equal
+instead of collapsing to `U+FFFD`:
 
 - **Sampling:** picks a random sample of `*.iso` files (default **1**) from
   `H:\XBOXTest` (override with `--dir`, `--count`, explicit `*.iso` paths, or a

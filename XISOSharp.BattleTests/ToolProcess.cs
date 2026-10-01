@@ -18,9 +18,19 @@ internal sealed class ToolProcess
     /// <summary>Gets the resolved exe path.</summary>
     internal string ExePath { get; }
 
-    internal ToolProcess(string exePath)
+    /// <summary>
+    /// Gets the encoding used to decode the tool's stdout/stderr. Each reference
+    /// tool emits a different encoding for non-ASCII names: extract-xiso writes
+    /// raw Latin-1 bytes, xdvdfs emits UTF-8, and the XISOSharp CLI writes the
+    /// inherited console's code page. Decoding every tool as UTF-8 turns those
+    /// names into U+FFFD on both sides and silently hides real name diffs.
+    /// </summary>
+    internal Encoding OutputEncoding { get; }
+
+    internal ToolProcess(string exePath, Encoding? outputEncoding = null)
     {
         ExePath = Path.GetFullPath(exePath);
+        OutputEncoding = outputEncoding ?? Encoding.UTF8;
     }
 
     /// <summary>Runs the exe with args; returns exit code, captured output, and the
@@ -34,8 +44,8 @@ internal sealed class ToolProcess
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
+            StandardOutputEncoding = OutputEncoding,
+            StandardErrorEncoding = OutputEncoding,
         };
         foreach (string a in args)
         {

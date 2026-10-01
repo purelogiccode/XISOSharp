@@ -37,6 +37,7 @@ XISOSharp join [--output <file>] <first.1.iso> [...]
 - Flags are matched exactly — combined shorts such as `-lr` are **not** supported.
 - An unknown flag is treated as a filename (it will then fail with an "open error"); a *known* flag in a filename slot fails fast with `must come before ISO filenames` (see [Misplaced flags](#misplaced-flags-upstream-61)).
 - `-h`/`--help` print help; `-v` prints the banner (`XISOSharp v<version> for <platform> - https://github.com/purelogiccode/XISOSharp`); all three exit 0. A `--help` token after the first filename is refused by the misplaced-flag guard (`must come before ISO filenames`).
+- stdout/stderr are always UTF-8, independent of the host console code page, so Latin-1 filenames such as `café.txt` render and pipe identically on every platform.
 - With no arguments at all, usage is printed and the tool exits 1. On an interactive
   double-click launch (Explorer, no redirection) the window additionally waits for a
   keypress (`Press any key to exit...`) instead of closing; scripts, pipes, and
