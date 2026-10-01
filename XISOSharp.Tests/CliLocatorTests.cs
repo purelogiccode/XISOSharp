@@ -38,12 +38,11 @@ public class CliLocatorTests
             OperatingSystem.IsWindows() ? "XISOSharp.Cli.exe" : "XISOSharp.Cli");
         Assert.True(File.Exists(cliPath), $"expected CLI binary at {cliPath}");
 
-        string? version = CliLocator.ProductVersion(cliPath);
-        if (version is not null)
-        {
-            Assert.NotEmpty(version);
-            Assert.DoesNotContain("+", version, StringComparison.Ordinal);
-        }
+        // Unconditional: a regression to null must fail, not silently skip the
+        // cleanliness assertions (Todo #72).
+        string version = Assert.IsType<string>(CliLocator.ProductVersion(cliPath));
+        Assert.NotEmpty(version);
+        Assert.DoesNotContain("+", version, StringComparison.Ordinal);
 
         string label = CliLocator.ProductLabel(cliPath);
         Assert.StartsWith("XISOSharp ", label, StringComparison.Ordinal);

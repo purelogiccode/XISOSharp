@@ -18,8 +18,8 @@ The C sources under `References/` are used only for cross-checking during develo
 **Is the output byte-identical to the original extract-xiso?**
 
 Yes, by design. The port reproduces the C tool's algorithms exactly (including AVL
-rebalancing and directory layout), and the test suite plus `Verify-Output.ps1`
-continuously verify SHA-256 equality of outputs. Rewrites (`-r`) are additionally
+rebalancing and directory layout), and the oracle-gated interop tests plus the
+battle harness continuously verify SHA-256 equality of outputs. Rewrites (`-r`) are additionally
 SHA-256-verified byte-identical against real Redump dumps by the
 [XISOSharp.BattleTests](testing.md#the-cli-battle-harness) harness (list, extract,
 and rewrite vs `extract-xiso.exe`; `checksum`/`md5`/`unpack`/`pack`/`cso` vs

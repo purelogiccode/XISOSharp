@@ -137,6 +137,18 @@ public sealed class XisoPathsTests : IDisposable
     }
 
     [Fact]
+    public void IsWithinDirectory_FilesystemRoot_Matches()
+    {
+        // Regression (Todo #23): roots keep their trailing separator, so the
+        // old character-after-prefix check read the first name character and
+        // reported "not within" for every path under C:\ or /.
+        string root = Path.GetPathRoot(CreateTempDir())!;
+        string inside = Path.Combine(root, "xiso_paths_probe", "out.iso");
+        Assert.True(XisoPaths.IsWithinDirectory(inside, root));
+        Assert.False(XisoPaths.IsWithinDirectory(root, root));
+    }
+
+    [Fact]
     public void TrimTrailingSeparators_RootSlash_Survives() => Assert.Equal("/", XisoPaths.TrimTrailingSeparators("/"));
 
     [Fact]

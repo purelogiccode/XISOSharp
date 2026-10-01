@@ -55,8 +55,8 @@ Everything lives in the `XISOSharp` namespace, except the internal data structur
 ## Design notes
 
 - **Faithful port**: the engine mirrors `extract-xiso.c` (reference build `202609111233`) operation-for-operation
-  so output is byte-identical to the reference tool (verified by the test suite and
-  `Verify-Output.ps1`).
+  so output is byte-identical to the reference tool (verified by the oracle-gated
+  interop tests and the battle harness).
 - **Directory layout** is an AVL tree; the writer performs a three-pass layout
   calculation — see [XISO Format](xiso-format.md).
 - **Synchronous core**: the engine is synchronous and thread-static buffers keep it

@@ -221,6 +221,17 @@ public class SectorAllocatorTests : IDisposable
     }
 
     [Fact]
+    public void MarkUsed_MergeSpanningFullAddressSpace_Throws()
+    {
+        // Regression (Todo #60): the coalesced count used to wrap to 0, reading
+        // as "nothing used" for the whole address space.
+        SectorAllocator allocator = new();
+        allocator.MarkUsed(0, uint.MaxValue);
+
+        Assert.Throws<InvalidOperationException>(() => allocator.MarkUsed(uint.MaxValue, 1));
+    }
+
+    [Fact]
     public void AllocateContiguous_AtAddressableEnd_ThrowsOnOverflow()
     {
         SectorAllocator allocator = new(uint.MaxValue - 1);

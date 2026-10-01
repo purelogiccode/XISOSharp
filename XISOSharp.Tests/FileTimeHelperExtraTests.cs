@@ -39,7 +39,8 @@ public class FileTimeHelperExtraTests
     [Fact]
     public void TryParseFileTime_Decimal_UnixEpoch()
     {
-        Assert.True(FileTimeHelper.TryParseFileTime("116444736000000000", out ulong fileTime, out DateTimeOffset dateTime));
+        Assert.True(FileTimeHelper.TryParseFileTime("116444736000000000", out ulong fileTime,
+            out DateTimeOffset dateTime));
         Assert.Equal(UnixEpochFileTime, fileTime);
         Assert.Equal(new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero), dateTime);
     }
@@ -48,7 +49,8 @@ public class FileTimeHelperExtraTests
     [Fact]
     public void TryParseFileTime_Hex_UnixEpoch()
     {
-        Assert.True(FileTimeHelper.TryParseFileTime("0x019DB1DED53E8000", out ulong fileTime, out DateTimeOffset dateTime));
+        Assert.True(FileTimeHelper.TryParseFileTime("0x019DB1DED53E8000", out ulong fileTime,
+            out DateTimeOffset dateTime));
         Assert.Equal(UnixEpochFileTime, fileTime);
         Assert.Equal(new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero), dateTime);
     }
@@ -57,7 +59,8 @@ public class FileTimeHelperExtraTests
     [Fact]
     public void TryParseFileTime_Iso8601_RoundTrips()
     {
-        Assert.True(FileTimeHelper.TryParseFileTime("2024-01-02T03:04:05Z", out ulong fileTime, out DateTimeOffset dateTime));
+        Assert.True(FileTimeHelper.TryParseFileTime("2024-01-02T03:04:05Z", out ulong fileTime,
+            out DateTimeOffset dateTime));
         DateTimeOffset expected = new(2024, 1, 2, 3, 4, 5, TimeSpan.Zero);
         Assert.Equal(expected, dateTime);
         Assert.Equal(FileTimeHelper.ToFileTimeRaw(expected), fileTime);

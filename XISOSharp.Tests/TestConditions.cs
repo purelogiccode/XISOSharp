@@ -219,9 +219,26 @@ internal static class SkipConditions
                         Task<string> stdoutTask = proc.StandardOutput.ReadToEndAsync();
                         Task<string> stderrTask = proc.StandardError.ReadToEndAsync();
                         bool exited = proc.WaitForExit(30000);
+                        if (!exited)
+                        {
+                            // A hung mklink must not be left as an orphan child
+                            // (Todo #75).
+                            try
+                            {
+                                proc.Kill(entireProcessTree: true);
+                            }
+                            catch
+                            {
+                                // best effort
+                            }
+
+                            proc.WaitForExit(5000);
+                            return false;
+                        }
+
                         stdoutTask.GetAwaiter().GetResult();
                         stderrTask.GetAwaiter().GetResult();
-                        return exited && proc.ExitCode == 0 && Directory.Exists(link);
+                        return proc.ExitCode == 0 && Directory.Exists(link);
                     }
                     catch
                     {

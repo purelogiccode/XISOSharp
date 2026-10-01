@@ -46,15 +46,16 @@ Thanks for considering a contribution! This project is a byte-faithful port of
   dotnet build CSharp_XISOSharp.sln -c Release
   dotnet test XISOSharp.Tests -c Release
   ```
-- For behavior-affecting changes, run the reference comparison
-  (`Verify-Output.ps1`, see [Testing](testing.md#reference-cross-checking)).
+- For behavior-affecting changes, run the reference comparison (the oracle-gated
+  interop tests plus the battle harness, see
+  [Testing](testing.md#reference-cross-checking)).
 - Update documentation when user-facing behavior changes (CLI flags, public API,
   format handling) — this wiki lives in `docs/`.
 - Contributions are licensed under the MIT license of the project.
 
 ## Compatibility discipline
 
-The original conversion followed a strict rule (from `ConversionPlan.md`):
+The original conversion followed a strict rule:
 **never proceed to the next step without a 100% hash match** against the reference C
 tool. Preserve that spirit:
 

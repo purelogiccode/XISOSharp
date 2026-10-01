@@ -108,6 +108,11 @@ public class XisoFilesystemTests : IDisposable
         Assert.False(fs.FileExists("missing.bin"));
         Assert.Equal(-1, fs.FileLength("missing.bin"));
         Assert.False(fs.FileExists("/no/dir/missing.bin"));
+        // Unresolvable paths report missing/-1 instead of throwing (Todo #63).
+        Assert.False(fs.FileExists(""));
+        Assert.Equal(-1, fs.FileLength(""));
+        Assert.False(LocalFilesystem.Instance.FileExists(""));
+        Assert.Equal(-1, LocalFilesystem.Instance.FileLength(""));
     }
 
     [Fact]

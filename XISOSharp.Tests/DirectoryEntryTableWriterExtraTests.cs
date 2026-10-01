@@ -12,13 +12,13 @@ public class DirectoryEntryTableWriterExtraTests
 {
     private static AvlNode Node(string name, bool isDirectory = false, uint startSector = 0,
         uint fileSize = 0, byte attributes = 0) => new()
-        {
-            Filename = name,
-            Subdirectory = isDirectory ? new AvlNode() : null,
-            StartSector = startSector,
-            FileSize = fileSize,
-            Attributes = attributes,
-        };
+    {
+        Filename = name,
+        Subdirectory = isDirectory ? new AvlNode() : null,
+        StartSector = startSector,
+        FileSize = fileSize,
+        Attributes = attributes,
+    };
 
     /// <summary>Verifies an empty entry set produces a null root.</summary>
     [Fact]
@@ -35,7 +35,9 @@ public class DirectoryEntryTableWriterExtraTests
     public void BuildTable_InvalidName_Throws(string name)
     {
         Assert.Throws<InvalidOperationException>(() =>
-            DirectoryEntryTableWriter.BuildTable([new DirectoryEntryTableWriter.DirectoryTableEntry(name, false, 0, 0)]));
+            DirectoryEntryTableWriter.BuildTable([
+                new DirectoryEntryTableWriter.DirectoryTableEntry(name, false, 0, 0)
+            ]));
     }
 
     /// <summary>Verifies a name longer than the maximum is rejected.</summary>
@@ -44,7 +46,9 @@ public class DirectoryEntryTableWriterExtraTests
     {
         string name = new('a', Constants.FilenameMaxChars + 1);
         Assert.Throws<InvalidOperationException>(() =>
-            DirectoryEntryTableWriter.BuildTable([new DirectoryEntryTableWriter.DirectoryTableEntry(name, false, 0, 0)]));
+            DirectoryEntryTableWriter.BuildTable([
+                new DirectoryEntryTableWriter.DirectoryTableEntry(name, false, 0, 0)
+            ]));
     }
 
     /// <summary>Verifies duplicate names differing only by case are rejected.</summary>
@@ -89,7 +93,7 @@ public class DirectoryEntryTableWriterExtraTests
 
         Assert.Equal(0u, first.Offset);
         Assert.Equal(16u, second.Offset); // 14 + 1 char -> 15 -> 16
-        Assert.Equal(32u, size);          // 16 + (14 + 2 -> 16)
+        Assert.Equal(32u, size); // 16 + (14 + 2 -> 16)
     }
 
     /// <summary>Verifies an entry that would straddle a sector boundary is moved to the next sector.</summary>

@@ -1,7 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using XISOSharp.Cli;
-using XISOSharp.Cli.Models;
 
 namespace XISOSharp.Tests;
 
@@ -207,13 +206,13 @@ public class UpdateCheckerExtraTests : IDisposable
     public void FindAssetUrl_MatchingAsset_ReturnsUrl()
     {
         using JsonDocument doc = JsonDocument.Parse("""
-            {
-              "assets": [
-                { "name": "release_1.2.3_linux-x64.zip", "browser_download_url": "https://example.com/linux.zip" },
-                { "name": "release_1.2.3_win-x64.zip", "browser_download_url": "https://example.com/win.zip" }
-              ]
-            }
-            """);
+                                                    {
+                                                      "assets": [
+                                                        { "name": "release_1.2.3_linux-x64.zip", "browser_download_url": "https://example.com/linux.zip" },
+                                                        { "name": "release_1.2.3_win-x64.zip", "browser_download_url": "https://example.com/win.zip" }
+                                                      ]
+                                                    }
+                                                    """);
 
         Assert.Equal("https://example.com/win.zip",
             UpdateChecker.FindAssetUrl(doc.RootElement, "1.2.3", "win-x64"));

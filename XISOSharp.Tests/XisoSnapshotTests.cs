@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 
 namespace XISOSharp.Tests;
 
+using TestDataGenerator;
+
 /// <summary>
 /// Snapshot tests for TODO #1 (full test suite, xdvdfs #107/#137): a fixed,
 /// deterministic source tree is packed with <c>fileTime: 0</c>, and the
@@ -14,8 +16,26 @@ namespace XISOSharp.Tests;
 [Collection("Sequential")]
 public class XisoSnapshotTests : IDisposable
 {
-    private static readonly string FixtureIsoPath = Path.GetFullPath(
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Fixtures", "test_fixture.iso"));
+    private static readonly string FixtureIsoPath = ResolveFixtureIsoPath();
+
+    /// <summary>
+    /// Resolves the checked-in fixture through the centralized solution-root walk
+    /// (BUG-TEST-006) instead of a fixed 3-level traversal that breaks under a
+    /// different output depth (Todo #76).
+    /// </summary>
+    private static string ResolveFixtureIsoPath()
+    {
+        string? root = TestDataLocator.GetSolutionRoot(AppContext.BaseDirectory);
+        if (root != null)
+        {
+            string viaRoot = Path.Combine(root, "XISOSharp.Tests", "Fixtures", "test_fixture.iso");
+            if (File.Exists(viaRoot))
+                return viaRoot;
+        }
+
+        return Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Fixtures", "test_fixture.iso"));
+    }
 
     private const ulong DeterministicFileTime = 0UL;
     private const string FixtureVolumeName = "test_fixture";

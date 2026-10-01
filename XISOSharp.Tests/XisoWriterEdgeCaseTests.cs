@@ -288,6 +288,43 @@ public class XisoWriterEdgeCaseTests : IDisposable
     }
 
     [Fact]
+    public void CreateXiso_CancellationDuringWrite_DeletesPartialOutput()
+    {
+        string srcDir = CreateTempDir();
+        string outputDir = CreateTempDir();
+        for (int i = 0; i < 100; i++)
+        {
+            File.WriteAllText(Path.Combine(srcDir, $"file_{i}.txt"), new string('x', 10000));
+        }
+
+        using CancellationTokenSource cts = new();
+        bool canceled = false;
+        try
+        {
+            // Cancel from the first progress report (before the output stream is
+            // opened); the write phase then throws on the first file check.
+            XisoWriter.CreateXiso(srcDir, outputDir, null, null, out _, null,
+                (_, _) =>
+                {
+                    if (!canceled)
+                    {
+                        canceled = true;
+                        cts.Cancel();
+                    }
+                }, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // expected
+        }
+
+        Assert.True(canceled, "progress callback should have fired before cancellation");
+        // Regression (Todo #53): a cancelled create must not leave a truncated
+        // .iso that looks like a finished artifact.
+        Assert.Empty(Directory.GetFiles(outputDir, "*.iso"));
+    }
+
+    [Fact]
     public void CreateXiso_SystemUpdate_SkippedWhenEnabled()
     {
         string srcDir = CreateTempDir();

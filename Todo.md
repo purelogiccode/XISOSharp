@@ -7,9 +7,14 @@ re-checked against the code while compiling this list; the rest carry the review
 `file:line` evidence and should be re-confirmed before fixing. Severity is impact-based,
 not effort-based.
 
-Items 1–20 were fixed on 2026-10-01 (working tree, uncommitted; see `**FIXED**` markers).
-Regression tests for items 1, 2, 3, 5, 12, 15 and 16 live in `AuditXisoTests`,
-`XisoCoverageTests`, `XisoSplitTests` and `XisoCorruptionResilienceTests`.
+Items 1–20 were fixed in the first pass (commits `679f04c`, `6e992cc`, `ee2d5a8`) and
+items 21–80 in the second pass (working tree; see the `**FIXED**` markers). Item 74's
+hardcoded key is now a double-Base64 literal in `XISOSharp.Cli/Logging/ApiKeyStore.cs`,
+decoded once at startup (`WarmUp` from `ApplicationStats.RecordLaunch`). Regression tests
+for the fixed items live in `AuditXisoTests`, `XisoCoverageTests`, `XisoSplitTests`,
+`XisoCorruptionResilienceTests`, `CliFlagContractExtraTests`, `Latin1EncodingExtraTests`,
+`SectorAllocatorTests`, `XisoPathsTests`, `XisoValidatorTests`, `XisoWriterEdgeCaseTests`
+and `XisoRedumpAndSkeletonTests`.
 
 ## High
 
@@ -103,184 +108,184 @@ Regression tests for items 1, 2, 3, 5, 12, 15 and 16 live in `AuditXisoTests`,
 20. **FIXED** **Optimized-tag probe ignores the disc offset** — `XISOSharp/XisoReader.cs:2457`:
     `ProbeOptimizedTag` seeks the absolute tag offset and ignores `discLseek`, so offset
     (Redump/XGD) images report the tag missing in audit/`IsOptimized`.
-21. **CWD not restored on pre-try throws** — `XISOSharp/XisoWriter.cs:301`: tree generation,
+21. **FIXED** **CWD not restored on pre-try throws** — `XISOSharp/XisoWriter.cs:301`: tree generation,
     cancellation checks and name validation run before the `try`; the per-directory
     `SetCurrentDirectory(prevDir)` at `:831` is also not in a `finally`.
-22. **Relative output path resolves against the source** — `XISOSharp/XisoWriter.cs:241`
+22. **FIXED** **Relative output path resolves against the source** — `XISOSharp/XisoWriter.cs:241`
     (verified logic): `xisoPath` is combined from a possibly-relative `outputDirectory`
     before the chdir, but the stream is opened at `:347` after
     `SetCurrentDirectory(rootDirectory)`, so `-c src out\game.iso` writes to
     `src\out\game.iso`; the collision check at `:248` resolves against the original CWD, so
     validation and the write disagree.
-23. **`IsWithinDirectory` fails under filesystem roots** — `XISOSharp/XisoPaths.cs:58`
+23. **FIXED** **`IsWithinDirectory` fails under filesystem roots** — `XISOSharp/XisoPaths.cs:58`
     (verified): `TrimTrailingSeparators` keeps the trailing separator on roots (`C:\`,
     `\\server\share\`), so `full[dir.Length]` is the first name character and every path
     under a drive/share root reports "not within"; `CopyOut` to `D:\` throws and
     `LocalFilesystem("C:\\")` throws `UnauthorizedAccessException`.
-24. **ZAR silently succeeds on a corrupt root table** — `XISOSharp/XisoZarchive.cs:224`:
+24. **FIXED** **ZAR silently succeeds on a corrupt root table** — `XISOSharp/XisoZarchive.cs:224`:
     `ParseNode` returns when `childOffset >= dirSize`, so a root table size of 0 yields an
     empty `.zar` and `CreateZar` returns true, while `XisoReader` rejects the same image.
-25. **Child offsets truncate to 16 bits** — `XISOSharp/DirectoryEntryTableWriter.cs:176`:
+25. **FIXED** **Child offsets truncate to 16 bits** — `XISOSharp/DirectoryEntryTableWriter.cs:176`:
     `(ushort)(Offset / DwordSize)` with no bound; a table over 65535 DWORDs (~16k entries)
     silently writes a corrupt table instead of failing.
-26. **Final CISO index entry can overflow 31 bits** — `XISOSharp/CisoWriter.cs:348`:
+26. **FIXED** **Final CISO index entry can overflow 31 bits** — `XISOSharp/CisoWriter.cs:348`:
     the final entry casts `position >> align` to `uint` and masks the top bit without the
     `> 0x7FFFFFFF` guard used per-sector (`:331`), so an oversized payload is written with a
     bogus end offset instead of a clear error.
-27. **CISO core reader validation gaps** — `XISOSharp/CisoReader.cs:306`:
+27. **FIXED** **CISO core reader validation gaps** — `XISOSharp/CisoReader.cs:306`:
     `ReadFromCsoCore` checks magic/header/block size but not `version` (v3+ silently treated
     as LZ4) or `align`, and allocates `new uint[indexLen]` from an unbounded
     `uncompressedSize` — a crafted header can drive a huge allocation.
-28. **Temp ISO leak on compress failure** — `XISOSharp/CisoWriter.cs:96`: the temp ISO is
+28. **FIXED** **Temp ISO leak on compress failure** — `XISOSharp/CisoWriter.cs:96`: the temp ISO is
     created before the `try`/`finally` at `:106`, so a packing throw/non-zero return leaves
     the `%TEMP%` file behind.
-29. **`CreateFromRemapTree` bypasses `CreateLock`** — `XISOSharp/XisoWriter.cs:992`:
+29. **FIXED** **`CreateFromRemapTree` bypasses `CreateLock`** — `XISOSharp/XisoWriter.cs:992`:
     it mutates shared `Logger.TotalBytes/TotalFiles` and captures/restores the process CWD
     without the lock, so it can interleave with a concurrent `CreateXiso` and restore the
     wrong directory.
-30. **Combined `--wipe --trim` drops later modes** — `XISOSharp.Cli/Program.cs:4175`: the
+30. **FIXED** **Combined `--wipe --trim` drops later modes** — `XISOSharp.Cli/Program.cs:4175`: the
     `continue` meant to skip the separate trim also skips the following `--petrify`/`--zar`
     for that image when the wiped file is absent or the wipe was declined.
-31. **TestDataWriter releases a mutex it may not own** — `XISOSharp.TestDataGenerator/TestDataWriter.cs:64`:
+31. **FIXED** **TestDataWriter releases a mutex it may not own** — `XISOSharp.TestDataGenerator/TestDataWriter.cs:64`:
     on cross-process `WaitOne` timeout the `finally` calls `ReleaseMutex()` without
     ownership, replacing the clear `TimeoutException` with `ApplicationException`; this runs
     from a `[ModuleInitializer]`, so the whole test host fails with a misleading error.
-32. **`--silent` is order-dependent** — `XISOSharp.Cli/Program.cs:890`: it consults
+32. **FIXED** **`--silent` is order-dependent** — `XISOSharp.Cli/Program.cs:890`: it consults
     `checksumFlagMode` while parsing, so `--silent --checksum file` errors while
     `--checksum --silent file` works, contradicting the CLI-002 order-independence contract.
-33. **`--file-time` silently ignored outside create** — `XISOSharp.Cli/Program.cs:631`:
+33. **FIXED** **`--file-time` silently ignored outside create** — `XISOSharp.Cli/Program.cs:631`:
     consumed only in the create-list branch (`:1523`); extract/list/tree/rewrite (including
     `--pack`) accept and ignore it, unlike the CLI-017 pattern of rejecting ignored
     mode-specific flags.
-34. **Extract ignores `--preserve-attrs`** — `XISOSharp.Cli/Program.cs:2210`: the pure-extract
+34. **FIXED** **Extract ignores `--preserve-attrs`** — `XISOSharp.Cli/Program.cs:2210`: the pure-extract
     branch never calls `RejectIgnoredOutputFlags`, and the redump batch (`:1468`) does the
     same, while list/tree/create reject it.
-35. **`--validate-strict` is a no-op** — `XISOSharp.Cli/Program.cs:498`: `validateStrict` only
+35. **FIXED** **`--validate-strict` is a no-op** — `XISOSharp.Cli/Program.cs:498`: `validateStrict` only
     gates flag placement (`:1151`), never reaches `XisoValidator`; since CLI-020 makes
     non-strict rewrites exit 2 as well, the flag contradicts the help text (`:4863`).
-36. **CLI compress guard misses the split first part** — `XISOSharp.Cli/Program.cs:3187`:
+36. **FIXED** **CLI compress guard misses the split first part** — `XISOSharp.Cli/Program.cs:3187`:
     only the derived base output is checked, while the GUI mirror also checks the `.1.cso`
     part (`MainViewModel.cs:743`); a source named like its own first part passes the guard
     and only fails later inside `CisoWriter`.
-37. **`--jobs`/`--policy` silently ignored outside `--zar`** — `XISOSharp.Cli/Program.cs:767`:
+37. **FIXED** **`--jobs`/`--policy` silently ignored outside `--zar`** — `XISOSharp.Cli/Program.cs:767`:
     parsed unconditionally but read only by the parallel ZAR path (`:3855`), unlike other
     mode-specific flags that are rejected.
-38. **Vacuous tests** — `XISOSharp.Tests/ApplicationStatsExtraTests.cs:31`
+38. **FIXED** **Vacuous tests** — `XISOSharp.Tests/ApplicationStatsExtraTests.cs:31`
     (`RecordLaunch_WhenDisabled_DoesNotThrow` passes because the test host is already
     disabled, never exercising `XISO_DISABLE_STATS`) and
     `XISOSharp.Tests/AuditXisoTests.cs:244` (the only assertion sits inside
     `if (result.IsValid)`, so a regression to invalid still passes).
-39. **Doc drift: battle harness default** — `docs/testing.md:253` says 3 ISOs; the code
+39. **FIXED** **Doc drift: battle harness default** — `docs/testing.md:253` says 3 ISOs; the code
     default is 1 (`XISOSharp.BattleTests/BattleOptions.cs:10`, README.md:24).
-40. **Doc drift: coverage artifact OS** — `docs/testing.md:187` says `ubuntu-latest`;
+40. **FIXED** **Doc drift: coverage artifact OS** — `docs/testing.md:187` says `ubuntu-latest`;
     `.github/workflows/ci.yml:73,93-99` uploads coverage from `windows-latest` only.
-41. **Doc drift: Tester CI claim** — `docs/testing.md:243` says the WPF Tester is not part of
+41. **FIXED** **Doc drift: Tester CI claim** — `docs/testing.md:243` says the WPF Tester is not part of
     CI; the full solution (including `XISOSharpTester`, with `EnableWindowsTargeting`) is
     built on all three OSes.
-42. **Doc drift: missing scripts** — `docs/testing.md:97,102,155` (plus
+42. **FIXED** **Doc drift: missing scripts** — `docs/testing.md:97,102,155` (plus
     `docs/contributing.md:50`, `docs/faq.md:21`, `docs/library.md:59`) reference
     `Scripts/Build-CReference.ps1`, `Verify-Output.ps1` and `Verify-MediaPatch.ps1`, none of
     which exist in the repo.
-43. **Doc drift: `--help` claim** — `README.md:125` (and `docs/cli.md:39`, `README.md:571`)
+43. **FIXED** **Doc drift: `--help` claim** — `README.md:125` (and `docs/cli.md:39`, `README.md:571`)
     say `--help` is treated as a filename; the CLI handles `--help` and exits 0
     (`XISOSharp.Cli/Program.cs:303-306`).
-44. **Doc drift: Release build packs** — `README.md:591,595` say a Release solution build
+44. **FIXED** **Doc drift: Release build packs** — `README.md:591,595` say a Release solution build
     packs NuGet; `GeneratePackageOnBuild` is false (`XISOSharp/XISOSharp.csproj:55`).
-45. **Publish scripts wipe protected artifact stores** — `publish-cli.ps1:60` deletes
+45. **FIXED** **Publish scripts wipe protected artifact stores** — `publish-cli.ps1:60` deletes
     `publish/<rid>` and `publish-gui.ps1:35` deletes `publish-gui/<rid>`, contradicting
     AGENTS.md's hard rule that those trees are never deleted.
-46. **GUI accepts `.zar` where the reader cannot** — `XISOSharp.Gui/Views/MainWindow.axaml.cs:36`
+46. **FIXED** **GUI accepts `.zar` where the reader cannot** — `XISOSharp.Gui/Views/MainWindow.axaml.cs:36`
     (and the Extract filter at `MainWindow.axaml:21`) includes `.zar`, but
     `XisoReader.OpenImageStream` supports only ISO/CISO (`XisoReader.cs:61-71`); a dropped or
     picked `.zar` is routed to Extract and fails while the header hint advertises `.zar`.
-47. **File-time helpers bypass CISO support** — `XISOSharp/XisoReader.cs:2165`:
+47. **FIXED** **File-time helpers bypass CISO support** — `XISOSharp/XisoReader.cs:2165`:
     `GetFileTimeRaw`/`SetFileTime` open a plain `FileStream` instead of `OpenImageStream`
     (unlike `GetVolumeInfo`/`GetSectorLayout`/`ListDirectory`), so a `.cso` path fails here
     while sibling APIs succeed.
 
 ## Low
 
-48. `XISOSharp/XisoReader.cs:1468` — `IsOptimizedImage(Stream)` uses a single `Read` and
+48. **FIXED** `XISOSharp/XisoReader.cs:1468` — `IsOptimizedImage(Stream)` uses a single `Read` and
     requires 24 bytes, so a legitimate short read reports "not optimized"; sibling probes
     use `ReadExact`.
-49. `XISOSharp/XisoReader.cs:93` — `StripRewriteSuffix` does `filename[..^4]` for non-`.old`
+49. **FIXED** `XISOSharp/XisoReader.cs:93` — `StripRewriteSuffix` does `filename[..^4]` for non-`.old`
     names without a length check; a name shorter than 4 chars throws instead of returning
     the documented error code.
-50. `XISOSharp/XisoRepairer.cs:38` — doc says the `.old` backup is "replacing any previous
+50. **FIXED** `XISOSharp/XisoRepairer.cs:38` — doc says the `.old` backup is "replacing any previous
     backup", but the code keeps the first backup (`XisoPatcher.cs:28`, BUG-LIB-027).
-51. `XISOSharp/XisoExplorer.cs:337` — `Dispose` sets `_disposed` and disposes `_heldStream`
+51. **FIXED** `XISOSharp/XisoExplorer.cs:337` — `Dispose` sets `_disposed` and disposes `_heldStream`
     without taking `_sync`, racing keep-open operations the class doc says are safe.
-52. `XISOSharp/XisoValidator.cs:231` — `LogResult` prints `Checksums: MATCH` whenever
+52. **FIXED** `XISOSharp/XisoValidator.cs:231` — `LogResult` prints `Checksums: MATCH` whenever
     `checksumsVerified` is true, even when files are missing/extra and never compared.
-53. `XISOSharp/XisoWriter.cs:493` — no error path unlinks the partially written output ISO,
+53. **FIXED** `XISOSharp/XisoWriter.cs:493` — no error path unlinks the partially written output ISO,
     so a failed/cancelled create leaves a truncated `.iso` that looks like an artifact.
-54. `XISOSharp/CisoWriter.cs:119` — a failed compress leaves the partial `.cso` (and created
+54. **FIXED** `XISOSharp/CisoWriter.cs:119` — a failed compress leaves the partial `.cso` (and created
     split parts); only `tempIso` is cleaned, unlike `XisoSplitter`.
-55. `XISOSharp/RemapFilesystem.cs:639` — the duplicated typed walk swallows unreadable-dir
+55. **FIXED** `XISOSharp/RemapFilesystem.cs:639` — the duplicated typed walk swallows unreadable-dir
     errors with `catch { continue; }` while `BuildMappings` logs them; the divergence hides
     why entries are missing.
-56. `XISOSharp/XisoWriter.cs:659` — sizes/byte counts are interpolated with the current
+56. **FIXED** `XISOSharp/XisoWriter.cs:659` — sizes/byte counts are interpolated with the current
     culture (no `InvariantCulture`), making logs locale-dependent.
-57. `XISOSharp/XisoZarchive.cs:150` — `ParseXdvdfs` runs outside the try, so
+57. **FIXED** `XISOSharp/XisoZarchive.cs:150` — `ParseXdvdfs` runs outside the try, so
     `XisoFormatException`/`EndOfStreamException` escape `CreateZar`'s true/false contract.
-58. `XISOSharp/XisoZarchive.cs:262` — a short read of an entry name (`n == 0`) silently
+58. **FIXED** `XISOSharp/XisoZarchive.cs:262` — a short read of an entry name (`n == 0`) silently
     returns, dropping the entry and its right subtree; a truncated image can yield an
     incomplete archive reported as success.
-59. `XISOSharp/CisoReader.cs:327` — `ReadFromCsoCore` rejects only `sector >= totalBlocks`; a
+59. **FIXED** `XISOSharp/CisoReader.cs:327` — `ReadFromCsoCore` rejects only `sector >= totalBlocks`; a
     read starting at/after `uncompressedSize` but inside the zero-padded last block returns
     padding bytes, while the block-device paths return 0 at EOF.
-60. `XISOSharp/SectorAllocator.cs:353` — coalescing casts `(uint)(end - lastStart)`; adjacent
+60. **FIXED** `XISOSharp/SectorAllocator.cs:353` — coalescing casts `(uint)(end - lastStart)`; adjacent
     ranges spanning the full 32-bit sector space wrap the merged count to 0.
-61. `XISOSharp/CisoWriter.cs:398` — `DeriveDefaultCsoPath(".")` uses `Path.GetFileName(".")`
+61. **FIXED** `XISOSharp/CisoWriter.cs:398` — `DeriveDefaultCsoPath(".")` uses `Path.GetFileName(".")`
     = `.` and `GetDirectoryName(".")` = `""`, producing `..cso` in the CWD.
-62. `XISOSharp/Latin1Encoding.cs:55` — the `GetBytes(char[])`/`GetChars(byte[])` overrides
+62. **FIXED** `XISOSharp/Latin1Encoding.cs:55` — the `GetBytes(char[])`/`GetChars(byte[])` overrides
     never validate index/count, surfacing `IndexOutOfRangeException` instead of the
     `Encoding` contract's `ArgumentOutOfRangeException`.
-63. `XISOSharp/LocalFilesystem.cs:84` — without a `Root`, `FileExists("")` calls
+63. **FIXED** `XISOSharp/LocalFilesystem.cs:84` — without a `Root`, `FileExists("")` calls
     `Path.GetFullPath("")` which throws `ArgumentException`; only `IOException`/
     `UnauthorizedAccessException` are caught, violating `IFilesystem`'s "unresolvable paths
     return false".
-64. `XISOSharp.Gui/Services/CliRunner.cs:62` — cancellation, timeout and start failures all
+64. **FIXED** `XISOSharp.Gui/Services/CliRunner.cs:62` — cancellation, timeout and start failures all
     return `-1` without invoking the `onLine` sink, so the UI shows only "finished with exit
     code -1" while the real reason stays in the file log.
-65. `XISOSharp.BattleTests/Program.cs:14` — the banner hardcodes "extract-xiso (v2.7.1)"
+65. **FIXED** `XISOSharp.BattleTests/Program.cs:14` — the banner hardcodes "extract-xiso (v2.7.1)"
     while AGENTS.md mandates the dated reference build `202609111233`.
-66. `XISOSharp.BattleTests/BattleReport.cs:17` — reports go under
+66. **FIXED** `XISOSharp.BattleTests/BattleReport.cs:17` — reports go under
     `Directory.GetCurrentDirectory()/BattleReports`, not "next to the sources" as
     `docs/testing.md:300` claims.
-67. `docs/building.md:147` — claims a green CI implies reference byte-compatibility, but the
+67. **FIXED** `docs/building.md:147` — claims a green CI implies reference byte-compatibility, but the
     reference-binary interop tests early-return when the gitignored `References/` binaries
     are absent (`docs/testing.md:75-77`).
-68. `docs/getting-started.md:59` — sample banner omits the URL that `Constants.Banner`
+68. **FIXED** `docs/getting-started.md:59` — sample banner omits the URL that `Constants.Banner`
     always includes (`XISOSharp/Constants.cs:229`) and shows an outdated version.
-69. `docs/testing.md:85` — the TestData table lists `source/empty_dir/`, `rewrite_c/`,
+69. **FIXED** `docs/testing.md:85` — the TestData table lists `source/empty_dir/`, `rewrite_c/`,
     `rewrite_cs/`; `TestDataWriter` creates none of them.
-70. `docs/testing.md:316` (and `docs/contributing.md:57`) — links `../ConversionPlan.md`,
+70. **FIXED** `docs/testing.md:316` (and `docs/contributing.md:57`) — links `../ConversionPlan.md`,
     which does not exist.
-71. `XISOSharpTester` dead code — `Services/HashUtil.cs:31` (`IsAllZero`) and `:71`
+71. **FIXED** `XISOSharpTester` dead code — `Services/HashUtil.cs:31` (`IsAllZero`) and `:71`
     (`ComputeMd5`), `Models/XisoFileEntry.cs:32` (`IsSmall`), and the unused sync wrappers
     `Run`/`RunQuiet`/`ListFiles`/`ExtractFiles`/`Rewrite`/`GetVersion` in
     `Services/ExtractXisoWrapper.cs` have no callers.
-72. `XISOSharp.Tests/CliLocatorTests.cs:42` — version-cleanliness assertions run only when
+72. **FIXED** `XISOSharp.Tests/CliLocatorTests.cs:42` — version-cleanliness assertions run only when
     `ProductVersion` is non-null, so a regression to null is not caught.
-73. `XISOSharp.Cli/Logging/BugReporter.cs:47` — `LastByKey` entries are never pruned; an
+73. **FIXED** `XISOSharp.Cli/Logging/BugReporter.cs:47` — `LastByKey` entries are never pruned; an
     unbounded dictionary in long-running GUI/Tester hosts.
-74. `XISOSharp.Cli/Logging/ApplicationStats.cs:27` and `BugReporter.cs:31` — the telemetry
+74. **FIXED** `XISOSharp.Cli/Logging/ApplicationStats.cs:27` and `BugReporter.cs:31` — the telemetry
     bearer key is hardcoded and shipped in every bundle (trivially extractable; by design
     for an anonymous client, but a known risk).
-75. `XISOSharp.Tests/TestConditions.cs:221` — the Windows symlink probe ignores a false
+75. **FIXED** `XISOSharp.Tests/TestConditions.cs:221` — the Windows symlink probe ignores a false
     `WaitForExit(30000)` and never kills a hung `mklink`, leaving an orphan child.
-76. `XISOSharp.Tests/XisoSnapshotTests.cs:17` — resolves `Fixtures/test_fixture.iso` with a
+76. **FIXED** `XISOSharp.Tests/XisoSnapshotTests.cs:17` — resolves `Fixtures/test_fixture.iso` with a
     fixed 3-level traversal instead of the `TestDataLocator` helper BUG-TEST-006 says
     centralizes path resolution.
-77. `XISOSharp.Cli/Program.cs:1450` — duplicate `assumeYes && assumeNo` check, unreachable
+77. **FIXED** `XISOSharp.Cli/Program.cs:1450` — duplicate `assumeYes && assumeNo` check, unreachable
     because `:1143` already returned.
-78. `XISOSharp.Cli/Program.cs:1005` — the error message claims `--skip-sectors` is supported
+78. **FIXED** `XISOSharp.Cli/Program.cs:1005` — the error message claims `--skip-sectors` is supported
     in create mode, but `:973` rejects exactly that combination.
-79. `XISOSharp.Cli/Program.cs:3823` — `RunRedumpBatch` discards `securitySectorsPath`
+79. **FIXED** `XISOSharp.Cli/Program.cs:3823` — `RunRedumpBatch` discards `securitySectorsPath`
     (`_ = securitySectorsPath;`) while the main parser always rejects the flag (`:988`); the
     parameter is unreachable dead code.
-80. **Update-check logic duplicated** — `XISOSharp.Gui/Services/UpdateService.cs` mirrors the
+80. **FIXED** **Update-check logic duplicated** — `XISOSharp.Gui/Services/UpdateService.cs` mirrors the
     CLI's `UpdateChecker` version parsing/comparison and probes GitHub on every GUI start,
     while the CLI uses a 24-hour disk cache; the two should share one implementation (and a
     cache) to avoid drift.
@@ -291,8 +296,9 @@ Regression tests for items 1, 2, 3, 5, 12, 15 and 16 live in `AuditXisoTests`,
   not reproduce on rerun (1713/1714 green). The failing test name was not captured; treat
   shared-state/timing flakes as a standing risk and consider capturing the name on the next
   occurrence.
-- `net10.0` is green at 1780 passed / 1 skipped (1781 total); `net8.0`/`net9.0` are green at
-  1720 passed / 1 skipped (1721 total) after the items 1–20 fixes added 7 regression tests.
+- `net10.0` is green at 1796 passed / 1 skipped (1797 total); `net8.0`/`net9.0` are green at
+  1736 passed / 1 skipped (1737 total) after the items 1–80 fixes added 23 regression tests
+  (7 for items 1–20, 16 for items 21–80).
 
 ## Markers without an in-repo tracker index
 

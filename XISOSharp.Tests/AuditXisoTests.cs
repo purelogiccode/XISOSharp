@@ -160,9 +160,9 @@ public class AuditXisoTests : IDisposable
         // Flip one byte of the descriptor's trailing header magic: the leading
         // fields still parse, so only the tail check can reject the image
         // (parity with extraction and the block-device audit).
-        long trailingMagic = Constants.HeaderOffset + Constants.HeaderDataLength +
-                             Constants.SectorOffsetSize + Constants.DirTableSize +
-                             Constants.FileTimeSize + Constants.UnusedSize;
+        const long trailingMagic = Constants.HeaderOffset + Constants.HeaderDataLength +
+                                   Constants.SectorOffsetSize + Constants.DirTableSize +
+                                   Constants.FileTimeSize + Constants.UnusedSize;
         using (FileStream fs = new(isoPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
             fs.Seek(trailingMagic, SeekOrigin.Begin);
@@ -267,12 +267,11 @@ public class AuditXisoTests : IDisposable
 
         AuditResult result = XisoReader.AuditXiso(isoPath);
 
-        // Verify consistency: if valid, files + dirs should be > 0
-        if (result.IsValid)
-        {
-            Assert.True(result.FilesChecked + result.DirsChecked > 0,
-                "At least one entry should be checked");
-        }
+        // Unconditional: gating both assertions on IsValid let a regression to
+        // invalid pass silently (Todo #38).
+        Assert.True(result.IsValid, $"Audit of created ISO failed: {string.Join("; ", result.Issues)}");
+        Assert.True(result.FilesChecked + result.DirsChecked > 0,
+            "At least one entry should be checked");
     }
 
     [Fact]

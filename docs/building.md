@@ -144,9 +144,11 @@ tags (`v*` or bare `[0-9]*`, both accepted by MinVer and the publish gate):
 3. **publish** (only on version tags, environment `nuget`) — push the nupkgs to
    nuget.org using the `NUGET_API_KEY` secret.
 
-The CI also runs the test suite's cross-checks against the bundled reference data, so a
-green pipeline implies byte-compatibility with the reference C tool for all covered
-scenarios.
+The reference-binary cross-checks (extract-xiso / xdvdfs / xboxkit oracles) early-return
+when the gitignored `References/` binaries are absent, so a green pipeline means the suite
+passed — not necessarily that reference byte-compatibility was exercised. Run the battle
+harness locally with the oracles installed for that guarantee (see
+[Testing](testing.md#the-cli-battle-harness)).
 
 See also: [Testing](testing.md) · [Contributing](contributing.md) ·
 [Troubleshooting](troubleshooting.md)

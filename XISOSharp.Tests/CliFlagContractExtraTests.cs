@@ -121,8 +121,10 @@ public class CliFlagContractExtraTests : IDisposable
             string source = Path.Combine(dir, "game.1.cso");
             File.WriteAllBytes(source, [1, 2, 3]);
 
-            int rc = Program.Main(["compress", "--split", "1000000", "-o",
-                Path.Combine(dir, "game.cso"), source]);
+            int rc = Program.Main([
+                "compress", "--split", "1000000", "-o",
+                Path.Combine(dir, "game.cso"), source
+            ]);
 
             Assert.Equal(1, rc);
             Assert.Contains("same file as the input", AllError(), StringComparison.Ordinal);

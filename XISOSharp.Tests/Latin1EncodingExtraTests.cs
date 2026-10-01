@@ -87,4 +87,26 @@ public class Latin1EncodingExtraTests
         Assert.Throws<ArgumentNullException>(() => Encoding.GetBytes((string)null!, 0, 0, [], 0));
         Assert.Throws<ArgumentNullException>(() => Encoding.GetChars(null!, 0, 0, [], 0));
     }
+
+    /// <summary>
+    /// Verifies the array overloads validate index/count per the Encoding
+    /// contract instead of throwing IndexOutOfRangeException (Todo #62).
+    /// </summary>
+    [Fact]
+    public void ArrayOverloads_InvalidRanges_ThrowArgumentOutOfRange()
+    {
+        char[] chars = ['a', 'b'];
+        byte[] bytes = new byte[4];
+        Assert.Throws<ArgumentOutOfRangeException>(() => Encoding.GetBytes(chars, -1, 1, bytes, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Encoding.GetBytes(chars, 0, 3, bytes, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Encoding.GetBytes("ab", 0, 3, bytes, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Encoding.GetCharCount(bytes, 0, 5));
+
+        byte[] source = [1, 2];
+        char[] dest = new char[4];
+        Assert.Throws<ArgumentOutOfRangeException>(() => Encoding.GetChars(source, 0, 3, dest, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Encoding.GetChars(source, -1, 1, dest, 0));
+        Assert.Throws<ArgumentException>(() => Encoding.GetBytes(chars, 0, 2, bytes, 3));
+        Assert.Throws<ArgumentException>(() => Encoding.GetChars(source, 0, 2, dest, 3));
+    }
 }

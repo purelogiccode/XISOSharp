@@ -82,44 +82,31 @@ Conventions:
 
 | Path | Purpose |
 |---|---|
-| `source/` | Reference source tree: `binary.bin`, `file1.txt`, `file2.txt`, `subdir/`, `empty_dir/`, `test.xbe` |
-| `rewrite_c/` | Output of the reference C tool (known-good) |
-| `rewrite_cs/` | Output of this implementation (compared against `rewrite_c/`) |
-| `output/` | Scratch area used by tests |
+| `source/` | Reference source tree: `binary.bin`, `file1.txt`, `file2.txt`, `subdir/subfile.txt`, `subdir/nested/deep.txt`, `test.xbe` |
+| `output/` | Scratch area; also holds the derived `source.iso` fixture (always rebuilt) |
 
 The presence of `test.xbe` ensures the media-enable patch path is exercised on every
 create round-trip.
 
 ## Reference cross-checking
 
-Two PowerShell helpers compare this implementation against the original C tool:
+There are no standalone PowerShell helper scripts in the repository; comparison
+against the original C tool is built into the test suite and the battle harness:
 
-### `Scripts/Build-CReference.ps1`
+- `XISOSharp.Tests/XisoLegacyInteropTests.cs` creates legacy-layout images with
+  the reference `extract-xiso.exe` (gitignored `References/` drop, dated build
+  `202609111233`) and round-trips them through the `llCompat` reader paths. The
+  tests early-return when the oracle is absent, so clean checkouts and non-Windows
+  CI stay green.
+- `XISOSharp.Tests/CisoSplitInteropTests.cs` checks split-CISO golden vectors
+  against the reference `xdvdfs-cli` 0.8.3.
+- `XISOSharp.BattleTests` ([below](#the-cli-battle-harness)) compares
+  list/extract/rewrite against a real `extract-xiso.exe` and the xdvdfs/xboxkit
+  oracles over game dumps, failing the run on any mismatch.
 
-Builds the reference `extract-xiso` from the bundled sources under `References/`
-(CMake-based). Requires a C compiler (e.g. Visual Studio Build Tools or gcc).
-
-### `Verify-Output.ps1`
-
-Runs both tools over the same inputs and diffs the results:
-
-```powershell
-.\Verify-Output.ps1
-```
-
-Parameters (all optional):
-
-| Parameter | Default / values |
-|---|---|
-| `-CExtractXiso` | Path to the C tool's `extract-xiso.exe` |
-| `-CsExtractXiso` | Path to this project's CLI executable |
-| `-TestData` | Path to the `TestData` folder |
-| `-Mode` | `all` (default) — runs every scenario; or one of `version`, `create`, `extract`, `list`, `rewrite` |
-
-> [!NOTE]
-> The script defaults point at the sibling repo layout
-> (`C:\Sincronizar\source\repos\CSharp_ExtractXiso`). Pass explicit paths if your
-> checkout differs.
+Build the reference C tool from the bundled sources under `References/`
+(CMake-based; requires a C compiler) or drop a prebuilt `extract-xiso.exe` into
+the oracle discovery path (`SkipConditions.OraclePath`).
 
 ## Reference-binary interop tests
 
@@ -152,28 +139,18 @@ at three levels:
    bytes, including a pattern straddling the 2 MB read-buffer boundary (exercises the
    Boyer-Moore overlap logic), the disabled mode (`-m` / `Logger.MediaEnable = false`),
    and that non-`.xbe` files are untouched.
-2. **Reference cross-check script** — `Scripts/Verify-MediaPatch.ps1`:
-   1. extracts a real game ISO once (extraction never patches → original `.xbe` bytes),
-   2. creates an ISO from those files with the reference C tool and this
-      implementation, patched (default) and unpatched (`-m`),
-   3. reads the `.xbe` files back out of each created ISO and proves: patched and
-      unpatched files are byte-identical between the two tools; at every pattern site
-      the patched file differs from the original exactly at byte 7 (`0x7D` → `0xEB`)
-      and nowhere else; `.xbe` files without the pattern are untouched; unpatched
-      creates keep the original bytes.
+2. **Battle-harness cross-check** — the `rewrite` op compares this
+   implementation against `extract-xiso.exe` byte-for-byte (SHA-256) and the
+   `pack` op compares content checksums against `xdvdfs.exe`, both over real
+   dumps and with the media-enable patch active; any divergence in the patched
+   `.xbe` bytes fails the battle (see
+   [The CLI battle harness](#the-cli-battle-harness)).
 3. **Real-ISO validation** (Redump dumps of original Xbox games):
    - *007 – Everything or Nothing*: `default.xbe` and `driving.xbe` each contain one
      pattern site (`0x5399C` / `0x2561A1`) — patched output byte-identical between
      tools and matching the exact expected transformation; 16/16 checks passed.
    - *007 – Agent Under Fire*: `bond.xbe` has no pattern site — untouched by both
      tools.
-
-```powershell
-.\Scripts\Verify-MediaPatch.ps1 -IsoPath "H:\XBOXTest\007 - Everything or Nothing [NTSC-U][Redump].iso"
-```
-
-Parameters: `-IsoPath`, `-CExtractXiso` (reference C tool), `-CsExtractXiso` (this
-implementation), `-WorkDir`, `-SkipExtract` (reuse an existing extraction).
 
 ## Coverage
 
@@ -184,7 +161,7 @@ dotnet test XISOSharp.Tests --collect:"XPlat Code Coverage"
 ```
 
 The report (`coverage.cobertura.xml`) is uploaded as a CI artifact from the
-`ubuntu-latest` job.
+`windows-latest` job (the only job that runs the test suite).
 
 Measured line coverage (coverlet, full suite): `XisoReader.cs` 95.9%,
 `XisoWriter.cs` 86.6%, `AvlTree.cs` 100% — all above the 85% target. The
@@ -240,7 +217,8 @@ All GUI runners share one core implementation: the single shared
 (override → sibling of the app → `PATH`, plus a `-v` probe) — replacing the old
 per-app runners.
 
-It targets Windows only and is not part of CI.
+It targets Windows only at runtime; the project is still built as part of the full
+solution on every CI OS (`EnableWindowsTargeting`), it just never runs there.
 
 ## The CLI battle harness
 
@@ -250,7 +228,7 @@ reference tools over real game dumps: the native **`extract-xiso.exe`** (referen
 **`xboxkit.exe` 0.7** (XboxKit-parity archival features). It shells out to the
 executables — no in-process library calls — so it tests exactly what end users run:
 
-- **Sampling:** picks a random sample of `*.iso` files (default **3**) from
+- **Sampling:** picks a random sample of `*.iso` files (default **1**) from
   `H:\XBOXTest` (override with `--dir`, `--count`, explicit `*.iso` paths, or a
   `--seed` for reproducibility — the seed is reported for re-runs).
 - **Battles per ISO** (select with `--ops <a,b,c>`; default = all; ops whose
@@ -297,8 +275,8 @@ executables — no in-process library calls — so it tests exactly what end use
   ratio; the summary totals both sides (JIT caveat: XISOSharp pays warm-up on its
   first op).
 - **Exit codes:** `0` all passed, `1` config error, `2` any check failed.
-- **Reports:** `BattleReports/battle_<stamp>.txt|.json` next to the sources
-  (per-op `cliSeconds`/`oracleSeconds` and per-tool totals in the JSON).
+- **Reports:** `BattleReports/battle_<stamp>.txt|.json` under the current working
+  directory (per-op `cliSeconds`/`oracleSeconds` and per-tool totals in the JSON).
 
 ```bash
 dotnet run --project XISOSharp.BattleTests -c Release -- --seed 2026
@@ -313,4 +291,4 @@ attribute normalization and empty-file frontier sectors — are in
 [XISO Format](xiso-format.md#attributes)).
 
 See also: [Building](building.md) · [Contributing](contributing.md) ·
-[Conversion plan](../ConversionPlan.md)
+[Troubleshooting](troubleshooting.md)

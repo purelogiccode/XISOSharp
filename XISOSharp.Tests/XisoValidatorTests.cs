@@ -207,6 +207,37 @@ public class XisoValidatorTests : IDisposable
     }
 
     [Fact]
+    public void LogResult_ChecksumsVerifiedButPathsDiffer_LogsSkipped()
+    {
+        // Regression (Todo #52): a missing/extra/size-mismatched file is never
+        // checksum-compared, so reporting MATCH was wrong.
+        ValidationResult result = new(
+            Passed: false,
+            SourceFileCount: 2,
+            OutputFileCount: 1,
+            SourceDirCount: 0,
+            OutputDirCount: 0,
+            SourceTotalBytes: 10,
+            OutputTotalBytes: 5,
+            Issues: [new ValidationIssue(ValidationIssueType.MissingInOutput, "/gone.bin", 5, 0, null, null)]);
+
+        StringWriter capture = new();
+        TextWriter saved = Logger.Out;
+        Logger.Out = capture;
+        try
+        {
+            XisoValidator.LogResult(result, "a.iso", "b.iso", checksumsVerified: true);
+        }
+        finally
+        {
+            Logger.Out = saved;
+        }
+
+        Assert.Contains("Checksums: SKIPPED", capture.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("Checksums: MATCH", capture.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LogResult_ChecksumsNotVerified_LogsSkipped()
     {
         string isoPath = CreateIsoFromSource();

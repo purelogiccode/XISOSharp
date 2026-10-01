@@ -18,10 +18,10 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) fo
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 35+ extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1781 tests on net10.0; 1721 on net8.0/net9.0) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1797 tests on net10.0; 1737 on net8.0/net9.0) — snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command coverage |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
-| [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 3 of `H:\XBOXTest`, seeded): `extract-xiso.exe` (reference build `202609111233`; `list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
+| [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 1 of `H:\XBOXTest`, seeded): `extract-xiso.exe` (reference build `202609111233`; `list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
 
 ## Documentation
 
@@ -126,7 +126,7 @@ XISO_NO_UPDATE_CHECK=1     # no GitHub update check
 
 ## Using the CLI
 
-The CLI binary is `XISOSharp(.exe)`. It is `extract-xiso`-compatible (`-c`/`-x`/`-l`/`-r`/`-d`/`-D`/`-m`/`-q`/`-Q`/`-s`/`-X`/`-h`/`-v`) plus XboxKit + xdvdfs verbs. Flags must precede positionals; `-h`/`-v` exit 0. Help is `-h` ONLY — `--help` is treated as a filename. `-v` prints the `XISOSharp v<version> for <platform>` banner. Double-clicking the exe prints usage and waits for a keypress instead of closing. Every launch also checks the latest GitHub release (daily-cached) and prints an `[UPDATE]` notice with the release URL when a newer `release_<version>_<rid>.zip` is available — opt out with `XISO_NO_UPDATE_CHECK=1`. Full project readme (all args + examples): [`XISOSharp.Cli/`](XISOSharp.Cli/) — deep reference: [`docs/cli.md`](docs/cli.md).
+The CLI binary is `XISOSharp(.exe)`. It is `extract-xiso`-compatible (`-c`/`-x`/`-l`/`-r`/`-d`/`-D`/`-m`/`-q`/`-Q`/`-s`/`-X`/`-h`/`-v`) plus XboxKit + xdvdfs verbs. Flags must precede positionals; `-h`/`--help`/`-v` exit 0. `-v` prints the `XISOSharp v<version> for <platform>` banner. Double-clicking the exe prints usage and waits for a keypress instead of closing. Every launch also checks the latest GitHub release (daily-cached) and prints an `[UPDATE]` notice with the release URL when a newer `release_<version>_<rid>.zip` is available — opt out with `XISO_NO_UPDATE_CHECK=1`. Full project readme (all args + examples): [`XISOSharp.Cli/`](XISOSharp.Cli/) — deep reference: [`docs/cli.md`](docs/cli.md).
 
 ### Basics
 
@@ -572,7 +572,7 @@ File-by-file against [`References/`](References/) — `extract-xiso` build `2026
 | Batch `--batch` sorted + `--batch-recursive` | ✅ | 🟡 explicit args only | ❌ | 🟡 `checksum` multi |
 | Input==output safety guard (refuse `-o` onto input/`.old`/split part) | ✅ | — (no `-o` flag) | ❌ | ❌ (open #36) |
 | Quiet `-q` / silent `-Q` (`checksum --silent` → hex only) | ✅ | ✅ | 🟡 | ❌ |
-| Help `-h` ONLY (`--help` is a filename) / banner `-v` `XISOSharp v<version>` | ✅ | ✅ | 🟡 `-h` only | 🟡 `clap` |
+| Help `-h`/`--help` / banner `-v` `XISOSharp v<version>` | ✅ | ✅ | 🟡 `-h` only | 🟡 `clap` |
 | Exit `0`/`1` + `2` for `validate --strict` | ✅ | 🟡 `0`/`1` only | ❌ | ❌ |
 | **Extras** | | | | |
 | Extraction to dir | ✅ | ✅ | ✅ | ✅ |
@@ -592,11 +592,11 @@ File-by-file against [`References/`](References/) — `extract-xiso` build `2026
 git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
-dotnet build CSharp_XISOSharp.sln -c Release # Release (packs NuGet)
-dotnet test -c Release                       # 1781 tests on net10.0 (1721 on net8/9; `XISOSharp.Tests`; ZArchiveSharp comes from NuGet)
+dotnet build CSharp_XISOSharp.sln -c Release # Release (same outputs; no implicit pack)
+dotnet test -c Release                       # 1797 tests on net10.0 (1737 on net8/9; `XISOSharp.Tests`; ZArchiveSharp comes from NuGet)
 ```
 
-Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs on build; `XISOSharp.Cli` (`net8.0`/`net9.0`/`net10.0`, ships net10.0); `XISOSharp.Tests` (`net8.0`/`net9.0`/`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF). `ZArchiveSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZArchiveSharp.Tests` + `ZArchiveSharp.Benchmarks` moved to the sibling `../CSharp_ZArchiveSharp` repo (own solution); `XISOSharp` consumes the library as NuGet package `ZArchiveSharp` 1.4.0. CI builds on `ubuntu`/`windows`/`macos`.
+Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs explicitly (`dotnet pack`; `GeneratePackageOnBuild` is off); `XISOSharp.Cli` (`net8.0`/`net9.0`/`net10.0`, ships net10.0); `XISOSharp.Tests` (`net8.0`/`net9.0`/`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF). `ZArchiveSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZArchiveSharp.Tests` + `ZArchiveSharp.Benchmarks` moved to the sibling `../CSharp_ZArchiveSharp` repo (own solution); `XISOSharp` consumes the library as NuGet package `ZArchiveSharp` 1.4.0. CI builds on `ubuntu`/`windows`/`macos`.
 
 ## Requirements
 

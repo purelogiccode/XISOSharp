@@ -699,6 +699,30 @@ public class XisoRedumpAndSkeletonTests : IDisposable
     }
 
     [Fact]
+    public void CreateZar_ZeroRootTableSize_ReturnsFalse()
+    {
+        // Regression (Todo #24): a zero-size root table used to produce an
+        // empty archive and report success.
+        string src = CreateSourceDir(PopulateSimple);
+        string iso = CreateIso(src);
+        string outDir = CreateTempDir();
+        string bad = Path.Combine(outDir, "bad-root.iso");
+        string zar = Path.Combine(outDir, "bad-root.zar");
+
+        byte[] bytes = File.ReadAllBytes(iso);
+        // Root size is the u32 after the root sector field (header + 20 + 4).
+        const int rootSizeOffset = Constants.HeaderOffset + Constants.HeaderDataLength + 4;
+        bytes[rootSizeOffset] = 0;
+        bytes[rootSizeOffset + 1] = 0;
+        bytes[rootSizeOffset + 2] = 0;
+        bytes[rootSizeOffset + 3] = 0;
+        File.WriteAllBytes(bad, bytes);
+
+        Assert.False(XisoZarchive.CreateZar(bad, zar, 0, quiet: true));
+        Assert.False(File.Exists(zar));
+    }
+
+    [Fact]
     public void CreateZar_MissingFile_ThrowsFileNotFoundException()
     {
         string outDir = CreateTempDir();
@@ -709,14 +733,17 @@ public class XisoRedumpAndSkeletonTests : IDisposable
     }
 
     [Fact]
-    public void CreateZar_InvalidIso_ThrowsEndOfStreamException()
+    public void CreateZar_InvalidIso_ReturnsFalse()
     {
         string outDir = CreateTempDir();
         string bad = Path.Combine(outDir, "bad.iso");
         File.WriteAllBytes(bad, new byte[100]);
         string zar = Path.Combine(outDir, "bad.zar");
 
-        Assert.Throws<EndOfStreamException>(() => XisoZarchive.CreateZar(bad, zar, 0, true));
+        // A corrupt/truncated image maps to the documented false return instead
+        // of escaping as an EndOfStreamException (Todo #57).
+        Assert.False(XisoZarchive.CreateZar(bad, zar, 0, true));
+        Assert.False(File.Exists(zar));
     }
 
     [Fact]

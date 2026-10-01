@@ -1,4 +1,5 @@
 using XISOSharp.Models;
+
 namespace XISOSharp.Tests;
 
 /// <summary>

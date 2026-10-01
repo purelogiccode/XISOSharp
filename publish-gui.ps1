@@ -32,14 +32,22 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 foreach ($r in $Rid) {
     $outDir = Join-Path $OutputRoot $r
     Write-Host "Publishing $r -> $outDir" -ForegroundColor Cyan
-    if (Test-Path -LiteralPath $outDir) {
-        Remove-Item -LiteralPath $outDir -Recurse -Force
+    # AGENTS.md hard rule: publish-gui/<rid> is an artifact store, never deleted.
+    # Publish into a temp stage, then merge over the same-named files.
+    $stage = Join-Path ([System.IO.Path]::GetTempPath()) "xiso_publish_gui/$r"
+    if (Test-Path -LiteralPath $stage) {
+        Remove-Item -LiteralPath $stage -Recurse -Force
     }
+    New-Item -ItemType Directory -Path $stage -Force | Out-Null
     & dotnet publish (Join-Path $PSScriptRoot 'XISOSharp.Gui/XISOSharp.Gui.csproj') `
-        -c $Configuration -r $r --self-contained -o $outDir
+        -c $Configuration -r $r --self-contained -o $stage
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet publish failed for RID $r (exit $LASTEXITCODE)."
     }
+
+    New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+    Copy-Item -Path (Join-Path $stage '*') -Destination $outDir -Recurse -Force
+    Remove-Item -LiteralPath $stage -Recurse -Force
 
     $exe = if ($r.StartsWith('win-')) { 'XISOSharp.Gui.exe' } else { 'XISOSharp.Gui' }
     $bin = Join-Path $outDir $exe

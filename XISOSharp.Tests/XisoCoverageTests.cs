@@ -876,6 +876,22 @@ public class XisoCoverageTests : IDisposable
     }
 
     [Fact]
+    public void Rewrite_ShortImageName_DoesNotThrow()
+    {
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+        string dir = CreateTempDir("xiso_cov_short");
+        string shortPath = Path.Combine(dir, "ab");
+        File.Copy(isoPath, shortPath);
+        string outDir = CreateTempDir("xiso_cov_short_out");
+
+        // Regression (Todo #49): the legacy last-4 strip used to throw on names
+        // shorter than four characters instead of returning them as-is.
+        Assert.Equal(0, XisoReader.Rewrite(shortPath, outDir, out string? rewritten));
+        Assert.NotNull(rewritten);
+        Assert.True(File.Exists(rewritten));
+    }
+
+    [Fact]
     public void CreateXiso_DotSourceDirectory_PacksFromThatDirectory()
     {
         string src = CreateTempDir("xiso_cov_dot_src");
