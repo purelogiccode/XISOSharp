@@ -305,9 +305,24 @@ public static class CisoReader
         byte align = header[21];
         if (magic != Magic || hsize != HeaderSize || blockSize != BlockSize)
             throw new InvalidDataException("Invalid CISO header");
+        if (version != CisoWriter.VersionDeflate && version != CisoWriter.VersionLz4)
+            throw new InvalidDataException($"Unsupported CISO version {version}");
+        if (align > 31)
+            throw new InvalidDataException($"Invalid CISO alignment {align}");
+        if (uncompressedSize > long.MaxValue)
+            throw new InvalidDataException("Invalid CISO uncompressed size");
 
         long totalBlocks = (long)((uncompressedSize + blockSize - 1) / blockSize);
         long indexLen = totalBlocks + 1;
+        // The index table must fit in the file: a crafted header cannot drive a
+        // huge allocation (Todo #27).
+        long maxIndexEntries = Math.Max(0L, (csoFs.Length - HeaderSize) / 4);
+        if (indexLen > maxIndexEntries)
+        {
+            throw new InvalidDataException(
+                $"Invalid CISO index: {indexLen} entries do not fit in the {csoFs.Length}-byte file");
+        }
+
         uint[] indexEntries = new uint[indexLen];
         Span<byte> leBuf = stackalloc byte[4];
         for (long i = 0; i < indexLen; i++)
@@ -319,12 +334,26 @@ public static class CisoReader
         long bufferPos = 0;
         long remaining = buffer.Length;
         long currentOffset = offset;
+        long imageSize = (long)uncompressedSize;
+
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
 
         while (remaining > 0)
         {
             long sector = currentOffset / BlockSize;
             long sectorOffset = currentOffset % BlockSize;
+            // Offsets beyond the addressable blocks stay out of range...
             if (sector >= totalBlocks) throw new ArgumentOutOfRangeException(nameof(offset));
+
+            // ...while reads at/after the logical end (inside the last block's
+            // zero padding) return no data, like the block-device EOF paths,
+            // instead of the padding bytes (Todo #59).
+            long valid = imageSize - currentOffset;
+            if (valid <= 0)
+            {
+                buffer[(int)bufferPos..].Clear();
+                break;
+            }
 
             uint rawEntry = indexEntries[sector];
             uint rawNext = indexEntries[sector + 1];
@@ -374,7 +403,7 @@ public static class CisoReader
                 sectorData = DecompressSector(version, align, compBuf, BlockSize);
             }
 
-            long toCopy = Math.Min(remaining, BlockSize - sectorOffset);
+            long toCopy = Math.Min(Math.Min(remaining, BlockSize - sectorOffset), valid);
             sectorData.AsSpan((int)sectorOffset, (int)toCopy).CopyTo(buffer.Slice((int)bufferPos, (int)toCopy));
             bufferPos += toCopy;
             remaining -= toCopy;

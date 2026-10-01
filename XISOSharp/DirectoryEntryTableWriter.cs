@@ -173,8 +173,8 @@ public static class DirectoryEntryTableWriter
             : node.Subdirectory != null
                 ? Constants.AttributeDir
                 : Constants.AttributeArc;
-        ushort lOffset = (ushort)(node.Left != null ? node.Left.Offset / Constants.DwordSize : 0);
-        ushort rOffset = (ushort)(node.Right != null ? node.Right.Offset / Constants.DwordSize : 0);
+        ushort lOffset = node.Left != null ? ToDwordOffset(node.Left.Offset, node.Filename) : (ushort)0;
+        ushort rOffset = node.Right != null ? ToDwordOffset(node.Right.Offset, node.Filename) : (ushort)0;
 
         byte[] record = new byte[Constants.FilenameOffset + nameBytes.Length];
         BinaryPrimitives.WriteUInt16LittleEndian(record.AsSpan(0, 2), lOffset);
@@ -220,6 +220,24 @@ public static class DirectoryEntryTableWriter
             return 0;
         }, buffer, AvlTraversalMethod.Prefix, 0);
         return buffer;
+    }
+
+    /// <summary>
+    /// Converts a table byte offset to the 16-bit DWORD offset stored in a
+    /// child-link field, failing instead of truncating (Todo #25).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The offset exceeds the field.</exception>
+    private static ushort ToDwordOffset(uint byteOffset, string name)
+    {
+        uint dwords = byteOffset / Constants.DwordSize;
+        if (dwords > ushort.MaxValue)
+        {
+            throw new InvalidOperationException(
+                $"Directory table containing '{name}' is too large: entry offset {byteOffset} bytes " +
+                "exceeds the 16-bit child-offset field (max 65535 DWORDs).");
+        }
+
+        return (ushort)dwords;
     }
 
     private static void ValidateName(string name)

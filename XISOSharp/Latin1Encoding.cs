@@ -56,6 +56,13 @@ internal static class Latin1Encoding
         {
             ArgumentNullException.ThrowIfNull(chars);
             ArgumentNullException.ThrowIfNull(bytes);
+            ValidateRange(charIndex, charCount, chars.Length, nameof(charIndex), nameof(charCount));
+            ArgumentOutOfRangeException.ThrowIfNegative(byteIndex);
+            if (byteIndex + charCount > bytes.Length)
+            {
+                throw new ArgumentException("Destination is too small for the encoded bytes.", nameof(bytes));
+            }
+
             for (int i = 0; i < charCount; i++)
             {
                 char c = chars[charIndex + i];
@@ -77,6 +84,13 @@ internal static class Latin1Encoding
         {
             ArgumentNullException.ThrowIfNull(s);
             ArgumentNullException.ThrowIfNull(bytes);
+            ValidateRange(charIndex, charCount, s.Length, nameof(charIndex), nameof(charCount));
+            ArgumentOutOfRangeException.ThrowIfNegative(byteIndex);
+            if (byteIndex + charCount > bytes.Length)
+            {
+                throw new ArgumentException("Destination is too small for the encoded bytes.", nameof(bytes));
+            }
+
             for (int i = 0; i < charCount; i++)
             {
                 char c = s[charIndex + i];
@@ -119,7 +133,12 @@ internal static class Latin1Encoding
         }
 
         /// <inheritdoc/>
-        public override int GetCharCount(byte[] bytes, int index, int count) => count;
+        public override int GetCharCount(byte[] bytes, int index, int count)
+        {
+            ArgumentNullException.ThrowIfNull(bytes);
+            ValidateRange(index, count, bytes.Length, nameof(index), nameof(count));
+            return count;
+        }
 
         /// <inheritdoc/>
         public override int GetCharCount(ReadOnlySpan<byte> bytes) => bytes.Length;
@@ -129,6 +148,13 @@ internal static class Latin1Encoding
         {
             ArgumentNullException.ThrowIfNull(bytes);
             ArgumentNullException.ThrowIfNull(chars);
+            ValidateRange(byteIndex, byteCount, bytes.Length, nameof(byteIndex), nameof(byteCount));
+            ArgumentOutOfRangeException.ThrowIfNegative(charIndex);
+            if (charIndex + byteCount > chars.Length)
+            {
+                throw new ArgumentException("Destination is too small for the decoded characters.", nameof(chars));
+            }
+
             for (int i = 0; i < byteCount; i++)
             {
                 chars[charIndex + i] = (char)bytes[byteIndex + i];
@@ -152,6 +178,22 @@ internal static class Latin1Encoding
             }
 
             return bytes.Length;
+        }
+
+        /// <summary>
+        /// Validates an <c>(index, count)</c> pair against a source length,
+        /// surfacing the <see cref="Encoding"/> contract's
+        /// <see cref="ArgumentOutOfRangeException"/> instead of letting the
+        /// loops throw <see cref="IndexOutOfRangeException"/> (Todo #62).
+        /// </summary>
+        private static void ValidateRange(int index, int count, int length, string indexName, string countName)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(index, indexName);
+            ArgumentOutOfRangeException.ThrowIfNegative(count, countName);
+            if (index + count > length)
+            {
+                throw new ArgumentOutOfRangeException(countName);
+            }
         }
 
         private static void ValidateEncodable(ReadOnlySpan<char> chars, string paramName)

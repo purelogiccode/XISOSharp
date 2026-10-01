@@ -91,6 +91,12 @@ public sealed class LocalFilesystem(string? root = null) : IFilesystem
         {
             return false;
         }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+        {
+            // Unresolvable paths (empty, invalid characters) report "missing"
+            // per the IFilesystem contract instead of throwing (Todo #63).
+            return false;
+        }
     }
 
     /// <inheritdoc/>
@@ -106,6 +112,11 @@ public sealed class LocalFilesystem(string? root = null) : IFilesystem
         }
         catch (UnauthorizedAccessException)
         {
+            return -1;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+        {
+            // See FileExists: unresolvable paths report -1 (Todo #63).
             return -1;
         }
     }

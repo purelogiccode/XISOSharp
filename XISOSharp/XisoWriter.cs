@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Globalization;
 using System.Text;
 using XISOSharp.DataStructures;
 using XISOSharp.Models;
@@ -180,6 +181,9 @@ public static class XisoWriter
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
         int err = 0;
+        // Declared before any `goto cleanup` path so the cleanup helper can
+        // always read it (Todo #53).
+        string? partialOutput = null;
 
         if (prependSectors is < 0)
         {
@@ -254,6 +258,23 @@ public static class XisoWriter
         // trailing backslashes, upstream #61) must stay `C:\`, not become the
         // drive-relative `C:` that Path.Combine would then mis-resolve.
         outputDirectory = XisoPaths.TrimTrailingSeparators(outputDirectory);
+
+        // #68 — a relative output directory resolves against the caller's CWD,
+        // not against the source directory the write phase chdirs into (the
+        // stream is opened after SetCurrentDirectory(rootDirectory)); the
+        // collision check below already resolves against the original CWD.
+        if (!Path.IsPathRooted(outputDirectory))
+        {
+            try
+            {
+                outputDirectory = Path.GetFullPath(Path.Combine(cwd, outputDirectory));
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+            {
+                // Leave the relative form: the write phase surfaces the natural error.
+                Logger.LogDebug($"Output directory resolve failed for '{outputDirectory}': {ex.Message}");
+            }
+        }
 
         if (string.IsNullOrEmpty(isoName))
         {
@@ -337,7 +358,8 @@ public static class XisoWriter
 
             if (filesSkipped > 0)
             {
-                Logger.LogErr($"warning: {filesSkipped} file(s)/director(y/ies) skipped due to access errors.\n");
+                Logger.LogErr(
+                    $"warning: {filesSkipped.ToString(CultureInfo.InvariantCulture)} file(s)/director(y/ies) skipped due to access errors.\n");
             }
         }
 
@@ -383,6 +405,7 @@ public static class XisoWriter
                 });
 
             outIsoPath = xisoPath;
+            partialOutput = xisoPath;
 
             if (prependOffset > 0)
             {
@@ -488,13 +511,15 @@ public static class XisoWriter
             if (inRoot == null)
             {
                 Logger.Log(
-                    $"\nsucessfully created {isoName}{(inName != null ? "" : ".iso")} ({Logger.TotalFiles} files totalling {Logger.TotalBytes} bytes added)\n");
+                    $"\nsucessfully created {isoName}{(inName != null ? "" : ".iso")} ({Logger.TotalFiles.ToString(CultureInfo.InvariantCulture)} files totalling {Logger.TotalBytes.ToString(CultureInfo.InvariantCulture)} bytes added)\n");
             }
 
             progress?.Report(new ProgressInfo(ProgressInfoType.FinishedPacking));
         }
         catch (OperationCanceledException)
         {
+            DeletePartialOutput();
+            outIsoPath = null;
             throw;
         }
         catch (UnauthorizedAccessException ex)
@@ -506,6 +531,8 @@ public static class XisoWriter
         {
             // A >4 GB source file cannot be represented (32-bit size field):
             // fail loudly instead of returning success for a partial image.
+            DeletePartialOutput();
+            outIsoPath = null;
             throw;
         }
         catch (IOException ex)
@@ -525,9 +552,34 @@ public static class XisoWriter
             AvlTree.FreeTree(root.Subdirectory);
         }
 
+        if (err != 0)
+        {
+            DeletePartialOutput();
+            outIsoPath = null;
+        }
+
         Directory.SetCurrentDirectory(cwd);
 
         return err;
+
+        void DeletePartialOutput()
+        {
+            // A failed/cancelled create must not leave a truncated .iso that
+            // looks like a finished artifact (Todo #53).
+            if (partialOutput == null)
+                return;
+
+            try
+            {
+                File.Delete(partialOutput);
+            }
+            catch
+            {
+                // Best effort: never mask the original failure.
+            }
+
+            partialOutput = null;
+        }
     }
 
     /// <summary>
@@ -685,7 +737,8 @@ public static class XisoWriter
 
         using (ctx.SourceStream == null ? srcStream : null)
         {
-            Logger.Log($"adding {ctx.Path}{avl.Filename} ({avl.FileSize} bytes) ");
+            Logger.Log(
+                $"adding {ctx.Path}{avl.Filename} ({avl.FileSize.ToString(CultureInfo.InvariantCulture)} bytes) ");
             Logger.Flush();
 
             int written = 0;
@@ -756,7 +809,7 @@ public static class XisoWriter
             if (originalSize != avl.FileSize)
             {
                 Logger.LogErr(
-                    $"WARNING: File {avl.Filename} is truncated. Reported size: {originalSize} bytes, wrote size: {avl.FileSize} bytes!\n");
+                    $"WARNING: File {avl.Filename} is truncated. Reported size: {originalSize.ToString(CultureInfo.InvariantCulture)} bytes, wrote size: {avl.FileSize.ToString(CultureInfo.InvariantCulture)} bytes!\n");
             }
 
             Logger.RecordFileWritten(avl.FileSize);
@@ -854,10 +907,18 @@ public static class XisoWriter
                     emptyDir = false;
                     string prevDir = Directory.GetCurrentDirectory();
                     Directory.SetCurrentDirectory(entryName);
-
-                    GenerateAvlTreeLocalCore(ref avl.Subdirectory, ref ioN, ref filesSkipped, matcher, entryRelPath);
-
-                    Directory.SetCurrentDirectory(prevDir);
+                    try
+                    {
+                        GenerateAvlTreeLocalCore(ref avl.Subdirectory, ref ioN, ref filesSkipped, matcher,
+                            entryRelPath);
+                    }
+                    finally
+                    {
+                        // A per-entry catch below (or a throw) must not leave the
+                        // walker inside the failed subdirectory: the remaining
+                        // siblings resolve relative to the parent (Todo #21).
+                        Directory.SetCurrentDirectory(prevDir);
+                    }
                 }
                 else
                 {
@@ -1022,6 +1083,19 @@ public static class XisoWriter
         IProgress<ProgressInfo>? progress = null, ProgressCallback? progressCallback = null,
         CancellationToken cancellationToken = default, int? prependSectors = null, ulong? fileTime = null)
     {
+        // Serialize with CreateXiso: both mutate the shared Logger totals and
+        // capture/restore the process CWD (Todo #29).
+        lock (CreateLock)
+        {
+            return CreateFromRemapTreeCore(remapRoot, outputIsoPath, volumeName, progress, progressCallback,
+                cancellationToken, prependSectors, fileTime);
+        }
+    }
+
+    private static int CreateFromRemapTreeCore(AvlNode? remapRoot, string outputIsoPath, string? volumeName,
+        IProgress<ProgressInfo>? progress, ProgressCallback? progressCallback,
+        CancellationToken cancellationToken, int? prependSectors, ulong? fileTime)
+    {
         ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -1147,7 +1221,8 @@ public static class XisoWriter
             xisoFs.Seek(prependOffset + Constants.OptimizedTagOffset, SeekOrigin.Begin);
             byte[] tagBytes = Encoding.ASCII.GetBytes(Constants.OptimizedTag);
             xisoFs.Write(tagBytes, 0, Constants.OptimizedTagLength);
-            Logger.Log($"\nsucessfully created {xisoSettingsName} ({totalFiles} files)\n");
+            Logger.Log(
+                $"\nsucessfully created {xisoSettingsName} ({totalFiles.ToString(CultureInfo.InvariantCulture)} files)\n");
             progress?.Report(new ProgressInfo(ProgressInfoType.FinishedPacking));
         }
         catch (OperationCanceledException)

@@ -336,11 +336,17 @@ public sealed class XisoExplorer : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_disposed)
-            return;
+        // Serialize with keep-open operations: a LockHoldingStream releases this
+        // same lock on dispose, so waiting here lets in-flight reads finish
+        // before the held handle closes (Todo #51).
+        lock (_sync)
+        {
+            if (_disposed)
+                return;
 
-        _disposed = true;
-        _heldStream?.Dispose();
+            _disposed = true;
+            _heldStream?.Dispose();
+        }
     }
 
     /// <summary>

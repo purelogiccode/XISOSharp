@@ -224,11 +224,17 @@ public static class XisoValidator
         // Checksums
         List<ValidationIssue> checksumIssues =
             result.Issues.Where(static i => i.Type == ValidationIssueType.ChecksumMismatch).ToList();
+        // Checksums are only compared for files present on both sides with equal
+        // sizes; a missing/extra/size-mismatched file was never compared, so
+        // reporting MATCH there is wrong (Todo #52).
+        bool allFilesCompared = checksumsVerified &&
+                                !result.Issues.Any(static i => i.Type is ValidationIssueType.MissingInOutput
+                                    or ValidationIssueType.ExtraInOutput or ValidationIssueType.SizeMismatch);
         if (checksumIssues.Count > 0)
         {
             Logger.Log($"[VALIDATE] Checksums: FAIL — {checksumIssues.Count} checksum difference(s) (SHA-256)\n");
         }
-        else if (!checksumsVerified || result.SourceFileCount == 0)
+        else if (!allFilesCompared || result.SourceFileCount == 0)
         {
             Logger.Log("[VALIDATE] Checksums: SKIPPED\n");
         }

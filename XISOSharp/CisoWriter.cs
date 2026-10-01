@@ -88,36 +88,58 @@ public static class CisoWriter
         string? tempIso = null;
         string sourceFile;
 
-        if (isDir)
-        {
-            // Pack directory to temp XISO then compress. Mirrors xdvdfs cmd_compress path for is_dir.
-            tempIso = Path.Combine(Path.GetTempPath(), $"xisosh-temp-{Guid.NewGuid():N}.iso");
-            // Use PackFromDirectory (1:1 mapping). Exclude none.
-            int rc = XisoWriterInternal.PackFromDirectoryForCiso(sourcePath, tempIso, ct);
-            if (rc != 0)
-                throw new IOException($"Failed to pack directory {sourcePath} to temp ISO");
-            sourceFile = tempIso;
-        }
-        else
-        {
-            sourceFile = sourcePath;
-        }
-
         try
         {
+            if (isDir)
+            {
+                // Pack directory to temp XISO then compress. Mirrors xdvdfs cmd_compress path for is_dir.
+                tempIso = Path.Combine(Path.GetTempPath(), $"xisosh-temp-{Guid.NewGuid():N}.iso");
+                // Use PackFromDirectory (1:1 mapping). Exclude none.
+                int rc = XisoWriterInternal.PackFromDirectoryForCiso(sourcePath, tempIso, ct);
+                if (rc != 0)
+                    throw new IOException($"Failed to pack directory {sourcePath} to temp ISO");
+                sourceFile = tempIso;
+            }
+            else
+            {
+                sourceFile = sourcePath;
+            }
+
             using FileStream src = new(sourceFile, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
             if (splitBytes.HasValue)
             {
                 using CisoSplitOutput split = new(output, splitBytes.Value);
-                CompressStream(src, split, level, version, progress, ct);
+                try
+                {
+                    CompressStream(src, split, level, version, progress, ct);
+                }
+                catch
+                {
+                    // A failed compress must not leave partial parts behind (Todo #54).
+                    foreach (string part in split.PartPaths)
+                        TryDeleteFile(part);
+                    throw;
+                }
+
                 foreach (string part in split.PartPaths)
                     Logger.Log($"  part {part} ({new FileInfo(part).Length} bytes)\n");
                 Logger.Log($"Compressed {sourcePath} -> {output} ({split.PartPaths.Count} part(s))\n");
             }
             else
             {
-                using FileStream dst = new(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
-                CompressStream(src, dst, level, version, progress, ct);
+                try
+                {
+                    using FileStream dst = new(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+                    CompressStream(src, dst, level, version, progress, ct);
+                }
+                catch
+                {
+                    // A failed compress must not leave a truncated .cso that looks
+                    // like a finished artifact (Todo #54).
+                    TryDeleteFile(output);
+                    throw;
+                }
+
                 Logger.Log($"Compressed {sourcePath} -> {output} ({new FileInfo(output).Length} bytes)\n");
             }
 
@@ -127,15 +149,20 @@ public static class CisoWriter
         {
             if (tempIso != null)
             {
-                try
-                {
-                    File.Delete(tempIso);
-                }
-                catch
-                {
-                    // ignored
-                }
+                TryDeleteFile(tempIso);
             }
+        }
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch
+        {
+            // ignored: best-effort cleanup
         }
     }
 
@@ -345,8 +372,11 @@ public static class CisoWriter
 
         // Final index entry (end of file) — never flagged
         {
-            uint posShifted = (uint)(position >> align);
-            indexEntries[indexLen - 1] = posShifted & 0x7FFFFFFFu;
+            long posShifted = position >> align;
+            if (posShifted > 0x7FFFFFFFL)
+                throw new IOException("CISO index overflow: image too large for the CISO format");
+
+            indexEntries[indexLen - 1] = (uint)posShifted;
         }
 
         // Write index table at indexStart
@@ -395,7 +425,10 @@ public static class CisoWriter
     {
         if (isDir)
         {
-            string trimmed = sourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            // Resolve first: `.`/`..` (and paths ending in a separator) have no
+            // usable name/parent as written and used to yield `..cso` in the
+            // CWD (Todo #61).
+            string trimmed = XisoPaths.TrimTrailingSeparators(Path.GetFullPath(sourcePath));
             string parent = Path.GetDirectoryName(trimmed) ?? Directory.GetCurrentDirectory();
             string name = Path.GetFileName(trimmed);
             if (string.IsNullOrEmpty(name)) name = "image";

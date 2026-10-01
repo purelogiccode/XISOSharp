@@ -350,7 +350,16 @@ public sealed class SectorAllocator
                 if (start <= (ulong)lastStart + lastCount)
                 {
                     ulong end = Math.Max((ulong)lastStart + lastCount, (ulong)start + count);
-                    merged[^1] = (lastStart, (uint)(end - lastStart));
+                    ulong mergedCount = end - lastStart;
+                    if (mergedCount > uint.MaxValue)
+                    {
+                        // Casting would wrap the count to 0 and read as "nothing
+                        // used" (Todo #60); fail loudly instead.
+                        throw new InvalidOperationException(
+                            "Used-sector range spans more than the addressable 32-bit sector space.");
+                    }
+
+                    merged[^1] = (lastStart, (uint)mergedCount);
                     continue;
                 }
             }

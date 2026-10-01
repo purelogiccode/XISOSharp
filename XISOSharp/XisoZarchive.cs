@@ -138,21 +138,23 @@ public static class XisoZarchive
         IProgress<ZarProgress>? progress = null)
     {
         ct.ThrowIfCancellationRequested();
-        // Standard sector-32 descriptor, or the rebuilt sector-0 layout. Invalid
-        // inputs keep the historical base so downstream reads fail as before.
-        long headerOffset = XisoReader.TryFindHeaderBase(isoFs, xisoOffset, out long detectedHeader)
-            ? detectedHeader
-            : xisoOffset + Constants.HeaderOffset;
-        isoFs.Seek(headerOffset + 20, SeekOrigin.Begin);
-        uint rootOffset = ReadUInt(isoFs);
-        uint rootSize = ReadUInt(isoFs);
-
-        ParseXdvdfs(isoFs, xisoOffset, (long)rootOffset * Constants.SectorSize, rootSize, removeUpdate,
-            out PathNode rootNode, out List<string> names);
-
         if (!quiet) Logger.Log($"[INFO] Writing ZArchive to {zarPath}\n");
         try
         {
+            // Standard sector-32 descriptor, or the rebuilt sector-0 layout. Invalid
+            // inputs keep the historical base so downstream reads fail as before.
+            long headerOffset = XisoReader.TryFindHeaderBase(isoFs, xisoOffset, out long detectedHeader)
+                ? detectedHeader
+                : xisoOffset + Constants.HeaderOffset;
+            isoFs.Seek(headerOffset + 20, SeekOrigin.Begin);
+            uint rootOffset = ReadUInt(isoFs);
+            uint rootSize = ReadUInt(isoFs);
+
+            // Parsing stays inside the try: a corrupt table must map to the
+            // documented false return, not escape as a format exception (Todo #57).
+            ParseXdvdfs(isoFs, xisoOffset, (long)rootOffset * Constants.SectorSize, rootSize, removeUpdate,
+                out PathNode rootNode, out List<string> names);
+
             // The XISO walk order is the pack order (directories before
             // children, siblings case-insensitively sorted); the shared
             // engine streams it exactly like WriteNode did.
@@ -169,6 +171,18 @@ public static class XisoZarchive
             };
             ZarPipeline.PackSource(source, zarPath, options, progress, ct);
             return true;
+        }
+        catch (XisoFormatException ex)
+        {
+            if (!quiet) Logger.LogErr($"[ERROR] {ex.Message}\n");
+            DeleteIncomplete(zarPath);
+            return false;
+        }
+        catch (EndOfStreamException)
+        {
+            if (!quiet) Logger.LogErr("[ERROR] truncated XISO: unexpected end of the image file.\n");
+            DeleteIncomplete(zarPath);
+            return false;
         }
         catch (InvalidOperationException ex)
         {
@@ -221,6 +235,13 @@ public static class XisoZarchive
         // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
     {
+        if (dirSize == 0)
+        {
+            // A zero-size root/nested table is corrupt: the walk below would
+            // silently emit an empty archive and report success (Todo #24).
+            throw new XisoFormatException("invalid XISO: directory table size is zero.");
+        }
+
         if (childOffset >= dirSize) return;
         // Hardening (#16): bound the walk — a corrupt cycle previously recursed
         // until the stack overflowed instead of failing with a named error.
@@ -259,7 +280,14 @@ public static class XisoZarchive
             while (read < nameLen)
             {
                 int n = isoFs.Read(nameBytes, read, nameLen - read);
-                if (n == 0) return;
+                if (n == 0)
+                {
+                    // A truncated name used to return silently, dropping the
+                    // entry and its right subtree while reporting success
+                    // (Todo #58); CreateZar maps this to false.
+                    throw new EndOfStreamException();
+                }
+
                 read += n;
             }
         }

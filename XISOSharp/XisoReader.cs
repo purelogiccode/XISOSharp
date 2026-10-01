@@ -88,9 +88,17 @@ public static class XisoReader
     /// </summary>
     private static string StripRewriteSuffix(string filename)
     {
-        filename = filename.EndsWith(".old", StringComparison.OrdinalIgnoreCase)
-            ? filename[..^".old".Length]
-            : filename[..^4];
+        if (filename.EndsWith(".old", StringComparison.OrdinalIgnoreCase))
+        {
+            filename = filename[..^".old".Length];
+        }
+        else if (filename.Length > 4)
+        {
+            // Legacy last-4 strip; a shorter name is returned as-is instead of
+            // throwing (Todo #49).
+            filename = filename[..^4];
+        }
+
         return IsCsoPath(filename) && filename.Length > 4 ? StripCsoSuffix(filename) : filename;
     }
 
@@ -1483,7 +1491,17 @@ public static class XisoReader
             imageStream.Seek(((long)(skipSectors ?? 0) * Constants.SectorSize) + Constants.OptimizedTagOffset,
                 SeekOrigin.Begin);
             Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];
-            if (imageStream.Read(tagBuf) != Constants.OptimizedTagLength)
+            // Fill the tag like the sibling probes (ReadExact): a legitimate
+            // short read must not report "not optimized" (Todo #48).
+            int read = 0;
+            while (read < tagBuf.Length)
+            {
+                int n = imageStream.Read(tagBuf[read..]);
+                if (n == 0) break;
+                read += n;
+            }
+
+            if (read < Constants.OptimizedTagLength)
             {
                 return false;
             }
@@ -2182,12 +2200,9 @@ public static class XisoReader
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public static ulong GetFileTimeRaw(string isoPath, int? skipSectors = null)
     {
-        using FileStream fs = new(
-            isoPath,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
-            });
+        // OpenImageStream: .cso/.1.cso inputs decompress transparently, matching
+        // the sibling GetVolumeInfo/ListDirectory APIs (Todo #47).
+        using Stream fs = OpenImageStream(isoPath);
         long headerBase = FindHeaderBaseForFileTime(fs, isoPath, skipSectors);
         Span<byte> buf = stackalloc byte[8];
         fs.Seek(headerBase + Constants.HeaderDataLength + 4 + 4, SeekOrigin.Begin);
@@ -2245,6 +2260,15 @@ public static class XisoReader
     /// <exception cref="IOException">Thrown on I/O errors.</exception>
     public static void SetFileTime(string isoPath, ulong fileTime, int? skipSectors = null)
     {
+        // The descriptor field cannot be patched through a compressed container:
+        // name the restriction instead of probing compressed bytes for a header
+        // (Todo #47).
+        if (IsCsoPath(isoPath) || CisoReader.IsCso(isoPath))
+        {
+            throw new IOException(
+                $"Cannot set the FILETIME of a compressed CISO image: {isoPath}; decompress it first");
+        }
+
         using FileStream fs = new(
             isoPath,
             new FileStreamOptions
@@ -2275,7 +2299,7 @@ public static class XisoReader
     /// sector-0 layout (descriptor at file offset 0).
     /// Shared by <see cref="GetFileTimeRaw(string,int?)"/> and <see cref="SetFileTime(string,ulong,int?)"/>.
     /// </summary>
-    private static long FindHeaderBaseForFileTime(FileStream fs, string isoName, int? skipSectors)
+    private static long FindHeaderBaseForFileTime(Stream fs, string isoName, int? skipSectors)
     {
         Span<byte> buf = stackalloc byte[Constants.HeaderDataLength];
         if (skipSectors.HasValue)
@@ -2949,7 +2973,7 @@ public static class XisoReader
 
         // The second descriptor sector carries the layout-tool signature in
         // some patched images; preserve it too when present.
-        long secondDescriptor = discLseek + ((long)headerSector + 1) * Constants.SectorSize;
+        long secondDescriptor = discLseek + (((long)headerSector + 1) * Constants.SectorSize);
         if (headerSector != uint.MaxValue && secondDescriptor + 24 <= fileLength)
         {
             try

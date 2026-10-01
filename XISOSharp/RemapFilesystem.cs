@@ -636,8 +636,11 @@ public static class RemapFilesystem
                 // first-wins duplicates, so sort ordinally.
                 Array.Sort(entries, StringComparer.Ordinal);
             }
-            catch
+            catch (Exception ex)
             {
+                // Log like BuildMappings: silently dropping a directory hides why
+                // entries are missing from the mapping (Todo #55).
+                Logger.LogDebug($"Skipping unreadable directory '{fullDir}': {ex.Message}");
                 continue;
             }
 

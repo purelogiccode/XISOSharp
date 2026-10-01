@@ -35,8 +35,9 @@ public static class XisoRepairer
 
     /// <summary>
     /// Repairs the class-C issues of an XISO image in place.
-    /// A <c>.old</c> backup of the pre-repair image is written first (replacing
-    /// any previous backup) unless disabled — the copy-in precedent (#22).
+    /// A <c>.old</c> backup of the pre-repair image is written first (an existing
+    /// backup is kept, not overwritten) unless disabled — the copy-in precedent
+    /// (#22).
     /// </summary>
     /// <param name="isoPath">Path to the XISO image (modified in place).</param>
     /// <param name="createBackup">Write a <c>.old</c> backup first (default true).</param>

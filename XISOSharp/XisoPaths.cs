@@ -55,8 +55,14 @@ public static class XisoPaths
         if (full == null || dir == null || dir.Length == 0 || full.Length <= dir.Length)
             return false;
 
+        // TrimTrailingSeparators keeps the separator on filesystem roots
+        // (`C:\`, `\\server\share\`, `/`), so the character after the prefix is
+        // already a name there (Todo #23).
+        bool dirIsRoot = dir[^1] == Path.DirectorySeparatorChar || dir[^1] == Path.AltDirectorySeparatorChar;
+
         return full.StartsWith(dir, PathComparison) &&
-               (full[dir.Length] == Path.DirectorySeparatorChar ||
+               (dirIsRoot ||
+                full[dir.Length] == Path.DirectorySeparatorChar ||
                 full[dir.Length] == Path.AltDirectorySeparatorChar);
     }
 

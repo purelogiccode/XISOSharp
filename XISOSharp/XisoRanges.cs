@@ -466,9 +466,13 @@ public static class XisoRanges
             // Structural entry: not a real file; children still walked below.
         }
         else if (isDirectory)
+        {
             CollectFileEntries(isoFs, isoOffset, entryOffset, entrySize, 0, entryPath, results, null, depth + 1);
+        }
         else
+        {
             results.Add((Path: entryPath, Offset: isoOffset + entryOffset, Size: entrySize));
+        }
 
         if (rightChild != 0 && rightChild != 0xFFFF)
         {

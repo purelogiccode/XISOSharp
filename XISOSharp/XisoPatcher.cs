@@ -26,7 +26,7 @@ namespace XISOSharp;
 /// The image file size never changes: allocations come from free space inside
 /// the image, and a clean <see cref="InvalidDataException"/> is thrown when
 /// nothing fits. A <c>.old</c> backup of the pre-patch image is written first
-/// (replacing any previous backup) unless disabled.
+/// (an existing backup is kept, not overwritten) unless disabled.
 /// </remarks>
 public static class XisoPatcher
 {
