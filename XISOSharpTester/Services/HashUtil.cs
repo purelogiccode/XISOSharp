@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using Serilog;
-using XISOSharpTester.Logging;
 
 namespace XISOSharpTester.Services;
 

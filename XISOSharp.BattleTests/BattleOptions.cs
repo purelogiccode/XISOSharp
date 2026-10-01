@@ -4,29 +4,29 @@ namespace XISOSharp.BattleTests;
 internal sealed class BattleOptions
 {
     /// <summary>Gets dirs scanned (top-level) for candidate *.iso files.</summary>
-    public List<string> Dirs { get; init; } = [];
+    internal List<string> Dirs { get; init; } = [];
 
     /// <summary>Gets how many ISOs are sampled at random (default 1).</summary>
-    public int Count { get; init; } = 1;
+    internal int Count { get; init; } = 1;
 
     /// <summary>Gets the explicit RNG seed; null = auto (reported for reproducibility).</summary>
-    public int? Seed { get; init; }
+    internal int? Seed { get; init; }
 
     /// <summary>Gets an explicit path to the XISOSharp CLI exe (default: auto-resolved).</summary>
-    public string? CliPath { get; init; }
+    internal string? CliPath { get; init; }
 
     /// <summary>Gets an explicit path to extract-xiso.exe (default: beside the harness).</summary>
-    public string? OraclePath { get; init; }
+    internal string? OraclePath { get; init; }
 
     /// <summary>Gets an explicit path to xdvdfs.exe (default: beside the harness); null = auto-resolve.</summary>
-    public string? XdvdfsPath { get; init; }
+    internal string? XdvdfsPath { get; init; }
 
     /// <summary>Gets an explicit path to xboxkit.exe (default: beside the harness); null = auto-resolve.</summary>
-    public string? XboxkitPath { get; init; }
+    internal string? XboxkitPath { get; init; }
 
     /// <summary>Gets the work root for scratch dirs (default: the drive with the
     /// most free space among the sampled ISOs' drives and %TEMP%).</summary>
-    public string? WorkRoot { get; init; }
+    internal string? WorkRoot { get; init; }
 
     /// <summary>
     /// Gets the ops to battle (default: all). extract-xiso oracle: list, extract,
@@ -34,21 +34,24 @@ internal sealed class BattleOptions
     /// pack, cso. xboxkit oracle (XboxKit-parity archival): petrify, video,
     /// random, seed, trim, wipe, zar, rebuild.
     /// </summary>
-    public List<string> Ops { get; init; } = [.. ValidOps];
+    internal List<string> Ops { get; init; } = [.. ValidOps];
 
     /// <summary>Gets a value indicating whether scratch dirs are kept after the run.</summary>
-    public bool KeepWork { get; init; }
+    internal bool KeepWork { get; init; }
 
     /// <summary>Gets the per-operation timeout in minutes (default 60).</summary>
-    public int TimeoutMinutes { get; init; } = 60;
+    internal int TimeoutMinutes { get; init; } = 60;
 
     /// <summary>Gets explicit ISO paths passed positionally; when set, sampling is skipped.</summary>
-    public List<string> ExplicitIsos { get; init; } = [];
+    internal List<string> ExplicitIsos { get; init; } = [];
 
     /// <summary>Gets a value indicating whether the usage text was requested.</summary>
-    public bool Help { get; init; }
+    internal bool Help { get; init; }
 
-    public static BattleOptions Parse(string[] args)
+    /// <summary>Parses command-line arguments into a <see cref="BattleOptions"/> instance.</summary>
+    /// <param name="args">Raw command-line arguments.</param>
+    /// <returns>The parsed options; <see cref="Help"/> is set when usage was requested.</returns>
+    internal static BattleOptions Parse(string[] args)
     {
         List<string> dirs = [];
         List<string> explicitIsos = [];
@@ -189,7 +192,7 @@ internal sealed class BattleOptions
     }
 
     /// <summary>All battleable op names, grouped by oracle.</summary>
-    public static readonly string[] ValidOps =
+    internal static readonly string[] ValidOps =
     [
         // extract-xiso oracle (extract-xiso parity)
         "list", "extract", "rewrite",
@@ -199,7 +202,8 @@ internal sealed class BattleOptions
         "petrify", "video", "random", "seed", "trim", "wipe", "zar", "rebuild",
     ];
 
-    public static void PrintUsage() =>
+    /// <summary>Writes the command-line usage text to standard output.</summary>
+    internal static void PrintUsage() =>
         Console.WriteLine("""
 
                           Usage: XISOSharp.BattleTests [options] [*.iso ...]

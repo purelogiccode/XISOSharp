@@ -4,7 +4,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using Serilog;
-using XISOSharpTester.Logging;
 using XISOSharpTester.Models;
 using XISOSharpTester.ViewModels;
 

@@ -1,7 +1,6 @@
 namespace XISOSharp.Cli;
 
 using Serilog;
-using Logging;
 
 /// <summary>
 /// Input==output refusal checks (TODO #15, xdvdfs #36). Each check returns the
@@ -22,7 +21,7 @@ internal static class CliOutputGuard
     /// bypass — a file literally named like a flag stays reachable as
     /// <c>./-y</c> or by absolute path.
     /// </summary>
-    public static string? CheckMisplacedFlag(string? token)
+    internal static string? CheckMisplacedFlag(string? token)
     {
         try
         {
@@ -66,7 +65,7 @@ internal static class CliOutputGuard
     /// <c>-o</c> pointing at the input itself (or at the backup about to hold
     /// it) is refused: the former is just the default, the latter destroys data.
     /// </summary>
-    public static string? CheckRewriteOutput(string xisoPath, string? outputName)
+    internal static string? CheckRewriteOutput(string xisoPath, string? outputName)
     {
         try
         {
@@ -101,7 +100,7 @@ internal static class CliOutputGuard
     /// Single-input <c>-o</c> used by the redump batch modes (video/random/seed/
     /// wipe/trim/petrify/update/zar): the output must not be the input itself.
     /// </summary>
-    public static string? CheckSingleInputOutput(string input, string? outputName)
+    internal static string? CheckSingleInputOutput(string input, string? outputName)
     {
         try
         {
@@ -129,7 +128,7 @@ internal static class CliOutputGuard
     /// Rebuild output must not clobber any component (xiso, video, filler/seed,
     /// update) nor the sectors file it is read from while writing.
     /// </summary>
-    public static string? CheckRebuildOutput(string output, string? securitySectorsPath,
+    internal static string? CheckRebuildOutput(string output, string? securitySectorsPath,
         params string?[] parts)
     {
         try
@@ -166,7 +165,7 @@ internal static class CliOutputGuard
     /// source file itself. Split-part collisions beyond the base name are caught
     /// by the library backstop (<see cref="CisoWriter.CompressToCso"/>).
     /// </summary>
-    public static string? CheckImageOutput(string source, string output)
+    internal static string? CheckImageOutput(string source, string output)
     {
         try
         {

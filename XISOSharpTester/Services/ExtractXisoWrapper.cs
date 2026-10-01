@@ -1,6 +1,5 @@
 using Serilog;
 using XISOSharp;
-using XISOSharpTester.Logging;
 using XISOSharp.Models;
 using XISOSharpTester.Models;
 

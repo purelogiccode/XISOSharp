@@ -755,7 +755,7 @@ public static class XisoWriter
     /// </param>
     /// <param name="relativePath">Relative path of the current directory within the source root.</param>
     /// <returns>0 on success.</returns>
-    internal static int GenerateAvlTreeLocal(
+    private static int GenerateAvlTreeLocal(
         ref AvlNode? outRoot,
         ref int ioN,
         ref int filesSkipped,
@@ -1232,7 +1232,7 @@ public static class XisoWriter
     /// <param name="context">Not used.</param>
     /// <param name="depth">Not used.</param>
     /// <returns>Always 0.</returns>
-    internal static int CalculateTotalFilesAndBytes(AvlNode avl, object? context, int depth)
+    private static int CalculateTotalFilesAndBytes(AvlNode avl, object? context, int depth)
     {
         if (avl.Subdirectory != null && !ReferenceEquals(avl.Subdirectory, AvlNode.EmptySubdirectory))
         {
@@ -1256,7 +1256,7 @@ public static class XisoWriter
     /// <param name="context">Not used.</param>
     /// <param name="depth">Not used.</param>
     /// <returns>Always 0.</returns>
-    internal static int CalculateDirectoryRequirements(AvlNode avl, object? context, int depth)
+    private static int CalculateDirectoryRequirements(AvlNode avl, object? context, int depth)
     {
         if (avl.Subdirectory != null)
         {
@@ -1287,7 +1287,7 @@ public static class XisoWriter
     /// </summary>
     /// <param name="avl">Node whose entry size is being calculated.</param>
     /// <param name="outSize">Running total size of the directory table; updated in place.</param>
-    internal static void CalculateDirectorySize(AvlNode avl, ref uint outSize) =>
+    private static void CalculateDirectorySize(AvlNode avl, ref uint outSize) =>
         // Shared table-layout primitive (TODO #3): identical offsets to SerializeTable.
         DirectoryEntryTableWriter.PlaceEntry(avl, ref outSize);
 
@@ -1301,7 +1301,7 @@ public static class XisoWriter
     /// </summary>
     /// <param name="avl">Current node being visited.</param>
     /// <param name="ctx">Context tracking the current sector counter.</param>
-    internal static void CalculateDirectoryOffsets(AvlNode avl, OffsetCalcContext ctx)
+    private static void CalculateDirectoryOffsets(AvlNode avl, OffsetCalcContext ctx)
     {
         if (avl.Subdirectory != null)
         {
@@ -1337,7 +1337,7 @@ public static class XisoWriter
     /// </summary>
     /// <param name="avl">Current node.</param>
     /// <param name="ctx">Context carrying the directory start and current sector.</param>
-    internal static void WriteDirStartAndFilePositions(AvlNode avl, WdsafpContext ctx)
+    private static void WriteDirStartAndFilePositions(AvlNode avl, WdsafpContext ctx)
     {
         avl.DirStart = ctx.DirStart;
 
@@ -1355,7 +1355,7 @@ public static class XisoWriter
     /// <param name="fs">File stream positioned at the data area start offset.</param>
     /// <param name="totalSectors">Total number of sectors in the image.</param>
     /// <param name="prependOffset">Byte offset prepended to all physical positions (skip/prepend support).</param>
-    internal static void WriteVolumeDescriptors(FileStream fs, uint totalSectors, long prependOffset = 0)
+    private static void WriteVolumeDescriptors(FileStream fs, uint totalSectors, long prependOffset = 0)
     {
         fs.Seek(prependOffset + Constants.Ecma119DataAreaStart, SeekOrigin.Begin);
         fs.WriteByte(0x01);

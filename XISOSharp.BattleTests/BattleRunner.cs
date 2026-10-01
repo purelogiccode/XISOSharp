@@ -6,7 +6,7 @@ namespace XISOSharp.BattleTests;
 internal static partial class BattleRunner
 {
     /// <summary>Runs all requested ops for a single ISO and prints per-op verdicts.</summary>
-    public static IsoResult RunIso(string iso, BattleOptions opt, ToolProcess cli, ToolProcess oracle,
+    internal static IsoResult RunIso(string iso, BattleOptions opt, ToolProcess cli, ToolProcess oracle,
         ToolProcess? xdvdfs, ToolProcess? xboxkit, string workRoot, int index, int total)
     {
         Stopwatch sw = Stopwatch.StartNew();

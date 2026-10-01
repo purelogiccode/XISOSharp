@@ -1,7 +1,6 @@
 namespace XISOSharp.Cli;
 
 using Serilog;
-using Logging;
 
 /// <summary>
 /// Interactive overwrite confirmation for CLI file outputs

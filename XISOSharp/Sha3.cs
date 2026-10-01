@@ -41,7 +41,7 @@ internal sealed class Sha3256 : IDisposable
     private bool _disposed;
 
     /// <summary>Appends data to the hash.</summary>
-    public void AppendData(ReadOnlySpan<byte> data)
+    internal void AppendData(ReadOnlySpan<byte> data)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         int offset = 0;
@@ -62,7 +62,7 @@ internal sealed class Sha3256 : IDisposable
     }
 
     /// <summary>Appends a segment of a byte array to the hash.</summary>
-    public void AppendData(byte[] buffer, int offset, int count)
+    internal void AppendData(byte[] buffer, int offset, int count)
     {
         ArgumentNullException.ThrowIfNull(buffer);
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
@@ -76,14 +76,14 @@ internal sealed class Sha3256 : IDisposable
     }
 
     /// <summary>Appends a byte array to the hash.</summary>
-    public void AppendData(byte[] buffer)
+    internal void AppendData(byte[] buffer)
     {
         ArgumentNullException.ThrowIfNull(buffer);
         AppendData(buffer.AsSpan());
     }
 
     /// <summary>Finalizes the hash, returns the 32-byte digest, and resets for reuse.</summary>
-    public byte[] GetHashAndReset()
+    internal byte[] GetHashAndReset()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -117,13 +117,6 @@ internal sealed class Sha3256 : IDisposable
         return digest;
     }
 
-    /// <summary>Computes the SHA3-256 digest of a single buffer.</summary>
-    public static byte[] HashData(ReadOnlySpan<byte> data)
-    {
-        using Sha3256 hasher = new();
-        hasher.AppendData(data);
-        return hasher.GetHashAndReset();
-    }
 
     /// <summary>
     /// Clears the internal state and marks the hasher disposed; further appends

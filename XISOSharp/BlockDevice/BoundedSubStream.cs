@@ -43,7 +43,7 @@ internal sealed class BoundedSubStream : Stream
     /// <param name="ownsParent">When <c>true</c>, disposing the window disposes the parent.</param>
     /// <param name="sync">Optional lock serializing parent I/O (keep-open explorer uses it).</param>
     /// <param name="onDisposed">Optional callback invoked once when the window is disposed.</param>
-    public BoundedSubStream(
+    internal BoundedSubStream(
         Stream parent,
         long start,
         long length,

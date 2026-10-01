@@ -8,7 +8,6 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Serilog;
-using XISOSharpTester.Logging;
 using XISOSharpTester.Services;
 using XISOSharpTester.Views;
 using XISOSharpTester.Models;

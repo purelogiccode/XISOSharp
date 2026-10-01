@@ -443,7 +443,7 @@ internal sealed class LockHoldingStream : Stream
     /// </summary>
     /// <param name="inner">Stream whose operations happen while the lock is held.</param>
     /// <param name="sync">Monitor held on behalf of the keep-open explorer.</param>
-    public LockHoldingStream(Stream inner, object sync)
+    internal LockHoldingStream(Stream inner, object sync)
     {
         _inner = inner;
         _sync = sync;

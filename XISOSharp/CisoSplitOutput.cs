@@ -19,7 +19,7 @@ internal sealed class CisoSplitOutput : Stream
     /// </summary>
     /// <param name="outputPath">Base output path used to derive part file names.</param>
     /// <param name="splitPoint">Global byte threshold at which a new part starts; must be positive.</param>
-    public CisoSplitOutput(string outputPath, long splitPoint)
+    internal CisoSplitOutput(string outputPath, long splitPoint)
     {
         _outputPath = outputPath ?? throw new ArgumentNullException(nameof(outputPath));
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(splitPoint);
@@ -27,7 +27,7 @@ internal sealed class CisoSplitOutput : Stream
     }
 
     /// <summary>Part file paths in creation order (ascending part index).</summary>
-    public IReadOnlyList<string> PartPaths => _partPaths;
+    internal IReadOnlyList<string> PartPaths => _partPaths;
 
     private FileStream GetPart(long partIndex)
     {

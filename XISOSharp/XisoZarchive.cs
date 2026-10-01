@@ -21,19 +21,19 @@ public static class XisoZarchive
     private sealed class PathNode
     {
         /// <summary>Child nodes sorted case-insensitively by name.</summary>
-        public readonly List<PathNode> Subnodes = [];
+        internal readonly List<PathNode> Subnodes = [];
 
         /// <summary>Whether this node is a file (<c>false</c> for directories).</summary>
-        public bool IsFile;
+        internal bool IsFile;
 
         /// <summary>Index into the shared ZAR name table.</summary>
-        public int NameIndex;
+        internal int NameIndex;
 
         /// <summary>Partition-relative byte offset of the file data within the image.</summary>
-        public long SourceOffset;
+        internal long SourceOffset;
 
         /// <summary>File size in bytes.</summary>
-        public ulong FileSize;
+        internal ulong FileSize;
     }
 
     private static int GetOrAddName(List<string> names, Dictionary<string, int> lookup, string name)

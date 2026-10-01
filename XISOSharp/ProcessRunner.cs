@@ -35,6 +35,7 @@ public static class ProcessRunner
     {
         ArgumentException.ThrowIfNullOrEmpty(fileName);
         ArgumentNullException.ThrowIfNull(args);
+        cancellationToken.ThrowIfCancellationRequested();
 
         ProcessStartInfo psi = new()
         {

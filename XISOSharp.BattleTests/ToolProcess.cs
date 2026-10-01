@@ -10,22 +10,22 @@ namespace XISOSharp.BattleTests;
 internal sealed class ToolProcess
 {
     /// <summary>Gets the per-run timeout in milliseconds.</summary>
-    public int TimeoutMs { get; init; } = 3_600_000;
+    internal int TimeoutMs { get; init; } = 3_600_000;
 
     /// <summary>Gets whether the exe exists on disk.</summary>
-    public bool Available => File.Exists(ExePath);
+    internal bool Available => File.Exists(ExePath);
 
     /// <summary>Gets the resolved exe path.</summary>
-    public string ExePath { get; }
+    internal string ExePath { get; }
 
-    public ToolProcess(string exePath)
+    internal ToolProcess(string exePath)
     {
         ExePath = Path.GetFullPath(exePath);
     }
 
     /// <summary>Runs the exe with args; returns exit code, captured output, and the
     /// exe's wall-clock seconds (start → exit, excludes harness overhead).</summary>
-    public (int ExitCode, string StdOut, string StdErr, double Seconds) Run(params string[] args)
+    internal (int ExitCode, string StdOut, string StdErr, double Seconds) Run(params string[] args)
     {
         ProcessStartInfo psi = new()
         {
@@ -61,7 +61,7 @@ internal sealed class ToolProcess
 
     /// <summary>Probes the tool banner: -v first, then --version, then --help
     /// (first non-empty line). Tolerates CLIs with different version flags.</summary>
-    public string GetVersion()
+    internal string GetVersion()
     {
         try
         {

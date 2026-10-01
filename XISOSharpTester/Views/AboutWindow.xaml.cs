@@ -3,7 +3,6 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Navigation;
 using Serilog;
-using XISOSharpTester.Logging;
 
 namespace XISOSharpTester.Views;
 

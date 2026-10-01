@@ -3,7 +3,6 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using Serilog;
-using XISOSharpTester.Logging;
 using XISOSharpTester.Models;
 
 namespace XISOSharpTester.Services;

@@ -1,7 +1,6 @@
 namespace XISOSharp.Gui.Services;
 
 using Serilog;
-using Logging;
 
 /// <summary>
 /// Headless verification for <c>--self-test</c>: asserts every

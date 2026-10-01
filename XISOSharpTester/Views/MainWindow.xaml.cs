@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
 using Serilog;
-using XISOSharpTester.Logging;
 using XISOSharpTester.ViewModels;
 
 namespace XISOSharpTester.Views;

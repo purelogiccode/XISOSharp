@@ -14,8 +14,6 @@ namespace XISOSharp.Gui;
 /// </summary>
 public class App : Application
 {
-    private Task? _startupTask;
-
     /// <summary>
     /// Loads the compiled Avalonia XAML resources.
     /// </summary>
@@ -46,7 +44,7 @@ public class App : Application
                 {
                     DataContext = viewModel,
                 };
-                _startupTask = StartupAsync(viewModel);
+                _ = StartupAsync(viewModel);
             }
 
             base.OnFrameworkInitializationCompleted();

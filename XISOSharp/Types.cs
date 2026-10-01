@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using XISOSharp.DataStructures;
 using XISOSharp.Models;
 
@@ -22,23 +21,6 @@ public delegate void ProgressCallback(long currentValue, long finalValue);
 /// <returns>0 to continue traversal; any non-zero value stops the traversal.</returns>
 public delegate int TraversalCallback(AvlNode node, object? context, int depth);
 
-/// <summary>
-/// Represents a Windows FILETIME value as two 32-bit unsigned integers.
-/// Internal implementation detail used for writing timestamps into XISO headers.
-/// </summary>
-[StructLayout(LayoutKind.Auto)]
-internal struct FileTime
-{
-    /// <summary>Low 32 bits of the FILETIME value.</summary>
-#pragma warning disable CS0649 // Field is assigned by external code / spans
-    public uint Low;
-#pragma warning restore CS0649
-
-    /// <summary>High 32 bits of the FILETIME value.</summary>
-#pragma warning disable CS0649
-    public uint High;
-#pragma warning restore CS0649
-}
 
 /// <summary>
 /// Context used during directory offset calculation for storing the
@@ -48,14 +30,14 @@ internal struct FileTime
 internal class WdsafpContext
 {
     /// <summary>Directory start offset in bytes (sector * 2048).</summary>
-    public long DirStart;
+    internal long DirStart;
 
     /// <summary>
     /// Allocator shared with the owning <see cref="DataStructures.OffsetCalcContext"/>,
     /// handing out file-data sectors within the directory.
     /// Required at construction (never left <c>null</c>).
     /// </summary>
-    public required SectorAllocator Allocator;
+    internal required SectorAllocator Allocator;
 }
 
 /// <summary>
@@ -70,41 +52,41 @@ internal class WriteTreeContext
     /// <see cref="Stream"/> (FileStream, MemoryStream, …) — write callbacks must
     /// not downcast it to <see cref="FileStream"/>. Required at construction.
     /// </summary>
-    public required Stream XisoStream;
+    internal required Stream XisoStream;
 
     /// <summary>
     /// Current path prefix for logging and file construction.
     /// </summary>
-    public string? Path;
+    internal string? Path;
 
     /// <summary>
     /// Source stream for reading original file data in rewrite mode;
     /// <c>null</c> when creating from a file system.
     /// </summary>
-    public Stream? SourceStream;
+    internal Stream? SourceStream;
 
     /// <summary>Optional byte-progress callback invoked during file writes.</summary>
-    public ProgressCallback? ProgressCallback;
+    internal ProgressCallback? ProgressCallback;
 
     /// <summary>Optional structured progress channel (create/rewrite events).</summary>
-    public IProgress<ProgressInfo>? StructuredProgress;
+    internal IProgress<ProgressInfo>? StructuredProgress;
 
     /// <summary>Total expected byte count used for progress reporting.</summary>
-    public long FinalBytes;
+    internal long FinalBytes;
 
     /// <summary>Cancellation token to observe during file writes.</summary>
-    public CancellationToken CancellationToken;
+    internal CancellationToken CancellationToken;
 
     /// <summary>Byte offset prepended to all physical write positions (skip/prepend support).</summary>
-    public long PrependOffset;
+    internal long PrependOffset;
 
     /// <summary>
     /// Disc lseek offset of <see cref="SourceStream"/> (rewrite mode), carried
     /// explicitly so concurrent rewrites never read a shared global
     /// (BUG-LIB-013). Zero when creating from a file system.
     /// </summary>
-    public long SourceDiscLseek;
+    internal long SourceDiscLseek;
 
     /// <summary>When <c>true</c>, file data is read from <see cref="DataStructures.AvlNode.HostPath"/> instead of the current directory.</summary>
-    public bool IsRemap;
+    internal bool IsRemap;
 }

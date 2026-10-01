@@ -197,7 +197,14 @@ internal static class UpdateChecker
         // Version needs at least major.minor.
         if (!t.Contains('.'))
             t += ".0";
-        return Version.TryParse(t, out core!) && core is not null;
+        if (!Version.TryParse(t, out Version? parsed) || parsed is null)
+        {
+            core = new Version(0, 0);
+            return false;
+        }
+
+        core = parsed;
+        return true;
     }
 
     /// <summary>

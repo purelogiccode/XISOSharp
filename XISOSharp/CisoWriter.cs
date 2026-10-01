@@ -443,7 +443,7 @@ public static class CisoWriter
         /// <param name="outputIsoPath">Exact destination ISO path.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>0 on success, 1 on error.</returns>
-        public static int PackFromDirectoryForCiso(string sourceDirectory, string outputIsoPath, CancellationToken ct)
+        internal static int PackFromDirectoryForCiso(string sourceDirectory, string outputIsoPath, CancellationToken ct)
         {
             // Use XisoWriter.CreateXiso directly with explicit output name to avoid extra .iso
             string dir = Path.GetDirectoryName(Path.GetFullPath(outputIsoPath)) ?? Directory.GetCurrentDirectory();

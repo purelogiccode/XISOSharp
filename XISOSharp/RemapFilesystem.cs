@@ -16,13 +16,13 @@ public static class RemapFilesystem
     private sealed class FileEntry
     {
         /// <summary>File or directory name without any path prefix.</summary>
-        public string Name = string.Empty;
+        internal string Name = string.Empty;
 
         /// <summary>Whether the entry is a directory.</summary>
-        public bool IsDirectory;
+        internal bool IsDirectory;
 
         /// <summary>File length in bytes; 0 for directories.</summary>
-        public long Length;
+        internal long Length;
     }
 
     /// <summary>

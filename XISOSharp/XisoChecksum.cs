@@ -183,16 +183,16 @@ public static class XisoChecksum
     private sealed class DirEnt
     {
         /// <summary>File or directory name.</summary>
-        public string Name = "";
+        internal string Name = "";
 
         /// <summary>Partition-relative start sector of the entry's data or subdirectory table.</summary>
-        public uint StartSector;
+        internal uint StartSector;
 
         /// <summary>File size or subdirectory table size in bytes.</summary>
-        public uint Size;
+        internal uint Size;
 
         /// <summary>Whether the entry is a directory.</summary>
-        public bool IsDirectory;
+        internal bool IsDirectory;
     }
 
     private static List<DirEnt> WalkDirentTree(IBlockDevice dev, long dirStart, uint dirSize)
@@ -256,28 +256,28 @@ public static class XisoChecksum
     private sealed class DirentNodeRaw
     {
         /// <summary>Left-child offset in DWORDs within the directory table (0 or 0xFFFF if none).</summary>
-        public ushort LeftOffset;
+        internal ushort LeftOffset;
 
         /// <summary>Right-child offset in DWORDs within the directory table (0 or 0xFFFF if none).</summary>
-        public ushort RightOffset;
+        internal ushort RightOffset;
 
         /// <summary>Partition-relative start sector of the entry's data or subdirectory table.</summary>
-        public uint StartSector;
+        internal uint StartSector;
 
         /// <summary>File size or subdirectory table size in bytes.</summary>
-        public uint Size;
+        internal uint Size;
 
         /// <summary>Raw attribute byte with reserved bits masked out.</summary>
-        public byte Attributes;
+        internal byte Attributes;
 
         /// <summary>Filename length in bytes.</summary>
-        public byte NameLength;
+        internal byte NameLength;
 
         /// <summary>Decoded entry name.</summary>
-        public string Name = "";
+        internal string Name = "";
 
         /// <summary>Whether the entry is a directory (derived from <see cref="Attributes"/>).</summary>
-        public bool IsDirectory => (Attributes & Constants.AttributeDir) != 0;
+        internal bool IsDirectory => (Attributes & Constants.AttributeDir) != 0;
     }
 
     private static DirentNodeRaw? ReadDirent(IBlockDevice dev, long offset)

@@ -22,59 +22,59 @@ internal sealed record SubResult(
 /// <summary>Per-ISO battle result across all requested ops.</summary>
 internal sealed class IsoResult
 {
-    public required string FilePath { get; init; }
+    internal required string FilePath { get; init; }
 
-    public required string FileName { get; init; }
+    internal required string FileName { get; init; }
 
-    public required long FileSize { get; init; }
+    internal required long FileSize { get; init; }
 
-    public double Seconds { get; set; }
+    internal double Seconds { get; set; }
 
-    public List<SubResult> Subs { get; } = [];
+    internal List<SubResult> Subs { get; } = [];
 
-    public bool HasFailures => Subs.Any(static s => s.Status == BattleStatus.Failed);
+    internal bool HasFailures => Subs.Any(static s => s.Status == BattleStatus.Failed);
 
-    public bool AllPassed => Subs.Count > 0 && Subs.All(static s => s.Status == BattleStatus.Passed);
+    internal bool AllPassed => Subs.Count > 0 && Subs.All(static s => s.Status == BattleStatus.Passed);
 }
 
 /// <summary>Aggregated session state for reporting.</summary>
 internal sealed class BattleSession
 {
-    public int Seed { get; init; }
+    internal int Seed { get; init; }
 
-    public string CliPath { get; set; } = string.Empty;
+    internal string CliPath { get; set; } = string.Empty;
 
-    public string OraclePath { get; set; } = string.Empty;
+    internal string OraclePath { get; set; } = string.Empty;
 
-    public string CliVersion { get; set; } = string.Empty;
+    internal string CliVersion { get; set; } = string.Empty;
 
-    public string OracleVersion { get; set; } = string.Empty;
+    internal string OracleVersion { get; set; } = string.Empty;
 
-    public string XdvdfsPath { get; set; } = string.Empty;
+    internal string XdvdfsPath { get; set; } = string.Empty;
 
-    public string XdvdfsVersion { get; set; } = "not found";
+    internal string XdvdfsVersion { get; set; } = "not found";
 
-    public string XboxkitPath { get; set; } = string.Empty;
+    internal string XboxkitPath { get; set; } = string.Empty;
 
-    public string XboxkitVersion { get; set; } = "not found";
+    internal string XboxkitVersion { get; set; } = "not found";
 
-    public string WorkRoot { get; set; } = string.Empty;
+    internal string WorkRoot { get; set; } = string.Empty;
 
-    public List<string> Ops { get; init; } = [];
+    internal List<string> Ops { get; init; } = [];
 
-    public TimeSpan Elapsed { get; set; }
+    internal TimeSpan Elapsed { get; set; }
 
-    public List<IsoResult> IsoResults { get; } = [];
+    internal List<IsoResult> IsoResults { get; } = [];
 
-    public int TotalIsos => IsoResults.Count;
+    internal int TotalIsos => IsoResults.Count;
 
-    public int FailedIsos => IsoResults.Count(static r => r.HasFailures);
+    internal int FailedIsos => IsoResults.Count(static r => r.HasFailures);
 
-    public int TotalSubs => IsoResults.Sum(static r => r.Subs.Count);
+    internal int TotalSubs => IsoResults.Sum(static r => r.Subs.Count);
 
-    public int PassedSubs => IsoResults.Sum(static r => r.Subs.Count(static s => s.Status == BattleStatus.Passed));
+    internal int PassedSubs => IsoResults.Sum(static r => r.Subs.Count(static s => s.Status == BattleStatus.Passed));
 
-    public int FailedSubs => IsoResults.Sum(static r => r.Subs.Count(static s => s.Status == BattleStatus.Failed));
+    internal int FailedSubs => IsoResults.Sum(static r => r.Subs.Count(static s => s.Status == BattleStatus.Failed));
 
-    public int SkippedSubs => IsoResults.Sum(static r => r.Subs.Count(static s => s.Status == BattleStatus.Skipped));
+    internal int SkippedSubs => IsoResults.Sum(static r => r.Subs.Count(static s => s.Status == BattleStatus.Skipped));
 }

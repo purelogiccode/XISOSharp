@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Serilog;
-using XISOSharp.Gui.Logging;
 
 namespace XISOSharp.Gui.Models;
 

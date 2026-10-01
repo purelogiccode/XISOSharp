@@ -25,7 +25,7 @@ internal sealed class CisoSplitInputStream : Stream
     /// </summary>
     /// <param name="parts">Open part streams in order; at least two are required.</param>
     /// <exception cref="ArgumentException">Thrown when fewer than two parts are supplied.</exception>
-    public CisoSplitInputStream(List<FileStream> parts)
+    internal CisoSplitInputStream(List<FileStream> parts)
     {
         if (parts is null || parts.Count < 2)
             throw new ArgumentException("At least two split parts are required", nameof(parts));

@@ -7,7 +7,10 @@ namespace XISOSharp.BattleTests;
 /// <summary>Writes the battle report (txt + json) under BattleReports\.</summary>
 internal static class BattleReport
 {
-    public static void Write(BattleSession s, IReadOnlyList<string> picked)
+    /// <summary>Writes the battle report as text and JSON under <c>BattleReports\</c>.</summary>
+    /// <param name="s">Completed battle session to report.</param>
+    /// <param name="picked">ISO paths that were sampled for the run.</param>
+    internal static void Write(BattleSession s, IReadOnlyList<string> picked)
     {
         try
         {

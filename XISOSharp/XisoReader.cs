@@ -463,7 +463,7 @@ public static class XisoReader
     /// extract mode the caller skips the bad subtree and records the failure
     /// instead of aborting (TODO #16 over #9).
     /// </exception>
-    internal static void TraverseXiso(
+    private static void TraverseXiso(
         Stream fs,
         DirEntry? inDirNode,
         long dirStart,
@@ -987,7 +987,7 @@ public static class XisoReader
     /// or a write fails — replacing the old truncate-and-warn path, which also
     /// spun forever on a 0-byte read at end of image.
     /// </exception>
-    internal static bool ExtractFile(
+    private static bool ExtractFile(
         Stream fs,
         string filename,
         uint startSector,

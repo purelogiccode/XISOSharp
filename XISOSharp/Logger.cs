@@ -164,9 +164,9 @@ public static class Logger
             // Call sites pass pre-interpolated text (file names, tool output) that may
             // itself contain braces; only run composite formatting when args exist.
             if (args.Length == 0)
-                Out.Write(message);
+                Out?.Write(message);
             else
-                Out.Write(message, args);
+                Out?.Write(message, args);
         }
 
         Forward(ForwardInfo, message, args);
@@ -179,7 +179,7 @@ public static class Logger
     /// <param name="message">The line of text to write (no format arguments).</param>
     public static void LogLine(string message)
     {
-        if (!Quiet && !RealQuiet) Out.WriteLine(message);
+        if (!Quiet && !RealQuiet) Out?.WriteLine(message);
         Forward(ForwardInfo, message, Array.Empty<object?>());
     }
 
@@ -204,7 +204,7 @@ public static class Logger
     /// </summary>
     public static void Flush()
     {
-        if (!Quiet && !RealQuiet) Out.Flush();
+        if (!Quiet && !RealQuiet) Out?.Flush();
     }
 
     /// <summary>
@@ -219,9 +219,9 @@ public static class Logger
         {
             // See Log: never composite-format caller-interpolated text without args.
             if (args.Length == 0)
-                Error.Write(message);
+                Error?.Write(message);
             else
-                Error.Write(message, args);
+                Error?.Write(message, args);
         }
 
         Forward(ForwardError, message, args);

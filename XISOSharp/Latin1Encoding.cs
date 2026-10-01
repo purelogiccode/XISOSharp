@@ -127,6 +127,8 @@ internal static class Latin1Encoding
         /// <inheritdoc/>
         public override int GetChars(byte[] bytes, int byteIndex, int byteCount, char[] chars, int charIndex)
         {
+            ArgumentNullException.ThrowIfNull(bytes);
+            ArgumentNullException.ThrowIfNull(chars);
             for (int i = 0; i < byteCount; i++)
             {
                 chars[charIndex + i] = (char)bytes[byteIndex + i];

@@ -1,5 +1,3 @@
-using XISOSharp.Models;
-
 namespace XISOSharp.Models;
 
 /// <summary>
@@ -38,7 +36,7 @@ public sealed class UnpackOptions
     /// Per-file failures recorded during a <see cref="ContinueOnError"/> run,
     /// in encounter order. Empty unless <see cref="ContinueOnError"/> is set.
     /// </summary>
-    internal List<ExtractFileException> Failures { get; } = [];
+    private List<ExtractFileException> Failures { get; } = [];
 
     /// <summary>Records a per-file failure for the end-of-run summary.</summary>
     internal void RecordFailure(ExtractFileException failure) => Failures.Add(failure);

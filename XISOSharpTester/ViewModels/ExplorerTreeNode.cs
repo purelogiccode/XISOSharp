@@ -5,8 +5,6 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Threading;
 using Serilog;
-using XISOSharp;
-using XISOSharpTester.Logging;
 using XISOSharp.Models;
 
 namespace XISOSharpTester.ViewModels;

@@ -131,7 +131,7 @@ public sealed class GlobMatcher
     /// </summary>
     /// <param name="glob">The glob pattern to convert.</param>
     /// <returns>An anchored regular expression matching the same set of relative paths.</returns>
-    internal static string GlobToRegex(string glob)
+    private static string GlobToRegex(string glob)
     {
         if (string.IsNullOrEmpty(glob))
             return "^$";

@@ -262,6 +262,6 @@ public static class DirectoryEntryTableWriter
     private sealed class TableSizeAccumulator
     {
         /// <summary>Total directory-table bytes accumulated so far.</summary>
-        public uint Size;
+        internal uint Size;
     }
 }
