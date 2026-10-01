@@ -174,9 +174,9 @@
         <ScrollViewer>
           <StackPanel>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
-              <TextBlock Text="Image (.iso/.cso/.zar)" VerticalAlignment="Center" ToolTip.Tip="Input image to extract from" />
+              <TextBlock Text="Image (.iso/.xiso/.cso)" VerticalAlignment="Center" ToolTip.Tip="Input image to extract from" />
               <TextBox Grid.Column="1" Text="{Binding ExImage}" PlaceholderText="game.iso"
-                       ToolTip.Tip="Path to the source disc image (.iso, .cso or .zar)" />
+                       ToolTip.Tip="Path to the source disc image (.iso, .xiso or .cso)" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseExImage_ClickAsync" Margin="6,0,0,0"
                       ToolTip.Tip="Pick the source image" />
             </Grid>

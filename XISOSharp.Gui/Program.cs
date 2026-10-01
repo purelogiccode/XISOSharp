@@ -110,7 +110,8 @@ internal sealed class Program
             if (banner is null)
             {
                 Console.WriteLine("CLI -v probe failed.");
-                Log.ForContext(BugReportSink.NoBugReportProperty, true).Warning("CLI -v probe failed for {Cli}", resolved);
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning("CLI -v probe failed for {Cli}", resolved);
                 return 1;
             }
 

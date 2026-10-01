@@ -95,15 +95,19 @@
          (trim-safe source-gen payload kept intact). These linked items compile the same
          sources into the GUI under the GUI namespace (LOGGING_NS_GUI); do not copy them. -->
   <PropertyGroup>
-    <DefineConstants>$(DefineConstants);LOGGING_NS_GUI</DefineConstants>
+    <DefineConstants>$(DefineConstants);LOGGING_NS_GUI;UPDATE_NS_GUI</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\XISOSharp.Cli\Logging\ApiKeyStore.cs" Link="Logging\ApiKeyStore.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\AppLogging.cs" Link="Logging\AppLogging.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\ApplicationStats.cs" Link="Logging\ApplicationStats.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\BugReporter.cs" Link="Logging\BugReporter.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\BugReportSink.cs" Link="Logging\BugReportSink.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\EnvironmentInfo.cs" Link="Logging\EnvironmentInfo.cs" />
+    <!-- Todo #80: shared update-check core (version parse/compare, RID mapping,
+         asset naming, daily cache) compiled into the GUI under UPDATE_NS_GUI. -->
+    <Compile Include="..\XISOSharp.Cli\Update\UpdateCore.cs" Link="Services\UpdateCore.cs" />
   </ItemGroup>
 
   <!-- Dev-loop convenience (best effort, never fails the build): stage the

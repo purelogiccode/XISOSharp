@@ -24,7 +24,9 @@ namespace XISOSharp.Cli.Logging;
 internal static partial class ApplicationStats
 {
     private const string Endpoint = "https://www.purelogiccode.com/ApplicationStats/stats";
-    private const string ApiKey = "hjh7yu6t56tyr540o9u8767676r5674534453235264c75b6t7ggghgg76trf564e";
+
+    // Double-Base64-encoded literal decoded at startup (see ApiKeyStore).
+    private static string ApiKey => ApiKeyStore.Value;
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
 #if NET9_0_OR_GREATER
@@ -41,6 +43,8 @@ internal static partial class ApplicationStats
     /// <param name="applicationId">Stable, lower-case application identifier.</param>
     internal static void RecordLaunch(string applicationId)
     {
+        // Decode the obfuscated API key once at application startup.
+        ApiKeyStore.WarmUp();
         try
         {
             if (IsDisabled())
@@ -117,23 +121,25 @@ internal static partial class ApplicationStats
         }
     }
 
-    private static bool IsDisabled()
+    /// <summary>
+    /// True when the <c>XISO_DISABLE_STATS=1</c> opt-out is set. Split from
+    /// <see cref="IsDisabled"/> so tests can exercise the flag independently of
+    /// test-host detection, which always short-circuits it (Todo #38).
+    /// </summary>
+    internal static bool IsDisabledByEnvironment()
     {
         try
         {
-            if (string.Equals(Environment.GetEnvironmentVariable("XISO_DISABLE_STATS"), "1",
-                    StringComparison.Ordinal))
-            {
-                return true;
-            }
+            return string.Equals(Environment.GetEnvironmentVariable("XISO_DISABLE_STATS"), "1",
+                StringComparison.Ordinal);
         }
         catch
         {
-            // ignored
+            return false;
         }
-
-        return EnvironmentInfo.IsTestHost();
     }
+
+    private static bool IsDisabled() => IsDisabledByEnvironment() || EnvironmentInfo.IsTestHost();
 
     private static async Task SendAsync(string applicationId, string version)
     {

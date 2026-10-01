@@ -24,13 +24,6 @@ public class XisoFileEntry
     /// </summary>
     public string FileSize => FormatSize(TryGetLength());
 
-    /// <summary>
-    /// Gets whether the file is smaller than 500 MB and can be processed
-    /// more quickly in test scenarios. Returns <c>false</c> when the file
-    /// is missing or cannot be statted.
-    /// </summary>
-    public bool IsSmall => TryGetLength() is { } length && length < 500_000_000L;
-
     private long? TryGetLength()
     {
         try

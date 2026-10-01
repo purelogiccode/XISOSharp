@@ -62,17 +62,37 @@ internal static class CliRunner
         catch (OperationCanceledException)
         {
             Log.Information("CLI run cancelled: {Cli}", cliPath);
+            SafeOnLine(onLine, "[GUI] CLI run cancelled.");
             return -1;
         }
         catch (TimeoutException ex)
         {
             Log.Error(ex, "CLI run timed out: {Cli}", cliPath);
+            SafeOnLine(onLine, $"[GUI] CLI run timed out: {ex.Message}");
             return -1;
         }
         catch (Exception ex)
         {
             Log.Error(ex, "CLI run failed: {Cli}", cliPath);
+            SafeOnLine(onLine, $"[GUI] CLI run failed: {ex.Message}");
             return -1;
+        }
+    }
+
+    /// <summary>
+    /// Invokes the output sink without letting a sink failure mask the original
+    /// error: cancellation/timeout/start failures must reach the UI log panel
+    /// instead of only the file log (Todo #64).
+    /// </summary>
+    private static void SafeOnLine(Action<string> onLine, string message)
+    {
+        try
+        {
+            onLine(message);
+        }
+        catch
+        {
+            // ignored: the file log already has the failure.
         }
     }
 }

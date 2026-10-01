@@ -19,7 +19,14 @@ public partial class MainWindow : Window
 {
     private static readonly FilePickerFileType ImageFilter = new("Xbox images")
     {
-        Patterns = ["*.iso", "*.xiso", "*.cso", "*.1.cso", "*.zar", "*.img"],
+        Patterns = ["*.iso", "*.xiso", "*.cso", "*.1.cso", "*.img"],
+    };
+
+    // Rebuild accepts a .zar sidecar in place of the game partition (Todo #46);
+    // every other picker must not offer it because XisoReader cannot open one.
+    private static readonly FilePickerFileType RebuildFilter = new("Xbox images or ZAR sidecar")
+    {
+        Patterns = ["*.iso", "*.xiso", "*.cso", "*.1.cso", "*.img", "*.zar"],
     };
 
     private static readonly FilePickerFileType CsoFilter = new("CISO images")
@@ -38,10 +45,13 @@ public partial class MainWindow : Window
 
     private static readonly string[] CsoExtensions = [".cso"];
 
+    private static readonly string[] ZarExtensions = [".zar"];
+
     // TabControl order in MainWindow.axaml.
     private const int ExtractTab = 0;
     private const int CreateTab = 1;
     private const int RewriteTab = 2;
+    private const int RebuildTab = 3;
     private const int DecompressTab = 6;
     private const int BatchTab = 8;
 
@@ -402,7 +412,13 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (IsCso(image))
+            if (IsZar(image))
+            {
+                Vm.RbParts = AppendLines(Vm.RbParts, [image]);
+                OpTabs.SelectedIndex = RebuildTab;
+                Vm.LogMessage($"[GUI] Drop: ZAR sidecar routed to the Rebuild tab: {image}");
+            }
+            else if (IsCso(image))
             {
                 Vm.DcCso = image;
                 OpTabs.SelectedIndex = DecompressTab;
@@ -485,6 +501,9 @@ public partial class MainWindow : Window
 
     private static bool IsCso(string path) =>
         CsoExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
+
+    private static bool IsZar(string path) =>
+        ZarExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
     private static string AppendDistinctLines(string current, IEnumerable<string> added)
     {
@@ -709,7 +728,7 @@ public partial class MainWindow : Window
         try
         {
             MainViewModel vm = Vm;
-            List<string> picked = await PickFilesAsync([ImageFilter], "Add rebuild components", allowMultiple: true)
+            List<string> picked = await PickFilesAsync([RebuildFilter], "Add rebuild components", allowMultiple: true)
                 .ConfigureAwait(false);
             if (picked.Count != 0)
             {

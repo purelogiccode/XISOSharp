@@ -11,7 +11,7 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
-        Console.WriteLine("XISOSharp.BattleTests — XISOSharp CLI vs extract-xiso (v2.7.1) CLI battle");
+        Console.WriteLine("XISOSharp.BattleTests — XISOSharp CLI vs extract-xiso (build 202609111233) CLI battle");
         Console.WriteLine("=========================================================================");
 
         SweepStaleWorkRoots();

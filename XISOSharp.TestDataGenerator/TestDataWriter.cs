@@ -59,9 +59,11 @@ public static class TestDataWriter
         // processes with a named mutex, and ride out transient file locks
         // (Dropbox sync, AV scanners, indexer) with bounded retries.
         using Mutex mutex = new(false, MutexName);
+        bool owned = false;
         try
         {
-            if (!mutex.WaitOne(TimeSpan.FromMinutes(5)))
+            owned = mutex.WaitOne(TimeSpan.FromMinutes(5));
+            if (!owned)
             {
                 throw new TimeoutException("Timed out waiting for the TestData fixture mutex (another host holds it).");
             }
@@ -70,6 +72,7 @@ public static class TestDataWriter
         {
             // Previous holder died mid-rebuild; we now own the mutex. The
             // canonicalize pass below repairs whatever partial state it left.
+            owned = true;
         }
 
         try
@@ -81,7 +84,12 @@ public static class TestDataWriter
         }
         finally
         {
-            mutex.ReleaseMutex();
+            // Only release when acquired: on timeout the mutex is not ours, and
+            // releasing it would mask the TimeoutException (Todo #31).
+            if (owned)
+            {
+                mutex.ReleaseMutex();
+            }
         }
     }
 

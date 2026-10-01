@@ -331,7 +331,8 @@ internal sealed partial class MainViewModel : ObservableObject
             {
                 SetOnUi(() => CliStatus = $"Found but -v failed: {resolved}");
                 AppendLog("[GUI] CLI -v probe failed.");
-                Log.ForContext(BugReportSink.NoBugReportProperty, true).Warning("CLI -v probe failed for {Cli}", resolved);
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning("CLI -v probe failed for {Cli}", resolved);
                 return;
             }
 

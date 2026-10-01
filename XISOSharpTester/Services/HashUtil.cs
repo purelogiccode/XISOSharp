@@ -24,22 +24,6 @@ public static class HashUtil
     }
 
     /// <summary>
-    /// Determines whether every byte in the array is zero.
-    /// </summary>
-    /// <param name="a">The byte array to check.</param>
-    /// <returns><c>true</c> if all bytes are zero; otherwise <c>false</c>.</returns>
-    public static bool IsAllZero(byte[] a)
-    {
-        foreach (byte b in a)
-        {
-            if (b != 0)
-                return false;
-        }
-
-        return true;
-    }
-
-    /// <summary>
     /// Computes the SHA-256 hash of the file at the specified path
     /// and returns it as a lowercase hexadecimal string.
     /// </summary>
@@ -58,29 +42,6 @@ public static class HashUtil
         catch (Exception ex)
         {
             Log.Error(ex, "ComputeSha256 failed for {Path}", filePath);
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// Computes the MD5 hash of the file at the specified path
-    /// and returns it as a lowercase hexadecimal string.
-    /// </summary>
-    /// <param name="filePath">The path to the file to hash.</param>
-    /// <returns>The MD5 hash as a lowercase hex string.</returns>
-    public static string ComputeMd5(string filePath)
-    {
-        try
-        {
-            ArgumentException.ThrowIfNullOrEmpty(filePath);
-            using MD5 md5 = MD5.Create();
-            using FileStream fs = File.OpenRead(filePath);
-            byte[] hash = md5.ComputeHash(fs);
-            return ToHex(hash);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "ComputeMd5 failed for {Path}", filePath);
             throw;
         }
     }

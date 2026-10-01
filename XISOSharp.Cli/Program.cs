@@ -191,6 +191,7 @@ internal static class Program
         bool validateMode = false;
         bool checksumFlagMode = false;
         bool checksumSilent = false;
+        bool silentFlag = false;
         string? hashAlgo = null;
         bool xSeen = false;
         bool deleteOld = false;
@@ -888,19 +889,11 @@ internal static class Program
                         isOptimizedMode = true;
                         break;
                     case "--silent":
-                        // --silent is an alias for checksum --silent when --checksum is active;
-                        // otherwise it is a checksum-specific flag handled by the verb subcommand.
-                        if (checksumFlagMode)
-                        {
-                            checksumSilent = true;
-                        }
-                        else
-                        {
-                            Logger.LogErr("Error: --silent requires --checksum\n");
-                            PrintUsage();
-                            return 1;
-                        }
-
+                        // Recorded here and validated after the whole command line
+                        // is parsed: consulting checksumFlagMode while parsing made
+                        // `--silent --checksum` fail while `--checksum --silent`
+                        // worked (Todo #32).
+                        silentFlag = true;
                         break;
                     default:
                         optind = i;
@@ -949,6 +942,44 @@ internal static class Program
                                  setFiletimeMode || sectorLayoutMode || rangesMode || isOptimizedMode))
         {
             Logger.LogErr("Error: --checksum cannot be combined with other modes\n");
+            return 1;
+        }
+
+        // Item #32: order-independent --silent validation.
+        if (silentFlag)
+        {
+            if (!checksumFlagMode)
+            {
+                Logger.LogErr("Error: --silent requires --checksum\n");
+                PrintUsage();
+                return 1;
+            }
+
+            checksumSilent = true;
+        }
+
+        // Item #33: --file-time is only consumed by create mode (and --pack /
+        // build-image, which translate to it); it used to be silently accepted
+        // and ignored by extract/list/tree/rewrite.
+        if (createFileTime.HasValue && createList.Count == 0)
+        {
+            Logger.LogErr("Error: --file-time is only used with -c (create mode) or --pack/build-image\n");
+            return 1;
+        }
+
+        // Item #34: --preserve-attrs is only consumed by rewrite; extract/list/
+        // tree and the redump modes used to accept and ignore it.
+        if (preserveAttrs && !rewrite)
+        {
+            Logger.LogErr("Error: --preserve-attrs is only used with -r (rewrite)\n");
+            return 1;
+        }
+
+        // Item #37: --jobs/--policy are only consumed by the parallel ZAR path
+        // (--compress expands to --zar later, so accept it here too).
+        if (!zarMode && !compressAlias && (jobs != 1 || zarPolicy != null))
+        {
+            Logger.LogErr("Error: --jobs/--policy are only used with --zar\n");
             return 1;
         }
 
@@ -1002,7 +1033,7 @@ internal static class Program
              allMode || bestMode || compressAlias || checksumFlagMode))
         {
             Logger.LogErr(
-                "Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, filetime, set-filetime, --is-optimized, and create (-c) modes\n");
+                "Error: --skip-sectors/--prepend-sectors are only supported in extract, list, tree, rewrite (-r), unpack, filetime, set-filetime, and --is-optimized modes; --prepend-sectors is also valid with create (-c)\n");
             return 1;
         }
 
@@ -1447,12 +1478,6 @@ internal static class Program
             return 1;
         }
 
-        if (assumeYes && assumeNo)
-        {
-            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
-            return 1;
-        }
-
         // CLI-010: a shared -o across a rewrite batch would clobber every input
         // into the same file (mirrors the RunRedumpBatch single-output guard).
         if (rewrite && outputName != null && isoFiles.Count != 1)
@@ -1481,7 +1506,7 @@ internal static class Program
             }
 
             return RunRedumpBatch(isoFiles, videoMode, randomMode, seedMode, wipeMode, trimMode, petrifyMode,
-                updateMode, zarMode, securitySectorsPath, outputName, assumeYes, assumeNo, jobs, zarPolicy);
+                updateMode, zarMode, outputName, assumeYes, assumeNo, jobs, zarPolicy);
         }
 
         if (createList.Count > 0)
@@ -3196,6 +3221,19 @@ internal static class Program
             return 1;
         }
 
+        // Item #36: the base-name check cannot see split parts; a source named
+        // like its own first part used to pass and fail later inside CisoWriter.
+        if (splitBytes.HasValue)
+        {
+            string firstPart = Path.ChangeExtension(probeCsoBase, "1.cso");
+            if (XisoPaths.AreSamePath(source, firstPart))
+            {
+                Logger.LogErr($"Error: output part {firstPart} is the same file as the input {source};" +
+                              " choose another name\n");
+                return 1;
+            }
+        }
+
         // Resolve the path CompressToCso will write (first split part when splitting)
         // so an existing output triggers the -y/-n prompt instead of silent overwrite.
         string probeCso = probeCsoBase;
@@ -3822,10 +3860,9 @@ internal static class Program
     }
 
     private static int RunRedumpBatch(List<string> isoFiles, bool video, bool random, bool seed, bool wipe, bool trim,
-        bool petrify, bool update, bool zar, string? securitySectorsPath, string? outputName,
+        bool petrify, bool update, bool zar, string? outputName,
         bool assumeYes, bool assumeNo, int jobs = 1, ZarCollisionPolicy? policy = null)
     {
-        _ = securitySectorsPath;
         // Single-output guard
         bool singleModeCount = new[] { video, random, seed, wipe, trim, petrify, update, zar }.Count(b => b) == 1;
         // CLI-014: -o with several redump modes used to skip the single-input
@@ -4162,7 +4199,8 @@ internal static class Program
                             ? outputName
                             : Path.Combine(dir, baseName + ".wiped.xiso");
                         // Do combined directly. A declined output counts as handled
-                        // (skipped) but the structural continue below still applies.
+                        // (skipped); the separate-trim branch below is the outer
+                        // else and is not reached from here (Todo #30).
                         bool trimConfirmed = ConfirmOutput(outPath2, $"--trim for {iso}");
                         bool ok = !trimConfirmed ||
                                   XisoOperations.WipeAndTrim(iso, outPath2, isRedump ? isoOffset : 0, Logger.Quiet);
@@ -4175,9 +4213,6 @@ internal static class Program
                         {
                             Logger.Log($"Wiped+trimmed XISO written to {outPath2}\n");
                         }
-
-                        // Skip separate trim below
-                        continue;
                     }
                 }
                 else
@@ -4865,7 +4900,8 @@ internal static class Program
 
                                                     --validate          Enable post-conversion validation after rewrite.
                                                     --validate-checksums  Also verify SHA-256 checksums (slower).
-                                                    --validate-strict   Fail with exit code 2 on any mismatch.
+                                                    --validate-strict   Retained for parity: mismatches exit 2 with
+                                                                        or without it. Implies --validate.
                                                     --validate-report <file>  Write JSON validation report to file.
 
                                                """);

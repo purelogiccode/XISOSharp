@@ -94,6 +94,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\XISOSharp.Cli\Logging\ApiKeyStore.cs" Link="Logging\ApiKeyStore.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\AppLogging.cs" Link="Logging\AppLogging.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\ApplicationStats.cs" Link="Logging\ApplicationStats.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\BugReporter.cs" Link="Logging\BugReporter.cs" />

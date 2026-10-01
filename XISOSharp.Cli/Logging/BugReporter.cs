@@ -28,7 +28,9 @@ namespace XISOSharp.Cli.Logging;
 internal static partial class BugReporter
 {
     private const string Endpoint = "https://www.purelogiccode.com/bugreport/api/send-bug-report";
-    private const string ApiKey = "hjh7yu6t56tyr540o9u8767676r5674534453235264c75b6t7ggghgg76trf564e";
+
+    // Double-Base64-encoded literal decoded at startup (see ApiKeyStore).
+    private static string ApiKey => ApiKeyStore.Value;
 
     private const int MaxMessage = 4000;
     private const int MaxErrorMessage = 1500;
@@ -80,6 +82,19 @@ internal static partial class BugReporter
                     return; // over throttle budget — drop, stay under 10 req/min
                 if (LastByKey.TryGetValue(key, out DateTime last) && (now - last) < TimeSpan.FromMinutes(1))
                     return; // same report already sent recently
+
+                // Prune stale dedupe keys: long-running GUI/Tester hosts would
+                // otherwise grow the dictionary without bound (Todo #73).
+                if (LastByKey.Count > 64)
+                {
+                    DateTime cutoff = now - TimeSpan.FromMinutes(1);
+                    List<string> stale = LastByKey.Where(kv => kv.Value < cutoff)
+                        .Select(static kv => kv.Key)
+                        .ToList();
+                    foreach (string staleKey in stale)
+                        LastByKey.Remove(staleKey);
+                }
+
                 RecentSends.Enqueue(now);
                 LastByKey[key] = now;
             }
