@@ -151,6 +151,33 @@ public class AuditXisoTests : IDisposable
     }
 
     [Fact]
+    public void AuditXiso_TrailingMagicCorrupt_ReturnsInvalid()
+    {
+        string outputDir = CreateTempDir();
+        XisoWriter.CreateXiso(SourceDir, outputDir, null, null, out string? isoPath, null, null);
+        Assert.NotNull(isoPath);
+
+        // Flip one byte of the descriptor's trailing header magic: the leading
+        // fields still parse, so only the tail check can reject the image
+        // (parity with extraction and the block-device audit).
+        long trailingMagic = Constants.HeaderOffset + Constants.HeaderDataLength +
+                             Constants.SectorOffsetSize + Constants.DirTableSize +
+                             Constants.FileTimeSize + Constants.UnusedSize;
+        using (FileStream fs = new(isoPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            fs.Seek(trailingMagic, SeekOrigin.Begin);
+            int b = fs.ReadByte();
+            fs.Seek(trailingMagic, SeekOrigin.Begin);
+            fs.WriteByte((byte)(b ^ 0xFF));
+        }
+
+        AuditResult result = XisoReader.AuditXiso(isoPath);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, static i => i.Contains("trailing", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void AuditXiso_InvalidFile_ReturnsNotValid()
     {
         string tempFile = Path.Combine(CreateTempDir(), "not_an_iso.bin");

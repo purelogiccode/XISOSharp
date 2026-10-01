@@ -384,6 +384,29 @@ public class XisoCorruptionResilienceTests : IDisposable
         Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(bad, dest));
     }
 
+    [Fact]
+    public void Extract_FilenameWithColon_ThrowsNamed()
+    {
+        // Regression (Todo item 1): a drive-relative colon must be rejected
+        // before extraction can resolve it against another directory.
+        string isoPath = CreateIso(src =>
+        {
+            File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
+            File.WriteAllText(Path.Combine(src, "b.txt"), "world");
+        }, "game.iso");
+        (uint rootSize, long rootAbs) = RootLayout(isoPath);
+
+        byte[] img = File.ReadAllBytes(isoPath);
+        long header = FindEntryHeader(img, rootAbs, rootSize, "a.txt");
+        img[header + 14] = (byte)':';
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        File.WriteAllBytes(bad, img);
+
+        string dest = CreateTempDir("xiso_corrupt_dest");
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.UnpackImage(bad, dest));
+        Assert.Contains("invalid character", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ------------------------------------------------------------------
     // Truncated directory table: every reader fails bounded, never hangs.
     // ------------------------------------------------------------------

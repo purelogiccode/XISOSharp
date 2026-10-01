@@ -7,96 +7,100 @@ re-checked against the code while compiling this list; the rest carry the review
 `file:line` evidence and should be re-confirmed before fixing. Severity is impact-based,
 not effort-based.
 
+Items 1–20 were fixed on 2026-10-01 (working tree, uncommitted; see `**FIXED**` markers).
+Regression tests for items 1, 2, 3, 5, 12, 15 and 16 live in `AuditXisoTests`,
+`XisoCoverageTests`, `XisoSplitTests` and `XisoCorruptionResilienceTests`.
+
 ## High
 
-1. **Path escape from crafted image names** — `XISOSharp/XisoSalvager.cs:384` (verified):
+1. **FIXED** **Path escape from crafted image names** — `XISOSharp/XisoSalvager.cs:384` (verified):
    `stagedName` only replaces `/` and `\`, so a Windows name like `C:evil` survives and
    `Path.Combine(stagingDir, "C:evil")` resolves drive-relative, writing outside the staging
    directory. The legacy extract walkers (`XisoReader.cs:659`, `:763`, `:1058`) reject only
    `.`/`..`/separators too, so a malicious image can escape the destination on Windows.
-2. **In-place patch can overwrite the optimized tag/PVD** — `XISOSharp/XisoReader.cs:2859`:
+2. **FIXED** **In-place patch can overwrite the optimized tag/PVD** — `XISOSharp/XisoReader.cs:2859`:
    `GetSectorLayout` marks only the descriptor sector used; the tag at sector 15 and ECMA-119
    descriptors at sectors 16–17 are missing from `UsedRanges`, while `XisoRanges.cs:217`
    preserves the second descriptor sector. `SectorAllocator.FromLayout` first-fit from sector
    0, so `XisoPatcher.CopyIn` of ≥32 KiB overwrites the tag and later reads auto-select
    `llCompat`, invalidating the image.
-3. **`-c .` packs from the parent directory** — `XISOSharp/XisoWriter.cs:416` (verified):
+3. **FIXED** **`-c .` packs from the parent directory** — `XISOSharp/XisoWriter.cs:416` (verified):
    when `rootDirectory` is `.` (or ends in `/.`), `isoDir` is `.`; the write phase does
    `SetCurrentDirectory("..")` and the synthetic root's `SetCurrentDirectory(".")` is a
    no-op, so file data is read relative to the source's parent (fails or packs same-named
    files from the wrong directory).
-4. **Cancellation/too-large leaves the process CWD changed** — `XISOSharp/XisoWriter.cs:467`
+4. **FIXED** **Cancellation/too-large leaves the process CWD changed** — `XISOSharp/XisoWriter.cs:467`
    (verified): `catch (OperationCanceledException) { throw; }` and the
    `XisoFileTooLargeException` rethrow exit before the `cleanup:` label, skipping
    `Directory.SetCurrentDirectory(cwd)`; `GenerateAvlTreeLocal` and the pre-try validation
    throws (`:301`, `:332`) have the same problem. The XML remark promises the CWD is always
    restored.
-5. **Split CISO with a dotted base cannot be reopened** — `XISOSharp/CisoSplitFile.cs:32`:
+5. **FIXED** **Split CISO with a dotted base cannot be reopened** — `XISOSharp/CisoSplitFile.cs:32`:
    `OpenParts` strips `.1.cso` then rebuilds part 1 with `Path.ChangeExtension(baseName,
    "1.cso")`; for `My.Game.1.cso` that yields `My.1.cso`, so a file the writer itself named
    `My.Game.1.cso` fails with `FileNotFoundException`.
-6. **`-D` deletes the `.old` backup after a failed rewrite** — `XISOSharp.Cli/Program.cs:2349`
+6. **FIXED** **`-D` deletes the `.old` backup after a failed rewrite** — `XISOSharp.Cli/Program.cs:2349`
    (verified): `if (deleteOld) File.Delete(oldPath)` runs inside the rewrite `try` even when
    `DecodeXiso` returned non-zero or validation failed (`err = 2`); upstream only unlinks on
    success, so a failed rewrite can destroy the only remaining copy.
-7. **GUI wipe/trim output is passed as a positional input** —
+7. **FIXED** **GUI wipe/trim output is passed as a positional input** —
    `XISOSharp.Gui/Services/CliCommands.cs:236` and `:254` (verified against
    `Program.cs:3866`): the CLI expands every positional as an input and honors only `-o`, so
    the GUI's chosen output is processed as an extra image — exit 1 (`Cannot stat`) or the
    file is silently wiped to the derived name while the requested output is untouched.
-8. **Optimized probe ignores prepended sectors** — `XISOSharp.Cli/Program.cs:2243`: the
+8. **FIXED** **Optimized probe ignores prepended sectors** — `XISOSharp.Cli/Program.cs:2243`: the
    pre-loop `XisoReader.IsOptimizedImage(xisoPath)` omits `skipSectors`, so a self-produced
    optimized prepended image is treated as non-optimized and extract/list/tree run with
    `llCompat: true`, contradicting the API contract.
-9. **Tester list comparison can never fail** — `XISOSharpTester/Services/XisoTestRunner.cs:746`:
+9. **FIXED** **Tester list comparison can never fail** — `XISOSharpTester/Services/XisoTestRunner.cs:746`:
    `ParseListOutput` matches a `Path/Size/StartSector` layout neither tool emits (both print
    `\name (N bytes)`), so both lists are always empty and `CompareListEntries` reports
    `AllMatch=true`; the "List Files" regression sub-test is a false pass.
-10. **Drop routing sends non-`.iso` folders to Batch** —
+10. **FIXED** **Drop routing sends non-`.iso` folders to Batch** —
     `XISOSharp.Gui/Views/MainWindow.axaml.cs:388` (verified) routes any folder containing an
     `IsImage` extension to Batch, but CLI `--batch` enumerates only `*.iso`
     (`XISOSharp.Cli/Program.cs:4521`, verified); folders with only `.xiso/.cso/.img/.zar`
     fail with "no .iso files found" instead of being routed to Create.
-11. **`CliStatus` set off the UI thread** — `XISOSharp.Gui/ViewModels/MainViewModel.cs:349`
+11. **FIXED** **`CliStatus` set off the UI thread** — `XISOSharp.Gui/ViewModels/MainViewModel.cs:349`
     (verified): the `catch` assigns the bound `ObservableProperty` directly after an
     `await ... ConfigureAwait(false)`; an exception after the probe resumes on a pool thread,
     breaking the file's own `SetOnUi` contract.
 
 ## Medium
 
-12. **Audit inconsistency on tail corruption** — `XISOSharp/XisoReader.cs:2424`: `AuditXiso(string)`
+12. **FIXED** **Audit inconsistency on tail corruption** — `XISOSharp/XisoReader.cs:2424`: `AuditXiso(string)`
     uses `GetVolumeInfo` + `AuditStream`, neither checking trailing header magic, while the
     block-device overload goes through `VerifyXiso` (`:323`) which does; the same image
     audits valid via path and invalid via device, and extraction rejects it.
-13. **Available-bytes check overstates space for offset images** — `XISOSharp/XisoReader.cs:238`
+13. **FIXED** **Available-bytes check overstates space for offset images** — `XISOSharp/XisoReader.cs:238`
     (and `:353`): `availableBytes = (totalSectors - rootDirSector) * SectorSize` uses the whole
     file while `rootDirSector` is partition-relative, so a `rootDirSize` past EOF passes for
     Redump/XGD images.
-14. **Sector-count overflow for >4 GiB extents** — `XISOSharp/XisoReader.cs:2921` (verified):
+14. **FIXED** **Sector-count overflow for >4 GiB extents** — `XISOSharp/XisoReader.cs:2921` (verified):
     `(size + SectorSize - 1) / SectorSize` is `uint` arithmetic and wraps to 0 above
     `0xFFFFF800`, so a ~4 GiB file is omitted from `UsedRanges` and can be overwritten by
     `XisoPatcher`; same pattern at `:2898` and `XisoPatcher.cs:157`.
-15. **All-zero empty-table sentinel unhandled** — `XISOSharp/XisoRanges.cs:363`:
+15. **FIXED** **All-zero empty-table sentinel unhandled** — `XISOSharp/XisoRanges.cs:363`:
     `CollectFileEntries` only handles `0xFFFF`; unlike the other walkers it treats the
     xdvdfs all-zero empty table as a phantom file entry, which `XisoSkeleton.Petrify` then
     hashes.
-16. **`.`/`..` entry handling diverges per walker** — `XISOSharp/XisoReader.cs:659`:
+16. **FIXED** **`.`/`..` entry handling diverges per walker** — `XISOSharp/XisoReader.cs:659`:
     `TraverseXiso` throws for them while `ReadDirectoryEntries`/`ReadRawEntries` skip,
     `AuditWalk` doesn't flag, and `GetValidSectors`/`CollectFileEntries` treat them as real
     entries; an image can audit/list fine yet abort extraction/rewrite.
-17. **Only one walker enforces the directory table size** — `XISOSharp/XisoReader.cs:2507`:
+17. **FIXED** **Only one walker enforces the directory table size** — `XISOSharp/XisoReader.cs:2507`:
     `AuditWalk`, `ReadDirectoryEntries` (`:4024`), `ReadRawEntries` (`:2947`), `SalvageWalk`
     and `Repairer.CollectWalk` bound child offsets by image length only, so corrupt offsets
     into another file's data can audit as valid while extraction rejects them.
-18. **Default output naming misses `/`** — `XISOSharp/XisoReader.cs:1759`: splitting
+18. **FIXED** **Default output naming misses `/`** — `XISOSharp/XisoReader.cs:1759`: splitting
     `imageName` with `LastIndexOf(Constants.PathChar)` only means a `C:/games/game.iso` input
     creates/chdirs into the source directory instead of a `game` subdirectory;
     `XisoWriter.cs:207` correctly uses both separators.
-19. **Repair collision check is case-sensitive** — `XISOSharp/XisoRepairer.cs:343` uses
+19. **FIXED** **Repair collision check is case-sensitive** — `XISOSharp/XisoRepairer.cs:343` uses
     `StringComparer.Ordinal` while XISO names are case-insensitive elsewhere; `A/B` → `A_B`
     is allowed when `a_b` exists, producing a duplicate the re-audit doesn't report,
     contradicting the class doc (`:19`).
-20. **Optimized-tag probe ignores the disc offset** — `XISOSharp/XisoReader.cs:2457`:
+20. **FIXED** **Optimized-tag probe ignores the disc offset** — `XISOSharp/XisoReader.cs:2457`:
     `ProbeOptimizedTag` seeks the absolute tag offset and ignores `discLseek`, so offset
     (Redump/XGD) images report the tag missing in audit/`IsOptimized`.
 21. **CWD not restored on pre-try throws** — `XISOSharp/XisoWriter.cs:301`: tree generation,
@@ -287,8 +291,8 @@ not effort-based.
   not reproduce on rerun (1713/1714 green). The failing test name was not captured; treat
   shared-state/timing flakes as a standing risk and consider capturing the name on the next
   occurrence.
-- `net10.0` is green at 1773 passed / 1 skipped (1774 total); `net8.0`/`net9.0` are green at
-  1713 passed / 1 skipped (1714 total).
+- `net10.0` is green at 1780 passed / 1 skipped (1781 total); `net8.0`/`net9.0` are green at
+  1720 passed / 1 skipped (1721 total) after the items 1–20 fixes added 7 regression tests.
 
 ## Markers without an in-repo tracker index
 

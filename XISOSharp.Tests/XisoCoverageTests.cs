@@ -835,6 +835,75 @@ public class XisoCoverageTests : IDisposable
     }
 
     [Fact]
+    public void GetSectorLayout_ReservesTagAndIso9660Descriptors()
+    {
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+
+        SectorLayout layout = XisoReader.GetSectorLayout(isoPath);
+
+        // Regression (Todo item 2): in-place patching must not allocate over the
+        // optimized tag (partition sector 15) or the ISO9660 descriptor pair
+        // (sectors 16-17).
+        Assert.Contains(layout.UsedRanges,
+            static r => r.StartSector <= 15 && 15 < r.StartSector + r.SectorCount);
+        Assert.Contains(layout.UsedRanges,
+            static r => r.StartSector <= 16 && 17 < r.StartSector + r.SectorCount);
+    }
+
+    [Fact]
+    public void GetFileEntries_AllZeroTable_YieldsNoPhantomEntry()
+    {
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+        (_, long rootAbs) = RootLayout(isoPath);
+
+        byte[] img = File.ReadAllBytes(isoPath);
+        Array.Clear(img, (int)rootAbs, Constants.SectorSize);
+        string bad = CopyIso(isoPath, "xiso_cov_bad");
+        File.WriteAllBytes(bad, img);
+
+        // Regression (Todo item 15): the xdvdfs all-zero empty table must not
+        // parse as a phantom file entry.
+        Assert.Empty(XisoRanges.GetFileEntries(bad));
+    }
+
+    [Fact]
+    public void GetFileEntries_DotEntry_SkippedButSiblingsListed()
+    {
+        List<(string Path, long Offset, uint Size)> entries = XisoRanges.GetFileEntries(CreateDotEntryIso());
+
+        Assert.DoesNotContain(entries, static e => string.Equals(e.Path, ".", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(entries, static e => string.Equals(e.Path, "b.txt", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CreateXiso_DotSourceDirectory_PacksFromThatDirectory()
+    {
+        string src = CreateTempDir("xiso_cov_dot_src");
+        File.WriteAllText(Path.Combine(src, "dot.txt"), "dotted");
+        string outDir = CreateTempDir("xiso_cov_dot_iso");
+
+        string cwd = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(src);
+
+            // Regression (Todo item 3): `-c .` must pack the current directory,
+            // not its parent (the write phase re-enters the source by name).
+            int rc = XisoWriter.CreateXiso(".", outDir, null, null, out string? isoPath, null, null);
+
+            Assert.Equal(0, rc);
+            Assert.NotNull(isoPath);
+            string dest = CreateTempDir("xiso_cov_dot_dest");
+            XisoReader.UnpackImage(isoPath, dest);
+            Assert.Equal("dotted", File.ReadAllText(Path.Combine(dest, "dot.txt")));
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(cwd);
+        }
+    }
+
+    [Fact]
     public void GetSectorLayout_SubSizeZero_SkipsTable()
     {
         string isoPath = CreateIso(src =>

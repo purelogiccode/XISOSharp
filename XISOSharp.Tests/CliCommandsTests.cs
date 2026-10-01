@@ -125,7 +125,7 @@ public class CliCommandsTests
     [Fact]
     public void WipeAndTrim_FlagBeforeImage()
     {
-        Assert.Equal(["--wipe", "-y", "a.iso", "out.iso"], CliCommands.Wipe("a.iso", "out.iso", true));
+        Assert.Equal(["--wipe", "-y", "a.iso", "-o", "out.iso"], CliCommands.Wipe("a.iso", "out.iso", true));
         Assert.Equal(["--trim", "-n", "a.iso"], CliCommands.Trim("a.iso", null, false));
     }
 

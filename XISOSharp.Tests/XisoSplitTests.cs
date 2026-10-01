@@ -142,6 +142,29 @@ public class XisoSplitTests : IDisposable
     }
 
     [Fact]
+    public void CisoOpenParts_DottedBase_FindsSequentialParts()
+    {
+        // Regression (Todo item 5): OpenParts used ChangeExtension on the base,
+        // so My.Game.1.cso looked for My.2.cso and never found the second part.
+        string dir = CreateTempDir("xiso_split_parts");
+        string first = Path.Combine(dir, "My.Game.1.cso");
+        File.WriteAllBytes(first, [1]);
+        File.WriteAllBytes(Path.Combine(dir, "My.Game.2.cso"), [2]);
+
+        List<FileStream> parts = CisoSplitFile.OpenParts(first);
+        try
+        {
+            Assert.Equal(2, parts.Count);
+            Assert.EndsWith("My.Game.2.cso", parts[1].Name, StringComparison.Ordinal);
+        }
+        finally
+        {
+            foreach (FileStream part in parts)
+                part.Dispose();
+        }
+    }
+
+    [Fact]
     public void PartPath_Naming_And_IsSplitPath()
     {
         Assert.Equal("game.1.iso", XisoSplitter.PartPath("game", 0));
