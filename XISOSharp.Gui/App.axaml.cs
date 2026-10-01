@@ -139,22 +139,18 @@ public class App : Application
         }
 
         TaskCompletionSource<bool> shown = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        EventHandler? opened = null;
-        EventHandler? closed = null;
-        opened = (_, _) =>
-        {
-            window.Opened -= opened;
-            window.Closed -= closed;
-            shown.TrySetResult(true);
-        };
-        closed = (_, _) =>
-        {
-            window.Opened -= opened;
-            window.Closed -= closed;
-            shown.TrySetResult(false);
-        };
+        EventHandler opened = (_, _) => shown.TrySetResult(true);
+        EventHandler closed = (_, _) => shown.TrySetResult(false);
         window.Opened += opened;
         window.Closed += closed;
-        return await shown.Task.ConfigureAwait(true);
+        try
+        {
+            return await shown.Task.ConfigureAwait(true);
+        }
+        finally
+        {
+            window.Opened -= opened;
+            window.Closed -= closed;
+        }
     }
 }
