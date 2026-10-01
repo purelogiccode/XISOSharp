@@ -53,7 +53,8 @@ internal static class CliRunner
 
             if (result.ExitCode != 0)
             {
-                Log.Warning("CLI exited with code {Exit}: {Cli}", result.ExitCode, cliPath);
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning("CLI exited with code {Exit}: {Cli}", result.ExitCode, cliPath);
             }
 
             return result.ExitCode;

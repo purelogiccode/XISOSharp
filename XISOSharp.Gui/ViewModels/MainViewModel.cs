@@ -318,7 +318,8 @@ internal sealed partial class MainViewModel : ObservableObject
                 CliStatus =
                     $"XISOSharp CLI ({CliLocator.CliFileName}) not found — set the CLI path on the Settings tab.";
                 AppendLog($"[GUI] XISOSharp CLI ({CliLocator.CliFileName}) not found (override, app folder, or PATH).");
-                Log.Warning("CLI {CliFile} not found (override, app folder, or PATH)", CliLocator.CliFileName);
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning("CLI {CliFile} not found (override, app folder, or PATH)", CliLocator.CliFileName);
                 return;
             }
 
@@ -330,7 +331,7 @@ internal sealed partial class MainViewModel : ObservableObject
             {
                 SetOnUi(() => CliStatus = $"Found but -v failed: {resolved}");
                 AppendLog("[GUI] CLI -v probe failed.");
-                Log.Warning("CLI -v probe failed for {Cli}", resolved);
+                Log.ForContext(BugReportSink.NoBugReportProperty, true).Warning("CLI -v probe failed for {Cli}", resolved);
                 return;
             }
 
@@ -605,7 +606,8 @@ internal sealed partial class MainViewModel : ObservableObject
         }
         catch (InvalidOperationException ex)
         {
-            Log.Warning(ex, "GUI validation: {Message}", ex.Message);
+            Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                .Warning(ex, "GUI validation: {Message}", ex.Message);
             AppendLog($"[GUI] {ex.Message}");
         }
         catch (Exception ex)
@@ -845,7 +847,8 @@ internal sealed partial class MainViewModel : ObservableObject
 
         if (cli is null)
         {
-            Log.Warning("Run {Title} refused: CLI {CliFile} not found", title, CliLocator.CliFileName);
+            Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                .Warning("Run {Title} refused: CLI {CliFile} not found", title, CliLocator.CliFileName);
             AppendLog(
                 $"[GUI] XISOSharp CLI ({CliLocator.CliFileName}) not found — set the CLI path on the Settings tab.");
             return;
@@ -869,7 +872,8 @@ internal sealed partial class MainViewModel : ObservableObject
             AppendLog($"[GUI] {title} finished with exit code {exit}.");
             if (exit != 0)
             {
-                Log.Warning("Job {Title} exited with code {Exit}", title, exit);
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning("Job {Title} exited with code {Exit}", title, exit);
             }
             else
             {

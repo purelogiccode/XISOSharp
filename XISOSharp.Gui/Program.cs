@@ -99,7 +99,8 @@ internal sealed class Program
             if (resolved is null)
             {
                 Console.WriteLine($"CLI ({CliLocator.CliFileName}) not found (override, app folder, or PATH).");
-                Log.Warning("CLI probe: {CliFile} not found (override, app folder, or PATH)", CliLocator.CliFileName);
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning("CLI probe: {CliFile} not found (override, app folder, or PATH)", CliLocator.CliFileName);
                 return 1;
             }
 
@@ -109,7 +110,7 @@ internal sealed class Program
             if (banner is null)
             {
                 Console.WriteLine("CLI -v probe failed.");
-                Log.Warning("CLI -v probe failed for {Cli}", resolved);
+                Log.ForContext(BugReportSink.NoBugReportProperty, true).Warning("CLI -v probe failed for {Cli}", resolved);
                 return 1;
             }
 
