@@ -112,7 +112,7 @@ public partial class MainWindow : Window
     // cannot itself crash the async void method.
     private MainViewModel? VmOrNull => DataContext as MainViewModel;
 
-    private void Donate_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void Donate_Click(object? sender, RoutedEventArgs e)
     {
         if (!UrlOpener.TryOpen("https://www.purelogiccode.com/donate"))
         {
@@ -120,7 +120,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void About_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void About_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -178,7 +178,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Exit_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void Exit_Click(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -502,7 +502,7 @@ public partial class MainWindow : Window
         return string.Join(Environment.NewLine, lines);
     }
 
-    private async void BrowseExImage_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseExImage_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -527,7 +527,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseExDest_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseExDest_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -552,7 +552,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseCrSource_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseCrSource_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -577,7 +577,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void AddRwImages_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void AddRwImages_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -603,7 +603,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseRwOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseRwOutput_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -628,7 +628,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseRwWorkDir_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseRwWorkDir_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -653,7 +653,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseRwReport_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseRwReport_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -678,7 +678,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseWpImage_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseWpImage_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -703,7 +703,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void AddRbParts_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void AddRbParts_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -729,7 +729,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseRbOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseRbOutput_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -754,7 +754,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseRbSectors_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseRbSectors_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -780,7 +780,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseCpSourceFile_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseCpSourceFile_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -805,7 +805,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseCpSourceFolder_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseCpSourceFolder_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -830,7 +830,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseCpOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseCpOutput_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -855,7 +855,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseZaSourceFile_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseZaSourceFile_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -880,7 +880,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseZaOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseZaOutput_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -905,7 +905,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseDcCso_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseDcCso_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -930,7 +930,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseDcOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseDcOutput_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -955,7 +955,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseVaSource_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseVaSource_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -980,7 +980,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseVaOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseVaOutput_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -1005,7 +1005,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseVaReport_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseVaReport_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -1030,7 +1030,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void AddCsImages_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void AddCsImages_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -1056,7 +1056,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseBaDir_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseBaDir_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -1081,7 +1081,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseBaDest_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseBaDest_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -1106,7 +1106,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseCliPath_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseCliPath_ClickAsync(object? sender, RoutedEventArgs e)
     {
         try
         {
