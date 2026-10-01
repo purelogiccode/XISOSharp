@@ -348,6 +348,7 @@ public class XisoSplitTests : IDisposable
         Assert.True(File.Exists(Path.Combine(work, "h.2.iso")));
     }
 
+    /// <summary>Records structured progress events in order.</summary>
     private sealed class ProgressRecorder(List<ProgressInfo> events) : IProgress<ProgressInfo>
     {
         private readonly List<ProgressInfo> _events = events;

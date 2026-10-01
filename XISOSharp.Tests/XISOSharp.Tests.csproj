@@ -6,6 +6,8 @@
     <AssemblyName>XISOSharp.Tests</AssemblyName>
     <RootNamespace>XISOSharp.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)..\XISOSharp\XISOSharp.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -52,6 +54,7 @@
   <ItemGroup>
     <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
     <ProjectReference Include="..\XISOSharp.Cli\XISOSharp.Cli.csproj" />
+    <ProjectReference Include="..\XISOSharp.Gui\XISOSharp.Gui.csproj" Condition="'$(TargetFramework)' == 'net10.0'" />
     <!-- TestDataWriter lives in the Generator project (single owner); Tests
              references the project instead of linked-compiling the file, so new
              Generator sources always propagate. -->

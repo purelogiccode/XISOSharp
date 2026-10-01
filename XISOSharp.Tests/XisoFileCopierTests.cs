@@ -41,9 +41,10 @@ public class XisoFileCopierTests : IDisposable
         return dir;
     }
 
+    /// <summary>Collects structured progress events in order.</summary>
     private sealed class CollectingProgress : IProgress<ProgressInfo>
     {
-        public List<ProgressInfo> Events { get; } = [];
+        internal List<ProgressInfo> Events { get; } = [];
 
         public void Report(ProgressInfo value)
         {
@@ -54,11 +55,12 @@ public class XisoFileCopierTests : IDisposable
         }
     }
 
+    /// <summary>Memory stream that returns at most a fixed number of bytes per read.</summary>
     private sealed class ShortReadStream : MemoryStream
     {
         private readonly int _maxPerRead;
 
-        public ShortReadStream(byte[] data, int maxPerRead)
+        internal ShortReadStream(byte[] data, int maxPerRead)
             : base(data, writable: false)
         {
             _maxPerRead = maxPerRead;

@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1427-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1744-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/purelogiccode/XISOSharp/blob/master/LICENSE)
@@ -42,6 +42,12 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Rebuilt sector-0 images** — descriptor at absolute offset 0: probe/verify/volume-info, explorer listing + read stream, filetime, block-device probe, sector-layout used ranges, in-place `CopyIn` add/replace/root-table-move, and `GetXisoRanges`/`CreateZar` round-trips
 - **Tool locator** — `ToolLocator` resolution chain (override → app directory → process directory → `PATH`), OS-aware file names, blank/unknown handling, bounded `-v` probe
 - **CLI surface** — `-h`/`-v` flags and the branded banner, `--sector-layout`/`--ranges`/`--is-optimized` verbs, update-check asset naming
+- **Process runner** — `ProcessRunner` exit codes, stdout/stderr capture, per-line callbacks, missing executables, argument validation, cancellation, timeouts
+- **Update checker extras** — version parsing, update comparison, RID mapping, cache round-trips/escaping, asset URL lookup
+- **Output guards / prompt** — misplaced-flag detection, input==output refusals (rewrite/rebuild/image), overwrite-prompt flag combinations and responses
+- **Bug reports / telemetry** — report entry points under test hosts, exception-block budgets, environment block lines, stats launch-ping opt-outs
+- **Internal helpers** (`InternalsVisibleTo`) — SHA3-256 NIST vectors/chunking/disposal, Latin-1 codec full byte range, bounded sub-stream window/ownership semantics
+- **GUI command builders** (net10.0) — `CliCommands` argv for every verb, flags-before-positionals invariant, `CliLocator` version metadata fallbacks
 
 ## Running Tests
 

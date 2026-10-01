@@ -92,6 +92,7 @@ public sealed class XisoZarPipelineTests : IDisposable
         return isoPath;
     }
 
+    /// <summary>Collects ZAR progress events in order.</summary>
     private sealed class Collector : IProgress<ZarProgress>
     {
 #if NET9_0_OR_GREATER
@@ -99,7 +100,7 @@ public sealed class XisoZarPipelineTests : IDisposable
 #else
         private readonly object _gate = new();
 #endif
-        public readonly List<ZarProgress> Events = [];
+        internal readonly List<ZarProgress> Events = [];
 
         public void Report(ZarProgress value)
         {

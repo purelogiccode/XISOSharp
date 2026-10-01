@@ -54,6 +54,7 @@ public class XisoZarRebuildTests : IDisposable
     /// scratch dirs; assertions then scan only that parent.
     /// Tests run in the Sequential collection, so process-wide env mutation is safe.
     /// </summary>
+    /// <summary>Redirects TMP/TEMP/TMPDIR to a scratch parent for the lifetime of the test.</summary>
     private sealed class ScopedTempParent : IDisposable
     {
         private string Parent { get; }
@@ -62,7 +63,7 @@ public class XisoZarRebuildTests : IDisposable
         private readonly string? _savedTemp;
         private readonly string? _savedTmpDir;
 
-        public ScopedTempParent(List<string> track, string prefix)
+        internal ScopedTempParent(List<string> track, string prefix)
         {
             string realTemp = Path.GetTempPath();
             Parent = Path.Combine(realTemp, $"{prefix}_{Guid.NewGuid():N}");
@@ -76,7 +77,7 @@ public class XisoZarRebuildTests : IDisposable
             Environment.SetEnvironmentVariable("TMPDIR", Parent);
         }
 
-        public string[] ZarScratchDirs() =>
+        internal string[] ZarScratchDirs() =>
             Directory.Exists(Parent)
                 ? Directory.GetDirectories(Parent, "XISOSharp_zar_*")
                 : [];
@@ -89,6 +90,7 @@ public class XisoZarRebuildTests : IDisposable
         }
     }
 
+    /// <summary>Captures <see cref="Logger"/> output while a test runs.</summary>
     private sealed class LogCapture : IDisposable
     {
         private readonly TextWriter _origOut = Logger.Out;
@@ -98,7 +100,7 @@ public class XisoZarRebuildTests : IDisposable
         private readonly StringWriter _out = new();
         private readonly StringWriter _err = new();
 
-        public LogCapture()
+        internal LogCapture()
         {
             Logger.Out = _out;
             Logger.Error = _err;
@@ -106,7 +108,7 @@ public class XisoZarRebuildTests : IDisposable
             Logger.RealQuiet = false;
         }
 
-        public string Output => _out.ToString() + _err;
+        internal string Output => _out.ToString() + _err;
 
         public void Dispose()
         {

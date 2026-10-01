@@ -19,12 +19,14 @@ public enum OracleKind
     Zarchive,
 }
 
+/// <summary>Kinds of symlinks exercised by filesystem tests.</summary>
 public enum SymlinkKind
 {
     DirLink,
     FileLink,
 }
 
+/// <summary>Discovery-time skip predicates for tests that need special OS or tool support.</summary>
 internal static class SkipConditions
 {
     internal static string? SolutionRoot()

@@ -44,7 +44,7 @@ public class ProgressInfoTests : IDisposable
     /// </summary>
     private sealed class CollectingProgress : IProgress<ProgressInfo>
     {
-        public List<ProgressInfo> Events { get; } = [];
+        internal List<ProgressInfo> Events { get; } = [];
 
         public void Report(ProgressInfo value)
         {

@@ -90,11 +90,12 @@ public class UnpackResumeTests : IDisposable
             File.SetLastWriteTimeUtc(file, PinnedTime);
     }
 
+    /// <summary>Forwards progress reports to a callback.</summary>
     private sealed class SyncProgress : IProgress<ProgressInfo>
     {
         private readonly Action<ProgressInfo> _onReport;
 
-        public SyncProgress(Action<ProgressInfo> onReport)
+        internal SyncProgress(Action<ProgressInfo> onReport)
         {
             _onReport = onReport;
         }

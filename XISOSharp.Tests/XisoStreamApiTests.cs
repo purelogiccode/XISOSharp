@@ -90,6 +90,7 @@ public class XisoStreamApiTests : IDisposable
         return result;
     }
 
+    /// <summary>Readable stream that rejects seeking, used for argument validation tests.</summary>
     private sealed class NonSeekableStream(Stream inner) : Stream
     {
         private readonly Stream _inner = inner;

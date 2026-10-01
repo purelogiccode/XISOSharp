@@ -73,6 +73,7 @@ public class CisoAutoDetectTests : IDisposable
             Assert.Equal(File.ReadAllBytes(Path.Combine(dirA, rel)), File.ReadAllBytes(Path.Combine(dirB, rel)));
     }
 
+    /// <summary>Captures <see cref="Logger"/> output while a test runs.</summary>
     private sealed class LogCapture : IDisposable
     {
         private readonly TextWriter _origOut = Logger.Out;
@@ -82,7 +83,7 @@ public class CisoAutoDetectTests : IDisposable
         private readonly StringWriter _out = new();
         private readonly StringWriter _err = new();
 
-        public LogCapture()
+        internal LogCapture()
         {
             Logger.Out = _out;
             Logger.Error = _err;
@@ -90,7 +91,7 @@ public class CisoAutoDetectTests : IDisposable
             Logger.RealQuiet = false;
         }
 
-        public string Output => _out.ToString() + _err;
+        internal string Output => _out.ToString() + _err;
 
         public void Dispose()
         {
