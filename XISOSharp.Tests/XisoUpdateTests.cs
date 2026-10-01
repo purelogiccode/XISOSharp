@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using XISOSharp.Cli;
+using XISOSharp.Cli.Update;
 
 
 namespace XISOSharp.Tests;

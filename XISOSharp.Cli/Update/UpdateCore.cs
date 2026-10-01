@@ -7,7 +7,7 @@ using Serilog;
 #if UPDATE_NS_GUI
 namespace XISOSharp.Gui.Services;
 #else
-namespace XISOSharp.Cli;
+namespace XISOSharp.Cli.Update;
 #endif
 
 /// <summary>

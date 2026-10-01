@@ -4,7 +4,7 @@ using Serilog.Events;
 #if LOGGING_NS_GUI
 namespace XISOSharp.Gui.Logging;
 #elif LOGGING_NS_TESTER
-namespace XISOSharpTester.Logging;
+namespace XISOSharpTester;
 #else
 namespace XISOSharp.Cli.Logging;
 #endif

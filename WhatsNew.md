@@ -10,10 +10,10 @@ compatibility, `-c .` default output, host-safe rewrite/list, audit/extraction
 parity, remap cleanup). The desktop app gains About/Donate/Exit actions, F8
 screenshots, and a shared startup update check.
 
-**No API breaks**: the data-model namespace consolidation was rolled back for the
-four long-standing public types (`UnpackOptions`, `ProcessRunResult`,
-`ExplorerNode`, `XisoExplorerOptions`) so 1.4.1 consumers compile unchanged;
-newer records/enums remain in `XISOSharp.Models`. Targets remain `net8.0` /
+**Namespace note**: data models, records, and enums now live in
+`XISOSharp.Models` — including the previously root-namespace `UnpackOptions`,
+`ProcessRunResult`, `ExplorerNode`, and `XisoExplorerOptions`; add
+`using XISOSharp.Models;` when upgrading from 1.4.1. Targets remain `net8.0` /
 `net9.0` / `net10.0`. Full suite green on all three: **1817 passed / 1 opt-in
 skip (1818) on net10.0** and **1756 passed / 1 opt-in skip (1757) on
 net8.0/net9.0**. The suite now disables xUnit parallelization assembly-wide

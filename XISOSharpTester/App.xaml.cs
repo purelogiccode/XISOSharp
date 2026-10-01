@@ -1,6 +1,5 @@
 using System.Windows;
 using Serilog;
-using XISOSharpTester.Logging;
 
 namespace XISOSharpTester;
 

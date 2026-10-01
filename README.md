@@ -276,7 +276,7 @@ Exit codes: `0` success/`-v`/`-h`/`validate` pass, `1` usage/I/O, `2` validation
 
 ## Using the Library
 
-Core APIs live in the `XISOSharp` namespace, together with the long-standing safety/explorer types (`UnpackOptions`, `ProcessRunResult`, `ExplorerNode`, `XisoExplorerOptions`); typed data models and enums live in `XISOSharp.Models`; interfaces (`IBlockDevice`, `IFilesystem`) live in `XISOSharp.Interfaces`. Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), repair types (`XisoRepairer`, `XisoSalvager`), explorer/split/validate (`XisoExplorer`, `XisoAttributes`, `XisoSplitter`, `XisoValidator`, `XisoPatcher`), safety types (`UnpackOptions`, `XisoPaths`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `RepairResult`, `SalvageResult`, `XexInfo`, `XbeInfo`, `ValidationResult`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
+Core APIs live in the `XISOSharp` namespace; data models and enums (`UnpackOptions`, `ProcessRunResult`, `ExplorerNode`, `XisoExplorerOptions`, `VolumeInfo`, `ProgressInfo`, …) live in `XISOSharp.Models`; interfaces (`IBlockDevice`, `IFilesystem`) live in `XISOSharp.Interfaces`. Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), repair types (`XisoRepairer`, `XisoSalvager`), explorer/split/validate (`XisoExplorer`, `XisoAttributes`, `XisoSplitter`, `XisoValidator`, `XisoPatcher`), safety types (`UnpackOptions`, `XisoPaths`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `RepairResult`, `SalvageResult`, `XexInfo`, `XbeInfo`, `ValidationResult`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
 
 Layouts: readers auto-detect RAW, GLOBAL/XGD2, XGD3, XGD2 Hybrid, and XGD1 by probing known disc offsets, and also accept rebuilt "sector-0" XISOs whose descriptor sits at absolute offset 0 (`DiscLseek = 0`, `DescriptorSector = 0`) — supported end-to-end by explorer, reads, `XisoRanges`, `CreateZar`, and in-place `CopyIn`. Writers emit the standard sector-32 layout; `RebuildRedump` rejects sector-0 inputs (repack to the standard layout first).
 
@@ -284,7 +284,7 @@ Layouts: readers auto-detect RAW, GLOBAL/XGD2, XGD3, XGD2 Hybrid, and XGD1 by pr
 
 ```csharp
 using XISOSharp;
-using XISOSharp.Models;         // typed records/enums (UnpackOptions is in XISOSharp)
+using XISOSharp.Models;         // UnpackOptions, typed records/enums
 using XISOSharp.DataStructures; // AvlNode, etc.
 
 // Extract (llCompat auto via tag; pass false for optimized, true for legacy)

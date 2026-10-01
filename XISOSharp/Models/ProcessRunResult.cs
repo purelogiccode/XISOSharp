@@ -1,4 +1,4 @@
-namespace XISOSharp;
+namespace XISOSharp.Models;
 
 /// <summary>
 /// Result of a <see cref="XISOSharp.ProcessRunner"/> execution: exit code plus captured output.

@@ -5,14 +5,13 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Threading;
 using Serilog;
-using XISOSharp;
 using XISOSharp.Models;
 
 namespace XISOSharpTester.ViewModels;
 
 /// <summary>
 /// One row of the Explore tab's <c>TreeView</c>: wraps a library
-/// <see cref="XISOSharp.ExplorerNode"/> and lazily loads directory children on
+/// <see cref="ExplorerNode"/> and lazily loads directory children on
 /// first expand (a dummy placeholder keeps the expander visible until then).
 /// Load failures are surfaced via <see cref="ErrorText"/> instead of throwing
 /// out of the binding engine.

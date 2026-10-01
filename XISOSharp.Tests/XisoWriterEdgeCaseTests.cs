@@ -309,6 +309,7 @@ public class XisoWriterEdgeCaseTests : IDisposable
                     if (!canceled)
                     {
                         canceled = true;
+                        // ReSharper disable once AccessToDisposedClosure
                         cts.Cancel();
                     }
                 }, cts.Token);

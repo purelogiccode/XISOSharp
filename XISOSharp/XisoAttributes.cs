@@ -1,3 +1,5 @@
+using XISOSharp.Models;
+
 namespace XISOSharp;
 
 /// <summary>

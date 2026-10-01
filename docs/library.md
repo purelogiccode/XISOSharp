@@ -28,12 +28,11 @@ dependencies.
 
 ## Namespaces and types
 
-Core operations and the long-standing safety/explorer types (`UnpackOptions`,
-`ProcessRunResult`, `ExplorerNode`, `XisoExplorerOptions`) live in `XISOSharp`; typed
-data models, records, and enums (`VolumeInfo`, `EntryInfo`, `AuditResult`,
-`ProgressInfo`, `ExtractMode`, …) live in `XISOSharp.Models`; `IBlockDevice` /
-`IFilesystem` live in `XISOSharp.Interfaces`. Internal data structures stay in
-`XISOSharp.DataStructures`.
+Core operations live in `XISOSharp`; data models, records, and enums
+(`UnpackOptions`, `ProcessRunResult`, `ExplorerNode`, `XisoExplorerOptions`,
+`VolumeInfo`, `EntryInfo`, `AuditResult`, `ProgressInfo`, `ExtractMode`, …) live in
+`XISOSharp.Models`; `IBlockDevice` / `IFilesystem` live in `XISOSharp.Interfaces`.
+Internal data structures stay in `XISOSharp.DataStructures`.
 
 | Type | Purpose |
 |---|---|

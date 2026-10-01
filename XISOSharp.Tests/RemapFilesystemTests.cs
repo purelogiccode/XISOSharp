@@ -608,6 +608,7 @@ public class RemapFilesystemTests : IDisposable
         {
             if (info.Type == ProgressInfoType.FileAdded)
             {
+                // ReSharper disable once AccessToDisposedClosure
                 cts.Cancel();
             }
         });
@@ -620,6 +621,7 @@ public class RemapFilesystemTests : IDisposable
 
     private sealed class InlineProgress(Action<ProgressInfo> onReport) : IProgress<ProgressInfo>
     {
-        public void Report(ProgressInfo value) => onReport(value);
+        private readonly Action<ProgressInfo> _onReport = onReport;
+        public void Report(ProgressInfo value) => _onReport(value);
     }
 }

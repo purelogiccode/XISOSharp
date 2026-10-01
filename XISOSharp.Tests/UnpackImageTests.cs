@@ -4,7 +4,7 @@ using XISOSharp.Models;
 namespace XISOSharp.Tests;
 
 /// <summary>
-/// Tests for <see cref="XisoReader.UnpackImage(string, string?, CancellationToken, int?, XISOSharp.UnpackOptions?, IProgress{XISOSharp.Models.ProgressInfo}?)"/> — full-image extraction with
+/// Tests for <see cref="XisoReader.UnpackImage(string, string?, CancellationToken, int?, UnpackOptions?, IProgress{XISOSharp.Models.ProgressInfo}?)"/> — full-image extraction with
 /// automatic optimized-tag detection and ISO-named default output directory.
 /// </summary>
 [Collection("Sequential")]

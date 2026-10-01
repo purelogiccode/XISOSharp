@@ -8,7 +8,6 @@ using Microsoft.Win32;
 using Serilog;
 using XISOSharp;
 using XISOSharp.Models;
-using XisoNode = XISOSharp.ExplorerNode;
 
 namespace XISOSharpTester.ViewModels;
 
@@ -242,7 +241,7 @@ internal partial class MainViewModel
         ExplorerStatusText = $"Opening {Path.GetFileName(path)}...";
         try
         {
-            (XisoExplorer explorer, IReadOnlyList<XisoNode> roots) = await Task.Run(() =>
+            (XisoExplorer explorer, IReadOnlyList<ExplorerNode> roots) = await Task.Run(() =>
             {
                 XisoExplorer opened = new(path);
                 return (opened, opened.ListChildren("/"));
@@ -253,7 +252,7 @@ internal partial class MainViewModel
                 _explorer = explorer;
                 ExploreImagePath = path;
                 ExplorerRoots.Clear();
-                foreach (XisoNode node in roots)
+                foreach (ExplorerNode node in roots)
                     ExplorerRoots.Add(new ExplorerTreeNode(node, LoadExploreChildren));
                 SetSelectedExplorerNode(null);
                 ExplorerHashText = string.Empty;
@@ -282,7 +281,7 @@ internal partial class MainViewModel
         }
     }
 
-    private IReadOnlyList<XisoNode> LoadExploreChildren(ExplorerTreeNode node) =>
+    private IReadOnlyList<ExplorerNode> LoadExploreChildren(ExplorerTreeNode node) =>
         // Invoked off the UI thread via ExplorerTreeNode's background load (TST-010);
         // directory listings are table reads, safe here. The node marshals the
         // resulting list back to the UI thread before touching its bound collection.

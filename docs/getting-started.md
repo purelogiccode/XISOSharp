@@ -120,6 +120,7 @@ or via the NuGet Package Manager in Visual Studio.
 
 ```csharp
 using XISOSharp;
+using XISOSharp.Models; // UnpackOptions
 
 int result = XisoReader.Extract("game.iso", "output_directory", llCompat: false);
 if (result == 0)

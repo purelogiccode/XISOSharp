@@ -8,14 +8,14 @@ CLI contract mismatches, vacuous tests, doc drift) is resolved, together with
 the follow-up regressions found while re-reviewing those fixes and a final pass
 over the fix commits. The desktop app gains Donate/About/Exit header actions, F8
 window screenshots, and a startup update prompt backed by the same `UpdateCore`
-+ 24-hour cache the CLI uses. No API breaks: the data-model namespace
-consolidation was rolled back for the four long-standing public types
-(`UnpackOptions`, `ProcessRunResult`, `ExplorerNode`, `XisoExplorerOptions`) so
-1.4.1 consumers compile unchanged. Targets remain `net8.0` / `net9.0` /
-`net10.0`; full suite green on all three (1818 tests on net10.0: 1817 passed,
-1 opt-in skip; 1757 on net8.0/net9.0: 1756 passed, 1 opt-in skip). The suite
-runs fully sequentially (assembly-wide `DisableTestParallelization`) because
-create/extract mutate the process CWD.
++ 24-hour cache the CLI uses. Namespace note: `UnpackOptions`,
+`ProcessRunResult`, `ExplorerNode`, and `XisoExplorerOptions` moved from
+`XISOSharp` to `XISOSharp.Models` — add `using XISOSharp.Models;` when
+upgrading from 1.4.1. Targets remain `net8.0` / `net9.0` / `net10.0`; full
+suite green on all three (1818 tests on net10.0: 1817 passed, 1 opt-in skip;
+1757 on net8.0/net9.0: 1756 passed, 1 opt-in skip). The suite runs fully
+sequentially (assembly-wide `DisableTestParallelization`) because create/extract
+mutate the process CWD.
 
 ### Library
 

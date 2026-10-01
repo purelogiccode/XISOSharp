@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Serilog;
+using XISOSharp.Cli.Update;
 
 namespace XISOSharp.Cli;
 
