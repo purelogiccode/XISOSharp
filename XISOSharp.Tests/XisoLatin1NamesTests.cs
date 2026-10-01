@@ -4,7 +4,7 @@ namespace XISOSharp.Tests;
 
 /// <summary>
 /// on-disk XISO names are WINDOWS_1252 bytes and every reader path must
-/// decode them via Latin1. <see cref="XisoRanges.CollectFileEntries"/> and
+/// decode them via Latin1. <c>XisoRanges.CollectFileEntries</c> and
 /// <see cref="XisoZarchive"/> previously used <c>Encoding.ASCII</c>, corrupting
 /// bytes ≥ 0x80 into <c>'?'</c> (skeleton <c>.hash</c> paths, ZAR tree names).
 /// Names below are Latin1-representable (U+0080–U+00FF); beyond-U+00FF names

@@ -14,7 +14,7 @@ public class EnvironmentInfoExtraTests
     {
         string version = EnvironmentInfo.ApplicationVersion();
         Assert.False(string.IsNullOrWhiteSpace(version));
-        Assert.NotEqual("Unknown", version);
+        Assert.NotEqual("Unknown", version, StringComparer.Ordinal);
     }
 
     /// <summary>Verifies the platform label matches the running OS.</summary>

@@ -21,7 +21,6 @@ public delegate void ProgressCallback(long currentValue, long finalValue);
 /// <returns>0 to continue traversal; any non-zero value stops the traversal.</returns>
 public delegate int TraversalCallback(AvlNode node, object? context, int depth);
 
-
 /// <summary>
 /// Context used during directory offset calculation for storing the
 /// current sector position and directory start offset.

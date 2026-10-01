@@ -13,7 +13,7 @@ public class CliLocatorTests
     [Fact]
     public void CliFileName_IsOsAware()
     {
-        Assert.Equal(XISOSharp.ToolLocator.GetFileName("XISOSharp"), CliLocator.CliFileName);
+        Assert.Equal(ToolLocator.GetFileName("XISOSharp"), CliLocator.CliFileName);
     }
 
     /// <summary>Verifies a missing binary yields no product version.</summary>
