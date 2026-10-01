@@ -1,5 +1,6 @@
 using Serilog;
 using XISOSharp.Gui.Logging;
+using XISOSharp.Models;
 
 namespace XISOSharp.Gui.Services;
 
@@ -34,7 +35,6 @@ internal static class CliRunner
         catch (Exception ex)
         {
             Log.Error(ex, "CliRunner argument validation failed");
-            BugReporter.ReportException(ex, "CliRunner argument validation failed");
             throw;
         }
 
@@ -67,13 +67,11 @@ internal static class CliRunner
         catch (TimeoutException ex)
         {
             Log.Error(ex, "CLI run timed out: {Cli}", cliPath);
-            BugReporter.ReportException(ex, $"CLI run timed out: {cliPath}");
             return -1;
         }
         catch (Exception ex)
         {
             Log.Error(ex, "CLI run failed: {Cli}", cliPath);
-            BugReporter.ReportException(ex, $"CLI run failed: {cliPath}");
             return -1;
         }
     }

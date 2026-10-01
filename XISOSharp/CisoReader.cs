@@ -46,6 +46,7 @@ public static class CisoReader
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            Logger.LogDebug($"CISO probe failed for '{path}': {ex.Message}");
             return false;
         }
     }

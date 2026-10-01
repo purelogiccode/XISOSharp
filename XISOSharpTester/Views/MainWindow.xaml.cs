@@ -24,7 +24,6 @@ internal partial class MainWindow
         catch (Exception ex)
         {
             Log.Error(ex, "MainWindow initialization failed");
-            BugReporter.ReportException(ex, "MainWindow initialization failed");
             throw;
         }
     }
@@ -57,7 +56,6 @@ internal partial class MainWindow
         catch (Exception ex)
         {
             Log.Error(ex, "MainWindow OnClosing failed");
-            BugReporter.ReportException(ex, "MainWindow OnClosing failed");
             try
             {
                 base.OnClosing(e);

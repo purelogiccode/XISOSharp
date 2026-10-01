@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using XISOSharp.Cli;
+using XISOSharp.Cli.Models;
 
 namespace XISOSharp.Tests;
 
@@ -123,7 +124,7 @@ public class XisoUpdateTests : IDisposable
     public void Cache_RoundTrip_PreservesFields()
     {
         string path = TempFile();
-        UpdateChecker.ReleaseInfo written = new(
+        ReleaseInfo written = new(
             new DateTime(2026, 9, 12, 12, 0, 0, DateTimeKind.Utc),
             "1.0.2",
             "https://github.com/purelogiccode/XISOSharp/releases/tag/1.0.2",
@@ -131,7 +132,7 @@ public class XisoUpdateTests : IDisposable
             "https://example.com/release_1.0.2_win-x64.zip");
 
         UpdateChecker.WriteCache(path, written);
-        UpdateChecker.ReleaseInfo? read = UpdateChecker.ReadCache(path);
+        ReleaseInfo? read = UpdateChecker.ReadCache(path);
 
         Assert.NotNull(read);
         Assert.Equal(written.CheckedUtc, read.CheckedUtc);

@@ -1,10 +1,10 @@
-using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Serilog;
 
 #if LOGGING_NS_GUI
 namespace XISOSharp.Gui.Logging;
@@ -31,6 +31,7 @@ internal static partial class BugReporter
     private const string ApiKey = "hjh7yu6t56tyr540o9u8767676r5674534453235264c75b6t7ggghgg76trf564e";
 
     private const int MaxMessage = 4000;
+    private const int MaxErrorMessage = 1500;
     private const int MaxStackTrace = 8000;
     private const int MaxAppName = 100;
     private const int MaxVersion = 20;
@@ -94,7 +95,7 @@ internal static partial class BugReporter
                 }
                 catch (Exception sendEx)
                 {
-                    Debug.WriteLine($"BugReporter send failed: {sendEx.Message}");
+                    LogDebug($"BugReporter send failed: {sendEx.Message}");
                 }
             });
             lock (Gate)
@@ -116,7 +117,19 @@ internal static partial class BugReporter
         }
         catch (Exception reportEx)
         {
-            Debug.WriteLine($"BugReporter failed: {reportEx.Message}");
+            LogDebug($"BugReporter failed: {reportEx.Message}");
+        }
+    }
+
+    private static void LogDebug(string message)
+    {
+        try
+        {
+            Log.ForContext(BugReportSink.NoBugReportProperty, true).Debug("{Message}", message);
+        }
+        catch
+        {
+            // Logging must never break reporting.
         }
     }
 
@@ -167,28 +180,24 @@ internal static partial class BugReporter
             {
                 return true;
             }
-
-            string? entry = Assembly.GetEntryAssembly()?.GetName().Name;
-            if (entry?.Contains("test", StringComparison.OrdinalIgnoreCase) == true)
-                return true;
-            if (AppDomain.CurrentDomain.FriendlyName.Contains("test", StringComparison.OrdinalIgnoreCase))
-                return true;
         }
         catch
         {
             // ignored
         }
 
-        return false;
+        return EnvironmentInfo.IsTestHost();
     }
 
     /// <summary>
     /// Builds the full bug-report message. Every report carries the three
     /// sections required by <c>InstructionsToSendBugs.md</c> — Environment
-    /// (Date, app name/version, OS version, architecture, bitness, Windows
+    /// (Date, app name/version, OS version, architecture, bitness, platform
     /// version, processor count, base directory, temp path), Error (the
     /// message), and Exception (type, message, source, stack trace) — plus the
-    /// standalone stack-trace field. Internal so format tests can lock the wire
+    /// standalone stack-trace field. The required sections survive the
+    /// <see cref="MaxMessage"/> wire limit: the stack trace is shortened first,
+    /// never a section header. Internal so format tests can lock the wire
     /// contract.
     /// </summary>
     /// <param name="kind">Report kind label (<c>Warning</c>/<c>Error</c>/<c>Exception</c>).</param>
@@ -199,21 +208,48 @@ internal static partial class BugReporter
     internal static string ComposeReport(string kind, string message, Exception? ex, out string stackTrace)
     {
         string envBlock = EnvironmentInfo.Collect(ApplicationName);
-        string errorBlock = "=== Error Details ===\n" + message;
-        string exceptionBlock = BuildExceptionBlock(ex);
         stackTrace = ex is null ? $"{kind}: {message}" : ex.ToString();
-        return $"{kind}: {message}\n\n{envBlock}\n\n{errorBlock}\n\n{exceptionBlock}";
+        message = Truncate(message, MaxErrorMessage);
+
+        string prefix = $"{kind}: {message}\n\n";
+        string errorBlock = "=== Error Details ===\n" + message;
+        const string exceptionHeader = "=== Exception Details ===\n";
+        const string stackLabel = "\nStackTrace: ";
+
+        int fixedLength = prefix.Length + envBlock.Length + 2 + errorBlock.Length + 2
+                          + exceptionHeader.Length + stackLabel.Length;
+        int budget = Math.Max(0, MaxMessage - fixedLength);
+        string exceptionFields = BuildExceptionFields(ex, budget);
+        int stackBudget = Math.Max(0, budget - exceptionFields.Length);
+        string stack = Truncate(GetStack(ex), stackBudget);
+        string inner = BuildInnerText(ex);
+        int innerBudget = Math.Max(0, MaxMessage - fixedLength - exceptionFields.Length - stack.Length);
+        if (inner.Length > innerBudget)
+            inner = Truncate(inner, innerBudget);
+
+        string report =
+            $"{prefix}{envBlock}\n\n{errorBlock}\n\n{exceptionHeader}{exceptionFields}{stackLabel}{stack}{inner}";
+        return report.Length <= MaxMessage ? report : Truncate(report, MaxMessage);
     }
 
-    internal static string BuildExceptionBlock(Exception? ex)
+    internal static string BuildExceptionBlock(Exception? ex) => BuildExceptionBlock(ex, int.MaxValue);
+
+    internal static string BuildExceptionBlock(Exception? ex, int stackBudget)
+    {
+        string stack = GetStack(ex);
+        if (stackBudget < stack.Length)
+            stack = Truncate(stack, Math.Max(0, stackBudget));
+        return $"=== Exception Details ===\n{BuildExceptionFields(ex)}\nStackTrace: {stack}{BuildInnerText(ex)}";
+    }
+
+    private static string BuildExceptionFields(Exception? ex, int budget = int.MaxValue)
     {
         if (ex is null)
-            return "=== Exception Details ===\nType: (none)\nMessage: (none)\nSource: (none)\nStackTrace: (none)";
+            return "Type: (none)\nMessage: (none)\nSource: (none)";
 
         string type;
         string msg;
         string source;
-        string stack;
         try
         {
             type = ex.GetType().FullName ?? ex.GetType().Name;
@@ -241,31 +277,52 @@ internal static partial class BugReporter
             source = "Unknown";
         }
 
+        // Always keep the three required labels; only their values are
+        // shortened so a huge exception message cannot push a later section
+        // past the wire limit.
+        const string typeLabel = "Type: ";
+        const string msgLabel = "\nMessage: ";
+        const string srcLabel = "\nSource: ";
+        int available = Math.Max(0, budget - typeLabel.Length - msgLabel.Length - srcLabel.Length);
+        type = Truncate(type, Math.Min(200, available));
+        available -= type.Length;
+        source = Truncate(source, Math.Min(200, Math.Max(0, available)));
+        available -= source.Length;
+        msg = Truncate(msg, Math.Max(0, available));
+
+        return $"{typeLabel}{type}{msgLabel}{msg}{srcLabel}{source}";
+    }
+
+    private static string GetStack(Exception? ex)
+    {
+        if (ex is null)
+            return "(none)";
         try
         {
-            stack = ex.StackTrace ?? "(no stack trace)";
+            return ex.StackTrace ?? "(no stack trace)";
         }
         catch
         {
-            stack = "Unknown";
+            return "Unknown";
         }
+    }
 
-        // Include inner exceptions (first level) for diagnosability.
-        string inner = string.Empty;
+    private static string BuildInnerText(Exception? ex)
+    {
         try
         {
-            if (ex.InnerException is not null)
+            if (ex?.InnerException is not null)
             {
-                inner =
+                return
                     $"\nInner Type: {ex.InnerException.GetType().FullName}\nInner Message: {ex.InnerException.Message}";
             }
         }
         catch
         {
-            inner = string.Empty;
+            // ignored
         }
 
-        return $"=== Exception Details ===\nType: {type}\nMessage: {msg}\nSource: {source}\nStackTrace: {stack}{inner}";
+        return string.Empty;
     }
 
     private static async Task SendAsync(string fullMessage, string stackTrace)

@@ -81,6 +81,16 @@ internal static class AppLogging
         // Qualified (not bare `Logger`) so this shared source compiles under the
         // CLI, GUI, and Tester logging namespaces alike (BUG-X-001).
         Logger.ForwardInfo = msg => Log.Information("{Message}", msg.TrimEnd('\r', '\n'));
+        Logger.ForwardDebug = msg =>
+            Log.ForContext(BugReportSink.NoBugReportProperty, true).Debug("{Message}", msg.TrimEnd('\r', '\n'));
+        Logger.ForwardWarning = msg =>
+        {
+            // Library-side diagnostics (probe/fallback failures) are expected
+            // operational noise: they stay in the file log, tagged NoBugReport so
+            // only app-level Warning+ events reach the bug-report API.
+            string text = msg.TrimEnd('\r', '\n');
+            Log.ForContext(BugReportSink.NoBugReportProperty, true).Warning("{Message}", text);
+        };
         Logger.ForwardError = msg =>
         {
             // BUG-X-004: every Logger.LogErr write is user-facing feedback —
@@ -101,13 +111,12 @@ internal static class AppLogging
             {
                 if (e.ExceptionObject is Exception ex)
                 {
+                    // Log.Fatal forwards through BugReportSink to the bug-report API.
                     Log.Fatal(ex, "Unhandled exception in {App}", applicationName);
-                    BugReporter.ReportException(ex, $"Unhandled exception in {applicationName}");
                 }
                 else
                 {
                     Log.Fatal("Unhandled non-exception in {App}: {Object}", applicationName, e.ExceptionObject);
-                    BugReporter.ReportError($"Unhandled non-exception in {applicationName}: {e.ExceptionObject}");
                 }
             }
             catch
@@ -132,7 +141,6 @@ internal static class AppLogging
             try
             {
                 Log.Error(e.Exception, "Unobserved task exception in {App}", applicationName);
-                BugReporter.ReportException(e.Exception, $"Unobserved task exception in {applicationName}");
                 e.SetObserved();
             }
             catch

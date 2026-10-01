@@ -140,6 +140,18 @@ public static class Logger
     public static Action<string>? ForwardError { get; set; }
 
     /// <summary>
+    /// Optional Serilog bridge for internal diagnostics (Debug level). Library
+    /// catch/fallback paths report here so swallowed errors stay observable in
+    /// the host log. Invocation is best-effort and never throws.
+    /// </summary>
+    public static Action<string>? ForwardDebug { get; set; }
+
+    /// <summary>
+    /// Optional Serilog bridge for library warnings. See <see cref="ForwardInfo"/>.
+    /// </summary>
+    public static Action<string>? ForwardWarning { get; set; }
+
+    /// <summary>
     /// Writes a formatted message to <see cref="Out"/> unless <see cref="Quiet"/>
     /// or <see cref="RealQuiet"/> is <c>true</c>.
     /// </summary>
@@ -168,7 +180,23 @@ public static class Logger
     public static void LogLine(string message)
     {
         if (!Quiet && !RealQuiet) Out.WriteLine(message);
+        Forward(ForwardInfo, message, Array.Empty<object?>());
     }
+
+    /// <summary>
+    /// Reports an internal diagnostic message through <see cref="ForwardDebug"/>
+    /// without writing to <see cref="Out"/>. Library catch blocks use this so
+    /// swallowed errors stay observable in the host log.
+    /// </summary>
+    /// <param name="message">The diagnostic message.</param>
+    public static void LogDebug(string message) => Forward(ForwardDebug, message, Array.Empty<object?>());
+
+    /// <summary>
+    /// Reports a library warning through <see cref="ForwardWarning"/> without
+    /// writing to <see cref="Error"/>. See <see cref="LogDebug"/>.
+    /// </summary>
+    /// <param name="message">The warning message.</param>
+    public static void LogWarn(string message) => Forward(ForwardWarning, message, Array.Empty<object?>());
 
     /// <summary>
     /// Flushes <see cref="Out"/> unless <see cref="Quiet"/> or

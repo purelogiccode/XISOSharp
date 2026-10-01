@@ -2,7 +2,7 @@ using System.Text.Json;
 using Serilog;
 using XISOSharp.Gui.Logging;
 
-namespace XISOSharp.Gui.Services;
+namespace XISOSharp.Gui.Models;
 
 /// <summary>Persisted GUI preferences (CLI location, overwrite default).</summary>
 internal sealed class GuiSettings
@@ -63,7 +63,6 @@ internal sealed class GuiSettings
         catch (Exception ex)
         {
             Log.Error(ex, "GUI settings load failed");
-            BugReporter.ReportException(ex, "GUI settings load failed");
             return new GuiSettings();
         }
     }

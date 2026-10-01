@@ -20,6 +20,9 @@ public partial class App
         try
         {
             AppLogging.Configure("XISOSharpTester");
+            // Launch ping for usage stats (fire-and-forget; test hosts and
+            // XISO_DISABLE_STATS=1 are honored inside ApplicationStats).
+            ApplicationStats.RecordLaunch("xisosharp-tester");
         }
         catch (Exception ex)
         {
@@ -34,7 +37,6 @@ public partial class App
         catch (Exception ex)
         {
             Log.Error(ex, "Application startup failed");
-            BugReporter.ReportException(ex, "Application startup failed");
             throw;
         }
     }
@@ -59,6 +61,7 @@ public partial class App
             try
             {
                 BugReporter.Flush(TimeSpan.FromSeconds(2));
+                ApplicationStats.Flush(TimeSpan.FromSeconds(2));
             }
             catch
             {

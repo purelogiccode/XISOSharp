@@ -7,12 +7,13 @@ using System.Windows.Threading;
 using Serilog;
 using XISOSharp;
 using XISOSharpTester.Logging;
+using XISOSharp.Models;
 
 namespace XISOSharpTester.ViewModels;
 
 /// <summary>
 /// One row of the Explore tab's <c>TreeView</c>: wraps a library
-/// <see cref="XISOSharp.ExplorerNode"/> and lazily loads directory children on
+/// <see cref="XISOSharp.Models.ExplorerNode"/> and lazily loads directory children on
 /// first expand (a dummy placeholder keeps the expander visible until then).
 /// Load failures are surfaced via <see cref="ErrorText"/> instead of throwing
 /// out of the binding engine.
@@ -158,7 +159,6 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
             catch (Exception ex)
             {
                 Log.Error(ex, "Explore expand failed for {Path}", FullPath);
-                BugReporter.ReportException(ex, $"Explore expand failed for {FullPath}");
                 _children.Clear();
                 ErrorText = $"Could not list {FullPath}: {ex.Message}";
             }
@@ -186,7 +186,6 @@ internal sealed class ExplorerTreeNode : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "Explore expand failed for {Path}", FullPath);
-            BugReporter.ReportException(ex, $"Explore expand failed for {FullPath}");
             MarshalExpandResult(dispatcher, null, $"Could not list {FullPath}: {ex.Message}");
             return;
         }

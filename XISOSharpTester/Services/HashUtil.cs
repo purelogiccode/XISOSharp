@@ -59,7 +59,6 @@ public static class HashUtil
         catch (Exception ex)
         {
             Log.Error(ex, "ComputeSha256 failed for {Path}", filePath);
-            BugReporter.ReportException(ex, $"ComputeSha256 failed for {filePath}");
             throw;
         }
     }
@@ -83,7 +82,6 @@ public static class HashUtil
         catch (Exception ex)
         {
             Log.Error(ex, "ComputeMd5 failed for {Path}", filePath);
-            BugReporter.ReportException(ex, $"ComputeMd5 failed for {filePath}");
             throw;
         }
     }

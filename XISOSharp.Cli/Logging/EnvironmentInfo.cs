@@ -31,19 +31,56 @@ internal static class EnvironmentInfo
         }
     }
 
+    internal static bool IsTestHost()
+    {
+        try
+        {
+            string? entry = Assembly.GetEntryAssembly()?.GetName().Name;
+            if (entry?.Contains("test", StringComparison.OrdinalIgnoreCase) == true)
+                return true;
+            if (AppDomain.CurrentDomain.FriendlyName.Contains("test", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        catch
+        {
+            // ignored
+        }
+
+        return false;
+    }
+
+    internal static string PlatformVersionLabel()
+    {
+        try
+        {
+            if (OperatingSystem.IsWindows())
+                return "Windows Version";
+            if (OperatingSystem.IsLinux())
+                return "Linux Version";
+            if (OperatingSystem.IsMacOS())
+                return "MacOsX Version";
+        }
+        catch
+        {
+            // fall through
+        }
+
+        return "OS Version";
+    }
+
     internal static string Collect(string applicationName)
     {
         string osVersion;
-        string windowsVersion;
+        string platformVersion;
         try
         {
             osVersion = Environment.OSVersion.ToString();
-            windowsVersion = RuntimeInformation.OSDescription;
+            platformVersion = RuntimeInformation.OSDescription;
         }
         catch
         {
             osVersion = "Unknown";
-            windowsVersion = "Unknown";
+            platformVersion = "Unknown";
         }
 
         string architecture;
@@ -95,7 +132,7 @@ internal static class EnvironmentInfo
         sb.Append("OS Version: ").AppendLine(osVersion);
         sb.Append("Architecture: ").AppendLine(architecture);
         sb.Append("Bitness: ").AppendLine(bitness);
-        sb.Append("Windows Version: ").AppendLine(windowsVersion);
+        sb.Append(PlatformVersionLabel()).Append(": ").AppendLine(platformVersion);
         sb.Append("Processor Count: ").AppendLine(Environment.ProcessorCount.ToString(CultureInfo.InvariantCulture));
         sb.Append("Base Directory: ").AppendLine(baseDir);
         sb.Append("Temp Path: ").Append(tempPath);

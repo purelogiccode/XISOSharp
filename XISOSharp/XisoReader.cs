@@ -402,6 +402,7 @@ public static class XisoReader
         }
         catch (Exception ex)
         {
+            Logger.LogDebug($"Audit failed for '{isoName}': {ex.Message}");
             return new AuditResult(false, 0, 0, [ex.Message]);
         }
     }

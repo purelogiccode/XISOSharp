@@ -138,7 +138,6 @@ public static class PdfExporter
         catch (Exception ex)
         {
             Log.Error(ex, "PDF export failed for {Path}", outputPath);
-            BugReporter.ReportException(ex, $"PDF export failed for {outputPath}");
             throw;
         }
     }

@@ -1,3 +1,5 @@
+using XISOSharp.Models;
+
 namespace XISOSharp;
 
 /// <summary>
@@ -63,6 +65,7 @@ public static class ToolLocator
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException
                                        or IOException or UnauthorizedAccessException)
         {
+            Logger.LogDebug($"Tool resolve failed for '{windowsFileName}': {ex.Message}");
             return null;
         }
     }
@@ -82,6 +85,7 @@ public static class ToolLocator
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
+            Logger.LogDebug($"Process directory probe failed: {ex.Message}");
             return null;
         }
     }
@@ -127,7 +131,7 @@ public static class ToolLocator
                 }
                 catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
                 {
-                    // Malformed PATH entry — skip it.
+                    Logger.LogDebug($"Skipping malformed PATH entry '{dir}': {ex.Message}");
                 }
             }
 
@@ -135,6 +139,7 @@ public static class ToolLocator
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
+            Logger.LogDebug($"PATH lookup failed for '{fileName}': {ex.Message}");
             return null;
         }
     }
@@ -184,14 +189,17 @@ public static class ToolLocator
         }
         catch (OperationCanceledException)
         {
+            Logger.LogDebug($"Tool -v probe canceled for '{toolPath}'");
             return null;
         }
         catch (TimeoutException)
         {
+            Logger.LogDebug($"Tool -v probe timed out for '{toolPath}'");
             return null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
+            Logger.LogDebug($"Tool -v probe failed for '{toolPath}': {ex.Message}");
             return null;
         }
     }

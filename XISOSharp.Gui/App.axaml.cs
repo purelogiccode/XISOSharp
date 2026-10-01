@@ -28,7 +28,6 @@ public class App : Application
         catch (Exception ex)
         {
             Log.Error(ex, "App.Initialize failed");
-            BugReporter.ReportException(ex, "App.Initialize failed");
             throw;
         }
     }
@@ -55,7 +54,6 @@ public class App : Application
         catch (Exception ex)
         {
             Log.Fatal(ex, "App startup failed");
-            BugReporter.ReportException(ex, "App startup failed");
             throw;
         }
     }
@@ -64,12 +62,14 @@ public class App : Application
     {
         try
         {
+            // Launch ping for usage stats (fire-and-forget; test hosts and
+            // XISO_DISABLE_STATS=1 are honored inside ApplicationStats).
+            ApplicationStats.RecordLaunch("xisosharp-gui");
             await viewModel.InitializeAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "GUI startup initialization failed");
-            BugReporter.ReportException(ex, "GUI startup initialization failed");
             try
             {
                 viewModel.LogMessage($"[GUI] Startup initialization failed: {ex.Message}");

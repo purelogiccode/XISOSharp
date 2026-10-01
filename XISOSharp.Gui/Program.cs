@@ -30,7 +30,6 @@ internal sealed class Program
         catch (Exception ex)
         {
             Log.Fatal(ex, "Unhandled GUI exception");
-            BugReporter.ReportException(ex, "Unhandled GUI exception");
             return 1;
         }
         finally
@@ -40,6 +39,7 @@ internal sealed class Program
             try
             {
                 BugReporter.Flush(TimeSpan.FromSeconds(2));
+                ApplicationStats.Flush(TimeSpan.FromSeconds(2));
             }
             catch
             {
@@ -123,7 +123,6 @@ internal sealed class Program
         catch (Exception ex)
         {
             Log.Error(ex, "CLI probe failed");
-            BugReporter.ReportException(ex, "CLI probe failed");
             Console.WriteLine($"CLI probe failed: {ex.Message}");
             return 1;
         }
@@ -146,7 +145,6 @@ internal sealed class Program
         catch (Exception ex)
         {
             Log.Error(ex, "BuildAvaloniaApp failed");
-            BugReporter.ReportException(ex, "BuildAvaloniaApp failed");
             throw;
         }
     }

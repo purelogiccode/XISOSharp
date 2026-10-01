@@ -36,7 +36,6 @@ internal partial class AboutWindow
         catch (Exception ex)
         {
             Log.Error(ex, "AboutWindow initialization failed");
-            BugReporter.ReportException(ex, "AboutWindow initialization failed");
             throw;
         }
     }
@@ -52,7 +51,6 @@ internal partial class AboutWindow
         catch (Exception ex)
         {
             Log.Error(ex, "Could not open link {Uri}", e.Uri);
-            BugReporter.ReportException(ex, $"Could not open link {e.Uri}");
             MessageBox.Show($"Could not open link: {ex.Message}", "Error",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }

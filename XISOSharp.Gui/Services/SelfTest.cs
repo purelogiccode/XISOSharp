@@ -91,7 +91,6 @@ internal static class SelfTest
                 catch (Exception ex)
                 {
                     Log.Error(ex, "GUI self-test runner-e2e failed");
-                    BugReporter.ReportException(ex, "GUI self-test runner-e2e failed");
                     log($"FAIL runner-e2e ({ex.Message})");
                     return 1;
                 }
@@ -103,7 +102,6 @@ internal static class SelfTest
         catch (Exception ex)
         {
             Log.Error(ex, "GUI self-test crashed");
-            BugReporter.ReportException(ex, "GUI self-test crashed");
             try
             {
                 log($"SELF-TEST: crashed ({ex.Message})");

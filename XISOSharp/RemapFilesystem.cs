@@ -83,8 +83,9 @@ public static class RemapFilesystem
                 {
                     _ = new WaxGlob(hostForGlob);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Logger.LogDebug($"Ignoring invalid host glob '{hostForGlob}': {ex.Message}");
                     continue;
                 }
 
@@ -286,8 +287,9 @@ public static class RemapFilesystem
                 // first-wins duplicate handling, so sort ordinally.
                 Array.Sort(entries, StringComparer.Ordinal);
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogDebug($"Skipping unreadable directory '{fullDir}': {ex.Message}");
                 continue;
             }
 
@@ -327,8 +329,9 @@ public static class RemapFilesystem
                             $"warning: packing symlink as target content (links are not preserved): {entryRel}.\n");
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Logger.LogDebug($"Skipping unreadable entry '{fullEntry}': {ex.Message}");
                     continue;
                 }
 
@@ -670,8 +673,9 @@ public static class RemapFilesystem
                             $"warning: packing symlink as target content (links are not preserved): {entryRel}.\n");
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Logger.LogDebug($"Skipping unreadable entry '{fullEntry}': {ex.Message}");
                     continue;
                 }
 

@@ -19,64 +19,82 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <StackPanel>
                 <TextBlock Text="XISOSharp Tester" FontSize="22" FontWeight="Bold"
-                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           ToolTip="About XISOSharp Tester: version, links, and acknowledgements." />
                 <TextBlock x:Name="AppVersionTextBlock" FontSize="13" Margin="0,4,0,0"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           ToolTip="Application version and build information." />
             </StackPanel>
         </StackPanel>
 
         <StackPanel Grid.Row="1">
             <TextBlock x:Name="DescriptionTextBlock" FontSize="12" TextWrapping="Wrap"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                       Margin="0,0,0,12" />
+                       Margin="0,0,0,12"
+                       ToolTip="Description of the XISOSharp Tester application." />
 
             <TextBlock Text="Links" FontSize="14" FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6" />
-            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"
+                       ToolTip="External project links." />
+            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       ToolTip="Link to the extract-xiso project on GitHub.">
                 <Hyperlink x:Name="GitHubLink" RequestNavigate="Hyperlink_RequestNavigate"
-                           Foreground="{DynamicResource AccentFillColorDefaultBrush}">
+                           Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                           ToolTip="Open the extract-xiso repository on GitHub.">
                     extract-xiso on GitHub
                 </Hyperlink>
             </TextBlock>
             <TextBlock FontSize="12" Margin="0,4,0,0"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       ToolTip="Link to the XboxDev/extract-xiso repository on GitHub.">
                 <Hyperlink x:Name="WebLink" RequestNavigate="Hyperlink_RequestNavigate"
-                           Foreground="{DynamicResource AccentFillColorDefaultBrush}">
+                           Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                           ToolTip="Open the XboxDev/extract-xiso repository on GitHub.">
                     XboxDev/extract-xiso
                 </Hyperlink>
             </TextBlock>
 
             <TextBlock Text="Acknowledgements" FontSize="14" FontWeight="SemiBold"
                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                       Margin="0,16,0,6" />
+                       Margin="0,16,0,6"
+                       ToolTip="Credits for libraries and tools used by this application." />
             <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       ToolTip="WPF-UI provides the Fluent Design interface.">
                 Built with <Hyperlink NavigateUri="https://github.com/nicoco007/WPF-UI" RequestNavigate="Hyperlink_RequestNavigate"
-                                      Foreground="{DynamicResource AccentFillColorDefaultBrush}">
+                                      Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                      ToolTip="Open the WPF-UI project page on GitHub.">
                     WPF-UI</Hyperlink> for the Fluent Design interface.
             </TextBlock>
             <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       ToolTip="Serilog provides structured logging.">
                 Uses <Hyperlink NavigateUri="https://www.nuget.org/packages/Serilog" RequestNavigate="Hyperlink_RequestNavigate"
-                                Foreground="{DynamicResource AccentFillColorDefaultBrush}">
+                                Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                ToolTip="Open the Serilog NuGet package page.">
                     Serilog</Hyperlink> for structured logging.
             </TextBlock>
             <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
-                       Foreground="{DynamicResource AccentFillColorDefaultBrush}">
+                       Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                       ToolTip="QuestPDF is used for PDF report export.">
                 Uses <Hyperlink NavigateUri="https://www.nuget.org/packages/QuestPDF" RequestNavigate="Hyperlink_RequestNavigate"
-                                Foreground="{DynamicResource AccentFillColorDefaultBrush}">
+                                Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                ToolTip="Open the QuestPDF NuGet package page.">
                     QuestPDF</Hyperlink> for PDF report export.
             </TextBlock>
             <TextBlock FontSize="12" TextWrapping="Wrap"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       ToolTip="extract-xiso is the reference tool used for cross-validation.">
                 Cross-validates against the <Hyperlink NavigateUri="https://github.com/XboxDev/extract-xiso" RequestNavigate="Hyperlink_RequestNavigate"
-                                                    Foreground="{DynamicResource AccentFillColorDefaultBrush}">
+                                                     Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                                     ToolTip="Open the extract-xiso repository on GitHub.">
                     extract-xiso</Hyperlink> C reference tool for verification.
             </TextBlock>
         </StackPanel>
 
         <ui:Button Grid.Row="2" Content="Close" Click="CloseButton_Click"
                    Appearance="Primary" HorizontalAlignment="Right"
-                   Margin="0,16,0,0" Width="80" />
+                   Margin="0,16,0,0" Width="80"
+                   ToolTip="Close the About window." />
     </Grid>
 </Window>

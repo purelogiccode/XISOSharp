@@ -59,7 +59,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "MainWindow initialization failed");
-            BugReporter.ReportException(ex, "MainWindow initialization failed");
             throw;
         }
     }
@@ -119,7 +118,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void About_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void About_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -129,7 +128,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "About dialog failed");
-            BugReporter.ReportException(ex, "About dialog failed");
         }
     }
 
@@ -147,7 +145,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Exit failed");
-            BugReporter.ReportException(ex, "Exit failed");
         }
     }
 
@@ -163,7 +160,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Log auto-scroll failed");
-            BugReporter.ReportException(ex, "Log auto-scroll failed");
         }
     }
 
@@ -177,7 +173,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "File picker failed: {Title}", title);
-            BugReporter.ReportException(ex, $"File picker failed: {title}");
             VmOrNull?.LogMessage($"[GUI] File picker failed: {ex.Message}");
             return null;
         }
@@ -206,7 +201,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "File picker failed: {Title}", title);
-            BugReporter.ReportException(ex, $"File picker failed: {title}");
             VmOrNull?.LogMessage($"[GUI] File picker failed: {ex.Message}");
             return [];
         }
@@ -233,7 +227,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Folder picker failed: {Title}", title);
-            BugReporter.ReportException(ex, $"Folder picker failed: {title}");
             VmOrNull?.LogMessage($"[GUI] Folder picker failed: {ex.Message}");
             return null;
         }
@@ -260,7 +253,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Save picker failed: {Title}", title);
-            BugReporter.ReportException(ex, $"Save picker failed: {title}");
             VmOrNull?.LogMessage($"[GUI] Save picker failed: {ex.Message}");
             return null;
         }
@@ -277,7 +269,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Drag-over handling failed");
-            BugReporter.ReportException(ex, "Drag-over handling failed");
             e.DragEffects = DragDropEffects.None;
         }
     }
@@ -307,7 +298,6 @@ public partial class MainWindow : Window
                     catch (Exception ex)
                     {
                         Log.Error(ex, "Reading dropped item path failed");
-                        BugReporter.ReportException(ex, "Reading dropped item path failed");
                         return null;
                     }
                 })
@@ -350,7 +340,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Drop handling failed");
-            BugReporter.ReportException(ex, "Drop handling failed");
             try
             {
                 Vm.LogMessage($"[GUI] Drop failed: {ex.Message}");
@@ -382,7 +371,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "DropSingleImage failed for {Image}", image);
-            BugReporter.ReportException(ex, $"DropSingleImage failed for {image}");
             Vm.LogMessage($"[GUI] Drop failed: {ex.Message}");
         }
     }
@@ -401,6 +389,10 @@ public partial class MainWindow : Window
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                // Environmental (permissions/IO), not a bug: log locally without
+                // filing a bug report, and tell the user in the log panel.
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning(ex, "Drop skipped (cannot read folder) {Dir}", dir);
                 try
                 {
                     Vm.LogMessage($"[GUI] Drop skipped (cannot read folder): {dir} ({ex.Message})");
@@ -429,7 +421,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "DropDirectory failed for {Dir}", dir);
-            BugReporter.ReportException(ex, $"DropDirectory failed for {dir}");
             try
             {
                 Vm.LogMessage($"[GUI] Drop failed: {ex.Message}");
@@ -464,7 +455,7 @@ public partial class MainWindow : Window
         return string.Join(Environment.NewLine, lines);
     }
 
-    private async void BrowseExImage_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseExImage_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -478,7 +469,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse extract image failed");
-            BugReporter.ReportException(ex, "Browse extract image failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -490,7 +480,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseExDest_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseExDest_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -504,7 +494,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse extract destination failed");
-            BugReporter.ReportException(ex, "Browse extract destination failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -516,7 +505,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseCrSource_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseCrSource_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -530,7 +519,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse create source failed");
-            BugReporter.ReportException(ex, "Browse create source failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -542,7 +530,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void AddRwImages_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void AddRwImages_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -557,7 +545,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Add rewrite images failed");
-            BugReporter.ReportException(ex, "Add rewrite images failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Add images failed: {ex.Message}");
@@ -569,7 +556,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseRwOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseRwOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -583,7 +570,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse rewrite output failed");
-            BugReporter.ReportException(ex, "Browse rewrite output failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -595,7 +581,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseRwWorkDir_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseRwWorkDir_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -609,7 +595,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse rewrite work directory failed");
-            BugReporter.ReportException(ex, "Browse rewrite work directory failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -621,7 +606,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseRwReport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseRwReport_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -635,7 +620,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse rewrite report failed");
-            BugReporter.ReportException(ex, "Browse rewrite report failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -647,7 +631,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseWpImage_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseWpImage_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -661,7 +645,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse wipe image failed");
-            BugReporter.ReportException(ex, "Browse wipe image failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -673,7 +656,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void AddRbParts_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void AddRbParts_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -688,7 +671,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Add rebuild parts failed");
-            BugReporter.ReportException(ex, "Add rebuild parts failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Add rebuild parts failed: {ex.Message}");
@@ -700,7 +682,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseRbOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseRbOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -714,7 +696,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse rebuild output failed");
-            BugReporter.ReportException(ex, "Browse rebuild output failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -726,7 +707,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseRbSectors_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseRbSectors_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -741,7 +722,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse rebuild sectors failed");
-            BugReporter.ReportException(ex, "Browse rebuild sectors failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -753,7 +733,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseCpSourceFile_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseCpSourceFile_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -767,7 +747,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse compress source file failed");
-            BugReporter.ReportException(ex, "Browse compress source file failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -779,7 +758,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseCpSourceFolder_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseCpSourceFolder_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -793,7 +772,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse compress source folder failed");
-            BugReporter.ReportException(ex, "Browse compress source folder failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -805,7 +783,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseCpOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseCpOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -819,7 +797,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse compress output failed");
-            BugReporter.ReportException(ex, "Browse compress output failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -831,7 +808,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseZaSourceFile_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseZaSourceFile_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -845,7 +822,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse ZAR source failed");
-            BugReporter.ReportException(ex, "Browse ZAR source failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -857,7 +833,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseZaOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseZaOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -871,7 +847,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse ZAR output failed");
-            BugReporter.ReportException(ex, "Browse ZAR output failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -883,7 +858,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseDcCso_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseDcCso_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -897,7 +872,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse decompress CSO failed");
-            BugReporter.ReportException(ex, "Browse decompress CSO failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -909,7 +883,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseDcOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseDcOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -923,7 +897,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse decompress output failed");
-            BugReporter.ReportException(ex, "Browse decompress output failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -935,7 +908,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseVaSource_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseVaSource_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -949,7 +922,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse validate source failed");
-            BugReporter.ReportException(ex, "Browse validate source failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -961,7 +933,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseVaOutput_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseVaOutput_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -975,7 +947,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse validate output failed");
-            BugReporter.ReportException(ex, "Browse validate output failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -987,7 +958,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseVaReport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseVaReport_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -1001,7 +972,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse validate report failed");
-            BugReporter.ReportException(ex, "Browse validate report failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -1013,7 +983,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void AddCsImages_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void AddCsImages_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -1028,7 +998,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Add checksum images failed");
-            BugReporter.ReportException(ex, "Add checksum images failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Add images failed: {ex.Message}");
@@ -1040,7 +1009,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseBaDir_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseBaDir_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -1054,7 +1023,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse batch directory failed");
-            BugReporter.ReportException(ex, "Browse batch directory failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -1066,7 +1034,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseBaDest_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseBaDest_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -1080,7 +1048,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse batch destination failed");
-            BugReporter.ReportException(ex, "Browse batch destination failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
@@ -1092,7 +1059,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void BrowseCliPath_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void BrowseCliPath_ClickAsync(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
         {
@@ -1106,7 +1073,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse CLI path failed");
-            BugReporter.ReportException(ex, "Browse CLI path failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");

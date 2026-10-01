@@ -69,6 +69,7 @@ public static class XisoPaths
         catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException
                                        or UnauthorizedAccessException)
         {
+            Logger.LogDebug($"Path resolve failed for '{path}': {ex.Message}");
             return null;
         }
     }
@@ -96,6 +97,7 @@ public static class XisoPaths
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
         {
+            Logger.LogDebug($"Path-root probe failed for '{path}': {ex.Message}");
             return trimmed;
         }
 

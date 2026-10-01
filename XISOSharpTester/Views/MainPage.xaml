@@ -17,7 +17,8 @@
         <DataTemplate x:Key="SubTestTemplate" DataType="{x:Type m:SubTestResult}">
             <Border Padding="8,4" Margin="0,1"
                     Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                    CornerRadius="4">
+                    CornerRadius="4"
+                    ToolTip="One sub-test result row: status icon, test name, detail, and elapsed time.">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -27,16 +28,20 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Width="24" TextAlignment="Center"
                                FontFamily="Segoe UI Symbol" FontSize="14"
-                               Text="{Binding Status, Converter={StaticResource StatusIconConverter}}" />
+                               Text="{Binding Status, Converter={StaticResource StatusIconConverter}}"
+                               ToolTip="Sub-test status: check mark when passed, cross when failed." />
                     <TextBlock Grid.Column="1" Text="{Binding TestName}"
-                               VerticalAlignment="Center" FontWeight="SemiBold" />
+                               VerticalAlignment="Center" FontWeight="SemiBold"
+                               ToolTip="Name of the individual sub-test." />
                     <TextBlock Grid.Column="2" Text="{Binding Detail}"
                                VerticalAlignment="Center" TextWrapping="Wrap"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                               FontSize="11" Margin="8,0,0,0" />
+                               FontSize="11" Margin="8,0,0,0"
+                               ToolTip="Details of this sub-test outcome." />
                     <TextBlock Grid.Column="3" Text="{Binding ElapsedSeconds, StringFormat={}{0:N2}s}"
                                VerticalAlignment="Center" HorizontalAlignment="Right"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="11" />
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="11"
+                               ToolTip="Time this sub-test took, in seconds." />
                 </Grid>
             </Border>
         </DataTemplate>
@@ -61,7 +66,8 @@
 
                 <TextBlock Grid.Column="0" Text="XISOSharp Tester" FontSize="22" FontWeight="Bold"
                            VerticalAlignment="Center"
-                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           ToolTip="XISOSharp Tester - regression and comparison test harness for XISO images." />
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <ui:Button Command="{Binding AboutCommand}"
                                Appearance="Secondary" Margin="0,0,6,0"
@@ -86,10 +92,12 @@
 
             <!-- SECTION 1: CONFIGURATION -->
             <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                    CornerRadius="8" Padding="16" Margin="0,0,0,12">
+                    CornerRadius="8" Padding="16" Margin="0,0,0,12"
+                    ToolTip="Configure the extract-xiso path and the ISO files to test.">
                 <StackPanel>
                     <TextBlock Text="Configuration" FontSize="14" FontWeight="Bold"
-                               Margin="0,0,0,12" />
+                               Margin="0,0,0,12"
+                               ToolTip="Test configuration: extract-xiso executable and input files." />
 
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
@@ -97,15 +105,19 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="extract-xiso:" VerticalAlignment="Center" FontWeight="SemiBold" />
+                        <TextBlock Text="extract-xiso:" VerticalAlignment="Center" FontWeight="SemiBold"
+                                   ToolTip="Label for the extract-xiso executable path field." />
                         <TextBox Grid.Column="1" Text="{Binding XisoSharpPath, UpdateSourceTrigger=PropertyChanged}"
                                  IsReadOnly="True" VerticalAlignment="Center"
-                                 Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                 Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                 ToolTip="Path to the extract-xiso executable used for comparison tests (read-only)." />
                         <ui:Button Grid.Column="2" Content="Browse" Margin="8,0,0,0"
-                                   Command="{Binding BrowseXisoSharpCommand}" Appearance="Primary" />
+                                   Command="{Binding BrowseXisoSharpCommand}" Appearance="Primary"
+                                   ToolTip="Browse for the extract-xiso executable." />
                     </Grid>
 
-                    <TextBlock Margin="0,0,0,10" FontSize="11" TextWrapping="Wrap">
+                    <TextBlock Margin="0,0,0,10" FontSize="11" TextWrapping="Wrap"
+                               ToolTip="Shows whether the selected extract-xiso executable is ready for comparison tests.">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Text" Value="No extract-xiso selected. Comparison tests will be skipped." />
@@ -122,22 +134,28 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <ui:Button Content="Add Files" Command="{Binding AddFilesCommand}"
-                                   Appearance="Primary" Margin="0,0,8,0" />
+                                   Appearance="Primary" Margin="0,0,8,0"
+                                   ToolTip="Add ISO files to the test queue." />
                         <ui:Button Content="Add Folder" Command="{Binding AddFolderCommand}"
-                                   Appearance="Secondary" />
+                                   Appearance="Secondary"
+                                   ToolTip="Add all ISO files found in a folder to the test queue." />
                         <TextBlock Text="{Binding FilesSummary}" VerticalAlignment="Center"
                                    Margin="16,0,0,0"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   ToolTip="Summary of selected ISO files: count and total size." />
                     </StackPanel>
 
                     <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
-                            CornerRadius="6" Padding="4" MinHeight="80">
-                        <ItemsControl ItemsSource="{Binding Files}">
+                            CornerRadius="6" Padding="4" MinHeight="80"
+                            ToolTip="ISO files queued for testing.">
+                        <ItemsControl ItemsSource="{Binding Files}"
+                                      ToolTip="Selected ISO files waiting to be tested.">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type m:XisoFileEntry}">
                                     <Border Padding="6,4" Margin="2"
                                             Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                                            CornerRadius="4">
+                                            CornerRadius="4"
+                                            ToolTip="One selected ISO file in the test queue.">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -145,15 +163,18 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding FileName}" VerticalAlignment="Center"
-                                                       FontWeight="SemiBold" />
+                                                       FontWeight="SemiBold"
+                                                       ToolTip="Name of the selected ISO file." />
                                             <TextBlock Grid.Column="1" Text="{Binding FileSize}"
                                                        VerticalAlignment="Center" Margin="12,0,0,0" FontSize="11"
-                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                       ToolTip="Size of the selected ISO file." />
                                             <ui:Button Grid.Column="2" Content="Remove" Margin="8,0,0,0"
                                                        Command="{Binding DataContext.RemoveFileCommand,
                                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                        CommandParameter="{Binding}" Appearance="Danger"
-                                                       FontSize="11" Padding="8,2" />
+                                                       FontSize="11" Padding="8,2"
+                                                       ToolTip="Remove this ISO file from the test queue." />
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
@@ -166,35 +187,43 @@
                                IsEnabled="{Binding CanRunTests}"
                                Appearance="Primary" FontSize="14"
                                HorizontalAlignment="Center" MinWidth="180"
-                               Height="40" />
+                               Height="40"
+                               ToolTip="Run all tests on the selected ISO files." />
                 </StackPanel>
             </Border>
 
             <!-- SECTION 2: PROGRESS -->
             <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                     CornerRadius="8" Padding="16" Margin="0,0,0,12"
-                    Visibility="{Binding ShowProgress, Converter={StaticResource BoolToVis}}">
+                    Visibility="{Binding ShowProgress, Converter={StaticResource BoolToVis}}"
+                    ToolTip="Live progress of the current test run.">
                 <StackPanel>
                     <TextBlock Text="Progress" FontSize="14" FontWeight="Bold"
-                               Margin="0,0,0,10" />
+                               Margin="0,0,0,10"
+                               ToolTip="Overall test execution progress." />
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <ProgressBar Value="{Binding ProgressValue}" Height="20"
-                                     Minimum="0" Maximum="100" />
+                                     Minimum="0" Maximum="100"
+                                     ToolTip="Overall progress of the current test run, 0 to 100 percent." />
                         <TextBlock Grid.Column="1" Text="{Binding FileProgress}"
                                    VerticalAlignment="Center" Margin="12,0,0,0"
-                                   FontWeight="SemiBold" />
+                                   FontWeight="SemiBold"
+                                   ToolTip="Current file being processed, for example 2/5." />
                     </Grid>
                     <TextBlock Text="{Binding ProgressText}" TextWrapping="Wrap" FontSize="13"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               ToolTip="Description of the current test phase." />
                     <TextBlock Text="{Binding CurrentTest}" FontSize="11"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               ToolTip="Name of the test currently executing." />
 
                     <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
-                            CornerRadius="6" Padding="8" Margin="0,8,0,0">
+                            CornerRadius="6" Padding="8" Margin="0,8,0,0"
+                            ToolTip="Log output captured during the current test run.">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -203,7 +232,8 @@
                             <ui:Button Grid.Row="0" Content="Copy Log" FontSize="10"
                                        Margin="0,0,0,4" Padding="6,2"
                                        HorizontalAlignment="Right"
-                                       Command="{Binding CopyLogCommand}" />
+                                       Command="{Binding CopyLogCommand}"
+                                       ToolTip="Copy the log output to the clipboard." />
                             <TextBox Grid.Row="1" Text="{Binding LogText, Mode=OneWay}"
                                  IsReadOnly="True"
                                  BorderThickness="0"
@@ -214,7 +244,8 @@
                                  HorizontalScrollBarVisibility="Auto"
                                  TextWrapping="NoWrap"
                                  Height="160"
-                                 TextChanged="LogTextBox_OnTextChanged" />
+                                 TextChanged="LogTextBox_OnTextChanged"
+                                 ToolTip="Read-only log output of the current test run." />
                         </Grid>
                     </Border>
                 </StackPanel>
@@ -223,10 +254,12 @@
             <!-- SECTION 3: RESULTS -->
             <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                     CornerRadius="8" Padding="16" Margin="0,0,0,12"
-                    Visibility="{Binding ShowResults, Converter={StaticResource BoolToVis}}">
+                    Visibility="{Binding ShowResults, Converter={StaticResource BoolToVis}}"
+                    ToolTip="Summary and per-file breakdown of the last test run.">
                 <StackPanel>
                     <TextBlock Text="Results" FontSize="14" FontWeight="Bold"
-                               Margin="0,0,0,10" />
+                               Margin="0,0,0,10"
+                               ToolTip="Aggregated results of the last test run." />
 
                     <!-- summary cards -->
                     <Grid Margin="0,0,0,12">
@@ -236,55 +269,71 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Border Grid.Column="0" Background="#1B5E20" CornerRadius="8"
-                                Padding="14,8" Margin="0,0,6,0">
+                                Padding="14,8" Margin="0,0,6,0"
+                                ToolTip="Number of tests that passed in the last run.">
                             <StackPanel>
-                                <TextBlock Text="PASSED" Foreground="#A5D6A7" FontSize="11" />
+                                <TextBlock Text="PASSED" Foreground="#A5D6A7" FontSize="11"
+                                           ToolTip="Passed test count." />
                                 <TextBlock Text="{Binding SummaryPassed}" Foreground="White"
-                                           FontSize="26" FontWeight="Bold" />
+                                           FontSize="26" FontWeight="Bold"
+                                           ToolTip="Total number of passed tests." />
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="1" Background="#B71C1C" CornerRadius="8"
-                                Padding="14,8" Margin="3,0">
+                                Padding="14,8" Margin="3,0"
+                                ToolTip="Number of tests that failed in the last run.">
                             <StackPanel>
-                                <TextBlock Text="FAILED" Foreground="#EF9A9A" FontSize="11" />
+                                <TextBlock Text="FAILED" Foreground="#EF9A9A" FontSize="11"
+                                           ToolTip="Failed test count." />
                                 <TextBlock Text="{Binding SummaryFailed}" Foreground="White"
-                                           FontSize="26" FontWeight="Bold" />
+                                           FontSize="26" FontWeight="Bold"
+                                           ToolTip="Total number of failed tests." />
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="2" Background="#E65100" CornerRadius="8"
-                                Padding="14,8" Margin="6,0,0,0">
+                                Padding="14,8" Margin="6,0,0,0"
+                                ToolTip="Number of tests that were skipped in the last run.">
                             <StackPanel>
-                                <TextBlock Text="SKIPPED" Foreground="#FFCC80" FontSize="11" />
+                                <TextBlock Text="SKIPPED" Foreground="#FFCC80" FontSize="11"
+                                           ToolTip="Skipped test count." />
                                 <TextBlock Text="{Binding SummarySkipped}" Foreground="White"
-                                           FontSize="26" FontWeight="Bold" />
+                                           FontSize="26" FontWeight="Bold"
+                                           ToolTip="Total number of skipped tests." />
                             </StackPanel>
                         </Border>
                     </Grid>
 
                     <TextBlock Text="{Binding SummaryText}" FontWeight="SemiBold"
-                               Margin="0,0,0,4" FontSize="12" />
+                               Margin="0,0,0,4" FontSize="12"
+                               ToolTip="One-line summary of the last test run." />
                     <TextBlock Text="{Binding SummarySubText}" FontSize="11"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Margin="0,0,0,12" />
+                               Margin="0,0,0,12"
+                               ToolTip="Additional details about the last test run." />
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <ui:Button Content="Export to PDF" Command="{Binding ExportPdfCommand}"
-                                   Appearance="Primary" Margin="0,0,8,0" />
+                                   Appearance="Primary" Margin="0,0,8,0"
+                                   ToolTip="Export the test results to a PDF report." />
                         <ui:Button Content="Copy Results" Command="{Binding CopyResultsCommand}"
-                                   Appearance="Secondary" />
+                                   Appearance="Secondary"
+                                   ToolTip="Copy the test results to the clipboard." />
                     </StackPanel>
 
                     <!-- per-file results -->
                     <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
-                            CornerRadius="6" Padding="4">
+                            CornerRadius="6" Padding="4"
+                            ToolTip="Per-file results of the last test run.">
                         <ListBox ItemsSource="{Binding FileResults}" BorderThickness="0"
-                                 Background="Transparent" MaxHeight="400">
+                                 Background="Transparent" MaxHeight="400"
+                                 ToolTip="Per-file results; expand a row to see its individual sub-tests.">
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="{x:Type m:PerFileResult}">
                                     <Border Margin="2" Padding="0"
                                             Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                                            CornerRadius="4">
-                                        <Expander>
+                                            CornerRadius="4"
+                                            ToolTip="One file result row.">
+                                        <Expander ToolTip="Expand to show the individual sub-test results for this file.">
                                             <Expander.Header>
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
@@ -294,7 +343,8 @@
                                                         <ColumnDefinition Width="90" />
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Grid.Column="0" Width="28" TextAlignment="Center"
-                                                               FontFamily="Segoe UI Symbol" FontSize="16">
+                                                               FontFamily="Segoe UI Symbol" FontSize="16"
+                                                               ToolTip="Overall file result: check when all sub-tests passed, cross otherwise.">
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
                                                                 <Setter Property="Text" Value="✓" />
@@ -310,24 +360,29 @@
                                                     </TextBlock>
                                                     <TextBlock Grid.Column="1" Text="{Binding FileName}"
                                                                FontWeight="SemiBold" VerticalAlignment="Center"
-                                                               Margin="4,0,0,0" />
+                                                               Margin="4,0,0,0"
+                                                               ToolTip="Name of the tested file." />
                                                     <TextBlock Grid.Column="2" Text="{Binding FileSize}"
                                                                VerticalAlignment="Center" FontSize="11"
                                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                                               Margin="12,0,0,0" />
+                                                               Margin="12,0,0,0"
+                                                               ToolTip="Size of the tested file." />
                                                     <StackPanel Grid.Column="3" Orientation="Horizontal"
                                                                 HorizontalAlignment="Right" VerticalAlignment="Center">
-                                                        <TextBlock Foreground="#4CAF50" FontWeight="Bold">
+                                                        <TextBlock Foreground="#4CAF50" FontWeight="Bold"
+                                                                   ToolTip="Number of passed sub-tests for this file.">
                                                             <TextBlock.Text>
                                                                 <Binding Path="Passed" StringFormat="{}{0} P"/>
                                                             </TextBlock.Text>
                                                         </TextBlock>
-                                                        <TextBlock Foreground="#F44336" FontWeight="Bold">
+                                                        <TextBlock Foreground="#F44336" FontWeight="Bold"
+                                                                   ToolTip="Number of failed sub-tests for this file.">
                                                             <TextBlock.Text>
                                                                 <Binding Path="Failed" StringFormat="  {0} F"/>
                                                             </TextBlock.Text>
                                                         </TextBlock>
-                                                        <TextBlock Foreground="#FF9800" FontWeight="Bold">
+                                                        <TextBlock Foreground="#FF9800" FontWeight="Bold"
+                                                                   ToolTip="Number of skipped sub-tests for this file.">
                                                             <TextBlock.Text>
                                                                 <Binding Path="Skipped" StringFormat="  {0} S"/>
                                                             </TextBlock.Text>
@@ -338,9 +393,11 @@
                                             <StackPanel Margin="16,4,4,8">
                                                 <TextBlock Text="{Binding ElapsedSeconds, StringFormat='Total: {0:N2}s'}"
                                                            FontSize="11" Margin="0,0,0,6"
-                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                           ToolTip="Total time spent testing this file." />
                                                 <ItemsControl ItemsSource="{Binding SubTests}"
-                                                              ItemTemplate="{StaticResource SubTestTemplate}" />
+                                                              ItemTemplate="{StaticResource SubTestTemplate}"
+                                                              ToolTip="Individual sub-test results for this file." />
                                             </StackPanel>
                                         </Expander>
                                     </Border>
@@ -353,13 +410,16 @@
 
             <!-- SECTION 4: EXPLORE -->
             <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                    CornerRadius="8" Padding="16" Margin="0,0,0,12">
+                    CornerRadius="8" Padding="16" Margin="0,0,0,12"
+                    ToolTip="Browse the contents of a plain .iso image in-process, without extracting.">
                 <StackPanel>
                     <TextBlock Text="Explore" FontSize="14" FontWeight="Bold"
-                               Margin="0,0,0,4" />
+                               Margin="0,0,0,4"
+                               ToolTip="Explore the directory structure of a plain .iso image." />
                     <TextBlock Text="Browse the image contents in-process — no extraction. Plain .iso images only."
                                FontSize="11" Margin="0,0,0,10"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               ToolTip="Explains that Explore reads plain .iso images in-process without extraction." />
 
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
@@ -367,25 +427,32 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Image (.iso):" VerticalAlignment="Center" FontWeight="SemiBold" />
+                        <TextBlock Text="Image (.iso):" VerticalAlignment="Center" FontWeight="SemiBold"
+                                   ToolTip="Label for the .iso image path to explore." />
                         <TextBox Grid.Column="1" Text="{Binding ExploreImagePath, UpdateSourceTrigger=PropertyChanged}"
                                  VerticalAlignment="Center"
-                                 Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                 Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                 ToolTip="Path to the plain .iso image to open for exploration." />
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
                             <ui:Button Content="Browse" Command="{Binding BrowseExploreImageCommand}"
-                                       Appearance="Secondary" Margin="0,0,6,0" />
+                                       Appearance="Secondary" Margin="0,0,6,0"
+                                       ToolTip="Browse for a plain .iso image to explore." />
                             <ui:Button Content="Open" Command="{Binding OpenExploreImageCommand}"
-                                       Appearance="Primary" Margin="0,0,6,0" />
+                                       Appearance="Primary" Margin="0,0,6,0"
+                                       ToolTip="Open the specified image for exploration." />
                             <ui:Button Content="Refresh" Command="{Binding RefreshExploreCommand}"
-                                       Appearance="Secondary" Margin="0,0,6,0" />
+                                       Appearance="Secondary" Margin="0,0,6,0"
+                                       ToolTip="Reload the directory tree from the open image." />
                             <ui:Button Content="Close" Command="{Binding CloseExploreImageCommand}"
-                                       Appearance="Secondary" />
+                                       Appearance="Secondary"
+                                       ToolTip="Close the currently open image." />
                         </StackPanel>
                     </Grid>
 
                     <TextBlock Text="{Binding ExploreVolumeText}" FontSize="11" Margin="0,0,0,8"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                               TextWrapping="Wrap" />
+                               TextWrapping="Wrap"
+                               ToolTip="Volume information for the open image: label, size, and sessions." />
 
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -394,18 +461,22 @@
                         </Grid.ColumnDefinitions>
 
                         <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
-                                CornerRadius="6" Padding="4" Margin="0,0,6,0">
+                                CornerRadius="6" Padding="4" Margin="0,0,6,0"
+                                ToolTip="Directory tree of the open image.">
                             <TreeView ItemsSource="{Binding ExplorerRoots}"
                                       MinHeight="260" MaxHeight="420"
                                       BorderThickness="0" Background="Transparent"
-                                      SelectedItemChanged="ExploreTree_OnSelectedItemChanged">
+                                      SelectedItemChanged="ExploreTree_OnSelectedItemChanged"
+                                      ToolTip="Directory tree; select a node to view its details.">
                                 <TreeView.Resources>
                                     <HierarchicalDataTemplate DataType="{x:Type vm:ExplorerTreeNode}"
                                                               ItemsSource="{Binding Children}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                       ToolTip="Name of the file or folder in the image." />
                                             <TextBlock FontSize="11" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                       ToolTip="Additional entry information, such as size or type.">
                                                 <TextBlock.Text>
                                                     <Binding Path="Suffix" StringFormat="  ({0})" />
                                                 </TextBlock.Text>
@@ -427,29 +498,36 @@
                                      IsReadOnly="True" BorderThickness="0" Background="Transparent"
                                      FontFamily="Consolas" FontSize="11"
                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                     TextWrapping="Wrap" MinHeight="96" />
+                                     TextWrapping="Wrap" MinHeight="96"
+                                     ToolTip="Read-only details of the selected tree node." />
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                 <ui:Button Content="Copy out…" Command="{Binding CopyOutNodeCommand}"
-                                           Appearance="Primary" Margin="0,0,8,0" />
+                                           Appearance="Primary" Margin="0,0,8,0"
+                                           ToolTip="Extract the selected file to disk." />
                                 <ui:Button Content="SHA-256" Command="{Binding HashNodeCommand}"
-                                           Appearance="Secondary" />
+                                           Appearance="Secondary"
+                                           ToolTip="Compute the SHA-256 hash of the selected file." />
                             </StackPanel>
                             <TextBlock Text="{Binding ExplorerHashText}" FontSize="11" Margin="0,8,0,0"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       TextWrapping="Wrap" FontFamily="Consolas" />
+                                       TextWrapping="Wrap" FontFamily="Consolas"
+                                       ToolTip="SHA-256 hash of the selected file, if computed." />
                             <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
                                     CornerRadius="6" Padding="8" Margin="0,8,0,0"
-                                    Visibility="{Binding ShowExplorerXex, Converter={StaticResource BoolToVis}}">
+                                    Visibility="{Binding ShowExplorerXex, Converter={StaticResource BoolToVis}}"
+                                    ToolTip="XEX executable header details for the selected file.">
                                 <TextBlock Text="{Binding ExplorerXexText}" FontSize="11"
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                           TextWrapping="Wrap" FontFamily="Consolas" />
+                                           TextWrapping="Wrap" FontFamily="Consolas"
+                                           ToolTip="Decoded XEX header information for the selected file." />
                             </Border>
                         </StackPanel>
                     </Grid>
 
                     <TextBlock Text="{Binding ExplorerStatusText}" FontSize="11" Margin="0,8,0,0"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               TextWrapping="Wrap" />
+                               TextWrapping="Wrap"
+                               ToolTip="Status messages for the Explore panel." />
                 </StackPanel>
             </Border>
 
@@ -459,7 +537,8 @@
         <!-- Status Bar -->
         <Border Grid.Row="1"
                 Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                Padding="10,5">
+                Padding="10,5"
+                ToolTip="Application status bar.">
             <Border BorderThickness="0,1,0,0"
                     BorderBrush="{DynamicResource SolidBackgroundFillColorBaseBrush}"
                     Padding="0">
@@ -472,12 +551,14 @@
                 <TextBlock Grid.Column="1" Text="{Binding StatusText}"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           FontSize="12" />
+                           FontSize="12"
+                           ToolTip="Current application status." />
                 <ProgressBar Grid.Column="2"
                              IsIndeterminate="{Binding IsRunning}"
                              Width="80" Height="10"
                              Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}"
-                             Margin="12,0,0,0" />
+                             Margin="12,0,0,0"
+                             ToolTip="Indeterminate progress indicator shown while tests are running." />
             </Grid>
             </Border>
         </Border>

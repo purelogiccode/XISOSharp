@@ -1,23 +1,9 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
+using XISOSharp.Models;
 
 namespace XISOSharp;
-
-/// <summary>
-/// Result of a <see cref="ProcessRunner"/> execution: exit code plus captured output.
-/// </summary>
-public sealed class ProcessRunResult
-{
-    /// <summary>Gets the process exit code, or -1 when it could not start or already exited unknown.</summary>
-    public int ExitCode { get; init; }
-
-    /// <summary>Gets the captured standard-output text (lines joined with newlines).</summary>
-    public string StandardOutput { get; init; } = string.Empty;
-
-    /// <summary>Gets the captured standard-error text.</summary>
-    public string StandardError { get; init; } = string.Empty;
-}
 
 /// <summary>
 /// Single async process-runner shared by the GUI, Tester, and BattleTests (BUG-X-004):
@@ -72,6 +58,7 @@ public static class ProcessRunner
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception)
         {
+            Logger.LogDebug($"Process start failed for '{fileName}': {ex.Message}");
             return new ProcessRunResult { ExitCode = -1, StandardOutput = string.Empty, StandardError = ex.Message };
         }
 
@@ -210,6 +197,7 @@ public static class ProcessRunner
         }
         catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
         {
+            Logger.LogDebug($"Exit-code probe failed: {ex.Message}");
             return -1;
         }
     }

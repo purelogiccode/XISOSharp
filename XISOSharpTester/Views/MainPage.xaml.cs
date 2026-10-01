@@ -29,7 +29,6 @@ internal partial class MainPage
         catch (Exception ex)
         {
             Log.Error(ex, "MainPage initialization failed");
-            BugReporter.ReportException(ex, "MainPage initialization failed");
             throw;
         }
     }
@@ -44,7 +43,6 @@ internal partial class MainPage
         catch (Exception ex)
         {
             Log.Error(ex, "Explore selection failed");
-            BugReporter.ReportException(ex, "Explore selection failed");
         }
     }
 
@@ -60,7 +58,6 @@ internal partial class MainPage
         catch (Exception ex)
         {
             Log.Error(ex, "Log auto-scroll failed");
-            BugReporter.ReportException(ex, "Log auto-scroll failed");
         }
     }
 }

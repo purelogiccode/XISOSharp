@@ -96,6 +96,30 @@ actions open the PureLogicCode donation page (**Donate**), an About dialog with 
 description, credits, and project links (**About**), or close the app (**Exit**). Headless helpers:
 `XISOSharp.Gui --probe-cli [path]` and `XISOSharp.Gui --self-test [cliPath]`.
 
+### Logging, bug reports, and telemetry
+
+The CLI, GUI, and Tester all route every log write through **Serilog** (file + Debug sinks,
+plus a console sink restricted to Warning+). Logs roll daily under
+`%LocalAppData%\<app>\logs\<app>-<date>.log` (14-day retention; temp-dir fallback).
+
+Every **Warning or above** event is forwarded to the PureLogicCode bug-report API with the
+required Environment / Error / Exception sections (date, app name/version, OS, architecture,
+bitness, platform version, processor count, base directory, temp path; error message;
+exception type/message/source/stack trace). Expected operational feedback — usage/validation
+refusals, missing-file probes, non-zero CLI exits, unreadable dropped folders — is tagged
+`NoBugReport` and stays in the local log only.
+
+Each application launch also sends a fire-and-forget usage ping to the ApplicationStats API
+(`POST /ApplicationStats/stats`). Test hosts and `--self-test` runs never send.
+
+Opt-outs (environment variables):
+
+```bash
+XISO_DISABLE_BUGREPORT=1   # no bug reports
+XISO_DISABLE_STATS=1       # no launch stats
+XISO_NO_UPDATE_CHECK=1     # no GitHub update check
+```
+
 ## Using the CLI
 
 The CLI binary is `XISOSharp(.exe)`. It is `extract-xiso`-compatible (`-c`/`-x`/`-l`/`-r`/`-d`/`-D`/`-m`/`-q`/`-Q`/`-s`/`-X`/`-h`/`-v`) plus XboxKit + xdvdfs verbs. Flags must precede positionals; `-h`/`-v` exit 0. Help is `-h` ONLY — `--help` is treated as a filename. `-v` prints the `XISOSharp v<version> for <platform>` banner. Double-clicking the exe prints usage and waits for a keypress instead of closing. Every launch also checks the latest GitHub release (daily-cached) and prints an `[UPDATE]` notice with the release URL when a newer `release_<version>_<rid>.zip` is available — opt out with `XISO_NO_UPDATE_CHECK=1`. Full project readme (all args + examples): [`XISOSharp.Cli/`](XISOSharp.Cli/) — deep reference: [`docs/cli.md`](docs/cli.md).
@@ -237,7 +261,7 @@ Exit codes: `0` success/`-v`/`-h`/`validate` pass, `1` usage/I/O, `2` validation
 
 ## Using the Library
 
-All in `XISOSharp` namespace (`XISOSharp.Core`). Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), repair types (`XisoRepairer`, `XisoSalvager`), explorer/split/validate (`XisoExplorer`, `XisoAttributes`, `XisoSplitter`, `XisoValidator`, `XisoPatcher`), safety types (`UnpackOptions`, `XisoPaths`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `RepairResult`, `SalvageResult`, `XexInfo`, `XbeInfo`, `ValidationResult`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
+Core APIs live in the `XISOSharp` namespace; data models and enums live in `XISOSharp.Models`; interfaces (`IBlockDevice`, `IFilesystem`) live in `XISOSharp.Interfaces`. Static `XisoReader`/`XisoWriter` plus archival types (`XisoRedump`, `XisoOperations`, `XisoRanges`, `XisoSkeleton`, `XisoZarchive`, `XgdTables`, `XboxPrng`, `SecuritySectors`), xdvdfs types (`WaxGlob`, `RemapFilesystem`, `XisoChecksum`, `CisoWriter`/`CisoReader`, `BlockDevice/*`), repair types (`XisoRepairer`, `XisoSalvager`), explorer/split/validate (`XisoExplorer`, `XisoAttributes`, `XisoSplitter`, `XisoValidator`, `XisoPatcher`), safety types (`UnpackOptions`, `XisoPaths`), typed records (`VolumeInfo`, `EntryInfo`, `AuditResult`, `RepairResult`, `SalvageResult`, `XexInfo`, `XbeInfo`, `ValidationResult`, `ProgressInfo`), `CancellationToken` + `IProgress<ProgressInfo>` + `*Async` everywhere.
 
 Layouts: readers auto-detect RAW, GLOBAL/XGD2, XGD3, XGD2 Hybrid, and XGD1 by probing known disc offsets, and also accept rebuilt "sector-0" XISOs whose descriptor sits at absolute offset 0 (`DiscLseek = 0`, `DescriptorSector = 0`) — supported end-to-end by explorer, reads, `XisoRanges`, `CreateZar`, and in-place `CopyIn`. Writers emit the standard sector-32 layout; `RebuildRedump` rejects sector-0 inputs (repack to the standard layout first).
 
@@ -245,6 +269,7 @@ Layouts: readers auto-detect RAW, GLOBAL/XGD2, XGD3, XGD2 Hybrid, and XGD1 by pr
 
 ```csharp
 using XISOSharp;
+using XISOSharp.Models;         // UnpackOptions, typed records/enums
 using XISOSharp.DataStructures; // AvlNode, etc.
 
 // Extract (llCompat auto via tag; pass false for optimized, true for legacy)

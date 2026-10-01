@@ -62,6 +62,9 @@ internal static class Program
     internal static int Main(string[] args)
     {
         AppLogging.Configure("XISOSharp");
+        // Launch ping for usage stats (fire-and-forget, opt out with
+        // XISO_DISABLE_STATS=1; test hosts are skipped).
+        ApplicationStats.RecordLaunch("xisosharp");
         // Daily GitHub update check (stderr notice + optional browser
         // redirect). Skipped for quiet/version runs, test hosts, offline
         // machines pay at most one short timeout per day — never fails the run.
@@ -79,7 +82,6 @@ internal static class Program
             try
             {
                 Log.Fatal(ex, "Unhandled CLI exception");
-                BugReporter.ReportException(ex, "Unhandled CLI exception");
             }
             catch
             {
@@ -96,6 +98,7 @@ internal static class Program
             try
             {
                 BugReporter.Flush(TimeSpan.FromSeconds(2));
+                ApplicationStats.Flush(TimeSpan.FromSeconds(2));
             }
             catch
             {

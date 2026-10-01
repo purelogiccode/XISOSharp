@@ -106,7 +106,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "Auto-detect extract-xiso failed");
-            BugReporter.ReportException(ex, "Auto-detect extract-xiso failed");
         }
     }
 
@@ -422,7 +421,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "Browse extract-xiso failed");
-            BugReporter.ReportException(ex, "Browse extract-xiso failed");
             AddLog($"Error selecting extract-xiso: {ex.Message}");
         }
     }
@@ -450,7 +448,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "Add files failed");
-            BugReporter.ReportException(ex, "Add files failed");
             AddLog($"Error adding files: {ex.Message}");
         }
     }
@@ -465,7 +462,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "Add folder dialog failed");
-            BugReporter.ReportException(ex, "Add folder dialog failed");
             AddLog($"Error opening folder dialog: {ex.Message}");
             return;
         }
@@ -487,7 +483,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
             catch (Exception ex)
             {
                 Log.Error(ex, "Error scanning folder {Folder}", dlg.FolderName);
-                BugReporter.ReportException(ex, $"Error scanning folder {dlg.FolderName}");
                 AddLog($"Error scanning folder: {ex.Message}");
             }
         }
@@ -505,7 +500,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "AddFileIfNew failed for {Path}", path);
-            BugReporter.ReportException(ex, $"AddFileIfNew failed for {path}");
             AddLog($"Error adding file: {ex.Message}");
         }
     }
@@ -525,7 +519,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "Remove file failed");
-            BugReporter.ReportException(ex, "Remove file failed");
             AddLog($"Error removing file: {ex.Message}");
         }
     }
@@ -560,7 +553,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "UpdateFilesSummary failed");
-            BugReporter.ReportException(ex, "UpdateFilesSummary failed");
         }
     }
 
@@ -633,7 +625,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "Test run failed");
-            BugReporter.ReportException(ex, "Test run failed");
             OnUiAfterFailure($"FATAL ERROR: {ex.Message}");
         }
         finally
@@ -718,7 +709,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "PDF save dialog failed");
-            BugReporter.ReportException(ex, "PDF save dialog failed");
             AddLog($"PDF export failed: {ex.Message}");
             return;
         }
@@ -737,7 +727,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
             {
                 AddLog($"PDF export failed: {ex.Message}");
                 Log.Error(ex, "PDF export failed");
-                BugReporter.ReportException(ex, "PDF export failed");
                 MessageBox.Show($"Export failed: {ex.Message}", "Export Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -757,7 +746,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "Copy log failed");
-            BugReporter.ReportException(ex, "Copy log failed");
             AddLog($"Copy log failed: {ex.Message}");
         }
     }
@@ -802,7 +790,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "Copy results failed");
-            BugReporter.ReportException(ex, "Copy results failed");
             AddLog($"Copy results failed: {ex.Message}");
         }
     }
@@ -851,7 +838,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "ShowAbout failed");
-            BugReporter.ReportException(ex, "ShowAbout failed");
         }
     }
 
@@ -865,7 +851,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             Log.Error(ex, "Exit failed");
-            BugReporter.ReportException(ex, "Exit failed");
         }
     }
 
@@ -880,23 +865,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
     /// <param name="name">Property name; defaults to the caller member name.</param>
     protected void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-}
-
-/// <summary>
-/// Represents a single log entry displayed in the application's
-/// scrolling log output, with a message and timestamp.
-/// </summary>
-public class LogEntry
-{
-    /// <summary>
-    /// Gets or sets the log message text.
-    /// </summary>
-    public string Message { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Gets or sets the timestamp string (e.g. "14:30:05").
-    /// </summary>
-    public string Timestamp { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -957,7 +925,6 @@ public class RelayCommand : ICommand
         catch (Exception ex)
         {
             Log.Error(ex, "Command execution failed");
-            BugReporter.ReportException(ex, "Command execution failed");
         }
     }
 
@@ -1070,7 +1037,6 @@ public sealed class AsyncRelayCommand : ICommand
             }
 
             Log.Error(ex, "Async command failed");
-            BugReporter.ReportException(ex, "Async command failed");
         }
     }
 

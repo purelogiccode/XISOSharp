@@ -394,6 +394,7 @@ public static class XisoSalvager
                 siblings.Remove(stagedName);
                 rawSiblings.Remove(filename);
                 state.Skipped.Add($"'{path}{filename}': cannot stage directory ({ex.Message}) (dropped).");
+                Logger.LogDebug($"Salvage: cannot stage directory '{path}{filename}': {ex.Message}");
                 return;
             }
 
@@ -465,6 +466,7 @@ public static class XisoSalvager
             }
 
             state.Skipped.Add($"'{path}{filename}': cannot stage file data ({ex.Message}) (dropped).");
+            Logger.LogDebug($"Salvage: cannot stage file data '{path}{filename}': {ex.Message}");
             return;
         }
 

@@ -99,6 +99,7 @@
 
   <ItemGroup>
     <Compile Include="..\XISOSharp.Cli\Logging\AppLogging.cs" Link="Logging\AppLogging.cs" />
+    <Compile Include="..\XISOSharp.Cli\Logging\ApplicationStats.cs" Link="Logging\ApplicationStats.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\BugReporter.cs" Link="Logging\BugReporter.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\BugReportSink.cs" Link="Logging\BugReportSink.cs" />
     <Compile Include="..\XISOSharp.Cli\Logging\EnvironmentInfo.cs" Link="Logging\EnvironmentInfo.cs" />

@@ -102,6 +102,13 @@ XisoWriter.CreateXiso("source_folder", "output_folder", null, null, out _, "game
 
 ## API Reference
 
+Namespaces: core operations live in `XISOSharp`; data models, records, and enums
+(`UnpackOptions`, `ProgressInfo`, `ExplorerNode`, `XisoExplorerOptions`,
+`ProcessRunResult`, `AuditResult`, …) live in `XISOSharp.Models`; interfaces
+(`IBlockDevice`, `IFilesystem`) live in `XISOSharp.Interfaces`. Add
+`using XISOSharp.Models;` (and `using XISOSharp.Interfaces;`) alongside
+`using XISOSharp;` in consuming code.
+
 ### XisoReader
 
 Static class for reading and processing XISO disc images.

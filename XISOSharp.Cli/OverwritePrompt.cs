@@ -78,7 +78,6 @@ internal static class OverwritePrompt
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Error(ex, "Overwrite prompt failed for {Path}", path);
-            BugReporter.ReportException(ex, $"Overwrite prompt failed for {path}");
             output ??= Console.Out;
             try
             {

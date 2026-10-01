@@ -9,7 +9,7 @@ using Serilog;
 using XISOSharp;
 using XISOSharp.Models;
 using XISOSharpTester.Logging;
-using XisoNode = XISOSharp.ExplorerNode;
+using XisoNode = XISOSharp.Models.ExplorerNode;
 
 namespace XISOSharpTester.ViewModels;
 
@@ -221,7 +221,6 @@ internal partial class MainViewModel
         catch (Exception ex)
         {
             Log.Error(ex, "Browse explore image failed");
-            BugReporter.ReportException(ex, "Browse explore image failed");
             AddLog($"Error selecting explore image: {ex.Message}");
         }
     }
@@ -272,7 +271,6 @@ internal partial class MainViewModel
         catch (Exception ex)
         {
             Log.Error(ex, "Explore open failed for {Path}", path);
-            BugReporter.ReportException(ex, $"Explore open failed for {path}");
             OnUi(() =>
             {
                 ExplorerStatusText = $"Open failed: {ex.Message}";
@@ -368,13 +366,11 @@ internal partial class MainViewModel
             catch (Exception ex)
             {
                 Log.Error(ex, "Explore XEX probe failed for {Path}", node.FullPath);
-                BugReporter.ReportException(ex, $"Explore XEX probe failed for {node.FullPath}");
             }
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error in method LoadXexForSelectionAsync");
-            BugReporter.ReportException(ex, "Error in method LoadXexForSelectionAsync");
         }
     }
 
@@ -412,7 +408,6 @@ internal partial class MainViewModel
         catch (Exception ex)
         {
             Log.Error(ex, "Explore copy-out dialog failed");
-            BugReporter.ReportException(ex, "Explore copy-out dialog failed");
             AddLog($"Copy-out failed: {ex.Message}");
             return;
         }
@@ -432,7 +427,6 @@ internal partial class MainViewModel
         catch (Exception ex)
         {
             Log.Error(ex, "Explore copy-out failed for {Path}", node.FullPath);
-            BugReporter.ReportException(ex, $"Explore copy-out failed for {node.FullPath}");
             OnUi(() =>
             {
                 ExplorerStatusText = $"Copy-out failed: {ex.Message}";
@@ -481,7 +475,6 @@ internal partial class MainViewModel
         catch (Exception ex)
         {
             Log.Error(ex, "Explore hash failed for {Path}", node.FullPath);
-            BugReporter.ReportException(ex, $"Explore hash failed for {node.FullPath}");
             OnUi(() =>
             {
                 ExplorerStatusText = $"Hash failed: {ex.Message}";

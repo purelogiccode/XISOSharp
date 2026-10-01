@@ -47,11 +47,11 @@
     </Style>
   </Window.Styles>
 
-  <ScrollViewer VerticalScrollBarVisibility="Auto">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" ToolTip.Tip="About XISOSharp">
     <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
 
       <!-- Logo -->
-      <Border Grid.Row="0" Classes="card">
+      <Border Grid.Row="0" Classes="card" ToolTip.Tip="XISOSharp logo">
         <StackPanel HorizontalAlignment="Center">
           <Image Width="120" Height="120"
                  Source="avares://XISOSharp.Gui/icon/icon.png"
@@ -60,7 +60,7 @@
       </Border>
 
       <!-- Title & version -->
-      <Border Grid.Row="1" Classes="card">
+      <Border Grid.Row="1" Classes="card" ToolTip.Tip="Application name and version">
         <StackPanel>
           <TextBlock Text="XISOSharp"
                      FontSize="22" FontWeight="Bold"
@@ -78,7 +78,7 @@
       </Border>
 
       <!-- Description -->
-      <Border Grid.Row="2" Classes="card">
+      <Border Grid.Row="2" Classes="card" ToolTip.Tip="What XISOSharp does">
         <StackPanel>
           <TextBlock Classes="section" Text="Description"
                      ToolTip.Tip="About XISOSharp" />
@@ -93,7 +93,7 @@
       </Border>
 
       <!-- Acknowledgements -->
-      <Border Grid.Row="3" Classes="card">
+      <Border Grid.Row="3" Classes="card" ToolTip.Tip="Open-source projects and tools used by XISOSharp">
         <StackPanel>
           <TextBlock Classes="section" Text="Acknowledgements"
                      ToolTip.Tip="Open-source projects and tools used by this application" />
@@ -107,55 +107,67 @@
                         ToolTip.Tip="The core XISO engine is a direct C-to-C# conversion of extract-xiso">
               <Button Classes="link" Content="extract-xiso"
                       Tag="https://github.com/XboxDev/extract-xiso"
-                      Click="Hyperlink_Click" />
-              <TextBlock Classes="muted" Text=" - core XISO engine ported from C to C#" />
+                      Click="Hyperlink_Click"
+                      ToolTip.Tip="Open the extract-xiso repository on GitHub" />
+              <TextBlock Classes="muted" Text=" - core XISO engine ported from C to C#"
+                         ToolTip.Tip="Core XISO engine ported from C to C#" />
             </StackPanel>
 
             <StackPanel Orientation="Horizontal"
                         ToolTip.Tip="Build-image remapping, CISO, and checksum logic ported from xdvdfs">
               <Button Classes="link" Content="xdvdfs"
                       Tag="https://github.com/antangelo/xdvdfs"
-                      Click="Hyperlink_Click" />
-              <TextBlock Classes="muted" Text=" - build-image remapping, CISO, and checksums" />
+                      Click="Hyperlink_Click"
+                      ToolTip.Tip="Open the xdvdfs repository on GitHub" />
+              <TextBlock Classes="muted" Text=" - build-image remapping, CISO, and checksums"
+                         ToolTip.Tip="Build-image remapping, CISO, and checksums" />
             </StackPanel>
 
             <StackPanel Orientation="Horizontal"
                         ToolTip.Tip="Redump archival logic (video/filler/seed/wipe/trim/petrify/update/zar/rebuild) ported from XboxKit">
               <Button Classes="link" Content="XboxKit"
                       Tag="https://github.com/Deterous/XboxKit"
-                      Click="Hyperlink_Click" />
-              <TextBlock Classes="muted" Text=" - Redump archival workflows" />
+                      Click="Hyperlink_Click"
+                      ToolTip.Tip="Open the XboxKit repository on GitHub" />
+              <TextBlock Classes="muted" Text=" - Redump archival workflows"
+                         ToolTip.Tip="Redump archival workflows" />
             </StackPanel>
 
             <StackPanel Orientation="Horizontal"
                         ToolTip.Tip="ZArchive/zstd compression library">
               <Button Classes="link" Content="ZArchiveSharp"
                       Tag="https://github.com/purelogiccode/CSharp_ZArchiveSharp"
-                      Click="Hyperlink_Click" />
-              <TextBlock Classes="muted" Text=" - ZArchive/zstd compression" />
+                      Click="Hyperlink_Click"
+                      ToolTip.Tip="Open the ZArchiveSharp repository on GitHub" />
+              <TextBlock Classes="muted" Text=" - ZArchive/zstd compression"
+                         ToolTip.Tip="ZArchive/zstd compression" />
             </StackPanel>
 
             <StackPanel Orientation="Horizontal"
                         ToolTip.Tip="Cross-platform desktop UI framework">
               <Button Classes="link" Content="Avalonia"
                       Tag="https://avaloniaui.net"
-                      Click="Hyperlink_Click" />
-              <TextBlock Classes="muted" Text=" - cross-platform desktop framework" />
+                      Click="Hyperlink_Click"
+                      ToolTip.Tip="Open the Avalonia website" />
+              <TextBlock Classes="muted" Text=" - cross-platform desktop framework"
+                         ToolTip.Tip="Cross-platform desktop framework" />
             </StackPanel>
 
             <StackPanel Orientation="Horizontal"
                         ToolTip.Tip="Structured logging library">
               <Button Classes="link" Content="Serilog"
                       Tag="https://serilog.net"
-                      Click="Hyperlink_Click" />
-              <TextBlock Classes="muted" Text=" - structured logging" />
+                      Click="Hyperlink_Click"
+                      ToolTip.Tip="Open the Serilog website" />
+              <TextBlock Classes="muted" Text=" - structured logging"
+                         ToolTip.Tip="Structured logging" />
             </StackPanel>
           </StackPanel>
         </StackPanel>
       </Border>
 
       <!-- Links & close -->
-      <Grid Grid.Row="4" ColumnDefinitions="*,Auto">
+      <Grid Grid.Row="4" ColumnDefinitions="*,Auto" ToolTip.Tip="Project links and close button">
         <StackPanel Grid.Column="0" VerticalAlignment="Center">
           <Button Classes="link" Content="www.purelogiccode.com"
                   HorizontalAlignment="Left"

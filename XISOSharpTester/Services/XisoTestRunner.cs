@@ -68,7 +68,6 @@ public static class XisoTestRunner
                 catch (Exception ex)
                 {
                     Log.Error(ex, "GetVersion failed");
-                    BugReporter.ReportException(ex, "GetVersion failed");
                 }
             }
 
@@ -82,7 +81,7 @@ public static class XisoTestRunner
                     "Starting", $"Testing {file.FileName}..."));
 
                 PerFileResult result = await Task
-                    .Run(() => TestSingleFile(file, currentWrapper, progress, fileIndex, files.Count,
+                    .Run(() => TestSingleFileAsync(file, currentWrapper, progress, fileIndex, files.Count,
                         cancellationToken), cancellationToken)
                     .ConfigureAwait(false);
                 session.FileResults.Add(result);
@@ -102,12 +101,11 @@ public static class XisoTestRunner
         catch (Exception ex)
         {
             Log.Error(ex, "Test session failed");
-            BugReporter.ReportException(ex, "Test session failed");
             throw;
         }
     }
 
-    private static async Task<PerFileResult> TestSingleFile(
+    private static async Task<PerFileResult> TestSingleFileAsync(
         XisoFileEntry entry,
         XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
@@ -139,26 +137,26 @@ public static class XisoTestRunner
             }
 
             // Test 1: Verify XISO header
-            await RunVerifyTest(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
+            await RunVerifyTestAsync(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
                 .ConfigureAwait(false);
 
             // Test 2: List files comparison
-            await RunListTest(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
+            await RunListTestAsync(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
                 .ConfigureAwait(false);
 
             // Test 3: Extract all files & hash comparison
-            await RunExtractTest(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
+            await RunExtractTestAsync(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
                 .ConfigureAwait(false);
 
             // Test 4: Rewrite comparison
-            await RunRewriteTest(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
+            await RunRewriteTestAsync(entry, wrapper, progress, fileIndex, totalFiles, result, cancellationToken)
                 .ConfigureAwait(false);
 
             result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
             Log.Information("[{Status}] {File} ({Time:N1}s)",
                 result.AllPassed ? "PASS" : "FAIL", entry.FileName, result.ElapsedSeconds);
             if (!result.AllPassed)
-                BugReporter.ReportWarning($"Test failures for {entry.FileName}");
+                Log.Warning("Test failures for {File}", entry.FileName);
 
             return result;
         }
@@ -169,7 +167,6 @@ public static class XisoTestRunner
         catch (Exception ex)
         {
             Log.Error(ex, "TestSingleFile failed for {File}", entry.FileName);
-            BugReporter.ReportException(ex, $"TestSingleFile failed for {entry.FileName}");
             result.SubTests.Add(new SubTestResult
             {
                 TestName = "All Tests",
@@ -182,7 +179,7 @@ public static class XisoTestRunner
         }
     }
 
-    private static async Task RunVerifyTest(
+    private static async Task RunVerifyTestAsync(
         XisoFileEntry entry,
         XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
@@ -206,7 +203,7 @@ public static class XisoTestRunner
 
             if (wrapper is { Available: true })
             {
-                XisoSharpWrapper.Result exeResult = await wrapper.ListFilesAsync(entry.FilePath, cancellationToken)
+                XisoSharpResult exeResult = await wrapper.ListFilesAsync(entry.FilePath, cancellationToken)
                     .ConfigureAwait(false);
                 bool exeValid = exeResult.ExitCode == 0;
                 string exeDetail = exeValid ? "extract-xiso: valid" : $"extract-xiso: exit code {exeResult.ExitCode}";
@@ -249,7 +246,6 @@ public static class XisoTestRunner
         {
             tSw.Stop();
             Log.Error(ex, "Verify test failed for {File}", entry.FileName);
-            BugReporter.ReportException(ex, $"Verify test failed for {entry.FileName}");
             result.SubTests.Add(new SubTestResult
             {
                 TestName = "Verify XISO",
@@ -260,7 +256,7 @@ public static class XisoTestRunner
         }
     }
 
-    private static async Task RunListTest(
+    private static async Task RunListTestAsync(
         XisoFileEntry entry,
         XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
@@ -282,7 +278,7 @@ public static class XisoTestRunner
 
             if (wrapper is { Available: true })
             {
-                XisoSharpWrapper.Result exeResult = await wrapper.ListFilesAsync(entry.FilePath, cancellationToken)
+                XisoSharpResult exeResult = await wrapper.ListFilesAsync(entry.FilePath, cancellationToken)
                     .ConfigureAwait(false);
                 if (exeResult.ExitCode == 0)
                 {
@@ -341,7 +337,6 @@ public static class XisoTestRunner
         {
             tSw.Stop();
             Log.Error(ex, "List test failed for {File}", entry.FileName);
-            BugReporter.ReportException(ex, $"List test failed for {entry.FileName}");
             result.SubTests.Add(new SubTestResult
             {
                 TestName = "List Files",
@@ -352,7 +347,7 @@ public static class XisoTestRunner
         }
     }
 
-    private static async Task RunExtractTest(
+    private static async Task RunExtractTestAsync(
         XisoFileEntry entry,
         XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
@@ -430,7 +425,7 @@ public static class XisoTestRunner
                 // extract-xiso extraction
                 if (wrapper is { Available: true })
                 {
-                    XisoSharpWrapper.Result exeResult = await wrapper
+                    XisoSharpResult exeResult = await wrapper
                         .ExtractFilesAsync(entry.FilePath, exeTempDir, cancellationToken)
                         .ConfigureAwait(false);
                     if (exeResult.ExitCode != 0)
@@ -484,7 +479,6 @@ public static class XisoTestRunner
         {
             tSw.Stop();
             Log.Error(ex, "Extract test failed for {File}", entry.FileName);
-            BugReporter.ReportException(ex, $"Extract test failed for {entry.FileName}");
             result.SubTests.Add(new SubTestResult
             {
                 TestName = "Extract & Hash Compare",
@@ -495,7 +489,7 @@ public static class XisoTestRunner
         }
     }
 
-    private static async Task RunRewriteTest(
+    private static async Task RunRewriteTestAsync(
         XisoFileEntry entry,
         XisoSharpWrapper? wrapper,
         IProgress<TestProgress>? progress,
@@ -621,7 +615,7 @@ public static class XisoTestRunner
             string exeOutDir = Path.Combine(exeWorkDir, "exe_out");
             Directory.CreateDirectory(exeOutDir);
 
-            XisoSharpWrapper.Result exeResult = await wrapper.RewriteAsync(exeInput, exeOutDir, cancellationToken)
+            XisoSharpResult exeResult = await wrapper.RewriteAsync(exeInput, exeOutDir, cancellationToken)
                 .ConfigureAwait(false);
             if (exeResult.ExitCode != 0)
             {
@@ -677,7 +671,6 @@ public static class XisoTestRunner
         {
             tSw.Stop();
             Log.Error(ex, "Rewrite test failed for {File}", entry.FileName);
-            BugReporter.ReportException(ex, $"Rewrite test failed for {entry.FileName}");
             result.SubTests.Add(new SubTestResult
             {
                 TestName = "Rewrite Compare",
@@ -720,7 +713,6 @@ public static class XisoTestRunner
             catch (Exception ex)
             {
                 Log.Error(ex, "CaptureCSharpListOutput failed for {Iso}", isoPath);
-                BugReporter.ReportException(ex, $"CaptureCSharpListOutput failed for {isoPath}");
                 return string.Empty;
             }
             finally
@@ -779,7 +771,6 @@ public static class XisoTestRunner
         catch (Exception ex)
         {
             Log.Error(ex, "ParseListOutput failed");
-            BugReporter.ReportException(ex, "ParseListOutput failed");
             return [];
         }
     }
@@ -1087,7 +1078,6 @@ public static class XisoTestRunner
         catch (Exception ex)
         {
             Log.Error(ex, "CreateTempSubDir failed");
-            BugReporter.ReportException(ex, "CreateTempSubDir failed");
             throw;
         }
     }

@@ -27,7 +27,7 @@ public class BugReportFormatTests
                      "OS Version:",
                      "Architecture:",
                      "Bitness:",
-                     "Windows Version:",
+                     EnvironmentInfo.PlatformVersionLabel() + ":",
                      "Processor Count:",
                      "Base Directory:",
                      "Temp Path:",
@@ -35,6 +35,22 @@ public class BugReportFormatTests
         {
             Assert.Contains(field, block, StringComparison.Ordinal);
         }
+    }
+
+    /// <summary>
+    /// Verifies the platform-version label names the OS the process runs on
+    /// (Windows / Linux / MacOsX), never a hard-coded "Windows".
+    /// </summary>
+    [Fact]
+    public void PlatformVersionLabel_MatchesCurrentOs()
+    {
+        string label = EnvironmentInfo.PlatformVersionLabel();
+
+        string expected =
+            OperatingSystem.IsWindows() ? "Windows Version" :
+            OperatingSystem.IsLinux() ? "Linux Version" :
+            OperatingSystem.IsMacOS() ? "MacOsX Version" : "OS Version";
+        Assert.Equal(expected, label);
     }
 
     /// <summary>
@@ -101,5 +117,56 @@ public class BugReportFormatTests
         Assert.Contains("=== Error Details ===\ndisk slow", report, StringComparison.Ordinal);
         Assert.Contains("=== Exception Details ===", report, StringComparison.Ordinal);
         Assert.Equal("Warning: disk slow", stackTrace);
+    }
+
+    /// <summary>
+    /// Verifies the required sections survive the 4000-char wire limit even
+    /// with a huge stack trace: the stack trace is shortened first, never a
+    /// section header or required field.
+    /// </summary>
+    [Fact]
+    public void ComposeReport_LongStackTrace_KeepsAllRequiredSections()
+    {
+        Exception ex;
+        try
+        {
+            throw new InvalidOperationException("deep failure");
+        }
+        catch (Exception caught)
+        {
+            ex = new InvalidOperationException(new string('x', 20_000), caught);
+        }
+
+        string report = BugReporter.ComposeReport("Error", "job failed", ex, out _);
+
+        Assert.True(report.Length <= 4000, $"report length {report.Length}");
+        Assert.Contains("=== Environment Details ===", report, StringComparison.Ordinal);
+        Assert.Contains("=== Error Details ===\njob failed", report, StringComparison.Ordinal);
+        Assert.Contains("=== Exception Details ===", report, StringComparison.Ordinal);
+        Assert.Contains("Type: System.InvalidOperationException", report, StringComparison.Ordinal);
+        Assert.Contains("Source:", report, StringComparison.Ordinal);
+        Assert.Contains("StackTrace:", report, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Verifies test hosts are detected (so bug reports and stats pings are
+    /// never filed from unit-test runs).
+    /// </summary>
+    [Fact]
+    public void IsTestHost_TrueUnderTestHost()
+    {
+        Assert.True(EnvironmentInfo.IsTestHost());
+    }
+
+    /// <summary>
+    /// Verifies the stats launch ping is a no-op under the test host and its
+    /// flush completes immediately.
+    /// </summary>
+    [Fact]
+    public void ApplicationStats_RecordLaunch_IsNoOpUnderTestHost()
+    {
+        ApplicationStats.RecordLaunch("xisosharp");
+
+        Assert.True(ApplicationStats.Flush(TimeSpan.Zero));
     }
 }

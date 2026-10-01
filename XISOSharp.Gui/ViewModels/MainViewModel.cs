@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using XISOSharp.Gui.Logging;
+using XISOSharp.Gui.Models;
 using XISOSharp.Gui.Services;
 
 namespace XISOSharp.Gui.ViewModels;
@@ -302,7 +303,6 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Error(ex, "GUI InitializeAsync failed");
-            BugReporter.ReportException(ex, "GUI InitializeAsync failed");
             AppendLog($"[GUI] Initialization failed: {ex.Message}");
         }
     }
@@ -346,7 +346,6 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Error(ex, "DetectCliAsync failed");
-            BugReporter.ReportException(ex, "DetectCliAsync failed");
             CliStatus = $"CLI detection failed: {ex.Message}";
             AppendLog($"[GUI] CLI detection failed: {ex.Message}");
         }
@@ -364,7 +363,6 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Error(ex, "SaveSettings failed");
-            BugReporter.ReportException(ex, "SaveSettings failed");
             AppendLog($"[GUI] Settings save failed: {ex.Message}");
         }
     }
@@ -613,7 +611,6 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Error(ex, "GUI command failed");
-            BugReporter.ReportException(ex, "GUI command failed");
             AppendLog($"[GUI] Error: {ex.Message}");
         }
     }
@@ -840,7 +837,6 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Error(ex, "CLI resolve failed for job {Title}", title);
-            BugReporter.ReportException(ex, $"CLI resolve failed for job {title}");
             AppendLog($"[GUI] CLI resolve failed: {ex.Message}");
             return;
         }
@@ -883,7 +879,6 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Error(ex, "Job {Title} failed", title);
-            BugReporter.ReportException(ex, $"GUI job '{title}' failed");
             AppendLog($"[GUI] {title} failed: {ex.Message}");
         }
         finally

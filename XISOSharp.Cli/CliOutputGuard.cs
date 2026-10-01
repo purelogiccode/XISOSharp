@@ -37,7 +37,6 @@ internal static class CliOutputGuard
         catch (Exception ex)
         {
             Log.Error(ex, "CheckMisplacedFlag failed");
-            BugReporter.ReportException(ex, "CheckMisplacedFlag failed");
             return null;
         }
     }
@@ -91,7 +90,6 @@ internal static class CliOutputGuard
         catch (Exception ex)
         {
             Log.Error(ex, "CheckRewriteOutput failed for {Input}", xisoPath);
-            BugReporter.ReportException(ex, $"CheckRewriteOutput failed for {xisoPath}");
             // CLI-024: fail closed — an unverifiable comparison must block the
             // overwrite, not wave it through (null reads as safe).
             return
@@ -121,7 +119,6 @@ internal static class CliOutputGuard
         catch (Exception ex)
         {
             Log.Error(ex, "CheckSingleInputOutput failed for {Input}", input);
-            BugReporter.ReportException(ex, $"CheckSingleInputOutput failed for {input}");
             // CLI-024: fail closed (see CheckRewriteOutput).
             return
                 $"Error: could not verify -o output {outputName ?? "<none>"} against {input} ({ex.Message}); refusing to overwrite\n";
@@ -158,7 +155,6 @@ internal static class CliOutputGuard
         catch (Exception ex)
         {
             Log.Error(ex, "CheckRebuildOutput failed for {Output}", output);
-            BugReporter.ReportException(ex, $"CheckRebuildOutput failed for {output}");
             // CLI-024: fail closed (see CheckRewriteOutput).
             return
                 $"Error: could not verify rebuild output {output} against its inputs ({ex.Message}); refusing to overwrite\n";
@@ -185,7 +181,6 @@ internal static class CliOutputGuard
         catch (Exception ex)
         {
             Log.Error(ex, "CheckImageOutput failed for {Source}", source);
-            BugReporter.ReportException(ex, $"CheckImageOutput failed for {source}");
             // CLI-024: fail closed (see CheckRewriteOutput).
             return $"Error: could not verify output {output} against {source} ({ex.Message}); refusing to overwrite\n";
         }

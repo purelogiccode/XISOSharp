@@ -1,6 +1,6 @@
 using XISOSharp.Models;
 
-namespace XISOSharp;
+namespace XISOSharp.Models;
 
 /// <summary>
 /// Options controlling unpack/extract/copy-out behavior (TODO #13, xdvdfs #190;
