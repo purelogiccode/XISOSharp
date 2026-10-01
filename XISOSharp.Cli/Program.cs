@@ -2240,7 +2240,9 @@ internal static class Program
             try
             {
                 // Probed through the decompressed view so .cso input is detected too.
-                optimized = XisoReader.IsOptimizedImage(xisoPath);
+                // skipSectors shifts the tag offset for prepended (Redump/XGD) images,
+                // matching the extraction/list walks that consume `optimized`.
+                optimized = XisoReader.IsOptimizedImage(xisoPath, skipSectors);
             }
             catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
             {
@@ -2346,7 +2348,10 @@ internal static class Program
                         }
                     }
 
-                    if (deleteOld) File.Delete(oldPath);
+                    // Only unlink the backup after a fully successful rewrite
+                    // (including validation): a failed rewrite must keep the
+                    // only remaining copy.
+                    if (deleteOld && err == 0) File.Delete(oldPath);
                 }
                 catch (Exception ex)
                 {

@@ -740,28 +740,25 @@ public static class XisoTestRunner
             ArgumentNullException.ThrowIfNull(output);
             List<ListEntry> entries = new();
 
-            // Matches: " - Path: filename                        Size: N bytes,  StartSector: S"
-            // or with nesting: " - filename                        Size: N bytes,  StartSector: S"
-            // or dir: " - dirname                                 DIR"
-            Regex fileRegex =
-                new(@"^\s*-\s+(?<path>.*?)\s{2,}Size:\s*(?<size>\d+)\s*bytes,\s*StartSector:\s*(?<sector>\d+)",
+            // Both the library and the CLI print one entry per line:
+            //   \default.xbe (1740800 bytes)
+            //   \media\ (0 bytes)
+            // A trailing separator marks a directory; the listing carries no
+            // start sector, so ListEntry.StartSector stays 0 on both sides.
+            Regex lineRegex =
+                new(@"^\s*(?<path>.+?)\s+\((?<size>\d+)\s+bytes\)\s*$",
                     RegexOptions.Multiline | RegexOptions.ExplicitCapture | RegexOptions.Compiled,
                     TimeSpan.FromSeconds(5));
-            Regex dirRegex = new(@"^\s*-\s+(?<path>.*?)\s{2,}DIR", RegexOptions.Multiline | RegexOptions.Compiled,
-                TimeSpan.FromSeconds(5));
 
-            foreach (Match m in fileRegex.Matches(output))
+            foreach (Match m in lineRegex.Matches(output))
             {
                 string path = m.Groups["path"].Value.Trim();
+                if (path.Length == 0)
+                    continue;
+
                 uint size = uint.Parse(m.Groups["size"].Value, CultureInfo.InvariantCulture);
-                uint sector = uint.Parse(m.Groups["sector"].Value, CultureInfo.InvariantCulture);
-                entries.Add(new ListEntry(path, false, size, sector));
-            }
-
-            foreach (Match m in dirRegex.Matches(output))
-            {
-                string path = m.Groups["path"].Value.Trim();
-                entries.Add(new ListEntry(path, true, 0, 0));
+                bool isDirectory = path.EndsWith('/') || path.EndsWith('\\');
+                entries.Add(new ListEntry(path, isDirectory, isDirectory ? 0u : size, 0));
             }
 
             entries.Sort(static (a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));

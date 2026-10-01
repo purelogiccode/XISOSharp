@@ -236,6 +236,9 @@ internal static class CliCommands
         List<string> args = new() { "--wipe", OverwriteFlag(overwrite), image };
         if (!string.IsNullOrWhiteSpace(output))
         {
+            // The CLI expands positional arguments as extra inputs; the chosen
+            // output must go through -o or it would be processed as an image.
+            args.Add("-o");
             args.Add(output);
         }
 
@@ -254,6 +257,9 @@ internal static class CliCommands
         List<string> args = new() { "--trim", OverwriteFlag(overwrite), image };
         if (!string.IsNullOrWhiteSpace(output))
         {
+            // The CLI expands positional arguments as extra inputs; the chosen
+            // output must go through -o or it would be processed as an image.
+            args.Add("-o");
             args.Add(output);
         }
 

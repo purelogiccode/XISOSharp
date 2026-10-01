@@ -426,13 +426,14 @@ public partial class MainWindow : Window
     {
         try
         {
-            // A folder full of images reads as a batch library; anything else reads
-            // as files to pack into a new image. Uses IsImage (same set as the
-            // pickers) so .cso/.zar/.img-only folders route to Batch, not Create.
+            // A folder full of .iso images reads as a batch library; anything
+            // else (including .cso/.zar/.img-only folders, which CLI --batch
+            // would reject with "no .iso files found") reads as files to pack.
             bool hasImages;
             try
             {
-                hasImages = Directory.EnumerateFiles(dir).Any(IsImage);
+                hasImages = Directory.EnumerateFiles(dir).Any(static p =>
+                    Path.GetExtension(p).Equals(".iso", StringComparison.OrdinalIgnoreCase));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {

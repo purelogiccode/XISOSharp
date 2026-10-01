@@ -346,7 +346,9 @@ internal sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Error(ex, "DetectCliAsync failed");
-            CliStatus = $"CLI detection failed: {ex.Message}";
+            // After the ConfigureAwait(false) probe above this catch can resume
+            // on a pool thread, so the bound property must go through SetOnUi.
+            SetOnUi(() => CliStatus = $"CLI detection failed: {ex.Message}");
             AppendLog($"[GUI] CLI detection failed: {ex.Message}");
         }
     }
