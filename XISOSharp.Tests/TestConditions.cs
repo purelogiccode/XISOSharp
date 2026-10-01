@@ -1,5 +1,11 @@
 using System.Diagnostics;
 
+// The suite mutates the process-wide current directory (create/extract CWD
+// hops), so every collection must run sequentially: parallel collections race
+// on that shared state. Previously only [Collection("Sequential")] classes were
+// serialized while newer classes ran in parallel with them.
+[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
+
 namespace XISOSharp.Tests;
 
 /// <summary>

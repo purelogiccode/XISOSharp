@@ -5,28 +5,41 @@ whole repository produced 80 tracked findings (path escapes from crafted image
 names, in-place patch collisions with the tag/descriptor sectors, CWD leaks,
 partial-output artifacts, CLI contract mismatches, vacuous tests, doc drift);
 this release resolves them, adds the follow-up regressions found while
-re-reviewing the fixes, and rounds out the desktop app with About/Donate/Exit
-actions, F8 screenshots, and a shared startup update check.
+re-reviewing the fixes, and closes a final pass over those commits (API
+compatibility, `-c .` default output, host-safe rewrite/list, audit/extraction
+parity, remap cleanup). The desktop app gains About/Donate/Exit actions, F8
+screenshots, and a shared startup update check.
 
-No API breaks; targets remain `net8.0` / `net9.0` / `net10.0`. Full suite green
-on all three: **1806 passed / 1 opt-in skip (1807) on net10.0** and **1745
-passed / 1 opt-in skip (1746) on net8.0/net9.0**.
+**No API breaks**: the data-model namespace consolidation was rolled back for the
+four long-standing public types (`UnpackOptions`, `ProcessRunResult`,
+`ExplorerNode`, `XisoExplorerOptions`) so 1.4.1 consumers compile unchanged;
+newer records/enums remain in `XISOSharp.Models`. Targets remain `net8.0` /
+`net9.0` / `net10.0`. Full suite green on all three: **1817 passed / 1 opt-in
+skip (1818) on net10.0** and **1756 passed / 1 opt-in skip (1757) on
+net8.0/net9.0**. The suite now disables xUnit parallelization assembly-wide
+because create/extract mutate the process-wide current directory.
 
 ## Highlights
 
 - **GUI**: Donate / About / Exit header actions and a proper About dialog, F8
   window screenshots, a startup "update available" prompt, tooltips throughout,
-  corrected drag-and-drop routing, and Wipe/Trim output paths that actually work.
+  corrected drag-and-drop routing (including `.zar` in multi-item drops), and
+  Wipe/Trim output paths that actually work.
 - **One update checker**: the CLI and GUI now share `UpdateCore` (version
   parsing/comparison, RID mapping, asset naming, 24-hour disk cache), so the GUI
   no longer probes GitHub on every start and the two front-ends cannot drift.
 - **Safety-first patching and writing**: crafted image names cannot escape the
   destination, in-place patches never allocate over the optimized tag or the
-  ECMA-119 descriptors, the working directory is always restored, and failed or
-  cancelled runs no longer leave truncated `.iso` / `.cso` / `.zar` artifacts.
+  ECMA-119 descriptors (even for header-only volumes), the working directory is
+  always restored, and failed or cancelled runs no longer leave truncated
+  `.iso` / `.cso` / `.zar` artifacts — including the `build-image` remap path.
 - **Backup discipline**: `.old` backups survive failed rewrites, an existing
-  backup is never overwritten, and `-D` only unlinks after a fully successful
-  (and validated) rewrite.
+  backup is never overwritten, `-D` only unlinks after a fully successful (and
+  validated) rewrite, and a pre-existing `.zar`/split part is never deleted by a
+  failed call.
+- **Compatibility parity**: listing and rewriting accept every structurally
+  valid name on every host (a colon name is only refused at extract on Windows),
+  and audit now rejects an oversized root table exactly like extraction does.
 - **Telemetry hardening**: the shared API key is no longer a plaintext literal
   (double-Base64 `ApiKeyStore`), expected operational warnings stay in the local
   log (`NoBugReport`), and the bug-report dedupe map is bounded.
@@ -39,8 +52,11 @@ passed / 1 opt-in skip (1746) on net8.0/net9.0**.
 
 - Crafted image names that could escape the destination are rejected or
   sanitized everywhere: separators, the Windows drive-relative colon
-  (`C:evil`), and trailing dots/spaces that Win32 normalizes away. A colon
-  stays a valid name on Unix, matching the writer/patcher and upstream.
+  (`C:evil`), and any trailing dot/space that Win32 strips during path
+  normalization (`foo.` no longer collides with `foo`).
+- Host safety applies where host paths are built: extraction refuses such names
+  on Windows, while listing, tree, rewrite, and ZAR packing follow the reference
+  tool and accept them on every host (a colon stays a valid name on Unix).
 - Every directory walk bounds child offsets by the recorded table size (not
   just image length), so a corrupt offset into another file's data can no
   longer audit as valid while extraction rejects it.
@@ -57,21 +73,29 @@ passed / 1 opt-in skip (1746) on net8.0/net9.0**.
 
 - The sector layout reserves the optimized tag (partition sector 15) and the
   ISO9660 descriptor pair (sectors 16-17) plus the layout-tool signature sector
-  when present, so an allocation can never overwrite them.
+  when present — including header-only (no files) volumes — so an allocation
+  can never overwrite them.
 - Table and extent sector counts use 64-bit math: a ~4 GiB file is no longer
   dropped from the allocation map by a 32-bit wrap.
 - The root directory size is recorded even when the table stays in place, so
   appended entries stay reachable.
+- Directory tables fail instead of truncating when a child offset would encode
+  the `0xFFFF` empty-child sentinel.
 
 ### Writing and containers
 
 - `CreateXiso` restores the working directory on every path (success, error,
   cancellation); a relative `-d` resolves against the caller's CWD, not the
   source directory the write phase changes into.
-- Failed/cancelled creates delete the partial output; a failed compress deletes
-  the partial `.cso` and closes split-part handles before deleting
-  (`FileShare.None` blocked the delete on Windows); a parse failure in
-  `CreateZar` no longer deletes a pre-existing `.zar` this call never touched.
+- A current-directory source (`-c .` / `-c ..`) packs the source and defaults
+  the output to the source's parent (mirroring `-c <leaf>` from that parent);
+  the same-leaf collision guard no longer aborts the default case.
+- Failed/cancelled creates delete the partial output — including the
+  `build-image` remap writer — and a failed compress deletes the partial `.cso`
+  and closes split-part handles before deleting (`FileShare.None` blocked the
+  delete on Windows).
+- `CreateZar` only deletes an output it created: a pre-existing `.zar` survives
+  a parse failure or a cancellation before packing.
 - CISO reading validates version/alignment/size and bounds the index table
   against the file; reads at/after the logical end return no data instead of
   the last block's zero padding; the final index entry rejects 31-bit overflow.
@@ -91,15 +115,18 @@ passed / 1 opt-in skip (1746) on net8.0/net9.0**.
   prepended/Redump images instead of corrupting the video partition.
 - Path and block-device audits agree on the trailing header magic and probe the
   tag at the detected disc offset, including the empty-image path.
+- Audit and extraction agree on the root table: a root size past the end of the
+  image is reported invalid instead of auditing clean.
 
 ## CLI
 
 - `--silent` is order-independent (`--silent --checksum` works like
-  `--checksum --silent`) and is still rejected without `--checksum`, including
-  when combined with `-v`/`--help`.
+  `--checksum --silent`, and with `-v`/`--help` in any position) and is still
+  rejected without `--checksum`.
 - Mode-specific flags are rejected loudly instead of silently ignored:
   `--file-time` outside create, `--preserve-attrs` outside rewrite,
-  `--jobs`/`--policy` outside `--zar`.
+  `--jobs`/`--policy` outside `--zar`, and `--jobs` with `--compress` or a
+  multi-mode redump run (where the parallel path can never take effect).
 - `--wipe`/`--trim` honor `-o` (the output is no longer processed as a second
   input); `--ciso-split` refuses a source named like its own first part;
   `--is-optimized` honors `--skip-sectors`.
@@ -107,8 +134,9 @@ passed / 1 opt-in skip (1746) on net8.0/net9.0**.
   (validated) rewrite, and one file's failure no longer suppresses a later
   file's success output or keeps its backup.
 - Help text corrected: `--help` is real help, `--validate-strict` is parity-only
-  (mismatches exit 2 either way), and the `--skip-sectors` wording matches what
-  create mode accepts.
+  (mismatches exit 2 either way), the `--skip-sectors` wording matches what
+  create mode accepts, and the redump modes show `-o <output>` instead of a
+  positional second file (which is parsed as another input).
 
 ## GUI
 
@@ -117,22 +145,26 @@ passed / 1 opt-in skip (1746) on net8.0/net9.0**.
 - **F8** saves a PNG screenshot of the active window to a `Screenshot` folder
   beside the app (falling back to `%LocalAppData%/XISOSharp/Screenshot`).
 - Startup update prompt (shared 24-hour cache with the CLI; disable with
-  `XISO_NO_UPDATE_CHECK=1`).
+  `XISO_NO_UPDATE_CHECK=1`), subscribing to window events before probing so a
+  fast show can never leave the dialog pending.
 - Drag-and-drop routing: only folders containing `*.iso` go to Batch;
-  `.cso`/`.zar`/`.img`-only folders go to Create, and a dropped `.zar` routes to
-  the Rebuild tab. Wipe/Trim pass the chosen output through `-o` correctly.
+  `.cso`/`.zar`/`.img`-only folders go to Create; a dropped `.zar` routes to the
+  Rebuild tab in single- and multi-item drops. Wipe/Trim pass the chosen output
+  through `-o` correctly.
 - `CliStatus` is always updated on the UI thread; the CLI-run cancel/timeout/
   start failures reach the log panel; GUI settings (CLI path, overwrite
   default) persist to `%AppData%/XISOSharp/gui-settings.json` again.
-- Tooltips across the main window; Models namespace layout; `--probe-cli` and
-  `--self-test` headless helpers kept green.
+- Screenshot diagnostics are treated as expected conditions (no bug report) and
+  the fallback folder is tried for security exceptions too.
+- Tooltips across the main window; `--probe-cli` and `--self-test` headless
+  helpers kept green.
 
 ## Logging, bug reports, and telemetry
 
 - CLI, GUI, and Tester share one Serilog pipeline; expected operational
   warnings (usage/validation refusals, missing-file probes, non-zero CLI exits,
-  unreadable dropped paths) are tagged `NoBugReport` and stay local, while
-  genuine Warning+ events still report.
+  unreadable dropped paths, screenshot environment issues) are tagged
+  `NoBugReport` and stay local, while genuine Warning+ events still report.
 - The shared ApplicationStats / bug-report API key is stored double-Base64
   encoded (`ApiKeyStore`) and decoded once at startup — obfuscation, not
   encryption, but no plaintext literal in sources or bundles.
@@ -146,16 +178,23 @@ passed / 1 opt-in skip (1746) on net8.0/net9.0**.
   tools; extract-xiso output is decoded as Latin-1 so `café.txt` and friends
   compare equal. Two empty parses are a failure, not a vacuous pass.
 - Removed dead helpers/wrappers (`HashUtil.ComputeMd5`/`IsAllZero`,
-  `XisoFileEntry.IsSmall`, unused sync wrappers).
+  `XisoFileEntry.IsSmall`, unused sync wrappers including `RunQuietAsync`).
 
 ## Docs and build
 
 - Fixed drift: test counts, `--help` behavior, Release-build packing, battle
-  harness default, coverage artifact OS, Tester CI claim, missing PowerShell
-  scripts, and stale `ConversionPlan.md` links.
+  harness default, coverage artifact OS, Tester CI claim, coverage figures,
+  missing PowerShell scripts, stale `ConversionPlan.md` links, and the
+  `docs/troubleshooting.md` verification-script section.
 - `publish-cli.ps1` / `publish-gui.ps1` no longer delete the protected
   `publish*/<rid>` trees: they stage into `%TEMP%` and merge the same-named
-  files over the artifact store (AGENTS.md hard rule).
+  files over the artifact store (AGENTS.md hard rule). `publish-cli.ps1 -Zip`
+  requires an exact release tag or `-Version <x.y.z>` so a pre-release run can
+  never overwrite a shipped `release_*.zip`.
+- Namespace docs match the shipped surface again (`UnpackOptions`,
+  `ProcessRunResult`, `ExplorerNode`, `XisoExplorerOptions` in `XISOSharp`;
+  typed models/enums in `XISOSharp.Models`; interfaces in
+  `XISOSharp.Interfaces`), and the library samples include the needed usings.
 - `docs/` is served both as a Docsify site on GitHub Pages (`_sidebar.md`
   left menu) and mirrored to the GitHub Wiki by `wiki.yml` +
   `.github/sync-wiki.ps1`, which generates `Home.md` and `_Sidebar.md` from the
@@ -165,9 +204,14 @@ passed / 1 opt-in skip (1746) on net8.0/net9.0**.
 
 - New coverage includes: review regressions (path escapes, table bounds,
   sentinel handling, split naming, partial-output cleanup, pre-existing-output
-  preservation, offset-image repair, CLI flag contracts), GUI command builders
-  and services, shared process runner/update checker, internals (SHA3, Latin-1,
-  bounded sub-streams), zero-size directories, and Latin-1 process output
-  decoding.
-- Suite: **net8.0/net9.0 — 1746 tests (1745 passed, 1 opt-in skip)**;
-  **net10.0 — 1807 tests (1806 passed, 1 opt-in skip, adds the GUI tests)**.
+  preservation, offset-image repair, CLI flag contracts), the follow-up fixes
+  (`-c .` default output, colon names through list/tree/rewrite, audit root-size
+  parity, `build-image` cancellation cleanup, `--jobs` rejection with
+  `--compress`), GUI command builders and services, shared process
+  runner/update checker, internals (SHA3, Latin-1, bounded sub-streams),
+  zero-size directories, and Latin-1 process output decoding.
+- The suite runs fully sequentially (assembly-wide
+  `[CollectionBehavior(DisableTestParallelization = true)]`) so the shared
+  process CWD is never mutated concurrently.
+- Suite: **net8.0/net9.0 — 1757 tests (1756 passed, 1 opt-in skip)**;
+  **net10.0 — 1818 tests (1817 passed, 1 opt-in skip, adds the GUI tests)**.

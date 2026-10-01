@@ -5,55 +5,71 @@
 Deep-review hardening and GUI experience release. An 80-item review of the whole
 repository (path escapes, patch-layout collisions, CWD leaks, partial artifacts,
 CLI contract mismatches, vacuous tests, doc drift) is resolved, together with
-the follow-up regressions found while re-reviewing those fixes. The desktop app
-gains Donate/About/Exit header actions, F8 window screenshots, and a startup
-update prompt backed by the same `UpdateCore` + 24-hour cache the CLI uses. No
-API breaks; targets remain `net8.0` / `net9.0` / `net10.0`; full suite green on
-all three (1807 tests on net10.0: 1806 passed, 1 opt-in skip; 1746 on
-net8.0/net9.0: 1745 passed, 1 opt-in skip).
+the follow-up regressions found while re-reviewing those fixes and a final pass
+over the fix commits. The desktop app gains Donate/About/Exit header actions, F8
+window screenshots, and a startup update prompt backed by the same `UpdateCore`
++ 24-hour cache the CLI uses. No API breaks: the data-model namespace
+consolidation was rolled back for the four long-standing public types
+(`UnpackOptions`, `ProcessRunResult`, `ExplorerNode`, `XisoExplorerOptions`) so
+1.4.1 consumers compile unchanged. Targets remain `net8.0` / `net9.0` /
+`net10.0`; full suite green on all three (1818 tests on net10.0: 1817 passed,
+1 opt-in skip; 1757 on net8.0/net9.0: 1756 passed, 1 opt-in skip). The suite
+runs fully sequentially (assembly-wide `DisableTestParallelization`) because
+create/extract mutate the process CWD.
 
 ### Library
 
 - **Path safety**: crafted image names (separators, Windows drive-relative
-  colons, trailing dots/spaces) are rejected or sanitized on every walk; the
-  colon stays valid on Unix where the writer/patcher accept it.
+  colons, any trailing dot/space) are rejected at extract on Windows or
+  sanitized by repair/salvage; listing, tree, rewrite, and ZAR packing accept
+  every structurally valid name on every host, matching the reference tool
+  (the colon stays valid on Unix where the writer/patcher accept it).
 - **Patching**: the allocator reserves the optimized tag (sector 15), the
-  ECMA-119 descriptor pair (16-17), and the layout-tool signature sector;
-  sector counts use 64-bit math; the root table size is recorded even when the
-  table stays in place.
+  ECMA-119 descriptor pair (16-17), and the layout-tool signature sector — also
+  for header-only volumes; sector counts use 64-bit math; the root table size
+  is recorded even when the table stays in place; a child offset that would
+  encode the `0xFFFF` empty-child sentinel fails instead of truncating.
 - **Walkers**: all child offsets are bounded by the recorded table size, the
   all-zero empty-table sentinel is honored, `.`/`..` records are skipped
-  consistently, truncated names fail instead of truncating the walk, and
-  zero-size directory entries list as empty.
-- **Writing/containers**: CWD is restored on every path; relative `-d` resolves
-  against the caller CWD; failed/cancelled runs delete partial `.iso`/`.cso`/
-  `.zar` output (closing split-part handles first on Windows) but never a
-  pre-existing file the call did not create; CISO headers/indexes are
-  validated; split part naming handles dotted bases; `Latin1Encoding` range
-  checks are overflow-safe.
+  consistently, truncated names fail instead of truncating the walk (including
+  `CollectFileEntries`), and zero-size directory entries list as empty.
+- **Writing/containers**: CWD is restored on every path; a cwd source
+  (`-c .` / `-c ..`) defaults its output next to the source instead of
+  aborting on the same-leaf guard; relative `-d` resolves against the caller
+  CWD; failed/cancelled runs delete partial `.iso`/`.cso`/`.zar` output
+  (including the `build-image` remap writer, and closing split-part handles
+  first on Windows) but never a pre-existing file the call did not create;
+  CISO headers/indexes are validated; split part naming handles dotted bases;
+  `Latin1Encoding` range checks are overflow-safe.
 - **Repair/audit**: a missing optimized tag is written at the disc offset for
-  prepended images; path and device audits agree on trailing magic and
-  empty-image tag probing.
+  prepended images; path and device audits agree on trailing magic, empty-image
+  tag probing, and an oversized root table (audit now matches extraction).
 - `XisoPaths` resolves both sides of an input==output check against one CWD
   snapshot; `XisoExplorer.Dispose` serializes with keep-open reads.
 
 ### CLI
 
-- `--silent` is order-independent (and rejected without `--checksum`, including
-  with `-v`/`--help`); `--file-time`/`--preserve-attrs`/`--jobs`/`--policy` are
-  rejected outside their modes; `--wipe`/`--trim` honor `-o`; `--is-optimized`
-  honors `--skip-sectors`; `--ciso-split` refuses a source named like its own
-  first part.
+- `--silent` is order-independent in every position, including with `-v`/
+  `--help`, and still requires `--checksum`; `--file-time`/`--preserve-attrs`/
+  `--jobs`/`--policy` are rejected outside their modes, and `--jobs` is rejected
+  with `--compress` or a multi-mode redump run where it cannot take effect;
+  `--wipe`/`--trim` honor `-o`; `--is-optimized` honors `--skip-sectors`;
+  `--ciso-split` refuses a source named like its own first part.
 - `-D` deletes `.old` only after a fully successful (validated) rewrite, and a
   failed file no longer suppresses a later file's success or keeps its backup.
+- Help shows `-o <output>` for the redump modes instead of a positional second
+  file (which is parsed as another input).
 
 ### GUI
 
 - Donate/About/Exit header actions with an About dialog; F8 screenshots;
-  startup update prompt; tooltips.
+  startup update prompt (subscribed before probing so a fast show cannot hang
+  it); tooltips.
 - Drag-and-drop routing fixed (only `*.iso` folders go to Batch; `.zar` drops
-  go to Rebuild); Wipe/Trim pass `-o` before the image; `CliStatus` updates on
-  the UI thread; settings persist again.
+  go to Rebuild in single- and multi-item drops); Wipe/Trim pass `-o` before
+  the image; `CliStatus` updates on the UI thread; settings persist again;
+  screenshot environment warnings stay local and the fallback folder is tried
+  for security exceptions.
 
 ### Logging, bug reports, telemetry
 
@@ -65,15 +81,19 @@ net8.0/net9.0: 1745 passed, 1 opt-in skip).
 ### Tester
 
 - List comparison parses the real `\name (N bytes)` format and decodes
-  extract-xiso's Latin-1 output; two empty parses fail instead of passing.
+  extract-xiso's Latin-1 output; two empty parses fail instead of passing;
+  remaining dead wrappers (`RunQuietAsync`) removed.
 
 ### Docs & build
 
 - Drift fixed (test counts, `--help`, Release packing, battle default, coverage
-  OS, Tester CI, missing scripts, `ConversionPlan.md`); publish scripts stage
-  into `%TEMP%` and merge instead of deleting the protected `publish*/` trees;
-  `docs/` serves Pages (Docsify `_sidebar.md`) and syncs to the wiki
-  (`Home.md` + `_Sidebar.md`) via `.github/workflows/wiki.yml`.
+  OS/figures, Tester CI, sequential-suite description, missing scripts,
+  `ConversionPlan.md`, namespace samples); publish scripts stage into `%TEMP%`
+  and merge instead of deleting the protected `publish*/` trees, and
+  `publish-cli.ps1 -Zip` requires an exact tag or `-Version <x.y.z>` so a
+  pre-release run cannot overwrite a shipped `release_*.zip`; `docs/` serves
+  Pages (Docsify `_sidebar.md`) and syncs to the wiki (`Home.md` +
+  `_Sidebar.md`) via `.github/workflows/wiki.yml`.
 
 ## 1.4.1
 

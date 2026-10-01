@@ -245,6 +245,15 @@ internal static class Program
 
         int optind = 0;
 
+        // CLI-002 order-independence for -v/-h: those return mid-parse and
+        // cannot consult the parsed silentFlag/checksumFlagMode (Todo #32).
+        // Scan the raw arguments so `--silent -v --checksum` is accepted in
+        // any order instead of failing on the flags seen so far.
+        bool silentRequestedAnywhere =
+            Array.Exists(args, static a => string.Equals(a, "--silent", StringComparison.Ordinal));
+        bool checksumRequestedAnywhere =
+            Array.Exists(args, static a => string.Equals(a, "--checksum", StringComparison.Ordinal));
+
         // Handle standalone verb commands early (don't start with '-')
         if (args.Length > 0 && string.Equals(args[0], "validate", StringComparison.OrdinalIgnoreCase))
         {
@@ -299,7 +308,7 @@ internal static class Program
                 switch (arg)
                 {
                     case "-v":
-                        if (silentFlag && !checksumFlagMode)
+                        if (silentRequestedAnywhere && !checksumRequestedAnywhere)
                         {
                             Logger.LogErr("Error: --silent requires --checksum\n");
                             return 1;
@@ -309,7 +318,7 @@ internal static class Program
                         return 0;
                     case "-h":
                     case "--help":
-                        if (silentFlag && !checksumFlagMode)
+                        if (silentRequestedAnywhere && !checksumRequestedAnywhere)
                         {
                             Logger.LogErr("Error: --silent requires --checksum\n");
                             return 1;
@@ -1179,6 +1188,19 @@ internal static class Program
             updateMode = true;
             videoMode = true;
             zarMode = true;
+        }
+
+        // Item 37 follow-up: --jobs only takes effect for a lone --zar over
+        // several inputs (the parallel branch). --compress/multi-mode used to
+        // accept it and silently run serially.
+        int redumpModeCount = new[]
+        {
+            videoMode, randomMode, seedMode, wipeMode, trimMode, petrifyMode, updateMode, zarMode
+        }.Count(b => b);
+        if (jobs != 1 && !(zarMode && redumpModeCount == 1))
+        {
+            Logger.LogErr("Error: --jobs is only used with a lone --zar over several inputs\n");
+            return 1;
         }
 
         // CLI-016: the -y/-n conflict must fire before the early-return
@@ -4801,14 +4823,17 @@ internal static class Program
                                                                            PVD at 0x832D. Supports filler file or 4-byte
                                                                            seed (XGD1 PRNG) plus optional sectors.txt for
                                                                            security sectors (--security-sectors).
-                                                     --video <redump.iso> [video.iso]  Extract video partition (L0+L1).
-                                                     --random <iso> [filler.bin]  Extract random filler gaps.
-                                                     --seed <iso> [seed.bin]    Extract XGD1 PRNG seed (brute-force, 4 bytes).
-                                                     --wipe <iso> [wiped.xiso]  Write XISO with filler zeroed.
-                                                     --trim <iso> [trimmed.xiso]  Trim XISO after last file extent.
-                                                     --petrify <iso> [skeleton.xiso] [hash]  Zero file data, emit SHA1 hashes.
-                                                     --update <video.iso|redump.iso> [update]  Extract su20076000_00000000 (XGD3) and zero it in video.
-                                                     --zar <iso> [out.zar]      Create ZArchive (zstd blocks, raw fallback; trimmable).
+                                                     --video <redump.iso> -o <video.iso>  Extract video partition (L0+L1).
+                                                     --random <iso> -o <filler.bin>  Extract random filler gaps.
+                                                     --seed <iso> -o <seed.bin>  Extract XGD1 PRNG seed (brute-force, 4 bytes).
+                                                     --wipe <iso> -o <wiped.xiso>  Write XISO with filler zeroed.
+                                                     --trim <iso> -o <trimmed.xiso>  Trim XISO after last file extent.
+                                                     --petrify <iso> [-o <skeleton.xiso>]  Zero file data, emit SHA1 hashes (.hash alongside).
+                                                     --update <video.iso|redump.iso> [-o <update>]  Extract su20076000_00000000 (XGD3) and zero it in video.
+                                                     --zar <iso> -o <out.zar>   Create ZArchive (zstd blocks, raw fallback; trimmable).
+                                                                                -o is only valid with exactly one mode and
+                                                                                one input; without it each mode derives
+                                                                                its own output name.
                                                      --jobs <n>               With a lone --zar over several inputs, pack
                                                                             up to <n> archives in parallel (default 1).
                                                      --policy <p>            --zar overwrite handling without prompting:

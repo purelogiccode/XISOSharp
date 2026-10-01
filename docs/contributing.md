@@ -76,7 +76,7 @@ Good starting points (the open research epics are tracked below):
   generation.
 - `docs/` improvements — accuracy passes, examples, screenshots.
 - Test coverage: sustain >85% line coverage on `XisoReader.cs`,
-  `XisoWriter.cs`, `AvlTree.cs` (currently 95.9% / 86.6% / 100% — see
+  `XisoWriter.cs`, `AvlTree.cs` (currently 94.2% / 89.6% / 100% — see
   [Testing](testing.md#coverage)); new code paths need tests, and new
   corruption shapes belong in `XisoCorruptionResilienceTests.cs`.
 - Batch-script edge cases for `-d` on Windows.

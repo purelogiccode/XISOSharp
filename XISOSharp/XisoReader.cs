@@ -679,10 +679,16 @@ public static class XisoReader
             ReadExact(fs, nameBuf);
             string filename = Latin1Encoding.Instance.GetString(nameBuf);
 
-            // Host-unsafe names (separators, drive-relative colons, Windows-
-            // invalid characters) abort the walk instead of reaching
-            // CreateDirectory/FileStream where they could escape the destination.
-            if (XisoEntryNames.IsInvalidEntryName(filename))
+            // Extract builds host paths: host-unsafe names (separators,
+            // drive-relative colons, Windows trailing dots/spaces) abort the
+            // walk instead of reaching CreateDirectory/FileStream where they
+            // could escape the destination. List/Tree/GenerateAvl only read or
+            // serialize the tree, so they follow the reference tool and accept
+            // every structurally valid name on every host.
+            bool nameInvalid = mode == ExtractMode.Extract
+                ? XisoEntryNames.IsInvalidEntryName(filename)
+                : XisoEntryNames.IsStructurallyInvalidEntryName(filename);
+            if (nameInvalid)
             {
                 Logger.LogErr($"filename '{filename}' contains invalid character(s), aborting.\n");
                 throw new XisoFormatException($"Filename '{filename}' contains invalid character(s).");
@@ -2581,6 +2587,16 @@ public static class XisoReader
             return new AuditResult(false, 0, 0, issues) { IsOptimized = isOptimized };
         }
 
+        // Parity with VerifyXiso/extraction: an oversized root table is
+        // invalid even when the entries inside it stay readable. Keep walking
+        // so a genuinely truncated file still surfaces its bounded I/O error
+        // (the documented IOException contract) instead of an invalid result.
+        if (rootDirSize > length - rootDirStart)
+        {
+            issues.Add(
+                $"Root directory size {rootDirSize} at offset {rootDirStart} exceeds available space {length - rootDirStart}.");
+        }
+
         HashSet<long> visited = new();
 
         AuditWalk(stream, rootDirStart, rootDirStart, rootDirSize, "/", length, discLseek, issues, visited,
@@ -2963,14 +2979,6 @@ public static class XisoReader
         List<SectorRange> used = new() { new SectorRange(headerSector, 1) };
         List<FileSectorExtent> entries = new();
 
-        if (volInfo is { RootDirSector: 0, RootDirSize: 0 })
-        {
-            return new SectorLayout(volInfo, Array.Empty<FileSectorExtent>(),
-                MergeSectorRanges(used, totalSectors),
-                ComplementSectorRanges(MergeSectorRanges(used, totalSectors), totalSectors),
-                totalSectors);
-        }
-
         // In-place patching must never allocate over the format's fixed system
         // areas: the optimized tag at partition sector 15 and the ISO9660
         // descriptor pair at sectors 16-17 (mirroring the sectors
@@ -2995,6 +3003,15 @@ public static class XisoReader
             {
                 // Unreadable second sector: nothing extra to reserve.
             }
+        }
+
+        // Header-only (no files) volume: the system-area reservations above
+        // still apply, so the free ranges stay safe for in-place patching.
+        if (volInfo is { RootDirSector: 0, RootDirSize: 0 })
+        {
+            IReadOnlyList<SectorRange> merged = MergeSectorRanges(used, totalSectors);
+            return new SectorLayout(volInfo, Array.Empty<FileSectorExtent>(), merged,
+                ComplementSectorRanges(merged, totalSectors), totalSectors);
         }
 
         // Iterative preorder walk over directory tables. ReadDirectoryEntries is
@@ -4268,20 +4285,16 @@ public static class XisoReader
             ReadExact(fs, nameBuf);
             string filename = Latin1Encoding.Instance.GetString(nameBuf);
 
-            // Parity with TraverseXiso (BUG-LIB-021): host-unsafe names
-            // (separators, drive-relative colons) abort the walk instead of
-            // flowing into Path.Combine, where they would create files outside
-            // the destination.
-            if (filename.Contains('/') || filename.Contains('\\'))
+            // Parity with TraverseXiso (BUG-LIB-021): separator-bearing names
+            // abort the walk instead of flowing into Path.Combine, where they
+            // would escape the destination. Only the structural rule applies
+            // here — listing/entry lookups never create host paths, so a
+            // colon or trailing dot stays listable on Windows like the
+            // reference tool.
+            if (XisoEntryNames.IsStructurallyInvalidEntryName(filename))
             {
                 throw new XisoFormatException(
-                    $"invalid TOC entry at '{contextPath}': filename '{filename}' contains a path separator.");
-            }
-
-            if (XisoEntryNames.IsInvalidEntryName(filename))
-            {
-                throw new XisoFormatException(
-                    $"invalid TOC entry at '{contextPath}': filename '{filename}' contains invalid character(s).");
+                    $"invalid TOC entry at '{contextPath}': filename '{filename}' is empty or contains a path separator.");
             }
 
             // Skip "." and ".." entries

@@ -18,7 +18,7 @@ public static class XisoAttributes
     /// <see cref="System.IO.FileAttributes.Normal"/> is added when no other
     /// standard flag is present. Reserved bits are masked first via
     /// <see cref="Constants.MaskAttributes(byte)"/>, so raw on-disk bytes map
-    /// identically to <see cref="Models.ExplorerNode.Attributes"/> and
+    /// identically to <see cref="ExplorerNode.Attributes"/> and
     /// <see cref="Models.EntryInfo.Attributes"/> (already masked).
     /// </summary>
     /// <param name="attributes">Raw XDVDFS attribute byte (see <see cref="Constants"/> for flags).</param>

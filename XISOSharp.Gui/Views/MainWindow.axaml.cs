@@ -383,9 +383,25 @@ public partial class MainWindow : Window
             {
                 if (images.Count > 0)
                 {
-                    Vm.RwImages = AppendDistinctLines(Vm.RwImages, images);
-                    OpTabs.SelectedIndex = RewriteTab;
-                    Vm.LogMessage($"[GUI] Drop: {images.Count} image(s) added to the Rewrite tab.");
+                    // .zar sidecars cannot be rewritten (CLI -r opens ISO/CISO
+                    // only); route them to Rebuild like the single-drop path
+                    // does (Todo #46).
+                    List<string> zarImages = images.Where(IsZar).ToList();
+                    List<string> rewriteImages = images.Where(p => !IsZar(p)).ToList();
+
+                    if (rewriteImages.Count > 0)
+                    {
+                        Vm.RwImages = AppendDistinctLines(Vm.RwImages, rewriteImages);
+                        Vm.LogMessage($"[GUI] Drop: {rewriteImages.Count} image(s) added to the Rewrite tab.");
+                    }
+
+                    if (zarImages.Count > 0)
+                    {
+                        Vm.RbParts = AppendLines(Vm.RbParts, zarImages);
+                        Vm.LogMessage($"[GUI] Drop: {zarImages.Count} ZAR sidecar(s) added to the Rebuild tab.");
+                    }
+
+                    OpTabs.SelectedIndex = rewriteImages.Count > 0 ? RewriteTab : RebuildTab;
                 }
 
                 foreach (string dir in dirs)

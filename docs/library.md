@@ -28,7 +28,11 @@ dependencies.
 
 ## Namespaces and types
 
-Everything lives in the `XISOSharp` namespace, except the internal data structures in
+Core operations and the long-standing safety/explorer types (`UnpackOptions`,
+`ProcessRunResult`, `ExplorerNode`, `XisoExplorerOptions`) live in `XISOSharp`; typed
+data models, records, and enums (`VolumeInfo`, `EntryInfo`, `AuditResult`,
+`ProgressInfo`, `ExtractMode`, …) live in `XISOSharp.Models`; `IBlockDevice` /
+`IFilesystem` live in `XISOSharp.Interfaces`. Internal data structures stay in
 `XISOSharp.DataStructures`.
 
 | Type | Purpose |
@@ -99,6 +103,7 @@ totalBytes`) and the structured `IProgress<ProgressInfo>` channel (`FileCount`,
 
 ```csharp
 using XISOSharp;
+using XISOSharp.Models;             // VolumeInfo, XexInfo, XbeInfo, ProgressInfo, …
 using System.IO;                    // FileShare, FileAttributes
 using System.Security.Cryptography; // HashAlgorithmName (explorer hashing)
 

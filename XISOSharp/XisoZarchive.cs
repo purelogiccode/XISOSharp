@@ -141,7 +141,18 @@ public static class XisoZarchive
         if (!quiet) Logger.Log($"[INFO] Writing ZArchive to {zarPath}\n");
         // Only a destination this call started writing may be deleted on
         // failure: a parse error before packing must leave an existing .zar
-        // (which this call never touched) alone.
+        // (which this call never touched) alone, and a pre-existing archive is
+        // never deleted (mirrors CisoWriter's created-only cleanup).
+        bool destinationExisted;
+        try
+        {
+            destinationExisted = File.Exists(zarPath);
+        }
+        catch
+        {
+            destinationExisted = true;
+        }
+
         bool packStarted = false;
         try
         {
@@ -203,7 +214,7 @@ public static class XisoZarchive
 
         void DeleteIncomplete(string path)
         {
-            if (!packStarted)
+            if (!packStarted || destinationExisted)
                 return;
 
             try

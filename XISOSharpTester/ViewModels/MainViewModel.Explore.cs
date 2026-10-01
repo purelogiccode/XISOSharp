@@ -8,7 +8,7 @@ using Microsoft.Win32;
 using Serilog;
 using XISOSharp;
 using XISOSharp.Models;
-using XisoNode = XISOSharp.Models.ExplorerNode;
+using XisoNode = XISOSharp.ExplorerNode;
 
 namespace XISOSharpTester.ViewModels;
 

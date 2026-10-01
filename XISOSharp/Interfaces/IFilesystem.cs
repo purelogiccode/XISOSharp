@@ -35,7 +35,7 @@ public interface IFilesystem
 
     /// <summary>
     /// Returns <c>true</c> when a file (not a directory) exists at
-    /// <paramref name="path"/>. Used by <see cref="XISOSharp.Models.UnpackOptions.SkipExisting"/>
+    /// <paramref name="path"/>. Used by <see cref="XISOSharp.UnpackOptions.SkipExisting"/>
     /// resume logic. Unresolvable paths return <c>false</c>.
     /// </summary>
     /// <param name="path">Destination-root-relative path to probe.</param>

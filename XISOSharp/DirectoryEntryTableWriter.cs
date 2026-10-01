@@ -230,11 +230,14 @@ public static class DirectoryEntryTableWriter
     private static ushort ToDwordOffset(uint byteOffset, string name)
     {
         uint dwords = byteOffset / Constants.DwordSize;
-        if (dwords > ushort.MaxValue)
+        // 0xFFFF is the empty-child/sentinel value every walker understands
+        // ("no child"), so it is not addressable: the last usable offset is
+        // 65534 DWORDs.
+        if (dwords >= ushort.MaxValue)
         {
             throw new InvalidOperationException(
                 $"Directory table containing '{name}' is too large: entry offset {byteOffset} bytes " +
-                "exceeds the 16-bit child-offset field (max 65535 DWORDs).");
+                $"exceeds the 16-bit child-offset field (max {ushort.MaxValue - 1} DWORDs).");
         }
 
         return (ushort)dwords;

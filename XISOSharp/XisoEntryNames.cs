@@ -14,12 +14,14 @@ namespace XISOSharp;
 internal static class XisoEntryNames
 {
     /// <summary>
-    /// Returns true when <paramref name="name"/> cannot be used as a host file
-    /// name safely. Structural <c>"."</c>/<c>".."</c> records are not flagged
-    /// here — walkers skip those separately — but names that normalize to them
-    /// on Windows are.
+    /// Returns true when <paramref name="name"/> is invalid for every walker,
+    /// on every host: an empty name or one carrying a path separator. Exact
+    /// <c>"."</c>/<c>".."</c> records are not flagged — walkers skip those
+    /// separately. Rewrite/archive paths (which never build host paths) must
+    /// use this check so a structurally readable image stays readable on
+    /// Windows, matching the reference tool.
     /// </summary>
-    internal static bool IsInvalidEntryName(string name)
+    internal static bool IsStructurallyInvalidEntryName(string name)
     {
         if (string.IsNullOrEmpty(name))
             return true;
@@ -30,16 +32,40 @@ internal static class XisoEntryNames
 
         foreach (char c in name)
         {
-            if (IsInvalidEntryChar(c))
+            if (c is '/' or '\\')
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Returns true when <paramref name="name"/> cannot be used as a host file
+    /// name safely. Structural <c>"."</c>/<c>".."</c> records are not flagged
+    /// here — walkers skip those separately — but names that normalize to them
+    /// on Windows are.
+    /// </summary>
+    internal static bool IsInvalidEntryName(string name)
+    {
+        if (IsStructurallyInvalidEntryName(name))
+            return true;
+
+        // Exact structural records are skipped by the walkers, not rejected.
+        if (name is "." or "..")
+            return false;
+
+        foreach (char c in name)
+        {
+            if (c == ':' && OperatingSystem.IsWindows())
                 return true;
         }
 
         if (OperatingSystem.IsWindows())
         {
             // Win32 strips trailing dots/spaces, so a name that normalizes to
-            // nothing or to a parent reference would escape the destination.
-            string trimmed = name.TrimEnd(' ', '.');
-            if (trimmed.Length == 0 || trimmed is "." or "..")
+            // nothing, to a parent reference, or to a *different* existing name
+            // (`foo.` -> `foo`) would escape or silently collide on extract.
+            if (name.TrimEnd(' ', '.').Length != name.Length)
                 return true;
         }
 

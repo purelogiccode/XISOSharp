@@ -64,8 +64,10 @@ Highlights:
 
 Conventions:
 
-- Tests run **sequentially** (`[Collection("Sequential")]`) because create/extract
-  operations temporarily change the current directory.
+- Tests run **sequentially** (assembly-wide
+  `[CollectionBehavior(DisableTestParallelization = true)]`, on top of
+  `[Collection("Sequential")]` on the CWD-sensitive classes) because create/extract
+  operations temporarily change the process-wide current directory.
 - Tests create their own temp directories and clean up afterwards.
 - A snapshot-style round-trip (create → extract → compare SHA-256 of every file) is
   the standard correctness pattern, locked by the checked-in reference
@@ -164,8 +166,8 @@ dotnet test XISOSharp.Tests --collect:"XPlat Code Coverage"
 The report (`coverage.cobertura.xml`) is uploaded as a CI artifact from the
 `windows-latest` job (the only job that runs the test suite).
 
-Measured line coverage (coverlet, full suite): `XisoReader.cs` 95.9%,
-`XisoWriter.cs` 86.6%, `AvlTree.cs` 100% — all above the 85% target. The
+Measured line coverage (coverlet, full net10.0 suite, 1.4.2): `XisoReader.cs`
+94.2%, `XisoWriter.cs` 89.6%, `AvlTree.cs` 100% — all above the 85% target. The
 remaining reader gaps are unreachable-by-construction defenses: the
 per-table entry-count caps (offsets are 16-bit, so >65536 distinct positions
 cannot occur), mid-copy I/O races, ACL-only permission paths, volume

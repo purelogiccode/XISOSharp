@@ -1286,11 +1286,15 @@ public class XisoCoverageTests : IDisposable
         Assert.Empty(XisoReader.ListDirectory(CreateZeroRootIso(), "/"));
 
     [Fact]
-    public void ZeroRoot_GetSectorLayout_ReturnsHeaderOnly()
+    public void ZeroRoot_GetSectorLayout_ReservesSystemAreas()
     {
         SectorLayout layout = XisoReader.GetSectorLayout(CreateZeroRootIso());
-        Assert.Single(layout.UsedRanges);
+        // Empty volume: no file extents, but the optimized tag (15) and the
+        // ECMA-119 descriptor pair (16-17) stay reserved so in-place patching
+        // can never allocate over them.
         Assert.DoesNotContain(layout.Entries, static e => !e.IsDirectory);
+        Assert.Contains(layout.UsedRanges, static r => r.StartSector == 15 && r.SectorCount == 3);
+        Assert.Contains(layout.UsedRanges, static r => r.StartSector == 32);
     }
 
     [Fact]
@@ -1347,4 +1351,82 @@ public class XisoCoverageTests : IDisposable
     // catches (output dir / ISO-name dir). Those need ACL deny rules to
     // trigger (the read-only directory flag does not block creation on
     // Windows), so they stay uncovered by unit tests.
+
+    [Fact]
+    public void CreateXiso_DotSourceDirectory_DefaultOutputLandsNextToSource()
+    {
+        // Regression: `-c .` with the default output used to collide with the
+        // source's own leaf (#55 guard) and abort; the ISO now defaults to the
+        // source's parent, mirroring `-c <leaf>` run from that parent.
+        string root = CreateTempDir("xiso_cov_dot_root");
+        string src = Path.Combine(root, "games");
+        Directory.CreateDirectory(src);
+        File.WriteAllText(Path.Combine(src, "dot.txt"), "dotted");
+
+        string cwd = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(src);
+            int rc = XisoWriter.CreateXiso(".", null, null, null, out string? isoPath, null, null);
+
+            Assert.Equal(0, rc);
+            Assert.Equal(Path.Combine(root, "games.iso"), isoPath);
+            Assert.True(File.Exists(isoPath));
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(cwd);
+        }
+    }
+
+    [Fact]
+    public void RewriteAndList_ColonEntryName_SupportedOnEveryHost()
+    {
+        // Regression: the Windows host-safety rule (colon is drive-relative)
+        // leaked into rewrite/list, so an image the reference tool reads could
+        // not be rewritten on Windows. Only extraction rejects such names.
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "ab.txt"), "hello"), "game.iso");
+        (uint rootSize, long rootAbs) = RootLayout(isoPath);
+
+        byte[] img = File.ReadAllBytes(isoPath);
+        long header = FindEntryHeader(img, rootAbs, rootSize, "ab.txt");
+        img[header + 14] = (byte)':';
+        string bad = CopyIso(isoPath, "xiso_cov_bad");
+        File.WriteAllBytes(bad, img);
+
+        Assert.Contains(XisoReader.ListDirectory(bad, "/"),
+            static e => string.Equals(e.Name, ":b.txt", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(0, XisoReader.List(bad, llCompat: false));
+        Assert.Equal(0, XisoReader.Tree(bad, llCompat: false));
+
+        Assert.Equal(0, XisoReader.Rewrite(bad, CreateTempDir("xiso_cov_colon_dest"), out string? rewritten));
+        Assert.NotNull(rewritten);
+        Assert.Contains(XisoReader.ListDirectory(rewritten, "/"),
+            static e => string.Equals(e.Name, ":b.txt", StringComparison.OrdinalIgnoreCase));
+
+        // Extraction still refuses the Windows drive-relative name (the whole
+        // point of the host-safety rule); Unix can create it.
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Throws<XisoFormatException>(() =>
+                XisoReader.Extract(bad, CreateTempDir("xiso_cov_colon_extract"), llCompat: false));
+        }
+    }
+
+    [Fact]
+    public void Audit_OversizedRootSize_ReportsInvalid()
+    {
+        // Regression: extraction rejects a root size past EOF while audit
+        // reported the image valid (audit/extraction parity).
+        string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
+        byte[] img = File.ReadAllBytes(isoPath);
+        BinaryPrimitives.WriteUInt32LittleEndian(
+            img.AsSpan(Constants.HeaderOffset + Constants.HeaderDataLength + 4), 0xFFFFFF00u);
+        string bad = CopyIso(isoPath, "xiso_cov_bad");
+        File.WriteAllBytes(bad, img);
+
+        AuditResult result = XisoReader.AuditXiso(bad);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, static i => i.Contains("Root directory size", StringComparison.Ordinal));
+    }
 }

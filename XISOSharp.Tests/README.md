@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1807-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1818-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![Test SDK](https://img.shields.io/badge/test--sdk-18.10.1-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
@@ -36,7 +36,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **XisoReader.AuditXiso** — deep integrity audit (header, tree, sectors, cycles)
 - **Snapshot** — `Fixtures/test_fixture.iso`: deterministic create (`fileTime: 0`) is byte-identical across runs and to the reference; extract/rewrite round-trips match SHA-256 per file
 - **Corruption resilience** — truncated tables, manipulated header pointers, out-of-image extents, `uint.MaxValue` sizes, invalid filenames, >4 GB inputs fail fast with named errors
-- **Reader gap-closers** — multi-sector tables, disc-layout probes, block-device errors, sentinel shapes (line coverage: `XisoReader` 95.9%, `XisoWriter` 86.6%, `AvlTree` 100%)
+- **Reader gap-closers** — multi-sector tables, disc-layout probes, block-device errors, sentinel shapes (line coverage: `XisoReader` 94.2%, `XisoWriter` 89.6%, `AvlTree` 100%)
 - **Legacy interop** — images created by the reference extract-xiso (legacy layout) round-trip through `llCompat` extract/list/rewrite
 - **File copier** — `XisoFileCopier.CopyExact` size matrix, truncation counts, short-read stitching, pooled buffers, mid-copy cancel, per-chunk `FileProgress` on copy-out/unpack
 - **Filesystem destinations** — `IFilesystem`/`LocalFilesystem`/`MemoryFilesystem` semantics, generic `UnpackImage` byte-parity with the legacy disk unpack, resume/continue-on-error/cancel/truncation through custom destinations
@@ -55,7 +55,9 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Bug reports / telemetry** — report entry points under test hosts, exception-block budgets, environment block lines, stats launch-ping opt-outs
 - **Internal helpers** (`InternalsVisibleTo`) — SHA3-256 NIST vectors/chunking/disposal, Latin-1 codec full byte range + overflow-safe range validation, bounded sub-stream window/ownership semantics
 - **Hardening regressions** — path-escape names, table-size bounds, all-zero sentinel, zero-size directory listing, split part naming (dotted bases), partial-output cleanup and pre-existing-output preservation (`CreateZar`/`CompressToCso`), offset-image tag repair, same-CWD input==output guard
-- **CLI flag contracts** — `--silent` order independence (incl. `-v`/`--help`), `--file-time`/`--preserve-attrs`/`--jobs`/`--policy` mode rejection, `--ciso-split` first-part guard, Wipe/Trim flags-before-positionals
+- **CLI flag contracts** — `--silent` order independence (incl. `-v`/`--help`), `--file-time`/`--preserve-attrs`/`--jobs`/`--policy` mode rejection (incl. `--jobs` with `--compress`/multi-mode), `--ciso-split` first-part guard, Wipe/Trim flags-before-positionals
+- **Follow-up regressions** — `-c .` default output next to the source, colon names through list/tree/rewrite (extract refuses on Windows), audit root-size/extraction parity, header-only sector-layout reservations, `build-image` cancellation cleanup, child-offset `0xFFFF` sentinel guard
+- **Sequential execution** — assembly-wide `[CollectionBehavior(DisableTestParallelization = true)]` because create/extract mutate the process CWD
 - **GUI command builders** (net10.0) — `CliCommands` argv for every verb, flags-before-positionals invariant, `CliLocator` version metadata fallbacks
 - **GUI services** (net10.0) — screenshot file naming/folder resolution/collision suffixes and update-check version comparison/release-URL fallback
 

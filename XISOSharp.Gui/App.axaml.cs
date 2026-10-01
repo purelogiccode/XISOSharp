@@ -133,11 +133,6 @@ public class App : Application
     /// </summary>
     private static async Task<bool> WaitForShownAsync(Window window)
     {
-        if (window.IsVisible)
-        {
-            return true;
-        }
-
         TaskCompletionSource<bool> shown = new(TaskCreationOptions.RunContinuationsAsynchronously);
         EventHandler opened = (_, _) => shown.TrySetResult(true);
         EventHandler closed = (_, _) => shown.TrySetResult(false);
@@ -145,6 +140,13 @@ public class App : Application
         window.Closed += closed;
         try
         {
+            // Subscribe before probing: a show between the check and the
+            // subscription would otherwise be missed and hang the dialog.
+            if (window.IsVisible)
+            {
+                return true;
+            }
+
             return await shown.Task.ConfigureAwait(true);
         }
         finally

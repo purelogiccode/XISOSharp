@@ -435,11 +435,18 @@ public static class XisoRanges
         byte[] nameBuf = new byte[nameLength];
         if (nameLength > 0)
         {
+            // A truncated name must fail, not silently drop the entry and its
+            // right-sibling chain (parity with GetValidSectors above).
             int read = 0;
             while (read < nameLength)
             {
                 int n = isoFs.Read(nameBuf, read, nameLength - read);
-                if (n == 0) return;
+                if (n == 0)
+                {
+                    throw new EndOfStreamException(
+                        $"invalid TOC entry at '{dirPath}': truncated filename (expected {nameLength} bytes, got {read}).");
+                }
+
                 read += n;
             }
         }

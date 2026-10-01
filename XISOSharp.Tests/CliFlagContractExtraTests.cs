@@ -93,6 +93,55 @@ public class CliFlagContractExtraTests : IDisposable
         Assert.Contains("--silent requires --checksum", AllError(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("--silent", "-v", "--checksum")]
+    [InlineData("--silent", "--checksum", "-v")]
+    [InlineData("--checksum", "-v", "--silent")]
+    [InlineData("--silent", "-h", "")]
+    [InlineData("-h", "--silent", "")]
+    public void Silent_WithChecksum_BeforeVersionOrHelp_IsOrderIndependent(string first, string second, string third)
+    {
+        List<string> args = [first, second];
+        if (third.Length > 0)
+        {
+            args.Add(third);
+        }
+
+        int rc = Program.Main([.. args]);
+        bool withChecksum = args.Contains("--checksum");
+        if (withChecksum)
+        {
+            // A valid --silent --checksum combination must reach the version/
+            // help handling instead of failing on whichever flag was seen first.
+            Assert.DoesNotContain("--silent requires --checksum", AllError(), StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Equal(1, rc);
+            Assert.Contains("--silent requires --checksum", AllError(), StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Jobs_WithCompressAlias_IsRejected()
+    {
+        // Item 37 follow-up: --compress expands to several modes, so --jobs can
+        // never take effect; it used to be accepted and silently ignored.
+        int rc = Program.Main(["--compress", "--jobs", "4", "no-such-flag-test.iso"]);
+
+        Assert.Equal(1, rc);
+        Assert.Contains("--jobs is only used with a lone --zar", AllError(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Jobs_WithMultiModeZar_IsRejected()
+    {
+        int rc = Program.Main(["--zar", "--petrify", "--jobs", "2", "no-such-flag-test.iso"]);
+
+        Assert.Equal(1, rc);
+        Assert.Contains("--jobs is only used with a lone --zar", AllError(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void FileTime_OutsideCreate_IsRejected()
     {

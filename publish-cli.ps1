@@ -26,6 +26,7 @@ param(
     [string[]]$Rid = @('win-x86', 'win-x64', 'win-arm64', 'linux-x64', 'linux-arm64', 'osx-x64', 'osx-arm64'),
     [string]$Configuration = 'Release',
     [string]$OutputRoot = '',
+    [string]$Version = '',
     [switch]$Zip
 )
 
@@ -35,10 +36,22 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 }
 
 # Version for the -Zip asset names (release_<version>_<rid>.zip), from the
-# latest git tag so it matches the GitHub release the zips attach to.
-$cliVersion = (& git -C $PSScriptRoot describe --tags --abbrev=0 2>$null)
+# exact git tag so it matches the GitHub release the zips attach to. An
+# untagged HEAD must not silently reuse the previous tag: that would overwrite
+# a shipped release_<old>_<rid>.zip (AGENTS.md). Pass -Version <x.y.z> to build
+# a planned release before tagging. Without -Zip the value is only cosmetic.
+$cliVersion = $Version
 if ([string]::IsNullOrWhiteSpace($cliVersion)) {
-    $cliVersion = '0.0.0-dev'
+    $cliVersion = (& git -C $PSScriptRoot describe --tags --exact-match 2>$null)
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($cliVersion)) {
+        if ($Zip) {
+            throw "-Zip needs an exact release tag or -Version <x.y.z>: refusing to overwrite a release_*.zip from an untagged commit."
+        }
+        $cliVersion = (& git -C $PSScriptRoot describe --tags --abbrev=0 2>$null)
+        if ([string]::IsNullOrWhiteSpace($cliVersion)) {
+            $cliVersion = '0.0.0-dev'
+        }
+    }
 }
 $cliVersion = $cliVersion -replace '^[vV]', ''
 

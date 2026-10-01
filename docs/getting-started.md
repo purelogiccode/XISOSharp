@@ -87,6 +87,14 @@ XISOSharp -c ./game_files my_game.iso          # written to ./my_game.iso
 XISOSharp -c ./game_files ./out/my_game.iso     # name may include a directory
 ```
 
+A current-directory source defaults its output next to the source instead, so it
+never lands inside the directory being packed:
+
+```bash
+cd ./game_files
+XISOSharp -c .                                  # ../game_files.iso
+```
+
 ### First listing
 
 ```bash
@@ -154,6 +162,9 @@ keep-open explorer: one held image stream, serialized operations, and bounded
 per-file read streams that never extract to disk.
 
 ```csharp
+using XISOSharp;
+using XISOSharp.Models; // VolumeInfo
+
 using var explorer = new XisoExplorer(isoPath,
     new XisoExplorerOptions { KeepOpen = true, Share = FileShare.ReadWrite });
 VolumeInfo vol = explorer.Volume;                       // CreationTime, DescriptorSector, DiscFormat

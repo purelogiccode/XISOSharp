@@ -230,20 +230,23 @@ The test suite is sequential, but a previous test run may still hold file handle
 the `TestData` outputs. Close other `extract-xiso` processes, clean
 `TestData/output`, and re-run.
 
-**`Verify-Output.ps1` cannot find the C tool.**
+**Output does not match the reference C tool.**
 
-The script's default parameters point at the sibling repo layout
-(`C:\Sincronizar\source\repos\CSharp_ExtractXiso`). Pass explicit paths:
+There is no standalone verification script; comparison is built into the suite.
+Drop `extract-xiso.exe` (build `202609111233`) into `References/` and run the
+oracle-gated tests, or run the battle harness. Both skip cleanly when the binary
+is absent:
 
-```powershell
-.\Verify-Output.ps1 -CExtractXiso "C:\path\to\extract-xiso.exe" -CsExtractXiso "C:\path\to\extract-xiso.exe" -TestData "C:\path\to\TestData"
+```bash
+dotnet test XISOSharp.Tests -c Release --filter "FullyQualifiedName~Interop"
+dotnet run --project XISOSharp.BattleTests -c Release
 ```
 
 **The WPF tester does not build on Linux/macOS.**
 
-`XISOSharpTester` is Windows-only (`net10.0-windows`). It is not part of CI; build the
-solution on non-Windows with `dotnet build CSharp_XISOSharp.sln` after excluding that
-project, or just build `XISOSharp.Core`/`XISOSharp.Cli`/`XISOSharp.Tests`.
+`XISOSharpTester` targets `net10.0-windows` and sets `EnableWindowsTargeting`, so
+`dotnet build CSharp_XISOSharp.sln -c Release` works on all three CI OSes; the
+test suite still runs on Windows only.
 
 ## Still stuck?
 

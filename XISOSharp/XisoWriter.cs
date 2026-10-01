@@ -219,6 +219,10 @@ public static class XisoWriter
 
         string isoName;
         string isoDir;
+        // Default output for a cwd source (`-c .` / `-c ..`): the source's
+        // parent, mirroring `-c <leaf>` run from that parent. Writing it into
+        // the source itself would trip the #55 same-leaf collision guard below.
+        string? defaultOutputDirectory = null;
 
         if (inRoot == null)
         {
@@ -237,6 +241,15 @@ public static class XisoWriter
                 isoDir = Path.GetFileName(Directory.GetCurrentDirectory());
                 if (isoDir.Length == 0)
                     isoDir = Constants.PathCharStr;
+
+                try
+                {
+                    defaultOutputDirectory = Path.GetDirectoryName(Directory.GetCurrentDirectory());
+                }
+                catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+                {
+                    Logger.LogDebug($"Source parent resolve failed: {ex.Message}");
+                }
             }
 
             isoName = inName ?? isoDir;
@@ -252,7 +265,9 @@ public static class XisoWriter
             isoDir = Constants.PathCharStr;
         }
 
-        outputDirectory ??= cwd;
+        // The parent fallback applies only to the derived default name: an
+        // explicit name without a directory still means "the caller's CWD".
+        outputDirectory ??= (inName == null ? defaultOutputDirectory : null) ?? cwd;
 
         // Never trim into a filesystem root: `-d C:\` (batch scripts love
         // trailing backslashes, upstream #61) must stay `C:\`, not become the
@@ -1142,6 +1157,9 @@ public static class XisoWriter
 
         int err = 0;
         string cwd = Directory.GetCurrentDirectory();
+        // A failed/cancelled remap create must not leave a truncated .iso that
+        // looks like a finished artifact (Todo #53, remap path).
+        string? partialOutput = null;
         try
         {
             // Directory layout
@@ -1164,6 +1182,7 @@ public static class XisoWriter
                     Share = FileShare.None,
                     BufferSize = 65536
                 });
+            partialOutput = xisoPath;
             if (prependOffset > 0)
             {
                 xisoFs.SetLength(prependOffset);
@@ -1227,6 +1246,7 @@ public static class XisoWriter
         }
         catch (OperationCanceledException)
         {
+            DeletePartialOutput();
             throw;
         }
         catch (Exception ex)
@@ -1248,7 +1268,27 @@ public static class XisoWriter
             }
         }
 
+        if (err != 0)
+            DeletePartialOutput();
+
         return err;
+
+        void DeletePartialOutput()
+        {
+            if (partialOutput == null)
+                return;
+
+            try
+            {
+                File.Delete(partialOutput);
+            }
+            catch
+            {
+                // Best effort: never mask the original failure.
+            }
+
+            partialOutput = null;
+        }
 
         void SumFiles(AvlNode? n)
         {

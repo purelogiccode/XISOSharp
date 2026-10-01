@@ -590,4 +590,36 @@ public class RemapFilesystemTests : IDisposable
         int res = RemapFilesystem.BuildImage(missing, isoPath, new List<RemapRule> { r! });
         Assert.Equal(1, res);
     }
+
+    [Fact]
+    public void BuildImage_CancelledDuringWrite_DeletesPartialOutput()
+    {
+        // Regression (Todo #53, remap path): a cancelled build-image must not
+        // leave a truncated .iso that looks like a finished artifact.
+        string src = CreateTempDir();
+        CreateFile(src, "a.txt", "hello");
+        CreateFile(src, "sub/b.txt", "world");
+        string outDir = CreateTempDir();
+        string isoPath = Path.Combine(outDir, "cancelled.iso");
+
+        Assert.True(RemapRule.TryParse("**:{0}", out RemapRule? rule, out _));
+        using CancellationTokenSource cts = new();
+        InlineProgress progress = new(info =>
+        {
+            if (info.Type == ProgressInfoType.FileAdded)
+            {
+                cts.Cancel();
+            }
+        });
+
+        Assert.Throws<OperationCanceledException>(() =>
+            RemapFilesystem.BuildImage(src, isoPath, new List<RemapRule> { rule! }, progress: progress,
+                ct: cts.Token));
+        Assert.False(File.Exists(isoPath));
+    }
+
+    private sealed class InlineProgress(Action<ProgressInfo> onReport) : IProgress<ProgressInfo>
+    {
+        public void Report(ProgressInfo value) => onReport(value);
+    }
 }

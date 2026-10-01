@@ -84,19 +84,6 @@ public class XisoSharpWrapper : IDisposable
     }
 
     /// <summary>
-    /// Runs the extract-xiso tool with the specified arguments, appending
-    /// the quiet flag (<c>-Q</c>) to suppress output, asynchronously.
-    /// </summary>
-    /// <param name="args">Command-line arguments to pass.</param>
-    /// <param name="cancellationToken">Cancels the run and kills the child process.</param>
-    /// <returns>A <see cref="XisoSharpResult"/> containing exit code and output.</returns>
-    public Task<XisoSharpResult> RunQuietAsync(string[] args, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(args);
-        return RunAsync([.. args, "-Q"], cancellationToken);
-    }
-
-    /// <summary>
     /// Lists the contents of an XISO image asynchronously.
     /// </summary>
     /// <param name="isoPath">Path to the XISO file.</param>

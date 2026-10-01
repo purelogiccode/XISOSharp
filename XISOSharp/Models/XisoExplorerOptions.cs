@@ -1,4 +1,4 @@
-namespace XISOSharp.Models;
+namespace XISOSharp;
 
 /// <summary>
 /// A single file or directory inside an XISO image, as surfaced by

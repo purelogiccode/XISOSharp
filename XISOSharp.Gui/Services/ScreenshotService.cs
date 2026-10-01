@@ -106,7 +106,9 @@ internal static class ScreenshotService
             Window? target = ActiveWindow(fallbackWindow);
             if (target is null)
             {
-                Log.Warning("Screenshot skipped: no visible window to capture");
+                // Expected at shutdown / with no window open: operational, not a defect.
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning("Screenshot skipped: no visible window to capture");
                 return null;
             }
 
@@ -137,7 +139,7 @@ internal static class ScreenshotService
                 return SaveTo(bitmap, PrimaryFolder, timestamp, usedFallback: false);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException
-                                           or ArgumentException)
+                                           or ArgumentException or System.Security.SecurityException)
             {
                 // Environment condition (read-only install), not a defect.
                 Log.ForContext(BugReportSink.NoBugReportProperty, true)
