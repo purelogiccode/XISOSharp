@@ -31,7 +31,7 @@ Redump: [ L0 (VIDEO_L0_LENGTH[wave]) | l0Padding | game partition (fileRanges + 
 ## Video
 
 ```bash
-XISOSharp --video <redump.iso> [video.iso]
+XISOSharp --video -o <video.iso> <redump.iso>
 ```
 
 `XisoRedump.TryExtractVideo(redumpPath, outputVideoPath, out outPath)` — head `VIDEO_L0_LENGTH[videoType]` at `0` + tail `VIDEO_L1_LENGTH[videoType]` at `isoSize-L1`, streamed `64*SectorSize` chunks via `Logger`. Gracefully fails (warning) when `GetVideoType == -1`. As sidecar of `--all`/`--best`/`--compress` (see aliases). XGD3 `su…` is **not** in video when `--update` also extracts it (zeroed in video for dedup).
@@ -39,7 +39,7 @@ XISOSharp --video <redump.iso> [video.iso]
 ## Random
 
 ```bash
-XISOSharp --random <input.iso> [filler.bin]
+XISOSharp --random -o <filler.bin> <input.iso>
 ```
 
 `XisoOperations.ExtractFiller(isoPath, isoOffset)` — bytes **not** in `SysRanges ∪ FileRanges` after `MergeRanges`, i.e. gaps. Validates `filler % SectorSize==0`. Mirrors `XDVDFS.GetValidSectors` → `ProcessXISO` filler path.
@@ -47,7 +47,7 @@ XISOSharp --random <input.iso> [filler.bin]
 ## Seed
 
 ```bash
-XISOSharp --seed <input.iso> [seed.bin]
+XISOSharp --seed -o <seed.bin> <input.iso>
 ```
 
 XGD1 only. `XisoOperations.TryExtractSeed` + `XboxPrng.BruteForceSeed(ReadOnlySpan<byte> fillerSample)` / `SimulateSectors` / `WriteSectors` — RC4-like PRNG (port of `XboxPRNG.cs`). Brute-forces 4-byte LE seed from first filler gap; gate `GetXisoType==0` (XGD1). Writes 4-byte LE seed to `*.seed`.
@@ -63,7 +63,7 @@ XISOSharp --wipe -o <wiped.xiso> <input.iso>
 ## Trim
 
 ```bash
-XISOSharp --trim <input.iso> [trimmed.xiso]
+XISOSharp --trim -o <trimmed.xiso> <input.iso>
 ```
 
 `XisoOperations.TrimXiso` — truncate after last file extent (`ranges.Max(End)+1)*SectorSize`), already `FileModulus`-aligned collection via `MergeRanges`. `FileStream.SetLength(trimmedLen)`.
@@ -71,7 +71,7 @@ XISOSharp --trim <input.iso> [trimmed.xiso]
 ## Petrify
 
 ```bash
-XISOSharp --petrify <input.iso> [skeleton.xiso] [hashFile]
+XISOSharp --petrify -o <skeleton.xiso> <input.iso>   # hash derives as <base>.hash
 ```
 
 `XisoSkeleton.Petrify` — XISO with file extents zeroed + SHA-1 hex per file (`CollectFileEntries` sorted by `Offset`, `SHA1` streaming `sector*SectorSize+isoOffset`, line `hex + " " + path`). Skeleton = every filesystem (bone) sector verbatim, everything else zeroed, walked as keep-segments so bone islands inside mixed bone/file extents survive (zeroing to merged-extent ends would pave over them and leave an unlistable skeleton — see [Troubleshooting](troubleshooting.md#petrify-battle-skipped-oracle-emits-unreadable-skeleton)). On Redump inputs only the game partition is emitted (no Redump prefix), matching `xboxkit -p` sizing.
@@ -79,7 +79,7 @@ XISOSharp --petrify <input.iso> [skeleton.xiso] [hashFile]
 ## Update
 
 ```bash
-XISOSharp --update <redump.iso> [updateFile]
+XISOSharp --update -o <updateFile> <redump.iso>
 ```
 
 `XisoRedump.TryExtractUpdate(redumpPath, outputUpdatePath, outputVideoPath)` — extracts `su20076000_00000000` from video `L1` tail and zeroes it in output `video.iso` for dedup (XGD3 only, `GetVideoType` 17/18). Heuristic `FindUpdateOffset` tail scan `ABCDABCD`, `l1Trimmed = L1 - suSize - SectorSize`. Warns no-op on XGD1/2.
@@ -87,7 +87,7 @@ XISOSharp --update <redump.iso> [updateFile]
 ## ZAR
 
 ```bash
-XISOSharp --zar <input.iso|redump.iso> [output.zar]
+XISOSharp --zar -o <output.zar> <input.iso|redump.iso>
 XISOSharp rebuild <game.zar> [video.iso] [filler|seed] [su...] -o <redump.iso>
 ```
 

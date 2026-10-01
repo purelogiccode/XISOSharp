@@ -156,6 +156,47 @@ public class XisoRepairTests : IDisposable
     }
 
     [Fact]
+    public void Repair_MissingTag_OffsetImage_WritesAtDiscOffset()
+    {
+        // The optimized tag lives at partition offset 31337; an offset image
+        // carries it at discLseek + 31337. Repair must write there, not at the
+        // absolute offset (which would corrupt the video partition).
+        string isoPath = CreateIsoWithFiles(("readme.txt", "hello"u8.ToArray()));
+        string offsetDir = CreateTempDir("xiso_repair_offset");
+        string offsetIso = Path.Combine(offsetDir, "global.iso");
+        long discLseek = Constants.GlobalLseekOffset;
+        byte[] partition = File.ReadAllBytes(isoPath);
+        using (FileStream outFs = new(offsetIso, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            outFs.SetLength(discLseek + partition.Length);
+            outFs.Seek(discLseek, SeekOrigin.Begin);
+            outFs.Write(partition);
+        }
+
+        long tagOffset = discLseek + Constants.OptimizedTagOffset;
+        using (FileStream fs = new(offsetIso, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            fs.Seek(tagOffset, SeekOrigin.Begin);
+            fs.Write(new byte[Constants.OptimizedTagLength], 0, Constants.OptimizedTagLength);
+        }
+
+        Assert.Contains(XisoReader.AuditXiso(offsetIso).Issues,
+            static i => i.Contains("Optimized tag", StringComparison.Ordinal));
+
+        RepairResult result = XisoReader.Repair(offsetIso);
+
+        Assert.True(result.Success);
+        Assert.True(XisoReader.IsOptimizedImage(offsetIso, skipSectors: (int)(discLseek / Constants.SectorSize)));
+
+        // The absolute tag offset is inside the prepended area and stays zero.
+        using FileStream check = new(offsetIso, FileMode.Open, FileAccess.Read, FileShare.Read);
+        check.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
+        byte[] absolute = new byte[Constants.OptimizedTagLength];
+        check.ReadExactly(absolute);
+        Assert.All(absolute, static b => Assert.Equal(0, b));
+    }
+
+    [Fact]
     public void Repair_Separator_Renamed()
     {
         string isoPath = CreateIsoWithFiles(("qx.txt", "data"u8.ToArray()));

@@ -94,6 +94,43 @@ public class CisoTests : IDisposable
 
     private static byte[] ComputeSha256Bytes(byte[] data) => SHA256.HashData(data);
 
+    /// <summary>Cancels the token after the Nth progress report (synchronous, deterministic).</summary>
+    private sealed class CancelAfterReports : IProgress<ProgressInfo>
+    {
+        private readonly CancellationTokenSource _cts;
+        private readonly int _after;
+        private int _count;
+
+        internal CancelAfterReports(CancellationTokenSource cts, int after)
+        {
+            _cts = cts;
+            _after = after;
+        }
+
+        public void Report(ProgressInfo value)
+        {
+            if (++_count >= _after)
+                _cts.Cancel();
+        }
+    }
+
+    [Fact]
+    public void CompressToCso_CancelledSplit_RemovesPartialParts()
+    {
+        // Cancels on the first per-sector report: part 1 exists and its handle
+        // is open. Cleanup must close the parts before deleting them, or the
+        // Windows FileShare.None lock leaves the partial part behind (Todo #54).
+        string isoPath = CreateTempIso();
+        string outDir = CreateTempDir();
+        string output = Path.Combine(outDir, "game.cso");
+        using CancellationTokenSource cts = new();
+
+        Assert.Throws<OperationCanceledException>(() => CisoWriter.CompressToCso(isoPath, output,
+            splitBytes: 1024 * 1024, progress: new CancelAfterReports(cts, after: 2), ct: cts.Token));
+
+        Assert.Empty(Directory.GetFiles(outDir, "*.cso"));
+    }
+
     [Fact]
     public void CompressToCso_FromIsoFile_ProducesCsoAndIsCsoTrue()
     {

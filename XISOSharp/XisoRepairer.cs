@@ -98,7 +98,7 @@ public static class XisoRepairer
 
             // Missing optimized tag (the audit flags it; a too-short file
             // cannot hold one, so the fix is only offered when it fits).
-            PendingFix? tagFix = DecideTagFix(isoPath, fileLength);
+            PendingFix? tagFix = DecideTagFix(isoPath, fileLength, volInfo.DiscLseek);
             if (tagFix != null)
                 fixes.Add(tagFix);
 
@@ -416,9 +416,13 @@ public static class XisoRepairer
         return fixes;
     }
 
-    private static PendingFix? DecideTagFix(string isoPath, long fileLength)
+    private static PendingFix? DecideTagFix(string isoPath, long fileLength, long discLseek)
     {
-        if (fileLength < Constants.OptimizedTagOffset + Constants.OptimizedTagLength)
+        // The tag lives at partition offset 31337, so offset (Redump/XGD)
+        // images carry it at discLseek + 31337 — the same location the audit
+        // probes. Writing the absolute offset would corrupt unrelated bytes.
+        long tagOffset = discLseek + Constants.OptimizedTagOffset;
+        if (fileLength < tagOffset + Constants.OptimizedTagLength)
             return null;
 
         try
@@ -429,7 +433,7 @@ public static class XisoRepairer
                 {
                     Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
                 });
-            fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
+            fs.Seek(tagOffset, SeekOrigin.Begin);
             Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];
             ReadExact(fs, tagBuf);
             string tag = Encoding.ASCII.GetString(tagBuf);
@@ -445,10 +449,10 @@ public static class XisoRepairer
         byte[] tagBytes = Encoding.ASCII.GetBytes(Constants.OptimizedTag);
         return new PendingFix(
             "tag",
-            $"Wrote optimized tag at offset {Constants.OptimizedTagOffset}.",
+            $"Wrote optimized tag at offset {tagOffset}.",
             fs =>
             {
-                fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
+                fs.Seek(tagOffset, SeekOrigin.Begin);
                 fs.Write(tagBytes, 0, Constants.OptimizedTagLength);
             });
     }

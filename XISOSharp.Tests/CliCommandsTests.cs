@@ -121,11 +121,16 @@ public class CliCommandsTests
         Assert.Equal(["-r", "--validate", "-n", "a.iso"], args);
     }
 
-    /// <summary>Verifies wipe and trim put the overwrite flag before the image.</summary>
+    /// <summary>
+    /// Verifies wipe and trim put every flag before the image: the CLI main
+    /// parser stops at the first positional and rejects flags after a filename,
+    /// so -o must precede the image.
+    /// </summary>
     [Fact]
-    public void WipeAndTrim_FlagBeforeImage()
+    public void WipeAndTrim_FlagsBeforeImage()
     {
-        Assert.Equal(["--wipe", "-y", "a.iso", "-o", "out.iso"], CliCommands.Wipe("a.iso", "out.iso", true));
+        Assert.Equal(["--wipe", "-y", "-o", "out.iso", "a.iso"], CliCommands.Wipe("a.iso", "out.iso", true));
+        Assert.Equal(["--trim", "-n", "-o", "out.iso", "a.iso"], CliCommands.Trim("a.iso", "out.iso", false));
         Assert.Equal(["--trim", "-n", "a.iso"], CliCommands.Trim("a.iso", null, false));
     }
 

@@ -384,11 +384,12 @@ public class XisoCorruptionResilienceTests : IDisposable
         Assert.Throws<ExtractFileException>(() => XisoReader.UnpackImage(bad, dest));
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void Extract_FilenameWithColon_ThrowsNamed()
     {
         // Regression (Todo item 1): a drive-relative colon must be rejected
-        // before extraction can resolve it against another directory.
+        // before extraction can resolve it against another directory. On Unix
+        // a colon is a valid host character, so this rejection is Windows-only.
         string isoPath = CreateIso(src =>
         {
             File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
@@ -405,6 +406,31 @@ public class XisoCorruptionResilienceTests : IDisposable
         string dest = CreateTempDir("xiso_corrupt_dest");
         XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.UnpackImage(bad, dest));
         Assert.Contains("invalid character", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ListDirectory_ZeroSizeSubdirectory_ReturnsEmpty()
+    {
+        // A zero-size dirent is a real-world xdvdfs quirk (empty directory, no
+        // table on disk). Listing/entering it must be empty, not a format error.
+        string isoPath = CreateIso(src =>
+        {
+            File.WriteAllText(Path.Combine(src, "top.txt"), "top");
+            Directory.CreateDirectory(Path.Combine(src, "sub"));
+            File.WriteAllText(Path.Combine(src, "sub", "inner.txt"), "inner");
+        }, "game.iso");
+        (uint rootSize, long rootAbs) = RootLayout(isoPath);
+
+        byte[] img = File.ReadAllBytes(isoPath);
+        long header = FindEntryHeader(img, rootAbs, rootSize, "sub");
+        BinaryPrimitives.WriteUInt32LittleEndian(img.AsSpan((int)header + 8), 0u);
+        string bad = CopyIso(isoPath, "xiso_corrupt_bad");
+        File.WriteAllBytes(bad, img);
+
+        Assert.Empty(XisoReader.ListDirectory(bad, "/sub"));
+        Assert.Null(XisoReader.GetEntryInfo(bad, "/sub/inner.txt"));
+        Assert.Contains(XisoReader.ListDirectory(bad, "/"),
+            static e => string.Equals(e.Name, "top.txt", StringComparison.Ordinal));
     }
 
     // ------------------------------------------------------------------

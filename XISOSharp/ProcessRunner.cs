@@ -23,6 +23,11 @@ public static class ProcessRunner
     /// <param name="timeout">Optional kill timeout; <c>null</c> or infinite waits indefinitely.</param>
     /// <param name="cancellationToken">Cancels the run and kills the process tree.</param>
     /// <param name="onLine">Optional sink receiving each stdout/stderr line as it arrives (serialized).</param>
+    /// <param name="outputEncoding">
+    /// Text encoding for stdout/stderr; defaults to UTF-8. Legacy tools that
+    /// print raw Latin-1 bytes (for example <c>extract-xiso</c>) need
+    /// <see cref="Encoding.Latin1"/> so non-ASCII names survive decoding.
+    /// </param>
     /// <returns>Exit code plus captured output; -1 when the process could not start.</returns>
     /// <exception cref="OperationCanceledException">Thrown when <paramref name="cancellationToken"/> is canceled.</exception>
     /// <exception cref="TimeoutException">Thrown when <paramref name="timeout"/> expires.</exception>
@@ -31,7 +36,8 @@ public static class ProcessRunner
         IReadOnlyList<string> args,
         TimeSpan? timeout = null,
         CancellationToken cancellationToken = default,
-        Action<string>? onLine = null)
+        Action<string>? onLine = null,
+        Encoding? outputEncoding = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(fileName);
         ArgumentNullException.ThrowIfNull(args);
@@ -44,13 +50,20 @@ public static class ProcessRunner
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
+            StandardOutputEncoding = outputEncoding ?? Encoding.UTF8,
+            StandardErrorEncoding = outputEncoding ?? Encoding.UTF8,
         };
         foreach (string arg in args)
         {
             psi.ArgumentList.Add(arg);
         }
+
+        // A child inherits the process working directory. If it was deleted
+        // (long-running hosts, tests that clean their temp cwd), Process.Start
+        // fails with a misleading "directory name is invalid"; fall back to a
+        // stable existing directory instead.
+        if (!WorkingDirectoryExists())
+            psi.WorkingDirectory = Path.GetTempPath();
 
         Process? process;
         try
@@ -171,6 +184,22 @@ public static class ProcessRunner
                     onLine(line);
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// True when the process working directory can be read and still exists;
+    /// <c>false</c> when it was deleted or is unreadable.
+    /// </summary>
+    private static bool WorkingDirectoryExists()
+    {
+        try
+        {
+            return Directory.Exists(Directory.GetCurrentDirectory());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
         }
     }
 

@@ -299,10 +299,22 @@ internal static class Program
                 switch (arg)
                 {
                     case "-v":
+                        if (silentFlag && !checksumFlagMode)
+                        {
+                            Logger.LogErr("Error: --silent requires --checksum\n");
+                            return 1;
+                        }
+
                         Console.Write(Constants.Banner);
                         return 0;
                     case "-h":
                     case "--help":
+                        if (silentFlag && !checksumFlagMode)
+                        {
+                            Logger.LogErr("Error: --silent requires --checksum\n");
+                            return 1;
+                        }
+
                         PrintUsage();
                         return 0;
                     case "-c":
@@ -963,7 +975,8 @@ internal static class Program
         // and ignored by extract/list/tree/rewrite.
         if (createFileTime.HasValue && createList.Count == 0)
         {
-            Logger.LogErr("Error: --file-time is only used with -c (create mode) or --pack/build-image\n");
+            Logger.LogErr(
+                "Error: --file-time is only used with -c (create mode), --pack <directory>, or build-image\n");
             return 1;
         }
 
@@ -2338,20 +2351,19 @@ internal static class Program
                         prependSectors: prependSectors, preserveAttributes: preserveAttrs);
 
                     // The input now lives at <input>.old; a failed rewrite must
-                    // not print success or exit 0.
-                    if (rewriteResult != 0)
-                    {
-                        err = rewriteResult;
-                    }
+                    // not print success or exit 0. Track this file's own result
+                    // so an earlier file's failure does not suppress the success
+                    // output or keep the backup of a later, successful rewrite.
+                    int fileErr = rewriteResult;
 
-                    if (err == 0)
+                    if (fileErr == 0)
                     {
                         Logger.Log($"\n{Logger.TotalFiles} files in {newIsoPath} total {Logger.TotalBytes} bytes\n");
                         Logger.Log(
                             $"\n{xisoPath} successfully rewritten{(path != null ? " as " : ".")}{(path != null ? newIsoPath : "")}\n");
                     }
 
-                    if (err == 0 && validateFlag && newIsoPath != null)
+                    if (fileErr == 0 && validateFlag && newIsoPath != null)
                     {
                         Logger.Log("\n");
                         ValidationResult valResult =
@@ -2369,14 +2381,17 @@ internal static class Program
                         // return 0). --validate-strict is retained for CLI parity.
                         if (!valResult.Passed)
                         {
-                            err = 2;
+                            fileErr = 2;
                         }
                     }
 
                     // Only unlink the backup after a fully successful rewrite
                     // (including validation): a failed rewrite must keep the
                     // only remaining copy.
-                    if (deleteOld && err == 0) File.Delete(oldPath);
+                    if (deleteOld && fileErr == 0) File.Delete(oldPath);
+
+                    if (fileErr != 0)
+                        err = fileErr;
                 }
                 catch (Exception ex)
                 {

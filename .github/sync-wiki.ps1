@@ -39,7 +39,6 @@ Get-ChildItem -LiteralPath $DocsDir -Filter '*.md' -File |
 
 # 2. Home.md from the docs index, with Docsify-isms reworded for the wiki.
 $homeText = Get-Content -LiteralPath (Join-Path $DocsDir 'README.md') -Raw
-$homeText = $homeText -replace 'provided by \[`_sidebar\.md`\]\(_sidebar\.md\) and \[`index\.html`\]\((index\.html)\)\.', 'provided by the wiki sidebar.'
 $homeText = $homeText -replace 'the sidebar \(`_sidebar\.md`\) is the canonical', 'the wiki sidebar is the canonical'
 $homeText = $homeText -replace '\[`docs/_sidebar\.md`\]\((docs/_sidebar\.md)\) is the sidebar\.', 'the wiki sidebar.'
 $homeText | Set-Content -LiteralPath (Join-Path $WikiDir 'Home.md') -NoNewline
@@ -57,6 +56,8 @@ Get-ChildItem -LiteralPath $WikiDir -Filter '*.md' -File | ForEach-Object {
     $text = Get-Content -LiteralPath $_.FullName -Raw
     $text = $text -replace '\]\(\.\./([^()]+)\)', "]($blobBase/`$1)"
     $text = $text -replace '\]\((?![a-zA-Z][\w+.-]*://)([^()]*?)\.md([)#])', ']($1$2'
+    # Point sidebar references at the generated wiki page spelling.
+    $text = $text -replace '\]\(_sidebar([)#])', '](_Sidebar$1'
     $text | Set-Content -LiteralPath $_.FullName -NoNewline
 }
 

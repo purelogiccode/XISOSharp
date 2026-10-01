@@ -294,35 +294,12 @@ public static class XisoReader
         }
         else
         {
-            bool ok = false;
-            long[] probes =
-            [
-                0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
-                Constants.Xgd1LseekOffset
-            ];
-            foreach (long probe in probes)
-            {
-                if (dev.Read(Constants.HeaderOffset + probe, buffer) != buffer.Length) continue;
-                if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
-                {
-                    discLseek = probe;
-                    headerBase = Constants.HeaderOffset + probe;
-                    ok = true;
-                    break;
-                }
-            }
-
-            // Rebuilt XISO: descriptor at the very start of the device.
-            if (!ok && dev.Read(0, buffer) == buffer.Length &&
-                buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
-            {
-                discLseek = 0;
-                headerBase = 0;
-                ok = true;
-            }
-
-            if (!ok)
+            (long DiscLseek, long HeaderBase)? header = FindDeviceHeader(dev);
+            if (header is null)
                 throw new XisoFormatException($"Invalid XISO: {isoName}");
+
+            discLseek = header.Value.DiscLseek;
+            headerBase = header.Value.HeaderBase;
         }
 
         if (dev.Read(headerBase + Constants.HeaderDataLength, intBuf) != 4)
@@ -375,6 +352,35 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Probes a block device for the XISO header at the known disc offsets
+    /// (RAW, GLOBAL/XGD2, XGD3, hybrid, XGD1) and the rebuilt sector-0 layout.
+    /// Returns the partition shift and header base, or <c>null</c> when no
+    /// header is found.
+    /// </summary>
+    private static (long DiscLseek, long HeaderBase)? FindDeviceHeader(IBlockDevice dev)
+    {
+        Span<byte> buffer = stackalloc byte[Constants.HeaderDataLength];
+        long[] probes =
+        [
+            0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
+            Constants.Xgd1LseekOffset
+        ];
+        foreach (long probe in probes)
+        {
+            if (dev.Read(Constants.HeaderOffset + probe, buffer) != buffer.Length)
+                continue;
+            if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+                return (probe, Constants.HeaderOffset + probe);
+        }
+
+        // Rebuilt XISO: descriptor at the very start of the device.
+        if (dev.Read(0, buffer) == buffer.Length && buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+            return (0, 0);
+
+        return null;
+    }
+
+    /// <summary>
     /// Audits a block-device image (memory, CISO, or offset-wrapped) with the same
     /// deep walk as <see cref="AuditXiso(string)"/>: header, optimized tag, full
     /// directory-tree traversal, sector bounds, cycles, and filenames. Never throws
@@ -411,10 +417,11 @@ public static class XisoReader
         {
             // Parity with AuditXiso(string): an empty (header-only, no files)
             // image is valid with nothing checked; the tag is still reported.
-            // VerifyXiso consumed the disc lseek while throwing, so the probe
-            // falls back to the raw offset (empty prepended images are rare).
+            // VerifyXiso consumed the disc lseek while throwing, so re-probe
+            // the header to report IsOptimized at the right offset.
             using BlockDeviceStream stream = new(dev, leaveOpen: true);
-            return new AuditResult(true, 0, 0, []) { IsOptimized = ProbeOptimizedTag(stream, 0, out _) };
+            long discLseek = FindDeviceHeader(dev)?.DiscLseek ?? 0;
+            return new AuditResult(true, 0, 0, []) { IsOptimized = ProbeOptimizedTag(stream, discLseek, out _) };
         }
         catch (Exception ex)
         {
@@ -3074,6 +3081,12 @@ public static class XisoReader
         Stream fs, long dirStart, long tableSize, string contextPath)
     {
         List<(string Name, bool IsDir, uint Sector, uint Size)> raw = new();
+        // A zero-size directory entry is a real-world xdvdfs quirk (an empty
+        // directory with no table on disk); it lists as empty rather than
+        // failing the bound check below.
+        if (tableSize <= 0)
+            return raw;
+
         Stack<long> stack = new();
         stack.Push(0);
 
@@ -4155,6 +4168,12 @@ public static class XisoReader
         string contextPath)
     {
         List<EntryInfo> entries = new();
+        // A zero-size directory entry is a real-world xdvdfs quirk (an empty
+        // directory with no table on disk); it lists as empty rather than
+        // failing the bound check below.
+        if (tableSize <= 0)
+            return entries;
+
         Stack<long> stack = new();
         stack.Push(0); // Start at offset 0
 

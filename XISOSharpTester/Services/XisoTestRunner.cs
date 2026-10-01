@@ -780,6 +780,14 @@ public static class XisoTestRunner
     {
         List<string> details = new();
 
+        // Two empty lists mean the parser matched nothing (output-format
+        // drift), not that the images matched: fail instead of passing
+        // vacuously.
+        if (csEntries.Count == 0 && exeEntries.Count == 0)
+        {
+            return new ListComparison(false, "No list entries parsed from either tool's output (format drift?).");
+        }
+
         if (csEntries.Count != exeEntries.Count)
         {
             details.Add($"File count: C#={csEntries.Count} extract-xiso={exeEntries.Count}");

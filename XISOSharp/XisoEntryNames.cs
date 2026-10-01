@@ -76,8 +76,13 @@ internal static class XisoEntryNames
         return new string(chars);
     }
 
-    // Escape-capable characters only. Other host-invalid characters (NUL,
-    // `<`, `>` …) still fail per-file at create time with a named
-    // ExtractFileException, which continue-on-error can record.
-    private static bool IsInvalidEntryChar(char c) => c is '/' or '\\' or ':';
+    // Escape-capable characters only. The colon is drive-relative on Windows
+    // (`C:evil` resolves against another directory) but a perfectly valid host
+    // character on Unix, where the writer/patcher accept it — rejecting it
+    // there would make XISOSharp unable to read images it just created.
+    // Other host-invalid characters (NUL, `<`, `>` …) still fail per-file at
+    // create time with a named ExtractFileException, which continue-on-error
+    // can record.
+    private static bool IsInvalidEntryChar(char c) =>
+        c is '/' or '\\' || (c == ':' && OperatingSystem.IsWindows());
 }

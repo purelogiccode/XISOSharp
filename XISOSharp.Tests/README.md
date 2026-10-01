@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1797-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1807-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![Test SDK](https://img.shields.io/badge/test--sdk-18.10.1-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
@@ -53,7 +53,9 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Update checker extras** — version parsing, update comparison, RID mapping, cache round-trips/escaping, asset URL lookup
 - **Output guards / prompt** — misplaced-flag detection, input==output refusals (rewrite/rebuild/image), overwrite-prompt flag combinations and responses
 - **Bug reports / telemetry** — report entry points under test hosts, exception-block budgets, environment block lines, stats launch-ping opt-outs
-- **Internal helpers** (`InternalsVisibleTo`) — SHA3-256 NIST vectors/chunking/disposal, Latin-1 codec full byte range, bounded sub-stream window/ownership semantics
+- **Internal helpers** (`InternalsVisibleTo`) — SHA3-256 NIST vectors/chunking/disposal, Latin-1 codec full byte range + overflow-safe range validation, bounded sub-stream window/ownership semantics
+- **Hardening regressions** — path-escape names, table-size bounds, all-zero sentinel, zero-size directory listing, split part naming (dotted bases), partial-output cleanup and pre-existing-output preservation (`CreateZar`/`CompressToCso`), offset-image tag repair, same-CWD input==output guard
+- **CLI flag contracts** — `--silent` order independence (incl. `-v`/`--help`), `--file-time`/`--preserve-attrs`/`--jobs`/`--policy` mode rejection, `--ciso-split` first-part guard, Wipe/Trim flags-before-positionals
 - **GUI command builders** (net10.0) — `CliCommands` argv for every verb, flags-before-positionals invariant, `CliLocator` version metadata fallbacks
 - **GUI services** (net10.0) — screenshot file naming/folder resolution/collision suffixes and update-check version comparison/release-URL fallback
 

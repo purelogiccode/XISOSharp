@@ -1,5 +1,80 @@
 # Release Notes
 
+## 1.4.2
+
+Deep-review hardening and GUI experience release. An 80-item review of the whole
+repository (path escapes, patch-layout collisions, CWD leaks, partial artifacts,
+CLI contract mismatches, vacuous tests, doc drift) is resolved, together with
+the follow-up regressions found while re-reviewing those fixes. The desktop app
+gains Donate/About/Exit header actions, F8 window screenshots, and a startup
+update prompt backed by the same `UpdateCore` + 24-hour cache the CLI uses. No
+API breaks; targets remain `net8.0` / `net9.0` / `net10.0`; full suite green on
+all three (1807 tests on net10.0: 1806 passed, 1 opt-in skip; 1746 on
+net8.0/net9.0: 1745 passed, 1 opt-in skip).
+
+### Library
+
+- **Path safety**: crafted image names (separators, Windows drive-relative
+  colons, trailing dots/spaces) are rejected or sanitized on every walk; the
+  colon stays valid on Unix where the writer/patcher accept it.
+- **Patching**: the allocator reserves the optimized tag (sector 15), the
+  ECMA-119 descriptor pair (16-17), and the layout-tool signature sector;
+  sector counts use 64-bit math; the root table size is recorded even when the
+  table stays in place.
+- **Walkers**: all child offsets are bounded by the recorded table size, the
+  all-zero empty-table sentinel is honored, `.`/`..` records are skipped
+  consistently, truncated names fail instead of truncating the walk, and
+  zero-size directory entries list as empty.
+- **Writing/containers**: CWD is restored on every path; relative `-d` resolves
+  against the caller CWD; failed/cancelled runs delete partial `.iso`/`.cso`/
+  `.zar` output (closing split-part handles first on Windows) but never a
+  pre-existing file the call did not create; CISO headers/indexes are
+  validated; split part naming handles dotted bases; `Latin1Encoding` range
+  checks are overflow-safe.
+- **Repair/audit**: a missing optimized tag is written at the disc offset for
+  prepended images; path and device audits agree on trailing magic and
+  empty-image tag probing.
+- `XisoPaths` resolves both sides of an input==output check against one CWD
+  snapshot; `XisoExplorer.Dispose` serializes with keep-open reads.
+
+### CLI
+
+- `--silent` is order-independent (and rejected without `--checksum`, including
+  with `-v`/`--help`); `--file-time`/`--preserve-attrs`/`--jobs`/`--policy` are
+  rejected outside their modes; `--wipe`/`--trim` honor `-o`; `--is-optimized`
+  honors `--skip-sectors`; `--ciso-split` refuses a source named like its own
+  first part.
+- `-D` deletes `.old` only after a fully successful (validated) rewrite, and a
+  failed file no longer suppresses a later file's success or keeps its backup.
+
+### GUI
+
+- Donate/About/Exit header actions with an About dialog; F8 screenshots;
+  startup update prompt; tooltips.
+- Drag-and-drop routing fixed (only `*.iso` folders go to Batch; `.zar` drops
+  go to Rebuild); Wipe/Trim pass `-o` before the image; `CliStatus` updates on
+  the UI thread; settings persist again.
+
+### Logging, bug reports, telemetry
+
+- Shared Serilog pipeline; expected operational warnings are tagged
+  `NoBugReport`; the shared API key is double-Base64 encoded
+  (`ApiKeyStore`); the dedupe map is bounded; `ProcessRunner` falls back to a
+  stable working directory when the inherited CWD was deleted.
+
+### Tester
+
+- List comparison parses the real `\name (N bytes)` format and decodes
+  extract-xiso's Latin-1 output; two empty parses fail instead of passing.
+
+### Docs & build
+
+- Drift fixed (test counts, `--help`, Release packing, battle default, coverage
+  OS, Tester CI, missing scripts, `ConversionPlan.md`); publish scripts stage
+  into `%TEMP%` and merge instead of deleting the protected `publish*/` trees;
+  `docs/` serves Pages (Docsify `_sidebar.md`) and syncs to the wiki
+  (`Home.md` + `_Sidebar.md`) via `.github/workflows/wiki.yml`.
+
 ## 1.4.1
 
 Dependency and legal maintenance release. `ZArchiveSharp` moves 1.3.0 → 1.4.0

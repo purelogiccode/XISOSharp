@@ -233,7 +233,9 @@ internal static class CliCommands
     /// <returns>The wipe argument list.</returns>
     internal static string[] Wipe(string image, string? output, bool overwrite)
     {
-        List<string> args = new() { "--wipe", OverwriteFlag(overwrite), image };
+        // -o must precede the image: the CLI main parser stops at the first
+        // positional, and a flag after a filename is rejected as misplaced.
+        List<string> args = new() { "--wipe", OverwriteFlag(overwrite) };
         if (!string.IsNullOrWhiteSpace(output))
         {
             // The CLI expands positional arguments as extra inputs; the chosen
@@ -242,6 +244,7 @@ internal static class CliCommands
             args.Add(output);
         }
 
+        args.Add(image);
         return [.. args];
     }
 
@@ -254,7 +257,9 @@ internal static class CliCommands
     /// <returns>The trim argument list.</returns>
     internal static string[] Trim(string image, string? output, bool overwrite)
     {
-        List<string> args = new() { "--trim", OverwriteFlag(overwrite), image };
+        // -o must precede the image: the CLI main parser stops at the first
+        // positional, and a flag after a filename is rejected as misplaced.
+        List<string> args = new() { "--trim", OverwriteFlag(overwrite) };
         if (!string.IsNullOrWhiteSpace(output))
         {
             // The CLI expands positional arguments as extra inputs; the chosen
@@ -263,6 +268,7 @@ internal static class CliCommands
             args.Add(output);
         }
 
+        args.Add(image);
         return [.. args];
     }
 

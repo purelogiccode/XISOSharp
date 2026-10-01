@@ -139,6 +139,10 @@ public static class XisoZarchive
     {
         ct.ThrowIfCancellationRequested();
         if (!quiet) Logger.Log($"[INFO] Writing ZArchive to {zarPath}\n");
+        // Only a destination this call started writing may be deleted on
+        // failure: a parse error before packing must leave an existing .zar
+        // (which this call never touched) alone.
+        bool packStarted = false;
         try
         {
             // Standard sector-32 descriptor, or the rebuilt sector-0 layout. Invalid
@@ -169,6 +173,7 @@ public static class XisoZarchive
                 // discovery list so the archives match byte-for-byte.
                 NameOrder = names,
             };
+            packStarted = true;
             ZarPipeline.PackSource(source, zarPath, options, progress, ct);
             return true;
         }
@@ -196,8 +201,11 @@ public static class XisoZarchive
             throw;
         }
 
-        static void DeleteIncomplete(string path)
+        void DeleteIncomplete(string path)
         {
+            if (!packStarted)
+                return;
+
             try
             {
                 File.Delete(path);
@@ -217,7 +225,7 @@ public static class XisoZarchive
         // so case-differing duplicates stay separate name-table entries.
         Dictionary<string, int> lookup = new(StringComparer.Ordinal);
         rootNode = new PathNode();
-        ParseNode(isoFs, isoOffset, dirOffset, dirSize, 0, rootNode, nameList, lookup);
+        ParseNode(isoFs, isoOffset, dirOffset, dirSize, 0, rootNode, nameList, lookup, isRoot: true);
         if (removeUpdate)
         {
             rootNode.Subnodes.RemoveAll(n =>
@@ -233,13 +241,18 @@ public static class XisoZarchive
         HashSet<long>? visited = null,
         // Recursion-depth bound (#16 hardening); kept explicit by design.
         // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
-        int depth = 0)
+        int depth = 0,
+        bool isRoot = false)
     {
         if (dirSize == 0)
         {
-            // A zero-size root/nested table is corrupt: the walk below would
-            // silently emit an empty archive and report success (Todo #24).
-            throw new XisoFormatException("invalid XISO: directory table size is zero.");
+            // A zero-size nested dirent is a real-world xdvdfs quirk (empty
+            // directory, no table on disk) and parses as empty. A zero-size
+            // root with a non-zero offset is corrupt and must not silently
+            // emit an empty archive (Todo #24).
+            if (isRoot && dirOffset != 0)
+                throw new XisoFormatException("invalid XISO: root directory table size is zero.");
+            return;
         }
 
         if (childOffset >= dirSize) return;

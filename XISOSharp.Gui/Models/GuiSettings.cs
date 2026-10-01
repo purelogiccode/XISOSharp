@@ -7,14 +7,17 @@ namespace XISOSharp.Gui.Models;
 internal sealed class GuiSettings
 {
     /// <summary>
-    /// Gets or sets the user-configured CLI executable path.
+    /// Gets or sets the user-configured CLI executable path. Public because
+    /// System.Text.Json only serializes public properties (the class itself is
+    /// internal), so internal ones would silently persist as <c>{}</c>.
     /// </summary>
-    internal string CliPath { get; set; } = string.Empty;
+    public string CliPath { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets whether overwrite-by-default (<c>-y</c>) is selected.
+    /// Public for the same JSON reason as <see cref="CliPath"/>.
     /// </summary>
-    internal bool OverwriteByDefault { get; set; }
+    public bool OverwriteByDefault { get; set; }
 
     private static string SettingsPath
     {

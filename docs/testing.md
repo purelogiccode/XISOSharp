@@ -45,7 +45,8 @@ Highlights:
 | Unpack resume (`UnpackOptions.SkipExisting`, cancel+resume, copy-out) | `UnpackResumeTests.cs` |
 | Table writer (offsets, encoding, byte-identity with writer output) | `DirectoryEntryTableWriterTests.cs` |
 | Snapshot (`Fixtures/test_fixture.iso` byte-identity; extract/rewrite SHA-256 per file) | `XisoSnapshotTests.cs` |
-| Corruption resilience (truncated tables, bad pointers, huge sizes, bad names, >4 GB) | `XisoCorruptionResilienceTests.cs` |
+| Corruption resilience (truncated tables, bad pointers, huge sizes, bad names, >4 GB, zero-size directories) | `XisoCorruptionResilienceTests.cs` |
+| Review hardening (path escapes, table bounds, sentinels, split naming, partial/pre-existing output cleanup, offset-image tag repair) | `XisoCorruptionResilienceTests.cs`, `XisoRedumpAndSkeletonTests.cs`, `CisoTests.cs`, `XisoRepairTests.cs` |
 | Reader gap-closers (multi-sector tables, disc probes, device errors, sentinels) | `XisoCoverageTests.cs` |
 | Legacy interop (reference extract-xiso legacy-layout images via `llCompat` extract/list/rewrite) | `XisoLegacyInteropTests.cs` |
 | In-place patching (replace/add, table moves, errors, backup, `.xbe`, `--copy-in` CLI) | `XisoPatcherTests.cs` |
@@ -202,8 +203,8 @@ exports PDF reports (`PdfExporter`). Services:
 
 | Service | Purpose |
 |---|---|
-| `ExtractXisoWrapper` | Invokes the reference `extract-xiso.exe` |
-| `XisoTestRunner` | Orchestrates test scenarios and comparisons |
+| `ExtractXisoWrapper` | Invokes the reference `extract-xiso.exe` (Latin-1 stdout decoding) |
+| `XisoTestRunner` | Orchestrates test scenarios and comparisons (list parser understands `\name (N bytes)`) |
 | `HashUtil` | SHA-256 comparison of extracted outputs |
 | `PdfExporter` | Test-session report generation |
 | `TestProgress` | UI progress reporting |

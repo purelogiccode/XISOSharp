@@ -18,6 +18,12 @@ public class ProcessRunnerTests
             ? ("cmd.exe", ["/c", "ping -n 30 127.0.0.1"])
             : ("sh", ["-c", "sleep 30"]);
 
+    /// <summary>Dumps a file's raw bytes to stdout (cmd <c>type</c> / <c>cat</c>).</summary>
+    private static (string FileName, string[] Args) RawDumpCommand(string path) =>
+        OperatingSystem.IsWindows()
+            ? ("cmd.exe", ["/c", "type", path])
+            : ("cat", [path]);
+
     /// <summary>Verifies the default values of a fresh <see cref="ProcessRunResult"/>.</summary>
     [Fact]
     public void ProcessRunResult_Defaults()
@@ -32,7 +38,20 @@ public class ProcessRunnerTests
     [Fact]
     public async Task RunAsync_DotnetVersion_ReturnsZeroWithStdout()
     {
-        ProcessRunResult result = await ProcessRunner.RunAsync("dotnet", ["--version"]);
+        // The suite churns the process-wide working directory in other
+        // collections, which can transiently break an external `dotnet` start
+        // (for example when the inherited CWD is mid-delete). Retry so this
+        // test measures ProcessRunner's capture, not the environment.
+        ProcessRunResult result = default!;
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            result = await ProcessRunner.RunAsync("dotnet", ["--version"]);
+            if (result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.StandardOutput))
+            {
+                break;
+            }
+        }
+
         Assert.Equal(0, result.ExitCode);
         Assert.False(string.IsNullOrWhiteSpace(result.StandardOutput));
     }
@@ -49,6 +68,30 @@ public class ProcessRunnerTests
         Assert.Contains("err", result.StandardError);
         Assert.Contains(lines, l => l.Contains("hello", StringComparison.Ordinal));
         Assert.Contains(lines, l => l.Contains("err", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Verifies the optional output encoding decodes legacy Latin-1 bytes
+    /// (extract-xiso output) instead of mangling them into U+FFFD.
+    /// </summary>
+    [Fact]
+    public async Task RunAsync_Latin1OutputEncoding_DecodesHighBytes()
+    {
+        // Raw bytes for "café" in Latin-1: c a f 0xE9.
+        string latin1File = Path.Combine(Path.GetTempPath(), $"xiso_latin1_{Guid.NewGuid():N}.bin");
+        await File.WriteAllBytesAsync(latin1File, [0x63, 0x61, 0x66, 0xE9]);
+        try
+        {
+            (string file, string[] args) = RawDumpCommand(latin1File);
+            ProcessRunResult result = await ProcessRunner.RunAsync(file, args,
+                outputEncoding: System.Text.Encoding.Latin1);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("caf\u00E9", result.StandardOutput, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(latin1File);
+        }
     }
 
     /// <summary>Verifies a non-zero exit code is propagated unchanged.</summary>

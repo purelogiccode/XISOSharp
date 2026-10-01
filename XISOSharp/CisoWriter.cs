@@ -109,16 +109,23 @@ public static class CisoWriter
             if (splitBytes.HasValue)
             {
                 using CisoSplitOutput split = new(output, splitBytes.Value);
+                bool completed = false;
                 try
                 {
                     CompressStream(src, split, level, version, progress, ct);
+                    completed = true;
                 }
-                catch
+                finally
                 {
-                    // A failed compress must not leave partial parts behind (Todo #54).
-                    foreach (string part in split.PartPaths)
-                        TryDeleteFile(part);
-                    throw;
+                    if (!completed)
+                    {
+                        // Close the part handles before deleting: on Windows a
+                        // FileShare.None handle blocks File.Delete (Todo #54).
+                        // ReSharper disable once DisposeOnUsingVariable
+                        split.Dispose();
+                        foreach (string part in split.PartPaths)
+                            TryDeleteFile(part);
+                    }
                 }
 
                 foreach (string part in split.PartPaths)
@@ -127,16 +134,21 @@ public static class CisoWriter
             }
             else
             {
+                bool created = false;
                 try
                 {
                     using FileStream dst = new(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+                    created = true;
                     CompressStream(src, dst, level, version, progress, ct);
                 }
                 catch
                 {
                     // A failed compress must not leave a truncated .cso that looks
-                    // like a finished artifact (Todo #54).
-                    TryDeleteFile(output);
+                    // like a finished artifact (Todo #54). Only delete a file this
+                    // call actually created: a pre-existing output that merely
+                    // failed to open must survive.
+                    if (created)
+                        TryDeleteFile(output);
                     throw;
                 }
 

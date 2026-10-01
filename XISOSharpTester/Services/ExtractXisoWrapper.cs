@@ -52,8 +52,11 @@ public class XisoSharpWrapper : IDisposable
             // Thin delegate over the shared core runner (BUG-X-004): async drains,
             // timeout, cancel, tree-kill, ArgumentList, and exit reporting live in
             // XISOSharp.ProcessRunner so GUI and Tester stay identical.
+            // extract-xiso prints raw Latin-1 bytes; decoding as UTF-8 would turn
+            // non-ASCII names into U+FFFD and break list comparison.
             ProcessRunResult core = await ProcessRunner
-                .RunAsync(_exePath, args, ProcessTimeout, cancellationToken)
+                .RunAsync(_exePath, args, ProcessTimeout, cancellationToken,
+                    outputEncoding: System.Text.Encoding.Latin1)
                 .ConfigureAwait(false);
             XisoSharpResult result = new()
                 { ExitCode = core.ExitCode, StdOut = core.StandardOutput, StdErr = core.StandardError };

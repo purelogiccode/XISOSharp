@@ -1,3 +1,6 @@
+using System.Buffers.Binary;
+using System.Text;
+using XISOSharp.Models;
 using ZArchiveSharp;
 
 namespace XISOSharp.Tests;
@@ -59,6 +62,31 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         File.WriteAllText(Path.Combine(dir, "b.txt"), new string('x', 3000));
         Directory.CreateDirectory(Path.Combine(dir, "sub"));
         File.WriteAllText(Path.Combine(dir, "sub", "c.txt"), "nested");
+    }
+
+    /// <summary>Finds the byte offset of a directory entry record by name.</summary>
+    private static long FindEntryHeader(byte[] img, long tableAbs, uint tableSize, string name)
+    {
+        byte[] nameBytes = Encoding.ASCII.GetBytes(name);
+        long tableEnd = tableAbs + tableSize;
+        for (long i = tableAbs; i + 14 + nameBytes.Length <= Math.Min(tableEnd, img.Length); i++)
+        {
+            bool match = true;
+            for (int k = 0; k < nameBytes.Length; k++)
+            {
+                if (img[i + 14 + k] != nameBytes[k])
+                {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match && img[i + 13] == nameBytes.Length)
+                return i;
+        }
+
+        Assert.Fail($"entry '{name}' not found in directory table at {tableAbs}");
+        return -1;
     }
 
     // -----------------------------------------------------------------------
@@ -523,7 +551,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         BitConverter.GetBytes(entrySector).CopyTo(img, offset + 4);
         BitConverter.GetBytes(entrySize).CopyTo(img, offset + 8);
         img[offset + 12] = attr;
-        byte[] nb = System.Text.Encoding.ASCII.GetBytes(name);
+        byte[] nb = Encoding.ASCII.GetBytes(name);
         img[offset + 13] = (byte)nb.Length;
         nb.CopyTo(img, offset + 14);
     }
@@ -579,7 +607,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
             Assert.Equal(magic.Length, skelFs.Read(magic, 0, magic.Length));
         }
 
-        Assert.Equal("MICROSOFT*XBOX*MEDIA", System.Text.Encoding.ASCII.GetString(magic));
+        Assert.Equal("MICROSOFT*XBOX*MEDIA", Encoding.ASCII.GetString(magic));
         Assert.True(File.Exists(hash));
     }
 
@@ -720,6 +748,60 @@ public class XisoRedumpAndSkeletonTests : IDisposable
 
         Assert.False(XisoZarchive.CreateZar(bad, zar, 0, quiet: true));
         Assert.False(File.Exists(zar));
+    }
+
+    [Fact]
+    public void CreateZar_ZeroSizeNestedDirectory_TreatedAsEmpty()
+    {
+        // A zero-size dirent is a real-world xdvdfs quirk (empty directory, no
+        // table on disk). It must not reject the whole archive as corrupt.
+        string src = CreateSourceDir(d =>
+        {
+            File.WriteAllText(Path.Combine(d, "top.txt"), "top");
+            Directory.CreateDirectory(Path.Combine(d, "sub"));
+            File.WriteAllText(Path.Combine(d, "sub", "inner.txt"), "inner");
+        });
+        string iso = CreateIso(src);
+        string outDir = CreateTempDir();
+        string zar = Path.Combine(outDir, "zero-sub.zar");
+
+        VolumeInfo vol = XisoReader.GetVolumeInfo(iso);
+        long rootAbs = ((long)vol.RootDirSector * Constants.SectorSize) + vol.DiscLseek;
+        byte[] img = File.ReadAllBytes(iso);
+        long entry = FindEntryHeader(img, rootAbs, vol.RootDirSize, "sub");
+        BinaryPrimitives.WriteUInt32LittleEndian(img.AsSpan((int)entry + 8), 0u);
+        File.WriteAllBytes(iso, img);
+
+        Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
+        using ZArchiveReader? reader = ZArchiveReader.TryOpen(zar);
+        Assert.NotNull(reader);
+        Assert.NotEqual(ZArchiveReader.InvalidNode, reader.LookUp("top.txt"));
+        Assert.Equal(ZArchiveReader.InvalidNode, reader.LookUp("sub/inner.txt"));
+    }
+
+    [Fact]
+    public void CreateZar_ParseFailure_KeepsExistingOutput()
+    {
+        // A parse error before packing must not delete a pre-existing .zar that
+        // this call never touched (regression from the Todo #57/#24 hardening).
+        string src = CreateSourceDir(PopulateSimple);
+        string iso = CreateIso(src);
+        string outDir = CreateTempDir();
+        string bad = Path.Combine(outDir, "bad-root.iso");
+        string zar = Path.Combine(outDir, "existing.zar");
+
+        byte[] bytes = File.ReadAllBytes(iso);
+        const int rootSizeOffset = Constants.HeaderOffset + Constants.HeaderDataLength + 4;
+        bytes[rootSizeOffset] = 0;
+        bytes[rootSizeOffset + 1] = 0;
+        bytes[rootSizeOffset + 2] = 0;
+        bytes[rootSizeOffset + 3] = 0;
+        File.WriteAllBytes(bad, bytes);
+        File.WriteAllText(zar, "sentinel");
+
+        Assert.False(XisoZarchive.CreateZar(bad, zar, 0, quiet: true));
+        Assert.True(File.Exists(zar));
+        Assert.Equal("sentinel", File.ReadAllText(zar));
     }
 
     [Fact]

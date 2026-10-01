@@ -28,10 +28,7 @@ internal static class Latin1Encoding
         public override int GetByteCount(char[] chars, int index, int count)
         {
             ArgumentNullException.ThrowIfNull(chars);
-            ArgumentOutOfRangeException.ThrowIfNegative(index);
-            ArgumentOutOfRangeException.ThrowIfNegative(count);
-            if (index + count > chars.Length)
-                throw new ArgumentOutOfRangeException(nameof(count));
+            ValidateRange(index, count, chars.Length, nameof(index), nameof(count));
             ValidateEncodable(chars.AsSpan(index, count), nameof(chars));
             return count;
         }
@@ -57,11 +54,8 @@ internal static class Latin1Encoding
             ArgumentNullException.ThrowIfNull(chars);
             ArgumentNullException.ThrowIfNull(bytes);
             ValidateRange(charIndex, charCount, chars.Length, nameof(charIndex), nameof(charCount));
-            ArgumentOutOfRangeException.ThrowIfNegative(byteIndex);
-            if (byteIndex + charCount > bytes.Length)
-            {
-                throw new ArgumentException("Destination is too small for the encoded bytes.", nameof(bytes));
-            }
+            ValidateDestination(byteIndex, charCount, bytes.Length, nameof(byteIndex), nameof(bytes),
+                "Destination is too small for the encoded bytes.");
 
             for (int i = 0; i < charCount; i++)
             {
@@ -85,11 +79,8 @@ internal static class Latin1Encoding
             ArgumentNullException.ThrowIfNull(s);
             ArgumentNullException.ThrowIfNull(bytes);
             ValidateRange(charIndex, charCount, s.Length, nameof(charIndex), nameof(charCount));
-            ArgumentOutOfRangeException.ThrowIfNegative(byteIndex);
-            if (byteIndex + charCount > bytes.Length)
-            {
-                throw new ArgumentException("Destination is too small for the encoded bytes.", nameof(bytes));
-            }
+            ValidateDestination(byteIndex, charCount, bytes.Length, nameof(byteIndex), nameof(bytes),
+                "Destination is too small for the encoded bytes.");
 
             for (int i = 0; i < charCount; i++)
             {
@@ -149,11 +140,8 @@ internal static class Latin1Encoding
             ArgumentNullException.ThrowIfNull(bytes);
             ArgumentNullException.ThrowIfNull(chars);
             ValidateRange(byteIndex, byteCount, bytes.Length, nameof(byteIndex), nameof(byteCount));
-            ArgumentOutOfRangeException.ThrowIfNegative(charIndex);
-            if (charIndex + byteCount > chars.Length)
-            {
-                throw new ArgumentException("Destination is too small for the decoded characters.", nameof(chars));
-            }
+            ValidateDestination(charIndex, byteCount, chars.Length, nameof(charIndex), nameof(chars),
+                "Destination is too small for the decoded characters.");
 
             for (int i = 0; i < byteCount; i++)
             {
@@ -190,9 +178,32 @@ internal static class Latin1Encoding
         {
             ArgumentOutOfRangeException.ThrowIfNegative(index, indexName);
             ArgumentOutOfRangeException.ThrowIfNegative(count, countName);
-            if (index + count > length)
+            // Subtraction, not `index + count`, so int overflow cannot slip a
+            // huge count past the check.
+            if (index > length || count > length - index)
             {
                 throw new ArgumentOutOfRangeException(countName);
+            }
+        }
+
+        /// <summary>
+        /// Validates a destination <c>(index, count)</c> pair without integer
+        /// overflow, surfacing <see cref="ArgumentOutOfRangeException"/> for an
+        /// out-of-range index and <see cref="ArgumentException"/> for a
+        /// too-small destination, matching the <see cref="Encoding"/> contract.
+        /// </summary>
+        private static void ValidateDestination(int index, int count, int length, string indexName,
+            string destinationName, string message)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(index, indexName);
+            if (index > length)
+            {
+                throw new ArgumentOutOfRangeException(indexName);
+            }
+
+            if (count > length - index)
+            {
+                throw new ArgumentException(message, destinationName);
             }
         }
 

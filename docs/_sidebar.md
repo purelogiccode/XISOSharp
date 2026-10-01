@@ -1,4 +1,4 @@
-<!-- docs/_sidebar.md — Docsify left menu -->
+<!-- docs/_sidebar.md — canonical side menu: Docsify (Pages) loads it directly; sync-wiki.ps1 rewrites it into the wiki _Sidebar.md. -->
 - [Home](README.md)
 
 - **User Guide**
@@ -7,8 +7,8 @@
   - [Validation](validation.md)
   - [Redump & Disc Layouts](redump-workflows.md)
   - [Archival Workflows](archival.md)
-  - [Build-Image & Image-Spec](xdvdfs-compat.md)
   - [Compression (CISO)](compression.md)
+  - [Build-Image & Image-Spec](xdvdfs-compat.md#build-image)
   - [Checksums](xdvdfs-compat.md#checksum)
   - [XISO Format](xiso-format.md)
   - [FAQ](faq.md)

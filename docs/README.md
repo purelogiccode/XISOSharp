@@ -17,15 +17,24 @@ build [`202609111233`](https://github.com/XboxDev/extract-xiso/releases/tag/buil
 Xbox ISO (XISO / XDVDFS) disc images. It is a direct, byte-identical port of the original
 C codebase into idiomatic managed C# — no native dependencies, no P/Invoke.
 
-This documentation set is served as the GitHub Pages site. It covers the CLI, the .NET library API,
-the XISO on-disk format, Xbox disc formats (XGD1/XGD2/XGD3/Hybrid, Redump images), archival workflows, and `xdvdfs` parity.
-The site is rendered with **Docsify** — a fixed **left sidebar** is provided by [`_sidebar.md`](_sidebar.md) and [`index.html`](index.html).
+This documentation set is published twice from the same sources and covers the CLI, the .NET
+library API, the XISO on-disk format, Xbox disc formats (XGD1/XGD2/XGD3/Hybrid, Redump images),
+archival workflows, and `xdvdfs` parity:
+
+- **GitHub Pages** — rendered with **Docsify**; the fixed **left sidebar** comes from
+  `_sidebar.md`, served by `index.html` (`pages.yml` deploys `docs/`).
+- **GitHub Wiki** — `wiki.yml` runs `sync-wiki.ps1`, which copies every page, generates
+  `Home.md` from this index, and builds the wiki **side menu** `_Sidebar.md` from the same
+  `_sidebar.md`, so both targets always share one navigation.
+
+Both side menus list the same pages; relative page links work in either renderer.
 
 ---
 
 ## Table of contents
 
-> **Left menu:** the sidebar (`_sidebar.md`) is the canonical navigation. The table below mirrors it for plain GitHub rendering.
+> **Left menu:** the sidebar (`_sidebar.md`) is the canonical navigation for Pages and the wiki.
+> The table below mirrors it for plain GitHub rendering.
 
 ### User guide
 
@@ -77,7 +86,7 @@ The site is rendered with **Docsify** — a fixed **left sidebar** is provided b
 - **xdvdfs parity:** `build-image` ordered `host/**:image/{0|1}` (`!` + `{n}` captures, `xdvdfs.toml`, `--dry-run`, `\:` colon escaping), `image-spec from`, **CISO** `compress`/`cso`/`decompress`/`uncso`/`decso` (DEFLATE v1 `0x80000000` + LZ4 v2, `align` 0/1/2, `--ciso-level`/`--ciso-version`/`--ciso-split`) with `CisoBlockDevice` random-access, `split`/`join`/`joinsplit` FATX parts, `IBlockDevice` (`File`/`Memory`/`Offset`/`Ciso`)
 - Automatic `.xbe` **media-enable patching** (Boyer–Moore `E8 CA FD FF FF 85 C0 7D → EB`)
 - Async APIs, `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FileProgress`/`FinishedPacking`, with `FileAdded` also per written file and per-chunk `FileProgress` in extract mode), `CancellationToken` throughout
-- Multi-targets **.NET 8, .NET 9, and .NET 10**; strong-named; trim/AOT compatible; **left sidebar** on Pages
+- Multi-targets **.NET 8, .NET 9, and .NET 10**; strong-named; trim/AOT compatible; **left side menu** on Pages and the GitHub Wiki
 
 ## Quick start
 
@@ -107,7 +116,7 @@ See [Getting Started](getting-started.md) for details.
 
 | Project | Description |
 |---|---|
-| `XISOSharp.Core` | Class library (NuGet package `XISOSharp`) — complete read/write engine |
+| `XISOSharp` | Class library (NuGet package `XISOSharp`) — complete read/write engine |
 | `XISOSharp.Cli` | Command-line tool `XISOSharp` (extract-xiso-compatible flags) |
 | `XISOSharp.Tests` | xUnit test suite |
 | `XISOSharp.Benchmarks` | BenchmarkDotNet benchmarks (AVL tree, Boyer–Moore, sector math) |

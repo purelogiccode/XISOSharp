@@ -49,7 +49,8 @@ internal static class SelfTest
                     "a.iso"
                 ]);
             Check("wipe", CliCommands.Wipe("a.iso", null, overwrite: true), ["--wipe", "-y", "a.iso"]);
-            Check("trim", CliCommands.Trim("a.iso", "t.iso", overwrite: false), ["--trim", "-n", "a.iso", "t.iso"]);
+            Check("trim", CliCommands.Trim("a.iso", "t.iso", overwrite: false),
+                ["--trim", "-n", "-o", "t.iso", "a.iso"]);
             Check("rebuild", CliCommands.Rebuild(["x.iso", "v.iso"], "r.iso", "s.txt", overwrite: true),
                 ["rebuild", "x.iso", "v.iso", "-o", "r.iso", "--security-sectors", "s.txt", "-y"]);
             Check("compress", CliCommands.Compress("a.iso", null, 9, 2, "0", overwrite: false),

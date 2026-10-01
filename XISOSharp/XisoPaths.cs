@@ -29,8 +29,12 @@ public static class XisoPaths
         if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
             return false;
 
-        string? fullA = TryResolve(a);
-        string? fullB = TryResolve(b);
+        // Snapshot the working directory once: resolving the two paths against
+        // different CWDs (a concurrent caller chdirs) would compare unrelated
+        // absolute paths and miss an input==output collision.
+        string? cwd = TryGetCurrentDirectory();
+        string? fullA = TryResolve(a, cwd);
+        string? fullB = TryResolve(b, cwd);
         if (fullA == null || fullB == null)
         {
             // At least one side is not a valid path: only identical spellings count.
@@ -50,8 +54,11 @@ public static class XisoPaths
         if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(directory))
             return false;
 
-        string? full = TryResolve(path);
-        string? dir = TryResolve(directory);
+        // Same CWD snapshot as AreSamePath: both sides must resolve against one
+        // working directory or a concurrent chdir can invert the containment.
+        string? cwd = TryGetCurrentDirectory();
+        string? full = TryResolve(path, cwd);
+        string? dir = TryResolve(directory, cwd);
         if (full == null || dir == null || dir.Length == 0 || full.Length <= dir.Length)
             return false;
 
@@ -66,16 +73,35 @@ public static class XisoPaths
                 full[dir.Length] == Path.AltDirectorySeparatorChar);
     }
 
-    private static string? TryResolve(string path)
+    private static string? TryResolve(string path, string? baseDirectory)
     {
         try
         {
-            return TrimTrailingSeparators(Path.GetFullPath(path));
+            string full = baseDirectory != null && !Path.IsPathRooted(path)
+                ? Path.GetFullPath(path, baseDirectory)
+                : Path.GetFullPath(path);
+            return TrimTrailingSeparators(full);
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException
                                        or UnauthorizedAccessException)
         {
             Logger.LogDebug($"Path resolve failed for '{path}': {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Returns the process working directory, or <c>null</c> when it cannot be
+    /// read (for example after the directory was deleted on Unix).
+    /// </summary>
+    private static string? TryGetCurrentDirectory()
+    {
+        try
+        {
+            return Directory.GetCurrentDirectory();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
             return null;
         }
     }

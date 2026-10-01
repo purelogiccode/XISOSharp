@@ -74,12 +74,62 @@ public class CliFlagContractExtraTests : IDisposable
     }
 
     [Fact]
+    public void Silent_BeforeVersion_IsRejected()
+    {
+        // -v/-h return before the post-parse validation, so they must run the
+        // same check themselves.
+        int rc = Program.Main(["--silent", "-v"]);
+
+        Assert.Equal(1, rc);
+        Assert.Contains("--silent requires --checksum", AllError(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Silent_BeforeHelp_IsRejected()
+    {
+        int rc = Program.Main(["--silent", "--help"]);
+
+        Assert.Equal(1, rc);
+        Assert.Contains("--silent requires --checksum", AllError(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FileTime_OutsideCreate_IsRejected()
     {
         int rc = Program.Main(["--file-time", "0", "-l", "no-such-flag-test.iso"]);
 
         Assert.Equal(1, rc);
         Assert.Contains("--file-time is only used with -c", AllError(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FileTime_WithPackIso_IsRejected()
+    {
+        // --pack <iso> translates to rewrite mode, which never consumes a file
+        // time; the message names the create-only combinations.
+        string dir = Path.Combine(Path.GetTempPath(), $"xiso_cli_flag_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            string iso = Path.Combine(dir, "game.iso");
+            File.WriteAllBytes(iso, new byte[64]);
+
+            int rc = Program.Main(["--pack", iso, "--file-time", "0"]);
+
+            Assert.Equal(1, rc);
+            Assert.Contains("--file-time is only used with", AllError(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+            catch
+            {
+                // best effort
+            }
+        }
     }
 
     [Fact]

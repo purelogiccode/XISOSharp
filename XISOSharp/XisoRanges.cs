@@ -127,13 +127,9 @@ public static class XisoRanges
             byte[] nameBuf = new byte[nameLength];
             if (nameLength > 0)
             {
-                int read = 0;
-                while (read < nameLength)
-                {
-                    int n = isoFs.Read(nameBuf, read, nameLength - read);
-                    if (n == 0) return;
-                    read += n;
-                }
+                // A truncated name must fail, not silently drop the entry and
+                // its right-sibling chain from the sector map.
+                ReadExact(isoFs, nameBuf);
             }
 
             string name = Latin1Encoding.Instance.GetString(nameBuf);
