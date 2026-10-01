@@ -4,6 +4,13 @@
 ![Tests](https://img.shields.io/badge/tests-1797-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
+[![Test SDK](https://img.shields.io/badge/test--sdk-18.10.1-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
+[![Coverlet](https://img.shields.io/badge/coverage-coverlet-blueviolet)](https://github.com/coverlet-coverage/coverlet)
+![Test matrix](https://img.shields.io/badge/tests-windows--latest-lightgrey)
+[![GitHub stars](https://img.shields.io/github/stars/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/issues)
+[![GitHub contributors](https://img.shields.io/github/contributors/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/graphs/contributors)
+[![Last commit](https://img.shields.io/github/last-commit/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/commits/master)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/purelogiccode/XISOSharp/blob/master/LICENSE)
 
 Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness of the C# implementation against the original extract-xiso reference.

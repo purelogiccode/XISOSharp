@@ -8,6 +8,13 @@
 ![Trim-ready](https://img.shields.io/badge/trimming-compatible-success)
 ![AOT-ready](https://img.shields.io/badge/AOT-compatible-success)
 ![Strong-named](https://img.shields.io/badge/strong--named-yes-blue)
+![SourceLink](https://img.shields.io/badge/SourceLink-enabled-blue)
+![XML docs](https://img.shields.io/badge/XML%20docs-included-blue)
+[![GitHub stars](https://img.shields.io/github/stars/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/issues)
+[![GitHub contributors](https://img.shields.io/github/contributors/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/graphs/contributors)
+[![Last commit](https://img.shields.io/github/last-commit/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/commits/master)
+[![Release date](https://img.shields.io/github/release-date/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/releases/latest)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://purelogiccode.github.io/XISOSharp/)
 
 A pure C# class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. A direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool from C to C# — byte-identical output, no native dependencies — extended with the archival power of [XboxKit](https://github.com/Deterous/XboxKit) (Redump video/filler/seed/wipe/trim/petrify/update/rebuild, ZAR) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) (build-image remapping, CISO compress/decompress, checksums). All logic — including the AVL tree, Boyer-Moore search, XISO header verification, directory traversal, format rewriting, and media-enable patching — is ported directly from the reference C implementation.

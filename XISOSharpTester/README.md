@@ -5,6 +5,12 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0%20%2B%20WPF-512BD4)](https://dotnet.microsoft.com/)
 [![WPF-UI](https://img.shields.io/badge/WPF--UI-4.3.0-blueviolet)](https://github.com/lepoco/wpfui)
 [![QuestPDF](https://img.shields.io/badge/QuestPDF-2026.9.1-blueviolet)](https://www.questpdf.com/)
+[![Serilog](https://img.shields.io/badge/Serilog-4.4.0-blueviolet)](https://serilog.net/)
+[![GitHub release](https://img.shields.io/github/v/release/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/releases/latest)
+[![GitHub stars](https://img.shields.io/github/stars/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/issues)
+[![GitHub contributors](https://img.shields.io/github/contributors/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/graphs/contributors)
+[![Last commit](https://img.shields.io/github/last-commit/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/commits/master)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/purelogiccode/XISOSharp/blob/master/LICENSE)
 
 A WPF desktop application for regression testing the XISOSharp C# implementation against the original C extract-xiso tool. Runs batch comparisons across multiple XISO images and reports pass/fail status with SHA-256 hash verification.

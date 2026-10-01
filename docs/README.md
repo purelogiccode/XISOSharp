@@ -3,8 +3,13 @@
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://purelogiccode.github.io/XISOSharp/)
 [![Docsify](https://img.shields.io/badge/docsify-4.x-blueviolet)](https://docsify.js.org/)
+[![Pages](https://github.com/purelogiccode/XISOSharp/actions/workflows/pages.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/pages.yml)
+[![Wiki sync](https://github.com/purelogiccode/XISOSharp/actions/workflows/wiki.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/wiki.yml)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![NuGet](https://img.shields.io/nuget/v/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
+[![GitHub stars](https://img.shields.io/github/stars/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/stargazers)
+[![GitHub contributors](https://img.shields.io/github/contributors/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/graphs/contributors)
+[![Last commit](https://img.shields.io/github/last-commit/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/commits/master)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/purelogiccode/XISOSharp/blob/master/LICENSE)
 
 **XISOSharp** is a pure C# implementation of [extract-xiso](https://github.com/XboxDev/extract-xiso)

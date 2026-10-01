@@ -8,6 +8,16 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://purelogiccode.github.io/XISOSharp/)
 [![Last commit](https://img.shields.io/github/last-commit/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/commits/master)
+[![Commit activity](https://img.shields.io/github/commit-activity/m/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/graphs/commit-activity)
+[![GitHub stars](https://img.shields.io/github/stars/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/network/members)
+[![GitHub issues](https://img.shields.io/github/issues/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/issues)
+[![GitHub contributors](https://img.shields.io/github/contributors/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/graphs/contributors)
+[![Release date](https://img.shields.io/github/release-date/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/purelogiccode/XISOSharp/total)](https://github.com/purelogiccode/XISOSharp/releases)
+[![Code size](https://img.shields.io/github/languages/code-size/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)](https://github.com/purelogiccode/XISOSharp)
+[![Avalonia](https://img.shields.io/badge/Avalonia-12.1.3-blueviolet)](https://avaloniaui.net/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/purelogiccode/XISOSharp/pulls)
 
 A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) for Xbox ISO (XISO / XDVDFS) images — **byte-identical** output, no native dependencies, no P/Invoke, just .NET. Beyond the C baseline it merges the archival power of [XboxKit](https://github.com/Deterous/XboxKit) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) into one trimmable, AOT-compatible library + CLI.
