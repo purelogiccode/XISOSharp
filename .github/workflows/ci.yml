@@ -35,14 +35,14 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # MinVer derives Version/InformationalVersion from git tags; a
           # shallow clone reports the wrong version.
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
           cache: true
@@ -84,7 +84,7 @@ jobs:
         # Always: the trx of a crashed/hung run carries the last-running-test
         # and per-test timings for post-mortems.
         if: always() && matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: TestResults/**/*.trx
@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload coverage
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: TestResults/**/coverage.cobertura.xml
@@ -104,12 +104,12 @@ jobs:
     timeout-minutes: 30
     needs: build-and-test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
           cache: true
@@ -130,7 +130,7 @@ jobs:
         run: dotnet pack XISOSharp/XISOSharp.csproj --no-build --configuration Release --output artifacts
 
       - name: Upload packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nuget-packages
           path: |
@@ -148,16 +148,16 @@ jobs:
     environment: nuget
     steps:
       # checkout supplies global.json for setup-dotnet.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: nuget-packages
           path: artifacts
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
