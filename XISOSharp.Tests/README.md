@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1744-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1774-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/purelogiccode/XISOSharp/blob/master/LICENSE)
@@ -48,6 +48,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Bug reports / telemetry** — report entry points under test hosts, exception-block budgets, environment block lines, stats launch-ping opt-outs
 - **Internal helpers** (`InternalsVisibleTo`) — SHA3-256 NIST vectors/chunking/disposal, Latin-1 codec full byte range, bounded sub-stream window/ownership semantics
 - **GUI command builders** (net10.0) — `CliCommands` argv for every verb, flags-before-positionals invariant, `CliLocator` version metadata fallbacks
+- **GUI services** (net10.0) — screenshot file naming/folder resolution/collision suffixes and update-check version comparison/release-URL fallback
 
 ## Running Tests
 
