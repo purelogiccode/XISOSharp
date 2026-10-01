@@ -1,8 +1,11 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using Serilog;
 using XISOSharp.Gui.Logging;
+using XISOSharp.Gui.Services;
 using XISOSharp.Gui.ViewModels;
 using XISOSharp.Gui.Views;
 
@@ -40,11 +43,12 @@ public class App : Application
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 MainViewModel viewModel = new();
-                desktop.MainWindow = new MainWindow
+                MainWindow window = new()
                 {
                     DataContext = viewModel,
                 };
-                _ = StartupAsync(viewModel);
+                desktop.MainWindow = window;
+                _ = StartupAsync(viewModel, window);
             }
 
             base.OnFrameworkInitializationCompleted();
@@ -56,7 +60,7 @@ public class App : Application
         }
     }
 
-    private static async Task StartupAsync(MainViewModel viewModel)
+    private static async Task StartupAsync(MainViewModel viewModel, MainWindow window)
     {
         try
         {
@@ -77,5 +81,80 @@ public class App : Application
                 // ignored
             }
         }
+
+        await CheckForUpdatesAsync(viewModel, window).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Probes GitHub for a newer release once at startup and, when one exists,
+    /// asks the user whether to open the release page. Best effort: failures
+    /// are debug-logged and never block or fail startup.
+    /// </summary>
+    private static async Task CheckForUpdatesAsync(MainViewModel viewModel, MainWindow window)
+    {
+        try
+        {
+            UpdateCheckResult? update = await UpdateService.CheckAsync(CancellationToken.None).ConfigureAwait(false);
+            if (update is null)
+            {
+                return;
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                if (!await WaitForShownAsync(window).ConfigureAwait(true))
+                {
+                    return;
+                }
+
+                string tag = update.LatestTag.TrimStart('v', 'V');
+                bool open = await MessageBoxWindow.ShowAsync(
+                    window,
+                    "Update available",
+                    $"XISOSharp {tag} is available (you have {update.LocalVersion}).\n\n" +
+                    "Open the GitHub release page to download the new version?",
+                    "Open GitHub",
+                    "Later").ConfigureAwait(true);
+                if (open && !UrlOpener.TryOpen(update.ReleaseUrl))
+                {
+                    viewModel.LogMessage("[GUI] Could not open the release page in the default browser.");
+                }
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "GUI update check failed");
+        }
+    }
+
+    /// <summary>
+    /// Completes when the window has been shown; <c>false</c> when it closed
+    /// before ever opening (so the caller can skip showing a dialog).
+    /// </summary>
+    private static async Task<bool> WaitForShownAsync(Window window)
+    {
+        if (window.IsVisible)
+        {
+            return true;
+        }
+
+        TaskCompletionSource<bool> shown = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        EventHandler? opened = null;
+        EventHandler? closed = null;
+        opened = (_, _) =>
+        {
+            window.Opened -= opened;
+            window.Closed -= closed;
+            shown.TrySetResult(true);
+        };
+        closed = (_, _) =>
+        {
+            window.Opened -= opened;
+            window.Closed -= closed;
+            shown.TrySetResult(false);
+        };
+        window.Opened += opened;
+        window.Closed += closed;
+        return await shown.Task.ConfigureAwait(true);
     }
 }

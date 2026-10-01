@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Serilog;
@@ -54,6 +55,7 @@ public partial class MainWindow : Window
             InitializeComponent();
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             AddHandler(DragDrop.DropEvent, OnDrop);
+            AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
             Log.Information("MainWindow initialized");
         }
         catch (Exception ex)
@@ -128,6 +130,51 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "About dialog failed");
+        }
+    }
+
+    /// <summary>
+    /// Tunnel handler for the F8 screenshot shortcut; runs before focused
+    /// controls can consume the key.
+    /// </summary>
+    private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.F8)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        TakeScreenshot();
+    }
+
+    private void TakeScreenshot()
+    {
+        try
+        {
+            ScreenshotResult? result = ScreenshotService.CaptureActive(this, DateTime.Now);
+            if (result is null)
+            {
+                VmOrNull?.LogMessage("[GUI] Screenshot failed; see the log file for details.");
+                return;
+            }
+
+            string note = result.UsedFallbackFolder
+                ? " (application folder not writable; saved to the fallback location)"
+                : string.Empty;
+            VmOrNull?.LogMessage($"[GUI] Screenshot saved{note}: {result.FilePath}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Screenshot shortcut failed");
+            try
+            {
+                VmOrNull?.LogMessage($"[GUI] Screenshot failed: {ex.Message}");
+            }
+            catch
+            {
+                // ignored
+            }
         }
     }
 

@@ -1,0 +1,50 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="XISOSharp.Gui.Views.MessageBoxWindow"
+        Title="XISOSharp"
+        Icon="avares://XISOSharp.Gui/icon/icon.ico"
+        Width="520"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppWindowBrush}">
+
+  <Window.Styles>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="16" />
+      <Setter Property="Padding" Value="18" />
+    </Style>
+    <Style Selector="TextBlock.body">
+      <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="LineHeight" Value="20" />
+    </Style>
+  </Window.Styles>
+
+  <Border Classes="card" Margin="16">
+    <StackPanel Spacing="16">
+      <TextBlock Name="MessageTextBlock"
+                 Classes="body"
+                 Text=""
+                 ToolTip.Tip="XISOSharp message" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Name="CancelButton"
+                Classes="headeraction"
+                Content="Later"
+                Click="Cancel_Click"
+                IsCancel="True"
+                ToolTip.Tip="Close this message without opening the page" />
+        <Button Name="AcceptButton"
+                Classes="accent"
+                Content="Open GitHub"
+                Click="Accept_Click"
+                IsDefault="True"
+                ToolTip.Tip="Open the release page in the default browser" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</Window>
