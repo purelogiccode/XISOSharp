@@ -179,8 +179,9 @@ switches it to keep-open for VFS/mount consumers.
 | `Dispose()` | Releases the held stream (keep-open); a no-op in stateless mode |
 
 `XisoExplorerOptions`: `KeepOpen` (hold one stream for the explorer's lifetime) and
-`Share` (plain-ISO `FileShare`, default `FileShare.Read`; use `FileShare.ReadWrite`
-so AV scanners/sync clients can touch the image while mounted).
+`Share` (image `FileShare`, default `FileShare.Read`; use `FileShare.ReadWrite`
+so AV scanners/sync clients can touch the image while mounted - applies to plain
+ISOs, single `.cso` containers, and split `*.1.cso` part sets).
 
 **Read-bounds contract.** `OpenReadStream`/`ReadFileBytes` expose only a file's own
 `[0, Size)` extent: the offset is `DiscLseek + StartSector * 2048` and the length is

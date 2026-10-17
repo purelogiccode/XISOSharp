@@ -874,6 +874,26 @@ public class CisoTests : IDisposable
     }
 
     [Fact]
+    public void SplitCso_ExplorerWithReadWriteShare_CoexistsWithWriterHoldingPart()
+    {
+        // Report follow-up: the caller-chosen share mode must reach split part files
+        // too. A writer (sync client, in-progress copy) keeps the first part open
+        // for write and shares reads only; read/write sharing coexists with it,
+        // while the previous hardcoded FileShare.Read failed with a sharing violation.
+        (_, string csoPath, _) = CreateSplitCso(splitBytes: 16384);
+        string firstPart = SplitParts(csoPath)[0];
+
+        using (FileStream writer = new(firstPart, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+        {
+            using XisoExplorer explorer = new(firstPart,
+                new XisoExplorerOptions { KeepOpen = true, Share = FileShare.ReadWrite });
+
+            IReadOnlyList<ExplorerNode> root = explorer.ListChildren("/");
+            Assert.Contains(root, static node => node is { Name: "file1.txt", IsDirectory: false });
+        }
+    }
+
+    [Fact]
     public void CompressToCso_SplitVersion1_RoundTrips()
     {
         (string isoPath, string csoPath, _) =

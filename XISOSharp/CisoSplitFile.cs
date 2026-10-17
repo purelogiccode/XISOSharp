@@ -27,7 +27,9 @@ internal static class CisoSplitFile
     internal static bool IsSplitPath(string path) => path.EndsWith(".1.cso", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Opens every existing part for a split path such as <c>game.1.cso</c>.</summary>
-    internal static List<FileStream> OpenParts(string firstPartPath)
+    /// <param name="firstPartPath">Path of the first part (<c>*.1.cso</c>).</param>
+    /// <param name="share">File sharing mode for the part files.</param>
+    internal static List<FileStream> OpenParts(string firstPartPath, FileShare share = FileShare.Read)
     {
         string baseName = firstPartPath[..^PartSuffixLength];
         List<FileStream> parts = new();
@@ -37,7 +39,7 @@ internal static class CisoSplitFile
             // -> `My.Game`) must yield `My.Game.2.cso`, not `My.2.cso`.
             string partPath = $"{baseName}.{i + 1}.cso";
             if (!File.Exists(partPath)) break;
-            parts.Add(new FileStream(partPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536));
+            parts.Add(new FileStream(partPath, FileMode.Open, FileAccess.Read, share, 65536));
         }
 
         return parts;

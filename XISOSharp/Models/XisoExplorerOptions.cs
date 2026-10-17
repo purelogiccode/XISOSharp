@@ -36,7 +36,9 @@ public sealed record XisoExplorerOptions
     public bool KeepOpen { get; init; }
 
     /// <summary>
-    /// Share mode for the underlying plain-ISO <see cref="FileStream"/>.
+    /// Share mode for the underlying image file(s): the plain-ISO
+    /// <see cref="FileStream"/>, a single <c>.cso</c> container, or every part
+    /// file of a split <c>*.1.cso</c> set.
     /// Default <see cref="FileShare.Read"/> (unchanged 1.0.2 behavior). Use
     /// <see cref="FileShare.ReadWrite"/> to coexist with AV scanners or sync
     /// clients that open the image for write while it is mounted.

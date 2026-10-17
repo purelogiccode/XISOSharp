@@ -33,11 +33,10 @@ public sealed class CisoBlockDevice : IBlockDevice
 
     /// <summary>
     /// Opens a CISO file with a caller-chosen share mode for the underlying
-    /// <c>.cso</c> part files (single-file containers only; split part sets are
-    /// always opened read-shared).
+    /// <c>.cso</c> file or split <c>*.1.cso</c> part files.
     /// </summary>
     /// <param name="csoPath">Path to a <c>.cso</c> file or split <c>*.1.cso</c> part set.</param>
-    /// <param name="share">File sharing mode for the container file.</param>
+    /// <param name="share">File sharing mode for the container or part files.</param>
     /// <remarks>
     /// The file handle opened here is owned by this device: if header validation
     /// throws, it is disposed before the exception propagates (no handle leak).
@@ -149,7 +148,7 @@ public sealed class CisoBlockDevice : IBlockDevice
     {
         if (CisoSplitFile.IsSplitPath(path))
         {
-            List<FileStream> parts = CisoSplitFile.OpenParts(path);
+            List<FileStream> parts = CisoSplitFile.OpenParts(path, share);
             if (parts.Count == 0) throw new FileNotFoundException($"CSO not found: {path}");
             return parts.Count == 1 ? parts[0] : new CisoSplitInputStream(parts);
         }

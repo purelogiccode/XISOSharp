@@ -165,6 +165,40 @@ public class XisoSplitTests : IDisposable
     }
 
     [Fact]
+    public void CisoOpenParts_HonorsCallerShareMode()
+    {
+        // Report follow-up: OpenParts must thread the caller's share mode to every
+        // part. A writer (sync client, in-progress copy) keeps the first part open
+        // for write and shares reads only: read/write sharing coexists with it.
+        string dir = CreateTempDir("xiso_split_share");
+        string first = Path.Combine(dir, "My.Game.1.cso");
+        File.WriteAllBytes(first, [1]);
+        File.WriteAllBytes(Path.Combine(dir, "My.Game.2.cso"), [2]);
+
+        using (FileStream writer = new(first, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+        {
+            List<FileStream> parts = CisoSplitFile.OpenParts(first, FileShare.ReadWrite);
+            try
+            {
+                Assert.Equal(2, parts.Count);
+            }
+            finally
+            {
+                foreach (FileStream part in parts)
+                    part.Dispose();
+            }
+        }
+
+        // The default stays read-shared, so a writer that does not share write
+        // access still excludes it — the relaxation only happens when requested.
+        if (OperatingSystem.IsWindows())
+        {
+            using FileStream writer = new(first, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+            Assert.Throws<IOException>(() => CisoSplitFile.OpenParts(first));
+        }
+    }
+
+    [Fact]
     public void PartPath_Naming_And_IsSplitPath()
     {
         Assert.Equal("game.1.iso", XisoSplitter.PartPath("game", 0));

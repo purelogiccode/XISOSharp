@@ -1,5 +1,32 @@
 # Release Notes
 
+## 1.4.3
+
+Split CISO part sets honor the caller-chosen `FileShare` when opening images.
+`CisoSplitFile.OpenParts` was hardcoded to `FileShare.Read`, so
+`XisoReader.OpenImageStream(path, FileShare.ReadWrite)` and
+`XisoExplorerOptions.Share` reached plain ISOs and single-file `.cso` containers
+but not the individual `*.1.cso` part files - a split set held open by a writer
+(sync client, in-progress copy, antivirus) still failed with a sharing violation
+on Windows. The share mode now threads to every part. Defaults are unchanged
+(`FileShare.Read`). Full suite green on all three targets: 1758 passed / 1
+opt-in skip (1759) on net8.0/net9.0, 1819 passed / 1 opt-in skip (1820) on
+net10.0.
+
+### Library
+
+- **Split CISO share mode**: `CisoSplitFile.OpenParts(firstPart, share)`
+  accepts a share mode, and `CisoBlockDevice` threads the caller's `FileShare`
+  through to every part file. `XisoExplorerOptions.Share` now covers plain
+  ISOs, single `.cso` containers, and split `*.1.cso` part sets alike.
+
+### Tests
+
+- `CisoOpenParts_HonorsCallerShareMode` pins the share plumbing, including
+  that the default stays read-shared; `SplitCso_ExplorerWithReadWriteShare_
+  CoexistsWithWriterHoldingPart` covers the end-to-end `XisoExplorer` flow with
+  a writer holding the first part.
+
 ## 1.4.2
 
 Deep-review hardening and GUI experience release. An 80-item review of the whole

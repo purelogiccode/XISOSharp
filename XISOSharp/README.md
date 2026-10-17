@@ -256,7 +256,7 @@ public sealed class XisoExplorer : IDisposable
 public sealed record XisoExplorerOptions
 {
     public bool KeepOpen { get; init; }                       // default false
-    public FileShare Share { get; init; } = FileShare.Read;   // FileShare.ReadWrite for writer coexistence
+    public FileShare Share { get; init; } = FileShare.Read;   // FileShare.ReadWrite for writer coexistence (ISO, single/split CSO)
 }
 
 public sealed record ExplorerNode(
