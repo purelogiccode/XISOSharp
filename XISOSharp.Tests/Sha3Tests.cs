@@ -104,7 +104,7 @@ public class Sha3Tests
     public void AppendData_NullBuffer_Throws()
     {
         using Sha3256 hasher = new();
-        Assert.Throws<ArgumentNullException>(() => hasher.AppendData((byte[])null!));
+        Assert.Throws<ArgumentNullException>(() => hasher.AppendData(null!));
     }
 
     /// <summary>Verifies a disposed hasher rejects further use.</summary>

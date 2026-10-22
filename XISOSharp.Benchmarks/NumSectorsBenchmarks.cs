@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using BenchmarkDotNet.Attributes;
 
 namespace XISOSharp.Benchmarks;
@@ -20,6 +21,8 @@ public class NumSectorsBenchmarks
     /// constant) so the JIT cannot constant-fold the call away (BUG-BEN-004).
     /// </summary>
     [Params(1u, 2048u, 204800u, 204801u, uint.MaxValue)]
+    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global",
+        Justification = "BenchmarkDotNet assigns [Params] through reflection.")]
     public uint ByteCount { get; set; }
 
     private uint[] _batch = null!;

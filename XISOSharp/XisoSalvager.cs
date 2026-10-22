@@ -227,7 +227,7 @@ public static class XisoSalvager
             if (lOffset == Constants.EmptyDirectorySentinel && dirStart == tableStart)
             {
                 long peekPos = image.Position;
-                bool isAllZeros = false;
+                bool isAllZeros;
                 try
                 {
                     ReadExact(image, headerRest);
@@ -447,7 +447,7 @@ public static class XisoSalvager
             image.Seek(dataOffset, SeekOrigin.Begin);
             using FileStream outFile = new(stagedPath, FileMode.Create, FileAccess.Write, FileShare.None,
                 CopyBufferSize);
-            long remaining = (long)fileSize;
+            long remaining = fileSize;
             byte[] buffer = new byte[CopyBufferSize];
             while (remaining > 0)
             {

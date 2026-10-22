@@ -22,7 +22,6 @@ public class CorruptTocTests : IDisposable
     private readonly TextWriter _savedOut;
     private readonly TextWriter _savedErr;
     private readonly string _savedCwd;
-    private readonly string _runDir;
 
     public CorruptTocTests()
     {
@@ -34,8 +33,8 @@ public class CorruptTocTests : IDisposable
         Logger.Error = _errCapture;
 
         _savedCwd = Directory.GetCurrentDirectory();
-        _runDir = CreateTempDir("xiso_toc_rundir");
-        Directory.SetCurrentDirectory(_runDir);
+        string runDir = CreateTempDir("xiso_toc_rundir");
+        Directory.SetCurrentDirectory(runDir);
     }
 
     public void Dispose()
@@ -150,7 +149,7 @@ public class CorruptTocTests : IDisposable
             File.WriteAllText(Path.Combine(src, "b.txt"), "world");
         }, "game.iso");
         (_, uint rootSize, long rootAbs, _) = RootLayout(isoPath);
-        Assert.Equal(2, XisoReader.ListDirectory(isoPath, "/").Count);
+        Assert.Equal(2, XisoReader.ListDirectory(isoPath).Count);
 
         // Patch b.txt's right-sibling pointer to itself: the old walk followed
         // it forever (pushing the same offset, growing the result list to OOM).
@@ -162,7 +161,7 @@ public class CorruptTocTests : IDisposable
         string bad = CopyIso(isoPath, "xiso_toc_bad");
         File.WriteAllBytes(bad, img);
 
-        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad, "/"));
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad));
         Assert.Contains("invalid TOC entry", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -235,7 +234,7 @@ public class CorruptTocTests : IDisposable
         string bad = CopyIso(isoPath, "xiso_toc_bad");
         File.WriteAllBytes(bad, img);
 
-        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad, "/"));
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad));
         Assert.Contains("invalid TOC entry", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -429,7 +428,7 @@ public class CorruptTocTests : IDisposable
         // most 65536 distinct entries can ever exist per table — the walk must
         // terminate; without bounds it would not.
         const uint rootSector = 40;
-        const uint rootSize = (uint)(entryCount * 16);
+        const uint rootSize = entryCount * 16;
         const long rootAbs = (long)rootSector * Constants.SectorSize;
         using (FileStream fs = new(isoPath, FileMode.Create, FileAccess.Write, FileShare.None))
         {
@@ -465,7 +464,7 @@ public class CorruptTocTests : IDisposable
             }
         }
 
-        IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(isoPath, "/");
+        IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(isoPath);
         Assert.Equal(entryCount, entries.Count);
     }
 }

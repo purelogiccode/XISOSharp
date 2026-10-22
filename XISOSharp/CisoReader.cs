@@ -119,7 +119,7 @@ public static class CisoReader
         // Validate the u64 size claim BEFORE allocating anything from it: a
         // large-but-plausible claim (e.g. 1 TB in a 2 GB sparse file) would
         // otherwise allocate gigabytes of index before the file-size guard runs.
-        if (uncompressedSize > (ulong)long.MaxValue)
+        if (uncompressedSize > long.MaxValue)
             throw new InvalidDataException($"CISO uncompressed size {uncompressedSize} exceeds supported range");
         long totalBlocks = (long)((uncompressedSize + blockSize - 1) / blockSize);
         long indexLen = totalBlocks + 1;

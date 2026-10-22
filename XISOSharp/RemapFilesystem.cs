@@ -13,17 +13,8 @@ public static class RemapFilesystem
     /// <summary>
     /// Snapshot of a host filesystem entry collected during the remap directory walk.
     /// </summary>
-    private sealed class FileEntry
-    {
-        /// <summary>File or directory name without any path prefix.</summary>
-        internal string Name = string.Empty;
-
-        /// <summary>Whether the entry is a directory.</summary>
-        internal bool IsDirectory;
-
-        /// <summary>File length in bytes; 0 for directories.</summary>
-        internal long Length;
-    }
+    /// <remarks>The walk only needs the entry kind; lengths are probed for readability.</remarks>
+    private readonly record struct FileEntry(bool IsDirectory);
 
     /// <summary>
     /// Parses an <c>xdvdfs.toml</c> spec file. Returns output path (if present) and ordered map rules.
@@ -300,7 +291,6 @@ public static class RemapFilesystem
                 string entryRel = string.IsNullOrEmpty(dirRel) ? name : dirRel + "/" + name;
 
                 bool isDir;
-                long len = 0;
                 try
                 {
                     FileAttributes attr = File.GetAttributes(fullEntry);
@@ -318,7 +308,9 @@ public static class RemapFilesystem
 
                     if (!isDir)
                     {
-                        len = new FileInfo(fullEntry).Length;
+                        // Probe the length so unreadable files (locked, denied) take
+                        // the skip path below; the walk itself only needs the kind.
+                        _ = new FileInfo(fullEntry).Length;
                     }
 
                     // XISO has no link representation: a file symlink packs its
@@ -335,7 +327,7 @@ public static class RemapFilesystem
                     continue;
                 }
 
-                FileEntry fe = new() { Name = name, IsDirectory = isDir, Length = len };
+                FileEntry fe = new(isDir);
 
                 bool directMatch = false;
                 foreach (WaxGlob g in waxGlobs)
@@ -650,7 +642,6 @@ public static class RemapFilesystem
                 if (name is "." or "..") continue;
                 string entryRel = string.IsNullOrEmpty(dirRel) ? name : dirRel + "/" + name;
                 bool isDir;
-                long len = 0;
                 try
                 {
                     FileAttributes attr = File.GetAttributes(fullEntry);
@@ -666,7 +657,12 @@ public static class RemapFilesystem
                         continue;
                     }
 
-                    if (!isDir) len = new FileInfo(fullEntry).Length;
+                    if (!isDir)
+                    {
+                        // Probe the length so unreadable files (locked, denied) take
+                        // the skip path below; the walk itself only needs the kind.
+                        _ = new FileInfo(fullEntry).Length;
+                    }
 
                     // XISO has no link representation: a file symlink packs its
                     // target's bytes under the link name — say so (BUG-LIB-026).
@@ -682,7 +678,7 @@ public static class RemapFilesystem
                     continue;
                 }
 
-                FileEntry fe = new() { Name = name, IsDirectory = isDir, Length = len };
+                FileEntry fe = new(isDir);
                 bool directMatch = false;
                 foreach (WaxGlob g in waxGlobs)
                 {

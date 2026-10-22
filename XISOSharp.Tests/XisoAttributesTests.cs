@@ -94,7 +94,7 @@ public sealed class XisoAttributesTests
     {
         FileAttributes clean = XisoAttributes.ToWindowsFileAttributes(Constants.AttributeArc);
         FileAttributes reserved = XisoAttributes.ToWindowsFileAttributes(
-            (byte)(Constants.AttributeArc | Constants.AttributeReservedMask));
+            Constants.AttributeArc | Constants.AttributeReservedMask);
 
         Assert.Equal(clean, reserved);
     }

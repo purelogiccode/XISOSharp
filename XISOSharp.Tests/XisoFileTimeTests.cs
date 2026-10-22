@@ -155,7 +155,7 @@ public class XisoFileTimeTests : IDisposable
 
         // BlockDevice overload parity
         using FileStream fs = new(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
-        FileBlockDevice dev = new(fs, false);
+        FileBlockDevice dev = new(fs);
         ulong devRaw = XisoReader.GetFileTimeRaw(dev, "test.iso");
         Assert.Equal(hexRaw, devRaw);
     }
@@ -176,9 +176,7 @@ public class XisoFileTimeTests : IDisposable
         File.Move(isoPath, oldPath);
         try
         {
-            int rc = XisoReader.Rewrite(oldPath, outDir, out string? rewriteOut, CancellationToken.None, null, null,
-                null,
-                null);
+            int rc = XisoReader.Rewrite(oldPath, outDir, out string? rewriteOut, CancellationToken.None);
             Assert.Equal(0, rc);
             // Rewrite may create new file in outDir or cwd; find it
             // Rewrite creates file named after source without .old suffix, with .iso if needed

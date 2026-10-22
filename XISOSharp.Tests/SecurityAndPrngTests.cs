@@ -8,7 +8,6 @@ namespace XISOSharp.Tests;
 [Collection("Sequential")]
 public class SecurityAndPrngTests : IDisposable
 {
-    private readonly List<string> _tempDirs = [];
     private readonly List<string> _tempFiles = [];
     private static readonly string[] Contents = new[] { "1000-5095", "9000-13095" };
 
@@ -16,18 +15,6 @@ public class SecurityAndPrngTests : IDisposable
     {
         Logger.Quiet = false;
         Logger.RealQuiet = false;
-        foreach (string dir in _tempDirs)
-        {
-            try
-            {
-                if (Directory.Exists(dir)) Directory.Delete(dir, true);
-            }
-            catch
-            {
-                // ignored
-            }
-        }
-
         foreach (string file in _tempFiles)
         {
             try
@@ -392,7 +379,7 @@ public class SecurityAndPrngTests : IDisposable
     public void XboxPrng_ExtractSeed_InvalidPath_Throws()
     {
         string missing = Path.Combine(Path.GetTempPath(), $"missing_{Guid.NewGuid():N}.iso");
-        Assert.Throws<FileNotFoundException>(() => XboxPrng.ExtractSeed(missing, 0, quiet: true));
+        Assert.Throws<FileNotFoundException>(() => XboxPrng.ExtractSeed(missing, quiet: true));
     }
 
     [Fact]
@@ -412,7 +399,7 @@ public class SecurityAndPrngTests : IDisposable
         string tmp = Path.Combine(Path.GetTempPath(), $"notxiso2_{Guid.NewGuid():N}.bin");
         File.WriteAllBytes(tmp, new byte[Constants.SectorSize * 4]);
         _tempFiles.Add(tmp);
-        uint? result = XboxPrng.ExtractSeed(tmp, 0, quiet: true);
+        uint? result = XboxPrng.ExtractSeed(tmp, quiet: true);
         Assert.Null(result);
     }
 }

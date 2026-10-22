@@ -335,7 +335,7 @@ internal static class UpdateCore
         // Version needs at least major.minor.
         if (!t.Contains('.'))
             t += ".0";
-        if (!Version.TryParse(t, out Version? parsed) || parsed is null)
+        if (!Version.TryParse(t, out Version? parsed))
         {
             core = new Version(0, 0);
             return false;

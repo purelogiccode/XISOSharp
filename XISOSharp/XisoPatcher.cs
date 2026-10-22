@@ -490,7 +490,7 @@ public static class XisoPatcher
             if (lOffset == Constants.EmptyDirectorySentinel && offset == 0)
             {
                 long peekPos = fs.Position;
-                bool isAllZeros = false;
+                bool isAllZeros;
                 try
                 {
                     ReadExact(fs, headerRest);

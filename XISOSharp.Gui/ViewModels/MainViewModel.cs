@@ -757,7 +757,7 @@ internal sealed partial class MainViewModel : ObservableObject
                         ex);
                 }
 
-                if (firstPart is not null && XisoPaths.AreSamePath(src, firstPart))
+                if (XisoPaths.AreSamePath(src, firstPart))
                 {
                     throw new InvalidOperationException(
                         $"Compress output part {firstPart} is the same file as the input ({src}); choose another output.");

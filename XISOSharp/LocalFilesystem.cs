@@ -120,4 +120,19 @@ public sealed class LocalFilesystem(string? root = null) : IFilesystem
             return -1;
         }
     }
+
+    /// <inheritdoc/>
+    public void DeleteFile(string path)
+    {
+        try
+        {
+            File.Delete(Resolve(path));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+                                       or NotSupportedException)
+        {
+            // Cleanup is best-effort and must not mask the extraction error that
+            // triggered it (see IFilesystem.DeleteFile).
+        }
+    }
 }

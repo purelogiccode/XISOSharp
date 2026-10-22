@@ -231,7 +231,7 @@ public static class XisoRepairer
                 if (lOffset == Constants.EmptyDirectorySentinel && dirStart == tableStart)
                 {
                     long peekPos = fs.Position;
-                    bool isAllZeros = false;
+                    bool isAllZeros;
                     try
                     {
                         ReadExact(fs, headerRest);

@@ -141,7 +141,7 @@ public class XisoZarRebuildTests : IDisposable
         bool ok;
         using (LogCapture capture = new())
         {
-            ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, null, quiet: false);
+            ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, quiet: false);
             log = capture.Output;
         }
 
@@ -176,7 +176,7 @@ public class XisoZarRebuildTests : IDisposable
         bool ok;
         using (LogCapture capture = new())
         {
-            ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, null, quiet: false);
+            ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, quiet: false);
             log = capture.Output;
         }
 
@@ -199,7 +199,7 @@ public class XisoZarRebuildTests : IDisposable
         bool ok;
         using (LogCapture capture = new())
         {
-            ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, null, quiet: false);
+            ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, quiet: false);
             log = capture.Output;
         }
 
@@ -225,7 +225,7 @@ public class XisoZarRebuildTests : IDisposable
         bool ok;
         using (LogCapture capture = new())
         {
-            ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, null, quiet: false);
+            ok = XisoRedump.RebuildRedump(zar, fakeVideo, null, null, outRedump, quiet: false);
             log = capture.Output;
         }
 
@@ -243,7 +243,7 @@ public class XisoZarRebuildTests : IDisposable
 
         Assert.Throws<FileNotFoundException>(() =>
             XisoRedump.RebuildRedump(missing, fakeVideo, null, null,
-                Path.Combine(work, "game.redump.iso"), null, quiet: true));
+                Path.Combine(work, "game.redump.iso"), quiet: true));
     }
 
     [Fact]
@@ -289,7 +289,7 @@ public class XisoZarRebuildTests : IDisposable
 
         Assert.Throws<OperationCanceledException>(() =>
             XisoRedump.RebuildRedump(zar, fakeVideo, null, null,
-                Path.Combine(work, "game.redump.iso"), null, quiet: true, cancellationToken: cts.Token));
+                Path.Combine(work, "game.redump.iso"), quiet: true, cancellationToken: cts.Token));
         Assert.Empty(tempScope.ZarScratchDirs());
     }
 }

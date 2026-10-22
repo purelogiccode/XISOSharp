@@ -143,7 +143,7 @@ internal sealed class Sha3256 : IDisposable
         // XOR the 136-byte (17-lane) block into the state, little-endian.
         for (int i = 0; i < RateBytes / 8; i++)
         {
-            ulong lane = (ulong)block[(i * 8) + 0]
+            ulong lane = block[(i * 8) + 0]
                          | ((ulong)block[(i * 8) + 1] << 8)
                          | ((ulong)block[(i * 8) + 2] << 16)
                          | ((ulong)block[(i * 8) + 3] << 24)

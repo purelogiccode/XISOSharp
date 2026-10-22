@@ -113,7 +113,7 @@ public sealed class CisoBlockDevice : IBlockDevice
 
         // The u64 claim must fit a long before any arithmetic: otherwise Length wraps
         // negative and the index math below goes negative with it.
-        if (claimedSize > (ulong)long.MaxValue)
+        if (claimedSize > long.MaxValue)
             throw new InvalidDataException($"CISO uncompressed size {claimedSize} exceeds supported range");
         long length = (long)claimedSize;
 

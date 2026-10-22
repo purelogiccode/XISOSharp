@@ -127,7 +127,7 @@ public sealed class XisoRebuiltSector0Tests : IDisposable
         Assert.Equal(stdSector, rootSector);
         Assert.Equal(stdSize, rootSize);
 
-        using FileBlockDevice dev = new(rebuilt, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        using FileBlockDevice dev = new(rebuilt, FileMode.Open, FileAccess.Read);
         (uint devSector, uint devSize, long devLseek) = XisoReader.VerifyXiso(dev, "rebuilt.iso");
         Assert.Equal(0, devLseek);
         Assert.Equal(rootSector, devSector);
@@ -144,7 +144,7 @@ public sealed class XisoRebuiltSector0Tests : IDisposable
 
         Assert.True(explorer.Volume.IsValid);
         Assert.Equal(0, explorer.Volume.DescriptorSector);
-        Assert.Equal((long)new FileInfo(rebuilt).Length, explorer.Volume.FileLength);
+        Assert.Equal(new FileInfo(rebuilt).Length, explorer.Volume.FileLength);
 
         ExplorerNode? file = explorer.GetNode("/default.xbe");
         Assert.NotNull(file);
@@ -185,7 +185,7 @@ public sealed class XisoRebuiltSector0Tests : IDisposable
 
         using FileStream fs = File.OpenRead(rebuilt);
 
-        IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(fs, "rebuilt.iso", "/");
+        IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(fs, "rebuilt.iso");
         Assert.Equal(2, entries.Count);
 
         EntryInfo? file = XisoReader.GetEntryInfo(fs, "rebuilt.iso", "/default.xbe");
@@ -225,7 +225,7 @@ public sealed class XisoRebuiltSector0Tests : IDisposable
     {
         (_, string rebuilt) = CreateImages();
 
-        using FileBlockDevice inner = new(rebuilt, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        using FileBlockDevice inner = new(rebuilt, FileMode.Open, FileAccess.Read);
         using OffsetBlockDevice view = OffsetBlockDevice.Probe(inner, "rebuilt.iso");
 
         Assert.Equal(0, view.Offset);
@@ -360,10 +360,10 @@ public sealed class XisoRebuiltSector0Tests : IDisposable
         Assert.Equal(stdFiles, files);
         Assert.Contains(sys, r => r.Start == 0);
         Assert.DoesNotContain(stdSys, r => r.Start == 0);
-        Assert.Equal(XisoRanges.GetFileEntries(standard, 0), XisoRanges.GetFileEntries(rebuilt, 0));
+        Assert.Equal(XisoRanges.GetFileEntries(standard), XisoRanges.GetFileEntries(rebuilt));
 
         string zar = Path.Combine(NewTempDir(), "rebuilt.zar");
-        Assert.True(XisoZarchive.CreateZar(rebuilt, zar, 0, quiet: true));
+        Assert.True(XisoZarchive.CreateZar(rebuilt, zar, quiet: true));
         using ZArchiveReader? reader = ZArchiveReader.TryOpen(zar);
         Assert.NotNull(reader);
         Assert.Equal((ulong)FileContent.Length, reader.GetFileSize(reader.LookUp("default.xbe")));

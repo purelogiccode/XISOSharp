@@ -112,7 +112,7 @@ public static class XisoZarchive
     private static string DeriveZarPath(string input)
     {
         string dir = Path.GetDirectoryName(input) ?? "";
-        string full = Path.GetFileName(input) ?? "archive";
+        string full = Path.GetFileName(input);
         if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".redump.iso".Length];
         else if (full.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".video.iso".Length];
         else if (full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".iso".Length];

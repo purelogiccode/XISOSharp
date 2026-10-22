@@ -119,10 +119,10 @@ public static class XisoRedump
     private static string DeriveVideoPath(string redumpPath)
     {
         string dir = Path.GetDirectoryName(redumpPath) ?? "";
-        string filename = Path.GetFileNameWithoutExtension(redumpPath) ?? "video";
+        string filename = Path.GetFileNameWithoutExtension(redumpPath);
         // Strip compound extensions like .redump
         string[] compounds = [".video.iso", ".redump.iso", ".skeleton.xiso", ".xiso"];
-        string full = Path.GetFileName(redumpPath) ?? "";
+        string full = Path.GetFileName(redumpPath);
         foreach (string ext in compounds)
         {
             if (full.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
@@ -380,7 +380,7 @@ public static class XisoRedump
                         securitySectors = SecuritySectors.ParseFile(candidate, redumpLength, xgdType, quiet) ?? [];
                 }
 
-                if (securitySectors.Length == 0 && xisoType == 0)
+                if (securitySectors.Length == 0)
                 {
                     Logger.LogErr(
                         "[ERROR] To rebuild from an initial seed, a list of security sector ranges is needed in sectors.txt\n");

@@ -118,7 +118,7 @@ public sealed class XisoZarPipelineTests : IDisposable
         string zar = Path.Combine(CreateTempDir("xiso_zp_zar"), "prog.zar");
 
         Collector collector = new();
-        Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true, progress: collector));
+        Assert.True(XisoZarchive.CreateZar(iso, zar, quiet: true, progress: collector));
 
         Assert.NotEmpty(collector.Events);
         ZarProgress last = collector.Events[^1];

@@ -175,7 +175,7 @@ public class XisoSplitTests : IDisposable
         File.WriteAllBytes(first, [1]);
         File.WriteAllBytes(Path.Combine(dir, "My.Game.2.cso"), [2]);
 
-        using (FileStream writer = new(first, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+        using (new FileStream(first, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
         {
             List<FileStream> parts = CisoSplitFile.OpenParts(first, FileShare.ReadWrite);
             try

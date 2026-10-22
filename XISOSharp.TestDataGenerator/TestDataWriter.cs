@@ -59,7 +59,7 @@ public static class TestDataWriter
         // processes with a named mutex, and ride out transient file locks
         // (Dropbox sync, AV scanners, indexer) with bounded retries.
         using Mutex mutex = new(false, MutexName);
-        bool owned = false;
+        bool owned;
         try
         {
             owned = mutex.WaitOne(TimeSpan.FromMinutes(5));

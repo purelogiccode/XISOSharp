@@ -204,7 +204,9 @@ working-directory changes) with the same per-file hardening as the disk path:
 skip-existing resume probes the destination filesystem, truncated data and failed
 writes throw the same `ExtractFileException` errors. Paths are
 destination-root-relative, `/`-separated, case-insensitive; `FileLength` returns
-`-1` for unresolvable paths (never skipped, reports as truncated).
+`-1` for unresolvable paths (never skipped, reports as truncated). A failed or
+cancelled copy deletes its partial destination through `DeleteFile` (default
+no-op, so custom stores keep their partial content if they cannot delete).
 
 Built-in implementations:
 

@@ -79,7 +79,7 @@ public sealed class XisoLatin1NamesTests : IDisposable
         string skel = Path.Combine(work, "game.skeleton.xiso");
         string hash = Path.Combine(work, "game.hash");
 
-        Assert.True(XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: true));
+        Assert.True(XisoSkeleton.Petrify(iso, skel, hash, quiet: true));
 
         string[] lines = File.ReadAllLines(hash);
         Assert.Equal(3, lines.Length);
@@ -96,7 +96,7 @@ public sealed class XisoLatin1NamesTests : IDisposable
         string work = CreateTempDir("xiso_latin_zar");
         string zar = Path.Combine(work, "game.zar");
 
-        Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
+        Assert.True(XisoZarchive.CreateZar(iso, zar, quiet: true));
 
         using ZArchiveReader? reader = ZArchiveReader.TryOpen(zar);
         Assert.NotNull(reader);

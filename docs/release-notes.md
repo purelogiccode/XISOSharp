@@ -1,5 +1,41 @@
 # Release Notes
 
+## 1.4.4
+
+Extraction-cleanup and static-analysis release. A failed or cancelled extraction no
+longer leaves a truncated destination file behind: `ExtractFile`/`CopyOutFile`
+delete the partial output through the new `IFilesystem.DeleteFile` member, which
+custom destination stores can override (the default keeps the previous no-op
+behavior). The solution is clean under JetBrains InspectCode - 0 errors and 0
+warnings across every project - and dead members found by the inspection were
+removed from the Tester. Full suite green on all three targets: 1760 passed / 1
+opt-in skip (1761) on net8.0/net9.0, 1821 passed / 1 opt-in skip (1822) on net10.0.
+
+### Library
+
+- **Partial-destination cleanup**: a copy that throws, reports truncation, or is
+  cancelled removes the destination it wrote, so callers (drag-and-drop prep,
+  batch extraction, resume runs) can never mistake a partial file for a complete
+  one. Cleanup is best-effort and never masks the extraction error.
+- **`IFilesystem.DeleteFile`**: new member with a default no-op implementation -
+  existing custom stores still compile and keep their partial content if they
+  cannot delete. `LocalFilesystem` deletes from disk (a missing file is a no-op);
+  `MemoryFilesystem` removes the stored snapshot.
+- Static-analysis cleanup across the library, CLI, GUI, Tester, benchmarks and
+  tests: redundant default arguments, redundant casts and assignments, dead null
+  guards, unused fields/properties, and simplified nullability in
+  `Logger.Out`/`Logger.Error` (assigning `null` now stores `TextWriter.Null`, so
+  the getters never return `null`). No output or format changes.
+
+### Tests
+
+- `ExtractRobustnessTests`: a truncated copy and a mid-write failure both leave no
+  destination file, including through a custom `IFilesystem`.
+- `XisoFilesystemTests`: `LocalFilesystem.DeleteFile` removes files and treats a
+  missing path as a no-op.
+- Suite: **net8.0/net9.0 - 1761 tests (1760 passed, 1 opt-in skip)**;
+  **net10.0 - 1822 tests (1821 passed, 1 opt-in skip, adds the GUI tests)**.
+
 ## 1.4.3
 
 Split CISO part sets honor the caller-chosen `FileShare` when opening images.

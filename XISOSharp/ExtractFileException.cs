@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using XISOSharp.Models;
 
 namespace XISOSharp;
@@ -13,6 +14,8 @@ namespace XISOSharp;
 /// <see cref="UnpackOptions.Failures"/> under <see cref="UnpackOptions.ContinueOnError"/>
 /// and summarized as <see cref="ExtractError.ErrExtractFailed"/> at the end of the run.
 /// </summary>
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global",
+    Justification = "Public failure payload: consumers read these properties, the library itself does not.")]
 public sealed class ExtractFileException : ExtractErrorException
 {
     /// <summary>Path of the entry inside the image (e.g. <c>game\sub\file.bin</c>).</summary>

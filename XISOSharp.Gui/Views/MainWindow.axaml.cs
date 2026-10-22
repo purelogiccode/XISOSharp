@@ -319,7 +319,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            e.DragEffects = !Vm.IsRunning && e.DataTransfer?.TryGetFiles()?.Length > 0
+            e.DragEffects = !Vm.IsRunning && e.DataTransfer.TryGetFiles()?.Length > 0
                 ? DragDropEffects.Copy
                 : DragDropEffects.None;
         }

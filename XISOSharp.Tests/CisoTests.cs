@@ -883,7 +883,7 @@ public class CisoTests : IDisposable
         (_, string csoPath, _) = CreateSplitCso(splitBytes: 16384);
         string firstPart = SplitParts(csoPath)[0];
 
-        using (FileStream writer = new(firstPart, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+        using (new FileStream(firstPart, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
         {
             using XisoExplorer explorer = new(firstPart,
                 new XisoExplorerOptions { KeepOpen = true, Share = FileShare.ReadWrite });
@@ -920,7 +920,7 @@ public class CisoTests : IDisposable
         BinaryPrimitives.WriteUInt32LittleEndian(hdr[..4], CisoReader.Magic);
         BinaryPrimitives.WriteUInt32LittleEndian(hdr[4..8], CisoReader.HeaderSize);
         BinaryPrimitives.WriteUInt64LittleEndian(hdr[8..16], 1UL << 40); // 1 TiB claim
-        BinaryPrimitives.WriteUInt32LittleEndian(hdr[16..20], (uint)CisoReader.BlockSize);
+        BinaryPrimitives.WriteUInt32LittleEndian(hdr[16..20], CisoReader.BlockSize);
         hdr[20] = CisoWriter.VersionDeflate;
         File.WriteAllBytes(path, hdr.ToArray());
 

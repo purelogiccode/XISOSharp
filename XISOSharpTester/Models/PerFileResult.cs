@@ -14,11 +14,6 @@ public class PerFileResult
     public string FileName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the full path to the file under test.
-    /// </summary>
-    public string FilePath { get; set; } = string.Empty;
-
-    /// <summary>
     /// Gets or sets the human-readable size of the file.
     /// </summary>
     public string FileSize { get; set; } = string.Empty;

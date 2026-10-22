@@ -82,15 +82,15 @@ internal sealed class BattleOptions
             {
                 case "--dir":
                 case "--dirs":
-                    string v = Value(args, ref i, inline) ?? string.Empty;
+                    string v = Value(args, ref i, inline);
                     dirs.AddRange(v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                     break;
                 case "--count":
-                    count = int.Parse(Value(args, ref i, inline) ?? "1",
+                    count = int.Parse(Value(args, ref i, inline),
                         System.Globalization.CultureInfo.InvariantCulture);
                     break;
                 case "--seed":
-                    seed = int.Parse(Value(args, ref i, inline) ?? "0",
+                    seed = int.Parse(Value(args, ref i, inline),
                         System.Globalization.CultureInfo.InvariantCulture);
                     break;
                 case "--cli":
@@ -110,14 +110,14 @@ internal sealed class BattleOptions
                     work = Value(args, ref i, inline);
                     break;
                 case "--ops":
-                    string o = Value(args, ref i, inline) ?? string.Empty;
+                    string o = Value(args, ref i, inline);
                     ops.AddRange(o.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                     break;
                 case "--keep":
                     keep = true;
                     break;
                 case "--timeout":
-                    timeout = int.Parse(Value(args, ref i, inline) ?? "60",
+                    timeout = int.Parse(Value(args, ref i, inline),
                         System.Globalization.CultureInfo.InvariantCulture);
                     break;
                 default:

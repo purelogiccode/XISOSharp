@@ -231,7 +231,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         File.WriteAllBytes(fakeVideo, new byte[1024 * 1024]);
         string outRedump = Path.Combine(outDir, "rebuilt.iso");
 
-        bool ok = XisoRedump.RebuildRedump(iso, fakeVideo, null, null, outRedump, null, quiet: true);
+        bool ok = XisoRedump.RebuildRedump(iso, fakeVideo, null, null, outRedump, quiet: true);
 
         Assert.False(ok);
         // Should not create output on failure (or if created, should be deleted/empty)
@@ -248,7 +248,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         File.WriteAllBytes(fakeVideo, new byte[1024 * 1024]);
         string outRedump = Path.Combine(outDir, "rebuilt.iso");
 
-        bool ok = XisoRedump.RebuildRedump(badXiso, fakeVideo, null, null, outRedump, null, quiet: true);
+        bool ok = XisoRedump.RebuildRedump(badXiso, fakeVideo, null, null, outRedump, quiet: true);
 
         Assert.False(ok);
     }
@@ -355,7 +355,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string skel = Path.Combine(outDir, "test.skeleton.xiso");
         string hash = Path.Combine(outDir, "test.hash");
 
-        bool ok = XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: true);
+        bool ok = XisoSkeleton.Petrify(iso, skel, hash, quiet: true);
 
         Assert.True(ok);
         Assert.True(File.Exists(skel));
@@ -373,7 +373,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string skel = Path.Combine(outDir, "size.skeleton.xiso");
         string hash = Path.Combine(outDir, "size.hash");
 
-        bool ok = XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: true);
+        bool ok = XisoSkeleton.Petrify(iso, skel, hash, quiet: true);
         Assert.True(ok);
 
         Assert.Equal(new FileInfo(iso).Length, new FileInfo(skel).Length);
@@ -407,7 +407,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string derivedIso = Path.Combine(outDir, "derived_test.iso");
         File.Copy(iso, derivedIso, true);
 
-        bool ok = XisoSkeleton.Petrify(derivedIso, null, null, 0, quiet: true);
+        bool ok = XisoSkeleton.Petrify(derivedIso, quiet: true);
 
         Assert.True(ok);
         string expectedSkel = Path.Combine(outDir, "derived_test.skeleton.xiso");
@@ -425,7 +425,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string skel = Path.Combine(outDir, "quiet.skeleton.xiso");
         string hash = Path.Combine(outDir, "quiet.hash");
 
-        bool ok = XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: false);
+        bool ok = XisoSkeleton.Petrify(iso, skel, hash, quiet: false);
 
         Assert.True(ok);
         Assert.True(File.Exists(skel));
@@ -439,7 +439,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string skel = Path.Combine(outDir, "out.skeleton.xiso");
         string hash = Path.Combine(outDir, "out.hash");
 
-        Assert.Throws<FileNotFoundException>(() => XisoSkeleton.Petrify(missing, skel, hash, 0, quiet: true));
+        Assert.Throws<FileNotFoundException>(() => XisoSkeleton.Petrify(missing, skel, hash, quiet: true));
     }
 
     [Fact]
@@ -451,7 +451,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string skel = Path.Combine(outDir, "bad.skeleton.xiso");
         string hash = Path.Combine(outDir, "bad.hash");
 
-        Assert.Throws<EndOfStreamException>(() => XisoSkeleton.Petrify(bad, skel, hash, 0, quiet: true));
+        Assert.Throws<EndOfStreamException>(() => XisoSkeleton.Petrify(bad, skel, hash, quiet: true));
     }
 
     [Fact]
@@ -466,7 +466,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         cts.Cancel();
 
         Assert.Throws<OperationCanceledException>(() =>
-            XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: true, ct: cts.Token));
+            XisoSkeleton.Petrify(iso, skel, hash, quiet: true, ct: cts.Token));
     }
 
     [Fact]
@@ -478,7 +478,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string skel = Path.Combine(outDir, "extractable.skeleton.xiso");
         string hash = Path.Combine(outDir, "extractable.hash");
 
-        bool ok = XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: true);
+        bool ok = XisoSkeleton.Petrify(iso, skel, hash, quiet: true);
         Assert.True(ok);
 
         // Skeleton should still be a valid XISO that can be listed/verified, but file data zeroed
@@ -528,7 +528,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string skel = Path.Combine(outDir, "frag.skeleton.xiso");
         string hash = Path.Combine(outDir, "frag.hash");
 
-        bool ok = XisoSkeleton.Petrify(iso, skel, hash, 0, quiet: true);
+        bool ok = XisoSkeleton.Petrify(iso, skel, hash, quiet: true);
 
         Assert.True(ok);
         Assert.Equal(img.Length, new FileInfo(skel).Length);
@@ -623,7 +623,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string outDir = CreateTempDir();
         string zar = Path.Combine(outDir, "test.zar");
 
-        bool ok = XisoZarchive.CreateZar(iso, zar, 0, quiet: true);
+        bool ok = XisoZarchive.CreateZar(iso, zar, quiet: true);
 
         Assert.True(ok);
         Assert.True(File.Exists(zar));
@@ -671,7 +671,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string derivedIso = Path.Combine(outDir, "derived_for_zar.iso");
         File.Copy(iso, derivedIso, true);
 
-        bool ok = XisoZarchive.CreateZar(derivedIso, null, 0, quiet: true);
+        bool ok = XisoZarchive.CreateZar(derivedIso, quiet: true);
 
         Assert.True(ok);
         string expectedZar = Path.Combine(outDir, "derived_for_zar.zar");
@@ -746,7 +746,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         bytes[rootSizeOffset + 3] = 0;
         File.WriteAllBytes(bad, bytes);
 
-        Assert.False(XisoZarchive.CreateZar(bad, zar, 0, quiet: true));
+        Assert.False(XisoZarchive.CreateZar(bad, zar, quiet: true));
         Assert.False(File.Exists(zar));
     }
 
@@ -772,7 +772,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         BinaryPrimitives.WriteUInt32LittleEndian(img.AsSpan((int)entry + 8), 0u);
         File.WriteAllBytes(iso, img);
 
-        Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
+        Assert.True(XisoZarchive.CreateZar(iso, zar, quiet: true));
         using ZArchiveReader? reader = ZArchiveReader.TryOpen(zar);
         Assert.NotNull(reader);
         Assert.NotEqual(ZArchiveReader.InvalidNode, reader.LookUp("top.txt"));
@@ -799,7 +799,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         File.WriteAllBytes(bad, bytes);
         File.WriteAllText(zar, "sentinel");
 
-        Assert.False(XisoZarchive.CreateZar(bad, zar, 0, quiet: true));
+        Assert.False(XisoZarchive.CreateZar(bad, zar, quiet: true));
         Assert.True(File.Exists(zar));
         Assert.Equal("sentinel", File.ReadAllText(zar));
     }
@@ -869,7 +869,7 @@ public class XisoRedumpAndSkeletonTests : IDisposable
         string outDir = CreateTempDir();
         string zar = Path.Combine(outDir, "large.zar");
 
-        bool ok = XisoZarchive.CreateZar(iso, zar, 0, quiet: true);
+        bool ok = XisoZarchive.CreateZar(iso, zar, quiet: true);
 
         Assert.True(ok);
         long len = new FileInfo(zar).Length;

@@ -251,7 +251,7 @@ public class XisoRangesTests : IDisposable
         const int header = Constants.HeaderOffset;
         magic.CopyTo(bytes.AsSpan(header, magic.Length));
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(header + 20, 4), 33);
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(header + 24, 4), (uint)Constants.SectorSize);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(header + 24, 4), Constants.SectorSize);
         magic.CopyTo(bytes.AsSpan(header + 20 + 4 + 4 + Constants.FileTimeSize + Constants.UnusedSize,
             magic.Length));
 

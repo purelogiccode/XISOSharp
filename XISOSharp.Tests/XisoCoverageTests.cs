@@ -150,7 +150,7 @@ public class XisoCoverageTests : IDisposable
     public void ManyFileDir_ListDirectory_CoversAllFiles()
     {
         string isoPath = CreateManyFileIso();
-        IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(isoPath, "/");
+        IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(isoPath);
         Assert.Equal(150, entries.Count);
     }
 
@@ -182,7 +182,7 @@ public class XisoCoverageTests : IDisposable
     {
         string isoPath = CreateIso(src => File.WriteAllText(Path.Combine(src, "a.txt"), "hello"), "game.iso");
         string bad = ZeroTableStart(isoPath, p => CopyIso(p, "xiso_cov_bad"));
-        Assert.Empty(XisoReader.ListDirectory(bad, "/"));
+        Assert.Empty(XisoReader.ListDirectory(bad));
     }
 
     [Fact]
@@ -717,7 +717,7 @@ public class XisoCoverageTests : IDisposable
     }
 
     [Fact]
-    public void EmptyRoot_ListDirectory_ReturnsEmpty() => Assert.Empty(XisoReader.ListDirectory(CreateEmptyIso(), "/"));
+    public void EmptyRoot_ListDirectory_ReturnsEmpty() => Assert.Empty(XisoReader.ListDirectory(CreateEmptyIso()));
 
     [Fact]
     public void EmptyRoot_GetSectorLayout_ReturnsHeaderOnly()
@@ -756,7 +756,7 @@ public class XisoCoverageTests : IDisposable
         string bad = CopyIso(isoPath, "xiso_cov_bad");
         File.WriteAllBytes(bad, img);
 
-        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad, "/"));
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad));
         Assert.Contains("outside the image", ex.Message, StringComparison.Ordinal);
     }
 
@@ -819,7 +819,7 @@ public class XisoCoverageTests : IDisposable
     [Fact]
     public void ListDirectory_DotEntry_SkippedButSiblingsListed()
     {
-        IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(CreateDotEntryIso(), "/");
+        IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(CreateDotEntryIso());
         Assert.DoesNotContain(entries, static e => string.Equals(e.Name, ".", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(entries, static e => string.Equals(e.Name, "b.txt", StringComparison.OrdinalIgnoreCase));
     }
@@ -1283,7 +1283,7 @@ public class XisoCoverageTests : IDisposable
 
     [Fact]
     public void ZeroRoot_ListDirectory_ReturnsEmpty() =>
-        Assert.Empty(XisoReader.ListDirectory(CreateZeroRootIso(), "/"));
+        Assert.Empty(XisoReader.ListDirectory(CreateZeroRootIso()));
 
     [Fact]
     public void ZeroRoot_GetSectorLayout_ReservesSystemAreas()
@@ -1394,14 +1394,14 @@ public class XisoCoverageTests : IDisposable
         string bad = CopyIso(isoPath, "xiso_cov_bad");
         File.WriteAllBytes(bad, img);
 
-        Assert.Contains(XisoReader.ListDirectory(bad, "/"),
+        Assert.Contains(XisoReader.ListDirectory(bad),
             static e => string.Equals(e.Name, ":b.txt", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(0, XisoReader.List(bad, llCompat: false));
         Assert.Equal(0, XisoReader.Tree(bad, llCompat: false));
 
         Assert.Equal(0, XisoReader.Rewrite(bad, CreateTempDir("xiso_cov_colon_dest"), out string? rewritten));
         Assert.NotNull(rewritten);
-        Assert.Contains(XisoReader.ListDirectory(rewritten, "/"),
+        Assert.Contains(XisoReader.ListDirectory(rewritten),
             static e => string.Equals(e.Name, ":b.txt", StringComparison.OrdinalIgnoreCase));
 
         // Extraction still refuses the Windows drive-relative name (the whole

@@ -316,7 +316,7 @@ public class XisoCorruptionResilienceTests : IDisposable
         string bad = CopyIso(isoPath, "xiso_corrupt_bad");
         File.WriteAllBytes(bad, img);
 
-        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad, "/"));
+        XisoFormatException ex = Assert.Throws<XisoFormatException>(() => XisoReader.ListDirectory(bad));
         Assert.Contains("path separator", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -429,7 +429,7 @@ public class XisoCorruptionResilienceTests : IDisposable
 
         Assert.Empty(XisoReader.ListDirectory(bad, "/sub"));
         Assert.Null(XisoReader.GetEntryInfo(bad, "/sub/inner.txt"));
-        Assert.Contains(XisoReader.ListDirectory(bad, "/"),
+        Assert.Contains(XisoReader.ListDirectory(bad),
             static e => string.Equals(e.Name, "top.txt", StringComparison.Ordinal));
     }
 
@@ -468,7 +468,7 @@ public class XisoCorruptionResilienceTests : IDisposable
     public void TruncatedTable_ListDirectory_ThrowsBounded()
     {
         string bad = CreateTableTruncatedIso();
-        Assert.Throws<IOException>(() => XisoReader.ListDirectory(bad, "/"));
+        Assert.Throws<IOException>(() => XisoReader.ListDirectory(bad));
     }
 
     [Fact]
@@ -538,7 +538,7 @@ public class XisoCorruptionResilienceTests : IDisposable
     public void TableEndingAtEof_ListDirectory_ThrowsBounded()
     {
         string bad = CreateTableEndAtEofIso();
-        Assert.Throws<IOException>(() => XisoReader.ListDirectory(bad, "/"));
+        Assert.Throws<IOException>(() => XisoReader.ListDirectory(bad));
     }
 
     [Fact]

@@ -2314,7 +2314,7 @@ internal static class Program
             Logger.TotalBytes = Logger.TotalFiles = 0;
 
             string xisoPath = isoFiles[i];
-            bool optimized = false;
+            bool optimized;
 
             try
             {
@@ -3532,7 +3532,7 @@ internal static class Program
                     return existing;
             }
 
-            int partCount = (int)Math.Min((long)int.MaxValue, ((length - 1) / chunk) + 1);
+            int partCount = (int)Math.Min(int.MaxValue, ((length - 1) / chunk) + 1);
             for (int i = 0; i < partCount; i++)
             {
                 string part = XisoSplitter.PartPath(splitBase, i);
@@ -3900,7 +3900,7 @@ internal static class Program
     private static string DeriveRedumpPath(string xisoPath)
     {
         string dir = Path.GetDirectoryName(xisoPath) ?? "";
-        string full = Path.GetFileName(xisoPath) ?? "redump";
+        string full = Path.GetFileName(xisoPath);
         string baseName = full;
         if (full.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase))
         {
@@ -3963,7 +3963,7 @@ internal static class Program
 
         foreach (string iso in isoFiles)
         {
-            long size = 0;
+            long size;
             try
             {
                 size = new FileInfo(iso).Length;
@@ -3998,7 +3998,7 @@ internal static class Program
                 }
 
                 int vType = videoTypeForRedump >= 0 ? videoTypeForRedump : 0;
-                int xsType = XgdTables.GetXisoTypeFromVideo(vType >= 0 ? vType : 0);
+                int xsType = XgdTables.GetXisoTypeFromVideo(vType);
                 if (xsType < 0 || xsType >= XgdTables.XisoOffset.Length)
                     xsType = redumpType >= 0 ? XgdTables.GetXgdType(redumpType) : 0;
                 isoOffset = XgdTables.XisoOffset[xsType];
@@ -4006,7 +4006,7 @@ internal static class Program
             }
 
             string dir = Path.GetDirectoryName(iso) ?? "";
-            string full = Path.GetFileName(iso) ?? "output";
+            string full = Path.GetFileName(iso);
             string baseName = full;
             if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase))
                 baseName = full[..^".redump.iso".Length];
@@ -4377,7 +4377,7 @@ internal static class Program
             }
 
             string isoDir = Path.GetDirectoryName(isoPath) ?? "";
-            string full = Path.GetFileName(isoPath) ?? "output";
+            string full = Path.GetFileName(isoPath);
             string stem = full;
             if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase))
                 stem = full[..^".redump.iso".Length];

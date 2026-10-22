@@ -76,11 +76,10 @@ public static class Lz4
         int[] dict = new int[HashTableSize];
         int endPosCheck = input.Length - MfLimit;
         int literalStart = 0;
-        int cur = 0;
 
         // lz4_flex: a block cannot start with a match, so seed the table with position 0.
         dict[GetHashTableIndex(input, 0)] = 0;
-        cur = 1;
+        int cur = 1;
 
         while (true)
         {

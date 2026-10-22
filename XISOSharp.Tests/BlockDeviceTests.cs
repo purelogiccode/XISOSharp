@@ -240,7 +240,7 @@ public class BlockDeviceTests : IDisposable
         }
 
         // Reopen via path ctor and verify persistence
-        FileBlockDevice dev2 = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        FileBlockDevice dev2 = new(path, FileMode.Open, FileAccess.Read);
         _devices.Add(dev2);
         Span<byte> buf2 = stackalloc byte[5];
         int r2 = dev2.Read(0, buf2);
@@ -256,7 +256,7 @@ public class BlockDeviceTests : IDisposable
         _tempFiles.Add(path);
 
         File.WriteAllBytes(path, new byte[2048]);
-        FileBlockDevice dev = new(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+        FileBlockDevice dev = new(path);
         _devices.Add(dev);
 
         Assert.Equal(2048, dev.Length);
@@ -527,7 +527,7 @@ public class BlockDeviceTests : IDisposable
         BinaryPrimitives.WriteUInt32LittleEndian(hdr[..4], CisoReader.Magic);
         BinaryPrimitives.WriteUInt32LittleEndian(hdr[4..8], CisoReader.HeaderSize);
         BinaryPrimitives.WriteUInt64LittleEndian(hdr[8..16], claimedSize);
-        BinaryPrimitives.WriteUInt32LittleEndian(hdr[16..20], (uint)CisoReader.BlockSize);
+        BinaryPrimitives.WriteUInt32LittleEndian(hdr[16..20], CisoReader.BlockSize);
         hdr[20] = CisoWriter.VersionDeflate;
         File.WriteAllBytes(path, hdr.ToArray());
         return path;
@@ -567,7 +567,7 @@ public class BlockDeviceTests : IDisposable
         for (int i = 0; i < payload.Length; i++) payload[i] = (byte)i;
         File.WriteAllBytes(path, payload);
 
-        FileBlockDevice dev = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        FileBlockDevice dev = new(path, FileMode.Open, FileAccess.Read);
         _devices.Add(dev);
 
         Assert.Equal(256, dev.Length);

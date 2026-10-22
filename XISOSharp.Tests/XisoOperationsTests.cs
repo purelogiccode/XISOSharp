@@ -7,7 +7,6 @@ namespace XISOSharp.Tests;
 public class XisoOperationsTests : IDisposable
 {
     private readonly List<string> _tempDirs = [];
-    private readonly List<string> _tempFiles = [];
 
     public void Dispose()
     {
@@ -16,18 +15,6 @@ public class XisoOperationsTests : IDisposable
             try
             {
                 if (Directory.Exists(dir)) Directory.Delete(dir, true);
-            }
-            catch
-            {
-                // ignored
-            }
-        }
-
-        foreach (string f in _tempFiles)
-        {
-            try
-            {
-                if (File.Exists(f)) File.Delete(f);
             }
             catch
             {
@@ -88,7 +75,7 @@ public class XisoOperationsTests : IDisposable
         string outDir = CreateTempDir();
         string fillerPath = Path.Combine(outDir, "out.filler");
 
-        bool ok = XisoOperations.ExtractFiller(iso, fillerPath, 0, null, quiet: true);
+        bool ok = XisoOperations.ExtractFiller(iso, fillerPath, quiet: true);
 
         Assert.True(ok);
         Assert.True(File.Exists(fillerPath));
@@ -104,7 +91,7 @@ public class XisoOperationsTests : IDisposable
         string outDir = CreateTempDir();
         string fillerPath = Path.Combine(outDir, "out.filler");
 
-        bool ok = XisoOperations.ExtractFiller(iso, fillerPath, 0, null, quiet: false);
+        bool ok = XisoOperations.ExtractFiller(iso, fillerPath);
 
         Assert.True(ok);
         Assert.True(File.Exists(fillerPath));
@@ -136,7 +123,7 @@ public class XisoOperationsTests : IDisposable
         string fillerPath = Path.Combine(outDir, "override.filler");
         long isoLen = new FileInfo(iso).Length;
 
-        bool ok = XisoOperations.ExtractFiller(iso, fillerPath, 0, xisoLengthOverride: isoLen, quiet: true);
+        bool ok = XisoOperations.ExtractFiller(iso, fillerPath, xisoLengthOverride: isoLen, quiet: true);
 
         Assert.True(ok);
         Assert.True(File.Exists(fillerPath));
@@ -151,7 +138,7 @@ public class XisoOperationsTests : IDisposable
         string fillerPath = Path.Combine(outDir, "prepend.filler");
         const long offset = 16L * Constants.SectorSize;
 
-        bool ok = XisoOperations.ExtractFiller(iso, fillerPath, offset, null, quiet: true);
+        bool ok = XisoOperations.ExtractFiller(iso, fillerPath, offset, quiet: true);
 
         Assert.True(ok);
         Assert.True(File.Exists(fillerPath));
@@ -165,7 +152,7 @@ public class XisoOperationsTests : IDisposable
         string outDir = CreateTempDir();
         string fillerPath = Path.Combine(outDir, "size.filler");
 
-        bool ok = XisoOperations.ExtractFiller(iso, fillerPath, 0, null, quiet: true);
+        bool ok = XisoOperations.ExtractFiller(iso, fillerPath, quiet: true);
         Assert.True(ok);
 
         // Compute expected filler size via XisoRanges
@@ -224,7 +211,7 @@ public class XisoOperationsTests : IDisposable
         string src = CreateSourceDir(PopulateSimple);
         string iso = CreateIso(src);
 
-        uint? seed = XisoOperations.ExtractSeed(iso, 0, quiet: true);
+        uint? seed = XisoOperations.ExtractSeed(iso, quiet: true);
 
         Assert.Null(seed);
     }
@@ -238,7 +225,7 @@ public class XisoOperationsTests : IDisposable
         string seedPath = Path.Combine(outDir, "seed.bin");
         if (File.Exists(seedPath)) File.Delete(seedPath);
 
-        bool ok = XisoOperations.TryExtractSeed(iso, seedPath, 0, quiet: true);
+        bool ok = XisoOperations.TryExtractSeed(iso, seedPath, quiet: true);
 
         Assert.False(ok);
         Assert.False(File.Exists(seedPath));
@@ -282,7 +269,7 @@ public class XisoOperationsTests : IDisposable
         string outDir = CreateTempDir();
         string wiped = Path.Combine(outDir, "wiped.iso");
 
-        bool ok = XisoOperations.WipeFiller(iso, wiped, 0, quiet: true);
+        bool ok = XisoOperations.WipeFiller(iso, wiped, quiet: true);
 
         Assert.True(ok);
         Assert.True(File.Exists(wiped));
@@ -344,7 +331,7 @@ public class XisoOperationsTests : IDisposable
         string trimmed = Path.Combine(outDir, "trimmed.iso");
         long origLen = new FileInfo(iso).Length;
 
-        bool ok = XisoOperations.TrimXiso(iso, trimmed, 0, quiet: true);
+        bool ok = XisoOperations.TrimXiso(iso, trimmed, quiet: true);
 
         Assert.True(ok);
         Assert.True(File.Exists(trimmed));
@@ -369,7 +356,7 @@ public class XisoOperationsTests : IDisposable
         File.Copy(iso, inPlace, true);
         long before = new FileInfo(inPlace).Length;
 
-        bool ok = XisoOperations.TrimXiso(inPlace, null, 0, quiet: true);
+        bool ok = XisoOperations.TrimXiso(inPlace, null, quiet: true);
 
         Assert.True(ok);
         long after = new FileInfo(inPlace).Length;
@@ -393,7 +380,7 @@ public class XisoOperationsTests : IDisposable
         long before = new FileInfo(copy).Length;
 
         // Passing the same path as output should trigger in-place logic
-        bool ok = XisoOperations.TrimXiso(copy, copy, 0, quiet: true);
+        bool ok = XisoOperations.TrimXiso(copy, copy, quiet: true);
 
         Assert.True(ok);
         Assert.True(new FileInfo(copy).Length <= before);
@@ -446,7 +433,7 @@ public class XisoOperationsTests : IDisposable
         string wipeTrimmed = Path.Combine(outDir, "wipetrim.iso");
         long origLen = new FileInfo(iso).Length;
 
-        bool ok = XisoOperations.WipeAndTrim(iso, wipeTrimmed, 0, quiet: true);
+        bool ok = XisoOperations.WipeAndTrim(iso, wipeTrimmed, quiet: true);
 
         Assert.True(ok);
         Assert.True(File.Exists(wipeTrimmed));

@@ -605,9 +605,9 @@ internal static partial class BattleRunner
             // xboxkit rebuild mode combines the input files (cwd-sensitive args first,
             // relative component names resolve beside the staged input).
             string prevDir = Directory.GetCurrentDirectory();
-            double oSec = 0;
-            int oCode = 0;
-            string oErr = string.Empty;
+            double oSec;
+            int oCode;
+            string oErr;
             try
             {
                 Directory.SetCurrentDirectory(xkDir);
@@ -723,8 +723,8 @@ internal static partial class BattleRunner
             List<(long Start, long End)> keep = [];
             foreach ((uint s, uint e) in bones)
             {
-                long cs = Math.Max((long)s, baseSector);
-                long ce = Math.Min((long)e, baseSector + ((partLen + 2047) / 2048) - 1);
+                long cs = Math.Max(s, baseSector);
+                long ce = Math.Min(e, baseSector + ((partLen + 2047) / 2048) - 1);
                 if (ce < cs)
                 {
                     continue;
@@ -901,7 +901,7 @@ internal static partial class BattleRunner
         stdout.Split('\n')
             .Select(static l => l.TrimEnd('\r').Trim())
             .Select(static l => l.Split('\t', ' ')[0])
-            .FirstOrDefault(static t => t is not null && Hex64Regex.IsMatch(t));
+            .FirstOrDefault(static t => Hex64Regex.IsMatch(t));
 
     /// <summary>Parses "md5  /path" lines into a path → hash map.</summary>
     private static Dictionary<string, string> ParseMd5Map(string stdout)

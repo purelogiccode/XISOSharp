@@ -76,7 +76,7 @@ public static class XisoTestRunner
                 XisoFileEntry file = files[i];
                 int fileIndex = i;
                 XisoSharpWrapper? currentWrapper = wrapper;
-                progress?.Report(new TestProgress(file.FileName, fileIndex + 1, files.Count,
+                progress?.Report(new TestProgress(fileIndex + 1, files.Count,
                     "Starting", $"Testing {file.FileName}..."));
 
                 PerFileResult result = await Task
@@ -86,8 +86,8 @@ public static class XisoTestRunner
                 session.FileResults.Add(result);
             }
 
-            progress?.Report(new TestProgress("Done", files.Count, files.Count,
-                "Complete", "All tests finished.", true));
+            progress?.Report(new TestProgress(files.Count, files.Count,
+                "Complete", "All tests finished."));
 
             Log.Information("Test session finished: {Passed} passed, {Failed} failed, {Skipped} skipped",
                 session.PassedFiles, session.FailedFiles, session.SkippedFiles);
@@ -115,7 +115,7 @@ public static class XisoTestRunner
         Stopwatch sw = Stopwatch.StartNew();
         PerFileResult result = new()
         {
-            FileName = entry.FileName, FilePath = entry.FilePath, FileSize = entry.FileSize
+            FileName = entry.FileName, FileSize = entry.FileSize
         };
 
         try
@@ -948,7 +948,7 @@ public static class XisoTestRunner
             {
                 try
                 {
-                    progress.Report(new TestProgress(file, index, total, test ?? "Cleanup",
+                    progress.Report(new TestProgress(index, total, test ?? "Cleanup",
                         $"WARNING: Could not delete temp dir {path} ({sizeText} left behind). Manual cleanup may be needed."));
                 }
                 catch (Exception reportEx)
@@ -1089,7 +1089,7 @@ public static class XisoTestRunner
     private static void Report(IProgress<TestProgress>? progress, string file, int index, int total,
         string test, string status)
     {
-        progress?.Report(new TestProgress(file, index, total, test, status));
+        progress?.Report(new TestProgress(index, total, test, status));
         Log.Debug("[{Index}/{Total}] {File} - {Test}: {Status}", index, total, file, test, status);
     }
 }

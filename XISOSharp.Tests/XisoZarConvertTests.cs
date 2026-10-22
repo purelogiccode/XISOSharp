@@ -119,7 +119,7 @@ public sealed class XisoZarConvertTests : IDisposable
         string work = CreateTempDir("xiso_zc_rt");
         string zar = Path.Combine(work, "game.zar");
 
-        Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
+        Assert.True(XisoZarchive.CreateZar(iso, zar, quiet: true));
 
         string outDir = Path.Combine(work, "out");
         ZArchiveTool.Extract(zar, outDir);
@@ -139,7 +139,7 @@ public sealed class XisoZarConvertTests : IDisposable
         string work = CreateTempDir("xiso_zc_ratio");
         string zar = Path.Combine(work, "game.zar");
 
-        Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
+        Assert.True(XisoZarchive.CreateZar(iso, zar, quiet: true));
 
         long zarLen = new FileInfo(zar).Length;
         Assert.True(zarLen < rawTotal / 2,
@@ -155,7 +155,7 @@ public sealed class XisoZarConvertTests : IDisposable
         string work = CreateTempDir("xiso_zc_rd");
         string zar = Path.Combine(work, "game.zar");
 
-        Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
+        Assert.True(XisoZarchive.CreateZar(iso, zar, quiet: true));
 
         using ZArchiveReader? reader = ZArchiveReader.TryOpen(zar);
         Assert.NotNull(reader);
@@ -224,7 +224,7 @@ public sealed class XisoZarConvertTests : IDisposable
         string work = CreateTempDir("xiso_zc_raw");
         string zar = Path.Combine(work, "game.zar");
 
-        Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true, compressor: new ZarRawCompressor()));
+        Assert.True(XisoZarchive.CreateZar(iso, zar, quiet: true, compressor: new ZarRawCompressor()));
 
         string outDir = Path.Combine(work, "out");
         ZArchiveTool.Extract(zar, outDir);
@@ -239,7 +239,7 @@ public sealed class XisoZarConvertTests : IDisposable
         string work = CreateTempDir("xiso_zc_hash");
         string zar = Path.Combine(work, "game.zar");
 
-        Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
+        Assert.True(XisoZarchive.CreateZar(iso, zar, quiet: true));
 
         using ZArchiveReader? reader = ZArchiveReader.TryOpen(zar);
         Assert.NotNull(reader);
@@ -268,7 +268,7 @@ public sealed class XisoZarConvertTests : IDisposable
         string work = CreateTempDir("xiso_zc_exe");
         string zar = Path.Combine(work, "game.zar");
 
-        Assert.True(XisoZarchive.CreateZar(iso, zar, 0, quiet: true));
+        Assert.True(XisoZarchive.CreateZar(iso, zar, quiet: true));
 
         string outDir = Path.Combine(work, "exedra");
         ProcessStartInfo psi = new()

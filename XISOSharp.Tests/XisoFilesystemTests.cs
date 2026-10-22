@@ -116,6 +116,22 @@ public class XisoFilesystemTests : IDisposable
     }
 
     [Fact]
+    public void LocalFilesystem_DeleteFile_RemovesFileAndMissingIsNoOp()
+    {
+        string root = CreateTempDir("xiso_fs_root");
+        LocalFilesystem fs = new(root);
+        using (Stream s = fs.CreateFile("partial.bin"))
+        {
+            s.Write([1, 2, 3, 4]);
+        }
+
+        Assert.True(fs.FileExists("partial.bin"));
+        fs.DeleteFile("partial.bin");
+        Assert.False(fs.FileExists("partial.bin"));
+        fs.DeleteFile("partial.bin");
+    }
+
+    [Fact]
     public void LocalFilesystem_LeadingSlashAndSeparators_NormalizedToSameFile()
     {
         string root = CreateTempDir("xiso_fs_root");

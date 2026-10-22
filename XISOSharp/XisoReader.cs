@@ -274,8 +274,8 @@ public static class XisoReader
     {
         Span<byte> buffer = stackalloc byte[Constants.HeaderDataLength];
         Span<byte> intBuf = stackalloc byte[4];
-        long discLseek = 0;
-        long headerBase = 0;
+        long discLseek;
+        long headerBase;
 
         if (skipSectors.HasValue)
         {
@@ -605,7 +605,7 @@ public static class XisoReader
                 // or it may be the xdvdfs empty-directory sentinel (14 bytes all zeros).
                 // Peek the remaining 12 bytes of the header to distinguish.
                 long peekPos = fs.Position;
-                bool isAllZeros = false;
+                bool isAllZeros;
                 try
                 {
                     ReadExact(fs, headerRest);
@@ -728,7 +728,7 @@ public static class XisoReader
             {
                 llCompat = false;
 
-                long leftSeek = dirStart + ((long)lOffset * Constants.DwordSize);
+                long leftSeek = dirStart + (lOffset * Constants.DwordSize);
                 if (leftSeek < dirStart || leftSeek >= fs.Length ||
                     (tableSize != long.MaxValue && leftSeek >= dirStart + tableSize))
                 {
@@ -1108,6 +1108,7 @@ public static class XisoReader
         }
 
         uint totalSize = 0;
+        bool succeeded = false;
         try
         {
             using (outFile)
@@ -1170,6 +1171,8 @@ public static class XisoReader
             long writtenLength = filesystem?.FileLength(dest) ?? new FileInfo(filename).Length;
             if (writtenLength != fileSize)
                 throw ExtractFileException.ForTruncated(internalPath, dest, startSector, fileSize, totalSize);
+
+            succeeded = true;
         }
         catch (ExtractFileException)
         {
@@ -1179,9 +1182,43 @@ public static class XisoReader
         {
             throw ExtractFileException.ForWrite(internalPath, filename, startSector, fileSize, totalSize, ex);
         }
+        finally
+        {
+            // A failed or canceled copy must not leave a partial destination behind:
+            // callers cannot distinguish it from a complete file. Custom stores get
+            // the same chance through IFilesystem.DeleteFile.
+            if (!succeeded) TryDeletePartialFile(filesystem, dest);
+        }
 
         Logger.Log("\n");
         return true;
+    }
+
+    /// <summary>
+    /// Removes a partially written destination after a failed extraction. Best-effort:
+    /// the cleanup failure is swallowed so it never masks the extraction error.
+    /// </summary>
+    /// <param name="filesystem">Destination filesystem, or <c>null</c> for the local disk.</param>
+    /// <param name="path">Destination path (host path for the legacy disk path).</param>
+    private static void TryDeletePartialFile(IFilesystem? filesystem, string path)
+    {
+        try
+        {
+            if (filesystem != null)
+            {
+                filesystem.DeleteFile(path);
+            }
+            else
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException
+                                       or ArgumentException)
+        {
+            // Leaving the file for the caller's own cleanup is preferable to hiding
+            // the extraction failure with a cleanup exception.
+        }
     }
 
     /// <summary>
@@ -2136,7 +2173,7 @@ public static class XisoReader
             }
 
             // Rebuilt XISO: descriptor at the very start of the image.
-            if (!isValid && fileLength >= Constants.HeaderDataLength)
+            if (!isValid)
             {
                 fs.Seek(0, SeekOrigin.Begin);
                 try
@@ -2675,7 +2712,7 @@ public static class XisoReader
             if (lOffset == Constants.EmptyDirectorySentinel && dirStart == tableStart)
             {
                 long peekPos = fs.Position;
-                bool isAllZeros = false;
+                bool isAllZeros;
                 try
                 {
                     ReadExact(fs, headerRest);
@@ -2983,7 +3020,7 @@ public static class XisoReader
         // areas: the optimized tag at partition sector 15 and the ISO9660
         // descriptor pair at sectors 16-17 (mirroring the sectors
         // XisoRanges.GetXisoRanges preserves for the rewrite path).
-        used.Add(new SectorRange((uint)(Constants.OptimizedTagOffset / Constants.SectorSize), 1));
+        used.Add(new SectorRange(Constants.OptimizedTagOffset / Constants.SectorSize, 1));
         used.Add(new SectorRange(16, 2));
 
         // The second descriptor sector carries the layout-tool signature in
@@ -3155,7 +3192,7 @@ public static class XisoReader
             if (lOffset == Constants.EmptyDirectorySentinel && offset == 0)
             {
                 long peekPos = fs.Position;
-                bool isAllZeros = false;
+                bool isAllZeros;
                 try
                 {
                     ReadExact(fs, headerRest);
@@ -3521,6 +3558,7 @@ public static class XisoReader
             throw ExtractFileException.ForCreate(internalPath, destPath, entry.StartSector, entry.FileSize, ex);
         }
 
+        bool succeeded = false;
         try
         {
             using (outFile)
@@ -3565,6 +3603,8 @@ public static class XisoReader
                 throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
                     entry.FileSize, new FileInfo(destPath).Length);
             }
+
+            succeeded = true;
         }
         catch (ExtractFileException)
         {
@@ -3573,6 +3613,13 @@ public static class XisoReader
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             throw ExtractFileException.ForWrite(internalPath, destPath, entry.StartSector, entry.FileSize, -1, ex);
+        }
+        finally
+        {
+            // Never leave a truncated destination behind after a failed copy: callers
+            // (drag-and-drop preparation, batch extraction, resume runs) cannot tell a
+            // partial file from a complete one. Cancellation lands here too.
+            if (!succeeded) TryDeletePartialFile(null, destPath);
         }
     }
 
@@ -4245,7 +4292,7 @@ public static class XisoReader
             if (lOffset == Constants.EmptyDirectorySentinel && offset == 0)
             {
                 long peekPos = fs.Position;
-                bool isAllZeros = false;
+                bool isAllZeros;
                 try
                 {
                     ReadExact(fs, headerRest);

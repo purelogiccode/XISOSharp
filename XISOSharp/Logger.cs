@@ -1,4 +1,6 @@
-﻿namespace XISOSharp;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace XISOSharp;
 
 /// <summary>
 /// Centralised logging for the XISO tool. Writes informational messages to
@@ -29,14 +31,32 @@ public static class Logger
     /// Defaults to <see cref="Console.Out"/>. Set to <c>null</c> or
     /// <see cref="TextWriter.Null"/> to discard output.
     /// </summary>
-    public static TextWriter Out { get; set; } = Console.Out;
+    /// <remarks>
+    /// The getter never returns <c>null</c>: assigning <c>null</c> stores
+    /// <see cref="TextWriter.Null"/>, so call sites cannot fault.
+    /// </remarks>
+    [AllowNull]
+    public static TextWriter Out
+    {
+        get => _out;
+        set => _out = value ?? TextWriter.Null;
+    }
 
     /// <summary>
     /// The <see cref="TextWriter"/> used for error output.
     /// Defaults to <see cref="Console.Error"/>. Set to <c>null</c> or
     /// <see cref="TextWriter.Null"/> to discard error output.
     /// </summary>
-    public static TextWriter Error { get; set; } = Console.Error;
+    /// <remarks>See <see cref="Out"/>: the getter never returns <c>null</c>.</remarks>
+    [AllowNull]
+    public static TextWriter Error
+    {
+        get => _error;
+        set => _error = value ?? TextWriter.Null;
+    }
+
+    private static TextWriter _out = Console.Out;
+    private static TextWriter _error = Console.Error;
 
     /// <summary>When <c>true</c>, suppresses all non-error output.</summary>
     public static bool Quiet { get; set; }
@@ -164,9 +184,9 @@ public static class Logger
             // Call sites pass pre-interpolated text (file names, tool output) that may
             // itself contain braces; only run composite formatting when args exist.
             if (args.Length == 0)
-                Out?.Write(message);
+                Out.Write(message);
             else
-                Out?.Write(message, args);
+                Out.Write(message, args);
         }
 
         Forward(ForwardInfo, message, args);
@@ -179,7 +199,7 @@ public static class Logger
     /// <param name="message">The line of text to write (no format arguments).</param>
     public static void LogLine(string message)
     {
-        if (!Quiet && !RealQuiet) Out?.WriteLine(message);
+        if (!Quiet && !RealQuiet) Out.WriteLine(message);
         Forward(ForwardInfo, message, Array.Empty<object?>());
     }
 
@@ -204,7 +224,7 @@ public static class Logger
     /// </summary>
     public static void Flush()
     {
-        if (!Quiet && !RealQuiet) Out?.Flush();
+        if (!Quiet && !RealQuiet) Out.Flush();
     }
 
     /// <summary>
@@ -219,9 +239,9 @@ public static class Logger
         {
             // See Log: never composite-format caller-interpolated text without args.
             if (args.Length == 0)
-                Error?.Write(message);
+                Error.Write(message);
             else
-                Error?.Write(message, args);
+                Error.Write(message, args);
         }
 
         Forward(ForwardError, message, args);

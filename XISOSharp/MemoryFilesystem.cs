@@ -87,6 +87,9 @@ public sealed class MemoryFilesystem : IFilesystem
     public long FileLength(string path) =>
         _files.TryGetValue(Normalize(path), out byte[]? bytes) ? bytes.LongLength : -1;
 
+    /// <inheritdoc/>
+    public void DeleteFile(string path) => _files.Remove(Normalize(path));
+
     /// <summary>
     /// Returns a snapshot of the bytes stored at <paramref name="path"/>
     /// (committed when the unpack closed the file's stream).

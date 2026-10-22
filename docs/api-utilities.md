@@ -295,6 +295,7 @@ for resume.
 | `void CreateDirectory(string path)` | Create the directory and all parents; root is a no-op |
 | `bool FileExists(string path)` | `true` when a file (not a directory) exists — resume probe |
 | `long FileLength(string path)` | Byte length, or `-1` when unresolvable (never skipped, reports as truncated) |
+| `void DeleteFile(string path)` | Delete the file after a failed extraction; deleting a missing file is a no-op. Default implementation does nothing (partial content stays) |
 
 Paths are destination-root-relative, forward-slash separated, case-insensitive
 (`"sub/file.bin"`, `"/sub/file.bin"`, `"sub\\file.bin"` all denote the same file);
@@ -304,7 +305,7 @@ Paths are destination-root-relative, forward-slash separated, case-insensitive
 |---|---|
 | `LocalFilesystem(string? root = null)` | Local disk under `root` (cwd-relative when `null`, matching the legacy unpack). `static LocalFilesystem Instance` is the shared cwd-relative instance. File creation matches the reader's direct path (`FileMode.Create`, 64 KiB buffered, no sharing); parent directories are **not** auto-created |
 | `MemoryFilesystem` | In-process memory: files are byte snapshots committed when the unpack closes each stream (visible to `FileExists`/`FileLength`/`ReadAllBytes`/`FileNames` immediately after). Re-creating a file truncates it; parent directories are materialized automatically. `ReadAllBytes(path)`, `FileNames`, `DirectoryNames` for inspection |
-| custom | Zip archives, network uploads, GUI preview panes — implement the four members |
+| custom | Zip archives, network uploads, GUI preview panes — implement the members (the `DeleteFile` default may stay a no-op) |
 
 ## Records
 

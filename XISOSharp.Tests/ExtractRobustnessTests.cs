@@ -1,4 +1,5 @@
 using XISOSharp.Cli;
+using XISOSharp.Interfaces;
 using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
@@ -23,7 +24,6 @@ public class ExtractRobustnessTests : IDisposable
     private readonly TextWriter _savedOut;
     private readonly TextWriter _savedErr;
     private readonly string _savedCwd;
-    private readonly string _runDir;
 
     public ExtractRobustnessTests()
     {
@@ -37,8 +37,8 @@ public class ExtractRobustnessTests : IDisposable
         Logger.RealQuiet = false;
 
         _savedCwd = Directory.GetCurrentDirectory();
-        _runDir = CreateTempDir("xiso_robust_rundir");
-        Directory.SetCurrentDirectory(_runDir);
+        string runDir = CreateTempDir("xiso_robust_rundir");
+        Directory.SetCurrentDirectory(runDir);
     }
 
     public void Dispose()
@@ -101,6 +101,64 @@ public class ExtractRobustnessTests : IDisposable
     }
 
     /// <summary>
+    /// Destination wrapper whose file stream fails the second write, simulating a
+    /// disk that fills up mid-copy. Deletes are forwarded so partial-file cleanup
+    /// can be observed on the backing filesystem.
+    /// </summary>
+    private sealed class FailingWriteFilesystem(IFilesystem inner) : IFilesystem
+    {
+        private readonly IFilesystem _inner = inner;
+
+        public Stream CreateFile(string path) => new FailingWriteStream(_inner.CreateFile(path));
+
+        public void CreateDirectory(string path) => _inner.CreateDirectory(path);
+
+        public bool FileExists(string path) => _inner.FileExists(path);
+
+        public long FileLength(string path) => _inner.FileLength(path);
+
+        public void DeleteFile(string path) => _inner.DeleteFile(path);
+
+        private sealed class FailingWriteStream(Stream inner) : Stream
+        {
+            private readonly Stream _inner = inner;
+            private int _writes;
+
+            public override bool CanRead => false;
+            public override bool CanSeek => false;
+            public override bool CanWrite => true;
+            public override long Length => _inner.Length;
+
+            public override long Position
+            {
+                get => _inner.Position;
+                set => throw new NotSupportedException();
+            }
+
+            public override void Flush() => _inner.Flush();
+
+            public override int Read(byte[] buffer, int offset, int count) =>
+                throw new NotSupportedException();
+
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+            public override void SetLength(long value) => throw new NotSupportedException();
+
+            public override void Write(byte[] buffer, int offset, int count)
+            {
+                if (++_writes > 1) throw new IOException("No space left on device");
+                _inner.Write(buffer, offset, count);
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing) _inner.Dispose();
+                base.Dispose(disposing);
+            }
+        }
+    }
+
+    /// <summary>
     /// Cuts the image inside <paramref name="internalPath"/>'s data, keeping
     /// all but the last <paramref name="dropBytes"/> of that file.
     /// (Cutting the tail is not enough: created images end with zero padding.)
@@ -135,6 +193,23 @@ public class ExtractRobustnessTests : IDisposable
         Assert.Contains("20000", ex.Message, StringComparison.Ordinal);
         Assert.Contains("sector", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("c.bin", ex.DestPath);
+        // The partial destination must not survive the failure.
+        Assert.False(File.Exists(Path.Combine(dest, "c.bin")));
+    }
+
+    [Fact]
+    public void WriteFailure_RemovesPartialFileFromCustomFilesystem()
+    {
+        string isoPath = CreateIso(src => WritePayload(Path.Combine(src, "big.bin"), 3_000_000), "game.iso");
+        MemoryFilesystem memory = new();
+        FailingWriteFilesystem fs = new(memory);
+
+        ExtractFileException ex = Assert.Throws<ExtractFileException>(() =>
+            XisoReader.UnpackImage(isoPath, fs));
+
+        Assert.Equal(ExtractError.ErrFileWrite, ex.ErrorCode);
+        Assert.False(memory.FileExists("big.bin"));
+        Assert.DoesNotContain("big.bin", memory.FileNames, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -227,6 +302,8 @@ public class ExtractRobustnessTests : IDisposable
         Assert.Equal(ExtractError.ErrFileTruncated, ex.ErrorCode);
         Assert.Contains("/c.bin", ex.Message, StringComparison.Ordinal);
         Assert.Contains("20000", ex.Message, StringComparison.Ordinal);
+        // CopyOut must remove the partial destination before rethrowing.
+        Assert.False(File.Exists(dest));
     }
 
     [Fact]

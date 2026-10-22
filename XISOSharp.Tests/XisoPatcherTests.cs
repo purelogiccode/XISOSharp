@@ -303,7 +303,7 @@ public class XisoPatcherTests : IDisposable
         XisoPatcher.CopyIntoImage(iso, host, "/brand-new.bin");
 
         Assert.Equal(content, File.ReadAllBytes(CopyOutToTemp(iso, "/brand-new.bin")));
-        IReadOnlyList<string> names = XisoReader.ListDirectoryFlat(iso, "/");
+        IReadOnlyList<string> names = XisoReader.ListDirectoryFlat(iso);
         Assert.Contains("brand-new.bin", names, StringComparer.OrdinalIgnoreCase);
 
         string backup = iso + ".old";

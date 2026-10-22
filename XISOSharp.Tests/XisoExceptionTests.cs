@@ -203,7 +203,7 @@ public class XisoExceptionTests
     public void ExtractFileException_NullInner_LeavesInnerExceptionNull()
     {
         ExtractFileException ex = new(
-            ExtractError.ErrFileTruncated, "inner.bin", "out.bin", 0, 100, "truncated", 10, null);
+            ExtractError.ErrFileTruncated, "inner.bin", "out.bin", 0, 100, "truncated", 10);
 
         Assert.Null(ex.InnerException);
         Assert.Contains("inner.bin", ex.Message, StringComparison.Ordinal);

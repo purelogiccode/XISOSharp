@@ -270,9 +270,6 @@ public static class XisoChecksum
         /// <summary>Raw attribute byte with reserved bits masked out.</summary>
         internal byte Attributes;
 
-        /// <summary>Filename length in bytes.</summary>
-        internal byte NameLength;
-
         /// <summary>Decoded entry name.</summary>
         internal string Name = "";
 
@@ -319,7 +316,6 @@ public static class XisoChecksum
             StartSector = sector,
             Size = size,
             Attributes = attrs,
-            NameLength = nameLen,
             Name = name
         };
     }

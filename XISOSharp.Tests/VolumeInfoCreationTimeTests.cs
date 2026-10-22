@@ -158,7 +158,7 @@ public sealed class VolumeInfoCreationTimeTests : IDisposable
         VolumeInfo partitioned = XisoReader.GetVolumeInfo(shifted);
 
         Assert.True(partitioned.IsValid);
-        Assert.Equal((long)Constants.Xgd3LseekOffset, partitioned.DiscLseek);
+        Assert.Equal(Constants.Xgd3LseekOffset, partitioned.DiscLseek);
         Assert.Equal("XGD3", partitioned.DiscFormat);
         Assert.Equal(Constants.HeaderOffset / Constants.SectorSize, partitioned.DescriptorSector);
     }

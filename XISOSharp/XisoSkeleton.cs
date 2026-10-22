@@ -125,8 +125,8 @@ public static class XisoSkeleton
         List<(long Start, long End)> keep = []; // partition-relative [start, end) byte ranges
         foreach ((uint s, uint e) in bones)
         {
-            long cs = Math.Max((long)s, baseSector);
-            long ce = Math.Min((long)e, baseSector + ((partLength + SectorSize - 1) / SectorSize) - 1);
+            long cs = Math.Max(s, baseSector);
+            long ce = Math.Min(e, baseSector + ((partLength + SectorSize - 1) / SectorSize) - 1);
             if (ce < cs)
             {
                 continue;
@@ -180,7 +180,7 @@ public static class XisoSkeleton
     private static string DeriveSkeletonPath(string input)
     {
         string dir = Path.GetDirectoryName(input) ?? "";
-        string full = Path.GetFileName(input) ?? "skeleton";
+        string full = Path.GetFileName(input);
         // Strip compound extensions
         if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".redump.iso".Length];
         else if (full.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".video.iso".Length];
@@ -192,7 +192,7 @@ public static class XisoSkeleton
     private static string DeriveHashPath(string input)
     {
         string dir = Path.GetDirectoryName(input) ?? "";
-        string full = Path.GetFileName(input) ?? "hash";
+        string full = Path.GetFileName(input);
         if (full.EndsWith(".redump.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".redump.iso".Length];
         else if (full.EndsWith(".video.iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".video.iso".Length];
         else if (full.EndsWith(".iso", StringComparison.OrdinalIgnoreCase)) full = full[..^".iso".Length];

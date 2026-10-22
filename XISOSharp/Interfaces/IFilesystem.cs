@@ -51,4 +51,17 @@ public interface IFilesystem
     /// </summary>
     /// <param name="path">Destination-root-relative path to measure.</param>
     long FileLength(string path);
+
+    /// <summary>
+    /// Deletes the file at <paramref name="path"/>. Called to remove a partially
+    /// written destination after a failed extraction, so callers never observe a
+    /// truncated file as if it were complete. Deleting a missing file is a no-op.
+    /// Implementations without a delete primitive may keep the default no-op,
+    /// but then partial content can remain in the store.
+    /// </summary>
+    /// <param name="path">Destination-root-relative path of the file to delete.</param>
+    void DeleteFile(string path)
+    {
+        // Default: stores that cannot delete files keep their partial content.
+    }
 }

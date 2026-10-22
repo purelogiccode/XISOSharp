@@ -290,9 +290,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>Gets the timestamped log entries bound to the log view.</summary>
-    public ObservableCollection<LogEntry> LogEntries { get; } = [];
-
     private TestSessionResult? _sessionResult;
 
     /// <summary>
@@ -562,7 +559,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         IsRunning = true;
         StatusText = "Please wait... Processing...";
         SessionResult = null;
-        LogEntries.Clear();
         LogText = string.Empty;
         ProgressValue = 0;
         ProgressText = "Starting tests...";
@@ -805,7 +801,6 @@ internal partial class MainViewModel : INotifyPropertyChanged
         try
         {
             string ts = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-            LogEntries.Add(new LogEntry { Message = message, Timestamp = ts });
             LogText += $"[{ts}] {message}\n";
             if (message.StartsWith("FATAL", StringComparison.OrdinalIgnoreCase) ||
                 message.StartsWith("Error", StringComparison.OrdinalIgnoreCase))
