@@ -9,12 +9,16 @@ on:
     paths: ['docs/**', '.github/sync-wiki.ps1', '.github/workflows/wiki.yml']
   workflow_dispatch:
 
+# Read-only by default; the sync job opts into the one write scope it needs.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # Pushes the mirrored pages to purelogiccode/XISOSharp.wiki.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

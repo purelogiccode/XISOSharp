@@ -88,6 +88,20 @@ This repository runs the following controls:
   by GitHub Actions from the tagged commit; the bundles are smoke-tested
   before the release is created.
 
+## Accepted Scorecard findings
+
+The weekly OpenSSF Scorecard run reports a few findings that are accepted by
+design. They are dismissed in **Security → Code scanning** with this rationale:
+
+| Check | Why it is accepted |
+| --- | --- |
+| BinaryArtifacts | `extract-xiso.exe`, `xdvdfs.exe`, `xboxkit.exe` and `test_fixture.iso` are checked-in interop oracles and fixtures the test suite runs against. |
+| TokenPermissions | The wiki-sync and release jobs need `contents: write` to push the wiki and create releases. The scope is job-level and the token is short-lived. |
+| PinnedDependencies | Every `PackageReference` pins its version, and Dependabot + NuGet audit + the `dependency-audit` CI gate cover known-vulnerable versions. Lock files are not used because the 13 RID/TFM publish combinations make `RestoreLockedMode` incompatible with the release matrix (NU1004). |
+| BranchProtection / CodeReview | `master` is protected against deletion and force-push; requiring pull-request approvals would block the maintainer's direct-push workflow, and every push runs the full CI gate. |
+| CIIBestPractices | The project is not registered for the OpenSSF Best Practices badge. |
+| Fuzzing | The parsers are exercised by the corruption and pathological-TOC suites; there is no OSS-Fuzz integration. |
+
 ## Using XISOSharp safely
 
 Xbox images are untrusted input. The parsers are hardened (depth limits,
