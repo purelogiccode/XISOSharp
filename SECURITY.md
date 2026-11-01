@@ -81,8 +81,9 @@ This repository runs the following controls:
 - **OpenSSF Scorecard** (`.github/workflows/scorecard.yml`) publishing the
   supply-chain score weekly.
 - **Least-privilege workflows**: `contents: read` by default, write
-  permissions granted per job, actions referenced by major tag, and the
-  `NUGET_API_KEY` secret scoped to the protected `nuget` environment.
+  permissions granted per job, actions pinned to commit SHAs (Dependabot keeps
+  the pins current), and the `NUGET_API_KEY` secret scoped to the protected
+  `nuget` environment.
 - **Reproducible releases**: NuGet packages and the six app bundles are built
   by GitHub Actions from the tagged commit; the bundles are smoke-tested
   before the release is created.
