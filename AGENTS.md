@@ -42,11 +42,12 @@ reproducible or re-downloadable. Never delete them.
 - Coverage: the Windows test job writes merged line/branch coverage to the job
   summary and fails below `MIN_LINE_COVERAGE` (75%) or
   `MIN_BRANCH_COVERAGE` (60%).
-- Formatting: `dotnet format whitespace --verify-no-changes` runs on the Linux
-  runner; run it locally before pushing.
-- The test suite runs on Ubuntu, Windows and macOS now (the old Windows-only
-  gate was removed after the CWD refactor); Linux/macOS also build the
-  Windows-only Tester/GUI projects.
+- Formatting: `dotnet format whitespace --verify-no-changes` runs on the Windows
+  runner (the CRLF working tree matches `.editorconfig`); run it locally before
+  pushing.
+- The test suite runs on Ubuntu, Windows and macOS (the suite restores the
+  process working directory); Linux/macOS also build the Windows-only Tester/GUI
+  projects.
 - Companion workflows: `codeql.yml` (CodeQL C#), `dependency-review.yml` (PRs),
   `scorecard.yml` (OpenSSF Scorecard), `release.yml` (tag: six RID bundles +
   GitHub release), `pages.yml`/`wiki.yml` (docs).

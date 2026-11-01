@@ -259,14 +259,16 @@ public class UnpackResumeTests : IDisposable
         try
         {
             Directory.SetCurrentDirectory(workDir);
+            // macOS resolves /var -> /private/var; compare the canonical cwd.
+            string canonicalWorkDir = Directory.GetCurrentDirectory();
 
             Assert.Equal(0, XisoReader.UnpackImage(isoPath));
-            Assert.Equal(workDir, Directory.GetCurrentDirectory());
+            Assert.Equal(canonicalWorkDir, Directory.GetCurrentDirectory());
 
             Assert.Equal(0, XisoReader.UnpackImage(isoPath));
-            Assert.Equal(workDir, Directory.GetCurrentDirectory());
+            Assert.Equal(canonicalWorkDir, Directory.GetCurrentDirectory());
 
-            Assert.Equal(HashTree(src), HashTree(Path.Combine(workDir, "game")));
+            Assert.Equal(HashTree(src), HashTree(Path.Combine(canonicalWorkDir, "game")));
         }
         finally
         {

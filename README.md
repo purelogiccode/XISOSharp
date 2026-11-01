@@ -682,7 +682,7 @@ Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs explicitly (`dotn
 
 ## Requirements
 
-- .NET 8 SDK or newer (pinned `10.0.301` in `global.json`, `rollForward: latestMinor`)
+- .NET SDK pinned to `10.0.301` (`rollForward: latestPatch`); the built binaries target .NET 8/9/10.
 
 ## License
 

@@ -5,7 +5,8 @@ root = true
 # ------------------------------------------------------------------
 [*]
 charset = utf-8
-end_of_line = crlf
+# Line endings are normalized by Git; do not enforce an EOL here so the format
+# gate passes on Windows (CRLF working tree) and Linux/macOS (LF checkouts).
 insert_final_newline = true
 trim_trailing_whitespace = true
 indent_style = space

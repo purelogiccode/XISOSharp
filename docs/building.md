@@ -11,10 +11,10 @@ This page covers SDK requirements, build and publish commands, and the CI pipeli
 
 ## Requirements
 
-- **.NET SDK 10.0.301 or newer within major 10** — pinned in [`global.json`](../global.json)
-  (`rollForward: latestMinor`): newer 10.x feature bands are accepted, but 11+
-  is not, and anything older than 10.0.301 (e.g. a VS-shipped 10.0.1xx) fails
-  before build.
+- **.NET SDK 10.0.301 or newer 10.0.3xx patch** — pinned in [`global.json`](../global.json)
+  (`rollForward: latestPatch`): 10.0.3xx patches are accepted; newer 10.0.4xx
+  feature bands and 11+ are not, and anything older than 10.0.301 (e.g. a
+  VS-shipped 10.0.1xx) fails before build.
 - Any OS supported by .NET (the CI builds on Windows, Linux, and macOS).
 - No native toolchain is required — this is a pure managed codebase.
 

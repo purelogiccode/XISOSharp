@@ -66,9 +66,10 @@ jobs:
         run: dotnet build --no-restore --configuration Release -m:1
 
       - name: Verify formatting
-        # Whitespace drift was previously silent; keep the tree clean on the
-        # Linux runner (the fastest, most deterministic format host).
-        if: matrix.os == 'ubuntu-latest'
+        # `.editorconfig` normalizes line endings via Git, so run the whitespace
+        # gate on Windows where the working tree is CRLF (the formatter's host
+        # default). Linux/macOS jobs still build and test the same sources.
+        if: matrix.os == 'windows-latest'
         run: dotnet format whitespace CSharp_XISOSharp.sln --verify-no-changes --no-restore
 
       - name: Test

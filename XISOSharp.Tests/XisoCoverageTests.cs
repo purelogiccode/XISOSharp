@@ -1369,8 +1369,10 @@ public class XisoCoverageTests : IDisposable
             Directory.SetCurrentDirectory(src);
             int rc = XisoWriter.CreateXiso(".", null, null, null, out string? isoPath, null, null);
 
+            // macOS resolves /var -> /private/var; compare against the canonical parent.
+            string canonicalRoot = Path.GetDirectoryName(Directory.GetCurrentDirectory())!;
             Assert.Equal(0, rc);
-            Assert.Equal(Path.Combine(root, "games.iso"), isoPath);
+            Assert.Equal(Path.Combine(canonicalRoot, "games.iso"), isoPath);
             Assert.True(File.Exists(isoPath));
         }
         finally

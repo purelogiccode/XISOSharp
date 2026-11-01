@@ -50,7 +50,9 @@ public sealed class XisoPathsTests : IDisposable
         try
         {
             Directory.SetCurrentDirectory(dir);
-            Assert.True(XisoPaths.AreSamePath("game.iso", file));
+            // macOS resolves /var -> /private/var; compare the canonical cwd.
+            string canonicalFile = Path.Combine(Directory.GetCurrentDirectory(), "game.iso");
+            Assert.True(XisoPaths.AreSamePath("game.iso", canonicalFile));
         }
         finally
         {
