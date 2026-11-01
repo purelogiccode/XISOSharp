@@ -182,8 +182,9 @@ jobs:
           $cli = (Resolve-Path 'XISOSharp.Cli/bin/Release/net10.0/XISOSharp.exe').Path
           $gui = (Resolve-Path 'XISOSharp.Gui/bin/Release/net10.0/XISOSharp.Gui.exe').Path
 
-          $banner = & $cli -v
+          $bannerLines = & $cli -v
           if ($LASTEXITCODE -ne 0) { throw "CLI -v exited $LASTEXITCODE" }
+          $banner = $bannerLines -join "`n"
           if ($banner -notmatch '^XISOSharp v\d+\.\d+\.\d+') { throw "Unexpected CLI banner: $banner" }
           Write-Host $banner
 

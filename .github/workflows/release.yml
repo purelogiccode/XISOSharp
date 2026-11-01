@@ -98,6 +98,12 @@ jobs:
             **/Directory.Build.props
             global.json
 
+      - name: Restore CLI
+        # The GUI's BuildCliForStaging target builds XISOSharp.Cli out-of-band
+        # (deliberately not a ProjectReference), so its assets file must exist
+        # before the GUI publish on a clean checkout.
+        run: dotnet restore XISOSharp.Cli/XISOSharp.Cli.csproj
+
       - name: Publish GUI
         run: >-
           dotnet publish XISOSharp.Gui/XISOSharp.Gui.csproj
@@ -212,8 +218,9 @@ jobs:
           Expand-Archive -Path (Get-ChildItem dist/*.zip).FullName -DestinationPath dist/bundle
           Set-Location dist/bundle
 
-          $banner = & ./XISOSharp.exe -v
+          $bannerLines = & ./XISOSharp.exe -v
           if ($LASTEXITCODE -ne 0) { throw "CLI -v exited $LASTEXITCODE" }
+          $banner = $bannerLines -join "`n"
           if ($banner -notmatch '^XISOSharp v\d+\.\d+\.\d+') { throw "Unexpected CLI banner: $banner" }
           Write-Host $banner
 
