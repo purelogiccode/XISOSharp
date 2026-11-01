@@ -192,73 +192,73 @@ public sealed class WaxGlob
 
                     break;
                 case '{':
-                {
-                    int braceEnd = FindMatchingBrace(fragment, i);
-                    if (braceEnd == -1)
-                        throw new ArgumentException($"Unclosed '{{' in glob fragment '{fragment}'");
-                    string inner = fragment.Substring(i + 1, braceEnd - i - 1);
-                    List<string> opts = SplitAlternatives(inner);
-                    List<string> optRegexes = new(opts.Count);
-                    foreach (string opt in opts)
                     {
-                        // Inside alternative, inner patterns are non-capturing per wax spec
-                        string optRegex = FragmentToRegex(opt, capturing: false);
-                        optRegexes.Add(optRegex);
-                    }
+                        int braceEnd = FindMatchingBrace(fragment, i);
+                        if (braceEnd == -1)
+                            throw new ArgumentException($"Unclosed '{{' in glob fragment '{fragment}'");
+                        string inner = fragment.Substring(i + 1, braceEnd - i - 1);
+                        List<string> opts = SplitAlternatives(inner);
+                        List<string> optRegexes = new(opts.Count);
+                        foreach (string opt in opts)
+                        {
+                            // Inside alternative, inner patterns are non-capturing per wax spec
+                            string optRegex = FragmentToRegex(opt, capturing: false);
+                            optRegexes.Add(optRegex);
+                        }
 
-                    string combined = string.Join("|", optRegexes);
-                    if (capturing)
-                    {
-                        sb.Append('(');
-                        sb.Append("(?:");
-                        sb.Append(combined);
-                        sb.Append("))");
-                    }
-                    else
-                    {
-                        sb.Append("(?:");
-                        sb.Append(combined);
-                        sb.Append(')');
-                    }
+                        string combined = string.Join("|", optRegexes);
+                        if (capturing)
+                        {
+                            sb.Append('(');
+                            sb.Append("(?:");
+                            sb.Append(combined);
+                            sb.Append("))");
+                        }
+                        else
+                        {
+                            sb.Append("(?:");
+                            sb.Append(combined);
+                            sb.Append(')');
+                        }
 
-                    i = braceEnd + 1;
-                }
+                        i = braceEnd + 1;
+                    }
                     break;
                 case '<':
-                {
-                    int angleEnd = fragment.IndexOf('>', i);
-                    if (angleEnd == -1)
                     {
-                        sb.Append(Regex.Escape("<"));
-                        i++;
-                        break;
-                    }
+                        int angleEnd = fragment.IndexOf('>', i);
+                        if (angleEnd == -1)
+                        {
+                            sb.Append(Regex.Escape("<"));
+                            i++;
+                            break;
+                        }
 
-                    string repContent = fragment.Substring(i + 1, angleEnd - i - 1);
-                    int colon = repContent.IndexOf(':');
-                    string subGlob = colon >= 0 ? repContent.Substring(0, colon) : repContent;
-                    string bound = colon >= 0 ? repContent.Substring(colon + 1) : string.Empty;
-                    string subRegex = FragmentToRegex(subGlob, capturing: false);
-                    string quant = BoundToQuantifier(bound, colon >= 0);
-                    if (capturing)
-                    {
-                        sb.Append('(');
-                        sb.Append("(?:");
-                        sb.Append(subRegex);
-                        sb.Append(')');
-                        sb.Append(quant);
-                        sb.Append(')');
-                    }
-                    else
-                    {
-                        sb.Append("(?:");
-                        sb.Append(subRegex);
-                        sb.Append(quant);
-                        sb.Append(')');
-                    }
+                        string repContent = fragment.Substring(i + 1, angleEnd - i - 1);
+                        int colon = repContent.IndexOf(':');
+                        string subGlob = colon >= 0 ? repContent.Substring(0, colon) : repContent;
+                        string bound = colon >= 0 ? repContent.Substring(colon + 1) : string.Empty;
+                        string subRegex = FragmentToRegex(subGlob, capturing: false);
+                        string quant = BoundToQuantifier(bound, colon >= 0);
+                        if (capturing)
+                        {
+                            sb.Append('(');
+                            sb.Append("(?:");
+                            sb.Append(subRegex);
+                            sb.Append(')');
+                            sb.Append(quant);
+                            sb.Append(')');
+                        }
+                        else
+                        {
+                            sb.Append("(?:");
+                            sb.Append(subRegex);
+                            sb.Append(quant);
+                            sb.Append(')');
+                        }
 
-                    i = angleEnd + 1;
-                }
+                        i = angleEnd + 1;
+                    }
                     break;
                 case '\\' when i + 1 < fragment.Length:
                     sb.Append(Regex.Escape(fragment[i + 1].ToString()));

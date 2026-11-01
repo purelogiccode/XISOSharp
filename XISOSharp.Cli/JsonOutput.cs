@@ -200,6 +200,57 @@ internal sealed record JsonValidation(
     JsonValidationSide OutputSummary,
     List<JsonValidationIssue> Issues);
 
+/// <summary>Full-image hashes for one input.</summary>
+internal sealed record JsonImageHash(
+    string Source,
+    long TotalBytes,
+    string Crc32,
+    string Md5,
+    string Sha1,
+    string Sha256,
+    string Sha3256);
+
+/// <summary><c>hash</c> command payload.</summary>
+internal sealed record JsonImageHashes(
+    int SchemaVersion,
+    string Command,
+    List<JsonImageHash> Hashes);
+
+/// <summary>One entry in a <c>verify-hashes</c> report.</summary>
+internal sealed record JsonHashEntry(
+    string Path,
+    string Status,
+    string? ExpectedSha1,
+    string? ActualSha1);
+
+/// <summary><c>verify-hashes</c> command payload.</summary>
+internal sealed record JsonHashVerification(
+    int SchemaVersion,
+    string Command,
+    string Source,
+    string HashFile,
+    bool Passed,
+    int Checked,
+    int Matched,
+    int Mismatched,
+    int Missing,
+    int Extra,
+    List<JsonHashEntry> Entries);
+
+/// <summary><c>title-info</c> command payload.</summary>
+internal sealed record JsonTitleInfo(
+    int SchemaVersion,
+    string Command,
+    string Source,
+    string XbePath,
+    string TitleName,
+    uint TitleId,
+    string TitleIdHex,
+    uint GameRegion,
+    string GameRegionName,
+    uint DiskNumber,
+    uint Version);
+
 /// <summary>
 /// Trim/AOT-safe source-generation context for every <c>--json</c> payload.
 /// </summary>
@@ -216,4 +267,7 @@ internal sealed record JsonValidation(
 [JsonSerializable(typeof(JsonXexInfo))]
 [JsonSerializable(typeof(JsonXbeInfo))]
 [JsonSerializable(typeof(JsonValidation))]
+[JsonSerializable(typeof(JsonImageHashes))]
+[JsonSerializable(typeof(JsonHashVerification))]
+[JsonSerializable(typeof(JsonTitleInfo))]
 internal sealed partial class JsonOutputContext : JsonSerializerContext;

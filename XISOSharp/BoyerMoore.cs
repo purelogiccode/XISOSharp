@@ -1,4 +1,4 @@
-﻿namespace XISOSharp;
+namespace XISOSharp;
 
 /// <summary>
 /// Boyer-Moore pattern search for arbitrary byte patterns.

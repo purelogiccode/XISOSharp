@@ -1,4 +1,4 @@
-﻿namespace XISOSharp.DataStructures;
+namespace XISOSharp.DataStructures;
 
 /// <summary>
 /// Represents an on-disk directory entry in an XISO image.

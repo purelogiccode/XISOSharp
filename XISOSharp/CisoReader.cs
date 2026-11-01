@@ -115,6 +115,8 @@ public static class CisoReader
             throw new InvalidDataException($"Unsupported CISO version {version} (expected 1 or 2)");
         if (blockSize != BlockSize)
             throw new InvalidDataException($"Unsupported CISO block size {blockSize} (expected 2048)");
+        if (align > 2)
+            throw new InvalidDataException($"Unsupported CISO index alignment {align} (expected 0..2)");
 
         // Validate the u64 size claim BEFORE allocating anything from it: a
         // large-but-plausible claim (e.g. 1 TB in a 2 GB sparse file) would
@@ -176,6 +178,17 @@ public static class CisoReader
 
             long dataLen = (long)(nextOffset - offset);
             if (dataLen < 0) throw new InvalidDataException($"Negative data length at sector {sector}");
+            if (offset > (ulong)source.Length || nextOffset > (ulong)source.Length)
+            {
+                throw new InvalidDataException(
+                    $"CISO index points outside the file at sector {sector} (offset {offset}, next {nextOffset}, length {source.Length}).");
+            }
+
+            if (!isPlain && dataLen > BlockSize * 4L)
+            {
+                throw new InvalidDataException(
+                    $"CISO compressed sector {sector} span {dataLen} exceeds the sane {BlockSize * 4}-byte cap.");
+            }
 
             source.Seek((long)offset, SeekOrigin.Begin);
 
@@ -307,8 +320,8 @@ public static class CisoReader
             throw new InvalidDataException("Invalid CISO header");
         if (version != CisoWriter.VersionDeflate && version != CisoWriter.VersionLz4)
             throw new InvalidDataException($"Unsupported CISO version {version}");
-        if (align > 31)
-            throw new InvalidDataException($"Invalid CISO alignment {align}");
+        if (align > 2)
+            throw new InvalidDataException($"Invalid CISO alignment {align} (expected 0..2)");
         if (uncompressedSize > long.MaxValue)
             throw new InvalidDataException("Invalid CISO uncompressed size");
 
@@ -363,6 +376,18 @@ public static class CisoReader
 
             ulong off = (rawEntry & 0x7FFFFFFFu) * (ulong)(1u << align);
             ulong nextOff = (rawNext & 0x7FFFFFFFu) * (ulong)(1u << align);
+            if (nextOff < off)
+            {
+                throw new InvalidDataException(
+                    $"CISO index corruption at sector {sector}: next {nextOff} < offset {off}");
+            }
+
+            if (off > (ulong)csoFs.Length || nextOff > (ulong)csoFs.Length)
+            {
+                throw new InvalidDataException(
+                    $"CISO index points outside the file at sector {sector} (offset {off}, next {nextOff}, length {csoFs.Length}).");
+            }
+
             long dataLen = (long)(nextOff - off);
             csoFs.Seek((long)off, SeekOrigin.Begin);
 
@@ -381,6 +406,11 @@ public static class CisoReader
             else
             {
                 if (dataLen <= 0) throw new InvalidDataException($"Zero-length compressed sector {sector}");
+                if (dataLen > BlockSize * 4L)
+                {
+                    throw new InvalidDataException(
+                        $"CISO compressed sector {sector} span {dataLen} exceeds the sane {BlockSize * 4}-byte cap.");
+                }
 
                 // The last sector's index gap can round down (final entry stores
                 // position >> align); extend the read to recover the true payload.

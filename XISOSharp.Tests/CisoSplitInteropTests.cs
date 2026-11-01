@@ -261,7 +261,7 @@ public class CisoSplitInteropTests : IDisposable
         Assert.Equal(0, CisoWriter.CompressToCso(isoPath, csoPath, level: 9, splitBytes: splitBytes));
 
         List<string> parts = new();
-        for (int i = 1;; i++)
+        for (int i = 1; ; i++)
         {
             string part = Path.Combine(csoDir, $"ours.{i}.cso");
             if (!File.Exists(part)) break;

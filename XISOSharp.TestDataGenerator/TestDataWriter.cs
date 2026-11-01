@@ -161,7 +161,7 @@ public static class TestDataWriter
                 // The rebuild writes/deletes several files in sequence; a transient
                 // external lock (Dropbox sync, AV, indexer) landing anywhere in the
                 // window must not fail the whole suite's ModuleInitializer.
-                for (int attempt = 1;; attempt++)
+                for (int attempt = 1; ; attempt++)
                 {
                     try
                     {
@@ -258,7 +258,7 @@ public static class TestDataWriter
     /// </summary>
     private static void DeleteWithRetry(string path)
     {
-        for (int attempt = 1;; attempt++)
+        for (int attempt = 1; ; attempt++)
         {
             try
             {
@@ -339,7 +339,7 @@ public static class TestDataWriter
 
     private static void WriteAllTextWithRetry(string path, string content)
     {
-        for (int attempt = 1;; attempt++)
+        for (int attempt = 1; ; attempt++)
         {
             try
             {
@@ -355,7 +355,7 @@ public static class TestDataWriter
 
     private static void WriteAllBytesWithRetry(string path, byte[] data)
     {
-        for (int attempt = 1;; attempt++)
+        for (int attempt = 1; ; attempt++)
         {
             try
             {

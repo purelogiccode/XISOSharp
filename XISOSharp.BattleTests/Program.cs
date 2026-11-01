@@ -53,10 +53,31 @@ internal static class Program
             return 1;
         }
 
+        // Copyright-free CI corpus: generated from deterministic source trees by
+        // the CLI itself. The caller can still override with explicit ISO paths.
+        string? syntheticRoot = null;
+        IEnumerable<string> scanDirs = opt.Dirs;
+        if (opt.Synthetic)
+        {
+            string corpusRoot = Path.Combine(Path.GetTempPath(),
+                "xiso_battle_corpus_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                syntheticRoot = SyntheticCorpus.Create(cli, corpusRoot);
+                Console.WriteLine($"Synthetic corpus: {syntheticRoot}");
+                scanDirs = [syntheticRoot];
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] Could not build the synthetic corpus: {ex.Message}");
+                return 1;
+            }
+        }
+
         // Sample: explicit positional ISOs win; otherwise N random distinct ISOs
         // from the scanned dirs (seed reported for reproducibility).
         int seed = opt.Seed ?? Random.Shared.Next();
-        List<string> pool = CollectIsos(opt.Dirs);
+        List<string> pool = CollectIsos(scanDirs);
         List<string> picked = opt.ExplicitIsos.Count > 0 ? opt.ExplicitIsos : PickRandom(pool, opt.Count, seed);
         if (picked.Count == 0)
         {
@@ -137,6 +158,17 @@ internal static class Program
         finally
         {
             CleanupWorkRoot(workRoot, opt.KeepWork);
+            if (syntheticRoot is not null)
+            {
+                if (opt.KeepWork)
+                {
+                    Console.WriteLine($"[KEEP] synthetic corpus: {syntheticRoot}");
+                }
+                else
+                {
+                    CleanupDirectory(syntheticRoot);
+                }
+            }
         }
     }
 
@@ -340,13 +372,21 @@ internal static class Program
             return;
         }
 
+        CleanupDirectory(workRoot);
+    }
+
+    private static void CleanupDirectory(string directory)
+    {
         try
         {
-            Directory.Delete(workRoot, true);
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, true);
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Console.WriteLine($"[WARN] Could not remove work root {workRoot}: {ex.Message}");
+            Console.WriteLine($"[WARN] Could not remove {directory}: {ex.Message}");
         }
     }
 }

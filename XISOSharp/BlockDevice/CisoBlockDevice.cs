@@ -110,6 +110,8 @@ public sealed class CisoBlockDevice : IBlockDevice
         if (version != CisoWriter.VersionDeflate && version != CisoWriter.VersionLz4)
             throw new InvalidDataException($"Unsupported CISO version {version}");
         if (blockSize != 2048) throw new InvalidDataException($"Unsupported CISO block size {blockSize}");
+        if (align > 2)
+            throw new InvalidDataException($"Unsupported CISO index alignment {align} (expected 0..2)");
 
         // The u64 claim must fit a long before any arithmetic: otherwise Length wraps
         // negative and the index math below goes negative with it.
@@ -199,15 +201,25 @@ public sealed class CisoBlockDevice : IBlockDevice
     private byte[] GetSector(long sector)
     {
         if (_cachedSector == sector && _cachedData != null) return _cachedData;
+        if ((ulong)sector >= (ulong)(_index.Length - 1))
+            throw new InvalidDataException($"CISO sector {sector} is outside the {_index.Length - 1} sector index.");
 
         uint rawEntry = _index[sector];
         uint rawNext = _index[sector + 1];
+        if ((rawNext & 0x7FFFFFFFu) < (rawEntry & 0x7FFFFFFFu))
+            throw new InvalidDataException(
+                $"CISO index corruption at sector {sector}: next entry {rawNext:X8} < current entry {rawEntry:X8}.");
+
         bool isPlain = _version == CisoWriter.VersionDeflate
             ? (rawEntry & 0x80000000u) != 0
             : (rawEntry & 0x80000000u) == 0;
 
         ulong off = (rawEntry & 0x7FFFFFFFu) * (ulong)(1u << _align);
         ulong nextOff = (rawNext & 0x7FFFFFFFu) * (ulong)(1u << _align);
+        if (off > (ulong)_csoFs.Length || nextOff > (ulong)_csoFs.Length)
+            throw new InvalidDataException(
+                $"CISO index points outside the file at sector {sector} (offset {off}, next {nextOff}, length {_csoFs.Length}).");
+
         long dataLen = (long)(nextOff - off);
 
         byte[] data;
@@ -226,6 +238,9 @@ public sealed class CisoBlockDevice : IBlockDevice
         else
         {
             if (dataLen <= 0) throw new InvalidDataException($"Zero-length compressed sector {sector}");
+            if (dataLen > _blockSize * 4L)
+                throw new InvalidDataException(
+                    $"CISO compressed sector {sector} span {dataLen} exceeds the sane {_blockSize * 4}-byte cap.");
 
             // The last sector's index gap can round down (final entry stores position >> align);
             // extend the read to recover the true payload.

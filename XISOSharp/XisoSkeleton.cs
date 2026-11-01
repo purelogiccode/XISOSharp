@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using XISOSharp.Models;
 
 namespace XISOSharp;
 
@@ -175,6 +176,146 @@ public static class XisoSkeleton
         }
 
         return numBytes == partLength;
+    }
+
+    /// <summary>
+    /// Verifies an image against the <c>.hash</c> sidecar produced by
+    /// <see cref="Petrify"/> (or XboxKit <c>--petrify</c>). Each line is
+    /// <c>sha1hex path</c>; paths may use a leading <c>/</c> or not. Works for
+    /// plain ISO, split ISO, CISO, CCI and ZAR inputs.
+    /// </summary>
+    /// <param name="imagePath">Image or archive to verify.</param>
+    /// <param name="hashFilePath">The <c>.hash</c> sidecar.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Per-file comparison results plus match/mismatch/missing/extra totals.</returns>
+    /// <exception cref="ArgumentException">A path is empty.</exception>
+    /// <exception cref="FileNotFoundException">The image or hash file does not exist.</exception>
+    /// <exception cref="InvalidDataException">A hash-file line is malformed.</exception>
+    public static HashVerificationResult VerifyHashes(string imagePath, string hashFilePath,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(imagePath);
+        ArgumentException.ThrowIfNullOrEmpty(hashFilePath);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!File.Exists(imagePath))
+        {
+            throw new FileNotFoundException($"Image not found: {imagePath}", imagePath);
+        }
+
+        if (!File.Exists(hashFilePath))
+        {
+            throw new FileNotFoundException($"Hash file not found: {hashFilePath}", hashFilePath);
+        }
+
+        Dictionary<string, string> expected = new(StringComparer.OrdinalIgnoreCase);
+        int lineNumber = 0;
+        foreach (string raw in File.ReadLines(hashFilePath))
+        {
+            lineNumber++;
+            string line = raw.Trim();
+            if (line.Length == 0 || line[0] == '#')
+            {
+                continue;
+            }
+
+            int separator = line.IndexOfAny([' ', '\t']);
+            if (separator <= 0)
+            {
+                throw new InvalidDataException(
+                    $"Invalid hash file line {lineNumber}: expected '<sha1> <path>'.");
+            }
+
+            string digest = line[..separator].Trim();
+            string path = line[separator..].Trim();
+            if (digest.Length != 40 || !digest.All(static c => Uri.IsHexDigit(c)))
+            {
+                throw new InvalidDataException(
+                    $"Invalid hash file line {lineNumber}: '{digest}' is not a SHA-1 hex digest.");
+            }
+
+            expected[NormalizeHashPath(path)] = digest.ToLowerInvariant();
+        }
+
+        Dictionary<string, string> actual = new(StringComparer.OrdinalIgnoreCase);
+        if (imagePath.EndsWith(".zar", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (ZarEntry entry in XisoZarchive.ListZar(imagePath))
+            {
+                if (entry.IsDirectory)
+                {
+                    continue;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                byte[]? hash = XisoZarchive.ComputeFileHash(imagePath, entry.Path, HashAlgorithmName.SHA1);
+                if (hash is not null)
+                {
+                    actual[NormalizeHashPath(entry.Path)] = Convert.ToHexString(hash).ToLowerInvariant();
+                }
+            }
+        }
+        else
+        {
+            using XisoImage image = XisoImage.Open(imagePath);
+            foreach (ExplorerNode node in image.ListFlat())
+            {
+                if (node.IsDirectory)
+                {
+                    continue;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                string? hash = image.ComputeHashHex(node.FullPath, HashAlgorithmName.SHA1);
+                if (hash is not null)
+                {
+                    actual[NormalizeHashPath(node.FullPath)] = hash.ToLowerInvariant();
+                }
+            }
+        }
+
+        List<HashVerificationEntry> entries = [];
+        int matched = 0;
+        int mismatched = 0;
+        int missing = 0;
+        foreach ((string path, string digest) in expected.OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!actual.TryGetValue(path, out string? actualDigest))
+            {
+                missing++;
+                entries.Add(new HashVerificationEntry(path, digest, null, HashVerificationStatus.Missing));
+            }
+            else if (string.Equals(digest, actualDigest, StringComparison.OrdinalIgnoreCase))
+            {
+                matched++;
+                entries.Add(new HashVerificationEntry(path, digest, actualDigest, HashVerificationStatus.Match));
+            }
+            else
+            {
+                mismatched++;
+                entries.Add(new HashVerificationEntry(path, digest, actualDigest, HashVerificationStatus.Mismatch));
+            }
+        }
+
+        int extra = 0;
+        foreach ((string path, string digest) in actual.OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            if (expected.ContainsKey(path))
+            {
+                continue;
+            }
+
+            extra++;
+            entries.Add(new HashVerificationEntry(path, null, digest, HashVerificationStatus.Extra));
+        }
+
+        return new HashVerificationResult(expected.Count, matched, mismatched, missing, extra, entries);
+    }
+
+    private static string NormalizeHashPath(string path)
+    {
+        string normalized = path.Replace('\\', '/').Trim();
+        return normalized.StartsWith('/') ? normalized : "/" + normalized;
     }
 
     private static string DeriveSkeletonPath(string input)

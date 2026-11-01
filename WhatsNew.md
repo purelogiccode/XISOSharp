@@ -1,4 +1,31 @@
-# What's New in 1.6.0 (since 1.5.0)
+# What's New in 1.5.0
+
+XISOSharp 1.5.0 is the first public release since 1.4.4 and merges the
+unreleased 1.5/1.6 work (CCI, split ISO, ZAR input, traversal hardening, batch
+conversion, JSON, preallocation and explicit layout packing) with the Phase 9
+"world-class library" work.
+
+## World-class library (Phase 9)
+
+- **`XisoImage`**: disposable, open-once facade over ISO/split ISO/CISO/CCI with
+  `List`, `ListFlat`, `ReadFile`, `OpenReadStream`, `Extract`, `Validate`,
+  `GetTitleInfo`, `ComputeImageHash` and async wrappers.
+- **Full-image hashes**: `XisoImageHash.Compute` streams CRC32, MD5, SHA-1,
+  SHA-256 and SHA3-256 in one pass; the CLI exposes `hash <image>`.
+- **`verify-hashes`**: verify a `--petrify`/XboxKit `.hash` sidecar for ISO,
+  CISO, CCI, split ISO and ZAR.
+- **`title-info`**: find the root `default.xbe` and report title name, ID,
+  region, disc and version.
+- **Hardening**: Windows long-path manifests, reserved device-name
+  rejection/sanitization, ZAR extraction byte/entry caps, and CISO
+  alignment/index validation (the new mutation fuzzer found an
+  `OverflowException` on a corrupt index).
+- **Quality**: 3-OS tests, formatting gate, AOT publish smoke, mutation fuzzing,
+  75% line / 60% branch coverage floors, package validation against 1.4.4.
+- **Packaging**: `dotnet tool install -g XISOSharp.Tool`, SBOM + build
+  provenance, community files and a console sample.
+
+## Layout packing (Phase 8)
 
 XISOSharp can now **pack to an explicit sector layout** (PlanToEnhance Phase 8).
 Take the JSON from `--sector-layout --json` (or write a compact `path=sector`
@@ -14,8 +41,8 @@ tab converts a `.zar` back to a plain ISO, ZAR extraction is depth-bounded and
 pre-sized, and CISO compression reads split/container sources directly.
 
 Targets remain `net8.0` / `net9.0` / `net10.0`. Full suite green on all three:
-**1946 passed / 1 opt-in skip (1947) on net8.0/net9.0** and **2010 passed / 1
-opt-in skip (2011) on net10.0**.
+**1979 passed / 1 opt-in skip (1980) on net8.0/net9.0** and **2043 passed / 1
+opt-in skip (2044) on net10.0**.
 
 ## Highlights
 
@@ -115,8 +142,8 @@ refusals carry `NoBugReport`. Seven `XisoImageSourceTests` suffix cases plus
 part naming for extraction, rewrite, recompress and salvage. One new
 `ZarInputTests` case rejects a 65-level tree in both list and extract, and one
 new `CisoTests` case recompresses a CISO through the direct decompressed view.
-Net8/net9: **1946 passed / 1 skipped (1947)**; net10:
-**2010 passed / 1 skipped (2011)**.
+Net8/net9: **1979 passed / 1 skipped (1980)**; net10:
+**2043 passed / 1 skipped (2044)**.
 
 ---
 

@@ -37,6 +37,7 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 
 | Type | Purpose |
 |---|---|
+| [`XisoImage`](api-utilities.md#xisoimage) / `XisoImageHash` | Open-once disposable facade (list/read/extract/validate/title/hash, async wrappers) + full-image CRC32/MD5/SHA-1/SHA-256/SHA3-256 |
 | [`XisoReader`](api-xisoreader.md) | Verify, extract, list, tree, rewrite, info, `ls`, audit, repair, salvage, hash, copy-out, copy-in, checksum, filetime, split/join, XEX/XBE info, BlockDevice overloads |
 | `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` | Unified detection and open (`TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`) for ISO, split ISO, CISO, CCI, split variants and ZAR |
 | `XisoCci` / `CciBlockDevice` | CCI/CCIM compression, extraction, default names and random access (CCISharp-backed) |
@@ -71,6 +72,24 @@ if (XisoImageSource.TryDetect(path, out XisoImageSourceInfo? info) && info is no
 
 using Stream image = XisoImageSource.OpenRead(@"C:\games\game.1.cci");
 using IBlockDevice dev = XisoImageSource.OpenBlockDevice(@"C:\games\game.1.iso");
+```
+
+## Open-once facade
+
+`XisoImage` keeps one decompressed view open, probes the volume eagerly and
+serializes operations internally:
+
+```csharp
+using XisoImage image = XisoImage.Open(@"C:\games\game.1.cci");
+Console.WriteLine($"{image.Source.Format} {image.Volume.DiscFormat} {image.Length}");
+
+foreach (ExplorerNode node in image.ListFlat("/"))
+    Console.WriteLine(node.FullPath);
+
+byte[] readme = image.ReadFile("/readme.txt");
+XisoImageHashResult hash = image.ComputeImageHash();   // CRC32/MD5/SHA1/SHA256/SHA3-256
+TitleInfo? title = image.GetTitleInfo();               // root default.xbe certificate
+AuditResult audit = image.Validate();
 ```
 
 | Format | Detection | Open behavior |

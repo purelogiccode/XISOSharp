@@ -166,7 +166,7 @@ public static class XisoSplitter
 
         string baseName = firstPartPath[..^PartSuffixLength];
         List<string> parts = new() { firstPartPath };
-        for (int i = 1;; i++)
+        for (int i = 1; ; i++)
         {
             // Append rather than ChangeExtension: a dotted base
             // (`My.Game.1.iso` -> `My.Game`) must yield `My.Game.2.iso`.

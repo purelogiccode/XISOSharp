@@ -346,6 +346,20 @@ internal static class Program
         {
             return RunConvertMode(args, 1);
         }
+        else if (args.Length > 0 && string.Equals(args[0], "hash", StringComparison.OrdinalIgnoreCase))
+        {
+            return RunImageHashMode(args, 1);
+        }
+        else if (args.Length > 0 && (string.Equals(args[0], "verify-hashes", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(args[0], "verify-hash", StringComparison.OrdinalIgnoreCase)))
+        {
+            return RunVerifyHashesMode(args, 1);
+        }
+        else if (args.Length > 0 && (string.Equals(args[0], "title-info", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(args[0], "title", StringComparison.OrdinalIgnoreCase)))
+        {
+            return RunTitleInfoMode(args, 1);
+        }
 
         for (int i = optind; i < args.Length; i++)
         {
@@ -381,39 +395,39 @@ internal static class Program
                         PrintUsage();
                         return 0;
                     case "-c":
-                    {
-                        if (xSeen || rewrite || !extract || i + 1 >= args.Length)
                         {
-                            PrintUsage();
-                            return 1;
-                        }
+                            if (xSeen || rewrite || !extract || i + 1 >= args.Length)
+                            {
+                                PrintUsage();
+                                return 1;
+                            }
 
-                        string dir = args[++i];
-                        string? name = null;
-                        if (i + 1 < args.Length && !args[i + 1].StartsWith('-'))
-                        {
-                            name = args[++i];
-                        }
+                            string dir = args[++i];
+                            string? name = null;
+                            if (i + 1 < args.Length && !args[i + 1].StartsWith('-'))
+                            {
+                                name = args[++i];
+                            }
 
-                        createList.Add((dir, name));
-                        break;
-                    }
-                    case "-x":
-                    {
-                        // CLI-002: -x is order-independent. It is the default, so a
-                        // repeat is harmless, but after any operational mode (or
-                        // -r/-c) it is a conflict, not a silent no-op.
-                        if (xSeen)
+                            createList.Add((dir, name));
                             break;
-                        if (rewrite || !extract || createList.Count > 0 || ClassicModeSelected())
-                        {
-                            PrintUsage();
-                            return 1;
                         }
+                    case "-x":
+                        {
+                            // CLI-002: -x is order-independent. It is the default, so a
+                            // repeat is harmless, but after any operational mode (or
+                            // -r/-c) it is a conflict, not a silent no-op.
+                            if (xSeen)
+                                break;
+                            if (rewrite || !extract || createList.Count > 0 || ClassicModeSelected())
+                            {
+                                PrintUsage();
+                                return 1;
+                            }
 
-                        xSeen = true;
-                        break;
-                    }
+                            xSeen = true;
+                            break;
+                        }
                     case "--unpack":
                         if (xSeen || rewrite || createList.Count > 0)
                         {
@@ -996,7 +1010,7 @@ internal static class Program
             }
         }
 
-        parse_done:
+    parse_done:
 
         if (jsonMode)
         {
@@ -4376,6 +4390,265 @@ internal static class Program
     }
 
     /// <summary>
+    /// <c>hash &lt;image&gt;... [--json]</c>: full logical-image CRC32/MD5/SHA-1/
+    /// SHA-256/SHA3-256 in one streaming pass, through the decompressed view so
+    /// ISO/CISO/CCI/split inputs agree.
+    /// </summary>
+    private static int RunImageHashMode(string[] args, int optind)
+    {
+        bool json = false;
+        List<string> positionals = new();
+        for (int i = optind; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase))
+            {
+                json = true;
+            }
+            else if (string.Equals(a, "-q", StringComparison.Ordinal))
+            {
+                Logger.Quiet = true;
+            }
+            else if (string.Equals(a, "-Q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = Logger.RealQuiet = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            {
+                if (json) WriteJsonVersion();
+                else WriteVersionInfo();
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for hash: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count == 0)
+        {
+            Logger.LogErr("Error: hash requires at least one image\n");
+            PrintUsage();
+            return 1;
+        }
+
+        int exit = 0;
+        List<JsonImageHash>? payloads = json ? [] : null;
+        foreach (string image in positionals)
+        {
+            try
+            {
+                XisoImageHashResult result = XisoImageHash.Compute(image);
+                if (!json)
+                {
+                    Logger.Log($"{image}\n");
+                    Logger.Log($"  CRC32     {result.Crc32}\n");
+                    Logger.Log($"  MD5       {result.Md5}\n");
+                    Logger.Log($"  SHA-1     {result.Sha1}\n");
+                    Logger.Log($"  SHA-256   {result.Sha256}\n");
+                    Logger.Log($"  SHA3-256  {result.Sha3256}\n");
+                    Logger.Log($"  Bytes     {result.TotalBytes}\n");
+                }
+
+                payloads?.Add(new JsonImageHash(image, result.TotalBytes, result.Crc32, result.Md5,
+                    result.Sha1, result.Sha256, result.Sha3256));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogErr($"Error hashing {image}: {ex.Message}\n");
+                exit = 1;
+            }
+        }
+
+        if (payloads is not null)
+        {
+            WriteJson(new JsonImageHashes(1, "hash", payloads));
+        }
+
+        return exit;
+    }
+
+    /// <summary>
+    /// <c>verify-hashes &lt;image&gt; &lt;hash-file&gt; [--json] [--ignore-extra]</c>:
+    /// compares every entry in a <c>--petrify</c>/XboxKit <c>.hash</c> sidecar
+    /// with the image. Missing or mismatched files fail the command; extra image
+    /// files are reported but can be ignored with <c>--ignore-extra</c>.
+    /// </summary>
+    private static int RunVerifyHashesMode(string[] args, int optind)
+    {
+        bool json = false;
+        bool ignoreExtra = false;
+        List<string> positionals = new();
+        for (int i = optind; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase))
+            {
+                json = true;
+            }
+            else if (string.Equals(a, "--ignore-extra", StringComparison.OrdinalIgnoreCase))
+            {
+                ignoreExtra = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for verify-hashes: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count != 2)
+        {
+            Logger.LogErr("Error: verify-hashes requires <image> <hash-file>\n");
+            PrintUsage();
+            return 1;
+        }
+
+        try
+        {
+            HashVerificationResult result = XisoSkeleton.VerifyHashes(positionals[0], positionals[1]);
+            bool passed = result.Mismatched == 0 && result.Missing == 0 &&
+                          (ignoreExtra || result.Extra == 0);
+
+            if (!json)
+            {
+                Logger.Log($"verify-hashes {positionals[0]} against {positionals[1]}:\n");
+                Logger.Log($"  Checked:    {result.Checked}\n");
+                Logger.Log($"  Matched:    {result.Matched}\n");
+                Logger.Log($"  Mismatched: {result.Mismatched}\n");
+                Logger.Log($"  Missing:    {result.Missing}\n");
+                Logger.Log($"  Extra:      {result.Extra}\n");
+                foreach (HashVerificationEntry entry in result.Entries)
+                {
+                    if (entry.Status == HashVerificationStatus.Match)
+                    {
+                        continue;
+                    }
+
+                    Logger.Log($"  {entry.Status,-10} {entry.Path} expected={entry.ExpectedSha1 ?? "-"} " +
+                               $"actual={entry.ActualSha1 ?? "-"}\n");
+                }
+
+                Logger.Log(passed ? "Result: PASS\n" : "Result: FAIL\n");
+            }
+            else
+            {
+                List<JsonHashEntry> entries = result.Entries
+                    .Select(static entry => new JsonHashEntry(entry.Path, entry.Status.ToString(),
+                        entry.ExpectedSha1, entry.ActualSha1))
+                    .ToList();
+                WriteJson(new JsonHashVerification(1, "verify-hashes", positionals[0], positionals[1], passed,
+                    result.Checked, result.Matched, result.Mismatched, result.Missing, result.Extra, entries));
+            }
+
+            return passed ? 0 : 1;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogErr($"Error verifying hashes for {positionals[0]}: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// <c>title-info &lt;image&gt; [--json]</c>: finds the root <c>default.xbe</c>
+    /// and reports the certificate title name, title ID, region, disc and version.
+    /// </summary>
+    private static int RunTitleInfoMode(string[] args, int optind)
+    {
+        bool json = false;
+        List<string> positionals = new();
+        for (int i = optind; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase))
+            {
+                json = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for title-info: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count != 1)
+        {
+            Logger.LogErr("Error: title-info requires exactly one image\n");
+            PrintUsage();
+            return 1;
+        }
+
+        try
+        {
+            TitleInfo? title = XisoReader.GetTitleInfo(positionals[0]);
+            if (title is null)
+            {
+                Logger.LogErr($"Error: no root default.xbe with an XBEH certificate in {positionals[0]}\n");
+                return 1;
+            }
+
+            if (json)
+            {
+                WriteJson(new JsonTitleInfo(1, "title-info", positionals[0], title.XbePath, title.TitleName,
+                    title.TitleId, title.TitleIdHex, title.GameRegion, title.GameRegionName,
+                    title.DiskNumber, title.Version));
+            }
+            else
+            {
+                Logger.Log($"Title:          {title.TitleName}\n");
+                Logger.Log($"Title ID:       {title.TitleIdHex}\n");
+                Logger.Log($"Region:         {title.GameRegionName} (0x{title.GameRegion:X8})\n");
+                Logger.Log($"Disc number:    {title.DiskNumber}\n");
+                Logger.Log($"Version:        0x{title.Version:X8}\n");
+                Logger.Log($"XBE:            {title.XbePath}\n");
+            }
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogErr($"Error reading title info from {positionals[0]}: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    /// <summary>
     /// CLI-008: the part paths a split of <paramref name="iso"/> would write
     /// (same layout math as <see cref="XisoSplitter"/>), filtered to the ones
     /// that already exist. Empty when the source cannot be probed — the split
@@ -6063,6 +6336,10 @@ internal static class Program
                                                                             Aliases: uncso, decso, uncci.
                                                        checksum <image> [images...] [--silent]  Compute SHA3-256 image checksum (xdvdfs-compatible:
                                                                              SHA3-256 over sorted path bytes + file data). Output: hex tab path.
+                                                       hash <image> [images...] [--json]  Full-image CRC32/MD5/SHA-1/SHA-256/SHA3-256 in one pass.
+                                                       verify-hashes <image> <hash-file> [--ignore-extra] [--json]
+                                                                             Verify a --petrify/XboxKit .hash sidecar against the image.
+                                                       title-info <image> [--json]  Find the root default.xbe and report title name, title ID, region, disc, version.
                                                        split <image> [images...] [--size <bytes|half>] [--output <base>] [--batch <dir>]  Split ISO into sector-aligned
                                                                              .1.iso/.2.iso… parts (default size 4G FATX cap; 'half' splits in two).
                                                        join <first.1.iso> [...] [--output <file>]  Reassemble split parts (output validated as XISO).

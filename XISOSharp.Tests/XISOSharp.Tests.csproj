@@ -41,6 +41,9 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Update="PublicApi.approved.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

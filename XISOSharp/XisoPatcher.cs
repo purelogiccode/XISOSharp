@@ -123,7 +123,9 @@ public static class XisoPatcher
             isoPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Open, Access = FileAccess.ReadWrite, Share = FileShare.None,
+                Mode = FileMode.Open,
+                Access = FileAccess.ReadWrite,
+                Share = FileShare.None,
                 BufferSize = 65536,
             });
 

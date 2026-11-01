@@ -31,7 +31,7 @@ public class CliLocatorTests
     }
 
     /// <summary>Verifies the shipped CLI binary's metadata produces a clean label.</summary>
-    [Fact]
+    [WindowsOnlyFact]
     public void ProductVersion_CliBinary_IsClean()
     {
         string cliPath = Path.Combine(AppContext.BaseDirectory,

@@ -123,7 +123,10 @@ public static class XisoRepairer
                 isoPath,
                 new FileStreamOptions
                 {
-                    Mode = FileMode.Open, Access = FileAccess.ReadWrite, Share = FileShare.None, BufferSize = 65536
+                    Mode = FileMode.Open,
+                    Access = FileAccess.ReadWrite,
+                    Share = FileShare.None,
+                    BufferSize = 65536
                 });
             foreach (PendingFix fix in fresh)
                 fix.Apply(fs);
@@ -166,7 +169,10 @@ public static class XisoRepairer
             isoPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                BufferSize = 65536
             });
         long rootDirStart = ((long)volInfo.RootDirSector * Constants.SectorSize) + volInfo.DiscLseek;
         if (rootDirStart < fileLength)
@@ -511,7 +517,10 @@ public static class XisoRepairer
                 isoPath,
                 new FileStreamOptions
                 {
-                    Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 256
+                    Mode = FileMode.Open,
+                    Access = FileAccess.Read,
+                    Share = FileShare.Read,
+                    BufferSize = 256
                 });
             fs.Seek(tagOffset, SeekOrigin.Begin);
             Span<byte> tagBuf = stackalloc byte[Constants.OptimizedTagLength];

@@ -59,7 +59,7 @@ public class XisoSharpWrapper : IDisposable
                     outputEncoding: System.Text.Encoding.Latin1)
                 .ConfigureAwait(false);
             XisoSharpResult result = new()
-                { ExitCode = core.ExitCode, StdOut = core.StandardOutput, StdErr = core.StandardError };
+            { ExitCode = core.ExitCode, StdOut = core.StandardOutput, StdErr = core.StandardError };
             if (result.ExitCode != 0)
             {
                 Log.Warning("extract-xiso exited with code {Exit}: {Args}", result.ExitCode,

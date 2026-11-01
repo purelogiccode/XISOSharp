@@ -47,7 +47,7 @@ public class XbeInfoTests : IDisposable
     /// at 0x00 with the certificate address as a load pointer (file offset =
     /// address - base), certificate at 0x400.
     /// </summary>
-    private static byte[] BuildXbe()
+    internal static byte[] BuildXbe()
     {
         byte[] data = new byte[0x1000];
         Span<byte> span = data.AsSpan();

@@ -111,15 +111,15 @@ public static class AvlTree
         switch (result)
         {
             case < 0:
-            {
-                AvlResult tmp = AvlInsert(ref root.Left, node);
-                return tmp == AvlResult.AvlBalanced ? AvlLeftGrown(ref root) : tmp;
-            }
+                {
+                    AvlResult tmp = AvlInsert(ref root.Left, node);
+                    return tmp == AvlResult.AvlBalanced ? AvlLeftGrown(ref root) : tmp;
+                }
             case > 0:
-            {
-                AvlResult tmp = AvlInsert(ref root.Right, node);
-                return tmp == AvlResult.AvlBalanced ? AvlRightGrown(ref root) : tmp;
-            }
+                {
+                    AvlResult tmp = AvlInsert(ref root.Right, node);
+                    return tmp == AvlResult.AvlBalanced ? AvlRightGrown(ref root) : tmp;
+                }
             default:
                 return AvlResult.AvlError;
         }
@@ -134,41 +134,41 @@ public static class AvlTree
         switch (root.Skew)
         {
             case AvlSkew.LeftSkew:
-            {
-                if (root.Left!.Skew == AvlSkew.LeftSkew)
                 {
-                    root.Skew = root.Left.Skew = AvlSkew.NoSkew;
-                }
-                else
-                {
-                    switch (root.Left!.Right!.Skew)
+                    if (root.Left!.Skew == AvlSkew.LeftSkew)
                     {
-                        case AvlSkew.LeftSkew:
-                            root.Skew = AvlSkew.RightSkew;
-                            root.Left.Skew = AvlSkew.NoSkew;
-                            break;
+                        root.Skew = root.Left.Skew = AvlSkew.NoSkew;
+                    }
+                    else
+                    {
+                        switch (root.Left!.Right!.Skew)
+                        {
+                            case AvlSkew.LeftSkew:
+                                root.Skew = AvlSkew.RightSkew;
+                                root.Left.Skew = AvlSkew.NoSkew;
+                                break;
 
-                        case AvlSkew.RightSkew:
-                            root.Skew = AvlSkew.NoSkew;
-                            root.Left.Skew = AvlSkew.LeftSkew;
-                            break;
+                            case AvlSkew.RightSkew:
+                                root.Skew = AvlSkew.NoSkew;
+                                root.Left.Skew = AvlSkew.LeftSkew;
+                                break;
 
-                        default:
-                            root.Skew = AvlSkew.NoSkew;
-                            root.Left.Skew = AvlSkew.NoSkew;
-                            break;
+                            default:
+                                root.Skew = AvlSkew.NoSkew;
+                                root.Left.Skew = AvlSkew.NoSkew;
+                                break;
+                        }
+
+                        root.Left.Right.Skew = AvlSkew.NoSkew;
+                        AvlNode left = root.Left;
+                        AvlRotateLeft(ref left);
+                        root.Left = left;
                     }
 
-                    root.Left.Right.Skew = AvlSkew.NoSkew;
-                    AvlNode left = root.Left;
-                    AvlRotateLeft(ref left);
-                    root.Left = left;
+                    AvlRotateRight(ref root);
+
+                    return AvlResult.NoErr;
                 }
-
-                AvlRotateRight(ref root);
-
-                return AvlResult.NoErr;
-            }
 
             case AvlSkew.RightSkew:
                 root.Skew = AvlSkew.NoSkew;
@@ -193,41 +193,41 @@ public static class AvlTree
                 return AvlResult.NoErr;
 
             case AvlSkew.RightSkew:
-            {
-                if (root.Right!.Skew == AvlSkew.RightSkew)
                 {
-                    root.Skew = root.Right.Skew = AvlSkew.NoSkew;
-                }
-                else
-                {
-                    switch (root.Right!.Left!.Skew)
+                    if (root.Right!.Skew == AvlSkew.RightSkew)
                     {
-                        case AvlSkew.LeftSkew:
-                            root.Skew = AvlSkew.NoSkew;
-                            root.Right.Skew = AvlSkew.RightSkew;
-                            break;
+                        root.Skew = root.Right.Skew = AvlSkew.NoSkew;
+                    }
+                    else
+                    {
+                        switch (root.Right!.Left!.Skew)
+                        {
+                            case AvlSkew.LeftSkew:
+                                root.Skew = AvlSkew.NoSkew;
+                                root.Right.Skew = AvlSkew.RightSkew;
+                                break;
 
-                        case AvlSkew.RightSkew:
-                            root.Skew = AvlSkew.LeftSkew;
-                            root.Right.Skew = AvlSkew.NoSkew;
-                            break;
+                            case AvlSkew.RightSkew:
+                                root.Skew = AvlSkew.LeftSkew;
+                                root.Right.Skew = AvlSkew.NoSkew;
+                                break;
 
-                        default:
-                            root.Skew = AvlSkew.NoSkew;
-                            root.Right.Skew = AvlSkew.NoSkew;
-                            break;
+                            default:
+                                root.Skew = AvlSkew.NoSkew;
+                                root.Right.Skew = AvlSkew.NoSkew;
+                                break;
+                        }
+
+                        root.Right.Left.Skew = AvlSkew.NoSkew;
+                        AvlNode right = root.Right;
+                        AvlRotateRight(ref right);
+                        root.Right = right;
                     }
 
-                    root.Right.Left.Skew = AvlSkew.NoSkew;
-                    AvlNode right = root.Right;
-                    AvlRotateRight(ref right);
-                    root.Right = right;
+                    AvlRotateLeft(ref root);
+
+                    return AvlResult.NoErr;
                 }
-
-                AvlRotateLeft(ref root);
-
-                return AvlResult.NoErr;
-            }
 
             default:
                 root.Skew = AvlSkew.RightSkew;

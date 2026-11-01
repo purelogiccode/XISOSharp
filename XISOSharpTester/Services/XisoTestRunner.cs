@@ -115,7 +115,8 @@ public static class XisoTestRunner
         Stopwatch sw = Stopwatch.StartNew();
         PerFileResult result = new()
         {
-            FileName = entry.FileName, FileSize = entry.FileSize
+            FileName = entry.FileName,
+            FileSize = entry.FileSize
         };
 
         try
@@ -129,7 +130,9 @@ public static class XisoTestRunner
                 Log.Warning("Test skipped (file not found): {Path}", path);
                 result.SubTests.Add(new SubTestResult
                 {
-                    TestName = "All Tests", Status = TestStatus.Skipped, Detail = "File not found on disk."
+                    TestName = "All Tests",
+                    Status = TestStatus.Skipped,
+                    Detail = "File not found on disk."
                 });
                 result.ElapsedSeconds = sw.Elapsed.TotalSeconds;
                 return result;

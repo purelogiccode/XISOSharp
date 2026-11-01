@@ -36,6 +36,9 @@ internal sealed class BattleOptions
     /// </summary>
     internal List<string> Ops { get; init; } = [.. ValidOps];
 
+    /// <summary>Gets a value indicating whether a deterministic synthetic corpus is generated for CI.</summary>
+    internal bool Synthetic { get; init; }
+
     /// <summary>Gets a value indicating whether scratch dirs are kept after the run.</summary>
     internal bool KeepWork { get; init; }
 
@@ -65,6 +68,7 @@ internal sealed class BattleOptions
         string? xboxkit = null;
         string? work = null;
         bool keep = false;
+        bool synthetic = false;
         bool help = args.Length != 0 && args.Any(a => a is "-h" or "--help" or "/?" or "-?");
 
         for (int i = 0; i < args.Length; i++)
@@ -116,6 +120,9 @@ internal sealed class BattleOptions
                 case "--keep":
                     keep = true;
                     break;
+                case "--synthetic":
+                    synthetic = true;
+                    break;
                 case "--timeout":
                     timeout = int.Parse(Value(args, ref i, inline),
                         System.Globalization.CultureInfo.InvariantCulture);
@@ -149,7 +156,7 @@ internal sealed class BattleOptions
                 $"Unknown ops: {string.Join(',', ops.Except(ValidOps, StringComparer.Ordinal))} (valid: {string.Join(',', ValidOps)})");
         }
 
-        if (dirs.Count == 0)
+        if (dirs.Count == 0 && !synthetic)
         {
             // Default source of candidates: the user's Xbox dump folder.
             if (Directory.Exists(@"H:\XBOXTest"))
@@ -169,6 +176,7 @@ internal sealed class BattleOptions
             XboxkitPath = xboxkit,
             WorkRoot = work,
             Ops = ops,
+            Synthetic = synthetic,
             KeepWork = keep,
             TimeoutMinutes = timeout,
             ExplicitIsos = explicitIsos,
@@ -220,6 +228,8 @@ internal sealed class BattleOptions
                             --xdvdfs <path>           Path to xdvdfs.exe (default: beside the harness)
                             --xboxkit <path>          Path to xboxkit.exe (default: beside the harness)
                             --ops <a,b,c>             Ops to battle (default: all; skipped when the op's oracle is missing)
+                            --synthetic               Generate a deterministic copyright-free corpus and battle it
+                                                      (no --dir / H:\XBOXTest needed; CI uses this)
                             --work <dir>              Scratch dir root (default: drive with the most free
                                                       space among the ISO drives and %TEMP%; ops skip
                                                       automatically when the drive runs low)

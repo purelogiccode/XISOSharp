@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Serilog;
 using XISOSharp.Gui.Logging;
 using XISOSharp.Gui.Services;

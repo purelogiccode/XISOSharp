@@ -337,7 +337,10 @@ public static class XisoChecksum
             // Add to result (preorder)
             result.Add(new DirEnt
             {
-                Name = node.Name, StartSector = node.StartSector, Size = node.Size, IsDirectory = node.IsDirectory
+                Name = node.Name,
+                StartSector = node.StartSector,
+                Size = node.Size,
+                IsDirectory = node.IsDirectory
             });
         }
 

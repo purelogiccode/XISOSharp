@@ -384,6 +384,8 @@ public static class XisoZarchive
     /// <param name="skipExisting">Skip files that already exist instead of overwriting.</param>
     /// <param name="progress">Optional progress channel (<see cref="ProgressInfoType.FileProgress"/> per chunk and <see cref="ProgressInfoType.FileAdded"/> per file).</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="maxTotalBytes">Optional cap on the total bytes written; <c>null</c> means no cap.</param>
+    /// <param name="maxEntries">Optional cap on the number of files and directories visited; <c>null</c> means no cap.</param>
     /// <returns><c>0</c> on success.</returns>
     /// <exception cref="ArgumentException">A path is null or empty.</exception>
     /// <exception cref="FileNotFoundException">The archive does not exist.</exception>
@@ -396,15 +398,29 @@ public static class XisoZarchive
     /// <exception cref="IOException">An output file cannot be written.</exception>
     /// <exception cref="OperationCanceledException">The operation was cancelled.</exception>
     public static int ExtractZar(string zarPath, string outputDirectory, bool skipExisting = false,
-        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default,
+        long? maxTotalBytes = null, int? maxEntries = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(zarPath);
         ArgumentException.ThrowIfNullOrEmpty(outputDirectory);
         ct.ThrowIfCancellationRequested();
+        if (maxTotalBytes is < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxTotalBytes), maxTotalBytes, "Must be non-negative.");
+        }
+
+        if (maxEntries is < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxEntries), maxEntries, "Must be non-negative.");
+        }
 
         using ZArchiveReader reader = OpenZarOrThrow(zarPath);
         Directory.CreateDirectory(outputDirectory);
-        ZarExtractState state = new();
+        ZarExtractState state = new()
+        {
+            MaxTotalBytes = maxTotalBytes,
+            MaxEntries = maxEntries,
+        };
         ExtractZarNode(reader, ZArchiveReader.RootNode, outputDirectory, string.Empty, skipExisting,
             progress, ct, state, depth: 0);
         return 0;
@@ -504,6 +520,10 @@ public static class XisoZarchive
     private sealed class ZarExtractState
     {
         internal int Files;
+        internal int Entries;
+        internal long TotalBytes;
+        internal long? MaxTotalBytes;
+        internal int? MaxEntries;
     }
 
     private static void ExtractZarNode(ZArchiveReader reader, uint node, string outputDirectory,
@@ -526,6 +546,13 @@ public static class XisoZarchive
             if (!reader.TryGetDirEntry(node, index, out uint child, out ZArchiveReader.DirEntry entry))
             {
                 throw new InvalidDataException($"Invalid ZArchive directory entry in '{parent}'.");
+            }
+
+            state.Entries++;
+            if (state.MaxEntries is { } maxEntries && state.Entries > maxEntries)
+            {
+                throw new InvalidDataException(
+                    $"ZArchive extraction exceeds the {maxEntries} entry limit.");
             }
 
             string relative = CombineZarPath(parent, entry.Name);
@@ -552,6 +579,13 @@ public static class XisoZarchive
             }
 
             long expectedLength = (long)entry.Size;
+            if (state.MaxTotalBytes is { } maxTotalBytes &&
+                (state.TotalBytes > maxTotalBytes || expectedLength > maxTotalBytes - state.TotalBytes))
+            {
+                throw new InvalidDataException(
+                    $"ZArchive extraction exceeds the {maxTotalBytes} byte limit at '{relative}'.");
+            }
+
             string? directory = Path.GetDirectoryName(destination);
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
@@ -567,6 +601,7 @@ public static class XisoZarchive
                 // producing a short file).
                 target.SetLength(expectedLength);
                 CopyZarFile(source, target, destination, expectedLength, progress, ct, state);
+                state.TotalBytes += expectedLength;
             }
             catch
             {

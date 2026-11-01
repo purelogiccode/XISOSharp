@@ -1,0 +1,5 @@
+# Code owners
+
+# Default owner for everything in the repository. Adjust as team membership
+# grows; CODEOWNERS is consulted by GitHub pull-request reviews.
+* @purelogiccode

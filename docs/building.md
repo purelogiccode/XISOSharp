@@ -136,21 +136,31 @@ dotnet pack XISOSharp -c Release -o ./artifacts
 `.github/workflows/ci.yml` runs on every push/PR to `master`/`main` and on version
 tags (`v*` or bare `[0-9]*`, both accepted by MinVer and the publish gate):
 
-1. **build-and-test** — matrix over `ubuntu-latest`, `windows-latest`,
-   `macos-latest`: restore → build (Release) → test the `XISOSharp.Tests`
-   project with XPlat code coverage on Windows. The merged line/branch coverage
-   lands in the job summary (the job fails below **65% line coverage**), and the
-   trx + coverage reports are uploaded as artifacts.
-2. **gui-smoke** — Windows: `XISOSharp -v`, `XISOSharp.Gui --probe-cli` and
+1. **build-and-test** - matrix over `ubuntu-latest`, `windows-latest`,
+   `macos-latest`: restore → format verification (Linux) → build (Release) →
+   test the `XISOSharp.Tests` project with XPlat code coverage. The merged
+   line/branch coverage lands in the job summary (fails below **75% line / 60%
+   branch**), and the trx + coverage reports are uploaded as artifacts.
+2. **gui-smoke** - Windows: `XISOSharp -v`, `XISOSharp.Gui --probe-cli` and
    `XISOSharp.Gui --self-test`, the headless contract the GUI ships with.
-3. **inspectcode** — JetBrains InspectCode (pinned `2026.2.3.1`) over the whole
+3. **inspectcode** - JetBrains InspectCode (pinned `2026.2.3.1`) over the whole
    solution; any warning or error fails the job and the SARIF report is uploaded
    to **Security → Code scanning**.
-4. **dependency-audit** — `dotnet list package --vulnerable --include-transitive`
+4. **dependency-audit** - `dotnet list package --vulnerable --include-transitive`
    fails on any known-vulnerable direct or transitive package.
-5. **pack** — after every gate: `dotnet pack` the core project and upload the
-   nupkgs.
-6. **publish** (only on version tags, environment `nuget`) — push the nupkgs to
+5. **aot-smoke** - publishes `XISOSharp.AotSmoke` with NativeAOT on Linux and
+   runs it, proving the library (and transitive ZAR/CCI packages) stay
+   trim/AOT-compatible.
+6. **fuzz-smoke** - two minutes of deterministic mutation fuzzing over ISO,
+   CISO, CCI and ZAR inputs; any exception outside the documented format/I/O
+   contract fails the job.
+7. **battle-interop** - Windows: the CLI is compared against the checked-in
+   extract-xiso, xdvdfs and xboxkit oracles over a synthetic, copyright-free
+   corpus (`--synthetic`) for list/extract/rewrite, checksum/md5, unpack/pack
+   and CISO round-trip; reports are uploaded as artifacts.
+8. **pack** - after every gate: `dotnet pack` the core package and the
+   `XISOSharp.Tool` dotnet tool, then upload the nupkgs.
+9. **publish** (only on version tags, environment `nuget`) - push the nupkgs to
    nuget.org using the `NUGET_API_KEY` secret.
 
 Companion workflows:
@@ -168,13 +178,15 @@ packages and GitHub Actions, and security updates are enabled repository-wide.
 
 ## Releases
 
-Pushing a version tag (`1.6.0` or `v1.6.0`) does two independent things:
+Pushing a version tag (`1.5.0` or `v1.5.0`) does two independent things:
 
-- `ci.yml` packs and publishes `XISOSharp.<version>.nupkg` + `.snupkg` to NuGet.
+- `ci.yml` packs and publishes `XISOSharp.<version>.nupkg` + `.snupkg` and the
+  `XISOSharp.Tool.<version>.nupkg` dotnet tool to NuGet.
 - `release.yml` builds the six framework-dependent bundles
   (`release_<version>_<rid>.zip` for `win-x64`, `win-arm64`, `linux-x64`,
   `linux-arm64`, `MacOsX-x64`, `MacOsX-arm64`) from the same tag, smoke-tests
-  the native ones, and attaches them to the GitHub release. Its body is the
+  the native ones, generates an SPDX 2.2 SBOM and a build-provenance
+  attestation, and attaches everything to the GitHub release. Its body is the
   version's section of [`release-notes.md`](release-notes.md).
 
 `release.yml` also has a `workflow_dispatch` entry with a `dry_run` switch to

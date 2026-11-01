@@ -576,7 +576,7 @@ public static class XisoWriter
             err = 1;
         }
 
-        cleanup:
+    cleanup:
         if (root.Subdirectory != null && !ReferenceEquals(root.Subdirectory, AvlNode.EmptySubdirectory))
         {
             AvlTree.FreeTree(root.Subdirectory);
@@ -755,7 +755,10 @@ public static class XisoWriter
             srcStream = new FileStream(hostPath,
                 new FileStreamOptions
                 {
-                    Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, BufferSize = 65536
+                    Mode = FileMode.Open,
+                    Access = FileAccess.Read,
+                    Share = FileShare.Read,
+                    BufferSize = 65536
                 });
         }
         else

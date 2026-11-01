@@ -785,7 +785,7 @@ public class CisoTests : IDisposable
     {
         List<string> parts = new();
         string baseName = csoPath[..^4]; // strip ".cso"
-        for (int i = 1;; i++)
+        for (int i = 1; ; i++)
         {
             string part = $"{baseName}.{i}.cso";
             if (!File.Exists(part)) break;
@@ -991,5 +991,35 @@ public class CisoTests : IDisposable
 
         Assert.True(layout.Volume.IsValid);
         Assert.NotEmpty(layout.Entries);
+    }
+
+    [Fact]
+    public void CisoBlockDevice_MutatedHeaderAlignment_ThrowsInvalidData()
+    {
+        string isoPath = CreateTempIso();
+        string csoPath = Path.Combine(CreateTempDir(), "bad-align.cso");
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, csoPath, level: 6));
+
+        byte[] bytes = File.ReadAllBytes(csoPath);
+        bytes[21] = 99; // index alignment
+        File.WriteAllBytes(csoPath, bytes);
+
+        Assert.Throws<InvalidDataException>(() => new CisoBlockDevice(csoPath));
+    }
+
+    [Fact]
+    public void CisoBlockDevice_NonMonotonicIndex_ThrowsInvalidData()
+    {
+        string isoPath = CreateTempIso();
+        string csoPath = Path.Combine(CreateTempDir(), "bad-index.cso");
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, csoPath, level: 6));
+
+        byte[] bytes = File.ReadAllBytes(csoPath);
+        // Index entry 1 sits at header (24) + one u32; make it point backwards.
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(24 + 4, 4), 0);
+        File.WriteAllBytes(csoPath, bytes);
+
+        using CisoBlockDevice device = new(csoPath);
+        Assert.Throws<InvalidDataException>(() => device.Read(0, new byte[2048]));
     }
 }

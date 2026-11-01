@@ -12,13 +12,13 @@ public class DirectoryEntryTableWriterExtraTests
 {
     private static AvlNode Node(string name, bool isDirectory = false, uint startSector = 0,
         uint fileSize = 0, byte attributes = 0) => new()
-    {
-        Filename = name,
-        Subdirectory = isDirectory ? new AvlNode() : null,
-        StartSector = startSector,
-        FileSize = fileSize,
-        Attributes = attributes,
-    };
+        {
+            Filename = name,
+            Subdirectory = isDirectory ? new AvlNode() : null,
+            StartSector = startSector,
+            FileSize = fileSize,
+            Attributes = attributes,
+        };
 
     /// <summary>Verifies an empty entry set produces a null root.</summary>
     [Fact]

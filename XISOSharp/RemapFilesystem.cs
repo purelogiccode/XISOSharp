@@ -458,7 +458,9 @@ public static class RemapFilesystem
         Dictionary<string, AvlNode> dirCache = new(StringComparer.OrdinalIgnoreCase);
         AvlNode imageRoot = new()
         {
-            Filename = "IMAGE", StartSector = Constants.RootDirectorySector, Subdirectory = null
+            Filename = "IMAGE",
+            StartSector = Constants.RootDirectorySector,
+            Subdirectory = null
         };
         dirCache[string.Empty] = imageRoot;
 
@@ -510,7 +512,10 @@ public static class RemapFilesystem
 
                 AvlNode fileNode = new()
                 {
-                    Filename = fileName, FileSize = (uint)packedLength, Subdirectory = null, HostPath = fi.FullName
+                    Filename = fileName,
+                    FileSize = (uint)packedLength,
+                    Subdirectory = null,
+                    HostPath = fi.FullName
                 };
                 AvlNode? tmp = parentNode.Subdirectory;
                 if (AvlTree.AvlInsert(ref tmp, fileNode) == AvlResult.AvlError)
@@ -764,4 +769,5 @@ public static class RemapFilesystem
         if (slash < 0) return path;
         return path.Substring(slash + 1);
     }
+
 }

@@ -23,8 +23,9 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
-  # Fails the coverage summary step when line coverage drops below this floor.
-  MIN_LINE_COVERAGE: '65'
+  # Fails the coverage summary step when coverage drops below these floors.
+  MIN_LINE_COVERAGE: '75'
+  MIN_BRANCH_COVERAGE: '60'
 
 jobs:
   build-and-test:
@@ -64,15 +65,18 @@ jobs:
         # solution build can race writes to the CLI output.
         run: dotnet build --no-restore --configuration Release -m:1
 
+      - name: Verify formatting
+        # Whitespace drift was previously silent; keep the tree clean on the
+        # Linux runner (the fastest, most deterministic format host).
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet format whitespace CSharp_XISOSharp.sln --verify-no-changes --no-restore
+
       - name: Test
-        # windows-latest only: the suite mutates the process-wide current
-        # directory, which races on Linux/macOS runners (getcwd fails once a
-        # test's directory is deleted). The 3-OS matrix still compile-checks
-        # every project. Scoped to the test project; the solution build above
-        # already compiled the Windows-only Tester/GUI harnesses.
+        # Runs on every OS: the suite is sequential and restores the process
+        # working directory, so Linux/macOS now exercise the same code paths
+        # (the old Windows-only gate hid CWD/clone regressions).
         # --blame-hang-dump-type none: hang dumps are not uploaded (too large),
         # so skip collecting them and abort faster on a hung test host.
-        if: matrix.os == 'windows-latest'
         run: >-
           dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj
           --no-build --configuration Release
@@ -109,8 +113,9 @@ jobs:
           }
 
           $lineRate = 100.0 * $linesCovered / $linesValid
-          $branchRate = if ($branchesValid -gt 0) { 100.0 * $branchesCovered / $branchesValid } else { 0 }
+          $branchRate = if ($branchesValid -gt 0) { 100.0 * $branchesCovered / $branchesValid } else { 100.0 }
           $floor = [double]$env:MIN_LINE_COVERAGE
+          $branchFloor = [double]$env:MIN_BRANCH_COVERAGE
 
           @(
             '### Test coverage',
@@ -120,11 +125,16 @@ jobs:
             ('| Lines | {0:N0} | {1:N0} | {2:N1}% |' -f $linesCovered, $linesValid, $lineRate),
             ('| Branches | {0:N0} | {1:N0} | {2:N1}% |' -f $branchesCovered, $branchesValid, $branchRate),
             '',
-            ('Line-coverage floor: {0:N0}%.' -f $floor)
+            ('Line-coverage floor: {0:N0}%. Branch-coverage floor: {1:N0}%.' -f $floor, $branchFloor)
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
           if ($lineRate -lt $floor) {
             Write-Error ('Line coverage {0:N1}% is below the {1:N0}% floor.' -f $lineRate, $floor)
+            exit 1
+          }
+
+          if ($branchRate -lt $branchFloor) {
+            Write-Error ('Branch coverage {0:N1}% is below the {1:N0}% floor.' -f $branchRate, $branchFloor)
             exit 1
           }
 
@@ -144,6 +154,102 @@ jobs:
         with:
           name: coverage-report
           path: TestResults/**/coverage.cobertura.xml
+          if-no-files-found: warn
+
+  aot-smoke:
+    name: aot-smoke (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.Build.props
+            global.json
+
+      - name: Install NativeAOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Publish and run AOT smoke
+        run: |
+          dotnet publish XISOSharp.AotSmoke/XISOSharp.AotSmoke.csproj -c Release -r linux-x64 -o aot
+          ./aot/XISOSharp.AotSmoke
+
+  fuzz-smoke:
+    name: fuzz-smoke (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.Build.props
+            global.json
+
+      - name: Mutation fuzz (2 minutes)
+        run: >-
+          dotnet run --project XISOSharp.Fuzz/XISOSharp.Fuzz.csproj
+          -c Release -- --seconds 120 --seed 20261101
+
+  battle-interop:
+    name: battle-interop (windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.Build.props
+            global.json
+
+      - name: Build battle harness
+        run: dotnet build XISOSharp.BattleTests/XISOSharp.BattleTests.csproj -c Release -m:1
+
+      - name: Synthetic corpus interop
+        # Copyright-free corpus generated by the CLI itself; the checked-in
+        # reference binaries (extract-xiso, xdvdfs, xboxkit) are the oracles.
+        # ZAR/petrify are excluded here because xboxkit refuses/mis-decodes the
+        # synthetic edge cases (empty dirs, Latin-1 names); the real-ISO harness
+        # still covers those ops locally.
+        run: >-
+          dotnet run --project XISOSharp.BattleTests/XISOSharp.BattleTests.csproj
+          -c Release --no-build --
+          --synthetic --count 5 --seed 20261101
+          --ops list,extract,rewrite,checksum,md5,unpack,pack,cso
+          --timeout 20
+
+      - name: Upload battle reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: battle-reports
+          path: |
+            BattleReports/**/*.txt
+            BattleReports/**/*.json
           if-no-files-found: warn
 
   gui-smoke:
@@ -318,7 +424,7 @@ jobs:
     timeout-minutes: 30
     # Package only when every gate is green: a tag push then publishes exactly
     # what CI validated.
-    needs: [build-and-test, gui-smoke, inspectcode, dependency-audit]
+    needs: [build-and-test, gui-smoke, inspectcode, dependency-audit, aot-smoke, fuzz-smoke, battle-interop]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -341,9 +447,13 @@ jobs:
         run: dotnet build XISOSharp/XISOSharp.csproj --no-restore --configuration Release
 
       - name: Pack
-        # The library is the only packable project. Strict package validation
-        # (EnablePackageValidation) runs as part of pack; .snupkg holds symbols.
-        run: dotnet pack XISOSharp/XISOSharp.csproj --no-build --configuration Release --output artifacts
+        # The library is the only project with package validation; the CLI is a
+        # framework-dependent dotnet tool (`dotnet tool install -g XISOSharp.Tool`,
+        # command `xisosharp`). Strict package validation runs as part of pack;
+        # .snupkg holds library symbols.
+        run: |
+          dotnet pack XISOSharp/XISOSharp.csproj --no-build --configuration Release --output artifacts
+          dotnet pack XISOSharp.Cli/XISOSharp.Cli.csproj --configuration Release --output artifacts
 
       - name: Upload packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

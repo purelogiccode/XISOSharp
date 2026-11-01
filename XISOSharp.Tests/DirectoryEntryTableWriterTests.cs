@@ -184,7 +184,10 @@ public class DirectoryEntryTableWriterTests : IDisposable
 
         AvlNode dir = new()
         {
-            Filename = "D", Subdirectory = new AvlNode(), FileSize = 2048, Attributes = 0x13
+            Filename = "D",
+            Subdirectory = new AvlNode(),
+            FileSize = 2048,
+            Attributes = 0x13
         };
         Assert.Equal(0x13, DirectoryEntryTableWriter.EncodeEntry(dir)[12]);
     }

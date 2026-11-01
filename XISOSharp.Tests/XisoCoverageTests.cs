@@ -311,8 +311,8 @@ public class XisoCoverageTests : IDisposable
     public void DecodeXiso_Stream_EmptyImageName_ReturnsOne()
     {
         using MemoryStream stream = new(new byte[1024]);
-        int rc = XisoReader.DecodeXiso(stream, "somedir\\", CreateTempDir("xiso_cov_dest"),
-            ExtractMode.List, out string? outPath, false);
+        int rc = XisoReader.DecodeXiso(stream, "somedir" + Path.DirectorySeparatorChar,
+            CreateTempDir("xiso_cov_dest"), ExtractMode.List, out string? outPath, false);
         Assert.Equal(1, rc);
         Assert.Null(outPath);
     }

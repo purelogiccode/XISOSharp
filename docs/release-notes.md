@@ -1,6 +1,39 @@
 # Release Notes
 
-## 1.6.0
+## 1.5.0
+
+**World-class library release.** This merges everything from the unreleased
+1.5.0/1.6.0 tree (CCI, split ISO, ZAR input, traversal hardening, batch
+conversion, JSON, preallocation and explicit layout packing) with the Phase 9
+productization work: an open-once `XisoImage` facade, full-image
+CRC32/MD5/SHA-1/SHA-256/SHA3-256, `.hash` verification, title metadata,
+Windows long-path/reserved-name hardening, ZAR extraction caps, mutation
+fuzzing, AOT smoke, 3-OS tests, a `dotnet tool`, SBOM and provenance.
+
+Full suite green on all three targets: **1979 passed / 1 opt-in skip (1980) on
+net8.0/net9.0** and **2043 passed / 1 opt-in skip (2044) on net10.0**.
+
+### Phase 9 — world-class library
+
+- **`XisoImage`** (`XISOSharp`): `Open`/`OpenAsync`, `List`/`ListFlat`,
+  `ReadFile`/`OpenReadStream`, `Extract`/`ExtractAsync`, `Validate`,
+  `GetTitleInfo`, `ComputeImageHash`, `IDisposable`/`IAsyncDisposable`.
+- **Full-image hashes**: `XisoImageHash.Compute` streams CRC32, MD5, SHA-1,
+  SHA-256 and SHA3-256 in one pass through the decompressed view.
+- **`verify-hashes`**: verifies a `--petrify`/XboxKit `.hash` sidecar for ISO,
+  CISO, CCI, split ISO and ZAR inputs.
+- **Title metadata**: `title-info` / `XisoReader.GetTitleInfo` find
+  `default.xbe` and report title name, ID, region, disc and version.
+- **Hardening**: Windows `longPathAware` manifests, reserved device-name
+  rejection/sanitization, ZAR extraction byte/entry caps, CISO malformed-index
+  and alignment validation (found by the new mutation fuzzer).
+- **Quality gates**: 3-OS test matrix, `dotnet format` gate, AOT publish smoke,
+  mutation fuzz job, 75% line / 60% branch coverage floors, package validation
+  against 1.4.4 with a reviewed suppression baseline.
+- **Packaging**: `XISOSharp.Tool` dotnet tool, SBOM + build provenance on
+  releases, community files and a console sample.
+
+### Layout packing (Phase 8)
 
 Sector-layout packing release (PlanToEnhance Phase 8), plus the Phase 4 TOC
 hardening follow-up. Images can now be repacked at
@@ -16,8 +49,8 @@ plain ISO. ZAR extraction is now depth-bounded, pre-sized and exact-length, and
 CISO compression reads split/container sources through the decompressed view
 instead of a joined temporary ISO.
 
-Full suite green on all three targets: **1946 passed / 1 opt-in skip (1947) on
-net8.0/net9.0** and **2010 passed / 1 opt-in skip (2011) on net10.0**.
+Full suite green on all three targets: **1979 passed / 1 opt-in skip (1980) on
+net8.0/net9.0** and **2043 passed / 1 opt-in skip (2044) on net10.0**.
 
 ### Library
 
@@ -145,10 +178,10 @@ net8.0/net9.0** and **2010 passed / 1 opt-in skip (2011) on net10.0**.
   CCI part naming: extraction, rewrite, recompress and salvage from `.2.cci` all
   use the game stem; `.10.cci`/`.0.cci` stay ordinary names, and `.1.zar` keeps
   its number.
-- **net8.0/net9.0 - 1947 tests (1946 passed, 1 opt-in skip)**;
-  **net10.0 - 2011 tests (2010 passed, 1 opt-in skip, adds the GUI tests)**.
+- **net8.0/net9.0 - 1980 tests (1979 passed, 1 opt-in skip)**;
+  **net10.0 - 2044 tests (2043 passed, 1 opt-in skip, adds the GUI tests)**.
 
-## 1.5.0
+### JSON and I/O efficiency (Phase 7)
 
 Machine-readable-output and I/O-efficiency release. Read-only verbs gain a
 stable `--json` schema (source-generated, trim/AOT-safe) with human logs moved

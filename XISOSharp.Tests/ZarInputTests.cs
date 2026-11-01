@@ -64,6 +64,32 @@ public sealed class ZarInputTests : IDisposable
     }
 
     [Fact]
+    public void ExtractZar_EntryLimit_RejectsHostileArchive()
+    {
+        string work = CreateTempDir("xiso_zar_limits");
+        string iso = CreateIso(work);
+        string zar = CreateZar(iso, Path.Combine(work, "game.zar"));
+        string extracted = Path.Combine(work, "limited");
+
+        InvalidDataException error = Assert.Throws<InvalidDataException>(
+            () => XisoZarchive.ExtractZar(zar, extracted, maxEntries: 2));
+        Assert.Contains("entry limit", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ExtractZar_ByteLimit_RejectsHostileArchive()
+    {
+        string work = CreateTempDir("xiso_zar_bytes");
+        string iso = CreateIso(work);
+        string zar = CreateZar(iso, Path.Combine(work, "game.zar"));
+        string extracted = Path.Combine(work, "limited");
+
+        InvalidDataException error = Assert.Throws<InvalidDataException>(
+            () => XisoZarchive.ExtractZar(zar, extracted, maxTotalBytes: 10));
+        Assert.Contains("byte limit", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ExtractZar_DeeplyNestedArchive_FailsAtMaxTocDepth()
     {
         string work = CreateTempDir("xiso_zar_deep");

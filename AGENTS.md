@@ -28,16 +28,25 @@ reproducible or re-downloadable. Never delete them.
 ## CI
 
 - `.github/workflows/ci.yml` builds the full solution on ubuntu/windows/macos
-  and runs the test suite on `windows-latest` only: the suite mutates the
-  process-wide current directory, which is not safe to parallelize on Unix
-  runners. Cross-platform test hardening is a known follow-up.
+  and runs the sequential test suite on all three. The suite restores the
+  process working directory after each test; keep that invariant when adding
+  CWD-sensitive tests.
 - The same workflow gates on `gui-smoke` (CLI `-v`, GUI `--probe-cli` /
   `--self-test`), `inspectcode` (JetBrains InspectCode, pinned
-  `2026.2.3.1`, fails on any warning/error and uploads SARIF) and
-  `dependency-audit` (`dotnet list package --vulnerable`). Keep InspectCode at
-  0 warnings; the floor is enforced in CI.
+  `2026.2.3.1`, fails on any warning/error and uploads SARIF),
+  `dependency-audit` (`dotnet list package --vulnerable`), `aot-smoke`
+  (NativeAOT publish + run), `fuzz-smoke` (2-minute mutation fuzz) and
+  `battle-interop` (synthetic copyright-free corpus vs the checked-in
+  extract-xiso/xdvdfs/xboxkit oracles). Keep InspectCode at 0 warnings; the
+  floor is enforced in CI.
 - Coverage: the Windows test job writes merged line/branch coverage to the job
-  summary and fails below `MIN_LINE_COVERAGE` (65%).
+  summary and fails below `MIN_LINE_COVERAGE` (75%) or
+  `MIN_BRANCH_COVERAGE` (60%).
+- Formatting: `dotnet format whitespace --verify-no-changes` runs on the Linux
+  runner; run it locally before pushing.
+- The test suite runs on Ubuntu, Windows and macOS now (the old Windows-only
+  gate was removed after the CWD refactor); Linux/macOS also build the
+  Windows-only Tester/GUI projects.
 - Companion workflows: `codeql.yml` (CodeQL C#), `dependency-review.yml` (PRs),
   `scorecard.yml` (OpenSSF Scorecard), `release.yml` (tag: six RID bundles +
   GitHub release), `pages.yml`/`wiki.yml` (docs).
@@ -55,6 +64,9 @@ reproducible or re-downloadable. Never delete them.
 
 ### Versioning facts
 
+- **Next release: `1.5.0`.** The tree's older `1.6.0` notes were never tagged or
+  published; they were merged into `1.5.0` (see `PlanToEnhance.md` Phase 9).
+  Do not create a `1.6.0` tag/release.
 - Version comes from git tags via **MinVer**. Never add or edit a `Version`
   property in a csproj.
 - Release tags are bare semver: `1.0.0`, `1.0.1`, `1.0.2` (`v1.0.2` also
@@ -77,7 +89,7 @@ reproducible or re-downloadable. Never delete them.
      `202609111233`), not `v2.7.1`. Never change the on-disk optimized tag
      `in!xiso!2.7.1 (01.11.14)` or `Constants.ExisoVersion`.
 2. Run the full suite: `dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release`
-   (currently 1946 passed / 1 skipped on net8.0/net9.0 and 2010 passed / 1 skipped on
+   (currently 1979 passed / 1 skipped on net8.0/net9.0 and 2043 passed / 1 skipped on
    net10.0 — net10.0 adds the GUI-helper tests).
 3. Commit + push `master` (only when the user asks), then tag and push:
    `git tag <version> && git push origin <version>`.

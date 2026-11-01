@@ -359,9 +359,18 @@ public class XisoCorruptionResilienceTests : IDisposable
         File.WriteAllText(Path.Combine(src, "file.txt"), "lower");
 
         string dir = CreateTempDir("xiso_corrupt_caseiso");
-        int rc = XisoWriter.CreateXiso(src, dir, null, null, out string? created, "case.iso", null);
-        Assert.Equal(1, rc);
-        Assert.True(created == null || !File.Exists(created));
+        try
+        {
+            int rc = XisoWriter.CreateXiso(src, dir, null, null, out string? created, "case.iso", null);
+            Assert.Equal(1, rc);
+            Assert.True(created == null || !File.Exists(created));
+        }
+        catch (InvalidDataException ex)
+        {
+            // Case-sensitive hosts reach the writer's duplicate guard directly
+            // (Windows collapses the two names into one file before the walk).
+            Assert.Contains("case-insensitive duplicate", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     [Fact]

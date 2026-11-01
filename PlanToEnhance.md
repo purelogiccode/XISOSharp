@@ -1043,3 +1043,157 @@ XISOSharp checksum game.1.iso   # must equal the single-image checksum
 XISOSharp -l game.zar
 XISOSharp --checksum game.zar   # must equal the ISO checksum
 ```
+
+---
+
+## 15. Phase 9 — World-class 1.5.0 checklist
+
+**Status:** implemented in tree on 2026-11-01; Linux full suite 2015 passed / 24 skipped, Windows 2043 passed / 1 skipped, NativeAOT smoke green; the `1.5.0` release (tag, NuGet, bundles) is pending. `[x]` = implemented and verified in this tree; `[ ]` = pending; `[-]` = evaluated and deliberately excluded (reason recorded).
+
+**Versioning note (2026-11-01):** `1.5.0` was never published, and `1.6.0` only exists in the tree. The next public release is **`1.5.0`**, containing everything from the old 1.5.0/1.6.0 notes plus this phase. Do not publish `1.6.0`.
+
+### 15.1 Release, packaging, versioning
+
+- [x] `release.yml` builds the six RID bundles, enforces the exact five-file layout, smoke-tests `win-x64`/`linux-x64`/`MacOsX-arm64`, and creates the GitHub release (dry-run verified).
+- [x] NuGet publish is gated on `pack` and runs only on tags (`ci.yml`).
+- [x] `AGENTS.md` release routine and bundle recipe document the automated path.
+- [x] Merge the tree's 1.5.0/1.6.0 notes into one `## 1.5.0` release section and refresh `WhatsNew.md` for the new features.
+- [ ] Publish `1.5.0`: tag, NuGet nupkg/snupkg, GitHub release with six bundles; verify `api.nuget.org/v3-flatcontainer/xisosharp/index.json` and the release assets.
+- [x] Add a `dotnet tool` package (`XISOSharp.Tool`, command `xisosharp`) and a tag-only publish job.
+- [x] Add SBOM generation (CycloneDX/SPDX) to the release workflow.
+- [x] Add GitHub build-provenance attestations for the six bundles.
+- [ ] Add optional NuGet author-signing and Windows Authenticode/macOS notarization steps gated on repository secrets.
+
+### 15.2 Library API and architecture
+
+- [x] `IFilesystem` destination abstraction (`LocalFilesystem`, `MemoryFilesystem`, custom stores).
+- [x] `IBlockDevice` source abstraction (`File`, `Memory`, `Offset`, `Stream`, `Ciso`, `Cci`).
+- [x] `XisoImageSource` unified detection/opening for ISO, split ISO, CISO, CCI and ZAR.
+- [x] Structured `IProgress<ProgressInfo>` and `CancellationToken` on the main read/write paths.
+- [x] Add `XisoImage` — a disposable, thread-safe, open-once facade (`Open`, `Info`, `List`, `ReadFile`, `Extract`, `Validate`, `Dispose`, async wrappers).
+- [ ] Remove `Directory.SetCurrentDirectory` from `XisoWriter`/`XisoReader` and replace the process-wide `CreateLock` with per-operation state; walk sources through `IFilesystem`.
+- [ ] Make logging per-call (`XisoOptions`/`ILogger`-style sink) while keeping the existing static `Logger` as a compatibility facade.
+- [ ] Add an opt-in bounded parallel extraction path (`UnpackOptions.MaxDegreeOfParallelism`).
+- [x] Enable `PackageValidationBaselineVersion` (1.4.4) with a reviewed compatibility-suppression file.
+- [x] Add a public-API snapshot/approval test.
+- [x] Publish a .NET support policy (`net8` until EOL, `net10` LTS; `net9` EOL May 2026) and decide whether to add `netstandard2.0`.
+- [ ] Generate an API reference site with DocFX from the XML docs.
+
+### 15.3 Verification, CI and quality gates
+
+- [x] Full-solution build on Ubuntu/Windows/macOS.
+- [x] Windows test suite on `net8.0`/`net9.0`/`net10.0`.
+- [x] InspectCode 2026.2.3.1 gate at 0 warnings + SARIF upload.
+- [x] Dependency audit (`dotnet list package --vulnerable`).
+- [x] CodeQL, Dependency Review and OpenSSF Scorecard workflows.
+- [x] TestData fixture stamp so parallel TFM hosts share one ISO.
+- [x] Run the full test suite on Ubuntu (verified locally in WSL: 2014 passed / 24 skipped) and macOS (CI matrix; same Unix code paths).
+- [x] Add `dotnet format --verify-no-changes` to CI and fix the current whitespace drift.
+- [x] Add a trimmed/AOT publish smoke app and run it on Linux in CI.
+- [x] Add a mutation-fuzz harness (`XISOSharp.Fuzz`) covering XISO TOC, CISO, CCI, ZAR, XBE/XEX and Redump offsets; run it in CI (2 minutes per push).
+- [ ] Add property-based round-trip tests (pack/extract, split/join, compress/decompress, ISO↔ZAR).
+- [x] Add a public-API breaking-change gate and a `PackageValidationBaselineVersion`.
+- [x] Raise the coverage floor to 75% lines / 60% branches.
+- [x] Run the battle/interop harness in CI against a public synthetic/homebrew corpus (not copyrighted game data).
+
+### 15.4 Performance
+
+- [x] Pre-sized extraction/copy-out and `SequentialScan` hints.
+- [x] Writer layout pre-sizing.
+- [x] Add end-to-end BenchmarkDotNet suites: create, extract, checksum, CISO compress/decompress, CCI compress/decompress, large-image I/O.
+- [ ] Add bounded parallel CISO sector compression and a `--jobs` option on `compress`/`cso`.
+- [ ] Add parallel CCI sector compression (CCISharp 1.1) and a `--jobs` option.
+- [ ] Add bounded parallel extraction (independent files) with ordered progress.
+- [ ] Add a sparse/large-file output strategy (avoid zero-filling 8 GB images where the OS supports sparse files).
+- [ ] Publish a benchmark comparison against extract-xiso, xdvdfs and XboxKit with methodology and hardware.
+
+### 15.5 Robustness and security
+
+- [x] Path-traversal/unsafe name rejection and sanitization.
+- [x] TOC cycles/out-of-table offsets/entry caps/depth caps.
+- [x] Input==output and split-part collision guards.
+- [x] ZAR extraction depth bound, pre-sizing and exact-length copies.
+- [x] Add Windows long-path support (`longPathAware` manifest + `\\?\` path handling) and tests.
+- [x] Add Windows reserved-device-name handling (`CON`, `NUL`, `COM1`… `LPT9`, with extensions) and tests.
+- [x] Add explicit ZAR extraction caps (`MaxTotalBytes`, `MaxEntries`, compression-ratio guard) and tests.
+- [ ] Add a safe-extract policy (reject / sanitize / skip) for hostile names.
+- [x] Fuzz the XBE/XEX parsers and CCI/CISO index decoders.
+- [x] Add memory/entry caps and malformed-index/alignment validation for CISO on hostile inputs.
+- [ ] Add memory/entry caps for CCI indexes on hostile inputs (CCISharp 1.1).
+- [x] Document a threat model and a “hostile image” test corpus.
+
+### 15.6 Feature completeness (beyond the references)
+
+- [x] extract-xiso parity (list/extract/create/rewrite/media patch/skip/legacy layout/byte parity).
+- [x] xdvdfs 0.8.3 parity (ls/tree/info/md5/checksum/copy-out/unpack/pack/build-image/image-spec/compress/CISO).
+- [x] XboxKit 0.7 parity (video/update/random/seed/wipe/trim/petrify/ZAR/rebuild/aliases/security sectors).
+- [x] CCI/CCIM read/write/split/validate through CCISharp.
+- [x] Split ISO input.
+- [x] ZAR input for list/extract/checksum/validate/convert.
+- [x] Add `verify-hashes <image> <hash-file>` to verify a rebuilt image against the `.hash` sidecar emitted by `--petrify` (works for ISO/CISO/CCI/ZAR).
+- [x] Add `hash <image>` with streaming CRC32/MD5/SHA1/SHA256/SHA3-256, `--json`, and per-file/full-image modes.
+- [x] Add `--title-info`/`GetTitleInfo` that finds `default.xbe`, parses the certificate and reports title name/ID/region/disc.
+- [ ] Add `--jobs` to extraction (`-x`, `--unpack`) and CISO/CCI compression.
+- [ ] Add CCI LZ4-HC level 12 encoding in CCISharp for byte-parity with libCCI/Repackinator (keep the fast encoder as default).
+- [ ] Add optional multi-digit CCI part discovery (`game.10.cci`) while keeping reference-compatible single-digit output.
+- [-] XRD Redump metadata generation — deferred: XboxKit 0.7's implementation is itself a stub (zeroed hashes, TODO certificates). Implement only with a complete XRD spec and a verified oracle, not by porting the stub.
+- [-] GOD/STFS/CON containers — non-goal for the XISO library; belongs in a separate Xbox 360 container package.
+
+### 15.7 Documentation, samples, community
+
+- [x] Docsify site + GitHub Wiki mirror.
+- [x] `docs/library.md`, API pages, CLI reference, archival, compression, format, testing, troubleshooting.
+- [ ] DocFX API reference published to Pages.
+- [x] `samples/XISOSharp.Sample` console app (open/list/read/extract/create/validate/verify).
+- [ ] `samples/XISOSharp.WasmSample` after the CWD/`IFilesystem` refactor.
+- [x] Root `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `CODEOWNERS`, `SUPPORT.md`, PR template.
+- [ ] Public synthetic/homebrew fixture corpus and a regeneration script.
+- [x] “Known limitations” page (long paths, GOD/STFS, XRD, net9 EOL, unsigned bundles).
+- [x] Refresh README/AGENTS/docs/release notes for 1.5.0.
+
+### 15.8 Distribution and supply chain
+
+- [x] `dotnet tool` package.
+- [ ] winget/scoop/brew manifests (generated from release assets).
+- [ ] Shell completions and a man page.
+- [x] SBOM per release.
+- [x] Build-provenance attestations.
+- [ ] NuGet signing (conditional on a certificate secret).
+- [ ] Windows Authenticode signing + macOS notarization (conditional on secrets).
+- [ ] Optional Docker image (`ghcr.io/purelogiccode/xisosharp`).
+
+### 15.9 Cross-repo work (CCISharp / ZArchiveSharp)
+
+- [ ] CCISharp 1.1: LZ4-HC encoder, multi-digit parts, fuzz harness, benchmarks, format/API/interop docs.
+- [ ] ZArchiveSharp: fuzz harness and benchmark coverage for ZAR decode.
+- [ ] SimpleXisoDrive/XISOStudio: consume the new `XisoImage` facade (optional, after 1.5.0).
+
+### 15.10 Explicit non-goals
+
+- [-] CHD containers.
+- [-] Xbox 360 XEX decryption or XBE editing.
+- [-] FUSE/Dokan mounting in the core library (SimpleXisoDrive owns it).
+- [-] Python bindings / native ABI in this release.
+- [-] Direct optical-drive reading (users implement `IBlockDevice`).
+- [-] Bit-exact CCI output until CCISharp ships LZ4-HC.
+- [-] GOD/STFS/CON and XRD (see 15.6).
+
+### 15.11 Verification commands for this phase
+
+```powershell
+dotnet build CSharp_XISOSharp.sln -c Release -m:1
+dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release
+dotnet format whitespace CSharp_XISOSharp.sln --verify-no-changes --no-restore
+dotnet pack XISOSharp/XISOSharp.csproj -c Release -o artifacts
+dotnet pack XISOSharp.Tool/XISOSharp.Tool.csproj -c Release -o artifacts
+dotnet publish XISOSharp.AotSmoke/XISOSharp.AotSmoke.csproj -c Release -r linux-x64
+dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
+dotnet run --project XISOSharp.Fuzz -c Release -- --seconds 60
+```
+
+### 15.12 Progress log
+
+| Date | Change | Commit |
+|---|---|---|
+| 2026-11-01 | Phase 9 plan added; 1.5/1.6 notes merged into 1.5.0 | — |
+| 2026-11-01 | Phase 9 implementation: `XisoImage`, full-image hashes, `verify-hashes`, `title-info`, CISO hardening (fuzzer found an `OverflowException`), ZAR caps, reserved names/long paths, `dotnet tool`, AOT smoke, mutation fuzzer, 3-OS CI, format/coverage gates, SBOM/provenance, community files, sample, end-to-end benchmarks, support policy, threat model, public-API snapshot. Full suite 1979/1 (net8/9), 2043/1 (net10); Linux 2015/24; NativeAOT smoke green. | — |

@@ -66,7 +66,7 @@ public sealed class XisoFileShareTests : IDisposable
         Assert.True(XisoReader.GetVolumeInfo(stream, iso).IsValid);
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void OpenImageStream_DefaultShare_FailsWhileWriterHoldsFile()
     {
         string iso = CreateIso();
@@ -96,7 +96,7 @@ public sealed class XisoFileShareTests : IDisposable
         Assert.Equal("shared image", System.Text.Encoding.ASCII.GetString(copy.ToArray()));
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void Explorer_DefaultShare_FailsWhileWriterHoldsFile()
     {
         string iso = CreateIso();

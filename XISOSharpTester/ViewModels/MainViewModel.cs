@@ -427,7 +427,9 @@ internal partial class MainViewModel : INotifyPropertyChanged
         {
             OpenFileDialog dlg = new()
             {
-                Title = "Select XISO files", Filter = "ISO files (*.iso)|*.iso|All files (*.*)|*.*", Multiselect = true
+                Title = "Select XISO files",
+                Filter = "ISO files (*.iso)|*.iso|All files (*.*)|*.*",
+                Multiselect = true
             };
             if (dlg.ShowDialog() == true)
             {

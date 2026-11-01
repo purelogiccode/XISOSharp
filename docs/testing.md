@@ -167,11 +167,10 @@ The CI collects coverage with XPlat code coverage:
 dotnet test XISOSharp.Tests --collect:"XPlat Code Coverage"
 ```
 
-The report (`coverage.cobertura.xml`) is uploaded as a CI artifact from the
-`windows-latest` job (the only job that runs the test suite), and the merged
-line/branch coverage is written to the job summary. The job fails when line
-coverage drops below the `MIN_LINE_COVERAGE` floor (65%, set in
-`.github/workflows/ci.yml`).
+The report (`coverage.cobertura.xml`) is uploaded as a CI artifact, and the
+merged line/branch coverage is written to the job summary. The job fails when
+line coverage drops below `MIN_LINE_COVERAGE` (75%) or branch coverage below
+`MIN_BRANCH_COVERAGE` (60%), both set in `.github/workflows/ci.yml`.
 
 Measured line coverage (coverlet, full net10.0 suite, 1.4.2): `XisoReader.cs`
 94.2%, `XisoWriter.cs` 89.6%, `AvlTree.cs` 100% — all above the 85% target. The
@@ -190,6 +189,7 @@ shapes neither writer emits.
 | `AvlTreeBenchmarks` | AVL insert performance |
 | `BoyerMooreBenchmarks` | Pattern search performance |
 | `NumSectorsBenchmarks` | Sector math |
+| `XisoEndToEndBenchmarks` | Pack, open/list, full-image hash, CISO compress/decompress |
 
 ```bash
 dotnet run --project XISOSharp.Benchmarks -c Release
@@ -243,7 +243,14 @@ instead of collapsing to `U+FFFD`:
 
 - **Sampling:** picks a random sample of `*.iso` files (default **1**) from
   `H:\XBOXTest` (override with `--dir`, `--count`, explicit `*.iso` paths, or a
-  `--seed` for reproducibility — the seed is reported for re-runs).
+  `--seed` for reproducibility - the seed is reported for re-runs).
+- **CI synthetic corpus:** `--synthetic` generates five deterministic,
+  copyright-free ISOs (basic tree, Latin-1/long/space/mixed-case names, 129
+  files, every sector-boundary size, 16-level nesting) with the CLI itself, then
+  battles them. The Windows `battle-interop` CI job runs the stable ops
+  (`list`, `extract`, `rewrite`, `checksum`, `md5`, `unpack`, `pack`, `cso`);
+  `zar`/`petrify` remain in the real-ISO local harness because xboxkit refuses
+  empty-directory inputs and decodes Latin-1 names as ASCII.
 - **Battles per ISO** (select with `--ops <a,b,c>`; default = all; ops whose
   oracle exe is missing are skipped):
   - extract-xiso oracle:

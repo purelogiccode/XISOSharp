@@ -11,6 +11,7 @@
   - [Build-Image & Image-Spec](xdvdfs-compat.md#build-image)
   - [Checksums](xdvdfs-compat.md#checksum)
   - [XISO Format](xiso-format.md)
+  - [Known Limitations](known-limitations.md)
   - [FAQ](faq.md)
 
 - **Library API**
@@ -25,5 +26,7 @@
   - [Building](building.md)
   - [Testing](testing.md)
   - [Contributing](contributing.md)
+  - [Support Policy](support-policy.md)
+  - [Threat Model](threat-model.md)
   - [Troubleshooting](troubleshooting.md)
   - [Release Notes](release-notes.md)

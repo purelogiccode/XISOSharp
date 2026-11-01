@@ -67,6 +67,12 @@ internal static class XisoEntryNames
             // (`foo.` -> `foo`) would escape or silently collide on extract.
             if (name.TrimEnd(' ', '.').Length != name.Length)
                 return true;
+
+            // DOS device names are special even with an extension (`CON.txt`
+            // still opens the console). Extracting one would fail or, worse,
+            // write to a device instead of a file.
+            if (IsReservedWindowsName(name))
+                return true;
         }
 
         return false;
@@ -89,6 +95,11 @@ internal static class XisoEntryNames
 
         if (OperatingSystem.IsWindows())
         {
+            if (IsReservedWindowsName(name))
+            {
+                chars[0] = '_';
+            }
+
             int end = chars.Length;
             while (end > 0 && (chars[end - 1] == ' ' || chars[end - 1] == '.'))
                 end--;
@@ -100,6 +111,43 @@ internal static class XisoEntryNames
         }
 
         return new string(chars);
+    }
+
+    /// <summary>
+    /// Returns true when <paramref name="name"/> is a DOS device name on
+    /// Windows (case-insensitive, with or without an extension): <c>CON</c>,
+    /// <c>PRN</c>, <c>AUX</c>, <c>NUL</c>, <c>CONIN$</c>, <c>CONOUT$</c>,
+    /// <c>COM1</c>…<c>COM9</c> and <c>LPT1</c>…<c>LPT9</c>.
+    /// </summary>
+    internal static bool IsReservedWindowsName(string name)
+    {
+        if (!OperatingSystem.IsWindows() || string.IsNullOrEmpty(name))
+            return false;
+
+        int dot = name.IndexOf('.');
+        string stem = (dot >= 0 ? name[..dot] : name).TrimEnd(' ');
+        if (stem.Length == 0)
+            return false;
+
+        if (stem.Equals("CON", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("PRN", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("AUX", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("NUL", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("CONIN$", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("CONOUT$", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (stem.Length == 4 &&
+            (stem.StartsWith("COM", StringComparison.OrdinalIgnoreCase) ||
+             stem.StartsWith("LPT", StringComparison.OrdinalIgnoreCase)) &&
+            stem[3] is >= '1' and <= '9')
+        {
+            return true;
+        }
+
+        return false;
     }
 
     // Escape-capable characters only. The colon is drive-relative on Windows

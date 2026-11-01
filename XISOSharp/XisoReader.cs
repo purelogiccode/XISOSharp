@@ -772,7 +772,9 @@ public static class XisoReader
                 // behavior and re-encodes RO/HID/SYS/NOR from the source image.
                 avl = new AvlNode
                 {
-                    Filename = filename, FileSize = fileSize, OldStartSector = startSector,
+                    Filename = filename,
+                    FileSize = fileSize,
+                    OldStartSector = startSector,
                     Attributes = preserveAttributes ? attributes : (byte)0
                 };
 
@@ -1138,7 +1140,10 @@ public static class XisoReader
                     filename,
                     new FileStreamOptions
                     {
-                        Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536,
+                        Mode = FileMode.Create,
+                        Access = FileAccess.Write,
+                        Share = FileShare.None,
+                        BufferSize = 65536,
                         Options = FileOptions.SequentialScan
                     });
 
@@ -2439,7 +2444,10 @@ public static class XisoReader
             isoPath,
             new FileStreamOptions
             {
-                Mode = FileMode.Open, Access = FileAccess.ReadWrite, Share = FileShare.None, BufferSize = 256
+                Mode = FileMode.Open,
+                Access = FileAccess.ReadWrite,
+                Share = FileShare.None,
+                BufferSize = 256
             });
         long headerBase = FindHeaderBaseForFileTime(fs, isoPath, skipSectors);
         Span<byte> buf = stackalloc byte[8];
@@ -3794,7 +3802,10 @@ public static class XisoReader
                 destPath,
                 new FileStreamOptions
                 {
-                    Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536,
+                    Mode = FileMode.Create,
+                    Access = FileAccess.Write,
+                    Share = FileShare.None,
+                    BufferSize = 65536,
                     Options = FileOptions.SequentialScan
                 });
 
@@ -4378,6 +4389,45 @@ public static class XisoReader
         fs.ReadExactly(header);
 
         return ParseXbeHeader(header);
+    }
+
+    /// <summary>
+    /// Parses the root <c>default.xbe</c> of an image and returns game title
+    /// metadata (name, title ID, region mask, disc number, version), or
+    /// <c>null</c> when the image has no root executable or it is not XBEH.
+    /// Plain ISO, split ISO, CISO and CCI inputs are accepted.
+    /// </summary>
+    /// <param name="isoPath">Image path.</param>
+    /// <returns>Title metadata, or <c>null</c> when no root XBE is present.</returns>
+    /// <exception cref="XisoFormatException">The image is not a valid XISO.</exception>
+    /// <exception cref="IOException">The image cannot be read.</exception>
+    public static TitleInfo? GetTitleInfo(string isoPath)
+    {
+        using Stream fs = OpenImageStream(isoPath);
+        return GetTitleInfo(fs, isoPath);
+    }
+
+    /// <summary>
+    /// Stream overload of <see cref="GetTitleInfo(string)"/> over an already-open
+    /// image. The stream must be readable and seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name for error messages.</param>
+    /// <returns>Title metadata, or <c>null</c> when no root XBE is present.</returns>
+    public static TitleInfo? GetTitleInfo(Stream imageStream, string imageName)
+    {
+        ArgumentNullException.ThrowIfNull(imageStream);
+        EntryInfo? xbe = ListDirectory(imageStream, imageName)
+            .FirstOrDefault(static entry => !entry.IsDirectory &&
+                                            string.Equals(entry.Name, "default.xbe", StringComparison.OrdinalIgnoreCase));
+        if (xbe is null)
+        {
+            return null;
+        }
+
+        string path = "/" + xbe.Name;
+        XbeInfo? info = GetXbeInfo(imageStream, imageName, path);
+        return info is null ? null : TitleInfoFactory.Create(path, info);
     }
 
     private static XbeInfo? ParseXbeHeader(byte[] header)
