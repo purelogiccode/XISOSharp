@@ -203,7 +203,9 @@ jobs:
 
           $probe = Invoke-Gui @('--probe-cli', $cli)
           Write-Host $probe
-          if ($probe -notmatch 'XISOSharp \d+\.\d+\.\d+') { throw 'GUI --probe-cli did not print the product label.' }
+          # The label comes from file metadata; single-file Linux/macOS builds
+          # fall back to the documented "XISOSharp CLI" form.
+          if ($probe -notmatch 'XISOSharp (\d+\.\d+\.\d+|CLI)') { throw 'GUI --probe-cli did not print the product label.' }
 
           $selfTest = Invoke-Gui @('--self-test', $cli)
           Write-Host $selfTest

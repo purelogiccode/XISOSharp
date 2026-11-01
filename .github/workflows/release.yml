@@ -203,7 +203,9 @@ jobs:
           grep -Eq '^XISOSharp v[0-9]+\.[0-9]+\.[0-9]+' cli.txt
 
           ./XISOSharp.Gui --probe-cli ./XISOSharp | tee probe.txt
-          grep -Eq 'XISOSharp [0-9]+\.[0-9]+\.[0-9]+' probe.txt
+          # The label comes from file metadata; single-file Linux/macOS builds
+          # fall back to the documented "XISOSharp CLI" form.
+          grep -Eq 'XISOSharp ([0-9]+\.[0-9]+\.[0-9]+|CLI)' probe.txt
 
           ./XISOSharp.Gui --self-test ./XISOSharp | tee selftest.txt
           grep -q 'SELF-TEST: all passed' selftest.txt
@@ -239,7 +241,9 @@ jobs:
 
           $probe = Invoke-Gui @('--probe-cli', './XISOSharp.exe')
           Write-Host $probe
-          if ($probe -notmatch 'XISOSharp \d+\.\d+\.\d+') { throw 'GUI --probe-cli did not print the product label.' }
+          # The label comes from file metadata; single-file Linux/macOS builds
+          # fall back to the documented "XISOSharp CLI" form.
+          if ($probe -notmatch 'XISOSharp (\d+\.\d+\.\d+|CLI)') { throw 'GUI --probe-cli did not print the product label.' }
 
           $selfTest = Invoke-Gui @('--self-test', './XISOSharp.exe')
           Write-Host $selfTest
