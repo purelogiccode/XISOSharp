@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1986-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2001-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![Test SDK](https://img.shields.io/badge/test--sdk-18.10.1-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
@@ -47,6 +47,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **ZAR input** - `XisoZarchive.ListZar`/`ExtractZar`/`ConvertZarToIso`, unsafe-name rejection, `ComputeZarChecksum` parity with `ComputeImageChecksum`, per-entry `ComputeFileHash`, ZAR↔ISO/CCI validation (tree + checksums), and CLI `-l`/`-x`/`checksum`/`validate`/`convert`
 - **Pathological TOC traversal** - 4,096-entry left-skewed/right-skewed/alternating/balanced tables: list/tree/extract/rewrite parity, rewrite-checksum equality with the balanced form, audit/sector-range/repair/salvage/ZAR parity on the left spine, left self-cycle refusal, and continue-on-error subtree skipping
 - **Batch conversion** - `compress`/`decompress`/`convert`/`split` `--batch`/`--batch-recursive`, naming templates (`{name}`/`{ext}`/`{format}`), `--skip-existing` resume, `--continue-on-error` partial-output cleanup, duplicate-output refusal, and `--jobs` parallelism
+- **Redump input guard** - every redump mode (`--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`) refuses `.cci`/`.cso`, split-ISO and `.zar` inputs with a decompress/convert/join message while a plain ISO still runs; `MainViewModelTests` covers the bidirectional ZAR tab, `CliCommandsTests.Convert`/the GUI self-test cover the convert argv, and `NoBugReport`-tagged overwrite refusals are asserted too
 - **JSON output** - `--json` schema for `info`/`list`/`tree`/`checksum`/`sector-layout`/`ranges`/`filetime`/`xex-info`/`xbe-info`/`validate`/`version`, stdout/stderr separation, multi-image list documents, CCI input, and rejection for mutating modes
 - **Preallocation / sequential I/O** - `IFilesystem.CreateFile(path, expectedLength)` pre-sizing, `LocalFilesystem`/`MemoryFilesystem` overrides, default-member fallback for custom stores, and entry sizes passed through extraction
 - **Explicit sector-layout packing** - `XisoLayoutSpec` JSON/text parsing, `FromSectorLayout`, fixed-extent placement, first-fit allocation around reserved gaps, byte-identical JSON round-trips, total-sector preservation, prepended partitions, `build-image`/`-c`/`--pack --layout`, and overlap/out-of-range/system-area/too-small/unknown-path failures

@@ -386,6 +386,18 @@ internal static class CliCommands
     }
 
     /// <summary>
+    /// Builds the convert argv (<c>convert</c> with an explicit source and
+    /// output, plus the overwrite flag). Handles <c>.zar</c> to <c>.iso</c>
+    /// and <c>.iso</c> to <c>.zar</c>; the direction follows the extensions.
+    /// </summary>
+    /// <param name="source">Source <c>.zar</c> or <c>.iso</c> path.</param>
+    /// <param name="output">Destination <c>.iso</c> or <c>.zar</c> path.</param>
+    /// <param name="overwrite">Whether to pass <c>-y</c> instead of <c>-n</c>.</param>
+    /// <returns>The convert argument list.</returns>
+    internal static string[] Convert(string source, string output, bool overwrite) =>
+        ["convert", source, output, OverwriteFlag(overwrite)];
+
+    /// <summary>
     /// Builds the decompress argv (<c>decompress</c> CSO plus optional output).
     /// </summary>
     /// <param name="cso">Source CSO path.</param>

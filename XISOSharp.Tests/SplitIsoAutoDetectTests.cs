@@ -117,6 +117,13 @@ public sealed class SplitIsoAutoDetectTests : IDisposable
         Assert.Equal(isoLayout.UsedRanges.Count, splitLayout.UsedRanges.Count);
         Assert.Equal(isoLayout.FreeRanges.Count, splitLayout.FreeRanges.Count);
         Assert.Equal(isoLayout.TotalSectors, splitLayout.TotalSectors);
+
+        (List<(uint Start, uint End)> isoSys, List<(uint Start, uint End)> isoFiles) =
+            XisoRanges.GetXisoRanges(iso);
+        (List<(uint Start, uint End)> splitSys, List<(uint Start, uint End)> splitFiles) =
+            XisoRanges.GetXisoRanges(parts[0]);
+        Assert.Equal(isoSys, splitSys);
+        Assert.Equal(isoFiles, splitFiles);
     }
 
     [Fact]

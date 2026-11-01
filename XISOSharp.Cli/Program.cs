@@ -4204,6 +4204,49 @@ internal static class Program
     private static bool IsZarPath(string path) =>
         Path.GetExtension(path).Equals(".zar", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Returns a refusal message when <paramref name="path"/> is a container the
+    /// raw-sector redump modes (video/filler/seed/wipe/trim/petrify/update/ZAR)
+    /// cannot process, or <c>null</c> for a plain ISO/XISO. Those modes read and
+    /// write absolute sectors through a raw <see cref="FileStream"/>, so handing
+    /// them a compressed or split container used to parse container bytes as an
+    /// XISO and fail with a confusing TOC error (or produce garbage output).
+    /// </summary>
+    private static string? RedumpInputRefusal(string path)
+    {
+        if (XisoSplitter.IsSplitPath(path))
+        {
+            return $"'{path}' is a split-ISO part; join it first (XISOSharp join).";
+        }
+
+        if (IsZarPath(path))
+        {
+            return $"'{path}' is a ZArchive; convert it to ISO first (XISOSharp convert).";
+        }
+
+        if (XisoImageSource.IsCompressedContainerPath(path))
+        {
+            return $"'{path}' is a compressed CISO/CCI container; decompress it first (XISOSharp decompress).";
+        }
+
+        if (!XisoImageSource.TryDetect(path, out XisoImageSourceInfo? info) || info is null)
+        {
+            return null;
+        }
+
+        return info.Format switch
+        {
+            XisoImageFormat.Iso => null,
+            XisoImageFormat.SplitIso => $"'{path}' is a split-ISO part; join it first (XISOSharp join).",
+            XisoImageFormat.Ciso or XisoImageFormat.SplitCiso =>
+                $"'{path}' is a CISO container; decompress it first (XISOSharp decompress).",
+            XisoImageFormat.Cci or XisoImageFormat.SplitCci =>
+                $"'{path}' is a CCI container; decompress it first (XISOSharp decompress).",
+            XisoImageFormat.Zar => $"'{path}' is a ZArchive; convert it to ISO first (XISOSharp convert).",
+            _ => null,
+        };
+    }
+
     private static string DeriveZarExtractDirectory(string zarPath)
     {
         string directory = Path.GetDirectoryName(zarPath) ?? string.Empty;
@@ -5050,6 +5093,33 @@ internal static class Program
 
         int exit = 0;
 
+        // Container inputs are not raw sector images. Refuse them before any
+        // mode touches the file so a .cci/.cso/.zar/split set gets a clear
+        // "decompress/convert/join first" message instead of a TOC parse error.
+        List<string> supportedInputs = new(isoFiles.Count);
+        foreach (string iso in isoFiles)
+        {
+            string? refusal = RedumpInputRefusal(iso);
+            if (refusal is null)
+            {
+                supportedInputs.Add(iso);
+                continue;
+            }
+
+            if (singleModeCount)
+            {
+                Logger.LogErr($"Error: redump operations require a plain ISO; {refusal}\n");
+                exit = 1;
+            }
+            else
+            {
+                Logger.Log($"[INFO] Skipping {iso}: {refusal}\n");
+            }
+        }
+
+        if (supportedInputs.Count == 0) return exit;
+        isoFiles = supportedInputs;
+
         // ZarManager-style batch: a lone --zar over several inputs with an
         // explicit (non-interactive) policy packs in parallel.
         if (zar && singleModeCount && policy.HasValue && jobs > 1 && isoFiles.Count > 1)
@@ -5060,7 +5130,7 @@ internal static class Program
                 if (DeriveAndPackZar(iso, policy.Value) != 0)
                     Interlocked.Exchange(ref failures, 1);
             });
-            return failures;
+            return failures != 0 ? 1 : exit;
         }
 
         foreach (string iso in isoFiles)

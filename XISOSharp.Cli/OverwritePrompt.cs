@@ -1,6 +1,7 @@
 namespace XISOSharp.Cli;
 
 using Serilog;
+using XISOSharp.Cli.Logging;
 
 /// <summary>
 /// Interactive overwrite confirmation for CLI file outputs
@@ -44,7 +45,10 @@ internal static class OverwritePrompt
             if (assumeNo)
             {
                 output.WriteLine($"[ERROR] File already exists: {path}");
-                Log.Warning("Overwrite refused (assume-no): {Path}", path);
+                // Expected user decision, not a bug: keep it in the local log but
+                // never forward it to the bug-report API.
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning("Overwrite refused (assume-no): {Path}", path);
                 return false;
             }
 
@@ -63,7 +67,10 @@ internal static class OverwritePrompt
             {
                 output.WriteLine(
                     $"[ERROR] Cannot prompt to overwrite {path}: standard input is redirected; pass -y/--yes to overwrite or -n/--no to refuse\n");
-                Log.Warning("Overwrite prompt refused (stdin redirected): {Path}", path);
+                // Expected host limitation (redirected stdin), not a bug: keep it
+                // in the local log but never forward it to the bug-report API.
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning("Overwrite prompt refused (stdin redirected): {Path}", path);
                 return false;
             }
 

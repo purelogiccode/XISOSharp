@@ -181,6 +181,16 @@ public class CliCommandsTests
         Assert.Equal(["--zar", "game.iso"], CliCommands.Zar("game.iso", null, null));
     }
 
+    /// <summary>Verifies convert emits both positionals before the overwrite flag.</summary>
+    [Fact]
+    public void Convert_Exact()
+    {
+        Assert.Equal(["convert", "game.zar", "game.iso", "-n"],
+            CliCommands.Convert("game.zar", "game.iso", overwrite: false));
+        Assert.Equal(["convert", "game.iso", "game.zar", "-y"],
+            CliCommands.Convert("game.iso", "game.zar", overwrite: true));
+    }
+
     /// <summary>Verifies decompress emits source, output, and flag.</summary>
     [Fact]
     public void Decompress_Exact()

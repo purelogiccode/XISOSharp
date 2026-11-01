@@ -1,4 +1,8 @@
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
 using XISOSharp.Cli;
+using XISOSharp.Cli.Logging;
 
 namespace XISOSharp.Tests;
 
@@ -92,6 +96,35 @@ public class OverwritePromptExtraTests : IDisposable
         Assert.True(Confirm(file, true, false, string.Empty, out _));
     }
 
+    /// <summary>
+    /// Expected refusals are user decisions, not bugs: the warning must carry
+    /// the <c>NoBugReport</c> marker so <see cref="BugReportSink"/> drops it.
+    /// </summary>
+    [Fact]
+    public void AssumeNo_Warning_IsTaggedNoBugReport()
+    {
+        string dir = CreateTempDir();
+        string file = Path.Combine(dir, "out.bin");
+        File.WriteAllText(file, "x");
+
+        List<LogEvent> events = [];
+        ILogger previous = Log.Logger;
+        Log.Logger = new LoggerConfiguration().WriteTo.Sink(new CaptureSink(events)).CreateLogger();
+        try
+        {
+            Assert.False(Confirm(file, false, true, string.Empty, out _));
+        }
+        finally
+        {
+            Log.Logger = previous;
+        }
+
+        LogEvent warning = Assert.Single(events, e => e.Level == LogEventLevel.Warning);
+        Assert.Contains("Overwrite refused", warning.RenderMessage(), StringComparison.Ordinal);
+        Assert.True(warning.Properties.TryGetValue(BugReportSink.NoBugReportProperty, out LogEventPropertyValue? marker));
+        Assert.Equal(true, Assert.IsType<ScalarValue>(marker).Value);
+    }
+
     /// <summary>Verifies interactive yes answers proceed and other answers deny.</summary>
     [Theory]
     [InlineData("y", true)]
@@ -111,5 +144,11 @@ public class OverwritePromptExtraTests : IDisposable
 
         Assert.Equal(expected, Confirm(file, false, false, response, out string output));
         Assert.Contains("Would you like to overwrite?", output, StringComparison.Ordinal);
+    }
+
+    /// <summary>Captures every Serilog event emitted while the test owns <see cref="Log.Logger"/>.</summary>
+    private sealed class CaptureSink(List<LogEvent> events) : ILogEventSink
+    {
+        public void Emit(LogEvent logEvent) => events.Add(logEvent);
     }
 }

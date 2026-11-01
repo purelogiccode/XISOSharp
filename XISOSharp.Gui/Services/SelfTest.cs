@@ -62,6 +62,8 @@ internal static class SelfTest
             Check("zar", CliCommands.Zar("a.iso", "a.zar", "skip"),
                 ["--zar", "--policy", "skip", "-o", "a.zar", "a.iso"]);
             Check("zar-derived", CliCommands.Zar("a.iso", null, null), ["--zar", "a.iso"]);
+            Check("convert", CliCommands.Convert("a.zar", "a.iso", overwrite: false),
+                ["convert", "a.zar", "a.iso", "-n"]);
             Check("decompress", CliCommands.Decompress("a.cso", "a.iso", overwrite: true),
                 ["decompress", "a.cso", "a.iso", "-y"]);
             Check("validate", CliCommands.Validate("a.iso", "b.iso", checksums: true, report: "r.json"),

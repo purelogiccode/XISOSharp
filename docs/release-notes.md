@@ -10,10 +10,12 @@ matching files and directory tables, and allocates every other entry first-fit a
 the reserved extents. `-c`, `--pack <dir>` and `build-image` gain `--layout <file>`.
 The audit, sector-range, repair, salvage and ZAR walks now use the same explicit
 in-order table traversal as extract/list/rewrite, so `MaxTocDepth` bounds real
-subdirectory nesting only.
+subdirectory nesting only. The raw-sector redump modes also reject compressed
+and split containers up front, and the GUI ZAR tab converts a `.zar` back to a
+plain ISO.
 
-Full suite green on all three targets: **1923 passed / 1 opt-in skip (1924) on
-net8.0/net9.0** and **1985 passed / 1 opt-in skip (1986) on net10.0**.
+Full suite green on all three targets: **1936 passed / 1 opt-in skip (1937) on
+net8.0/net9.0** and **2000 passed / 1 opt-in skip (2001) on net10.0**.
 
 ### Library
 
@@ -69,6 +71,19 @@ net8.0/net9.0** and **1985 passed / 1 opt-in skip (1986) on net10.0**.
 - Help text and the misplaced-flag guard cover `--layout`.
 - `--sector-layout --json game.iso > layout.json` followed by
   `-c game_dir out.iso --layout layout.json` reproduces the source layout.
+- The raw-sector redump modes (`--video`, `--random`, `--seed`, `--wipe`,
+  `--trim`, `--petrify`, `--update`, `--zar`) refuse `.cso`/`.cci`, split ISO
+  and `.zar` inputs with a clear "decompress/convert/join first" message
+  instead of parsing container bytes as an XISO.
+- Expected overwrite refusals (`-n`, redirected stdin) stay in the local log
+  and no longer reach the bug-report API.
+
+### GUI
+
+- The ZAR tab is bidirectional: a `.zar` source runs `convert` and writes a
+  plain ISO (output auto-derived next to the archive); an image source keeps the
+  existing pack + overwrite/skip/auto-rename behavior. The output picker and
+  labels follow the detected direction, and the self-test covers the new argv.
 
 ### Tests
 
@@ -86,8 +101,14 @@ net8.0/net9.0** and **1985 passed / 1 opt-in skip (1986) on net10.0**.
   hashing (case-insensitive paths, missing/directory paths), missing-file and
   checksum-mismatch detection, CLI `validate --json`/`--validate-report`, and a
   clean sector-only rejection for `.zar` inputs.
-- **net8.0/net9.0 - 1924 tests (1923 passed, 1 opt-in skip)**;
-  **net10.0 - 1986 tests (1985 passed, 1 opt-in skip, adds the GUI tests)**.
+- `RedumpInputGuardTests` (11): every redump mode refuses `.cci`/`.cso`, split
+  ISO and `.zar` inputs with the documented message, while a plain ISO still
+  runs. `CliCommandsTests.Convert`, `MainViewModelTests` and the GUI self-test
+  cover the ZAR→ISO direction/argv; `OverwritePromptExtraTests` asserts expected
+  refusals carry `NoBugReport`. `CisoAutoDetectTests.ReaderVerbs_CsoMatchIso`
+  and the split-ISO reader test now compare `--ranges` and sector-layout output.
+- **net8.0/net9.0 - 1937 tests (1936 passed, 1 opt-in skip)**;
+  **net10.0 - 2001 tests (2000 passed, 1 opt-in skip, adds the GUI tests)**.
 
 ## 1.5.0
 

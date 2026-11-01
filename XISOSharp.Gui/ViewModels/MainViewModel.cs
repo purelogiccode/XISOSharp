@@ -213,18 +213,41 @@ internal sealed partial class MainViewModel : ObservableObject
     public partial string CpSplit { get; set; } = string.Empty;
 
     // ZAR tab
-    /// <summary>Gets or sets the source image (ISO/XISO/Redump) to pack into a <c>.zar</c>.</summary>
+    /// <summary>
+    /// Gets or sets the ZAR source: an ISO/XISO/Redump image to pack into a
+    /// <c>.zar</c>, or a <c>.zar</c> to convert back to ISO.
+    /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RunZarCommand))]
+    [NotifyPropertyChangedFor(nameof(ZaIsConvert))]
+    [NotifyPropertyChangedFor(nameof(ZaActionLabel))]
+    [NotifyPropertyChangedFor(nameof(ZaOutputLabel))]
+    [NotifyPropertyChangedFor(nameof(ZaCanPickPolicy))]
     public partial string ZaSource { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets the optional <c>.zar</c> output path (auto-derived when empty).</summary>
+    /// <summary>Gets or sets the optional output path (auto-derived when empty).</summary>
     [ObservableProperty]
     public partial string ZaOutput { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the selected overwrite policy label (<see cref="ZarPolicies"/>).</summary>
     [ObservableProperty]
     public partial string ZaPolicy { get; set; } = "Overwrite";
+
+    /// <summary>
+    /// Gets a value indicating whether the ZAR tab is converting a <c>.zar</c>
+    /// back to ISO rather than packing an image into a <c>.zar</c>.
+    /// </summary>
+    public bool ZaIsConvert =>
+        ZaSource.Trim().EndsWith(".zar", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Gets the ZAR-tab primary action label for the current direction.</summary>
+    public string ZaActionLabel => ZaIsConvert ? "Convert to ISO" : "Create ZAR";
+
+    /// <summary>Gets the ZAR-tab output field label for the current direction.</summary>
+    public string ZaOutputLabel => ZaIsConvert ? "Output ISO" : "Output .zar";
+
+    /// <summary>Gets a value indicating whether the ZAR collision policy applies (pack only).</summary>
+    public bool ZaCanPickPolicy => !ZaIsConvert;
 
     // Decompress tab
     /// <summary>Gets or sets the source CSO path for decompression.</summary>
@@ -549,6 +572,20 @@ internal sealed partial class MainViewModel : ObservableObject
         {
             string source = RequireValue(ZaSource, "source image");
             string? output = NullIfEmpty(ZaOutput);
+
+            if (ZaIsConvert)
+            {
+                output ??= Path.ChangeExtension(source, ".iso");
+                if (Path.GetExtension(output).Equals(".zar", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        "A .zar source converts to a plain ISO; choose an .iso output.");
+                }
+
+                ThrowIfSameOutput(output, [source], "ISO output");
+                return RunJobAsync("convert", CliCommands.Convert(source, output, OverwriteExisting));
+            }
+
             if (output is not null)
             {
                 ThrowIfSameOutput(output, [source], "ZAR output");

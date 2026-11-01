@@ -213,7 +213,7 @@ XISOSharp --pack ./game_files game.iso --layout layout.txt
 XISOSharp --batch ./isos -d ./extracted
 XISOSharp -r --batch ./isos --batch-recursive
 
-# Archival (Redump)
+# Archival (Redump) - plain ISOs only; decompress/convert/join containers first
 XISOSharp --video game.redump.iso
 XISOSharp --best game.redump.iso
 XISOSharp --zar -o game.zar game.iso

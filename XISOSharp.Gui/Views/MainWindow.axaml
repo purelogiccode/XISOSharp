@@ -395,36 +395,36 @@
         </ScrollViewer>
       </TabItem>
 
-      <TabItem Header="ZAR" ToolTip.Tip="Pack an image into a ZArchive (.zar) for Xenia canary">
+      <TabItem Header="ZAR" ToolTip.Tip="Pack an image into a ZArchive (.zar) for Xenia canary, or convert a .zar back to ISO">
         <ScrollViewer>
           <StackPanel>
-            <TextBlock Text="Source (ISO / XISO / Redump .iso) — one file" Margin="0,0,0,2"
-                       ToolTip.Tip="Source image to pack into .zar" />
+            <TextBlock Text="Source (ISO / XISO / Redump .iso / .zar) — one file" Margin="0,0,0,2"
+                       ToolTip.Tip="Image to pack into .zar, or a .zar to convert back to ISO" />
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
-              <TextBlock Text="Source image" VerticalAlignment="Center" ToolTip.Tip="Image to pack into .zar" />
-              <TextBox Grid.Column="1" Text="{Binding ZaSource}" PlaceholderText="game.iso"
-                       ToolTip.Tip="Path to the source image" />
+              <TextBlock Text="Source" VerticalAlignment="Center" ToolTip.Tip="Image to pack into .zar, or a .zar to convert" />
+              <TextBox Grid.Column="1" Text="{Binding ZaSource}" PlaceholderText="game.iso or game.zar"
+                       ToolTip.Tip="Path to the source image or .zar" />
               <Button Grid.Column="2" Content="File…" Click="BrowseZaSourceFile_ClickAsync" Margin="6,0,0,0"
-                      ToolTip.Tip="Pick the source image" />
+                      ToolTip.Tip="Pick the source image or .zar" />
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
-              <TextBlock Text="Output .zar" VerticalAlignment="Center" ToolTip.Tip="Output ZArchive path" />
+              <TextBlock Text="{Binding ZaOutputLabel}" VerticalAlignment="Center" ToolTip.Tip="Output path (empty = next to the source)" />
               <TextBox Grid.Column="1" Text="{Binding ZaOutput}" PlaceholderText="(auto-derived next to the source)"
-                       ToolTip.Tip="Output .zar path (empty = next to the source)" />
+                       ToolTip.Tip="Output path (empty = next to the source)" />
               <Button Grid.Column="2" Content="Save as…" Click="BrowseZaOutput_ClickAsync" Margin="6,0,0,0"
                       ToolTip.Tip="Pick the output path" />
             </Grid>
-            <Grid Classes="row" ColumnDefinitions="150,*,Auto">
+            <Grid Classes="row" ColumnDefinitions="150,*,Auto" IsEnabled="{Binding ZaCanPickPolicy}">
               <TextBlock Text="If output exists" VerticalAlignment="Center" ToolTip.Tip="Collision policy when the output already exists" />
               <ComboBox Grid.Column="1" ItemsSource="{Binding ZarPolicies}" SelectedItem="{Binding ZaPolicy}"
                         HorizontalAlignment="Left" Width="170"
                         ToolTip.Tip="Overwrite, skip or auto-rename the existing output" />
             </Grid>
             <TextBlock Classes="hint" Margin="0,8,0,0"
-                       Text="Packs the image tree with zstd blocks (level 6, raw fallback) into a single .zar that loads directly in Xenia canary. Redump ISOs are auto-detected and packed from the game partition."
-                       ToolTip.Tip="ZAR packs the image with zstd blocks for Xenia canary" />
-            <Button Classes="accent" Content="Create ZAR" Command="{Binding RunZarCommand}" IsEnabled="{Binding CanRun}" Margin="0,12,0,0" HorizontalAlignment="Left"
-                    ToolTip.Tip="Create the ZArchive" />
+                       Text="Packs the image tree with zstd blocks (level 6, raw fallback) into a single .zar that loads directly in Xenia canary. Redump ISOs are auto-detected and packed from the game partition. A .zar source is converted back to a plain ISO instead."
+                       ToolTip.Tip="ZAR packs the image with zstd blocks for Xenia canary; a .zar source converts to ISO" />
+            <Button Classes="accent" Content="{Binding ZaActionLabel}" Command="{Binding RunZarCommand}" IsEnabled="{Binding CanRun}" Margin="0,12,0,0" HorizontalAlignment="Left"
+                    ToolTip.Tip="Create the ZArchive, or convert the .zar back to ISO" />
           </StackPanel>
         </ScrollViewer>
       </TabItem>

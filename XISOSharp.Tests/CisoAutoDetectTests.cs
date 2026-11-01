@@ -267,4 +267,29 @@ public class CisoAutoDetectTests : IDisposable
 
         Assert.Equal(XisoReader.IsOptimizedImage(iso), XisoReader.IsOptimizedImage(cso));
     }
+
+    [Fact]
+    public void ReaderVerbs_CsoMatchIso()
+    {
+        string work = CreateTempDir("xiso_csoauto");
+        string iso = CreateIso(work);
+        string cso = Compress(iso, Path.Combine(work, "game.cso"));
+
+        Assert.Equal(XisoReader.GetVolumeInfo(iso), XisoReader.GetVolumeInfo(cso));
+        Assert.Equal(XisoReader.GetFileTimeRaw(iso), XisoReader.GetFileTimeRaw(cso));
+
+        SectorLayout isoLayout = XisoReader.GetSectorLayout(iso);
+        SectorLayout csoLayout = XisoReader.GetSectorLayout(cso);
+        Assert.Equal(isoLayout.Entries.Count, csoLayout.Entries.Count);
+        Assert.Equal(isoLayout.UsedRanges.Count, csoLayout.UsedRanges.Count);
+        Assert.Equal(isoLayout.FreeRanges.Count, csoLayout.FreeRanges.Count);
+        Assert.Equal(isoLayout.TotalSectors, csoLayout.TotalSectors);
+
+        (List<(uint Start, uint End)> isoSys, List<(uint Start, uint End)> isoFiles) =
+            XisoRanges.GetXisoRanges(iso);
+        (List<(uint Start, uint End)> csoSys, List<(uint Start, uint End)> csoFiles) =
+            XisoRanges.GetXisoRanges(cso);
+        Assert.Equal(isoSys, csoSys);
+        Assert.Equal(isoFiles, csoFiles);
+    }
 }

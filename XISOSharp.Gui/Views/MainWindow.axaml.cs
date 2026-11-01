@@ -39,6 +39,13 @@ public partial class MainWindow : Window
         Patterns = ["*.iso", "*.xiso"],
     };
 
+    // The ZAR tab packs a plain image (or Redump ISO) and converts a .zar back
+    // to ISO; compressed CISO/CCI inputs are not accepted by either direction.
+    private static readonly FilePickerFileType ZarSourceFilter = new("Xbox images or ZAR")
+    {
+        Patterns = ["*.iso", "*.xiso", "*.img", "*.zar"],
+    };
+
     // Single source for image detection (BUG-GUI-012): includes every extension
     // the pickers accept so drag-and-drop routing agrees with the filters.
     private static readonly string[] ImageExtensions = [".iso", ".xiso", ".cso", ".cci", ".img", ".zar"];
@@ -898,7 +905,9 @@ public partial class MainWindow : Window
         try
         {
             MainViewModel vm = Vm;
-            string? picked = await PickSingleFileAsync([IsoFilter], "Select source image").ConfigureAwait(false);
+            // The ZAR tab is bidirectional: a .zar source converts back to ISO.
+            string? picked = await PickSingleFileAsync([ZarSourceFilter], "Select source image or ZAR")
+                .ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.ZaSource = picked);
@@ -923,7 +932,9 @@ public partial class MainWindow : Window
         try
         {
             MainViewModel vm = Vm;
-            string? picked = await PickSaveAsync("ZAR output", "game.zar").ConfigureAwait(false);
+            string? picked = vm.ZaIsConvert
+                ? await PickSaveAsync("ISO output", "game.iso").ConfigureAwait(false)
+                : await PickSaveAsync("ZAR output", "game.zar").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.ZaOutput = picked);

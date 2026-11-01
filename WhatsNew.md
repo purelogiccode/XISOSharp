@@ -9,10 +9,12 @@ first-fit around them. A round-trip of an unchanged tree is byte-identical.
 The Phase 4 TOC hardening follow-up also lands here: the audit, sector-range,
 repair, salvage and ZAR walks use the same explicit in-order table traversal as
 extract/list/rewrite, so `MaxTocDepth` bounds real subdirectory nesting only.
+The raw-sector redump modes now refuse container inputs up front, and the GUI
+ZAR tab converts a `.zar` back to a plain ISO.
 
 Targets remain `net8.0` / `net9.0` / `net10.0`. Full suite green on all three:
-**1923 passed / 1 opt-in skip (1924) on net8.0/net9.0** and **1985 passed / 1
-opt-in skip (1986) on net10.0**.
+**1936 passed / 1 opt-in skip (1937) on net8.0/net9.0** and **2000 passed / 1
+opt-in skip (2001) on net10.0**.
 
 ## Highlights
 
@@ -35,6 +37,15 @@ opt-in skip (1986) on net10.0**.
   archive's name tree with the image, with `--validate-checksums` hashing each
   entry through `XisoZarchive.ComputeFileHash` without extracting. `.zar` on a
   sector-only verb is now a clean error instead of a stack trace.
+- **GUI ZAR round-trip**: the ZAR tab detects a `.zar` source and converts it
+  back to a plain ISO through the CLI's `convert` verb; packing an image keeps
+  the overwrite/skip/auto-rename policies.
+- **Redump modes refuse containers**: `--video`, `--random`, `--seed`, `--wipe`,
+  `--trim`, `--petrify`, `--update` and `--zar` now reject `.cso`/`.cci`, split
+  ISO and `.zar` inputs with a "decompress/convert/join first" message instead
+  of parsing container bytes as an XISO.
+- **Quieter bug reports**: expected overwrite refusals (`-n`, redirected stdin)
+  stay in the local log and no longer file bug reports.
 
 ## CLI
 
@@ -82,9 +93,13 @@ by large layouts. Five new `PathologicalTocTests` prove the 4,096-entry left
 spine audits/maps, repairs its deepest entry, salvages and packs to ZAR. Ten new
 `ZarValidateTests` cover ZAR↔ISO/CCI tree and checksum validation, per-entry
 `ComputeFileHash`, CLI `validate --json`/`--validate-report`, and the clean
-sector-only rejection for `.zar` inputs.
-Net8/net9: **1923 passed / 1 skipped (1924)**; net10:
-**1985 passed / 1 skipped (1986)**.
+sector-only rejection for `.zar` inputs. Eleven `RedumpInputGuardTests` prove
+every redump mode refuses container inputs while a plain ISO still runs;
+`CliCommandsTests.Convert`, `MainViewModelTests` and the GUI self-test cover the
+ZAR→ISO direction/argv, and `OverwritePromptExtraTests` asserts expected
+refusals carry `NoBugReport`.
+Net8/net9: **1936 passed / 1 skipped (1937)**; net10:
+**2000 passed / 1 skipped (2001)**.
 
 ---
 

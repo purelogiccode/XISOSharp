@@ -103,6 +103,11 @@ Image inputs accept `.cso`/`.1.cso` and `.cci`/`.1.cci` files directly (auto-det
 | `join\|joinsplit [--output <file>] <first.1.iso> [...]` | **Reassemble** split parts (`XisoSplitter.Join`). Output defaults to the part stem + `.iso` and must not exist; the result is validated as an XISO afterwards. |
 | `convert <src.zar\|src.iso> <out.iso\|out.zar> [-y\|-n] [--batch <dir> --format iso\|zar]` | **Convert** ZArchive to ISO (`XisoZarchive.ConvertZarToIso`: extract to a temp directory then `XisoWriter.PackFromDirectory`) or ISO to ZArchive (`CreateZar`). Existing outputs follow `-y`/`-n`. With `--batch`, converts every unsplit `.iso`/`.xiso` to `.zar` (`--format zar`, default) or every `.zar` to `.iso` (`--format iso`). |
 
+The redump modes read and write absolute sectors through a raw file stream, so
+they accept only plain `.iso`/`.xiso` images. A `.cso`/`.cci`, a split-ISO part
+or a `.zar` is refused up front with a "decompress/convert/join first" error
+(use `decompress`, `convert` or `join`).
+
 ## Options
 
 | Flag | Description |

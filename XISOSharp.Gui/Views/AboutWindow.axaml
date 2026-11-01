@@ -87,8 +87,8 @@
                      Text="XISOSharp is a pure C# port of extract-xiso for Xbox ISO (XISO/XDVDFS) images — byte-identical output, no native dependencies, no P/Invoke, just .NET. It runs on Windows, Linux, and macOS."
                      ToolTip.Tip="XISOSharp extracts, creates, rewrites, and archives Xbox disc images with byte-identical extract-xiso output" />
           <TextBlock Classes="body"
-                     Text="Features include extract/create/rewrite, CISO and ZArchive compression, Redump archival workflows (video/filler/seed/wipe/trim/rebuild), integrity validation with SHA3-256 checksums, and a batch mode — all driving the same engine as the XISOSharp CLI."
-                     ToolTip.Tip="Key features: extract, create, rewrite, CISO/ZAR compression, Redump archival, validation, checksums, and batch processing" />
+                     Text="Features include extract/create/rewrite, CISO/CCI and ZArchive compression (including ZAR → ISO conversion), Redump archival workflows (video/filler/seed/wipe/trim/rebuild), integrity validation with SHA3-256 checksums, and a batch mode — all driving the same engine as the XISOSharp CLI."
+                     ToolTip.Tip="Key features: extract, create, rewrite, CISO/CCI/ZAR compression, ZAR to ISO conversion, Redump archival, validation, checksums, and batch processing" />
         </StackPanel>
       </Border>
 
