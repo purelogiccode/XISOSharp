@@ -147,6 +147,22 @@ public class CisoTests : IDisposable
     }
 
     [Fact]
+    public void CompressToCso_FromCisoSource_ReadsDecompressedView()
+    {
+        string isoPath = CreateTempIso();
+        string work = CreateTempDir();
+        string first = Path.Combine(work, "first.cso");
+        string second = Path.Combine(work, "second.cso");
+        string decompressed = Path.Combine(work, "second.iso");
+
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, first, level: 6));
+        Assert.Equal(0, CisoWriter.CompressToCso(first, second, level: 6));
+        Assert.Equal(0, CisoReader.DecompressToIso(second, decompressed));
+
+        Assert.Equal(ComputeSha256(isoPath), ComputeSha256(decompressed));
+    }
+
+    [Fact]
     public void CompressToCso_FromDirectory_DirectlyProducesCso()
     {
         string csoDir = CreateTempDir();

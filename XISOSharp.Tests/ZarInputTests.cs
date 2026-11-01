@@ -1,5 +1,6 @@
 using XISOSharp.Cli;
 using XISOSharp.Models;
+using ZArchiveSharp;
 
 namespace XISOSharp.Tests;
 
@@ -60,6 +61,33 @@ public sealed class ZarInputTests : IDisposable
         // skipExisting must not throw when files are already there.
         Assert.Equal(0, XisoZarchive.ExtractZar(zar, extracted, skipExisting: true));
         AssertSameTree(source, extracted);
+    }
+
+    [Fact]
+    public void ExtractZar_DeeplyNestedArchive_FailsAtMaxTocDepth()
+    {
+        string work = CreateTempDir("xiso_zar_deep");
+        string zar = Path.Combine(work, "deep.zar");
+        string deepPath = string.Join('/',
+            Enumerable.Range(1, Constants.MaxTocDepth + 1).Select(static i => $"d{i}"));
+
+        using (FileStream output = File.Create(zar))
+        using (ZArchiveWriter writer = new(output))
+        {
+            Assert.True(writer.StartNewFile("a.txt"));
+            writer.AppendData("x"u8);
+            Assert.True(writer.MakeDir(deepPath, recursive: true));
+            writer.Finalize();
+        }
+
+        string extracted = Path.Combine(work, "extracted");
+        InvalidDataException extractError = Assert.Throws<InvalidDataException>(
+            () => XisoZarchive.ExtractZar(zar, extracted));
+        Assert.Contains("depth", extractError.Message, StringComparison.OrdinalIgnoreCase);
+
+        InvalidDataException listError = Assert.Throws<InvalidDataException>(
+            () => XisoZarchive.ListZar(zar));
+        Assert.Contains("depth", listError.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

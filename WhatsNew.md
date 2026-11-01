@@ -9,12 +9,13 @@ first-fit around them. A round-trip of an unchanged tree is byte-identical.
 The Phase 4 TOC hardening follow-up also lands here: the audit, sector-range,
 repair, salvage and ZAR walks use the same explicit in-order table traversal as
 extract/list/rewrite, so `MaxTocDepth` bounds real subdirectory nesting only.
-The raw-sector redump modes now refuse container inputs up front, and the GUI
-ZAR tab converts a `.zar` back to a plain ISO.
+The raw-sector redump modes now refuse container inputs up front, the GUI ZAR
+tab converts a `.zar` back to a plain ISO, ZAR extraction is depth-bounded and
+pre-sized, and CISO compression reads split/container sources directly.
 
 Targets remain `net8.0` / `net9.0` / `net10.0`. Full suite green on all three:
-**1944 passed / 1 opt-in skip (1945) on net8.0/net9.0** and **2008 passed / 1
-opt-in skip (2009) on net10.0**.
+**1946 passed / 1 opt-in skip (1947) on net8.0/net9.0** and **2010 passed / 1
+opt-in skip (2011) on net10.0**.
 
 ## Highlights
 
@@ -37,6 +38,14 @@ opt-in skip (2009) on net10.0**.
   archive's name tree with the image, with `--validate-checksums` hashing each
   entry through `XisoZarchive.ComputeFileHash` without extracting. `.zar` on a
   sector-only verb is now a clean error instead of a stack trace.
+- **ZAR extraction hardening**: the extract walk is bounded by `MaxTocDepth`
+  like list/checksum, each destination is pre-sized from the name tree and
+  copied exactly (a truncated entry fails instead of silently producing a short
+  file), and a failed or canceled entry no longer leaves a partial file behind.
+- **Direct container compression**: `CisoWriter.CompressToCso` reads split ISO
+  and CISO/CCI inputs through the seekable decompressed view instead of writing
+  a joined temporary ISO first; the split-output guard checks every source part,
+  not just the entry path.
 - **GUI ZAR round-trip**: the ZAR tab detects a `.zar` source and converts it
   back to a plain ISO through the CLI's `convert` verb; packing an image keeps
   the overwrite/skip/auto-rename policies.
@@ -103,9 +112,11 @@ ZAR→ISO direction/argv, and `OverwritePromptExtraTests` asserts expected
 refusals carry `NoBugReport`. Seven `XisoImageSourceTests` suffix cases plus
 `CciAutoDetectTests.SecondCciPart_NamesOutputsAfterGameStem` and
 `XisoRepairerRefusalTests.Salvage_DefaultOutputPath_Naming` cover numbered CCI
-part naming for extraction, rewrite, recompress and salvage.
-Net8/net9: **1944 passed / 1 skipped (1945)**; net10:
-**2008 passed / 1 skipped (2009)**.
+part naming for extraction, rewrite, recompress and salvage. One new
+`ZarInputTests` case rejects a 65-level tree in both list and extract, and one
+new `CisoTests` case recompresses a CISO through the direct decompressed view.
+Net8/net9: **1946 passed / 1 skipped (1947)**; net10:
+**2010 passed / 1 skipped (2011)**.
 
 ---
 

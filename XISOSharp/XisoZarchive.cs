@@ -388,7 +388,11 @@ public static class XisoZarchive
     /// <exception cref="ArgumentException">A path is null or empty.</exception>
     /// <exception cref="FileNotFoundException">The archive does not exist.</exception>
     /// <exception cref="UnauthorizedAccessException">The archive or an output path cannot be accessed.</exception>
-    /// <exception cref="InvalidDataException">The archive is malformed or contains an unsafe entry name.</exception>
+    /// <exception cref="InvalidDataException">
+    /// The archive is malformed, contains an unsafe entry name, nests directories deeper than
+    /// <see cref="Constants.MaxTocDepth"/>, or declares an entry too large to extract.
+    /// </exception>
+    /// <exception cref="TruncatedCopyException">An entry's data ends before its declared size.</exception>
     /// <exception cref="IOException">An output file cannot be written.</exception>
     /// <exception cref="OperationCanceledException">The operation was cancelled.</exception>
     public static int ExtractZar(string zarPath, string outputDirectory, bool skipExisting = false,
@@ -402,7 +406,7 @@ public static class XisoZarchive
         Directory.CreateDirectory(outputDirectory);
         ZarExtractState state = new();
         ExtractZarNode(reader, ZArchiveReader.RootNode, outputDirectory, string.Empty, skipExisting,
-            progress, ct, state);
+            progress, ct, state, depth: 0);
         return 0;
     }
 
@@ -502,8 +506,14 @@ public static class XisoZarchive
 
     private static void ExtractZarNode(ZArchiveReader reader, uint node, string outputDirectory,
         string parent, bool skipExisting, IProgress<ProgressInfo>? progress, CancellationToken ct,
-        ZarExtractState state)
+        ZarExtractState state, int depth)
     {
+        if (depth > Constants.MaxTocDepth)
+        {
+            throw new InvalidDataException(
+                $"ZArchive directory depth exceeds {Constants.MaxTocDepth} at '{parent}'.");
+        }
+
         uint count = reader.GetDirEntryCount(node);
         for (uint index = 0; index < count; index++)
         {
@@ -523,56 +533,71 @@ public static class XisoZarchive
                     Count: state.Files,
                     Path: "/" + relative.Replace(Path.DirectorySeparatorChar, '/'),
                     Sector: 0));
-                ExtractZarNode(reader, child, outputDirectory, relative, skipExisting, progress, ct, state);
+                ExtractZarNode(reader, child, outputDirectory, relative, skipExisting, progress, ct, state,
+                    depth + 1);
                 continue;
             }
 
             if (skipExisting && File.Exists(destination)) continue;
 
+            if (entry.Size > long.MaxValue)
+            {
+                throw new InvalidDataException(
+                    $"ZArchive entry '{relative}' is too large to extract ({entry.Size} bytes).");
+            }
+
+            long expectedLength = (long)entry.Size;
             string? directory = Path.GetDirectoryName(destination);
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
             using Stream source = reader.OpenRead(child);
             using FileStream target = new(destination, FileMode.Create, FileAccess.Write, FileShare.None,
                 1 << 20, FileOptions.SequentialScan);
-            CopyZarFile(source, target, destination, entry.Size, progress, ct, state);
+            try
+            {
+                // Phase 7: the name tree carries the exact length, so size the
+                // destination before the first write and copy exactly that many
+                // bytes (a truncated archive now fails instead of silently
+                // producing a short file).
+                target.SetLength(expectedLength);
+                CopyZarFile(source, target, destination, expectedLength, progress, ct, state);
+            }
+            catch
+            {
+                // A failed or canceled copy must not leave a partial destination
+                // behind (same rule as XisoReader extraction). Close the handle
+                // first so Windows can delete it.
+                target.Dispose();
+                TryDeleteFile(destination);
+                throw;
+            }
         }
     }
 
-    private static void CopyZarFile(Stream source, Stream destination, string destinationPath, ulong size,
+    private static void CopyZarFile(Stream source, Stream destination, string destinationPath, long size,
         IProgress<ProgressInfo>? progress, CancellationToken ct, ZarExtractState state)
     {
-        byte[] buffer = ArrayPool<byte>.Shared.Rent(Constants.ReadWriteBufferSize);
-        try
-        {
-            long total = 0;
-            int read;
-            while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
-            {
-                ct.ThrowIfCancellationRequested();
-                destination.Write(buffer, 0, read);
-                total += read;
-                progress?.Report(new ProgressInfo(
-                    ProgressInfoType.FileProgress,
-                    Count: (long)size,
-                    Path: destinationPath,
-                    Sector: 0,
-                    Size: total));
-            }
-
-            state.Files++;
-            state.Bytes += total;
-            progress?.Report(new ProgressInfo(
-                ProgressInfoType.FileAdded,
-                Count: state.Files,
+        XisoFileCopier.CopyExact(
+            source,
+            size,
+            (buffer, count) => destination.Write(buffer, 0, count),
+            buffer: null,
+            copied => progress?.Report(new ProgressInfo(
+                ProgressInfoType.FileProgress,
+                Count: size,
                 Path: destinationPath,
                 Sector: 0,
-                Size: total));
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
+                Size: copied)),
+            ct);
+
+        state.Files++;
+        state.Bytes += size;
+        progress?.Report(new ProgressInfo(
+            ProgressInfoType.FileAdded,
+            Count: state.Files,
+            Path: destinationPath,
+            Sector: 0,
+            Size: size));
     }
 
     private static string CombineZarPath(string parent, string name)
@@ -587,6 +612,22 @@ public static class XisoZarchive
         }
 
         return parent.Length == 0 ? name : parent + Path.DirectorySeparatorChar + name;
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (IOException)
+        {
+            // Best effort.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Best effort.
+        }
     }
 
     private static void TryDeleteDirectory(string path)

@@ -116,7 +116,7 @@ Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXis
 | `XisoSkeleton` | `Petrify` (zeroed XISO + SHA-1 `hex + " " + path` lines, `CollectFileEntries` sorted) |
 | `XisoRedump` | `TryExtractVideo` (L0 head + L1 tail), `TryExtractUpdate` (`FindUpdateOffset` `ABCDABCD`, `l1Trimmed` split), `RebuildRedump` (full `l0Padding`/`l1Padding` + PRNG/`securitySectors`) |
 | `SecuritySectors` | `Parse(path)` → `int[]` sorted, `4096`-sector `start-end` validation (`4095` length) |
-| `XisoZarchive` | `CreateZar` (XISO to `.zar` via `ZArchiveSharp.ZArchiveWriter`: zstd L6 blocks, raw fallback, optional `IZarBlockCompressor`, `removeUpdate`, partition offsets); `ListZar`, `ExtractZar`, `ConvertZarToIso`, `ComputeFileHash` (per-entry MD5/SHA-256 for validation) |
+| `XisoZarchive` | `CreateZar` (XISO to `.zar` via `ZArchiveSharp.ZArchiveWriter`: zstd L6 blocks, raw fallback, optional `IZarBlockCompressor`, `removeUpdate`, partition offsets); `ListZar`, `ExtractZar` (depth-bounded, pre-sized exact-length copies, partial-file cleanup), `ConvertZarToIso`, `ComputeFileHash` (per-entry MD5/SHA-256 for validation) |
 | `XisoChecksum` | `ComputeImageChecksum` / `ComputeImageChecksumHex` — SHA3-256 `SortedDictionary Ordinal` (`/path` UTF-8 + streamed data, `xdvdfs` compat; BCL `SHA3_256` when supported, else pure-managed fallback); `ComputeZarChecksum`/`ComputeZarChecksumHex` for `.zar` |
 | `CisoWriter` / `CisoReader` | `CompressToCso` (BCL DEFLATE v1 `0x80000000`, `align` 0/1/2, threshold `+12`, `--ciso-split` shim) / `DecompressToIso` (v1 DEFLATE + v2 LZ4) |
 | `XisoCci` | `CompressToCci` / `DecompressToIso` / `DeriveDefaultCciPath` / `DeriveDefaultIsoPath` (CCISharp-backed CCI/CCIM) |

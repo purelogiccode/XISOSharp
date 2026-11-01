@@ -12,10 +12,12 @@ The audit, sector-range, repair, salvage and ZAR walks now use the same explicit
 in-order table traversal as extract/list/rewrite, so `MaxTocDepth` bounds real
 subdirectory nesting only. The raw-sector redump modes also reject compressed
 and split containers up front, and the GUI ZAR tab converts a `.zar` back to a
-plain ISO.
+plain ISO. ZAR extraction is now depth-bounded, pre-sized and exact-length, and
+CISO compression reads split/container sources through the decompressed view
+instead of a joined temporary ISO.
 
-Full suite green on all three targets: **1944 passed / 1 opt-in skip (1945) on
-net8.0/net9.0** and **2008 passed / 1 opt-in skip (2009) on net10.0**.
+Full suite green on all three targets: **1946 passed / 1 opt-in skip (1947) on
+net8.0/net9.0** and **2010 passed / 1 opt-in skip (2011) on net10.0**.
 
 ### Library
 
@@ -64,6 +66,27 @@ net8.0/net9.0** and **2008 passed / 1 opt-in skip (2009) on net10.0**.
   reports a clean `Error:` naming the archive verbs instead of an unhandled
   `NotSupportedException` stack trace.
 
+### ZAR extraction hardening (Phase 3/7 follow-up)
+
+- `XisoZarchive.ExtractZar` now bounds directory nesting at
+  `Constants.MaxTocDepth`, matching `ListZar` and `ComputeZarChecksum`; a
+  malicious or corrupt archive fails with a named `InvalidDataException`
+  instead of recursing until the stack overflows.
+- Each extracted destination is pre-sized from the name tree and copied with
+  `XisoFileCopier.CopyExact`, so a truncated entry throws
+  `TruncatedCopyException` instead of silently producing a short file. Failed
+  or canceled entries delete their partial output (Windows-safe: the handle is
+  closed first).
+
+### Direct CISO input (Phase 2 follow-up)
+
+- `CisoWriter.CompressToCso` reads split ISO, CISO and CCI sources through the
+  seekable decompressed view from `XisoImageSource` instead of writing a joined
+  temporary ISO first. Split output still goes through `CisoSplitOutput`.
+- The split-output collision guard now compares every source part (not just the
+  entry path), so recompressing a split CISO/ISO set cannot truncate one of its
+  own parts.
+
 ### CLI
 
 - `--layout <file>` on `-c <dir>`, `--pack <dir>` and `build-image`; rejected for
@@ -106,6 +129,11 @@ net8.0/net9.0** and **2008 passed / 1 opt-in skip (2009) on net10.0**.
   hashing (case-insensitive paths, missing/directory paths), missing-file and
   checksum-mismatch detection, CLI `validate --json`/`--validate-report`, and a
   clean sector-only rejection for `.zar` inputs.
+- `ZarInputTests` (+1): a 65-level name tree is rejected by both `ListZar` and
+  `ExtractZar` with the depth message; the existing list/extract/checksum/
+  convert tests still pass with pre-sized, exact-length extraction.
+- `CisoTests` (+1): recompressing a CISO through `CompressToCso` now reads the
+  decompressed view directly and round-trips to the same ISO hash.
 - `RedumpInputGuardTests` (11): every redump mode refuses `.cci`/`.cso`, split
   ISO and `.zar` inputs with the documented message, while a plain ISO still
   runs. `CliCommandsTests.Convert`, `MainViewModelTests` and the GUI self-test
@@ -117,8 +145,8 @@ net8.0/net9.0** and **2008 passed / 1 opt-in skip (2009) on net10.0**.
   CCI part naming: extraction, rewrite, recompress and salvage from `.2.cci` all
   use the game stem; `.10.cci`/`.0.cci` stay ordinary names, and `.1.zar` keeps
   its number.
-- **net8.0/net9.0 - 1945 tests (1944 passed, 1 opt-in skip)**;
-  **net10.0 - 2009 tests (2008 passed, 1 opt-in skip, adds the GUI tests)**.
+- **net8.0/net9.0 - 1947 tests (1946 passed, 1 opt-in skip)**;
+  **net10.0 - 2011 tests (2010 passed, 1 opt-in skip, adds the GUI tests)**.
 
 ## 1.5.0
 

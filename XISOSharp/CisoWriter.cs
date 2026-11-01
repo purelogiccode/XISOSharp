@@ -42,8 +42,8 @@ public static class CisoWriter
 
     /// <summary>
     /// Compresses an XISO image or a directory (which is first packed into a temp XISO) to CISO/CSO.
-    /// Split ISO, CISO and CCI sources are read through <see cref="XisoImageSource"/> and
-    /// materialized to a temporary ISO before compression.
+    /// Split ISO, CISO and CCI sources are read through the seekable decompressed view from
+    /// <see cref="XisoImageSource"/> and compressed directly, without a joined temporary ISO.
     /// </summary>
     /// <param name="sourcePath">Source directory, ISO file, split ISO/CISO/CCI image.</param>
     /// <param name="outputCsoPath">Destination CSO path; if null, derived from source (<c>.cso</c>).</param>
@@ -85,10 +85,16 @@ public static class CisoWriter
         if (XisoPaths.AreSamePath(sourcePath, output))
             throw new IOException("Source and destination paths are the same");
         if (splitBytes.HasValue && !isDir)
-            GuardSplitParts(sourcePath, output, splitBytes.Value);
+        {
+            XisoImageSource.TryDetect(sourcePath, out XisoImageSourceInfo? guardInfo);
+            long sourceLength = guardInfo?.Length ?? new FileInfo(sourcePath).Length;
+            IReadOnlyList<string> sourceParts = guardInfo?.Parts ?? [sourcePath];
+            GuardSplitParts(output, splitBytes.Value, sourceLength, sourceParts);
+        }
 
         string? tempIso = null;
-        string sourceFile;
+        Stream? containerStream = null;
+        string sourceFile = sourcePath;
 
         try
         {
@@ -102,38 +108,24 @@ public static class CisoWriter
                     throw new IOException($"Failed to pack directory {sourcePath} to temp ISO");
                 sourceFile = tempIso;
             }
-            else
+            else if (XisoImageSource.TryDetect(sourcePath, out XisoImageSourceInfo? info) &&
+                     info is not null &&
+                     (info.Format != XisoImageFormat.Iso || info.IsSplit))
             {
-                // Split ISO, CISO and CCI inputs are read through the
-                // decompressed/concatenated view and materialized to a
-                // temporary ISO so the sector compressor sees one flat file.
-                if (XisoImageSource.TryDetect(sourcePath, out XisoImageSourceInfo? info) &&
-                    info is not null &&
-                    (info.Format != XisoImageFormat.Iso || info.IsSplit))
+                // Split ISO and CISO/CCI containers already expose one flat,
+                // seekable decompressed view; compress it directly instead of
+                // materializing a joined temporary ISO (Phase 2).
+                if (info.Format == XisoImageFormat.Zar)
                 {
-                    if (info.Format == XisoImageFormat.Zar)
-                    {
-                        throw new NotSupportedException(
-                            "ZArchive (.zar) input is not a sector image; convert it to ISO first.");
-                    }
-
-                    tempIso = Path.Combine(Path.GetTempPath(), $"xisosh-temp-{Guid.NewGuid():N}.iso");
-                    using (Stream source = XisoImageSource.OpenRead(sourcePath))
-                    using (FileStream destination = new(tempIso, FileMode.CreateNew, FileAccess.Write,
-                               FileShare.None, 1 << 20, FileOptions.SequentialScan))
-                    {
-                        source.CopyTo(destination);
-                    }
-
-                    sourceFile = tempIso;
+                    throw new NotSupportedException(
+                        "ZArchive (.zar) input is not a sector image; convert it to ISO first.");
                 }
-                else
-                {
-                    sourceFile = sourcePath;
-                }
+
+                containerStream = XisoImageSource.OpenRead(sourcePath);
             }
 
-            using FileStream src = new(sourceFile, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+            using Stream src = containerStream ?? new FileStream(sourceFile, FileMode.Open, FileAccess.Read,
+                FileShare.Read, 65536);
             if (splitBytes.HasValue)
             {
                 using CisoSplitOutput split = new(output, splitBytes.Value);
@@ -187,6 +179,7 @@ public static class CisoWriter
         }
         finally
         {
+            containerStream?.Dispose();
             if (tempIso != null)
             {
                 TryDeleteFile(tempIso);
@@ -207,20 +200,25 @@ public static class CisoWriter
     }
 
     /// <summary>
-    /// Refuses a split compress whose part files would overwrite the source:
-    /// part <c>n</c> holds the global range <c>[(n-1)·split, n·split)</c>, so a
-    /// source literally named like one of its own parts (e.g. compressing
+    /// Refuses a split compress whose part files would overwrite any source
+    /// part: part <c>n</c> holds the global range <c>[(n-1)·split, n·split)</c>,
+    /// so a source literally named like one of its own parts (e.g. compressing
     /// <c>game.1.cso</c> to split base <c>game.cso</c>) would be truncated
-    /// mid-read. Only parts that can exist for this source size are checked.
+    /// mid-read. Only parts that can exist for the uncompressed source size are
+    /// checked; a split/compressed source contributes every part path.
     /// </summary>
-    private static void GuardSplitParts(string sourcePath, string output, long splitBytes)
+    private static void GuardSplitParts(string output, long splitBytes, long sourceLength,
+        IReadOnlyList<string> sourceParts)
     {
-        long maxPart = (new FileInfo(sourcePath).Length / splitBytes) + 2;
+        long maxPart = (sourceLength / splitBytes) + 2;
         for (long i = 0L; i < maxPart; i++)
         {
             string part = CisoSplitFile.PartPath(output, i);
-            if (XisoPaths.AreSamePath(sourcePath, part))
-                throw new IOException($"Source and split output part paths are the same: {part}");
+            foreach (string sourcePart in sourceParts)
+            {
+                if (XisoPaths.AreSamePath(sourcePart, part))
+                    throw new IOException($"Source and split output part paths are the same: {part}");
+            }
         }
     }
 
