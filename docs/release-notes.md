@@ -1,5 +1,56 @@
 # Release Notes
 
+## 1.6.0
+
+Sector-layout packing release (PlanToEnhance Phase 8). Images can now be repacked at
+an explicit layout: `XisoLayoutSpec` accepts the JSON emitted by
+`--sector-layout --json` (or a compact `path=sector` text spec), fixes the sectors of
+matching files and directory tables, and allocates every other entry first-fit around
+the reserved extents. `-c`, `--pack <dir>` and `build-image` gain `--layout <file>`.
+
+Full suite green on all three targets: **1908 passed / 1 opt-in skip (1909) on
+net8.0/net9.0** and **1970 passed / 1 opt-in skip (1971) on net10.0**.
+
+### Library
+
+- **`XisoLayoutSpec` / `XisoLayoutEntry`** (`XISOSharp.Models`):
+  `FromSectorLayout`, `Load` (JSON/text auto-detect), `Parse`, `ParseJson` and
+  `ParseText`. JSON accepts the full `--sector-layout` payload, a bare `entries`
+  array, camelCase or PascalCase names, and `startSector`/`sector` aliases; the
+  text form supports `#`/`;` comments, `total-sectors=N` and `0x` hex sectors.
+- **`XisoWriter` layout packing**: `CreateXiso`, `CreateXisoAsync`,
+  `PackFromDirectory`, `PackFromDirectoryAsync` and `RemapFilesystem.BuildImage`
+  accept an optional `layout`. A two-pass planner validates every fixed extent
+  (overlap, reserved system area, bounds, too-small extents), assigns the requested
+  sectors, then seeds `SectorAllocator` so unplaced entries fill gaps first-fit.
+- **Layout fidelity**: a JSON layout round-trips an unchanged source tree
+  byte-for-byte; `TotalSectors` is preserved (subject to the writer's final 64 KiB
+  alignment); partition-relative sectors stay correct under `prependSectors`.
+- **Strict/lenient paths**: the compact text form rejects paths missing from the
+  source tree; JSON extra entries are reserved (with a warning) so a subset repack
+  cannot reuse their bytes.
+
+### CLI
+
+- `--layout <file>` on `-c <dir>`, `--pack <dir>` and `build-image`; rejected for
+  rewrite/extract/list modes and for `--pack <iso>`.
+- Help text and the misplaced-flag guard cover `--layout`.
+- `--sector-layout --json game.iso > layout.json` followed by
+  `-c game_dir out.iso --layout layout.json` reproduces the source layout.
+
+### Tests
+
+- `LayoutPackingTests` (41): JSON/text parsing and validation, `FromSectorLayout`,
+  byte-identical JSON round-trips, fixed-extent placement, first-fit gaps, reserved
+  unmatched JSON extents, total-sector preservation, prepended partitions, case-
+  insensitive paths, empty files/directories, `build-image`, and CLI
+  `-c`/`--pack`/`build-image` end-to-end plus usage errors.
+- `SectorAllocatorTests` (+7 `SeedUsedRanges` cases): one-pass bulk seeding
+  sorts/coalesces, rejects overlaps and out-of-bounds ranges, refuses to seed after
+  allocations, handles null and zero-count ranges.
+- **net8.0/net9.0 - 1909 tests (1908 passed, 1 opt-in skip)**;
+  **net10.0 - 1971 tests (1970 passed, 1 opt-in skip, adds the GUI tests)**.
+
 ## 1.5.0
 
 Machine-readable-output and I/O-efficiency release. Read-only verbs gain a

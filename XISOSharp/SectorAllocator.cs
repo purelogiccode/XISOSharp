@@ -298,6 +298,87 @@ public sealed class SectorAllocator
         return allocator;
     }
 
+    /// <summary>
+    /// Seeds several externally placed, non-overlapping ranges in one pass
+    /// (layout packing, PlanToEnhance Phase 8). Validates bounds, rejects
+    /// overlaps, then sorts and coalesces once instead of re-sorting per range.
+    /// Must be called before any allocation.
+    /// </summary>
+    /// <param name="ranges">Ranges to mark used.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="ranges"/> is <c>null</c>.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the allocator already has allocations.</exception>
+    /// <exception cref="ArgumentException">Thrown when a range is out of bounds or overlaps another.</exception>
+    internal void SeedUsedRanges(IReadOnlyList<SectorRange> ranges)
+    {
+        ArgumentNullException.ThrowIfNull(ranges);
+
+        if (_used.Count != 0)
+        {
+            throw new InvalidOperationException(
+                "SeedUsedRanges must be called before the allocator hands out any range.");
+        }
+
+        List<(uint Start, uint Count)> sorted = new(ranges.Count);
+        foreach (SectorRange range in ranges)
+        {
+            if (range.SectorCount == 0)
+                continue;
+
+            ulong end = (ulong)range.StartSector + range.SectorCount;
+            if (end - 1 > uint.MaxValue)
+            {
+                throw new ArgumentException(
+                    $"Range [{range.StartSector}, {end}) exceeds the addressable sector range.",
+                    nameof(ranges));
+            }
+
+            if (TotalSectors.HasValue && end > (ulong)TotalSectors.Value)
+            {
+                throw new ArgumentException(
+                    $"Range [{range.StartSector}, {end}) exceeds total sectors {TotalSectors.Value}.",
+                    nameof(ranges));
+            }
+
+            sorted.Add((range.StartSector, range.SectorCount));
+        }
+
+        sorted.Sort(static (a, b) => a.Start.CompareTo(b.Start));
+
+        List<(uint Start, uint Count)> merged = new(sorted.Count);
+        foreach ((uint start, uint count) in sorted)
+        {
+            if (merged.Count > 0)
+            {
+                (uint lastStart, uint lastCount) = merged[^1];
+                ulong lastEnd = (ulong)lastStart + lastCount;
+                if (start < lastEnd)
+                {
+                    throw new ArgumentException(
+                        $"Range [{start}, {(ulong)start + count}) overlaps tracked range " +
+                        $"[{lastStart}, {lastEnd}).",
+                        nameof(ranges));
+                }
+
+                if (start == lastEnd)
+                {
+                    ulong mergedCount = (ulong)start + count - lastStart;
+                    if (mergedCount > uint.MaxValue)
+                    {
+                        throw new InvalidOperationException(
+                            "Used-sector range spans more than the addressable 32-bit sector space.");
+                    }
+
+                    merged[^1] = (lastStart, (uint)mergedCount);
+                    continue;
+                }
+            }
+
+            merged.Add((start, count));
+        }
+
+        _used.AddRange(merged);
+    }
+
     private uint FindFit(uint sectorCount)
     {
         ulong cursor = FirstFreeSector;

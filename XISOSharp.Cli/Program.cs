@@ -247,6 +247,7 @@ internal static class Program
         string? packInput = null;
         string? packName = null;
         string? packIsoFile = null;
+        string? layoutFile = null;
 
         bool filetimeMode = false;
         bool setFiletimeMode = false;
@@ -752,6 +753,15 @@ internal static class Program
                         }
 
                         break;
+                    case "--layout":
+                        if (i + 1 >= args.Length || args[i + 1].StartsWith('-'))
+                        {
+                            Logger.LogErr("Error: --layout requires a layout file\n");
+                            return 1;
+                        }
+
+                        layoutFile = args[++i];
+                        break;
                     case "--video":
                         if (xSeen || rewrite || createList.Count > 0)
                         {
@@ -1015,6 +1025,14 @@ internal static class Program
                 filetimeMode, setFiletimeMode, sectorLayoutMode, rangesMode, isOptimizedMode,
                 optind, args.Length, createList, ref rewrite, ref packIsoFile, ref path) != 0)
         {
+            return 1;
+        }
+
+        // --layout is a create modifier: it needs a directory source so every
+        // entry has a host file to read from. Rewrite/extract/list modes reject it.
+        if (layoutFile != null && createList.Count == 0)
+        {
+            Logger.LogErr("Error: --layout is only used with -c <directory> or --pack <directory>\n");
             return 1;
         }
 
@@ -1654,6 +1672,24 @@ internal static class Program
             if (RejectIgnoredOutputFlags("-c (create)"))
                 return 1;
 
+            XisoLayoutSpec? layout = null;
+            if (layoutFile != null)
+            {
+                try
+                {
+                    layout = XisoLayoutSpec.Load(layoutFile);
+                }
+                catch (Exception ex) when (ex is IOException or FormatException or UnauthorizedAccessException or ArgumentException)
+                {
+                    Logger.LogErr($"Error: cannot read sector layout {layoutFile}: {ex.Message}\n");
+                    return 1;
+                }
+
+                Logger.Log(
+                    $"using sector layout {layoutFile} ({layout.Entries.Count} fixed extent(s)" +
+                    (layout.TotalSectors is long total ? $", {total} total sector(s)" : "") + ")\n");
+            }
+
             foreach ((string dir, string? name) in createList)
             {
                 string? outputDir = null;
@@ -1684,7 +1720,8 @@ internal static class Program
                     XisoWriter.CreateXiso(dir, outputDir, null, null, out _, isoName, null,
                         prependSectors: prependSectors,
                         excludePatterns: excludePatterns.Count > 0 ? excludePatterns : null,
-                        fileTime: createFileTime);
+                        fileTime: createFileTime,
+                        layout: layout);
                 }
                 catch (UnauthorizedAccessException ex)
                 {
@@ -3176,6 +3213,7 @@ internal static class Program
         string? metaOutput = null;
         bool dryRun = false;
         ulong? fileTime = null;
+        string? layoutFile = null;
         List<string> positionals = new();
 
         for (int i = optind; i < args.Length; i++)
@@ -3232,6 +3270,16 @@ internal static class Program
 
                 fileTime = raw;
                 i++;
+            }
+            else if (string.Equals(a, "--layout", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length || args[i + 1].StartsWith('-'))
+                {
+                    Logger.LogErr("Error: --layout requires a layout file\n");
+                    return 1;
+                }
+
+                layoutFile = args[++i];
             }
             else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
@@ -3429,8 +3477,23 @@ internal static class Program
             string? outDir = Path.GetDirectoryName(outputIso);
             if (!string.IsNullOrEmpty(outDir))
                 Directory.CreateDirectory(outDir);
+
+            XisoLayoutSpec? layout = null;
+            if (layoutFile != null)
+            {
+                try
+                {
+                    layout = XisoLayoutSpec.Load(layoutFile);
+                }
+                catch (Exception ex) when (ex is IOException or FormatException or UnauthorizedAccessException or ArgumentException)
+                {
+                    Logger.LogErr($"Error: cannot read sector layout {layoutFile}: {ex.Message}\n");
+                    return 1;
+                }
+            }
+
             Logger.Log($"{Constants.Banner}");
-            return RemapFilesystem.BuildImage(sourceDir, outputIso, rules, fileTime: fileTime);
+            return RemapFilesystem.BuildImage(sourceDir, outputIso, rules, fileTime: fileTime, layout: layout);
         }
     }
 
@@ -5947,7 +6010,7 @@ internal static class Program
 
                                                        XDVDFS / Packing modes (ordered remapping):
 
-                                                      build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run] [--file-time <value>]
+                                                      build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run] [--file-time <value>] [--layout <file>]
                                                                             Pack an image with ordered wax-glob remapping ({0} whole match, {1..n} per '*'/'**' capture, '!' exclusion). Examples:
                                                                               build-image -m "bin:/" -m "assets/**:/assets/{1}" ./src dist/final.xiso.iso
                                                                               build-image --dry-run -f xdvdfs.toml ./src
@@ -5982,6 +6045,12 @@ internal static class Program
                                                                            a video partition. Valid in create (-c) and
                                                                            rewrite (-r) mode. Combine with --skip-sectors
                                                                            for round-trip Redump-style reconstruction.
+                                                     --layout <file>      Create (-c), --pack <dir> and build-image:
+                                                                           place matching files/directories at the sectors
+                                                                           from a --sector-layout --json file or a compact
+                                                                           "path=sector" text spec; other entries are
+                                                                           allocated first-fit around them. Overlaps,
+                                                                           too-small extents and out-of-range sectors fail.
                                                      --preserve-attrs     In rewrite (-r) mode, re-encode the source
                                                                            dirent attribute bits (RO/HID/SYS/NOR) into
                                                                            the output. Default is extract-xiso parity:

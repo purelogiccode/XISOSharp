@@ -76,6 +76,7 @@ Both side menus list the same pages; relative page links work in either renderer
 ## Feature highlights
 
 - **Create** XISO images from a directory, with glob-based exclusion (`-X` via `GlobMatcher`/`WaxGlob`)
+- **Pack to a fixed layout** (`--layout <file>`, `XisoLayoutSpec`): replay a `--sector-layout --json` or compact `path=sector` spec, placing matching files/tables at exact sectors and first-fitting the rest; overlaps, system-area placements, out-of-range extents and too-small extents fail before writing
 - **Extract** full images, or single files/directories with `--copy-out` / `--unpack` (auto `llCompat`); resume interrupted runs with `--skip-existing` (`skip: <path>`); patch single files back in with `--copy-in` (keeps `.old` backup)
 - **List** (`-l`), recursive **tree** (`-t`), volume **info** (`-i`), **hash** (`--md5` / `--sha256`), per-image **SHA3-256** `checksum`, XEX2 (`--xex-info`) and XBE (`--xbe-info`) executable info
 - **Rewrite** images into an optimized AVL layout (`-r`) + **validate** (`validate` / `--validate*`); outputs colliding with their inputs are refused (input==output guard)

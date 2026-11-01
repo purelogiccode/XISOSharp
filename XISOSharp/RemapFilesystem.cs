@@ -193,8 +193,10 @@ public static class RemapFilesystem
     /// Optional fixed FILETIME for the volume descriptor (deterministic output, TODO #2).
     /// When <c>null</c> (default), the current time is written.
     /// </param>
+    /// <param name="layout">Optional explicit sector layout (PlanToEnhance Phase 8).</param>
     public static int BuildImage(string sourceDir, string outputIsoPath, IReadOnlyList<RemapRule> rules,
-        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default, ulong? fileTime = null)
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default, ulong? fileTime = null,
+        XisoLayoutSpec? layout = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(sourceDir);
         ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
@@ -233,7 +235,7 @@ public static class RemapFilesystem
         try
         {
             return XisoWriter.CreateFromRemapTree(avlRoot, outputIsoPath, progress: progress, cancellationToken: ct,
-                fileTime: fileTime);
+                fileTime: fileTime, layout: layout);
         }
         catch (OperationCanceledException)
         {

@@ -6,6 +6,7 @@ three passes.
 
 - [CreateXiso](#createxiso)
 - [CreateXisoAsync](#createxisoasync)
+- [Explicit sector-layout packing](#explicit-sector-layout-packing)
 - [Rewrite mode](#rewrite-mode)
 - [Exclusion patterns](#exclusion-patterns)
 - [Progress reporting](#progress-reporting)
@@ -22,7 +23,8 @@ public static int PackFromDirectory(
     ProgressCallback? progressCallback = null,
     CancellationToken cancellationToken = default,
     IProgress<ProgressInfo>? progress = null,
-    ulong? fileTime = null)
+    ulong? fileTime = null,
+    XisoLayoutSpec? layout = null)
 
 public static async Task<int> PackFromDirectoryAsync(
     string sourceDirectory,
@@ -31,7 +33,8 @@ public static async Task<int> PackFromDirectoryAsync(
     ProgressCallback? progressCallback = null,
     CancellationToken cancellationToken = default,
     IProgress<ProgressInfo>? progress = null,
-    ulong? fileTime = null)
+    ulong? fileTime = null,
+    XisoLayoutSpec? layout = null)
 ```
 
 `PackFromDirectory` is the convenience form of `CreateXiso` for packing a directory
@@ -52,7 +55,9 @@ public static int CreateXiso(
     int? prependSectors = null,
     IReadOnlyList<string>? excludePatterns = null,
     IProgress<ProgressInfo>? progress = null,
-    ulong? fileTime = null)
+    ulong? fileTime = null,
+    long sourceDiscLseek = 0,
+    XisoLayoutSpec? layout = null)
 ```
 
 | Parameter | Meaning |
@@ -69,12 +74,16 @@ public static int CreateXiso(
 | `excludePatterns` | Glob patterns of files/directories to omit (create mode only) |
 | `progress` | Structured progress channel — `IProgress<ProgressInfo>` events (counts, per-entry additions, completion). See [Progress reporting](#progress-reporting) |
 | `fileTime` | Fixed FILETIME for the volume descriptor; `null` (default) = current time, or the preserved source timestamp in rewrite mode. See [Deterministic output](#deterministic-output) |
+| `layout` | Optional explicit sector layout. Matching files/tables are written at their requested sectors; the rest are allocated first-fit around them. See [Explicit sector-layout packing](#explicit-sector-layout-packing) |
 
 Returns 0 on success, 1 on error (permission, I/O, or any exception while writing —
 errors are logged and converted to the return code).
 
 Throws: `ArgumentOutOfRangeException` for a negative `prependSectors`;
-`XisoFileTooLargeException` when a source file exceeds ~4 GB.
+`XisoFileTooLargeException` when a source file exceeds ~4 GB;
+`InvalidDataException` when a supplied layout has an overlap, an out-of-range or
+too-small extent, a type mismatch, or (text form) a path missing from the source
+tree.
 
 **Symlinks (TODO #21):** directory reparse points (symlinks, junctions, mount
 points) are skipped with a warning and never descended — XISO has no link
@@ -97,10 +106,57 @@ public static async Task<(int Result, string? OutIsoPath)> CreateXisoAsync(
     int? prependSectors = null,
     IReadOnlyList<string>? excludePatterns = null,
     IProgress<ProgressInfo>? progress = null,
-    ulong? fileTime = null)
+    ulong? fileTime = null,
+    XisoLayoutSpec? layout = null)
 ```
 
 Async wrapper returning the result code and the output path.
+
+## Explicit sector-layout packing
+
+PlanToEnhance Phase 8 (xdvdfs #49). `XisoLayoutSpec` (in `XISOSharp.Models`) describes
+fixed sector extents. Build one from an existing image's layout, from the JSON emitted
+by `--sector-layout --json`, or from a compact `path=sector` text file:
+
+```csharp
+// From an image's parsed layout (every extent fixed)
+SectorLayout layout = XisoReader.GetSectorLayout("game.iso");
+XisoLayoutSpec spec = XisoLayoutSpec.FromSectorLayout(layout);
+
+// From --sector-layout --json, or a compact text spec
+XisoLayoutSpec fromJson = XisoLayoutSpec.Load("layout.json");
+XisoLayoutSpec fromText = XisoLayoutSpec.ParseText("""
+    # comments and 0x hex are allowed
+    total-sectors=512
+    /readme.txt=400
+    /sub/game.bin=0x190
+    """);
+
+XisoWriter.PackFromDirectory("game_dir", "game.iso", layout: spec);
+```
+
+- **Fixed entries** — a path present in both the layout and the source tree is written
+  at the layout's `startSector`. A directory table may use a larger reserved extent;
+  it fails with `InvalidDataException` when the source entry needs more sectors than
+  the layout reserves.
+- **Unplaced entries** — source files/tables not in the layout are allocated first-fit
+  from `Constants.RootDirectorySector` (`0x108`) around the fixed extents.
+- **JSON extra entries** — a non-strict JSON layout may name files the source tree no
+  longer has. Their extents are reserved (and logged as a warning) so dynamic
+  allocations cannot reuse them.
+- **Text extra entries** — the compact form is strict: a declared path missing from
+  the source tree is an error (almost always a typo).
+- **Validation** — overlaps, extents in the reserved system area (`[0, 33)`), extents
+  outside `TotalSectors`, and too-small extents fail before the output is written.
+  `TotalSectors` (from `volume.totalSectors` or `total-sectors=`) is preserved; the
+  writer still applies its final 64 KiB alignment padding.
+- **Prepended partitions** — layout sectors are partition-relative; `prependSectors`
+  shifts the physical byte positions without changing the stored sector numbers.
+- **Build-image** — `RemapFilesystem.BuildImage(..., layout: spec)` and
+  `build-image --layout <file>` apply the same placement to remapped trees.
+
+The CLI exposes this as `--layout <file>` on `-c`, `--pack <dir>` and `build-image`.
+See [CLI](cli.md#options) and the Phase 8 tests in `LayoutPackingTests`.
 
 ## Rewrite mode
 

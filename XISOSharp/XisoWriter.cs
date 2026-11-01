@@ -112,6 +112,12 @@ public static class XisoWriter
     /// rewrites of images with different offsets cannot cross-read each other's
     /// value (BUG-LIB-013).
     /// </param>
+    /// <param name="layout">
+    /// Optional explicit sector layout (PlanToEnhance Phase 8). Matching files and
+    /// directory tables are written at their requested sectors; entries not in the
+    /// layout are allocated first-fit around them. <c>null</c> keeps the historical
+    /// contiguous layout.
+    /// </param>
     /// <returns>0 on success, 1 on error.</returns>
     /// <remarks>
     /// Concurrent calls from multiple threads are safe but run one at a time
@@ -131,7 +137,8 @@ public static class XisoWriter
         IReadOnlyList<string>? excludePatterns = null,
         IProgress<ProgressInfo>? progress = null,
         ulong? fileTime = null,
-        long sourceDiscLseek = 0)
+        long sourceDiscLseek = 0,
+        XisoLayoutSpec? layout = null)
     {
         lock (CreateLock)
         {
@@ -140,7 +147,7 @@ public static class XisoWriter
             {
                 return CreateXisoCore(rootDirectory, outputDirectory, inRoot, sourceStream,
                     out outIsoPath, inName, progressCallback, cancellationToken, prependSectors,
-                    excludePatterns, progress, fileTime, sourceDiscLseek);
+                    excludePatterns, progress, fileTime, sourceDiscLseek, layout);
             }
             finally
             {
@@ -176,7 +183,8 @@ public static class XisoWriter
         IReadOnlyList<string>? excludePatterns = null,
         IProgress<ProgressInfo>? progress = null,
         ulong? fileTime = null,
-        long sourceDiscLseek = 0)
+        long sourceDiscLseek = 0,
+        XisoLayoutSpec? layout = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
@@ -398,7 +406,7 @@ public static class XisoWriter
         AvlTree.AvlTraverseDepthFirst(root, CalculateDirectoryRequirements, null,
             AvlTraversalMethod.Prefix, 0);
 
-        OffsetCalcContext offsetCtx = new(startSector, prependOffset);
+        OffsetCalcContext offsetCtx = CreateOffsetContext(root, startSector, prependOffset, layout);
         AvlTree.AvlTraverseDepthFirst(root, static (n, c, _) =>
         {
             CalculateDirectoryOffsets(n, (OffsetCalcContext)c!);
@@ -1032,6 +1040,10 @@ public static class XisoWriter
     /// <c>0</c> matches xdvdfs deterministic images). When <c>null</c> (default), the
     /// current time is written.
     /// </param>
+    /// <param name="layout">
+    /// Optional explicit sector layout (PlanToEnhance Phase 8). Matching entries are
+    /// packed at their requested sectors; the rest are allocated first-fit around them.
+    /// </param>
     /// <returns>0 on success, 1 on error.</returns>
     /// <exception cref="ArgumentException">Thrown when <paramref name="outputIsoPath"/> is null or empty.</exception>
     /// <exception cref="DirectoryNotFoundException">Thrown when the source directory does not exist.</exception>
@@ -1043,7 +1055,8 @@ public static class XisoWriter
         ProgressCallback? progressCallback = null,
         CancellationToken cancellationToken = default,
         IProgress<ProgressInfo>? progress = null,
-        ulong? fileTime = null)
+        ulong? fileTime = null,
+        XisoLayoutSpec? layout = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
 
@@ -1059,7 +1072,7 @@ public static class XisoWriter
 
         return CreateXiso(sourceDirectory, outputDirectory, null, null, out _, inName,
             progressCallback, cancellationToken, excludePatterns: excludePatterns, progress: progress,
-            fileTime: fileTime);
+            fileTime: fileTime, layout: layout);
     }
 
     /// <summary>
@@ -1072,6 +1085,7 @@ public static class XisoWriter
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <param name="progress">Optional structured progress channel.</param>
     /// <param name="fileTime">Optional fixed FILETIME for the volume descriptor (deterministic output).</param>
+    /// <param name="layout">Optional explicit sector layout (PlanToEnhance Phase 8).</param>
     /// <returns>A task that completes with 0 on success, 1 on error.</returns>
     public static async Task<int> PackFromDirectoryAsync(
         string sourceDirectory,
@@ -1080,10 +1094,11 @@ public static class XisoWriter
         ProgressCallback? progressCallback = null,
         CancellationToken cancellationToken = default,
         IProgress<ProgressInfo>? progress = null,
-        ulong? fileTime = null) =>
+        ulong? fileTime = null,
+        XisoLayoutSpec? layout = null) =>
         await Task.Run(() => PackFromDirectory(
                 sourceDirectory, outputIsoPath, excludePatterns, progressCallback, cancellationToken, progress,
-                fileTime),
+                fileTime, layout),
             cancellationToken).ConfigureAwait(false);
 
     /// <summary>
@@ -1101,22 +1116,24 @@ public static class XisoWriter
     /// Optional fixed FILETIME for the volume descriptor (deterministic output, TODO #2).
     /// When <c>null</c> (default), the current time is written.
     /// </param>
+    /// <param name="layout">Optional explicit sector layout (PlanToEnhance Phase 8).</param>
     internal static int CreateFromRemapTree(AvlNode? remapRoot, string outputIsoPath, string? volumeName = null,
         IProgress<ProgressInfo>? progress = null, ProgressCallback? progressCallback = null,
-        CancellationToken cancellationToken = default, int? prependSectors = null, ulong? fileTime = null)
+        CancellationToken cancellationToken = default, int? prependSectors = null, ulong? fileTime = null,
+        XisoLayoutSpec? layout = null)
     {
         // Serialize with CreateXiso: both mutate the shared Logger totals and
         // capture/restore the process CWD (Todo #29).
         lock (CreateLock)
         {
             return CreateFromRemapTreeCore(remapRoot, outputIsoPath, volumeName, progress, progressCallback,
-                cancellationToken, prependSectors, fileTime);
+                cancellationToken, prependSectors, fileTime, layout);
         }
     }
 
     private static int CreateFromRemapTreeCore(AvlNode? remapRoot, string outputIsoPath, string? volumeName,
         IProgress<ProgressInfo>? progress, ProgressCallback? progressCallback,
-        CancellationToken cancellationToken, int? prependSectors, ulong? fileTime)
+        CancellationToken cancellationToken, int? prependSectors, ulong? fileTime, XisoLayoutSpec? layout)
     {
         ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
         cancellationToken.ThrowIfCancellationRequested();
@@ -1171,7 +1188,7 @@ public static class XisoWriter
         {
             // Directory layout
             AvlTree.AvlTraverseDepthFirst(root, CalculateDirectoryRequirements, null, AvlTraversalMethod.Prefix, 0);
-            OffsetCalcContext offsetCtx = new(root.StartSector, prependOffset);
+            OffsetCalcContext offsetCtx = CreateOffsetContext(root, root.StartSector, prependOffset, layout);
             AvlTree.AvlTraverseDepthFirst(root, static (n, c, _) =>
             {
                 CalculateDirectoryOffsets(n, (OffsetCalcContext)c!);
@@ -1449,14 +1466,39 @@ public static class XisoWriter
         (size / Constants.SectorSize) + (size % Constants.SectorSize != 0 ? 1u : 0u);
 
     /// <summary>
+    /// Builds the offset context for a create/rewrite pass. With a layout, the
+    /// planner validates every fixed extent and seeds the allocator so unplaced
+    /// entries fill the gaps first-fit; without one, the historical contiguous
+    /// allocation from <paramref name="firstFreeSector"/> is unchanged.
+    /// </summary>
+    private static OffsetCalcContext CreateOffsetContext(AvlNode root, uint firstFreeSector,
+        long prependOffset, XisoLayoutSpec? layout)
+    {
+        if (layout == null)
+            return new OffsetCalcContext(firstFreeSector, prependOffset);
+
+        LayoutPlanner planner = new(layout);
+        planner.Plan(root);
+        return new OffsetCalcContext(planner.Allocator, prependOffset, planner.FixedStarts,
+            planner.TotalSectors);
+    }
+
+    /// <summary>
     /// Returns the exact image length implied by the finished sector layout:
     /// the end of the last allocated file/table sector plus any prepended
     /// partition. Used to pre-size the output before the data phase
     /// (PlanToEnhance Phase 7); the final 64 KiB alignment padding is added by
-    /// the writer afterwards and is never truncated.
+    /// the writer afterwards and is never truncated. A layout's declared
+    /// partition size is preserved even when the last allocation is earlier.
     /// </summary>
-    private static long PreallocatedImageLength(OffsetCalcContext ctx, long prependOffset) =>
-        prependOffset + ((long)ctx.Allocator.NextFree * Constants.SectorSize);
+    private static long PreallocatedImageLength(OffsetCalcContext ctx, long prependOffset)
+    {
+        ulong end = ctx.Allocator.NextFree;
+        if (ctx.TotalSectors is long total && (ulong)total > end)
+            end = (ulong)total;
+
+        return prependOffset + ((long)end * Constants.SectorSize);
+    }
 
     /// <summary>
     /// Traversal callback that assigns sector positions to directory entries
@@ -1470,14 +1512,19 @@ public static class XisoWriter
         {
             if (ReferenceEquals(avl.Subdirectory, AvlNode.EmptySubdirectory))
             {
-                avl.StartSector = ctx.Allocator.AllocateContiguous(1);
+                avl.StartSector = FixedStart(ctx, avl) ?? ctx.Allocator.AllocateContiguous(1);
             }
             else
             {
-                avl.StartSector = ctx.Allocator.AllocateContiguous(NumSectors(avl.FileSize));
+                avl.StartSector = FixedStart(ctx, avl) ?? ctx.Allocator.AllocateContiguous(NumSectors(avl.FileSize));
                 long dirStart = ctx.PrependOffset + ((long)avl.StartSector * Constants.SectorSize);
 
-                WdsafpContext wdsafp = new() { Allocator = ctx.Allocator, DirStart = dirStart };
+                WdsafpContext wdsafp = new()
+                {
+                    Allocator = ctx.Allocator,
+                    DirStart = dirStart,
+                    FixedStarts = ctx.FixedStarts,
+                };
 
                 AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, static (n, c, _) =>
                 {
@@ -1495,6 +1542,13 @@ public static class XisoWriter
     }
 
     /// <summary>
+    /// Returns the layout-requested sector for <paramref name="node"/>, or
+    /// <c>null</c> when the node is allocated dynamically.
+    /// </summary>
+    private static uint? FixedStart(OffsetCalcContext ctx, AvlNode node) =>
+        ctx.FixedStarts != null && ctx.FixedStarts.TryGetValue(node, out uint start) ? start : null;
+
+    /// <summary>
     /// Assigns the directory start offset and starting sector to each file node
     /// in preparation for writing.
     /// </summary>
@@ -1506,7 +1560,9 @@ public static class XisoWriter
 
         if (avl.Subdirectory == null)
         {
-            avl.StartSector = ctx.Allocator.AllocateContiguous(NumSectors(avl.FileSize));
+            avl.StartSector = ctx.FixedStarts != null && ctx.FixedStarts.TryGetValue(avl, out uint start)
+                ? start
+                : ctx.Allocator.AllocateContiguous(NumSectors(avl.FileSize));
         }
     }
 
@@ -1590,6 +1646,7 @@ public static class XisoWriter
     /// When <c>null</c> (default), the current time is written, or the source timestamp
     /// is preserved in rewrite mode.
     /// </param>
+    /// <param name="layout">Optional explicit sector layout (PlanToEnhance Phase 8).</param>
     /// <returns>A task that completes with 0 on success, 1 on error. The first tuple element is the result code; the second is the output ISO path.</returns>
     public static async Task<(int Result, string? OutIsoPath)> CreateXisoAsync(
         string rootDirectory,
@@ -1602,12 +1659,13 @@ public static class XisoWriter
         int? prependSectors = null,
         IReadOnlyList<string>? excludePatterns = null,
         IProgress<ProgressInfo>? progress = null,
-        ulong? fileTime = null) =>
+        ulong? fileTime = null,
+        XisoLayoutSpec? layout = null) =>
         await Task.Run(() =>
         {
             int result = CreateXiso(rootDirectory, outputDirectory, inRoot, sourceStream,
                 out string? outPath, inName, progressCallback, cancellationToken, prependSectors, excludePatterns,
-                progress, fileTime);
+                progress, fileTime, layout: layout);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
 

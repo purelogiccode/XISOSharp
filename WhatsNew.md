@@ -1,3 +1,75 @@
+# What's New in 1.6.0 (since 1.5.0)
+
+XISOSharp can now **pack to an explicit sector layout** (PlanToEnhance Phase 8).
+Take the JSON from `--sector-layout --json` (or write a compact `path=sector`
+text spec), and `-c`, `--pack <dir>` or `build-image` will place matching files
+and directory tables at exactly those sectors while allocating the rest
+first-fit around them. A round-trip of an unchanged tree is byte-identical.
+
+Targets remain `net8.0` / `net9.0` / `net10.0`. Full suite green on all three:
+**1908 passed / 1 opt-in skip (1909) on net8.0/net9.0** and **1970 passed / 1
+opt-in skip (1971) on net10.0**.
+
+## Highlights
+
+- **`XisoLayoutSpec`**: parse the `--sector-layout --json` payload or a compact
+  `path=sector` text file (`#`/`;` comments, `0x` hex, optional `total-sectors=N`).
+- **Fixed-extent packing**: matching files/tables land at their requested sectors;
+  unlisted entries are allocated first-fit from `0x108` around the fixed extents.
+- **Layout fidelity**: `TotalSectors` is preserved; `prependSectors` keeps layout
+  sectors partition-relative; an unchanged tree repacks byte-for-byte.
+- **Fail-fast validation**: overlaps, reserved system-area extents (`[0, 33)`),
+  out-of-range extents and too-small extents throw `InvalidDataException` before
+  anything is written. JSON extra entries are reserved; text extra entries are
+  rejected as typos.
+- **All create paths**: `CreateXiso`, `CreateXisoAsync`, `PackFromDirectory`,
+  `PackFromDirectoryAsync`, `RemapFilesystem.BuildImage`, and the CLI's `-c`,
+  `--pack <dir>` and `build-image`.
+
+## CLI
+
+```bash
+# Capture a layout, then repack at it
+XISOSharp --sector-layout --json game.iso > game.layout.json
+XISOSharp -c ./game_files game.iso --layout game.layout.json
+
+# Compact text form
+cat > layout.txt <<'EOF'
+total-sectors=512
+/readme.txt=400
+/sub/game.bin=0x190
+EOF
+XISOSharp --pack ./game_files game.iso --layout layout.txt
+
+# build-image remapping also honours a layout
+XISOSharp build-image -m "**:{0}" ./src out.iso --layout layout.txt
+```
+
+- `--layout` is create-only: it is rejected with rewrite/extract/list modes and
+  with `--pack <iso>` (a rewrite has no host files to place).
+- Flags still precede positional arguments.
+
+## Library
+
+- `XisoLayoutSpec.FromSectorLayout(SectorLayout)`, `.Load(path)`, `.Parse(text)`,
+  `.ParseJson(json)`, `.ParseText(text)`.
+- `XisoWriter.CreateXiso`/`PackFromDirectory`/`...Async` and
+  `RemapFilesystem.BuildImage` accept `XisoLayoutSpec? layout = null`.
+- `LayoutPlanner` (internal) validates and seeds `SectorAllocator`; no public API
+  break for existing callers (all new parameters are optional).
+
+## Tests
+
+New `LayoutPackingTests` (41) covers JSON/text parsing, byte-identical JSON
+round-trips, fixed/first-fit placement, reserved JSON extents, total-sector
+preservation, prepended partitions, case-insensitive paths, empty entries,
+`build-image`, and CLI `-c`/`--pack`/`build-image` with usage errors. Seven new
+`SectorAllocatorTests.SeedUsedRanges` cases cover the one-pass bulk seeding used
+by large layouts. Net8/net9: **1908 passed / 1 skipped (1909)**; net10:
+**1970 passed / 1 skipped (1971)**.
+
+---
+
 # What's New in 1.5.0 (since 1.4.5)
 
 XISOSharp now speaks **JSON** on every read-only verb, and extraction/creation

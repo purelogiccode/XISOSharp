@@ -37,6 +37,12 @@ internal class WdsafpContext
     /// Required at construction (never left <c>null</c>).
     /// </summary>
     internal required SectorAllocator Allocator;
+
+    /// <summary>
+    /// Layout-requested sectors keyed by node, or <c>null</c> when no explicit
+    /// layout is active (PlanToEnhance Phase 8).
+    /// </summary>
+    internal IReadOnlyDictionary<AvlNode, uint>? FixedStarts;
 }
 
 /// <summary>

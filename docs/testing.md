@@ -58,6 +58,7 @@ Highlights:
 | Destination filesystems (`IFilesystem`, `LocalFilesystem`, `MemoryFilesystem`, generic `UnpackImage` parity) | `XisoFilesystemTests.cs` |
 | Image explorer (`XisoExplorer` load/navigate/copy-out/hash/XEX/path helpers) | `XisoExplorerTests.cs` |
 | Image splitting (`XisoSplitter` split/halves/join, alignment, guards, CLI verbs) | `XisoSplitTests.cs` |
+| Explicit sector-layout packing (`XisoLayoutSpec` JSON/text, fixed extents, first-fit, CLI/build-image) | `LayoutPackingTests.cs` |
 | CISO compress/decompress, split parts, `.cso` auto-detect | `CisoTests.cs`, `CisoAutoDetectTests.cs` |
 | Golden interop vs reference `xdvdfs-cli 0.8.3` (both directions, split layout) | `CisoSplitInteropTests.cs` |
 | Logging, constants, types, exceptions | `LoggerTests.cs`, `ConstantsTests.cs`, `TypesTests.cs`, `XisoExceptionTests.cs`, … |

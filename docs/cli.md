@@ -121,6 +121,7 @@ Image inputs accept `.cso`/`.1.cso` and `.cci`/`.1.cci` files directly (auto-det
 | `-n`, `--no` | Never overwrite: refuse when an output file exists (prints `[ERROR] File already exists`, skips the operation). Cannot be combined with `-y`. |
 | `--skip-sectors N` | Treat the image as if the XISO filesystem starts `N` sectors (2048 bytes each) into the file — for Redump images with a video partition. Valid in extract, list, tree, rewrite (`-r`), `--unpack`, `--filetime`, `--set-filetime`, and `--is-optimized` modes. Rejected with `-c` and with `-i`, `--ls`, `--xex-info`, `--xbe-info`, `--md5`/`--sha256`, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, `checksum`, `--sector-layout`, and `--ranges`. See [Redump & Disc Layouts](redump-workflows.md). |
 | `--prepend-sectors N` | Write the output image with `N` empty sectors before the XISO filesystem, reserving room for a video partition. Valid in create (`-c`) and rewrite (`-r`) modes. See [Redump & Disc Layouts](redump-workflows.md). |
+| `--layout <file>` | **Explicit sector-layout packing** (PlanToEnhance Phase 8). Create (`-c`), `--pack <dir>` and `build-image` place files/directories at the sectors named by a `--sector-layout --json` file or a compact `path=sector` text spec (`total-sectors=N` optional, `0x` hex allowed, `#`/`;` comments). Unlisted entries are allocated first-fit around the fixed extents. Overlaps, extents in the reserved system area, extents outside `total-sectors`, and extents smaller than the source entry needs fail before writing. JSON layouts may name files the source tree lacks (their extents are reserved); the text form rejects unknown paths. See [XisoWriter API](api-xisowriter.md#explicit-sector-layout-packing). |
 | `--preserve-attrs` | Rewrite (`-r`) mode: re-encode the source dirent attribute bits (RO/HID/SYS/NOR) into the output instead of the extract-xiso parity default (DIR/ARC defaults, `dir=0x10`/`file=0x20`). Default off so rewritten images stay byte-identical to `extract-xiso -r`. |
 | `--file-time <value>` | Fixed FILETIME for the volume descriptor on create (`-c`), `--pack`, and `build-image` (values: ISO-8601, decimal raw, `0x` hex, `'now'`, `'0'`). `'0'` writes the xdvdfs deterministic timestamp so identical input produces byte-identical output. See [XisoWriter API](api-xisowriter.md#deterministic-output). |
 | `--filetime <image>` | Show the FILETIME volume-descriptor field (ISO-8601 + raw u64; `0` = 1601-01-01, xdvdfs compatible). See [FILETIME](api-xisoreader.md#filetime). |
@@ -303,6 +304,7 @@ Enforced at parse time; violations print an error and exit 1:
 |---|---|
 | `--skip-sectors` with `-c` | Error |
 | `--prepend-sectors` without `-c` or `-r` | Error |
+| `--layout` without `-c <dir>`, `--pack <dir>` or `build-image` (e.g. with `-r`, `-l`, `--pack <iso>`) | Error |
 | `--preserve-attrs` without `-r` | Error |
 | `--skip-sectors`/`--prepend-sectors` with `-i`, `--ls`, `--xex-info`, `--xbe-info`, hash, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, `checksum`, `--sector-layout`, or `--ranges` | Error |
 | `--validate`/`--validate-checksums`/`--validate-strict`/`--validate-report` without `-r` or `validate` | Error |
@@ -470,6 +472,12 @@ XISOSharp --ls game.iso /media
 XISOSharp --sector-layout game.iso
 XISOSharp --ranges game.iso
 XISOSharp --is-optimized game.iso
+
+# Repack a directory at an existing image's sector layout
+XISOSharp --sector-layout --json game.iso > game.layout.json
+XISOSharp -c ./game_dir game.iso --layout game.layout.json
+# ... or from a compact "path=sector" text spec
+XISOSharp --pack ./game_dir game.iso --layout layout.txt
 
 # Show the Xbox 360 executable header of a game
 # (title ID, entry point, region, media types, ...)

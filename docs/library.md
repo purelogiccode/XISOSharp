@@ -56,7 +56,7 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | [`XisoChecksum` / `CisoWriter`/`CisoReader`](api-utilities.md) | SHA3-256 image checksum + CISO compress/decompress |
 | [`BlockDevice/*`](api-utilities.md#blockdevice) | `IBlockDevice` + `File`/`Memory`/`Offset`/`Stream`/`Ciso`/`Cci` devices |
 | [`RemapFilesystem`](api-utilities.md) | Ordered `host→image` remapping, `xdvdfs.toml`, `GenerateSpecText`, `DryRunRemap` |
-| Records/enums | `VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `RemapRule`, `ProgressInfo`, `ExtractMode`, … |
+| Records/enums | `VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `RemapRule`, `XisoLayoutSpec`, `XisoLayoutEntry`, `ProgressInfo`, `ExtractMode`, … |
 | Exceptions | `XisoFormatException`, `XisoEmptyException`, `XisoFileTooLargeException`, `ExtractErrorException` |
 
 ## Container input
@@ -219,6 +219,10 @@ XisoWriter.PackFromDirectory("source_dir", "game.iso", fileTime: 0);
 SectorLayout layout = XisoReader.GetSectorLayout("game.iso");
 var allocator = SectorAllocator.FromLayout(layout);
 uint sector = allocator.AllocateForBytes(1_000_000); // first-fit free run, no overlaps
+
+// Pack to a fixed layout (PlanToEnhance Phase 8; CLI: --layout)
+XisoLayoutSpec spec = XisoLayoutSpec.FromSectorLayout(layout);
+XisoWriter.PackFromDirectory("game_dir", "repacked.iso", layout: spec);
 
 // Info
 VolumeInfo info = XisoReader.GetVolumeInfo("game.iso");

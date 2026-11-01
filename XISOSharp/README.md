@@ -598,7 +598,10 @@ public static int CreateXiso(
     CancellationToken cancellationToken = default,
     int? prependSectors = null,
     IReadOnlyList<string>? excludePatterns = null,
-    IProgress<ProgressInfo>? progress = null)
+    IProgress<ProgressInfo>? progress = null,
+    ulong? fileTime = null,
+    long sourceDiscLseek = 0,
+    XisoLayoutSpec? layout = null)
 ```
 
 | Parameter | Type | Description |
@@ -613,6 +616,9 @@ public static int CreateXiso(
 | `cancellationToken` | `CancellationToken` | Token to monitor for cancellation requests. |
 | `prependSectors` | `int?` | Optional number of 2048-byte sectors to prepend to the output image before the XISO filesystem begins, leaving room for a video partition. The placeholder area is zero-filled; stored sector numbers remain partition-relative. Negative values throw `ArgumentOutOfRangeException`. |
 | `excludePatterns` | `IReadOnlyList<string>?` | Optional glob patterns of files/directories to omit from the image when creating from a file system (see [`GlobMatcher`](#globmatcher)). Excluded directories are not recursed into. When `Logger.RemoveSystemUpdate` is set, `**/$SystemUpdate/**` is implicitly added. Ignored in rewrite mode. |
+| `fileTime` | `ulong?` | Optional fixed FILETIME for the volume descriptor; `0` makes deterministic images. |
+| `sourceDiscLseek` | `long` | Disc offset of the rewrite source stream (set by `XisoReader.Rewrite`). |
+| `layout` | `XisoLayoutSpec?` | Optional explicit sector layout. Matching files/tables are written at their requested sectors; the rest are allocated first-fit around them. |
 
 **Returns**: `0` on success, `1` on error.
 
@@ -655,6 +661,32 @@ XisoWriter.CreateXiso(srcDir, outputDir, null, null, out _, "game.iso", null,
 ```
 
 Both parameters are also exposed on the CLI as `--skip-sectors N` and `--prepend-sectors N`.
+
+### Explicit sector-layout packing
+
+`XisoLayoutSpec` fixes the sectors of named files and directory tables so a repack can
+reproduce an existing image's layout:
+
+```csharp
+SectorLayout layout = XisoReader.GetSectorLayout("game.iso");
+XisoLayoutSpec spec = XisoLayoutSpec.FromSectorLayout(layout);
+
+// Or load the CLI's JSON / a compact "path=sector" text file
+XisoLayoutSpec json = XisoLayoutSpec.Load("game.layout.json");
+XisoLayoutSpec text = XisoLayoutSpec.ParseText("total-sectors=512\n/readme.txt=400\n");
+
+XisoWriter.PackFromDirectory("game_dir", "repacked.iso", fileTime: 0, layout: spec);
+```
+
+- Matching entries are written at their requested sectors; a too-small extent,
+  an overlap, an extent in the reserved system area (`[0, 33)`), or one outside
+  `TotalSectors` throws `InvalidDataException` before writing.
+- Unlisted source entries are allocated first-fit from `0x108` around the fixed
+  extents. JSON layouts may contain extra entries (their extents are reserved);
+  the compact text form rejects paths that are not in the source tree.
+- `RemapFilesystem.BuildImage(..., layout: spec)` and `build-image --layout <file>`
+  apply the same placement to remapped trees; the CLI also exposes `-c --layout`
+  and `--pack <dir> --layout`.
 
 ### `GlobMatcher`
 

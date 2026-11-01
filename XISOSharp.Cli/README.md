@@ -144,6 +144,7 @@ printed and the tool exits 1.
 | `-X <glob>` | Create mode only: exclude files/dirs by glob (repeatable; `/` separator, case-insensitive) |
 | `--skip-sectors N` | Filesystem starts N sectors into the file (Redump video partition); extract/list/tree/rewrite/unpack/filetime |
 | `--prepend-sectors N` | Write N empty sectors before the filesystem (create/rewrite) |
+| `--layout <file>` | Create/`--pack`/`build-image`: pack at fixed sectors from a `--sector-layout --json` file or a `path=sector` text spec; unlisted entries are first-fit |
 | `--preserve-attrs` | Rewrite: keep source RO/HID/SYS/NOR bits instead of DIR/ARC defaults |
 | `--file-time <value>` | Fixed volume FILETIME on create/pack/build-image (ISO-8601, decimal, `0x` hex, `now`, `0` = deterministic) |
 | `--skip-existing` | Extract/unpack/copy-out: skip files already on disk with matching sizes (resume). Batch verbs: skip sources whose output exists |
@@ -202,6 +203,11 @@ XISOSharp --xbe-info game.iso /default.xbe
 XISOSharp --sector-layout game.iso
 XISOSharp --ranges game.iso
 XISOSharp --is-optimized game.iso
+
+# Repack at an existing image's sector layout (JSON or path=sector text)
+XISOSharp --sector-layout --json game.iso > game.layout.json
+XISOSharp -c ./game_files game.iso --layout game.layout.json
+XISOSharp --pack ./game_files game.iso --layout layout.txt
 
 # Batch a folder of ISOs
 XISOSharp --batch ./isos -d ./extracted

@@ -312,6 +312,78 @@ public class SectorAllocatorTests : IDisposable
         Assert.Throws<ArgumentNullException>(() => SectorAllocator.FromLayout(null!));
 
     [Fact]
+    public void SeedUsedRanges_SortsCoalescesAndAllocatesAroundThem()
+    {
+        SectorAllocator allocator = new(10, 100);
+
+        allocator.SeedUsedRanges(
+        [
+            new SectorRange(40, 5),
+            new SectorRange(12, 3),
+            new SectorRange(15, 5),
+        ]);
+
+        IReadOnlyList<SectorRange> used = allocator.UsedRanges;
+        Assert.Equal(2, used.Count);
+        Assert.Equal(new SectorRange(12, 8), used[0]);
+        Assert.Equal(new SectorRange(40, 5), used[1]);
+
+        // First fit starts in [10, 12), then skips the seeded range.
+        Assert.Equal(10u, allocator.AllocateContiguous(2));
+        Assert.Equal(20u, allocator.AllocateContiguous(1));
+    }
+
+    [Fact]
+    public void SeedUsedRanges_Overlap_Throws()
+    {
+        SectorAllocator allocator = new(0, 100);
+
+        Assert.Throws<ArgumentException>(() => allocator.SeedUsedRanges(
+        [
+            new SectorRange(10, 5),
+            new SectorRange(14, 2),
+        ]));
+    }
+
+    [Theory]
+    [InlineData(99u, 2u)] // beyond total
+    [InlineData(uint.MaxValue, 2u)] // beyond addressable space
+    public void SeedUsedRanges_OutOfBounds_Throws(uint start, uint count)
+    {
+        SectorAllocator allocator = new(0, 100);
+
+        Assert.Throws<ArgumentException>(() => allocator.SeedUsedRanges([new SectorRange(start, count)]));
+    }
+
+    [Fact]
+    public void SeedUsedRanges_AfterAllocation_Throws()
+    {
+        SectorAllocator allocator = new();
+        allocator.AllocateContiguous(1);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            allocator.SeedUsedRanges([new SectorRange(400, 1)]));
+    }
+
+    [Fact]
+    public void SeedUsedRanges_Null_Throws()
+    {
+        SectorAllocator allocator = new();
+
+        Assert.Throws<ArgumentNullException>(() => allocator.SeedUsedRanges(null!));
+    }
+
+    [Fact]
+    public void SeedUsedRanges_SkipsZeroCountRanges()
+    {
+        SectorAllocator allocator = new(10, 100);
+        allocator.SeedUsedRanges([new SectorRange(50, 0)]);
+
+        Assert.Empty(allocator.UsedRanges);
+        Assert.Equal(10u, allocator.AllocateContiguous(1));
+    }
+
+    [Fact]
     public void Writer_AllocationsDoNotOverlap()
     {
         string src = CreateTempDir("xiso_alloc_src");

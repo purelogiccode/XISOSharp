@@ -1,6 +1,6 @@
 # Plan to Enhance XISOSharp
 
-**Status:** CCISharp 1.0.0 published on NuGet (2026-11-01). XISOSharp 1.5.0 implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input, Phase 4 pathological-TOC traversal hardening, Phase 5 batch conversion/naming, Phase 6 `--json` output and Phase 7 preallocation/sequential I/O (library + CLI + GUI + tests). Remaining roadmap: explicit sector-layout packing (Phase 8, design only).
+**Status:** CCISharp 1.0.0 published on NuGet (2026-11-01). XISOSharp 1.6.0 implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input, Phase 4 pathological-TOC traversal hardening, Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests).
 **Baseline:** XISOSharp `1.4.4` (tag), extract-xiso build `202609111233`, xdvdfs `0.8.3`
 **Reference:** CCI spec/implementation copied to `References/libCCI-0.1.0-1b0087e` (commit `1b0087e`, GPL-2.0-or-later; reference only) and verified to build/round-trip.
 **CCISharp repo:** <https://github.com/purelogiccode/CCISharp> — package <https://www.nuget.org/packages/CCISharp/1.0.0>.
@@ -717,11 +717,27 @@ candidates for the same explicit-stack treatment in a follow-up.
 
 **Implementation (1.5.0):** `IFilesystem.CreateFile(path, expectedLength)` is an additive default interface member; `LocalFilesystem` opens with `FileOptions.SequentialScan` and calls `SetLength` before the first write, `MemoryFilesystem` preallocates its buffer, and custom stores keep the old behavior through the default member. `XisoReader.ExtractFile`/`CopyOutFile` pass the entry size, `XisoWriter` sizes the output to the exact post-layout extent before the data phase, and plain-ISO sources open with `SequentialScan`. `PreallocationTests` verifies pre-sizing, the default-member fallback, and that extraction passes each entry's size to the destination.
 
-### 8.9 Phase 8 — explicit sector-layout packing (design only, deferred)
+### 8.9 Phase 8 — explicit sector-layout packing — done in 1.6.0
 
-- `--layout <file>` accepting the JSON emitted by `--sector-layout` (or a compact `path=sector` text spec).
-- Seed `SectorAllocator.FromLayout`; write fixed-extent files at their sectors; allocate unplaced files first-fit; fail on overlap/out-of-range.
-- Requires a two-pass writer (placements before table/data writes). Do not start until Phases 0–4 are stable.
+- `--layout <file>` accepts the JSON emitted by `--sector-layout --json`
+  (`XisoLayoutSpec.ParseJson`) or a compact `path=sector` text spec
+  (`XisoLayoutSpec.ParseText`; `#`/`;` comments, `0x` hex, optional
+  `total-sectors=N`).
+- `LayoutPlanner` validates every fixed extent (system area, overlap, bounds,
+  too-small extents), assigns the matching nodes their requested sectors, and
+  seeds `SectorAllocator` so unplaced entries are allocated first-fit around
+  the fixed extents. `TotalSectors` is preserved; `prependSectors` keeps the
+  stored sectors partition-relative.
+- The writer runs a placement pass after `CalculateDirectoryRequirements` and
+  before `CalculateDirectoryOffsets`/the data phase, so table/data writes see
+  the final placements.
+- Wired through `XisoWriter.CreateXiso`/`CreateXisoAsync`/`PackFromDirectory`/
+  `PackFromDirectoryAsync`, `RemapFilesystem.BuildImage`, and the CLI's `-c`,
+  `--pack <dir>` and `build-image` (`--layout <file>`).
+- Tests: `LayoutPackingTests` (41) covers parsing, byte-identical JSON
+  round-trips, fixed/first-fit placement, reserved JSON extents, total-sector
+  preservation, prepended partitions, case-insensitive paths, empty entries,
+  `build-image`, and CLI usage errors.
 
 ---
 
@@ -759,7 +775,10 @@ candidates for the same explicit-stack treatment in a follow-up.
 | `XISOSharp/XisoChecksum.cs` | use the factory; add `ComputeZarChecksum` |
 | `XISOSharp/XisoRepairer.cs` | refuse CCI/split in-place with a clear message |
 | `XISOSharp/XisoZarchive.cs` | `ListZar`, `ExtractZar`, `ConvertZarToIso` |
-| `XISOSharp/XisoWriter.cs` | layout pre-sizing; sequential output; future layout mode |
+| `XISOSharp/XisoWriter.cs` | layout pre-sizing; sequential output; explicit layout packing (`layout` parameter) |
+| `XISOSharp/Models/XisoLayoutSpec.cs` (new, phase 8) | layout JSON/text parsing, `XisoLayoutEntry`, `FromSectorLayout` |
+| `XISOSharp/LayoutPlanner.cs` (new, phase 8) | fixed-extent validation/placement + seeded allocator |
+| `XISOSharp/DataStructures/OffsetCalcContext.cs` | fixed-start/total-sector context for layout mode |
 | `XISOSharp/XisoReader.cs` | pre-sized extraction/copy-out; offset-aware `GetVolumeInfo`/`ListDirectory`/`GetSectorLayout` |
 | `XISOSharp/LocalFilesystem.cs` / `MemoryFilesystem.cs` | `CreateFile(path, expectedLength)` pre-sizing + `SequentialScan` |
 | `XISOSharp/Interfaces/IFilesystem.cs` | optional `CreateFile(path, expectedLength)` default member |
@@ -835,19 +854,20 @@ candidates for the same explicit-stack treatment in a follow-up.
   - Reader, writer, split sets, seekable stream, ISO extraction, validation.
   - **39 tests green on all three TFMs**, including `libCCI` -> CCISharp and CCISharp -> `libCCI` interop.
   - CI green on Windows/Linux/macOS; tag `v1.0.0` builds/publishes `1.0.0` (nupkg + snupkg).
-- **XISOSharp 1.5.0 (in tree, untagged):**
+- **XISOSharp 1.6.0 (in tree, untagged):**
   - `XisoImageSource` factory (ISO/split ISO/CISO/split CISO/CCI/split CCI/ZAR).
   - `CciBlockDevice`, `XisoCci`, `StreamBlockDevice`, `SplitIsoFile`/`SplitIsoStream`.
   - `XisoZarchive.ListZar`/`ExtractZar`/`ConvertZarToIso`; `XisoChecksum.ComputeZarChecksum`.
   - CLI: `compress --format cci`, `--cci-level`/`--cci-split`, `cci`/`uncci`, `convert`, ZAR-aware list/extract/checksum.
   - GUI: CISO/CCI format selector, `.cci` filters/drop routing, ZAR input through Extract.
-  - **Full suite green:** 1860 passed / 1 skipped (1861) on net8.0/net9.0; 1922 passed / 1 skipped (1923) on net10.0.
+  - **Full suite green:** 1908 passed / 1 skipped (1909) on net8.0/net9.0; 1970 passed / 1 skipped (1971) on net10.0.
   - **Phase 4:** `TraverseXiso` walks each directory table with an explicit in-order stack; a 4,096-entry left-skewed chain lists/trees/extracts/rewrites (the rewrite checksum matches the balanced form). `Constants.MaxTocStackFrames` backstops the stack; subdirectory nesting still uses `MaxTocDepth`.
   - **Phase 5:** `compress`/`decompress`/`convert`/`split` accept `--batch`/`--batch-recursive`, `--skip-existing`, `--continue-on-error`, `--jobs 1..64` and `--output-name` templates (`{name}`, `{ext}`, `{format}`); duplicate outputs and input clobbers are refused before writing, and failed conversions remove partial outputs.
   - **Phase 6:** `--json` on read-only verbs with a source-generated `JsonOutputContext`; stdout JSON/stderr logs; `CliJsonTests`.
   - **Phase 7:** `IFilesystem.CreateFile(path, expectedLength)`, `SequentialScan` sources/destinations, writer layout pre-sizing; `PreallocationTests`.
+  - **Phase 8:** `XisoLayoutSpec` (JSON/text parsing), `LayoutPlanner`, fixed-extent placement + first-fit allocation, `TotalSectors` preservation, `--layout` on `-c`/`--pack`/`build-image`; `LayoutPackingTests`.
   - **Phase 1 gap closed:** `XisoRanges.GetXisoRanges`/`GetFileEntries` are container-aware (`Stream` overloads + `XisoImageSource`), so `--ranges` reads split ISO/CISO/CCI.
-- **Remaining roadmap:** optional explicit layout packing (Phase 8).
+- **Remaining roadmap:** none from this plan (CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work).
 
 ### 12.1 Dependency graph
 
@@ -856,7 +876,7 @@ CCISharp bootstrap ──► CCISharp 1.0.0 ─┐
                                        ▼
 XISOSharp 1.5.0 (factory + split ISO + CCI + ZAR input + traversal hardening + batch + JSON + preallocation)
                                              │
-                                             └─► 1.6.0 (layout, optional)
+                                             └─► 1.6.0 (layout packing)
 ```
 
 ### 12.2 Recommended order
@@ -873,7 +893,7 @@ XISOSharp 1.5.0 (factory + split ISO + CCI + ZAR input + traversal hardening + b
 | 7 | Batch convert + naming | done (1.4.5) | `--batch` on compress/decompress/convert/split, templates, jobs, resume |
 | 8 | JSON output | done (1.5.0) | `--json` on read-only verbs, `JsonOutputContext`, stderr logs |
 | 9 | Preallocation | done (1.5.0) | `CreateFile(path, expectedLength)`, `SequentialScan`, writer pre-sizing |
-| 10 | Layout packing | pending (optional) | 1.6.0 |
+| 10 | Layout packing | done (1.6.0) | `XisoLayoutSpec`, `LayoutPlanner`, `--layout` on create/pack/build-image, 41 tests |
 
 Effort figures are indicative, not commitments; they exclude review, docs polish and release overhead.
 
@@ -890,7 +910,7 @@ Effort figures are indicative, not commitments; they exclude review, docs polish
 
 - **CCISharp 1.0.0** — read/write/split/validate.
 - **XISOSharp 1.5.0** — factory + split ISO + CCI/ZAR input + batch + JSON + preallocation.
-- **XISOSharp 1.6.0** — explicit layout packing (optional).
+- **XISOSharp 1.6.0** — explicit sector-layout packing (`--layout`, `XisoLayoutSpec`).
 
 ---
 
@@ -913,7 +933,7 @@ Effort figures are indicative, not commitments; they exclude review, docs polish
 3. **CLI scope:** ship `CCISharp.Cli` in 1.0.0 or defer to 1.1.0?
 4. **CCI split default:** FATX caps a file at `0xFFFFFFFF` bytes (4 GiB − 1), so a literal 4 GiB slice is not writable. Use a conservative default (e.g., `0xFFBF6000`, the same ~4 GiB point CISO uses) or `4 GiB − 64 KiB`, and confirm against a real Cerbios/Repackinator set.
 5. **ZAR conversion:** v1 via temp directory (simple) vs direct `ISourceFilesystem` writer (clean, more work)?
-6. **Layout packing:** is it worth a 1.7.0, or should it stay a documented future item?
+6. **Layout packing:** is it worth a 1.7.0, or should it stay a documented future item? **Resolved:** implemented in 1.6.0.
 
 ---
 
