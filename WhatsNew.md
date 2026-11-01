@@ -13,8 +13,8 @@ The raw-sector redump modes now refuse container inputs up front, and the GUI
 ZAR tab converts a `.zar` back to a plain ISO.
 
 Targets remain `net8.0` / `net9.0` / `net10.0`. Full suite green on all three:
-**1936 passed / 1 opt-in skip (1937) on net8.0/net9.0** and **2000 passed / 1
-opt-in skip (2001) on net10.0**.
+**1944 passed / 1 opt-in skip (1945) on net8.0/net9.0** and **2008 passed / 1
+opt-in skip (2009) on net10.0**.
 
 ## Highlights
 
@@ -44,6 +44,9 @@ opt-in skip (2001) on net10.0**.
   `--trim`, `--petrify`, `--update` and `--zar` now reject `.cso`/`.cci`, split
   ISO and `.zar` inputs with a "decompress/convert/join first" message instead
   of parsing container bytes as an XISO.
+- **CCI part naming**: a split CCI opened through `.2.cci` … `.9.cci` now names
+  outputs after the game (`game/`, `game.iso`) and recompresses to `game.cci`
+  instead of the numbered part; plain ISO/CISO sets still strip only `.1`.
 - **Quieter bug reports**: expected overwrite refusals (`-n`, redirected stdin)
   stay in the local log and no longer file bug reports.
 
@@ -97,9 +100,12 @@ sector-only rejection for `.zar` inputs. Eleven `RedumpInputGuardTests` prove
 every redump mode refuses container inputs while a plain ISO still runs;
 `CliCommandsTests.Convert`, `MainViewModelTests` and the GUI self-test cover the
 ZAR→ISO direction/argv, and `OverwritePromptExtraTests` asserts expected
-refusals carry `NoBugReport`.
-Net8/net9: **1936 passed / 1 skipped (1937)**; net10:
-**2000 passed / 1 skipped (2001)**.
+refusals carry `NoBugReport`. Seven `XisoImageSourceTests` suffix cases plus
+`CciAutoDetectTests.SecondCciPart_NamesOutputsAfterGameStem` and
+`XisoRepairerRefusalTests.Salvage_DefaultOutputPath_Naming` cover numbered CCI
+part naming for extraction, rewrite, recompress and salvage.
+Net8/net9: **1944 passed / 1 skipped (1945)**; net10:
+**2008 passed / 1 skipped (2009)**.
 
 ---
 

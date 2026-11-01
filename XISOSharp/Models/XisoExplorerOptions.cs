@@ -37,8 +37,8 @@ public sealed record XisoExplorerOptions
 
     /// <summary>
     /// Share mode for the underlying image file(s): the plain-ISO
-    /// <see cref="FileStream"/>, a single <c>.cso</c> container, or every part
-    /// file of a split <c>*.1.cso</c> set.
+    /// <see cref="FileStream"/>, a single CISO/CCI container, or every part
+    /// file of a split ISO/CISO/CCI set.
     /// Default <see cref="FileShare.Read"/> (unchanged 1.0.2 behavior). Use
     /// <see cref="FileShare.ReadWrite"/> to coexist with AV scanners or sync
     /// clients that open the image for write while it is mounted.

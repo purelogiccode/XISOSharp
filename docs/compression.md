@@ -112,7 +112,9 @@ device.Read(0, sector);
 ```
 
 - **Split sets**: `game.1.cci` … `game.9.cci`; open any numbered part and the
-  reader discovers the set from `.1`.
+  reader discovers the set from `.1`. Outputs are named after the game, not the
+  part: extraction creates `game/`, rewrite writes `game.iso`, and recompressing
+  `game.2.cci` derives `game.cci`.
 - **Encoder**: fast LZ4 block encoder. Output is spec-valid and interoperable
   with libCCI/Repackinator, but not byte-identical to their LZ4-HC output.
 - **In-place guards**: `--repair`, `--copy-in`, and `--set-filetime` refuse CCI

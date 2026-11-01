@@ -11,7 +11,7 @@ namespace XISOSharp;
 /// gate into a staging directory, then repacks it through the
 /// <see cref="XisoWriter.CreateXiso"/> pipeline into a fresh plain
 /// <c>.iso</c>. The source image is only ever read — never written, so no
-/// backup is needed and CISO input is allowed (reads go through the
+/// backup is needed and CISO/CCI input is allowed (reads go through the
 /// decompressed view).
 /// Class-C quirks do not block salvage: reserved attribute bits are masked
 /// (readers already mask) and path separators in names are sanitized to
@@ -28,7 +28,8 @@ public static class XisoSalvager
     /// <summary>
     /// Derives the default salvage output path: the source's directory plus
     /// the source stem with a <c>.salvaged.iso</c> suffix
-    /// (<c>game.iso</c>/<c>game.cso</c> → <c>game.salvaged.iso</c>).
+    /// (<c>game.iso</c>/<c>game.cso</c>/<c>game.2.cci</c> →
+    /// <c>game.salvaged.iso</c>).
     /// </summary>
     /// <param name="sourcePath">Path of the image being salvaged.</param>
     /// <returns>The default output path (the file is not created).</returns>
@@ -37,7 +38,10 @@ public static class XisoSalvager
     {
         ArgumentException.ThrowIfNullOrEmpty(sourcePath);
         string? dir = Path.GetDirectoryName(Path.GetFullPath(sourcePath));
-        string stem = Path.GetFileNameWithoutExtension(sourcePath);
+        string file = Path.GetFileName(sourcePath);
+        string stem = XisoImageSource.HasImageSuffix(file)
+            ? XisoImageSource.StripImageSuffix(file)
+            : Path.GetFileNameWithoutExtension(file);
         return Path.Combine(dir!, stem + ".salvaged.iso");
     }
 
@@ -48,7 +52,7 @@ public static class XisoSalvager
     /// surface the <c>OverwritePrompt</c> convention); the source is never
     /// modified.
     /// </summary>
-    /// <param name="sourcePath">Path of the corrupt image (plain or CISO).</param>
+    /// <param name="sourcePath">Path of the corrupt image (plain, CISO or CCI).</param>
     /// <param name="outputPath">
     /// Destination for the rebuilt plain <c>.iso</c>
     /// (<c>null</c> = <see cref="DefaultOutputPath"/>). A not-yet-existing

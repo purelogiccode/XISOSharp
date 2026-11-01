@@ -588,7 +588,7 @@ repairs wandering into file data. Each pass ends with a re-audit — repairing a
 clean image is a no-op success.
 
 Truncation, structural (depth/chain/cycle), and refused (bad magic/root)
-classes are reported, never patched (Phase 2 salvage rebuild). CISO
+classes are reported, never patched (Phase 2 salvage rebuild). CISO/CCI
 containers and split parts are refused with `InvalidDataException`
 (decompress/reassemble first); invalid images fail with `XisoFormatException`
 before anything is written. A `<iso>.old` backup is written first (replacing
@@ -620,17 +620,19 @@ Phase 2):
   separator-collision (or host-unusable) names, and subtrees past the depth
   gate (dropped whole — carrying them would rebuild an image that still fails
   the audit).
-- The source is only ever read, never written: no backup is needed and CISO
-  input is allowed (reads go through the decompressed view). Split parts read
-  as the truncated images they are. A missing tree root (class R) throws
+- The source is only ever read, never written: no backup is needed and
+  CISO/CCI input is allowed (reads go through the decompressed view). Split-ISO
+  parts read as the truncated images they are; split CISO/CCI sets decompress
+  through the container view. A missing tree root (class R) throws
   `XisoFormatException` — there is nothing to salvage with.
 - The rebuilt image is re-audited; `OutputIssues` carries the verdict
   (`Success` when it passes). A salvage that still fails is reported, not
   hidden.
 
 `outputPath` defaults to the source's directory plus the source stem with a
-`.salvaged.iso` suffix (`XisoSalvager.DefaultOutputPath`); an existing file is
-overwritten and a missing parent directory is created. Returns
+`.salvaged.iso` suffix (`XisoSalvager.DefaultOutputPath`); a numbered container
+part is named after the game (`game.2.cci` → `game.salvaged.iso`). An existing
+file is overwritten and a missing parent directory is created. Returns
 `SalvageResult` (`Copied`, `Skipped`, `OutputPath`, `OutputIssues`). CLI:
 `--salvage <file>` (`--repair-out <path>` overrides the output; existing
 files follow the `-y`/`-n` convention).

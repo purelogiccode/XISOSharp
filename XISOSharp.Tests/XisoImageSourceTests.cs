@@ -149,7 +149,14 @@ public sealed class XisoImageSourceTests : IDisposable
     [InlineData("game.1.cso", "game")]
     [InlineData("game.cci", "game")]
     [InlineData("game.1.cci", "game")]
+    [InlineData("game.2.cci", "game")]
+    [InlineData("game.9.cci", "game")]
+    [InlineData("game.10.cci", "game.10")]
+    [InlineData("game.0.cci", "game.0")]
     [InlineData("Halo.2.iso", "Halo.2")]
+    [InlineData("archive.1.zar", "archive.1")]
+    [InlineData("game.1.xiso", "game.1")]
+    [InlineData("game.1.img", "game.1")]
     [InlineData("game", "game")]
     public void StripImageSuffix_HandlesContainersAndParts(string name, string expected) =>
         Assert.Equal(expected, XisoImageSource.StripImageSuffix(name));
@@ -172,6 +179,12 @@ public sealed class XisoImageSourceTests : IDisposable
             XisoCci.DeriveDefaultCciPath(Path.Combine(dir, "game.1.iso"), isDirectory: false));
         Assert.Equal(Path.Combine(dir, "game.iso"),
             XisoCci.DeriveDefaultIsoPath(Path.Combine(dir, "game.1.cci")));
+        Assert.Equal(Path.Combine(dir, "game.cci"),
+            XisoCci.DeriveDefaultCciPath(Path.Combine(dir, "game.2.cci"), isDirectory: false));
+        Assert.Equal(Path.Combine(dir, "game.iso"),
+            XisoCci.DeriveDefaultIsoPath(Path.Combine(dir, "game.2.cci")));
+        Assert.Equal(Path.Combine(dir, "game.cso"),
+            CisoWriter.DeriveDefaultCsoPath(Path.Combine(dir, "game.2.cci"), isDir: false));
         Assert.Equal(Path.Combine(dir, "game.iso"),
             CisoReader.DeriveDefaultIsoPath(Path.Combine(dir, "game.1.cso")));
     }

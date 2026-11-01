@@ -90,6 +90,12 @@ public class XisoRepairerRefusalTests : IDisposable
         string cso = Path.Combine(Path.GetTempPath(), "sub", "game.cso");
         string expectedCso = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(cso))!, "game.salvaged.iso");
         Assert.Equal(expectedCso, XisoSalvager.DefaultOutputPath(cso));
+
+        string csoPart = Path.Combine(Path.GetTempPath(), "sub", "game.1.cso");
+        Assert.Equal(expectedCso, XisoSalvager.DefaultOutputPath(csoPart));
+
+        string cciPart = Path.Combine(Path.GetTempPath(), "sub", "game.2.cci");
+        Assert.Equal(expectedCso, XisoSalvager.DefaultOutputPath(cciPart));
     }
 
     /// <summary>Verifies default salvage output rejects invalid paths.</summary>

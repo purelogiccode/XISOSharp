@@ -63,7 +63,7 @@ A full review of the upstream trackers — 56 extract-xiso issues, 54 extract-xi
 - `XISOSharp/XisoZarchive.cs` — `CreateZar`, `ListZar`, `ExtractZar` and `ConvertZarToIso`.
 - `XISOSharp/XisoPatcher.cs`, `SectorAllocator.cs`, `XisoValidator.cs`, `XisoChecksum.cs` — sector layout, copy-in, audit and SHA3-256 checksum already exist.
 - `XISOSharp.Cli/Program.cs` — `--batch` covers extract/list/tree/rewrite/audit and the container verbs (`compress`/`decompress`/`convert`/`split`); JSON only via `--validate-report` (Phase 6).
-- `XISOSharp.Tests` - current suite: 1936 passed / 1 opt-in skip on net8.0/net9.0; 2000 passed / 1 opt-in skip on net10.0.
+- `XISOSharp.Tests` - current suite: 1944 passed / 1 opt-in skip on net8.0/net9.0; 2008 passed / 1 opt-in skip on net10.0.
 
 ---
 
@@ -869,7 +869,7 @@ existing named error or report/drop gate.
   - `XisoZarchive.ListZar`/`ExtractZar`/`ConvertZarToIso`/`ComputeFileHash`; `XisoChecksum.ComputeZarChecksum`.
   - CLI: `compress --format cci`, `--cci-level`/`--cci-split`, `cci`/`uncci`, `convert`, ZAR-aware list/extract/checksum/validate.
   - GUI: CISO/CCI format selector, `.cci` filters/drop routing, ZAR input through Extract, and `.zar` → ISO conversion on the bidirectional ZAR tab.
-  - **Full suite green:** 1936 passed / 1 skipped (1937) on net8.0/net9.0; 2000 passed / 1 skipped (2001) on net10.0.
+  - **Full suite green:** 1944 passed / 1 skipped (1945) on net8.0/net9.0; 2008 passed / 1 skipped (2009) on net10.0.
   - **Phase 4:** `TraverseXiso` walks each directory table with an explicit in-order stack; a 4,096-entry left-skewed chain lists/trees/extracts/rewrites (the rewrite checksum matches the balanced form). `Constants.MaxTocStackFrames` backstops the stack; subdirectory nesting still uses `MaxTocDepth`. **Follow-up done:** `AuditWalk`, `XisoRanges.GetValidSectorsCore`/`CollectFileEntries`, `XisoRepairer.CollectWalk`, `XisoSalvager.SalvageWalk` and `XisoZarchive.ParseNode` use the same explicit stack, so the left spine audits/maps/repairs/salvages/packs to ZAR too.
   - **Phase 5:** `compress`/`decompress`/`convert`/`split` accept `--batch`/`--batch-recursive`, `--skip-existing`, `--continue-on-error`, `--jobs 1..64` and `--output-name` templates (`{name}`, `{ext}`, `{format}`); duplicate outputs and input clobbers are refused before writing, and failed conversions remove partial outputs.
   - **Phase 6:** `--json` on read-only verbs with a source-generated `JsonOutputContext`; stdout JSON/stderr logs; `CliJsonTests`.
@@ -877,6 +877,7 @@ existing named error or report/drop gate.
   - **Phase 8:** `XisoLayoutSpec` (JSON/text parsing), `LayoutPlanner`, fixed-extent placement + first-fit allocation, `TotalSectors` preservation, `--layout` on `-c`/`--pack`/`build-image`; `LayoutPackingTests`.
   - **Phase 1 gap closed:** `XisoRanges.GetXisoRanges`/`GetFileEntries` are container-aware (`Stream` overloads + `XisoImageSource`), so `--ranges` reads split ISO/CISO/CCI.
   - **Container guard:** the raw-sector redump modes (`--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`) refuse `.cso`/`.cci`, split ISO and `.zar` inputs with a decompress/convert/join message instead of parsing container bytes as an XISO; `RedumpInputGuardTests` covers every mode.
+  - **CCI part naming:** a split CCI opened through `.2.cci` … `.9.cci` names extraction/rewrite/compress outputs after the game (`game/`, `game.iso`, `game.cci`); `StripImageSuffix` strips a part marker only for split-capable extensions (`.1` for ISO/CISO, any digit for CCI, never for `.zar`).
 - **Remaining roadmap:** none from this plan (CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work).
 
 ### 12.1 Dependency graph

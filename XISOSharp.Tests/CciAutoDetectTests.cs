@@ -287,6 +287,58 @@ public sealed class CciAutoDetectTests : IDisposable
     }
 
     [Fact]
+    public void SecondCciPart_NamesOutputsAfterGameStem()
+    {
+        string work = CreateTempDir("xiso_cciauto");
+        string src = Path.Combine(work, "src_random");
+        Directory.CreateDirectory(src);
+        byte[] random = new byte[400_000];
+        Random.Shared.NextBytes(random);
+        File.WriteAllBytes(Path.Combine(src, "r.bin"), random);
+        string isoDir = Path.Combine(work, "iso_random");
+        Directory.CreateDirectory(isoDir);
+        Assert.Equal(0, XisoWriter.CreateXiso(src, isoDir, null, null, out string? iso, "game.iso", null));
+        Assert.NotNull(iso);
+
+        Compress(iso, Path.Combine(work, "game.cci"), splitBytes: 100_000);
+        string second = Path.Combine(work, "game.2.cci");
+        Assert.True(File.Exists(second));
+
+        // Extraction from any part names the directory after the game, not the part.
+        string cwd = Directory.GetCurrentDirectory();
+        Directory.SetCurrentDirectory(work);
+        try
+        {
+            Assert.Equal(0, XisoReader.Extract(second, null, llCompat: false));
+            Assert.True(Directory.Exists(Path.Combine(work, "game")));
+            Assert.False(Directory.Exists(Path.Combine(work, "game.2")));
+            Assert.Equal(random, File.ReadAllBytes(Path.Combine(work, "game", "r.bin")));
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(cwd);
+        }
+
+        // Rewrite from a later part names the output after the game too.
+        string rewriteDir = Path.Combine(work, "rewrite");
+        Directory.CreateDirectory(rewriteDir);
+        Assert.Equal(0, XisoReader.Rewrite(second, rewriteDir, out string? rewritten));
+        Assert.NotNull(rewritten);
+        Assert.Equal("game.iso", Path.GetFileName(rewritten));
+
+        // Recompressing from a later part derives game.cci, not the input path.
+        Assert.Equal(Path.Combine(work, "game.cci"),
+            XisoCci.DeriveDefaultCciPath(second, isDirectory: false));
+        Assert.Equal(0, XisoCci.CompressToCci(second, splitBytes: 0));
+        string recompressed = Path.Combine(work, "game.cci");
+        Assert.True(File.Exists(recompressed));
+
+        string extracted = Path.Combine(work, "recompressed.iso");
+        Assert.Equal(0, XisoCci.DecompressToIso(recompressed, extracted));
+        Assert.Equal(File.ReadAllBytes(iso), File.ReadAllBytes(extracted));
+    }
+
+    [Fact]
     public void CompressDirectory_ToCci_MatchesSourceTree()
     {
         string work = CreateTempDir("xiso_cciauto");

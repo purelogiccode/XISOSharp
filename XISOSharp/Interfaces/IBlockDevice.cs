@@ -3,8 +3,9 @@ namespace XISOSharp.Interfaces;
 /// <summary>
 /// Abstraction over a random-access block device, mirroring <c>xdvdfs-core/src/blockdev.rs</c>
 /// <c>BlockDeviceRead</c> / <c>BlockDeviceWrite</c> and <c>OffsetWrapper</c>.
-/// Enables <c>FileBlockDevice</c>, <c>MemoryBlockDevice</c> (tests) and <c>CisoBlockDevice</c>
-/// (CISO random access) to share the same <c>XisoReader</c> / <c>VerifyXiso</c> paths.
+/// Enables <c>FileBlockDevice</c>, <c>MemoryBlockDevice</c> (tests) and the
+/// <c>CisoBlockDevice</c>/<c>CciBlockDevice</c> containers (random access) to share
+/// the same <c>XisoReader</c> / <c>VerifyXiso</c> paths.
 /// </summary>
 public interface IBlockDevice : IDisposable
 {

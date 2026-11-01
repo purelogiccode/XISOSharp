@@ -5980,9 +5980,9 @@ internal static class Program
                                                                             anything (rejected without --repair).
                                                       --salvage <file>    Rebuild a readable image from a corrupt
                                                                             one: carry every reachable entry into
-                                                                            <file> without its extension plus
+                                                                            <file> named after the game plus
                                                                             '.salvaged.iso' (source never modified;
-                                                                            CISO input allowed). --repair-out
+                                                                            CISO/CCI input allowed). --repair-out
                                                                             overrides the output path (existing
                                                                             files follow the -y/-n convention).
                                                       --filetime <image>   Show FILETIME header field (ISO-8601 + raw u64, xdvdfs compatible; 0 = 1601-01-01).

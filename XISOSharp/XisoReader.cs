@@ -3712,10 +3712,10 @@ public static class XisoReader
     /// facade over <see cref="XisoSalvager.Salvage"/>): carries every entry
     /// reachable without tripping a truncation or structural gate and repacks
     /// them through the <c>CreateXiso</c> pipeline into a fresh plain
-    /// <c>.iso</c>. The source is only read, never modified; CISO input is
+    /// <c>.iso</c>. The source is only read, never modified; CISO/CCI input is
     /// allowed (reads go through the decompressed view).
     /// </summary>
-    /// <param name="sourcePath">Path of the corrupt image (plain or CISO).</param>
+    /// <param name="sourcePath">Path of the corrupt image (plain, CISO or CCI).</param>
     /// <param name="outputPath">
     /// Destination for the rebuilt image (<c>null</c> = same directory,
     /// source stem plus <c>.salvaged.iso</c>). An existing file is

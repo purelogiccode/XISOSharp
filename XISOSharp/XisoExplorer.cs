@@ -14,8 +14,8 @@ namespace XISOSharp;
 /// <see cref="XisoExplorerOptions.KeepOpen"/> to hold one stream for the
 /// explorer's lifetime — the VFS-mounter mode — and dispose the explorer when
 /// done; its operations are serialized by an internal lock.
-/// Plain <c>.iso</c> images and CISO containers (single <c>.cso</c> or split
-/// <c>.1.cso</c> part sets) are supported — every operation routes through
+/// Plain <c>.iso</c> images, split-ISO sets and CISO/CCI containers (single or
+/// split) are supported — every operation routes through
 /// <see cref="XisoReader.OpenImageStream(string)"/> and the stream reader overloads.
 /// </summary>
 public sealed class XisoExplorer : IDisposable
@@ -28,7 +28,7 @@ public sealed class XisoExplorer : IDisposable
     /// Opens the image at <paramref name="isoPath"/> for exploration, probing
     /// the volume descriptor eagerly so a bad image fails fast.
     /// </summary>
-    /// <param name="isoPath">Path to the XISO image (plain <c>.iso</c> or <c>.cso</c>).</param>
+    /// <param name="isoPath">Path to the XISO image (plain <c>.iso</c>, split ISO, CISO or CCI).</param>
     /// <exception cref="ArgumentException">Thrown when <paramref name="isoPath"/> is empty.</exception>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     /// <exception cref="XisoFormatException">Thrown when the file is not a valid XISO image.</exception>
@@ -43,7 +43,7 @@ public sealed class XisoExplorer : IDisposable
     /// fails fast. With <see cref="XisoExplorerOptions.KeepOpen"/> the image
     /// stream stays open until <see cref="Dispose"/>.
     /// </summary>
-    /// <param name="isoPath">Path to the XISO image (plain <c>.iso</c> or <c>.cso</c>).</param>
+    /// <param name="isoPath">Path to the XISO image (plain <c>.iso</c>, split ISO, CISO or CCI).</param>
     /// <param name="options">Explorer options (keep-open, share mode).</param>
     /// <exception cref="ArgumentException">Thrown when <paramref name="isoPath"/> is empty.</exception>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="options"/> is <c>null</c>.</exception>

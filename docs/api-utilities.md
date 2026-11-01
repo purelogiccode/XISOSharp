@@ -168,8 +168,8 @@ writes the current Windows FILETIME (8 bytes, little-endian) into the header are
 ## XisoExplorer & XisoAttributes
 
 `public sealed class XisoExplorer` — UI-agnostic explorer over one image (`.iso`,
-single `.cso`, or split `.1.cso`). Stateless by default; `XisoExplorerOptions`
-switches it to keep-open for VFS/mount consumers.
+single `.cso`/`.cci`, or split `.1.cso`/`.1.cci`/`.1.iso`). Stateless by default;
+`XisoExplorerOptions` switches it to keep-open for VFS/mount consumers.
 
 | Member | Description |
 |---|---|

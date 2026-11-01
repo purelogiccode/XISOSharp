@@ -14,8 +14,8 @@ subdirectory nesting only. The raw-sector redump modes also reject compressed
 and split containers up front, and the GUI ZAR tab converts a `.zar` back to a
 plain ISO.
 
-Full suite green on all three targets: **1936 passed / 1 opt-in skip (1937) on
-net8.0/net9.0** and **2000 passed / 1 opt-in skip (2001) on net10.0**.
+Full suite green on all three targets: **1944 passed / 1 opt-in skip (1945) on
+net8.0/net9.0** and **2008 passed / 1 opt-in skip (2009) on net10.0**.
 
 ### Library
 
@@ -77,6 +77,11 @@ net8.0/net9.0** and **2000 passed / 1 opt-in skip (2001) on net10.0**.
   instead of parsing container bytes as an XISO.
 - Expected overwrite refusals (`-n`, redirected stdin) stay in the local log
   and no longer reach the bug-report API.
+- CCI split sets opened through any numbered part (`.2.cci` … `.9.cci`) name
+  outputs after the game: extraction creates `game/`, rewrite writes `game.iso`,
+  and `compress` derives `game.cci` instead of refusing the source as its own
+  output. Plain ISO/CISO sets still strip only `.1`, and `archive.1.zar` keeps
+  its number.
 
 ### GUI
 
@@ -107,8 +112,13 @@ net8.0/net9.0** and **2000 passed / 1 opt-in skip (2001) on net10.0**.
   cover the ZAR→ISO direction/argv; `OverwritePromptExtraTests` asserts expected
   refusals carry `NoBugReport`. `CisoAutoDetectTests.ReaderVerbs_CsoMatchIso`
   and the split-ISO reader test now compare `--ranges` and sector-layout output.
-- **net8.0/net9.0 - 1937 tests (1936 passed, 1 opt-in skip)**;
-  **net10.0 - 2001 tests (2000 passed, 1 opt-in skip, adds the GUI tests)**.
+- `XisoImageSourceTests` (+7 part-suffix cases), `CciAutoDetectTests.SecondCciPart_NamesOutputsAfterGameStem`
+  and `XisoRepairerRefusalTests.Salvage_DefaultOutputPath_Naming` cover numbered
+  CCI part naming: extraction, rewrite, recompress and salvage from `.2.cci` all
+  use the game stem; `.10.cci`/`.0.cci` stay ordinary names, and `.1.zar` keeps
+  its number.
+- **net8.0/net9.0 - 1945 tests (1944 passed, 1 opt-in skip)**;
+  **net10.0 - 2009 tests (2008 passed, 1 opt-in skip, adds the GUI tests)**.
 
 ## 1.5.0
 
