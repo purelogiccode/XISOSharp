@@ -313,7 +313,10 @@ jobs:
             # Re-run: refresh the same-named assets, never delete anything else.
             gh release upload "$version" dist/*.zip dist/*.spdx.json --clobber --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$version" --verify-tag --title "$version" \
+            gh release create "$version" --verify-tag --title "$version" --draft=false \
               --notes-file release-notes.md --repo "$GITHUB_REPOSITORY" dist/*.zip dist/*.spdx.json
           fi
+          # A release created while the tag was being moved can land as a draft;
+          # make the published state explicit on every run.
+          gh release edit "$version" --draft=false --repo "$GITHUB_REPOSITORY"
           gh release view "$version" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'

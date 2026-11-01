@@ -1048,7 +1048,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 
 ## 15. Phase 9 — World-class 1.5.0 checklist
 
-**Status:** implemented in tree on 2026-11-01; Linux full suite 2015 passed / 24 skipped, Windows 2043 passed / 1 skipped, NativeAOT smoke green; the `1.5.0` release (tag, NuGet, bundles) is pending. `[x]` = implemented and verified in this tree; `[ ]` = pending; `[-]` = evaluated and deliberately excluded (reason recorded).
+**Status:** **released** 2026-11-01. Linux full suite 2015 passed / 24 skipped, Windows 2043 passed / 1 skipped, macOS CI green, NativeAOT smoke green, NuGet `XISOSharp` 1.5.0 + `XISOSharp.Tool` 1.5.0 published, GitHub release 1.5.0 published with six bundles + SPDX SBOM. `[x]` = implemented and verified in this tree; `[ ]` = pending; `[-]` = evaluated and deliberately excluded (reason recorded).
 
 **Versioning note (2026-11-01):** `1.5.0` was never published, and `1.6.0` only exists in the tree. The next public release is **`1.5.0`**, containing everything from the old 1.5.0/1.6.0 notes plus this phase. Do not publish `1.6.0`.
 
@@ -1058,7 +1058,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [x] NuGet publish is gated on `pack` and runs only on tags (`ci.yml`).
 - [x] `AGENTS.md` release routine and bundle recipe document the automated path.
 - [x] Merge the tree's 1.5.0/1.6.0 notes into one `## 1.5.0` release section and refresh `WhatsNew.md` for the new features.
-- [ ] Publish `1.5.0`: tag, NuGet nupkg/snupkg, GitHub release with six bundles; verify `api.nuget.org/v3-flatcontainer/xisosharp/index.json` and the release assets.
+- [x] Publish `1.5.0`: tag, NuGet nupkg/snupkg + `XISOSharp.Tool`, GitHub release with six bundles + SPDX SBOM; verified `api.nuget.org/v3-flatcontainer` and the release assets.
 - [x] Add a `dotnet tool` package (`XISOSharp.Tool`, command `xisosharp`) and a tag-only publish job.
 - [x] Add SBOM generation (CycloneDX/SPDX) to the release workflow.
 - [x] Add GitHub build-provenance attestations for the six bundles.
@@ -1196,4 +1196,5 @@ dotnet run --project XISOSharp.Fuzz -c Release -- --seconds 60
 | Date | Change | Commit |
 |---|---|---|
 | 2026-11-01 | Phase 9 plan added; 1.5/1.6 notes merged into 1.5.0 | — |
-| 2026-11-01 | Phase 9 implementation: `XisoImage`, full-image hashes, `verify-hashes`, `title-info`, CISO hardening (fuzzer found an `OverflowException`), ZAR caps, reserved names/long paths, `dotnet tool`, AOT smoke, mutation fuzzer, 3-OS CI, format/coverage gates, SBOM/provenance, community files, sample, end-to-end benchmarks, support policy, threat model, public-API snapshot. Full suite 1979/1 (net8/9), 2043/1 (net10); Linux 2015/24; NativeAOT smoke green. | — |
+| 2026-11-01 | Phase 9 implementation: `XisoImage`, full-image hashes, `verify-hashes`, `title-info`, CISO hardening (fuzzer found an `OverflowException`), ZAR caps, reserved names/long paths, `dotnet tool`, AOT smoke, mutation fuzzer, 3-OS CI, format/coverage gates, SBOM/provenance, community files, sample, end-to-end benchmarks, support policy, threat model, public-API snapshot, synthetic battle-interop. Full suite 1979/1 (net8/9), 2043/1 (net10); Linux 2015/24; NativeAOT smoke green. | — |
+| 2026-11-01 | **Released 1.5.0**: tag pushed, CI green on Ubuntu/Windows/macOS + AOT + fuzz + battle-interop + InspectCode, NuGet `XISOSharp` 1.5.0 + `XISOSharp.Tool` 1.5.0 published, GitHub release published with six RID bundles + SPDX SBOM. | `1.5.0` |

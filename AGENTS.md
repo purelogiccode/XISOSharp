@@ -65,9 +65,9 @@ reproducible or re-downloadable. Never delete them.
 
 ### Versioning facts
 
-- **Next release: `1.5.0`.** The tree's older `1.6.0` notes were never tagged or
-  published; they were merged into `1.5.0` (see `PlanToEnhance.md` Phase 9).
-  Do not create a `1.6.0` tag/release.
+- **1.5.0 is published (2026-11-01).** Do not reuse the version or move the
+  `1.5.0` tag again. The next release is at least `1.6.0`; the old 1.6.0 notes
+  were merged into 1.5.0 and must not be published as a separate tag.
 - Version comes from git tags via **MinVer**. Never add or edit a `Version`
   property in a csproj.
 - Release tags are bare semver: `1.0.0`, `1.0.1`, `1.0.2` (`v1.0.2` also
