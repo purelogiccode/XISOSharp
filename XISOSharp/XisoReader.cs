@@ -31,19 +31,12 @@ public static class XisoReader
     private static readonly byte[] HeaderDataBytes = Encoding.ASCII.GetBytes(Constants.HeaderData);
 
     /// <summary>
-    /// True when <paramref name="path"/> has a <c>.cso</c> extension; covers split
-    /// <c>*.1.cso</c> part sets (mirroring <c>xdvdfs-cli/src/img.rs::open_image</c>).
-    /// </summary>
-    internal static bool IsCsoPath(string path) =>
-        Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// Opens an image for reading: <c>.cso</c> paths (single or split parts) are routed
-    /// through <see cref="CisoBlockDevice"/> wrapped in a <see cref="BlockDeviceStream"/>,
-    /// everything else opens as a plain <see cref="FileStream"/>. Detection is by extension
-    /// (mirroring <c>xdvdfs-cli/src/img.rs::open_image</c>) with a <c>CISO</c> magic sniff
-    /// fallback, so renamed containers — notably the CLI rewrite flow, which appends
-    /// <c>.old</c> — still resolve to the decompressed view.
+    /// Opens an image for reading. Plain ISO files are opened directly; CISO,
+    /// CCI and split part sets are routed through <see cref="XisoImageSource"/>
+    /// so every reader verb sees the decompressed, concatenated view.
+    /// Detection is extension-led with a magic sniff fallback, so renamed
+    /// containers — notably the CLI rewrite flow, which appends <c>.old</c> —
+    /// still resolve to the decompressed view.
     /// The caller owns the returned stream.
     /// </summary>
     public static Stream OpenImageStream(string path) => OpenImageStream(path, FileShare.Read);
@@ -52,39 +45,19 @@ public static class XisoReader
     /// Opens an image for reading with a caller-chosen share mode. Plain ISO
     /// files pass <paramref name="share"/> straight to the <see cref="FileStream"/>,
     /// so a host process that coexists with writers (AV scanners, sync clients)
-    /// can request <see cref="FileShare.ReadWrite"/>. CISO inputs thread the share
-    /// mode through <see cref="CisoBlockDevice"/> to the underlying part files.
+    /// can request <see cref="FileShare.ReadWrite"/>. Compressed and split
+    /// inputs thread the share mode through to the underlying part files.
     /// The caller owns the returned stream.
     /// </summary>
-    /// <param name="path">Path to the image (plain <c>.iso</c> or <c>.cso</c>).</param>
-    /// <param name="share">File sharing mode for the underlying plain-ISO <see cref="FileStream"/>.</param>
-    public static Stream OpenImageStream(string path, FileShare share)
-    {
-        if (IsCsoPath(path) || CisoReader.IsCso(path))
-            return new BlockDeviceStream(new CisoBlockDevice(path, share), leaveOpen: false);
-        return new FileStream(
-            path,
-            new FileStreamOptions
-            {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = share, BufferSize = 65536
-            });
-    }
+    /// <param name="path">Path to an image (plain <c>.iso</c>, CISO, CCI or a split part).</param>
+    /// <param name="share">File sharing mode for the underlying file(s).</param>
+    public static Stream OpenImageStream(string path, FileShare share) =>
+        XisoImageSource.OpenRead(path, share);
 
     /// <summary>
-    /// Strips a <c>.cso</c> (or split <c>.1.cso</c>) image suffix for output naming:
-    /// <c>game.cso</c> → <c>game</c>, <c>game.1.cso</c> → <c>game</c>.
-    /// </summary>
-    private static string StripCsoSuffix(string name)
-    {
-        string stem = name[..^".cso".Length];
-        if (stem.EndsWith(".1", StringComparison.Ordinal))
-            stem = stem[..^2];
-        return stem;
-    }
-
-    /// <summary>
-    /// Strips the rewrite backup suffix (legacy: last 4 chars, i.e. <c>.old</c>) plus any
-    /// <c>.cso</c> image suffix, so a rewrite names its output after the game, not the container.
+    /// Strips the rewrite backup suffix (legacy: last 4 chars, i.e. <c>.old</c>)
+    /// plus any image container suffix and split-part marker, so a rewrite names
+    /// its output after the game, not the container.
     /// </summary>
     private static string StripRewriteSuffix(string filename)
     {
@@ -92,14 +65,15 @@ public static class XisoReader
         {
             filename = filename[..^".old".Length];
         }
-        else if (filename.Length > 4)
+        else if (!XisoImageSource.HasImageSuffix(filename) && filename.Length > 4)
         {
             // Legacy last-4 strip; a shorter name is returned as-is instead of
-            // throwing (Todo #49).
+            // throwing (Todo #49). Known container suffixes skip this so
+            // `game.1.cci` keeps its part marker for the split-aware strip below.
             filename = filename[..^4];
         }
 
-        return IsCsoPath(filename) && filename.Length > 4 ? StripCsoSuffix(filename) : filename;
+        return XisoImageSource.StripImageSuffix(filename);
     }
 
     /// <summary>
@@ -431,12 +405,16 @@ public static class XisoReader
     }
 
     /// <summary>
-    /// Recursively traverses the on-disk directory tree of an XISO image,
-    /// building an AVL index and optionally extracting files or listing entries.
+    /// Traverses one directory table of an XISO image, building an AVL index and
+    /// optionally extracting files or listing entries. The on-disk AVL tree is
+    /// walked in order (left subtree, entry, right subtree) with an explicit
+    /// stack instead of recursion, so a left-skewed table of up to
+    /// <see cref="Constants.MaxTocEntriesPerTable"/> entries cannot overflow the
+    /// process stack. Subdirectory descent remains recursive but is bounded by
+    /// <see cref="Constants.MaxTocDepth"/>.
     /// </summary>
-    /// <param name="fs">Image stream positioned at the start of the directory sector.</param>
-    /// <param name="inDirNode">Pre-allocated directory entry node, or <c>null</c> to create one.</param>
-    /// <param name="dirStart">Byte offset of the current directory sector.</param>
+    /// <param name="fs">Image stream; the walk seeks absolutely for every entry.</param>
+    /// <param name="dirStart">Byte offset of the current directory table.</param>
     /// <param name="path">Path prefix for logging and extraction.</param>
     /// <param name="mode">Operating mode (extract, list, or generate AVL tree).</param>
     /// <param name="avlRoot">Reference to the AVL root being built.</param>
@@ -449,13 +427,6 @@ public static class XisoReader
     /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <param name="progress">Optional channel receiving <c>FileAdded</c> per written file in extract mode.</param>
-    /// <param name="visited">
-    /// Absolute stream offsets of entries already seen in this directory table
-    /// (TODO #16): shared across the left-subtree recursion of the same table so
-    /// a corrupt cycle (extract-xiso #25, Burnout PAL) fails with a named
-    /// <c>invalid TOC entry</c> error instead of hanging then OOMing. Pass
-    /// <c>null</c> to start a new table (subdirectory descent gets a fresh set).
-    /// </param>
     /// <param name="tableSize">
     /// Byte size of the directory table being walked (root: volume root size;
     /// subdirectory: the entry's reported size), mirroring
@@ -463,9 +434,10 @@ public static class XisoReader
     /// beyond it are corruption, not data. <c>long.MaxValue</c> disables the check.
     /// </param>
     /// <param name="depth">
-    /// Nesting depth (subdirectory descent + intra-table AVL recursion). Genuine
-    /// images stay far below <see cref="Constants.MaxTocDepth"/>; deeper means a
-    /// malicious subdir cycle and throws instead of overflowing the stack.
+    /// Subdirectory nesting depth. Genuine images stay far below
+    /// <see cref="Constants.MaxTocDepth"/>; deeper means a malicious subdir cycle
+    /// and throws instead of overflowing the stack. Intra-table AVL depth is not
+    /// counted here: the explicit stack bounds it by the table entry cap.
     /// </param>
     /// <param name="filesystem">
     /// Optional destination filesystem (TODO #7). When set (extract mode), directories
@@ -488,7 +460,6 @@ public static class XisoReader
     /// </exception>
     private static void TraverseXiso(
         Stream fs,
-        DirEntry? inDirNode,
         long dirStart,
         string? path,
         ExtractMode mode,
@@ -498,14 +469,9 @@ public static class XisoReader
         UnpackOptions? unpackOptions = null,
         CancellationToken cancellationToken = default,
         IProgress<ProgressInfo>? progress = null,
-        HashSet<long>? visited = null,
         long tableSize = long.MaxValue,
-        // Recursion-depth bound (#16 hardening); threaded through left-subtree and subdir recursion by design.
-        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Global
         int depth = 0,
         IFilesystem? filesystem = null,
-        // Rewrite-mode only: when false (default, extract-xiso parity) the source
-        // attribute byte is dropped and entries re-encode with the DIR/ARC defaults.
         bool preserveAttributes = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -515,36 +481,186 @@ public static class XisoReader
                 $"invalid TOC entry at '{path}': maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
         }
 
-        visited ??= [];
-        Span<byte> intBuf = stackalloc byte[4];
-        Span<byte> shortBuf = stackalloc byte[2];
-        Span<byte> byteBuf = stackalloc byte[1];
-        Span<byte> headerRest = stackalloc byte[12];
-
-        DirEntry node = new();
-        DirEntry dir = inDirNode ?? node;
-
-        dir.Left = null;
-        dir.Parent = null;
-        dir.AvlNode = null;
-        dir.Filename = "";
-
-        // Running table offset in DWORDs (widened to long: the old (ushort)
-        // narrowing wrapped sector-padded offsets past 64K DWORDs — BUG-LIB-028).
-        long lOffset = 0;
+        HashSet<long> visited = [];
+        List<TocEntry> stack = [];
+        long readPos = dirStart;
 
         while (true)
         {
-            // Right-sibling iteration re-enters here via `continue`, bypassing the
-            // method entry, so every entry — file, directory, or sibling — observes
-            // cancellation (TODO #13: an interrupted unpack must stop promptly).
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Hardening (#16): bound the walk before trusting the bytes. Every entry
-            // position is absolute (dirStart + table offset); revisiting one is
-            // a corrupt cycle, and positions outside the table/image are corrupt
-            // pointers — both previously hung then OOMed (extract-xiso #25).
-            long entryPos = fs.Position;
+            TocEntry? read;
+            TocEntry node;
+
+            try
+            {
+                read = ReadTocEntry(fs, dirStart, ref readPos, visited, tableSize, path, mode,
+                    ref avlRoot, preserveAttributes);
+            }
+            catch (Exception ex) when (IsTocCatchable(ex, mode, unpackOptions))
+            {
+                if (stack.Count == 0) throw;
+                node = PopToc(stack);
+                RecordTocFailure(unpackOptions, path, node.Filename, ex);
+                goto ProcessNode;
+            }
+
+            if (read is null)
+            {
+                return;
+            }
+
+            if (read.LeftOffset != 0)
+            {
+                long leftSeek;
+                try
+                {
+                    leftSeek = dirStart + (read.LeftOffset * Constants.DwordSize);
+                    if (leftSeek < dirStart || leftSeek >= fs.Length ||
+                        (tableSize != long.MaxValue && leftSeek >= dirStart + tableSize))
+                    {
+                        throw new XisoFormatException(
+                            $"invalid TOC entry at '{path}{read.Filename}': left child offset {read.LeftOffset} (seek {leftSeek}) " +
+                            $"points outside the directory table (table at {dirStart}, size {tableSize}, image length {fs.Length}).");
+                    }
+                }
+                catch (Exception ex) when (IsTocCatchable(ex, mode, unpackOptions))
+                {
+                    if (stack.Count == 0) throw;
+                    node = PopToc(stack);
+                    RecordTocFailure(unpackOptions, path, node.Filename, ex);
+                    goto ProcessNode;
+                }
+
+                llCompat = false;
+                stack.Add(read);
+                if (stack.Count > Constants.MaxTocStackFrames)
+                {
+                    throw new XisoFormatException(
+                        $"invalid TOC entry at '{path}': intra-table traversal stack exceeded " +
+                        $"{Constants.MaxTocStackFrames} frames (possible corrupt offset chain).");
+                }
+
+                readPos = leftSeek;
+                continue;
+            }
+
+            node = read;
+
+        ProcessNode:
+            // `node` is not on the stack: its left subtree (if any) is complete.
+            while (true)
+            {
+                try
+                {
+                    ProcessTocEntry(fs, node, path, mode, discLseek, unpackOptions, cancellationToken,
+                        progress, filesystem, depth, llCompat);
+                }
+                catch (Exception ex) when (IsTocCatchable(ex, mode, unpackOptions))
+                {
+                    if (stack.Count == 0) throw;
+                    TocEntry parent = PopToc(stack);
+                    RecordTocFailure(unpackOptions, path, parent.Filename, ex);
+                    node = parent;
+                    continue;
+                }
+
+                if (node.ROffset != 0)
+                {
+                    ushort rOffset = node.ROffset;
+                    if (llCompat)
+                    {
+                        long sector = (node.EndPosition - dirStart) / Constants.SectorSize;
+                        if ((long)rOffset * Constants.DwordSize / Constants.SectorSize > sector)
+                        {
+                            rOffset = (ushort)((sector * (Constants.SectorSize / Constants.DwordSize)) +
+                                               (Constants.SectorSize / Constants.DwordSize));
+                        }
+                    }
+
+                    long rightSeek = dirStart + ((long)rOffset * Constants.DwordSize);
+                    if (rightSeek < dirStart || rightSeek >= fs.Length ||
+                        (tableSize != long.MaxValue && rightSeek >= dirStart + tableSize))
+                    {
+                        Exception error = new XisoFormatException(
+                            $"invalid TOC entry at '{path}': right child offset {rOffset} (seek {rightSeek}) " +
+                            $"points outside the directory table (table at {dirStart}, size {tableSize}, image length {fs.Length}).");
+
+                        if (!IsTocCatchable(error, mode, unpackOptions)) throw error;
+                        if (stack.Count == 0) throw error;
+                        TocEntry parent = PopToc(stack);
+                        RecordTocFailure(unpackOptions, path, parent.Filename, error);
+                        node = parent;
+                        continue;
+                    }
+
+                    readPos = rightSeek;
+                    break;
+                }
+
+                if (stack.Count == 0)
+                {
+                    return;
+                }
+
+                node = PopToc(stack);
+            }
+        }
+    }
+
+    /// <summary>Parsed directory entry plus the in-order walk bookkeeping.</summary>
+    private sealed class TocEntry
+    {
+        /// <summary>Absolute stream offset immediately after the filename.</summary>
+        internal long EndPosition;
+
+        /// <summary>Left-child offset in DWORDs; 0 means no left child.</summary>
+        internal long LeftOffset;
+
+        /// <summary>Right-child offset in DWORDs; 0 means no right sibling.</summary>
+        internal ushort ROffset;
+
+        /// <summary>Start sector of the file data or subdirectory table.</summary>
+        internal uint StartSector;
+
+        /// <summary>File size, or subdirectory table size for directories.</summary>
+        internal uint FileSize;
+
+        /// <summary>Masked attribute byte.</summary>
+        internal byte Attributes;
+
+        /// <summary>Entry name (Latin-1 decoded).</summary>
+        internal string Filename = "";
+
+        /// <summary>AVL node created for rewrite mode; <c>null</c> otherwise.</summary>
+        internal AvlNode? Avl;
+
+        /// <summary>True for the structural "." / ".." records.</summary>
+        internal bool Structural;
+    }
+
+    /// <summary>
+    /// Reads one directory entry at <paramref name="readPos"/>, skipping sector
+    /// padding. Returns <c>null</c> at the end of an empty table; updates
+    /// <paramref name="readPos"/> past any padding encountered.
+    /// </summary>
+    private static TocEntry? ReadTocEntry(
+        Stream fs,
+        long dirStart,
+        ref long readPos,
+        HashSet<long> visited,
+        long tableSize,
+        string? path,
+        ExtractMode mode,
+        ref AvlNode? avlRoot,
+        bool preserveAttributes)
+    {
+        Span<byte> shortBuf = stackalloc byte[2];
+        Span<byte> headerRest = stackalloc byte[12];
+
+        while (true)
+        {
+            long entryPos = readPos;
             if (entryPos < dirStart || entryPos >= fs.Length ||
                 (tableSize != long.MaxValue && entryPos >= dirStart + tableSize))
             {
@@ -566,26 +682,43 @@ public static class XisoReader
                     $"(>{Constants.MaxTocEntriesPerTable}, possible corrupt offset chain).");
             }
 
+            fs.Seek(entryPos, SeekOrigin.Begin);
             ReadExact(fs, shortBuf);
-            ushort tmp = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+            ushort leftOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
 
-            if (tmp == Constants.PadShort)
+            bool isPad = leftOffset == Constants.PadShort;
+            if (!isPad && leftOffset == Constants.EmptyDirectorySentinel)
             {
-                if (lOffset == 0)
+                // 0x0000 may be a valid left child offset (no left child) for a real
+                // entry, or the xdvdfs empty-directory sentinel (14 bytes all zeros).
+                ReadExact(fs, headerRest);
+                isPad = headerRest[0] == 0 && headerRest[1] == 0 && headerRest[2] == 0 &&
+                        headerRest[3] == 0 && headerRest[4] == 0 && headerRest[5] == 0 &&
+                        headerRest[6] == 0 && headerRest[7] == 0 && headerRest[8] == 0 &&
+                        headerRest[9] == 0 && headerRest[10] == 0 && headerRest[11] == 0;
+            }
+            else if (!isPad)
+            {
+                ReadExact(fs, headerRest);
+            }
+
+            if (isPad)
+            {
+                if (entryPos == dirStart)
                 {
                     if (mode == ExtractMode.GenerateAvl)
                     {
                         AvlTree.AvlInsert(ref avlRoot, AvlNode.EmptySubdirectory);
                     }
 
-                    goto end_traverse;
+                    return null;
                 }
 
                 // Sector-pad rounding in full precision (BUG-LIB-028): bounds-check
                 // before seeking so a corrupt offset fails here with its own name
                 // instead of wrapping (old (ushort) cast) into a mis-walk.
-                long padded = (lOffset * Constants.DwordSize) +
-                              (Constants.SectorSize - ((lOffset * Constants.DwordSize) % Constants.SectorSize));
+                long relative = entryPos - dirStart;
+                long padded = relative + (Constants.SectorSize - (relative % Constants.SectorSize));
                 long padSeek = dirStart + padded;
                 if (padSeek < dirStart || padSeek >= fs.Length ||
                     (tableSize != long.MaxValue && padSeek >= dirStart + tableSize))
@@ -595,85 +728,15 @@ public static class XisoReader
                         $"(table at {dirStart}, size {tableSize}, image length {fs.Length}).");
                 }
 
-                lOffset = padded;
-                fs.Seek(padSeek, SeekOrigin.Begin);
+                readPos = padSeek;
                 continue;
             }
-            else if (tmp == Constants.EmptyDirectorySentinel)
-            {
-                // 0x0000 may be a valid left child offset (no left child) for a real entry,
-                // or it may be the xdvdfs empty-directory sentinel (14 bytes all zeros).
-                // Peek the remaining 12 bytes of the header to distinguish.
-                long peekPos = fs.Position;
-                bool isAllZeros;
-                try
-                {
-                    ReadExact(fs, headerRest);
-                    isAllZeros = headerRest[0] == 0 && headerRest[1] == 0 && headerRest[2] == 0 &&
-                                 headerRest[3] == 0 && headerRest[4] == 0 && headerRest[5] == 0 &&
-                                 headerRest[6] == 0 && headerRest[7] == 0 && headerRest[8] == 0 &&
-                                 headerRest[9] == 0 && headerRest[10] == 0 && headerRest[11] == 0;
-                }
-                catch
-                {
-                    isAllZeros = false;
-                }
 
-                fs.Seek(peekPos, SeekOrigin.Begin);
-
-                if (isAllZeros)
-                {
-                    if (lOffset == 0)
-                    {
-                        if (mode == ExtractMode.GenerateAvl)
-                        {
-                            AvlTree.AvlInsert(ref avlRoot, AvlNode.EmptySubdirectory);
-                        }
-
-                        goto end_traverse;
-                    }
-
-                    // Same full-precision pad rounding as above (BUG-LIB-028).
-                    long paddedZero = (lOffset * Constants.DwordSize) +
-                                      (Constants.SectorSize -
-                                       ((lOffset * Constants.DwordSize) % Constants.SectorSize));
-                    long padSeekZero = dirStart + paddedZero;
-                    if (padSeekZero < dirStart || padSeekZero >= fs.Length ||
-                        (tableSize != long.MaxValue && padSeekZero >= dirStart + tableSize))
-                    {
-                        throw new XisoFormatException(
-                            $"invalid TOC entry at '{path}': padded table offset {paddedZero} points outside the directory table " +
-                            $"(table at {dirStart}, size {tableSize}, image length {fs.Length}).");
-                    }
-
-                    lOffset = paddedZero;
-                    fs.Seek(padSeekZero, SeekOrigin.Begin);
-                    continue;
-                }
-                else
-                {
-                    lOffset = tmp;
-                }
-            }
-            else
-            {
-                lOffset = tmp;
-            }
-
-            ReadExact(fs, shortBuf);
-            ushort rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
-
-            ReadExact(fs, intBuf);
-            uint startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
-
-            ReadExact(fs, intBuf);
-            uint fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
-
-            ReadExact(fs, byteBuf);
-            byte attributes = Constants.MaskAttributes(byteBuf[0]);
-
-            ReadExact(fs, byteBuf);
-            byte filenameLength = byteBuf[0];
+            ushort rOffset = BinaryPrimitives.ReadUInt16LittleEndian(headerRest);
+            uint startSector = BinaryPrimitives.ReadUInt32LittleEndian(headerRest[2..]);
+            uint fileSize = BinaryPrimitives.ReadUInt32LittleEndian(headerRest[6..]);
+            byte attributes = Constants.MaskAttributes(headerRest[10]);
+            byte filenameLength = headerRest[11];
 
             byte[] nameBuf = new byte[filenameLength];
             ReadExact(fs, nameBuf);
@@ -696,9 +759,10 @@ public static class XisoReader
 
             // Structural "." / ".." records are skipped (parity with
             // ReadDirectoryEntries/ReadRawEntries); their left/right children
-            // are still traversed below.
+            // are still traversed by the caller.
             bool structuralEntry = filename is "." or "..";
 
+            AvlNode? avl = null;
             if (!structuralEntry && mode == ExtractMode.GenerateAvl)
             {
                 // Attribute policy (BUG-LIB-034 revisited): extract-xiso discards the
@@ -706,12 +770,11 @@ public static class XisoReader
                 // (extract-xiso.c:2252), so byte parity with the oracle requires the
                 // same normalization. `preserveAttributes: true` restores the richer
                 // behavior and re-encodes RO/HID/SYS/NOR from the source image.
-                AvlNode avl = new()
+                avl = new AvlNode
                 {
                     Filename = filename, FileSize = fileSize, OldStartSector = startSector,
                     Attributes = preserveAttributes ? attributes : (byte)0
                 };
-                dir.AvlNode = avl;
 
                 // XISO names are case-insensitive: a tree holding both cases
                 // cannot round-trip, so fail loudly instead of dropping one
@@ -724,272 +787,249 @@ public static class XisoReader
                 }
             }
 
-            if (lOffset != 0)
+            return new TocEntry
             {
-                llCompat = false;
+                EndPosition = fs.Position,
+                LeftOffset = leftOffset,
+                ROffset = rOffset,
+                StartSector = startSector,
+                FileSize = fileSize,
+                Attributes = attributes,
+                Filename = filename,
+                Avl = avl,
+                Structural = structuralEntry,
+            };
+        }
+    }
 
-                long leftSeek = dirStart + (lOffset * Constants.DwordSize);
-                if (leftSeek < dirStart || leftSeek >= fs.Length ||
-                    (tableSize != long.MaxValue && leftSeek >= dirStart + tableSize))
-                {
-                    throw new XisoFormatException(
-                        $"invalid TOC entry at '{path}{filename}': left child offset {lOffset} (seek {leftSeek}) " +
-                        $"points outside the directory table (table at {dirStart}, size {tableSize}, image length {fs.Length}).");
-                }
+    /// <summary>
+    /// Emits or extracts one parsed directory entry. Directories descend into
+    /// their own table (bounded by <see cref="Constants.MaxTocDepth"/>); files
+    /// are written in extract mode or logged otherwise.
+    /// </summary>
+    private static void ProcessTocEntry(
+        Stream fs,
+        TocEntry entry,
+        string? path,
+        ExtractMode mode,
+        long discLseek,
+        UnpackOptions? unpackOptions,
+        CancellationToken cancellationToken,
+        IProgress<ProgressInfo>? progress,
+        IFilesystem? filesystem,
+        int depth,
+        bool llCompat)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
 
-                DirEntry left = new();
-                dir.Left = left;
-                left.Parent = dir;
+        if (entry.Structural)
+        {
+            return;
+        }
 
-                fs.Seek(leftSeek, SeekOrigin.Begin);
+        string filename = entry.Filename;
+        if ((entry.Attributes & Constants.AttributeDir) != 0)
+        {
+            // Destination-relative paths chain with '/' under a custom
+            // filesystem; the legacy chdir walk keeps the host separator.
+            string sep = filesystem != null ? "/" : Constants.PathCharStr;
+            string? subPath = path is null ? null : path + filename + sep;
 
-                // A corrupt left subtree skips just that subtree under
-                // continue-on-error (the current entry and right siblings still
-                // process: every sibling seek below is absolute, so recovery is
-                // position-safe); otherwise the named error aborts the run.
-                try
-                {
-                    DirEntry savedDir = dir.Left!;
-                    TraverseXiso(fs, savedDir, dirStart, path, mode, ref avlRoot, llCompat, discLseek,
-                        unpackOptions, cancellationToken, progress, visited, tableSize, depth + 1, filesystem);
-                }
-                catch (Exception ex) when (unpackOptions?.ContinueOnError == true && mode == ExtractMode.Extract &&
-                                           ex is not OperationCanceledException)
-                {
-                    ExtractFileException failure = ex as ExtractFileException
-                                                   ?? ExtractFileException.ForToc(string.Concat(path, filename),
-                                                       filename, 0, 0, ex);
-                    unpackOptions.RecordFailure(failure);
-                    Logger.LogErr($"Error: {failure.Message}\n");
-                }
-            }
-
-            dir.Left = null;
-            long curpos = fs.Position;
-
-            if (structuralEntry)
+            if (!Logger.RemoveSystemUpdate || !filename.Contains("$SystemUpdate", StringComparison.Ordinal))
             {
-                // Skipped: not a real entry; the sibling chain below still runs.
-            }
-            else if ((attributes & Constants.AttributeDir) != 0)
-            {
-                // Destination-relative paths chain with '/' under a custom
-                // filesystem; the legacy chdir walk keeps the host separator.
-                string sep = filesystem != null ? "/" : Constants.PathCharStr;
-                string subPath = null!;
-                if (path != null)
+                // Under continue-on-error an uncreatable directory records a
+                // named failure and skips its whole subtree (xdvdfs #187);
+                // otherwise the error aborts the run as before.
+                bool dirOk = true;
+                if (mode == ExtractMode.Extract)
                 {
-                    subPath = path + filename + sep;
-                    fs.Seek(((long)startSector * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
-                }
-
-                if (!Logger.RemoveSystemUpdate || !filename.Contains("$SystemUpdate", StringComparison.Ordinal))
-                {
-                    // Under continue-on-error an uncreatable directory records a
-                    // named failure and skips its whole subtree (xdvdfs #187);
-                    // otherwise the error aborts the run as before.
-                    bool dirOk = true;
-                    if (mode == ExtractMode.Extract)
+                    try
                     {
-                        try
+                        if (filesystem != null)
                         {
-                            if (filesystem != null)
-                            {
-                                filesystem.CreateDirectory(string.Concat(path, filename));
-                            }
-                            else
-                            {
-                                Directory.CreateDirectory(filename);
-                                Directory.SetCurrentDirectory(filename);
-                            }
+                            filesystem.CreateDirectory(string.Concat(path, filename));
                         }
-                        catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
-                                                   ex is not OperationCanceledException)
+                        else
                         {
-                            ExtractFileException failure = ex as ExtractFileException
-                                                           ?? ExtractFileException.ForDirectory(
-                                                               string.Concat(path, filename),
-                                                               filesystem != null
-                                                                   ? string.Concat(path, filename)
-                                                                   : filename,
-                                                               ex);
-                            unpackOptions.RecordFailure(failure);
-                            Logger.LogErr($"Error: {failure.Message}\n");
-                            dirOk = false;
+                            Directory.CreateDirectory(filename);
+                            Directory.SetCurrentDirectory(filename);
                         }
                     }
-
-                    if (dirOk)
+                    catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
+                                               ex is not OperationCanceledException)
                     {
-                        if (mode != ExtractMode.GenerateAvl)
-                        {
-                            Logger.Log(
-                                $"{mode switch { ExtractMode.Extract => "creating ", _ => "" }}{path}{filename}{sep} (0 bytes){mode switch { ExtractMode.Extract => " [OK]", _ => "" }}\n");
-                            Logger.Flush();
-                        }
-
-                        if (fileSize > 0)
-                        {
-                            // Hardening (#16): validate the subdirectory pointer before
-                            // descending: a corrupt start sector/size previously
-                            // sent the walk into garbage (or past EOF) and hung
-                            // or overflowed the stack on cycles (Burnout PAL).
-                            long subStart = ((long)startSector * Constants.SectorSize) + discLseek;
-                            if (subStart < 0 || subStart >= fs.Length)
-                            {
-                                throw new XisoFormatException(
-                                    $"invalid TOC entry at '{subPath}': directory start sector {startSector} " +
-                                    $"(seek {subStart}) points outside the image (length {fs.Length}).");
-                            }
-
-                            if (fileSize > (ulong)(fs.Length - subStart))
-                            {
-                                throw new XisoFormatException(
-                                    $"invalid TOC entry at '{subPath}': directory size {fileSize} " +
-                                    $"(ends at {subStart + fileSize}) exceeds image length {fs.Length}).");
-                            }
-
-                            DirEntry subdir = new()
-                            {
-                                Left = dir.Left,
-                                Parent = null,
-                                AvlNode = dir.AvlNode,
-                                Filename = dir.Filename,
-                                ROffset = dir.ROffset,
-                                Attributes = dir.Attributes,
-                                FilenameLength = dir.FilenameLength,
-                                FileSize = dir.FileSize,
-                                StartSector = dir.StartSector
-                            };
-
-                            // A corrupt subdirectory skips just that subtree
-                            // under continue-on-error while siblings continue
-                            // (sibling seeks are absolute, so recovery is
-                            // position-safe); otherwise the named error aborts.
-                            AvlNode? subAvlRoot = mode == ExtractMode.GenerateAvl ? dir.AvlNode?.Subdirectory : null;
-                            try
-                            {
-                                TraverseXiso(
-                                    fs, subdir,
-                                    subStart,
-                                    subPath, mode,
-                                    ref mode == ExtractMode.GenerateAvl
-                                        ? ref dir.AvlNode!.Subdirectory
-                                        : ref subAvlRoot,
-                                    llCompat, discLseek, unpackOptions, cancellationToken, progress,
-                                    null, fileSize, depth + 1, filesystem);
-                            }
-                            catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
-                                                       mode == ExtractMode.Extract &&
-                                                       ex is not OperationCanceledException)
-                            {
-                                ExtractFileException failure = ex as ExtractFileException
-                                                               ?? ExtractFileException.ForToc(subPath, filename,
-                                                                   startSector,
-                                                                   fileSize, ex);
-                                unpackOptions.RecordFailure(failure);
-                                Logger.LogErr($"Error: {failure.Message}\n");
-                            }
-                        }
-                        else if (mode == ExtractMode.GenerateAvl && dir.AvlNode != null)
-                        {
-                            // Parity with extract-xiso build-202609111233: a zero-size
-                            // directory is an empty directory, not a file. Without this,
-                            // Subdirectory stays null and the rewrite writer emits the
-                            // entry as a file (ARC + file data) instead of a directory.
-                            dir.AvlNode.Subdirectory = AvlNode.EmptySubdirectory;
-                        }
-
-                        if (mode == ExtractMode.Extract && filesystem == null)
-                        {
-                            Directory.SetCurrentDirectory("..");
-                        }
+                        ExtractFileException failure = ex as ExtractFileException
+                                                       ?? ExtractFileException.ForDirectory(
+                                                           string.Concat(path, filename),
+                                                           filesystem != null
+                                                               ? string.Concat(path, filename)
+                                                               : filename,
+                                                           ex);
+                        unpackOptions.RecordFailure(failure);
+                        Logger.LogErr($"Error: {failure.Message}\n");
+                        dirOk = false;
                     }
                 }
-            }
-            else if (mode != ExtractMode.GenerateAvl)
-            {
-                if (!Logger.RemoveSystemUpdate || !(path?.Contains("$SystemUpdate", StringComparison.Ordinal) ?? false))
-                {
-                    // A failed file still advances the sibling chain: every entry
-                    // seeks explicitly (ExtractFile seeks to its sector, siblings
-                    // seek from the saved position), so recording and carrying on
-                    // is position-safe. Failed files are excluded from the totals.
-                    bool fileOk = true;
-                    if (mode == ExtractMode.Extract)
-                    {
-                        bool written;
-                        try
-                        {
-                            written = ExtractFile(fs, filename, startSector, fileSize, path, discLseek,
-                                unpackOptions, cancellationToken, progress, filesystem);
-                        }
-                        catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
-                                                   ex is not OperationCanceledException)
-                        {
-                            ExtractFileException failure = ex as ExtractFileException
-                                                           ?? ExtractFileException.ForWrite(
-                                                               string.Concat(path, filename), filename,
-                                                               startSector, fileSize, -1, ex);
-                            unpackOptions.RecordFailure(failure);
-                            Logger.LogErr($"Error: {failure.Message}\n");
-                            written = false;
-                            fileOk = false;
-                        }
 
-                        if (written)
-                        {
-                            progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded,
-                                Path: string.Concat(path, filename).Replace('\\', '/'),
-                                Sector: startSector, Size: fileSize));
-                        }
-                    }
-                    else
+                if (dirOk)
+                {
+                    if (mode != ExtractMode.GenerateAvl)
                     {
-                        Logger.Log($"{path!}{filename} ({fileSize} bytes)\n");
+                        Logger.Log(
+                            $"{mode switch { ExtractMode.Extract => "creating ", _ => "" }}{path}{filename}{sep} (0 bytes){mode switch { ExtractMode.Extract => " [OK]", _ => "" }}\n");
                         Logger.Flush();
                     }
 
-                    if (fileOk)
+                    if (entry.FileSize > 0)
                     {
-                        Logger.RecordIsoFileWritten(fileSize);
+                        // Hardening (#16): validate the subdirectory pointer before
+                        // descending: a corrupt start sector/size previously
+                        // sent the walk into garbage (or past EOF) and hung
+                        // or overflowed the stack on cycles (Burnout PAL).
+                        long subStart = ((long)entry.StartSector * Constants.SectorSize) + discLseek;
+                        if (subStart < 0 || subStart >= fs.Length)
+                        {
+                            throw new XisoFormatException(
+                                $"invalid TOC entry at '{subPath}': directory start sector {entry.StartSector} " +
+                                $"(seek {subStart}) points outside the image (length {fs.Length}).");
+                        }
+
+                        if (entry.FileSize > (ulong)(fs.Length - subStart))
+                        {
+                            throw new XisoFormatException(
+                                $"invalid TOC entry at '{subPath}': directory size {entry.FileSize} " +
+                                $"(ends at {subStart + entry.FileSize}) exceeds image length {fs.Length}).");
+                        }
+
+                        fs.Seek(subStart, SeekOrigin.Begin);
+
+                        // A corrupt subdirectory skips just that subtree
+                        // under continue-on-error while siblings continue
+                        // (sibling seeks are absolute, so recovery is
+                        // position-safe); otherwise the named error aborts.
+                        try
+                        {
+                            if (mode == ExtractMode.GenerateAvl)
+                            {
+                                TraverseXiso(
+                                    fs, subStart, subPath, mode,
+                                    ref entry.Avl!.Subdirectory,
+                                    llCompat, discLseek, unpackOptions, cancellationToken, progress,
+                                    tableSize: entry.FileSize, depth: depth + 1, filesystem: filesystem);
+                            }
+                            else
+                            {
+                                AvlNode? unusedAvl = null;
+                                TraverseXiso(
+                                    fs, subStart, subPath, mode,
+                                    ref unusedAvl,
+                                    llCompat, discLseek, unpackOptions, cancellationToken, progress,
+                                    tableSize: entry.FileSize, depth: depth + 1, filesystem: filesystem);
+                            }
+                        }
+                        catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
+                                                   mode == ExtractMode.Extract &&
+                                                   ex is not OperationCanceledException)
+                        {
+                            ExtractFileException failure = ex as ExtractFileException
+                                                           ?? ExtractFileException.ForToc(subPath!, filename,
+                                                               entry.StartSector,
+                                                               entry.FileSize, ex);
+                            unpackOptions.RecordFailure(failure);
+                            Logger.LogErr($"Error: {failure.Message}\n");
+                        }
+                    }
+                    else if (mode == ExtractMode.GenerateAvl && entry.Avl != null)
+                    {
+                        // Parity with extract-xiso build-202609111233: a zero-size
+                        // directory is an empty directory, not a file. Without this,
+                        // Subdirectory stays null and the rewrite writer emits the
+                        // entry as a file (ARC + file data) instead of a directory.
+                        entry.Avl.Subdirectory = AvlNode.EmptySubdirectory;
+                    }
+
+                    if (mode == ExtractMode.Extract && filesystem == null)
+                    {
+                        Directory.SetCurrentDirectory("..");
                     }
                 }
             }
-
-            if (rOffset != 0)
-            {
-                if (llCompat)
-                {
-                    long sector = (curpos - dirStart) / Constants.SectorSize;
-                    if ((long)rOffset * Constants.DwordSize / Constants.SectorSize > sector)
-                    {
-                        rOffset = (ushort)((sector * (Constants.SectorSize / Constants.DwordSize)) +
-                                           (Constants.SectorSize / Constants.DwordSize));
-                    }
-                }
-
-                long rightSeek = dirStart + ((long)rOffset * Constants.DwordSize);
-                if (rightSeek < dirStart || rightSeek >= fs.Length ||
-                    (tableSize != long.MaxValue && rightSeek >= dirStart + tableSize))
-                {
-                    throw new XisoFormatException(
-                        $"invalid TOC entry at '{path}': right child offset {rOffset} (seek {rightSeek}) " +
-                        $"points outside the directory table (table at {dirStart}, size {tableSize}, image length {fs.Length}).");
-                }
-
-                fs.Seek(rightSeek, SeekOrigin.Begin);
-
-                dir.Filename = "";
-                lOffset = rOffset;
-
-                continue;
-            }
-
-            break;
         }
+        else if (mode != ExtractMode.GenerateAvl)
+        {
+            if (!Logger.RemoveSystemUpdate || !(path?.Contains("$SystemUpdate", StringComparison.Ordinal) ?? false))
+            {
+                // A failed file still advances the sibling chain: every entry
+                // seeks explicitly (ExtractFile seeks to its sector, siblings
+                // seek from the saved position), so recording and carrying on
+                // is position-safe. Failed files are excluded from the totals.
+                bool fileOk = true;
+                if (mode == ExtractMode.Extract)
+                {
+                    bool written;
+                    try
+                    {
+                        written = ExtractFile(fs, filename, entry.StartSector, entry.FileSize, path, discLseek,
+                            unpackOptions, cancellationToken, progress, filesystem);
+                    }
+                    catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
+                                               ex is not OperationCanceledException)
+                    {
+                        ExtractFileException failure = ex as ExtractFileException
+                                                       ?? ExtractFileException.ForWrite(
+                                                           string.Concat(path, filename), filename,
+                                                           entry.StartSector, entry.FileSize, -1, ex);
+                        unpackOptions.RecordFailure(failure);
+                        Logger.LogErr($"Error: {failure.Message}\n");
+                        written = false;
+                        fileOk = false;
+                    }
 
-        end_traverse: ;
+                    if (written)
+                    {
+                        progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded,
+                            Path: string.Concat(path, filename).Replace('\\', '/'),
+                            Sector: entry.StartSector, Size: entry.FileSize));
+                    }
+                }
+                else
+                {
+                    Logger.Log($"{path!}{filename} ({entry.FileSize} bytes)\n");
+                    Logger.Flush();
+                }
+
+                if (fileOk)
+                {
+                    Logger.RecordIsoFileWritten(entry.FileSize);
+                }
+            }
+        }
+    }
+
+    /// <summary>Pops the top frame of the explicit intra-table traversal stack.</summary>
+    private static TocEntry PopToc(List<TocEntry> stack)
+    {
+        TocEntry entry = stack[^1];
+        stack.RemoveAt(stack.Count - 1);
+        return entry;
+    }
+
+    /// <summary>
+    /// True when a structural walk failure should skip the current subtree and be
+    /// recorded instead of aborting (extract mode with continue-on-error).
+    /// </summary>
+    private static bool IsTocCatchable(Exception ex, ExtractMode mode, UnpackOptions? unpackOptions) =>
+        unpackOptions?.ContinueOnError == true &&
+        mode == ExtractMode.Extract &&
+        ex is not OperationCanceledException;
+
+    /// <summary>Records a skipped corrupt subtree against the nearest entry.</summary>
+    private static void RecordTocFailure(UnpackOptions? unpackOptions, string? path, string filename, Exception ex)
+    {
+        ExtractFileException failure = ex as ExtractFileException
+                                       ?? ExtractFileException.ForToc(string.Concat(path, filename), filename, 0, 0, ex);
+        unpackOptions!.RecordFailure(failure);
+        Logger.LogErr($"Error: {failure.Message}\n");
     }
 
     /// <summary>
@@ -1849,19 +1889,18 @@ public static class XisoReader
         int len = name.Length;
 
         string? shortName = null;
-        switch (len)
+        if (len == 0)
         {
-            case > 4 when string.Equals(name[^4..], ".iso", StringComparison.OrdinalIgnoreCase):
-                shortName = name[..^4];
-                break;
-            case 0:
-                Logger.LogErr($"invalid xiso image name: {imageName}\n");
-                return 1;
+            Logger.LogErr($"invalid xiso image name: {imageName}\n");
+            return 1;
         }
 
-        // A .cso input names its outputs after the game, not the container.
-        if (shortName == null && len > 4 && IsCsoPath(name))
-            shortName = StripCsoSuffix(name);
+        // Container inputs (plain ISO, CISO, CCI and split parts) name their
+        // outputs after the game, not the container.
+        if (XisoImageSource.HasImageSuffix(name))
+        {
+            shortName = XisoImageSource.StripImageSuffix(name);
+        }
 
         string? cwd = null;
 
@@ -1954,7 +1993,7 @@ public static class XisoReader
                 {
                     fs.Seek(((long)rootDirSect * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
                     AvlNode? avlRoot = null;
-                    TraverseXiso(fs, null, ((long)rootDirSect * Constants.SectorSize) + discLseek,
+                    TraverseXiso(fs, ((long)rootDirSect * Constants.SectorSize) + discLseek,
                         buf, ExtractMode.GenerateAvl, ref avlRoot, llCompat, discLseek,
                         cancellationToken: cancellationToken, tableSize: rootDirSize,
                         preserveAttributes: preserveAttributes);
@@ -1977,10 +2016,10 @@ public static class XisoReader
                     AvlNode? avlRoot = null;
                     try
                     {
-                        TraverseXiso(fs, null, ((long)rootDirSect * Constants.SectorSize) + discLseek,
+                        TraverseXiso(fs, ((long)rootDirSect * Constants.SectorSize) + discLseek,
                             filesystem != null ? "/" : buf, mode, ref avlRoot, llCompat, discLseek,
                             unpackOptions, cancellationToken, progress,
-                            null, rootDirSize, 0, filesystem);
+                            tableSize: rootDirSize, filesystem: filesystem);
                     }
                     catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
                                                mode == ExtractMode.Extract &&
@@ -2312,11 +2351,11 @@ public static class XisoReader
     {
         // The descriptor field cannot be patched through a compressed container:
         // name the restriction instead of probing compressed bytes for a header
-        // (Todo #47).
-        if (IsCsoPath(isoPath) || CisoReader.IsCso(isoPath))
+        // (Todo #47). CCI joins CISO here.
+        if (XisoImageSource.IsCompressedContainerPath(isoPath) || XisoImageSource.IsCompressedImage(isoPath))
         {
             throw new IOException(
-                $"Cannot set the FILETIME of a compressed CISO image: {isoPath}; decompress it first");
+                $"Cannot set the FILETIME of a compressed image: {isoPath}; decompress it first");
         }
 
         using FileStream fs = new(
@@ -3457,7 +3496,7 @@ public static class XisoReader
     /// <exception cref="FileNotFoundException">The image file does not exist.</exception>
     /// <exception cref="XisoFormatException">The image is not a valid XISO.</exception>
     /// <exception cref="InvalidDataException">
-    /// The image is a CISO container or a split part; neither is patch-stable.
+    /// The image is a CISO/CCI container or a split part; neither is patch-stable.
     /// </exception>
     /// <exception cref="IOException">Thrown on read/write errors.</exception>
     public static RepairResult Repair(string isoPath, bool createBackup = true, bool dryRun = false) =>

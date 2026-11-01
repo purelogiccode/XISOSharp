@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using XISOSharp.BlockDevice;
 using XISOSharp.Interfaces;
+using ZArchiveSharp;
 
 namespace XISOSharp;
 
@@ -21,27 +22,17 @@ public static class XisoChecksum
     /// for regular files, the file data. This matches <c>xdvdfs checksum</c>.
     /// </summary>
     /// <param name="isoPath">Path to the XISO file (or Redump partition; use <paramref name="skipSectors"/> for video offset).
-    /// A <c>.cso</c> path — single file or split <c>*.1.cso</c> parts — is auto-detected by extension and
-    /// routed through <see cref="CisoBlockDevice"/> (mirroring <c>xdvdfs-cli/src/img.rs::open_image</c>).</param>
+    /// Plain ISO, CISO/CSO, CCI and split part sets are auto-detected by
+    /// <see cref="XisoImageSource"/> and read through the decompressed view.</param>
     /// <param name="skipSectors">Optional skip sectors for Redump game partition.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>32-byte SHA3-256 digest.</returns>
     public static byte[] ComputeImageChecksum(string isoPath, int? skipSectors = null, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        if (IsCsoPath(isoPath))
-        {
-            using CisoBlockDevice dev = new(isoPath);
-            return ComputeImageChecksum(dev, Path.GetFileName(isoPath), skipSectors, ct);
-        }
-
-        using FileBlockDevice fsDev = new(isoPath, FileMode.Open, FileAccess.Read);
-        return ComputeImageChecksum(fsDev, Path.GetFileName(isoPath), skipSectors, ct);
+        using IBlockDevice dev = XisoImageSource.OpenBlockDevice(isoPath);
+        return ComputeImageChecksum(dev, Path.GetFileName(isoPath), skipSectors, ct);
     }
-
-    /// <summary>True when <paramref name="path"/> has a <c>.cso</c> extension (covers split <c>*.1.cso</c>).</summary>
-    private static bool IsCsoPath(string path) =>
-        Path.GetExtension(path).Equals(".cso", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Computes checksum from an open stream with known disc name (for error reporting).</summary>
     public static byte[] ComputeImageChecksum(FileStream fs, string isoName, int? skipSectors = null,
@@ -135,9 +126,112 @@ public static class XisoChecksum
         CancellationToken ct = default) =>
         Convert.ToHexString(ComputeImageChecksum(isoPath, skipSectors, ct)).ToLowerInvariant();
 
+    /// <summary>
+    /// Computes the same deterministic SHA3-256 tree checksum for a ZArchive
+    /// (<c>.zar</c>) that <see cref="ComputeImageChecksum(string,int?,CancellationToken)"/>
+    /// computes for an ISO: sorted <c>/path</c> bytes plus file data. Equivalent
+    /// trees therefore hash equally across ISO and ZAR.
+    /// </summary>
+    /// <param name="zarPath">Path to the <c>.zar</c> archive.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>32-byte SHA3-256 digest.</returns>
+    /// <exception cref="ArgumentException"><paramref name="zarPath"/> is null or empty.</exception>
+    /// <exception cref="FileNotFoundException">The archive does not exist.</exception>
+    /// <exception cref="InvalidDataException">The archive is malformed.</exception>
+    public static byte[] ComputeZarChecksum(string zarPath, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(zarPath);
+        ct.ThrowIfCancellationRequested();
+
+        using ZArchiveReader reader = ZArchiveReader.TryOpen(zarPath, out ZArchiveOpenFailure failure)
+                                      ?? throw failure switch
+                                      {
+                                          ZArchiveOpenFailure.FileNotFound => new FileNotFoundException(
+                                              $"ZArchive not found: {zarPath}", zarPath),
+                                          ZArchiveOpenFailure.AccessDenied => new UnauthorizedAccessException(
+                                              $"Access denied reading ZArchive: {zarPath}"),
+                                          _ => new InvalidDataException(
+                                              $"Invalid ZArchive '{zarPath}': {failure}."),
+                                      };
+
+        SortedDictionary<string, (bool IsDir, uint Node, ulong Size)> map = new(StringComparer.Ordinal);
+        CollectZarTree(reader, ZArchiveReader.RootNode, string.Empty, map, ct);
+
+        using IncrementalHash? nativeHasher = SHA3_256.IsSupported
+            ? IncrementalHash.CreateHash(HashAlgorithmName.SHA3_256)
+            : null;
+        using Sha3256? managedHasher = nativeHasher == null ? new Sha3256() : null;
+        byte[] buffer = new byte[Constants.ReadWriteBufferSize];
+
+        foreach (KeyValuePair<string, (bool IsDir, uint Node, ulong Size)> kv in map)
+        {
+            ct.ThrowIfCancellationRequested();
+            byte[] pathBytes = Encoding.UTF8.GetBytes(kv.Key);
+            if (nativeHasher != null) nativeHasher.AppendData(pathBytes);
+            else managedHasher!.AppendData(pathBytes);
+
+            (bool isDir, uint node, ulong size) = kv.Value;
+            if (isDir || size == 0) continue;
+
+            ulong consumed = 0;
+            ulong remaining = size;
+            while (remaining > 0)
+            {
+                int toRead = (int)Math.Min((ulong)buffer.Length, remaining);
+                ulong read = reader.ReadFromFile(node, consumed, buffer.AsSpan(0, toRead));
+                if (read == 0)
+                {
+                    throw new IOException(
+                        $"Truncated ZArchive file data for {kv.Key}: expected {size}, remaining {remaining}");
+                }
+
+                if (nativeHasher != null) nativeHasher.AppendData(buffer, 0, (int)read);
+                else managedHasher!.AppendData(buffer, 0, (int)read);
+
+                consumed += read;
+                remaining -= read;
+            }
+        }
+
+        return nativeHasher != null ? nativeHasher.GetHashAndReset() : managedHasher!.GetHashAndReset();
+    }
+
+    /// <summary>Returns the lowercase hex representation of <see cref="ComputeZarChecksum"/>.</summary>
+    /// <param name="zarPath">Path to the <c>.zar</c> archive.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public static string ComputeZarChecksumHex(string zarPath, CancellationToken ct = default) =>
+        Convert.ToHexString(ComputeZarChecksum(zarPath, ct)).ToLowerInvariant();
+
     // -----------------------------------------------------------------------
     // File-tree collection — mirrors xdvdfs read.rs file_tree + walk_dirent_tree
     // -----------------------------------------------------------------------
+
+    private static void CollectZarTree(ZArchiveReader reader, uint node, string parent,
+        SortedDictionary<string, (bool IsDir, uint Node, ulong Size)> map, CancellationToken ct, int depth = 0)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (depth > Constants.MaxTocDepth)
+        {
+            throw new InvalidDataException(
+                $"ZArchive directory depth exceeds {Constants.MaxTocDepth} at '{parent}'.");
+        }
+
+        uint count = reader.GetDirEntryCount(node);
+        for (uint index = 0; index < count; index++)
+        {
+            if (!reader.TryGetDirEntry(node, index, out uint child, out ZArchiveReader.DirEntry entry))
+            {
+                throw new InvalidDataException($"Invalid ZArchive directory entry in '{parent}'.");
+            }
+
+            string path = parent + "/" + entry.Name;
+            map[path] = (entry.IsDirectory, child, entry.Size);
+            if (entry.IsDirectory)
+            {
+                CollectZarTree(reader, child, path, map, ct, depth + 1);
+            }
+        }
+    }
 
     private static void CollectFileTree(IBlockDevice dev, long dirStart, uint dirSize, long discLseek,
         string parent, SortedDictionary<string, (bool IsDir, long Offset, uint Size)> map, CancellationToken ct,

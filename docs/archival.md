@@ -91,7 +91,7 @@ XISOSharp --zar -o <output.zar> <input.iso|redump.iso>
 XISOSharp rebuild <game.zar> [video.iso] [filler|seed] [su...] -o <redump.iso>
 ```
 
-`XisoZarchive.CreateZar` — streams the XISO file tree straight into `ZArchiveSharp.ZArchiveWriter`
+`XisoZarchive.CreateZar` - streams the XISO file tree straight into `ZArchiveSharp.ZArchiveWriter`
 (no intermediate directory): every 64 KiB block is compressed with the pure-C# zstd
 encoder (level 6 by default, `IZarBlockCompressor` overridable, raw fallback for
 incompressible blocks — all BCL-only, trimmable/AOT-safe). Output is byte-compatible
@@ -109,6 +109,12 @@ Redump batch (zar of the XISO component); pass-through `removeUpdate` drops
 `$SystemUpdate` from the archive tree. The name table follows the XDVDFS btree
 discovery order (not pack order), so output is byte-identical to xboxkit's
 (`--zar` battle-verified SHA-256 match).
+
+Read side: `XisoZarchive.ListZar`, `ExtractZar` (path-safe, skip-existing,
+progress) and `ConvertZarToIso` (extract to a temp tree, repack with
+`XisoWriter.PackFromDirectory`). `XisoChecksum.ComputeZarChecksum` returns the
+same SHA3-256 tree digest as the equivalent ISO. The CLI accepts `.zar` for
+`-l`, `-t`, `-x`, `--unpack`, `checksum` and `convert`.
 
 ## Security sectors
 

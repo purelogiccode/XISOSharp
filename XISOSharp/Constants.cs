@@ -103,13 +103,23 @@ public static class Constants
     public const int MaxTocEntriesPerTable = 65536;
 
     /// <summary>
-    /// Maximum directory nesting depth (subdirectory descent + intra-table AVL
-    /// recursion) before the image is rejected as corrupt (TODO #16). Genuine
-    /// Xbox images nest a handful of levels and AVL depth is logarithmic, so
-    /// this never fires on valid images; it converts a malicious subdir cycle
-    /// (Burnout PAL style) from a <c>StackOverflowException</c> into a named error.
+    /// Maximum directory nesting depth before the image is rejected as corrupt
+    /// (TODO #16). Genuine Xbox images nest a handful of levels, so this never
+    /// fires on valid images; it converts a malicious subdir cycle (Burnout PAL
+    /// style) from a <c>StackOverflowException</c> into a named error.
+    /// <see cref="XisoReader"/>'s extraction walk applies this to subdirectory
+    /// descent only (intra-table AVL depth is bounded by its explicit stack); the
+    /// repair, salvage, range and audit walkers still use it as a combined bound.
     /// </summary>
     public const int MaxTocDepth = 64;
+
+    /// <summary>
+    /// Hard bound on the explicit intra-table traversal stack (TODO #16). Table
+    /// offsets are 16-bit DWORD indexes, so a valid table cannot exceed
+    /// <see cref="MaxTocEntriesPerTable"/> distinct entries; this backstop keeps
+    /// an absurd/corrupt chain from growing memory without bound.
+    /// </summary>
+    public const int MaxTocStackFrames = 100_000;
 
     /// <summary>Size of a table offset field (2 bytes).</summary>
     public const int TableOffsetSize = 2;

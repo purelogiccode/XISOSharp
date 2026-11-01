@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1821-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1904-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![Test SDK](https://img.shields.io/badge/test--sdk-18.10.1-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
@@ -41,8 +41,13 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **File copier** — `XisoFileCopier.CopyExact` size matrix, truncation counts, short-read stitching, pooled buffers, mid-copy cancel, per-chunk `FileProgress` on copy-out/unpack
 - **Filesystem destinations** — `IFilesystem`/`LocalFilesystem`/`MemoryFilesystem` semantics, generic `UnpackImage` byte-parity with the legacy disk unpack, resume/continue-on-error/cancel/truncation through custom destinations
 - **Image explorer** — `XisoExplorer` load/navigate/copy-out/hash/XEX/path helpers over `.iso` and `.cso` (engine behind the Tester's Explore tab)
-- **Image splitting** — `XisoSplitter` split/halves/join round-trips, sector alignment, guards, progress/cancel, `split`/`join` CLI verbs
-- **In-place repair** — `XisoRepairer` class-C fixes (reserved bits, tag, separator renames + collision refusal), convergence, backup/dry-run semantics, CISO/split refusals, `--repair` CLI
+- **Image splitting** - `XisoSplitter` split/halves/join round-trips, sector alignment, guards, progress/cancel, `split`/`join` CLI verbs
+- **Container input** - `XisoImageSource` detection table (ISO/XISO/IMG/CISO/split CISO/CCI/split CCI/split ISO/ZAR), magic sniffing, `CciBlockDevice`, split-ISO seeks, and CCI/split-ISO/ZAR reader-verb parity with plain ISO
+- **CCI** - `XisoCci` single/split round-trips, default-path helpers, CLI `--format cci`, `--cci-level`/`--cci-split`, `cci`/`uncci` aliases, and in-place refusal guards
+- **ZAR input** - `XisoZarchive.ListZar`/`ExtractZar`/`ConvertZarToIso`, unsafe-name rejection, `ComputeZarChecksum` parity with `ComputeImageChecksum`, and CLI `-l`/`-x`/`checksum`/`convert`
+- **Pathological TOC traversal** - 4,096-entry left-skewed/right-skewed/alternating/balanced tables: list/tree/extract/rewrite parity, rewrite-checksum equality with the balanced form, left self-cycle refusal, and continue-on-error subtree skipping
+- **Batch conversion** - `compress`/`decompress`/`convert`/`split` `--batch`/`--batch-recursive`, naming templates (`{name}`/`{ext}`/`{format}`), `--skip-existing` resume, `--continue-on-error` partial-output cleanup, duplicate-output refusal, and `--jobs` parallelism
+- **In-place repair** - `XisoRepairer` class-C fixes (reserved bits, tag, separator renames + collision refusal), convergence, backup/dry-run semantics, CISO/CCI/split refusals, `--repair` CLI
 - **Salvage rebuild** — `XisoSalvager` carry/drop exactness (forged sizes/sectors, real truncation, cycles, depth gate), CISO→plain ISO, re-salvage stability, `--salvage`/`--repair-out` CLI
 - **Executable info** — `GetXexInfo`/`GetXbeInfo` path + stream overloads, all-fields parsing, cert bounds, explorer surface, CLI end-to-end
 - **Disc identity** — `VolumeInfo.DiscFormat` across RAW/GLOBAL/XGD3/Hybrid/XGD1/unknown layouts

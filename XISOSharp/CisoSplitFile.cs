@@ -31,17 +31,75 @@ internal static class CisoSplitFile
     /// <param name="share">File sharing mode for the part files.</param>
     internal static List<FileStream> OpenParts(string firstPartPath, FileShare share = FileShare.Read)
     {
-        string baseName = firstPartPath[..^PartSuffixLength];
         List<FileStream> parts = new();
-        for (int i = 0;; i++)
+        foreach (string partPath in DiscoverPartPaths(firstPartPath))
         {
-            // Append rather than ChangeExtension: a dotted base (`My.Game.1.cso`
-            // -> `My.Game`) must yield `My.Game.2.cso`, not `My.2.cso`.
-            string partPath = $"{baseName}.{i + 1}.cso";
-            if (!File.Exists(partPath)) break;
             parts.Add(new FileStream(partPath, FileMode.Open, FileAccess.Read, share, 65536));
         }
 
         return parts;
+    }
+
+    /// <summary>
+    /// Enumerates existing split part paths for a <c>*.1.cso</c> path. A
+    /// non-split path resolves to itself when it exists.
+    /// </summary>
+    internal static List<string> DiscoverPartPaths(string firstPartPath)
+    {
+        List<string> parts = new();
+        if (!IsSplitPath(firstPartPath))
+        {
+            if (File.Exists(firstPartPath)) parts.Add(firstPartPath);
+            return parts;
+        }
+
+        string baseName = firstPartPath[..^PartSuffixLength];
+        for (int i = 1; ; i++)
+        {
+            // Append rather than ChangeExtension: a dotted base (`My.Game.1.cso`
+            // -> `My.Game`) must yield `My.Game.2.cso`, not `My.2.cso`.
+            string partPath = $"{baseName}.{i}.cso";
+            if (!File.Exists(partPath)) break;
+            parts.Add(partPath);
+        }
+
+        ThrowIfPartGap(baseName, parts.Count);
+        return parts;
+    }
+
+    private static void ThrowIfPartGap(string baseName, int contiguousCount)
+    {
+        string directory = Path.GetDirectoryName(baseName) ?? string.Empty;
+        if (directory.Length == 0) directory = ".";
+        string stem = Path.GetFileName(baseName) ?? string.Empty;
+        if (stem.Length == 0) return;
+
+        string prefix = stem + ".";
+        try
+        {
+            foreach (string candidate in Directory.EnumerateFiles(directory, prefix + "*.cso"))
+            {
+                string name = Path.GetFileName(candidate);
+                if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!name.EndsWith(".cso", StringComparison.OrdinalIgnoreCase)) continue;
+
+                string digits = name[prefix.Length..^".cso".Length];
+                if (!int.TryParse(digits, System.Globalization.NumberStyles.None,
+                        System.Globalization.CultureInfo.InvariantCulture, out int index))
+                {
+                    continue;
+                }
+
+                if (index > contiguousCount)
+                {
+                    throw new InvalidDataException(
+                        $"Split CISO part {index} exists but part {contiguousCount + 1} is missing: {candidate}");
+                }
+            }
+        }
+        catch (DirectoryNotFoundException)
+        {
+            // The first part is missing; the caller reports not-found.
+        }
     }
 }

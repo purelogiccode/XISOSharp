@@ -19,19 +19,19 @@ public partial class MainWindow : Window
 {
     private static readonly FilePickerFileType ImageFilter = new("Xbox images")
     {
-        Patterns = ["*.iso", "*.xiso", "*.cso", "*.1.cso", "*.img"],
+        Patterns = ["*.iso", "*.xiso", "*.cso", "*.1.cso", "*.cci", "*.1.cci", "*.img", "*.zar"],
     };
 
     // Rebuild accepts a .zar sidecar in place of the game partition (Todo #46);
     // every other picker must not offer it because XisoReader cannot open one.
     private static readonly FilePickerFileType RebuildFilter = new("Xbox images or ZAR sidecar")
     {
-        Patterns = ["*.iso", "*.xiso", "*.cso", "*.1.cso", "*.img", "*.zar"],
+        Patterns = ["*.iso", "*.xiso", "*.cso", "*.1.cso", "*.cci", "*.1.cci", "*.img", "*.zar"],
     };
 
-    private static readonly FilePickerFileType CsoFilter = new("CISO images")
+    private static readonly FilePickerFileType CompressedFilter = new("Compressed images")
     {
-        Patterns = ["*.cso", "*.1.cso"],
+        Patterns = ["*.cso", "*.1.cso", "*.cci", "*.1.cci"],
     };
 
     private static readonly FilePickerFileType IsoFilter = new("ISO images")
@@ -41,9 +41,9 @@ public partial class MainWindow : Window
 
     // Single source for image detection (BUG-GUI-012): includes every extension
     // the pickers accept so drag-and-drop routing agrees with the filters.
-    private static readonly string[] ImageExtensions = [".iso", ".xiso", ".cso", ".img", ".zar"];
+    private static readonly string[] ImageExtensions = [".iso", ".xiso", ".cso", ".cci", ".img", ".zar"];
 
-    private static readonly string[] CsoExtensions = [".cso"];
+    private static readonly string[] CompressedExtensions = [".cso", ".cci"];
 
     private static readonly string[] ZarExtensions = [".zar"];
 
@@ -430,15 +430,15 @@ public partial class MainWindow : Window
         {
             if (IsZar(image))
             {
-                Vm.RbParts = AppendLines(Vm.RbParts, [image]);
-                OpTabs.SelectedIndex = RebuildTab;
-                Vm.LogMessage($"[GUI] Drop: ZAR sidecar routed to the Rebuild tab: {image}");
+                Vm.ExImage = image;
+                OpTabs.SelectedIndex = ExtractTab;
+                Vm.LogMessage($"[GUI] Drop: ZAR routed to the Extract tab (list/extract/checksum): {image}");
             }
-            else if (IsCso(image))
+            else if (IsCompressed(image))
             {
                 Vm.DcCso = image;
                 OpTabs.SelectedIndex = DecompressTab;
-                Vm.LogMessage($"[GUI] Drop: CSO routed to the Decompress tab: {image}");
+                Vm.LogMessage($"[GUI] Drop: compressed image routed to the Decompress tab: {image}");
             }
             else
             {
@@ -515,8 +515,8 @@ public partial class MainWindow : Window
     private static bool IsImage(string path) =>
         ImageExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
-    private static bool IsCso(string path) =>
-        CsoExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
+    private static bool IsCompressed(string path) =>
+        CompressedExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
     private static bool IsZar(string path) =>
         ZarExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
@@ -871,7 +871,9 @@ public partial class MainWindow : Window
         try
         {
             MainViewModel vm = Vm;
-            string? picked = await PickSaveAsync("CSO output", "game.cso").ConfigureAwait(false);
+            bool cci = string.Equals(vm.CpFormat, "CCI", StringComparison.OrdinalIgnoreCase);
+            string? picked = await PickSaveAsync(cci ? "CCI output" : "CISO output",
+                cci ? "game.cci" : "game.cso").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.CpOutput = picked);
@@ -946,7 +948,7 @@ public partial class MainWindow : Window
         try
         {
             MainViewModel vm = Vm;
-            string? picked = await PickSingleFileAsync([CsoFilter], "Select CSO").ConfigureAwait(false);
+            string? picked = await PickSingleFileAsync([CompressedFilter], "Select CISO/CCI").ConfigureAwait(false);
             if (picked is not null)
             {
                 await Dispatcher.UIThread.InvokeAsync(() => vm.DcCso = picked);
@@ -954,7 +956,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Browse decompress CSO failed");
+            Log.Error(ex, "Browse decompress CISO/CCI failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");

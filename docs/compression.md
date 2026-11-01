@@ -1,12 +1,19 @@
-# Compression (CISO + ZAR/zstd)
+# Compression (CISO, CCI + ZAR/zstd)
 
 Pure-managed **CISO** (Compressed ISO) writer/reader with BCL DEFLATE (version 1) + LZ4 (version 2) — port of xdvdfs `ciso` crate (`SectorLinearBlockDevice` + `CisoSectorInput` → `ciso::write::write_ciso_image` + `SplitOutput`), including split `.1.cso`/`.2.cso`… output and input (`ciso::split` parity).
+
+**CCI** ("CCIM", Cerbios Compressed Image) read/write support comes from the standalone
+[CCISharp](https://github.com/purelogiccode/CCISharp) package (`net8.0`/`net9.0`/`net10.0`,
+zero dependencies): `XisoCci` compresses/decompresses, `CciBlockDevice` exposes random
+access, and `.cci`/`.1.cci` inputs work through the same reader verbs as CISO. See
+[CCI (CCIM)](#cci-ccim).
 
 Also covered here: **ZAR/ZArchive block compression** (`ZArchiveSharp`, pure-C# zstd) — see [ZArchive / zstd block compression](#zarchive--zstd-block-compression).
 
 - [Format](#format)
 - [CISO v2 (LZ4) writer](#ciso-v2-lz4-writer)
 - [Split output & input](#split-output--input)
+- [CCI (CCIM)](#cci-ccim)
 - [CLI](#cli)
 - [API surface](#api-surface)
 - [Block device](#block-device)
@@ -75,20 +82,68 @@ extension marks split input).
 
 ---
 
+## CCI (CCIM)
+
+CCI is the compressed container used by the Cerbios BIOS and produced by
+Repackinator/XboxToolkit. Each 2048-byte sector is stored raw or as one LZ4
+block, with a `(sectors + 1) × u32` random-access index at the end. The
+normative description is
+[`Team-Resurgent/libCCI` `FORMAT.md`](https://github.com/Team-Resurgent/libCCI/blob/main/FORMAT.md).
+
+XISOSharp consumes [CCISharp](https://github.com/purelogiccode/CCISharp) 1.0.0,
+an independent MIT implementation (no GPL code). The API surface:
+
+```csharp
+// Compress any supported source (ISO, split ISO, CISO, CCI or a directory).
+int rc = XisoCci.CompressToCci(
+    @"C:\games\game.iso",
+    @"C:\games\game.cci",
+    level: 9,                       // 0 = store, 1..9 = fast-LZ4 presets
+    splitBytes: XisoCci.DefaultSplitBytes, // ~4 GiB; 0 = single file
+    overwrite: false);
+
+// Extract (split sets are stitched transparently).
+int rc2 = XisoCci.DecompressToIso(@"C:\games\game.1.cci", @"C:\games\game.iso");
+
+// Random access.
+using CciBlockDevice device = new(@"C:\games\game.cci");
+byte[] sector = new byte[2048];
+device.Read(0, sector);
+```
+
+- **Split sets**: `game.1.cci` … `game.9.cci`; open any numbered part and the
+  reader discovers the set from `.1`.
+- **Encoder**: fast LZ4 block encoder. Output is spec-valid and interoperable
+  with libCCI/Repackinator, but not byte-identical to their LZ4-HC output.
+- **In-place guards**: `--repair`, `--copy-in`, and `--set-filetime` refuse CCI
+  (compressed bytes are not patch-stable); decompress first.
+- **Reader verbs**: `-l`, `-t`, `-x`, `--unpack`, `-r`, `checksum`,
+  `--sector-layout`, `--ranges`, `--filetime` (read) and `-i` all operate on
+  `.cci`/`.1.cci` through the decompressed view.
+
+---
+
 ## CLI
 
 ```
-XISOSharp compress <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
-XISOSharp cso <sourceDir|image.iso> [output.cso]       # alias
-XISOSharp decompress <cso|.1.cso> [output.iso]
-XISOSharp uncso|decso <cso|.1.cso> [output.iso]        # aliases
+XISOSharp compress <sourceDir|image> [output] [--format cso|cci]
+    [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
+    [--cci-level 0..9] [--cci-split bytes] [--batch <dir>]
+XISOSharp cso <sourceDir|image> [output.cso]              # CISO alias
+XISOSharp cci <sourceDir|image> [output.cci]              # CCI alias
+XISOSharp decompress <cso|cci> [output.iso] [--batch <dir>]
+XISOSharp uncso|decso <cso|.1.cso> [output.iso]           # CISO aliases
+XISOSharp uncci <cci|.1.cci> [output.iso]                 # CCI alias
 ```
 
 | Flag | Effect |
 |---|---|
 | `--ciso-level 0..9` | Compression level (default `9`). v1: maps to `CompressionLevel` (`NoCompression`/`Fastest`/`Optimal`/`SmallestSize`). v2: `0` = store; `1..9` = LZ4 acceleration `10 - level` (level 9 is byte-identical to xdvdfs). |
 | `--ciso-version 1\|2\|auto` | Payload codec. `2` (default, `auto` = `2`): LZ4, fixed `align 2`, byte-compatible with modern `xdvdfs compress`. `1`: classic DEFLATE. |
-| `--ciso-split <bytes>` | Split point override. Default: `0xffbf6000` (~4 GiB) — xdvdfs `SplitOutput` behavior. `0` = single-file output. |
+| `--ciso-split <bytes>` | Split point override. Default: `0xffbf6000` (~4 GiB) - xdvdfs `SplitOutput` behavior. `0` = single-file output. |
+| `--format cso\|cci` | Output container. Default `cso`; `cci` selects the CCISharp writer. |
+| `--cci-level 0..9` | CCI level: `0` stores every sector raw; `1..9` map to the fast LZ4 block encoder's acceleration (`10 - level`, level 9 = smallest). |
+| `--cci-split <bytes>` | CCI split point. Default `0xffbf6000` (~4 GiB) into `.1.cci`/`.2.cci` …; `0` = single `.cci`. |
 
 Examples:
 
@@ -106,7 +161,33 @@ XISOSharp cso game.iso game.cso --ciso-version 1 --ciso-split 1073741824
 # Decompress (single or split input)
 XISOSharp decompress game.1.cso game.iso
 XISOSharp uncso game.cso
+
+# CCI: single-file and split output
+XISOSharp cci game.iso game.cci --cci-split 0
+XISOSharp cci game.iso game.cci --cci-level 9
+#   → game.1.cci (+ game.2.cci … for images > ~4 GiB)
+
+# Any compressed/split source can be recompressed
+XISOSharp compress --format cci game.1.iso game.cci --cci-split 0
+XISOSharp uncci game.1.cci game.iso
+
+# Batch conversion (compress / decompress / convert / split)
+XISOSharp compress --batch ./isos --format cci --cci-split 0 -y
+XISOSharp decompress --batch ./compressed --skip-existing -y
+XISOSharp convert --batch ./isos --format zar -y
+XISOSharp split --batch ./isos --size half -y
+XISOSharp compress --batch ./isos --output-name "{name}.xiso.{format}" --jobs 4 -y
 ```
+
+Batch mode scans the verb's own inputs (`.iso`/`.xiso` for `compress`, unsplit
+`.iso`/`.xiso` for `convert --format zar`, `.cso`/`.cci` for `decompress`, `.zar` for
+`convert --format iso`, and unsplit `.iso`/`.xiso` for `split`). Split sets are
+collapsed to their first part for the verbs that read them; ZAR conversion
+requires an unsplit ISO (join the parts first). `--skip-existing` resumes an interrupted run,
+`--continue-on-error` keeps going after a failed file (partial outputs are
+removed) and returns exit code `1` after the summary, `--jobs 1..64` converts in
+parallel, and `--output-name` supports `{name}` (source stem with a `.1` split
+marker stripped), `{ext}` and `{format}`.
 
 Multi-file handling: `compress` accepts `sourceDir` or `image.iso`; when given a directory it first builds an ISO (via `XisoWriter.CreateXiso` pipeline) then wraps via `CisoWriter`.
 
@@ -131,6 +212,23 @@ public static int Decompress(ReadOnlySpan<byte> source, Span<byte> destination);
 public static int DecompressToIso(string csoPath, string? outputIsoPath = null, ...); // single or *.1.cso input
 public static void ReadFromCso(string csoPath, long offset, Span<byte> buffer);
 public static bool IsCso(string path);
+
+// XISOSharp/XisoCci.cs (CCISharp-backed)
+public static int CompressToCci(string sourcePath, string? outputCciPath = null, int level = 9,
+    long splitBytes = DefaultSplitBytes, bool overwrite = false, ...);
+public static int DecompressToIso(string cciPath, string? outputIsoPath = null, bool overwrite = false, ...);
+public static string DeriveDefaultCciPath(string sourcePath, bool isDirectory);
+public static string DeriveDefaultIsoPath(string cciPath);
+public const long DefaultSplitBytes = CciFormat.DefaultSplitBytes; // 0xffbf6000
+
+// XISOSharp/BlockDevice/CciBlockDevice.cs
+public sealed class CciBlockDevice : IBlockDevice
+{
+    public CciBlockDevice(string cciPath, FileShare share = FileShare.Read);
+    public CciFile Image { get; }
+    public long Length { get; }
+    public int Read(long offset, Span<byte> buffer);
+}
 ```
 
 Both writer versions share the `+12` saving threshold and the `ciso write.rs` layout (header → index reservation → aligned per-sector payloads → index fill). Split output flows through an internal `CisoSplitOutput` stream (writer) and `CisoSplitInputStream` (reader) mirroring `ciso::split::SplitOutput`/`SplitFileReader`. CLI wiring in `XISOSharp.Cli/Program.cs:RunCompressMode` / `RunDecompressMode` (progress `FileCount`/`FileAdded`/`FinishedPacking`).
@@ -141,7 +239,7 @@ Header detection: `IsCso` checks `CISO` magic + `headerSize==24` + `version 1/2`
 
 ## Block device
 
-`XISOSharp/BlockDevice/CisoBlockDevice.cs` implements `IBlockDevice` over `.cso` via `index` random-access:
+`XISOSharp/BlockDevice/CisoBlockDevice.cs` implements `IBlockDevice` over `.cso` via `index` random-access; `CciBlockDevice` does the same over `.cci` via CCISharp's sector index:
 
 - On-demand sector decompress with **single-sector cache** (`_cachedSectorIndex` + `_cachedSectorData` 2048 bytes) — avoids realloc per read.
 - Accepts a path (single or split `*.1.cso` parts), a `FileStream`, or any seekable `Stream` (e.g. the composite split stream).
@@ -165,6 +263,13 @@ Usage:
 ```csharp
 using var dev = new CisoBlockDevice("game.1.cso"); // single file or split parts
 var (rootSector, rootSize, lseek) = XisoReader.VerifyXiso(dev, "game.cso");
+```
+
+CCI:
+
+```csharp
+using var dev = new CciBlockDevice("game.1.cci"); // single file or split parts
+var (rootSector, rootSize, lseek) = XisoReader.VerifyXiso(dev, "game.cci");
 ```
 
 See [xdvdfs Compat — Block Device](xdvdfs-compat.md#block-device).

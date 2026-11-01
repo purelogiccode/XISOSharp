@@ -1,3 +1,5 @@
+using System.Buffers;
+using XISOSharp.Models;
 using ZArchiveSharp;
 using ZArchiveSharp.Pipeline;
 
@@ -225,6 +227,255 @@ public static class XisoZarchive
             {
                 // best effort
             }
+        }
+    }
+
+    /// <summary>
+    /// Lists every entry in a ZArchive (<c>.zar</c>) name tree, parents before
+    /// children and siblings in stored order.
+    /// </summary>
+    /// <param name="zarPath">Path to the <c>.zar</c> archive.</param>
+    /// <returns>Entries in archive order, with leading-<c>/</c> paths.</returns>
+    /// <exception cref="ArgumentException"><paramref name="zarPath"/> is null or empty.</exception>
+    /// <exception cref="FileNotFoundException">The archive does not exist.</exception>
+    /// <exception cref="UnauthorizedAccessException">The archive cannot be read.</exception>
+    /// <exception cref="InvalidDataException">The archive is malformed or contains an unsafe name.</exception>
+    public static IReadOnlyList<ZarEntry> ListZar(string zarPath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(zarPath);
+        using ZArchiveReader reader = OpenZarOrThrow(zarPath);
+        List<ZarEntry> entries = new();
+        WalkZar(reader, ZArchiveReader.RootNode, string.Empty, entries, 0);
+        return entries;
+    }
+
+    /// <summary>
+    /// Extracts every file and directory from a ZArchive into
+    /// <paramref name="outputDirectory"/>.
+    /// </summary>
+    /// <param name="zarPath">Path to the <c>.zar</c> archive.</param>
+    /// <param name="outputDirectory">Destination directory (created when missing).</param>
+    /// <param name="skipExisting">Skip files that already exist instead of overwriting.</param>
+    /// <param name="progress">Optional progress channel (<see cref="ProgressInfoType.FileProgress"/> per chunk and <see cref="ProgressInfoType.FileAdded"/> per file).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns><c>0</c> on success.</returns>
+    /// <exception cref="ArgumentException">A path is null or empty.</exception>
+    /// <exception cref="FileNotFoundException">The archive does not exist.</exception>
+    /// <exception cref="UnauthorizedAccessException">The archive or an output path cannot be accessed.</exception>
+    /// <exception cref="InvalidDataException">The archive is malformed or contains an unsafe entry name.</exception>
+    /// <exception cref="IOException">An output file cannot be written.</exception>
+    /// <exception cref="OperationCanceledException">The operation was cancelled.</exception>
+    public static int ExtractZar(string zarPath, string outputDirectory, bool skipExisting = false,
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(zarPath);
+        ArgumentException.ThrowIfNullOrEmpty(outputDirectory);
+        ct.ThrowIfCancellationRequested();
+
+        using ZArchiveReader reader = OpenZarOrThrow(zarPath);
+        Directory.CreateDirectory(outputDirectory);
+        ZarExtractState state = new();
+        ExtractZarNode(reader, ZArchiveReader.RootNode, outputDirectory, string.Empty, skipExisting,
+            progress, ct, state);
+        return 0;
+    }
+
+    /// <summary>
+    /// Converts a ZArchive to a plain ISO by extracting to a temporary
+    /// directory and packing it with <see cref="XisoWriter.PackFromDirectory"/>.
+    /// </summary>
+    /// <param name="zarPath">Path to the <c>.zar</c> archive.</param>
+    /// <param name="isoPath">Destination ISO path; defaults to the archive name with <c>.iso</c>.</param>
+    /// <param name="overwrite">Overwrite an existing ISO (default <c>false</c>).</param>
+    /// <param name="progress">Optional progress channel.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns><c>0</c> on success.</returns>
+    /// <exception cref="ArgumentException">A path is null or empty.</exception>
+    /// <exception cref="FileNotFoundException">The archive does not exist.</exception>
+    /// <exception cref="IOException">The output exists and <paramref name="overwrite"/> is <c>false</c>, or an I/O error occurred.</exception>
+    /// <exception cref="InvalidDataException">The archive is malformed.</exception>
+    /// <exception cref="OperationCanceledException">The operation was cancelled.</exception>
+    public static int ConvertZarToIso(string zarPath, string? isoPath = null, bool overwrite = false,
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(zarPath);
+        string output = isoPath ?? DeriveIsoPath(zarPath);
+        if (!overwrite && File.Exists(output))
+        {
+            throw new IOException($"Output already exists: {output}");
+        }
+
+        string tempDirectory = Path.Combine(Path.GetTempPath(), $"xiso_zar_{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(tempDirectory);
+            ExtractZar(zarPath, tempDirectory, skipExisting: false, progress: null, ct);
+            return XisoWriter.PackFromDirectory(tempDirectory, output, cancellationToken: ct, progress: progress);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempDirectory);
+        }
+    }
+
+    private static string DeriveIsoPath(string zarPath)
+    {
+        string directory = Path.GetDirectoryName(zarPath) ?? string.Empty;
+        string file = Path.GetFileName(zarPath);
+        string stem = file.EndsWith(".zar", StringComparison.OrdinalIgnoreCase)
+            ? file[..^".zar".Length]
+            : Path.GetFileNameWithoutExtension(file);
+        return Path.Combine(directory, stem + ".iso");
+    }
+
+    private static ZArchiveReader OpenZarOrThrow(string zarPath)
+    {
+        ZArchiveReader? reader = ZArchiveReader.TryOpen(zarPath, out ZArchiveOpenFailure failure);
+        if (reader is not null && failure == ZArchiveOpenFailure.None) return reader;
+
+        throw failure switch
+        {
+            ZArchiveOpenFailure.FileNotFound => new FileNotFoundException(
+                $"ZArchive not found: {zarPath}", zarPath),
+            ZArchiveOpenFailure.AccessDenied => new UnauthorizedAccessException(
+                $"Access denied reading ZArchive: {zarPath}"),
+            _ => new InvalidDataException($"Invalid ZArchive '{zarPath}': {failure}."),
+        };
+    }
+
+    private static void WalkZar(ZArchiveReader reader, uint node, string parent, List<ZarEntry> entries, int depth)
+    {
+        if (depth > Constants.MaxTocDepth)
+        {
+            throw new InvalidDataException(
+                $"ZArchive directory depth exceeds {Constants.MaxTocDepth} at '{parent}'.");
+        }
+
+        uint count = reader.GetDirEntryCount(node);
+        for (uint index = 0; index < count; index++)
+        {
+            if (!reader.TryGetDirEntry(node, index, out uint child, out ZArchiveReader.DirEntry entry))
+            {
+                throw new InvalidDataException($"Invalid ZArchive directory entry in '{parent}'.");
+            }
+
+            string path = parent + "/" + entry.Name;
+            entries.Add(new ZarEntry(path, entry.IsDirectory, entry.Size));
+            if (entry.IsDirectory)
+            {
+                WalkZar(reader, child, path, entries, depth + 1);
+            }
+        }
+    }
+
+    private sealed class ZarExtractState
+    {
+        internal int Files;
+        internal long Bytes;
+    }
+
+    private static void ExtractZarNode(ZArchiveReader reader, uint node, string outputDirectory,
+        string parent, bool skipExisting, IProgress<ProgressInfo>? progress, CancellationToken ct,
+        ZarExtractState state)
+    {
+        uint count = reader.GetDirEntryCount(node);
+        for (uint index = 0; index < count; index++)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!reader.TryGetDirEntry(node, index, out uint child, out ZArchiveReader.DirEntry entry))
+            {
+                throw new InvalidDataException($"Invalid ZArchive directory entry in '{parent}'.");
+            }
+
+            string relative = CombineZarPath(parent, entry.Name);
+            string destination = Path.Combine(outputDirectory, relative);
+            if (entry.IsDirectory)
+            {
+                Directory.CreateDirectory(destination);
+                progress?.Report(new ProgressInfo(
+                    ProgressInfoType.DirAdded,
+                    Count: state.Files,
+                    Path: "/" + relative.Replace(Path.DirectorySeparatorChar, '/'),
+                    Sector: 0));
+                ExtractZarNode(reader, child, outputDirectory, relative, skipExisting, progress, ct, state);
+                continue;
+            }
+
+            if (skipExisting && File.Exists(destination)) continue;
+
+            string? directory = Path.GetDirectoryName(destination);
+            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+
+            using Stream source = reader.OpenRead(child);
+            using FileStream target = new(destination, FileMode.Create, FileAccess.Write, FileShare.None,
+                1 << 20, FileOptions.SequentialScan);
+            CopyZarFile(source, target, destination, entry.Size, progress, ct, state);
+        }
+    }
+
+    private static void CopyZarFile(Stream source, Stream destination, string destinationPath, ulong size,
+        IProgress<ProgressInfo>? progress, CancellationToken ct, ZarExtractState state)
+    {
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(Constants.ReadWriteBufferSize);
+        try
+        {
+            long total = 0;
+            int read;
+            while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                destination.Write(buffer, 0, read);
+                total += read;
+                progress?.Report(new ProgressInfo(
+                    ProgressInfoType.FileProgress,
+                    Count: (long)size,
+                    Path: destinationPath,
+                    Sector: 0,
+                    Size: total));
+            }
+
+            state.Files++;
+            state.Bytes += total;
+            progress?.Report(new ProgressInfo(
+                ProgressInfoType.FileAdded,
+                Count: state.Files,
+                Path: destinationPath,
+                Sector: 0,
+                Size: total));
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    private static string CombineZarPath(string parent, string name)
+    {
+        if (string.IsNullOrEmpty(name) ||
+            name is "." or ".." ||
+            name.IndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, '\0']) >= 0 ||
+            Path.IsPathRooted(name) ||
+            (OperatingSystem.IsWindows() && name.Contains(':')))
+        {
+            throw new InvalidDataException($"Unsafe ZArchive entry name: '{name}'.");
+        }
+
+        return parent.Length == 0 ? name : parent + Path.DirectorySeparatorChar + name;
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+        }
+        catch (IOException)
+        {
+            // Best effort.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Best effort.
         }
     }
 

@@ -25,12 +25,15 @@ XISOSharp validate <source.iso> <output.iso> [options]
 XISOSharp rebuild <xiso|game.zar> [video.iso] [filler|seed] [su20076000_00000000] -o <redump.iso>
 XISOSharp build-image [sourceDir] [output.iso] -m "host:image" [-f <toml>] [-O output] [-D|--dry-run]
 XISOSharp image-spec from -O <out> -m "host:image" ... [specPath]
-XISOSharp compress|cso <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
-XISOSharp decompress|uncso|decso <cso|.1.cso> [output.iso]
+XISOSharp compress|cso|cci <sourceDir|image> [output] [--format cso|cci]
+    [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
+    [--cci-level 0..9] [--cci-split bytes] [--batch <dir>]
+XISOSharp decompress|uncso|decso|uncci <cso|cci> [output.iso] [--batch <dir>]
 XISOSharp checksum [--silent] <image> [images...]
 XISOSharp --checksum <image> [--silent]            # flag form
-XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...]
+XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...] [--batch <dir>]
 XISOSharp join [--output <file>] <first.1.iso> [...]
+XISOSharp convert <src.zar|src.iso> <out.iso|out.zar> [--batch <dir> --format iso|zar]
 ```
 
 - Flags must precede positional arguments; the first non-flag token ends option parsing (except verbs above which are detected as first token).
@@ -47,7 +50,7 @@ XISOSharp join [--output <file>] <first.1.iso> [...]
 
 Modes are mutually exclusive unless noted as aliases. If no mode is given, **extract** is the default.
 
-Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, `xdvdfs img.rs` parity): `extract`, `--unpack`, `-l`/`-t`, `--pack` (iso→rewrite), `-r`, and `checksum` all operate on the decompressed view, with outputs named after the game stem (`game.cso` → `game.iso`, extract dir `game/`).
+Image inputs accept `.cso`/`.1.cso` and `.cci`/`.1.cci` files directly (auto-detected by extension with a magic-sniff fallback, `xdvdfs img.rs` parity): `extract`, `--unpack`, `-l`/`-t`, `--pack` (iso→rewrite), `-r`, and `checksum` all operate on the decompressed view, with outputs named after the game stem (`game.cso` → `game.iso`, extract dir `game/`). Split plain-ISO sets (`game.1.iso`) are also read directly. `.zar` archives are accepted by `-l`, `-t`, `-x`, `--unpack` and `checksum`, and converted with `convert`.
 
 | Flag | Description |
 |---|---|
@@ -68,8 +71,9 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--dry-run` | With `--repair`, preview the fixes without changing anything (exit mirrors the audit: `1` when fixes would apply). Rejected without `--repair`. |
 | `--salvage <file>` | **Salvage** — rebuild a readable image from a corrupt one: carry every entry reachable without tripping a truncation/structural gate into `<file>` without its extension plus `.salvaged.iso` (CISO input allowed; source never modified). Prints `Carried:` / `Dropped:` / `Result: PASS|FAIL`. See [Salvage](api-xisoreader.md#salvage). |
 | `--repair-out <path>` | With `--salvage`, write the rebuilt image to `<path>` instead of the default (existing files follow the `-y`/`-n` convention). Rejected without `--salvage`. |
-| `--batch <dir>` | Process **all `.iso` files** in `<dir>` instead of explicit filenames. Sorted for deterministic order. Works with extract, list, tree, rewrite (`-r`), and audit (`-V`) only; rejected with single-ISO modes, redump modes, and explicit filenames. |
+| `--batch <dir>` | Process every supported image in `<dir>` instead of explicit filenames. On the main modes it scans `.iso` files and works with extract, list, tree, rewrite (`-r`), and audit (`-V`); on the container verbs it scans the verb's own inputs (`compress`: `.iso`/`.xiso`; `decompress`: `.cso`/`.cci`; `convert --format zar`: unsplit `.iso`/`.xiso`; `convert --format iso`: `.zar`; `split`: unsplit `.iso`/`.xiso`). Split sets are collapsed to their first part (`.1.cso`, `.1.cci`, `.1.iso`). Sorted for deterministic order. |
 | `--batch-recursive` | With `--batch`, search subdirectories recursively. Rejected without `--batch`. |
+| `--output-name <template>` | With a batch container verb, name outputs from `{name}` (source stem with a `.1` split marker and the container extension stripped), `{ext}` (source extension), and `{format}` (output format). Example: `--output-name "{name}.xiso.{format}"`. Relative templates resolve against each source's directory; a template without an extension gets the format's extension. Rejected without `--batch`. |
 | `--copy-out <iso> <path> <dest>` | Copy a single file **or an entire directory** out of an ISO to `<dest>`. Supports `--skip-existing` (resume) and `--continue-on-error`. |
 | `--copy-in <iso> <host> <path>` | Copy a host file **into** an ISO, modifying it in place: replaces `<path>` when it exists, adds it as a new file otherwise. A host directory is rejected fast (`InvalidDataException`, nothing written). Writes an `<iso>.old` backup first unless `--no-backup`. See [CopyIn](api-xisoreader.md#copyin). |
 | `--no-backup` | With `--copy-in` or `--repair`, skip the `<iso>.old` backup (rejected without either). |
@@ -83,7 +87,7 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--petrify` | **Redump:** skeleton — XISO with file extents zeroed + SHA-1 per file (`XisoSkeleton.Petrify`, `CollectFileEntries` sorted); writes skeleton + `*.hash`. See [Archival](archival.md#petrify). |
 | `--update` | **Redump:** extract system update `su20076000_00000000` from XGD3 video `L1` tail (`XisoRedump.TryExtractUpdate`, `FindUpdateOffset` `ABCDABCD`); warns on XGD1/2. See [Archival](archival.md#update). |
 | `--zar` | Create ZArchive/zstd (`XisoZarchive.CreateZar` → `ZArchiveSharp.ZArchiveWriter`, L6 blocks + raw fallback; standalone `--zar -o <out.zar> <iso>` or Redump-batch zar of the XISO component). Load the result directly in Xenia canary. See [Archival](archival.md#zar). |
-| `--jobs <n>` | With a lone `--zar` over several inputs, pack up to `<n>` archives in parallel (default `1`). |
+| `--jobs <n>` | With a lone `--zar` over several inputs, pack up to `<n>` archives in parallel (default `1`). On a batch container verb (`compress`, `decompress`, `convert`, `split`), run up to `<n>` conversions in parallel (`1..64`, default `1`). |
 | `--policy <p>` | `--zar` overwrite handling without prompting: `skip` \| `overwrite` \| `auto-rename`. |
 | `--all` | Alias: `--random --seed --trim --update --video --wipe` (→ `--xiso` as batch). Mirrors XboxKit `-a`. |
 | `--best` | Alias: `--trim --wipe` (XISO). Mirrors XboxKit `-b`. |
@@ -92,11 +96,12 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `rebuild <xiso\|game.zar> [video.iso] [filler\|seed] [su…] -o <redump.iso>` | **Rebuild** Redump ISO (`XisoRedump.RebuildRedump`): `L0`+`l0Padding`+game partition scan (filler/PRNG + security-sector zero-skip) + `l1Padding`+`L1` (optionally `l1Trimmed+updateFS+lastSector`). `<xiso>` accepts a `.zar` sidecar (single embedded XISO verbatim, else tree repacked). Positional alias `XISOSharp <input.xiso> [files...]` also accepted. See [Archival](archival.md#rebuild). |
 | `build-image [sourceDir] [output.iso] -m "host:image" [-f <toml>] [-O output] [-D\|--dry-run] [--file-time <value>]` | **xdvdfs parity:** ordered `wax` remapping (`RemapFilesystem`, `WaxGlob` `*`/`**`/`?`/`[]`/`{a,b}` + `{0}` whole + `{n}` groups, `!negation` first-wins, suffix re-add), `xdvdfs.toml` `[map_rules]`, `--dry-run` via `DryRunRemap` → `CreateFromRemapTree` (`IsRemap` skips CWD). In `-m` rules the separator is the first unescaped `:` — write `\:` for a literal colon, `\\` for a backslash. See [xdvdfs Compat](xdvdfs-compat.md#build-image). |
 | `image-spec from -O <out> -m "host:image" ... [specPath]` | **xdvdfs parity:** TOML generation (`GenerateSpecText` preserve-order `[metadata] output` + `[map_rules]`), stdout when `specPath` omitted. See [xdvdfs Compat](xdvdfs-compat.md#image-spec). |
-| `compress\|cso <src> [out.cso] [--ciso-level 0..9] [--ciso-version 1\|2\|auto] [--ciso-split bytes]` | **CISO** compress: `CisoWriter.CompressToCso` — v2 (default) LZ4 sectors with fixed `align 2`, byte-identical to modern `xdvdfs compress` (pure-managed `lz4_flex` port); v1 BCL DEFLATE `0x80000000` with dynamic `align` 0/1/2; threshold `+12`. Use on `sourceDir` or `image.iso`. Output splits at `0xffbf6000` (~4 GiB) into `.1.cso`/`.2.cso`… parts (xdvdfs `SplitOutput` parity); `--ciso-split 0` writes a single `.cso`. See [Compression](compression.md). |
-| `decompress\|uncso\|decso <cso\|.1.cso> [out.iso]` | **CISO** decompress: `CisoReader.DecompressToIso` handles both versions, single files and split `.N.cso` parts. |
-| `checksum [--silent] <image> [images...]` / `--checksum <image> [--silent]` | **SHA3-256** image checksum (`XisoChecksum.ComputeImageChecksum`, `SortedDictionary Ordinal` `/path` UTF-8 + streamed data, `xdvdfs` compat). `.cso` / split `.1.cso` inputs are auto-detected by extension and read through `CisoBlockDevice` (`img.rs::open_image` parity), hashing the decompressed view — result identical to the source ISO. Prints `hex tab path` (`--silent` → hex only). Also `flag` form `--checksum` supports multiple ISOs (`--silent` requires `--checksum` in flag form). See [xdvdfs Compat](xdvdfs-compat.md#checksum). |
-| `split [--size <bytes\|half>] [--output <base>] <image> [images...]` | **Split** a plain ISO into sector-aligned `<base>.1.iso`, `<base>.2.iso`, … parts (`XisoSplitter.Split`, TODO #17 / xdvdfs #97 — the plain-ISO counterpart to CSO `--ciso-split`). `--size` accepts bytes with `K`/`M`/`G` suffixes or `half`/`halves`; default 4G (FATX cap). Base defaults to the input stem. Existing parts are refused; partial parts are removed on failure/cancel. |
+| `compress\|cso\|cci <src> [out] [--format cso\|cci] [--ciso-level 0..9] [--ciso-version 1\|2\|auto] [--ciso-split bytes] [--cci-level 0..9] [--cci-split bytes] [--batch <dir>]` | **CISO/CCI** compress. CISO (`CisoWriter.CompressToCso`): v2 (default) LZ4 sectors with fixed `align 2`, byte-identical to modern `xdvdfs compress` (pure-managed `lz4_flex` port); v1 BCL DEFLATE `0x80000000` with dynamic `align` 0/1/2; threshold `+12`. CCI (`XisoCci.CompressToCci`, CCISharp): fast LZ4 block per sector, spec-valid and interoperable (not byte-identical to LZ4-HC). Use on `sourceDir`, `image.iso`, or a split ISO/CISO/CCI source (decompressed to a temporary ISO first). CISO splits at `0xffbf6000` (~4 GiB) into `.1.cso`/`.2.cso` parts; CCI into `.1.cci`/`.2.cci`. `--*-split 0` writes a single file. With `--batch`, converts every `.iso`/`.xiso` in `<dir>`. See [Compression](compression.md). |
+| `decompress\|uncso\|decso\|uncci <cso\|cci> [out.iso] [--batch <dir>]` | **CISO/CCI** decompress: compressed containers are detected by extension/magic; `CisoReader.DecompressToIso` handles CISO v1/v2 and `XisoCci.DecompressToIso` handles CCI, single files and split `.N.cso`/`.N.cci` parts. With `--batch`, converts every `.cso`/`.cci` in `<dir>`. |
+| `checksum [--silent] <image> [images...]` / `--checksum <image> [--silent]` | **SHA3-256** image checksum (`XisoChecksum.ComputeImageChecksum`, `SortedDictionary Ordinal` `/path` UTF-8 + streamed data, `xdvdfs` compat). `.cso`/`.1.cso`, `.cci`/`.1.cci` and split `.1.iso` inputs are auto-detected and read through the decompressed/concatenated view - result identical to the source ISO. `.zar` inputs use `ComputeZarChecksum` (same tree hash) - also identical. Prints `hex tab path` (`--silent` = hex only). Also `flag` form `--checksum` supports multiple ISOs (`--silent` requires `--checksum` in flag form). See [xdvdfs Compat](xdvdfs-compat.md#checksum). |
+| `split [--size <bytes\|half>] [--output <base>] <image> [images...] [--batch <dir>]` | **Split** a plain ISO into sector-aligned `<base>.1.iso`, `<base>.2.iso`, … parts (`XisoSplitter.Split`, TODO #17 / xdvdfs #97 — the plain-ISO counterpart to CSO `--ciso-split`). `--size` accepts bytes with `K`/`M`/`G` suffixes or `half`/`halves`; default 4G (FATX cap). Base defaults to the input stem. Existing parts are refused; partial parts are removed on failure/cancel. With `--batch`, splits every unsplit `.iso`/`.xiso` in `<dir>`. |
 | `join\|joinsplit [--output <file>] <first.1.iso> [...]` | **Reassemble** split parts (`XisoSplitter.Join`). Output defaults to the part stem + `.iso` and must not exist; the result is validated as an XISO afterwards. |
+| `convert <src.zar\|src.iso> <out.iso\|out.zar> [-y\|-n] [--batch <dir> --format iso\|zar]` | **Convert** ZArchive to ISO (`XisoZarchive.ConvertZarToIso`: extract to a temp directory then `XisoWriter.PackFromDirectory`) or ISO to ZArchive (`CreateZar`). Existing outputs follow `-y`/`-n`. With `--batch`, converts every unsplit `.iso`/`.xiso` to `.zar` (`--format zar`, default) or every `.zar` to `.iso` (`--format iso`). |
 
 ## Options
 
@@ -121,11 +126,14 @@ Image inputs accept `.cso`/`.1.cso` files directly (auto-detected by extension, 
 | `--sector-layout <image>` | **Sector layout** — full on-disk map (`XisoReader.GetSectorLayout`): volume summary (format, root dir sector/size, total sectors), per-file extents (`path`, start sector, sector count, bytes), and used/free sector ranges (inclusive spans). Offset-0 only (`--skip-sectors` rejected). |
 | `--ranges <image>` | **Sector ranges** (`XisoRanges.GetXisoRanges`): system (bone) vs file sector ranges as inclusive `start-end` spans, with counts. Offset-0 only (`--skip-sectors` rejected). |
 | `--is-optimized <image>` | Print `<iso>: optimized` or `<iso>: not optimized` (`XisoReader.IsOptimizedImage` tag probe at offset 31337); supports `--skip-sectors`. Always exits 0 on a readable image. |
-| `--skip-existing` | In extract, `--unpack`, and `--copy-out` modes, skip files already on disk with matching sizes (logged as `skip: <path>`) instead of overwriting them. Re-run an interrupted unpack to resume it; pairs with `--batch`. See [Resume interrupted unpacks](#resume-interrupted-unpacks). |
-| `--continue-on-error` | In extract, `--unpack`, and `--copy-out` modes, log per-file failures (`Error: Failed to extract ...`) and continue with the next entry instead of aborting. An uncreatable directory skips its subtree. The run still ends with a `Failed to unpack image` summary and a non-zero exit code. See [Extraction robustness](#extraction-robustness). |
+| `--skip-existing` | In extract, `--unpack`, and `--copy-out` modes, skip files already on disk with matching sizes (logged as `skip: <path>`) instead of overwriting them. Re-run an interrupted unpack to resume it; pairs with `--batch`. On a batch container verb (`compress`, `decompress`, `convert`, `split`), skip a source whose output already exists (for `split`, every expected part must exist; a partial set is resumed). See [Resume interrupted unpacks](#resume-interrupted-unpacks). |
+| `--continue-on-error` | In extract, `--unpack`, and `--copy-out` modes, log per-file failures (`Error: Failed to extract ...`) and continue with the next entry instead of aborting. An uncreatable directory skips its subtree. The run still ends with a `Failed to unpack image` summary and a non-zero exit code. On a batch container verb, keep converting after a failed file, remove any partial output, and return exit code `1` after the summary. See [Extraction robustness](#extraction-robustness). |
 | `--ciso-level 0..9` | CISO compression level (`compress`/`cso`, default `9`). v1: maps to `CompressionLevel` for BCL DEFLATE (`0` NoCompression, `1..3` Fastest, `4..6` Optimal, `7..9` SmallestSize). v2: `0` = store all plain, `1..9` = LZ4 acceleration `10 - level` (level 9 byte-identical to xdvdfs). |
 | `--ciso-version 1\|2\|auto` | CISO payload codec (`compress`/`cso`). Default `2` (LZ4, `align 2` — modern xdvdfs parity); `1` = classic DEFLATE. |
 | `--ciso-split <bytes>` | Split point for `.1.cso`/`.2.cso`… output (`compress`/`cso`). Default `0xffbf6000` (~4 GiB, xdvdfs `SplitOutput`); `0` = single `.cso`. |
+| `--format cso\|cci` | Output container for `compress` (default `cso`; `cci` selects CCISharp). |
+| `--cci-level 0..9` | CCI compression level (`compress`/`cci`): `0` = store every sector raw; `1..9` map to the fast LZ4 encoder acceleration (`10 - level`). |
+| `--cci-split <bytes>` | CCI split point (`compress`/`cci`). Default `0xffbf6000` (~4 GiB) into `.1.cci`/`.2.cci`; `0` = single `.cci`. |
 | `-p` | (Hidden) Print usage and exit 1. |
 
 ### Overwrite behavior
@@ -297,9 +305,11 @@ Enforced at parse time; violations print an error and exit 1:
 | `--skip-sectors`/`--prepend-sectors` with `-i`, `--ls`, `--xex-info`, `--xbe-info`, hash, `--copy-out`, `--copy-in`, `-V`, `validate`/`--validate*`, redump verbs, `checksum`, `--sector-layout`, or `--ranges` | Error |
 | `--validate`/`--validate-checksums`/`--validate-strict`/`--validate-report` without `-r` or `validate` | Error |
 | `-X` without `-c` | Error |
-| `--skip-existing` without extract/`--unpack`/`--copy-out` (e.g. with `-l`, `-t`, `-r`, `-c`, redump verbs) | Error |
-| `--continue-on-error` without extract/`--unpack`/`--copy-out` | Error |
-| `--batch` without extract/list/tree/rewrite/audit (e.g. with `--copy-out`, `--copy-in`, `validate`, redump, `checksum`, `--filetime`, `--sector-layout`, `--ranges`, `--is-optimized`) | Error |
+| `--skip-existing` without extract/`--unpack`/`--copy-out` (e.g. with `-l`, `-t`, `-r`, `-c`, redump verbs) or a batch container verb (`compress`, `decompress`, `convert`, `split`) | Error |
+| `--continue-on-error` without extract/`--unpack`/`--copy-out` or a batch container verb | Error |
+| `--jobs` without a lone `--zar` or a batch container verb | Error |
+| `--output-name` without a batch container verb | Error |
+| `--batch` without extract/list/tree/rewrite/audit or a container verb (`compress`, `decompress`, `convert`, `split`) (e.g. with `--copy-out`, `--copy-in`, `validate`, redump, `checksum`, `--filetime`, `--sector-layout`, `--ranges`, `--is-optimized`) | Error |
 | `--batch-recursive` without `--batch` | Error |
 | `--no-backup` without `--copy-in` or `--repair` | Error |
 | `--dry-run` without `--repair` | Error |
@@ -309,7 +319,7 @@ Enforced at parse time; violations print an error and exit 1:
 | `-c` with extra positional arguments | Usage error |
 | `-y` with `-n` | Error (`[ERROR] Cannot use both --no (-n) and --yes (-y)`) |
 | No positional arguments in a non-create/non-verb mode | Usage error |
-| `--ciso-level` / `--ciso-version` / `--ciso-split` without `compress`/`cso` | Error (verb-only flags, parsed by `RunCompressMode`) |
+| `--ciso-*` / `--cci-*` / `--format` without `compress`/`cso`/`cci` | Error (verb-only flags, parsed by `RunCompressMode`; `--ciso-*` and `--cci-*` are also rejected for the other format) |
 | `--security-sectors`/`--sectors` outside the `rebuild` verb | Error (`only supported by the rebuild verb`) |
 
 Flags that take arguments (`-c`, `-d`, `-o`, `-X`, `--skip-sectors`, `--prepend-sectors`,
@@ -482,6 +492,25 @@ XISOSharp decompress game.cso game.iso
 XISOSharp uncso game.cso
 XISOSharp decso game.cso
 
+# CCI compress / decompress (CCISharp, LZ4 sector blocks)
+XISOSharp compress --format cci game.iso game.cci --cci-level 9 --cci-split 0
+XISOSharp cci game.iso game.cci --cci-split 0
+XISOSharp decompress game.1.cci game.iso
+XISOSharp uncci game.cci game.iso
+
+# ZArchive input / conversion
+XISOSharp -l game.zar
+XISOSharp --unpack game.zar out/
+XISOSharp checksum game.zar
+XISOSharp convert game.zar game.iso
+
+# Batch container conversion (compress / decompress / convert / split)
+XISOSharp compress --batch ./isos --format cci --cci-split 0 -y
+XISOSharp decompress --batch ./compressed --skip-existing -y
+XISOSharp convert --batch ./isos --format zar -y
+XISOSharp split --batch ./isos --size half -y
+XISOSharp compress --batch ./isos --output-name "{name}.xiso.{format}" --jobs 4 -y
+
 # SHA3-256 image checksum (deterministic, BTreeMap sorted)
 XISOSharp checksum game.iso
 XISOSharp checksum --silent game1.iso game2.iso
@@ -498,6 +527,7 @@ XISOSharp --checksum game.iso
 - Archival verbs (`--video`/`--random`/…/`--zar`/`--all`/`--best`/`--compress`) dispatch via `RunRedumpBatch` with
   shared `ExpandIsoFiles` (`--jobs`/`--policy` thread through the `--zar` path); `rebuild` has its own parser with `--security-sectors`/`--sectors`.
 - xdvdfs verbs (`build-image`/`image-spec`/`compress`/`decompress`/`checksum`/`split`/`join`) are detected as first token and handled before `getopt` parsing.
+- Container batch verbs (`compress`/`decompress`/`convert`/`split`) parse their own `--batch`, `--batch-recursive`, `--skip-existing`, `--continue-on-error`, `--jobs` and `--output-name` before the main parser, so the main-mode `--batch` restrictions do not apply to them.
 - Output progress uses carriage returns when writing to a terminal and newlines when
   stdout is redirected, so logs stay readable in CI.
 - **Automatic update checks:** every launch compares the running version against

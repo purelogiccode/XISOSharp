@@ -55,6 +55,10 @@ internal static class SelfTest
                 ["rebuild", "x.iso", "v.iso", "-o", "r.iso", "--security-sectors", "s.txt", "-y"]);
             Check("compress", CliCommands.Compress("a.iso", null, 9, 2, "0", overwrite: false),
                 ["compress", "--ciso-level", "9", "--ciso-version", "2", "--ciso-split", "0", "a.iso", "-n"]);
+            Check("compress-cci", CliCommands.Compress("a.iso", "a.cci", 9, 2, "0", overwrite: false, "cci"),
+                [
+                    "compress", "--format", "cci", "--cci-level", "9", "--cci-split", "0", "a.iso", "a.cci", "-n"
+                ]);
             Check("zar", CliCommands.Zar("a.iso", "a.zar", "skip"),
                 ["--zar", "--policy", "skip", "-o", "a.zar", "a.iso"]);
             Check("zar-derived", CliCommands.Zar("a.iso", null, null), ["--zar", "a.iso"]);

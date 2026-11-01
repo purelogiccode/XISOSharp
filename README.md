@@ -29,7 +29,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) fo
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) — full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) — extract-xiso-compatible flags + 35+ extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1821 tests on net10.0; 1760 on net8.0/net9.0) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (1904 tests on net10.0; 1842 on net8.0/net9.0) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + CCI/libCCI interop + split-ISO input + ZAR input + pathological TOC chains + batch container conversion + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command coverage |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 1 of `H:\XBOXTest`, seeded): `extract-xiso.exe` (reference build `202609111233`; `list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
@@ -42,7 +42,7 @@ Full docs live in [`docs/`](docs/README.md) — served as a **Docsify site with 
 - [CLI Reference](docs/cli.md) — every flag, verb, exit code
 - [Archival Workflows](docs/archival.md) — `--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`rebuild`
 - [Build-Image & Image-Spec](docs/xdvdfs-compat.md#build-image) — ordered `wax` remapping, `xdvdfs.toml`
-- [Compression (CISO)](docs/compression.md) — `compress`/`decompress`, `CisoBlockDevice`
+- [Compression (CISO, CCI)](docs/compression.md) - `compress`/`decompress`, `CisoBlockDevice`, `CciBlockDevice`, `XisoCci`
 - [Checksums](docs/xdvdfs-compat.md#checksum) — SHA3-256 `checksum` vs MD5/SHA-256
 - [XISO Format](docs/xiso-format.md) — header, dirtab, AVL, ECMA-119, `0x0000` sentinel
 - [Redump & Disc Layouts](docs/redump-workflows.md) — XGD offsets incl. hybrid `0x89D80000`
@@ -61,7 +61,7 @@ dotnet add package XISOSharp
 Install-Package XISOSharp
 ```
 
-Package targets `net8.0`, `net9.0`, `net10.0`, zero runtime dependencies (BCL only), strong-named, `IsTrimmable`+`IsAotCompatible`, `snupkg` via SourceLink.
+Package targets `net8.0`, `net9.0`, `net10.0`, strong-named, `IsTrimmable`+`IsAotCompatible`, `snupkg` via SourceLink; runtime dependencies are `ZArchiveSharp` (ZAR) and `CCISharp` (CCI).
 
 ### CLI (tool)
 
@@ -93,12 +93,12 @@ dotnet publish XISOSharp.Cli -c Release -r linux-x64 --self-contained
 `XISOSharp.Gui` is a modern dark-theme front-end (left navigation rail, card layout,
 green accent) that drives the `XISOSharp` CLI as a child
 process via the shared core `ProcessRunner` + `ToolLocator` (override → sibling →
-`PATH` + `-v` probe; extract/create/rewrite/rebuild/compress/zar/decompress/validate/batch plus
+`PATH` + `-v` probe; extract/create/rewrite/rebuild/compress (CISO or CCI)/zar/decompress/validate/batch plus
 list/tree/info/unpack/copy-out/checksum, live log, cancel, overwrite `-y`/`-n`
 switch). The **ZAR** tab packs an ISO/XISO/Redump image into a `.zar`
 (ZArchive/zstd, loadable in Xenia canary) and offers overwrite/skip/auto-rename
 collision policies. Files and folders can be **dragged onto the window**: a single image queues
-Extract, a single `.cso` queues Decompress, multiple images queue Rewrite, and a folder
+Extract, a single `.cso`/`.cci` queues Decompress, a `.zar` queues Extract/list/checksum, multiple images queue Rewrite, and a folder
 queues Batch (when it contains `*.iso`) or Create. Input==output mistakes are refused
 before the CLI runs. It finds the CLI next to itself, on `PATH`, or via the Settings tab
 (persisted atomically to `%AppData%/XISOSharp/gui-settings.json`). Picker results marshal
@@ -181,6 +181,13 @@ XISOSharp --skip-existing --unpack game.iso ./out
 XISOSharp --skip-existing --batch ./isos -d ./out   # bulk runs resume too
 XISOSharp --skip-existing --copy-out game.iso /media ./media_out
 
+# Batch container conversion (compress / decompress / convert / split)
+XISOSharp compress --batch ./isos --format cci --cci-split 0 -y
+XISOSharp decompress --batch ./compressed --skip-existing -y
+XISOSharp convert --batch ./isos --format zar -y
+XISOSharp split --batch ./isos --size half -y
+XISOSharp compress --batch ./isos --output-name "{name}.xiso.{format}" --jobs 4 -y
+
 # Safety: an -o that points back at the input (or its .old backup) is refused (exit 1)
 XISOSharp -r -o game.iso game.iso        # Error: ... is the same file as the input
 ```
@@ -261,6 +268,18 @@ XISOSharp compress ./game_dir game.cso --ciso-level 9       # 0=store; 1..9 = LZ
 XISOSharp cso game.iso game.cso --ciso-split 0              # single .cso (default splits at ~4 GiB)
 XISOSharp decompress game.1.cso game.iso                    # also reads split .1.cso/.2.cso parts
 XISOSharp uncso game.cso                                    # decso alias
+
+# CCI/CCIM (CCISharp; fast LZ4 sector blocks)
+XISOSharp compress --format cci game.iso game.cci --cci-level 9 --cci-split 0
+XISOSharp cci game.iso game.cci --cci-split 0               # cso-style alias
+XISOSharp decompress game.1.cci game.iso                    # single or split .N.cci
+XISOSharp uncci game.cci game.iso
+
+# ZArchive input / conversion (list/extract/checksum read the name tree)
+XISOSharp -l game.zar
+XISOSharp --unpack game.zar out/
+XISOSharp checksum game.zar
+XISOSharp convert game.zar game.iso
 
 # Plain-ISO split/join (FATX-friendly) + deterministic checksum
 XISOSharp split --size half game.iso                        # -> game.1.iso/game.2.iso
@@ -442,7 +461,7 @@ int isoType = XgdTables.GetRedumpIsoTypeBySize(new FileInfo("game.redump.iso").L
 var prng = new XboxPrng(seedVal); prng.SimulateSectors(100); prng.WriteSectors(stream, 100);
 ```
 
-### Packing, CISO & checksums (xdvdfs parity)
+### Packing, CISO/CCI, ZAR & checksums (xdvdfs parity)
 
 ```csharp
 // Build-image ordered remapping (WaxGlob *,**,?,[],{a,b} + {0}/{n} captures, ! negation)
@@ -463,11 +482,31 @@ int cso = CisoWriter.CompressToCso("game.iso", "game.cso", level: 9, splitBytes:
 int iso = CisoReader.DecompressToIso("game.1.cso", "rebuilt.iso"); // split .N.cso input supported
 bool isCso = CisoReader.IsCso("game.cso"); // magic CISO + blockSize 2048 + ver 1/2
 
+// CCI/CCIM (CCISharp-backed: fast LZ4 sector blocks; 0 = single file)
+int cci = XisoCci.CompressToCci("game.iso", "game.cci", level: 9, splitBytes: 0);
+int fromCci = XisoCci.DecompressToIso("game.1.cci", "rebuilt.iso"); // split .N.cci input supported
+
+// Unified detection: ISO, split .1.iso, CISO, CCI and their split sets
+if (XisoImageSource.TryDetect("game.1.cci", out XisoImageSourceInfo? source) && source is not null)
+{
+    Console.WriteLine($"{source.Format}: {source.Length} bytes across {source.Parts.Count} part(s)");
+}
+
+using Stream imageView = XisoImageSource.OpenRead("game.1.cci"); // decompressed/concatenated view
+using IBlockDevice imageDev = XisoImageSource.OpenBlockDevice("game.1.iso");
+
+// ZAR input: list, extract, convert, and the ISO-equivalent tree checksum
+IReadOnlyList<ZarEntry> zarEntries = XisoZarchive.ListZar("game.zar");
+int extracted = XisoZarchive.ExtractZar("game.zar", "game_dir");
+int converted = XisoZarchive.ConvertZarToIso("game.zar", "rebuilt.iso");
+byte[] zarHash = XisoChecksum.ComputeZarChecksum("game.zar"); // same digest as the equivalent ISO
+
 // BlockDevice — in-memory golden fixtures without temp files (no_std parity)
 using var mem = new MemoryBlockDevice(File.ReadAllBytes("game.iso"));
 var (rootSector, rootSize, discLseek) = XisoReader.VerifyXiso(mem, "game.iso");
 AuditResult a2 = XisoReader.AuditXiso(mem);
 using var cisoDev = new CisoBlockDevice(new FileBlockDevice(File.OpenRead("game.cso"))); // single-sector cache
+using var cciDev = new CciBlockDevice("game.cci"); // single or split .cci
 var files2 = XisoReader.ListDirectory(cisoDev, "/");
 
 // Deterministic image checksum (SHA3-256, SortedDictionary Ordinal, /path UTF-8 + streamed data — xdvdfs compat)
@@ -526,7 +565,10 @@ File-by-file against [`References/`](References/) — `extract-xiso` build `2026
 | Optimized tag `in!xiso` at 31337 | ✅ | ✅ | ❌ | ❌ |
 | CISO decompress (DEFLATE v1 + LZ4 v2, single + split parts) | ✅ | ❌ | ❌ | ✅ |
 | `.cso`/`.1.cso` input auto-detect in all verbs (`img.rs` parity) | ✅ | ❌ | ❌ | ✅ |
-| BlockDevice random-access (File/Memory/Offset/Ciso) | ✅ | ❌ | ❌ | ✅ |
+| CCI/CCIM read/write (LZ4 sectors, single + split `.1.cci`…`.9.cci`) | ✅ | ❌ | ❌ | ❌ (open #185) |
+| Split plain-ISO input (`game.1.iso` … concatenated) | ✅ | ❌ | ❌ | ❌ |
+| ZAR input (`list`/`extract`/`convert`/tree checksum) | ✅ | ❌ | 🟡 `rebuild` only | ❌ |
+| BlockDevice random-access (File/Memory/Offset/Stream/Ciso/Cci) | ✅ | ❌ | ❌ | ✅ |
 | Track/TOC parsing | ✅* | — | — | 🟡 |
 | **Writing** | | | | |
 | Write V5 (optimized AVL) | ✅ | ✅ | 🟡 ranges only | ✅ |
@@ -580,7 +622,7 @@ File-by-file against [`References/`](References/) — `extract-xiso` build `2026
 | **CLI** | | | | |
 | `-c` repeatable + `-X` excludes + `-s` | ✅ | 🟡 no `-X` | — | ✅ `pack` |
 | `--pack` dir→create / iso→rewrite | ✅ | ❌ | — | ✅ |
-| Batch `--batch` sorted + `--batch-recursive` | ✅ | 🟡 explicit args only | ❌ | 🟡 `checksum` multi |
+| Batch `--batch` sorted + `--batch-recursive` (extract/list/tree/rewrite/audit + compress/decompress/convert/split) | ✅ | 🟡 explicit args only | ❌ | 🟡 `checksum` multi |
 | Input==output safety guard (refuse `-o` onto input/`.old`/split part) | ✅ | — (no `-o` flag) | ❌ | ❌ (open #36) |
 | Quiet `-q` / silent `-Q` (`checksum --silent` → hex only) | ✅ | ✅ | 🟡 | ❌ |
 | Help `-h`/`--help` / banner `-v` `XISOSharp v<version>` | ✅ | ✅ | 🟡 `-h` only | 🟡 `clap` |
@@ -604,7 +646,7 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (same outputs; no implicit pack)
-dotnet test -c Release                       # 1821 tests on net10.0 (1760 on net8/9; `XISOSharp.Tests`; ZArchiveSharp comes from NuGet)
+dotnet test -c Release                       # 1904 tests on net10.0 (1842 on net8/9; `XISOSharp.Tests`; ZArchiveSharp/CCISharp come from NuGet)
 ```
 
 Projects: `XISOSharp.Core` (`net8.0`/`net9.0`/`net10.0`) packs explicitly (`dotnet pack`; `GeneratePackageOnBuild` is off); `XISOSharp.Cli` (`net8.0`/`net9.0`/`net10.0`, ships net10.0); `XISOSharp.Tests` (`net8.0`/`net9.0`/`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF). `ZArchiveSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZArchiveSharp.Tests` + `ZArchiveSharp.Benchmarks` moved to the sibling `../CSharp_ZArchiveSharp` repo (own solution); `XISOSharp` consumes the library as NuGet package `ZArchiveSharp` 1.4.0. CI builds on `ubuntu`/`windows`/`macos`.

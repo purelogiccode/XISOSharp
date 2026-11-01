@@ -1,58 +1,97 @@
-# What's New in 1.4.4 (since 1.4.3)
+# What's New in 1.4.5 (since 1.4.4)
 
-A failed or cancelled extraction no longer leaves a truncated destination file
-behind. `ExtractFile`/`CopyOutFile` now delete the partial output they wrote, so a
-disk that fills up mid-copy, a torn image, or a cancelled run cannot leave a file
-that later looks complete to a resume probe, a drag-and-drop preparation, or a
-batch script. Custom destination stores opt in through the new
-`IFilesystem.DeleteFile` member; its default implementation keeps the old no-op
-behavior, so existing implementations still compile and run unchanged.
-
-The whole solution is now clean under JetBrains InspectCode - 0 errors and 0
-warnings across all projects - and `dotnet build` reports 0 warnings. Dead
-members uncovered by the inspection were removed from the Tester.
+XISOSharp now reads **CCI/CCIM** images, **split plain-ISO** sets, and
+**ZArchive** (`.zar`) inputs, all through one unified image-source layer.
+`compress` can write CCI (`--format cci`), `decompress` auto-detects CISO vs
+CCI, and a new `convert` verb bridges ZAR and ISO. The container verbs also
+accept `--batch`, so whole folders convert in one command. CCI support comes
+from the standalone MIT [CCISharp](https://github.com/purelogiccode/CCISharp)
+1.0.0 package (pure managed, no native code).
 
 Targets remain `net8.0` / `net9.0` / `net10.0`. Full suite green on all three:
-**1760 passed / 1 opt-in skip (1761) on net8.0/net9.0** and **1821 passed / 1
-opt-in skip (1822) on net10.0**.
+**1841 passed / 1 opt-in skip (1842) on net8.0/net9.0** and **1903 passed / 1
+opt-in skip (1904) on net10.0**.
 
 ## Highlights
 
-- **No partial files after a failed extraction**: truncated copies, mid-write
-  I/O failures, and cancellation all remove the destination the call created.
-  Cleanup is best-effort: a delete failure is swallowed so it never hides the
-  extraction error.
-- **Custom destinations can clean up too**: `IFilesystem.DeleteFile` defaults to
-  a no-op, `LocalFilesystem` deletes from disk (missing path is a no-op), and
-  `MemoryFilesystem` drops the stored snapshot.
-- **Static-analysis clean**: JetBrains InspectCode reports 0 errors and 0
-  warnings for the entire solution, and the regular build stays warning-free.
+- **CCI/CCIM read + write**: single `game.cci` and split `game.1.cci` …
+  `game.9.cci` sets; random access, extraction, validation and recompression.
+- **Split ISO input**: `game.1.iso` … is read as one concatenated, seekable
+  image. A missing middle part is a clear error, never silent truncation.
+- **ZArchive input**: `-l`, `-t`, `-x`, `--unpack`, `checksum` and `convert`
+  work directly on `.zar`; the tree checksum matches the equivalent ISO.
+- **One detection table**: `XisoImageSource` replaces scattered `.cso` checks
+  and resolves renamed containers by `CISO`/`CCIM` magic.
+- **Format-aware CLI/GUI**: `compress --format cso|cci`, `cci`/`uncci`
+  aliases, CCI-level/split flags, a GUI Format selector, and `.cci` filters.
+- **Pathological TOC hardening**: the directory walk uses an explicit in-order
+  stack, so a 4,096-entry left-skewed table lists/extracts/rewrites instead of
+  hitting the depth cap or overflowing the stack.
+- **Batch conversion**: `compress`, `decompress`, `convert` and `split` accept
+  `--batch`/`--batch-recursive`, `--skip-existing`, `--continue-on-error`,
+  `--jobs 1..64` and `--output-name` templates (`{name}`, `{ext}`, `{format}`).
 
 ## Library
 
-- `ExtractFile`/`CopyOutFile` track success and delete the partial destination in
-  a `finally` block when the copy did not complete.
-- `IFilesystem.DeleteFile(string path)` - new member with a default no-op body;
-  called only for cleanup after a failed extraction.
-- `LocalFilesystem.DeleteFile` resolves the path like every other member and
-  treats a missing file as a no-op; `MemoryFilesystem.DeleteFile` removes the
-  committed snapshot.
-- `Logger.Out`/`Logger.Error` accept `null` (documented behavior) through
-  `[AllowNull]` and store `TextWriter.Null`, so the getters never return `null`.
-- Inspection-driven cleanup elsewhere: redundant default arguments, redundant
-  casts/assignments, dead null guards, and unused members. No output, format, or
-  on-disk changes.
+- `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` -
+  `TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`.
+- `XisoCci` - `CompressToCci`, `DecompressToIso`, default-path helpers.
+- `CciBlockDevice` - `IBlockDevice` over CCISharp's random-access reader.
+- `SplitIsoFile` / `SplitIsoStream` - split ISO discovery and concatenation.
+- `XisoZarchive.ListZar` / `ExtractZar` / `ConvertZarToIso`.
+- `XisoChecksum.ComputeZarChecksum` / `ComputeZarChecksumHex`.
+- `StreamBlockDevice` - any seekable stream as an `IBlockDevice`.
+- `XisoReader.OpenImageStream` and `XisoChecksum` now use the factory, so every
+  reader verb sees the decompressed/concatenated view.
+- `Repair`, `CopyIntoImage` and `SetFileTime` refuse CISO/CCI in place with a
+  clear "decompress first" message (even for a missing or corrupt container).
+- `CisoWriter.CompressToCso` and `XisoCci.CompressToCci` accept split ISO,
+  CISO and CCI sources by materializing a temporary ISO first.
+- `TraverseXiso` uses an explicit in-order stack (`Constants.MaxTocStackFrames`);
+  `MaxTocDepth` now bounds subdirectory nesting only.
+- Runtime dependencies: `ZArchiveSharp` 1.4.0 and `CCISharp` 1.0.0.
 
-## Tester
+## CLI
 
-- Removed the unused `LogEntries` collection and `LogEntry` model (the UI binds
-  `LogText`), plus `PerFileResult.FilePath` and the unused `TestProgress` fields.
+```bash
+XISOSharp compress --format cci game.iso game.cci --cci-level 9 --cci-split 0
+XISOSharp cci game.iso game.cci --cci-split 0
+XISOSharp decompress game.1.cci game.iso
+XISOSharp uncci game.cci game.iso
+XISOSharp convert game.zar game.iso
+XISOSharp -l game.zar
+XISOSharp checksum game.zar
+XISOSharp compress --batch ./isos --format cci --cci-split 0 -y
+XISOSharp decompress --batch ./compressed --skip-existing -y
+XISOSharp convert --batch ./isos --format zar -y
+XISOSharp split --batch ./isos --size half -y
+```
+
+- `--format cso|cci` (default `cso`), `--cci-level 0..9`, `--cci-split bytes`.
+- `-l`/`--level` and `--split` stay format-neutral; `--ciso-*` is rejected for
+  CCI output and `--cci-*` for CISO output.
+- `decompress` detects CISO vs CCI by extension and magic.
+- `convert` supports `.zar -> .iso` and `.iso -> .zar`, and
+  `convert --batch --format iso|zar` converts a whole directory.
+- `--batch` on `compress`/`decompress`/`convert`/`split` scans the verb's own
+  inputs, collapses split sets to their first part, refuses duplicate outputs
+  and input clobbers before writing, and removes partial outputs on failure.
+
+## GUI
+
+- Compress tab has a **Format** selector (CISO/CCI); the save dialog and split
+  placeholder follow the selection.
+- Picker filters and drag-and-drop include `.cci`/`.1.cci` and `.zar`.
+- A dropped `.zar` opens the Extract tab (list/extract/checksum); compressed
+  images route to Decompress.
+- Decompress collision guards use CCI-aware default output naming.
 
 ## Tests
 
-- `ExtractRobustnessTests` asserts no destination survives a truncated copy, a
-  mid-write failure, or a custom-filesystem write failure.
-- `XisoFilesystemTests` covers `DeleteFile` on `LocalFilesystem`, including the
-  missing-file no-op.
-- Suite: **net8.0/net9.0 - 1761 tests (1760 passed, 1 opt-in skip)**;
-  **net10.0 - 1822 tests (1821 passed, 1 opt-in skip, adds the GUI tests)**.
+New suites: `XisoImageSourceTests`, `CciAutoDetectTests`,
+`SplitIsoAutoDetectTests`, `CliCciTests`, `ZarInputTests`,
+`PathologicalTocTests` and `CliBatchConvertTests`. They cover the detection
+table, CCI round-trips, split recompression, ZAR conversion/checksum, CLI
+aliases, format-specific flag contracts, pathological left/right/alternating TOC
+chains, and batch conversion with naming templates, resume, continue-on-error
+and parallel jobs.

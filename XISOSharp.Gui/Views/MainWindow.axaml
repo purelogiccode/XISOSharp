@@ -174,9 +174,9 @@
         <ScrollViewer>
           <StackPanel>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
-              <TextBlock Text="Image (.iso/.xiso/.cso)" VerticalAlignment="Center" ToolTip.Tip="Input image to extract from" />
+              <TextBlock Text="Image (.iso/.cso/.cci/.zar)" VerticalAlignment="Center" ToolTip.Tip="Input image or ZAR to extract from" />
               <TextBox Grid.Column="1" Text="{Binding ExImage}" PlaceholderText="game.iso"
-                       ToolTip.Tip="Path to the source disc image (.iso, .xiso or .cso)" />
+                       ToolTip.Tip="Path to the source disc image (.iso, .xiso, .cso, .cci or .zar)" />
               <Button Grid.Column="2" Content="Browse…" Click="BrowseExImage_ClickAsync" Margin="6,0,0,0"
                       ToolTip.Tip="Pick the source image" />
             </Grid>
@@ -348,21 +348,27 @@
         </ScrollViewer>
       </TabItem>
 
-      <TabItem Header="Compress" ToolTip.Tip="Compress an ISO or directory to CISO (.cso)">
+      <TabItem Header="Compress" ToolTip.Tip="Compress an ISO or directory to CISO (.cso) or CCI (.cci)">
         <ScrollViewer>
           <StackPanel>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
               <TextBlock Text="Source (dir or ISO)" VerticalAlignment="Center" ToolTip.Tip="Directory or ISO to compress" />
-              <TextBox Grid.Column="1" Text="{Binding CpSource}" ToolTip.Tip="Source directory or .iso file" />
+              <TextBox Grid.Column="1" Text="{Binding CpSource}" ToolTip.Tip="Source directory or image file" />
               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="6,0,0,0">
                 <Button Content="File…" Click="BrowseCpSourceFile_ClickAsync" ToolTip.Tip="Pick a source file" />
                 <Button Content="Folder…" Click="BrowseCpSourceFolder_ClickAsync" ToolTip.Tip="Pick a source folder" />
               </StackPanel>
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
-              <TextBlock Text="Output .cso" VerticalAlignment="Center" ToolTip.Tip="Output CISO path" />
+              <TextBlock Text="Format" VerticalAlignment="Center" ToolTip.Tip="Output container format" />
+              <ComboBox Grid.Column="1" ItemsSource="{Binding CompressionFormats}" SelectedItem="{Binding CpFormat}"
+                        HorizontalAlignment="Left" Width="120"
+                        ToolTip.Tip="CISO (.cso, LZ4/DEFLATE) or CCI (.cci, LZ4)" />
+            </Grid>
+            <Grid Classes="row" ColumnDefinitions="150,*,Auto">
+              <TextBlock Text="Output" VerticalAlignment="Center" ToolTip.Tip="Output CISO/CCI path" />
               <TextBox Grid.Column="1" Text="{Binding CpOutput}" PlaceholderText="(auto-derived)"
-                       ToolTip.Tip="Output .cso path (empty = auto-derived)" />
+                       ToolTip.Tip="Output path (empty = auto-derived; .cso or .cci)" />
               <Button Grid.Column="2" Content="Save as…" Click="BrowseCpOutput_ClickAsync" Margin="6,0,0,0"
                       ToolTip.Tip="Pick the output path" />
             </Grid>
@@ -372,19 +378,19 @@
                              ToolTip.Tip="0 = store, 9 = smallest (default)" />
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
-              <TextBlock Text="CISO version" VerticalAlignment="Center" ToolTip.Tip="CISO container version" />
+              <TextBlock Text="CISO version" VerticalAlignment="Center" ToolTip.Tip="CISO container version (ignored for CCI)" />
               <ComboBox Grid.Column="1" ItemsSource="{Binding CisoVersions}" SelectedItem="{Binding CpVersion}" HorizontalAlignment="Left" Width="120"
-                        ToolTip.Tip="Version 2 writes LZ4 sectors; version 1 classic DEFLATE" />
+                        ToolTip.Tip="CISO only: version 2 writes LZ4 sectors; version 1 classic DEFLATE" />
             </Grid>
             <Grid Classes="row" ColumnDefinitions="150,*,Auto">
-              <TextBlock Text="Split bytes" VerticalAlignment="Center" ToolTip.Tip="Split the .cso into parts" />
-              <TextBox Grid.Column="1" Text="{Binding CpSplit}" PlaceholderText="(default ~4 GiB; 0 = single .cso)"
-                       ToolTip.Tip="Part size in bytes (default ~4 GiB; 0 = single .cso)" />
+              <TextBlock Text="Split bytes" VerticalAlignment="Center" ToolTip.Tip="Split the output into parts" />
+              <TextBox Grid.Column="1" Text="{Binding CpSplit}" PlaceholderText="(default ~4 GiB; 0 = single file)"
+                       ToolTip.Tip="Part size in bytes (default ~4 GiB; 0 = single .cso/.cci)" />
             </Grid>
-            <TextBlock Classes="hint" Text="Level 0 = store, 9 = smallest (default). Version 2 writes LZ4 sectors, version 1 classic DEFLATE."
-                       ToolTip.Tip="Level 0 stores data; level 9 is smallest. Version 2 uses LZ4, version 1 classic DEFLATE" />
+            <TextBlock Classes="hint" Text="Level 0 = store, 9 = smallest (default). CISO version 2 writes LZ4 sectors, version 1 classic DEFLATE; CCI always uses LZ4."
+                       ToolTip.Tip="Level 0 stores data; level 9 is smallest. CISO v2 uses LZ4, v1 DEFLATE; CCI uses LZ4" />
             <Button Classes="accent" Content="Compress" Command="{Binding RunCompressCommand}" IsEnabled="{Binding CanRun}" Margin="0,12,0,0" HorizontalAlignment="Left"
-                    ToolTip.Tip="Compress to CISO" />
+                    ToolTip.Tip="Compress to CISO or CCI" />
           </StackPanel>
         </ScrollViewer>
       </TabItem>

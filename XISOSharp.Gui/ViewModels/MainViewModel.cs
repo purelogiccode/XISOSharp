@@ -196,7 +196,11 @@ internal sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial string CpOutput { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets the CISO compression level (0-9).</summary>
+    /// <summary>Gets or sets the compression container format ("CISO" or "CCI").</summary>
+    [ObservableProperty]
+    public partial string CpFormat { get; set; } = "CISO";
+
+    /// <summary>Gets or sets the CISO/CCI compression level (0-9).</summary>
     [ObservableProperty]
     public partial int CpLevel { get; set; } = 9;
 
@@ -284,6 +288,9 @@ internal sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the CISO version choices offered in the UI.</summary>
     internal IReadOnlyList<string> CisoVersions { get; } = ["1", "2"];
+
+    /// <summary>Gets the compression format choices offered in the UI.</summary>
+    internal IReadOnlyList<string> CompressionFormats { get; } = ["CISO", "CCI"];
 
     /// <summary>Gets the ZAR output-exists policies offered in the UI.</summary>
     internal IReadOnlyList<string> ZarPolicies { get; } = ["Overwrite", "Skip", "Auto-rename"];
@@ -529,10 +536,11 @@ internal sealed partial class MainViewModel : ObservableObject
         GuardedAsync(() =>
         {
             string source = RequireValue(CpSource, "source directory or image");
-            ThrowIfCompressCollision(source, NullIfEmpty(CpOutput), NullIfEmpty(CpSplit));
+            bool cci = string.Equals(CpFormat, "CCI", StringComparison.OrdinalIgnoreCase);
+            ThrowIfCompressCollision(source, NullIfEmpty(CpOutput), NullIfEmpty(CpSplit), cci);
             return RunJobAsync("compress", CliCommands.Compress(source, NullIfEmpty(CpOutput),
                 Math.Clamp(CpLevel, 0, 9), string.Equals(CpVersion, "1", StringComparison.Ordinal) ? 1 : 2,
-                NullIfEmpty(CpSplit), OverwriteExisting));
+                NullIfEmpty(CpSplit), OverwriteExisting, cci ? "cci" : "cso"));
         });
 
     [RelayCommand(CanExecute = nameof(CanRunZar))]
@@ -699,9 +707,9 @@ internal sealed partial class MainViewModel : ObservableObject
     /// <summary>
     /// Compress guard mirroring the CLI compress path: the (explicit or derived)
     /// base output must not equal the source, and when splitting the derived
-    /// first-part probe (<c>.1.cso</c>) must not equal the source either.
+    /// first-part probe (<c>.1.cso</c>/<c>.1.cci</c>) must not equal the source either.
     /// </summary>
-    private static void ThrowIfCompressCollision(string source, string? output, string? splitBytes)
+    private static void ThrowIfCompressCollision(string source, string? output, string? splitBytes, bool cci)
     {
         try
         {
@@ -722,7 +730,9 @@ internal sealed partial class MainViewModel : ObservableObject
 
                 try
                 {
-                    outputBase = CisoWriter.DeriveDefaultCsoPath(src, isDir);
+                    outputBase = cci
+                        ? XisoCci.DeriveDefaultCciPath(src, isDir)
+                        : CisoWriter.DeriveDefaultCsoPath(src, isDir);
                 }
                 catch (Exception ex)
                 {
@@ -748,7 +758,7 @@ internal sealed partial class MainViewModel : ObservableObject
                 string firstPart;
                 try
                 {
-                    firstPart = Path.ChangeExtension(outputBase, "1.cso");
+                    firstPart = Path.ChangeExtension(outputBase, cci ? "1.cci" : "1.cso");
                 }
                 catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
                 {
@@ -777,19 +787,27 @@ internal sealed partial class MainViewModel : ObservableObject
 
     /// <summary>
     /// Decompress guard mirroring the CLI decompress path: the (explicit or
-    /// derived) <c>.iso</c> output must not equal the source CSO.
+    /// derived) <c>.iso</c> output must not equal the source container (CISO or CCI).
     /// </summary>
     private static void ThrowIfDecompressCollision(string cso, string? output)
     {
         try
         {
             string src = cso.Trim();
+            bool cci = Path.GetExtension(src).Equals(".cci", StringComparison.OrdinalIgnoreCase);
+            if (!cci && XisoImageSource.TryDetect(src, out XisoImageSourceInfo? info) && info is not null)
+            {
+                cci = info.Format is XisoImageFormat.Cci or XisoImageFormat.SplitCci;
+            }
+
             string probe;
             if (string.IsNullOrWhiteSpace(output))
             {
                 try
                 {
-                    probe = CisoReader.DeriveDefaultIsoPath(src);
+                    probe = cci
+                        ? XisoCci.DeriveDefaultIsoPath(src)
+                        : CisoReader.DeriveDefaultIsoPath(src);
                 }
                 catch (Exception ex)
                 {

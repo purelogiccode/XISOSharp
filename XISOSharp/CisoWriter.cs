@@ -42,8 +42,10 @@ public static class CisoWriter
 
     /// <summary>
     /// Compresses an XISO image or a directory (which is first packed into a temp XISO) to CISO/CSO.
+    /// Split ISO, CISO and CCI sources are read through <see cref="XisoImageSource"/> and
+    /// materialized to a temporary ISO before compression.
     /// </summary>
-    /// <param name="sourcePath">Source directory or ISO file.</param>
+    /// <param name="sourcePath">Source directory, ISO file, split ISO/CISO/CCI image.</param>
     /// <param name="outputCsoPath">Destination CSO path; if null, derived from source (<c>.cso</c>).</param>
     /// <param name="level">Compression level 0..9 (0=store, 1=fastest … 9=smallestSize). Default 6.
     /// For version 2 the level maps inversely to the LZ4 acceleration parameter
@@ -102,7 +104,33 @@ public static class CisoWriter
             }
             else
             {
-                sourceFile = sourcePath;
+                // Split ISO, CISO and CCI inputs are read through the
+                // decompressed/concatenated view and materialized to a
+                // temporary ISO so the sector compressor sees one flat file.
+                if (XisoImageSource.TryDetect(sourcePath, out XisoImageSourceInfo? info) &&
+                    info is not null &&
+                    (info.Format != XisoImageFormat.Iso || info.IsSplit))
+                {
+                    if (info.Format == XisoImageFormat.Zar)
+                    {
+                        throw new NotSupportedException(
+                            "ZArchive (.zar) input is not a sector image; convert it to ISO first.");
+                    }
+
+                    tempIso = Path.Combine(Path.GetTempPath(), $"xisosh-temp-{Guid.NewGuid():N}.iso");
+                    using (Stream source = XisoImageSource.OpenRead(sourcePath))
+                    using (FileStream destination = new(tempIso, FileMode.CreateNew, FileAccess.Write,
+                               FileShare.None, 1 << 20, FileOptions.SequentialScan))
+                    {
+                        source.CopyTo(destination);
+                    }
+
+                    sourceFile = tempIso;
+                }
+                else
+                {
+                    sourceFile = sourcePath;
+                }
             }
 
             using FileStream src = new(sourceFile, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
@@ -431,7 +459,7 @@ public static class CisoWriter
     /// Derives the default <c>.cso</c> output path for <paramref name="sourcePath"/>
     /// (same rule <see cref="CompressToCso"/> uses when no explicit output is given):
     /// a directory maps to <c>&lt;parent&gt;/&lt;name&gt;.cso</c>, a file maps to its
-    /// sibling with the extension replaced by <c>.cso</c>.
+    /// sibling with the image suffix (including a <c>.1</c> split marker) replaced by <c>.cso</c>.
     /// </summary>
     public static string DeriveDefaultCsoPath(string sourcePath, bool isDir)
     {
@@ -451,14 +479,11 @@ public static class CisoWriter
             // For file, replace extension with .cso (or append if no ext)
             string dir = Path.GetDirectoryName(sourcePath) ?? "";
             string file = Path.GetFileName(sourcePath);
-            // If file ends with .iso, produce .cso sibling
-            if (file.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+            // Replace any recognized image suffix (including a `.1` split
+            // marker and CISO/CCI containers) with `.cso`.
+            if (XisoImageSource.HasImageSuffix(file))
             {
-                file = file[..^4] + ".cso";
-            }
-            else if (file.EndsWith(".xiso", StringComparison.OrdinalIgnoreCase))
-            {
-                file = file[..^5] + ".cso";
+                file = XisoImageSource.StripImageSuffix(file) + ".cso";
             }
             else
             {

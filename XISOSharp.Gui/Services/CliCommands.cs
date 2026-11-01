@@ -301,14 +301,16 @@ internal static class CliCommands
     }
 
     /// <summary>
-    /// Builds the compress argv (<c>compress</c> with level, version, optional split and output).
+    /// Builds the compress argv (<c>compress</c> with format, level, version,
+    /// optional split and output).
     /// </summary>
     /// <param name="source">Source image or directory.</param>
     /// <param name="output">Optional output path.</param>
-    /// <param name="level">CISO compression level.</param>
+    /// <param name="level">CISO/CCI compression level.</param>
     /// <param name="version">CISO version (1 or 2).</param>
-    /// <param name="splitBytes">Optional <c>--ciso-split</c> value.</param>
+    /// <param name="splitBytes">Optional split value (bytes).</param>
     /// <param name="overwrite">Whether to pass <c>-y</c> instead of <c>-n</c>.</param>
+    /// <param name="format">Output format: <c>cso</c> (default) or <c>cci</c>.</param>
     /// <returns>The compress argument list.</returns>
     internal static string[] Compress(
         string source,
@@ -316,20 +318,35 @@ internal static class CliCommands
         int level,
         int version,
         string? splitBytes,
-        bool overwrite)
+        bool overwrite,
+        string format = "cso")
     {
-        List<string> args = new()
+        bool cci = string.Equals(format, "cci", StringComparison.OrdinalIgnoreCase);
+        List<string> args = new() { "compress" };
+
+        if (cci)
         {
-            "compress",
-            "--ciso-level",
-            level.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--ciso-version",
-            version.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        };
-        if (!string.IsNullOrWhiteSpace(splitBytes))
+            args.Add("--format");
+            args.Add("cci");
+            args.Add("--cci-level");
+            args.Add(level.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            if (!string.IsNullOrWhiteSpace(splitBytes))
+            {
+                args.Add("--cci-split");
+                args.Add(splitBytes);
+            }
+        }
+        else
         {
-            args.Add("--ciso-split");
-            args.Add(splitBytes);
+            args.Add("--ciso-level");
+            args.Add(level.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            args.Add("--ciso-version");
+            args.Add(version.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            if (!string.IsNullOrWhiteSpace(splitBytes))
+            {
+                args.Add("--ciso-split");
+                args.Add(splitBytes);
+            }
         }
 
         args.Add(source);

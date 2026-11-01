@@ -50,17 +50,17 @@ public static class XisoRepairer
     /// <exception cref="FileNotFoundException">The image file does not exist.</exception>
     /// <exception cref="XisoFormatException">The image is not a valid XISO.</exception>
     /// <exception cref="InvalidDataException">
-    /// The image is a CISO container (decompress first) or a split part
+    /// The image is a CISO/CCI container (decompress first) or a split part
     /// (reassemble first); neither is patch-stable in place.
     /// </exception>
     /// <exception cref="IOException">Thrown on read/write errors.</exception>
     public static RepairResult RepairInPlace(string isoPath, bool createBackup = true, bool dryRun = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(isoPath);
-        if (XisoReader.IsCsoPath(isoPath) || CisoReader.IsCso(isoPath))
+        if (XisoImageSource.IsCompressedContainerPath(isoPath) || XisoImageSource.IsCompressedImage(isoPath))
         {
             throw new InvalidDataException(
-                $"Cannot repair CISO container '{isoPath}' in place (compressed bytes are not patch-stable); decompress it first.");
+                $"Cannot repair compressed CISO/CCI container '{isoPath}' in place (compressed bytes are not patch-stable); decompress it first.");
         }
 
         if (XisoSplitter.IsSplitPath(isoPath))

@@ -97,8 +97,10 @@ Manual `xdvdfs.toml` subset parser — see [xdvdfs Compat — Build-Image](xdvdf
 | `IBlockDevice : IDisposable` | `long Length; int Read(long offset, Span<byte> buf); void Write(long offset, ReadOnlySpan<byte> buf);` |
 | `FileBlockDevice` | Wraps `FileStream` (`BufferSize 65536`, `Stream.CopyTo` chunked) |
 | `MemoryBlockDevice` | In-memory `byte[]` (golden `.iso` blobs, no temp files) |
-| `OffsetBlockDevice` | `OffsetWrapper` parity — probes `[0, Global, Xgd3, Hybrid, Xgd1]` skip-sectors & CISO offset |
+| `OffsetBlockDevice` | `OffsetWrapper` parity - probes `[0, Global, Xgd3, Hybrid, Xgd1]` skip-sectors & CISO offset |
+| `StreamBlockDevice` | Any readable, seekable `Stream` (split ISO, archives, test streams) with serialized reads/writes |
 | `CisoBlockDevice` | CISO random-access, `index[totalBlocks+1]` LE u32 + single-sector cache, DEFLATE v1 + LZ4 v2 on-demand |
+| `CciBlockDevice` | CCI/CCIM random-access over `CCISharp.CciFile`; single or split `.cci` sets |
 
 Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXiso(IBlockDevice, isoName, requireOptimizedTag)`), `ListDirectory(IBlockDevice, path)`. FileStream overloads delegate thinly.
 
@@ -113,9 +115,11 @@ Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXis
 | `XisoSkeleton` | `Petrify` (zeroed XISO + SHA-1 `hex + " " + path` lines, `CollectFileEntries` sorted) |
 | `XisoRedump` | `TryExtractVideo` (L0 head + L1 tail), `TryExtractUpdate` (`FindUpdateOffset` `ABCDABCD`, `l1Trimmed` split), `RebuildRedump` (full `l0Padding`/`l1Padding` + PRNG/`securitySectors`) |
 | `SecuritySectors` | `Parse(path)` → `int[]` sorted, `4096`-sector `start-end` validation (`4095` length) |
-| `XisoZarchive` | `CreateZar` (XISO → `.zar` via `ZArchiveSharp.ZArchiveWriter`: zstd L6 blocks, raw fallback, optional `IZarBlockCompressor`, `removeUpdate`, partition offsets) |
-| `XisoChecksum` | `ComputeImageChecksum` / `ComputeImageChecksumHex` — SHA3-256 `SortedDictionary Ordinal` (`/path` UTF-8 + streamed data, `xdvdfs` compat; BCL `SHA3_256` when supported, else pure-managed fallback) |
+| `XisoZarchive` | `CreateZar` (XISO to `.zar` via `ZArchiveSharp.ZArchiveWriter`: zstd L6 blocks, raw fallback, optional `IZarBlockCompressor`, `removeUpdate`, partition offsets); `ListZar`, `ExtractZar`, `ConvertZarToIso` (read side) |
+| `XisoChecksum` | `ComputeImageChecksum` / `ComputeImageChecksumHex` — SHA3-256 `SortedDictionary Ordinal` (`/path` UTF-8 + streamed data, `xdvdfs` compat; BCL `SHA3_256` when supported, else pure-managed fallback); `ComputeZarChecksum`/`ComputeZarChecksumHex` for `.zar` |
 | `CisoWriter` / `CisoReader` | `CompressToCso` (BCL DEFLATE v1 `0x80000000`, `align` 0/1/2, threshold `+12`, `--ciso-split` shim) / `DecompressToIso` (v1 DEFLATE + v2 LZ4) |
+| `XisoCci` | `CompressToCci` / `DecompressToIso` / `DeriveDefaultCciPath` / `DeriveDefaultIsoPath` (CCISharp-backed CCI/CCIM) |
+| `XisoImageSource` | `TryDetect` / `IsSupportedImage` / `IsCompressedImage` / `OpenRead` / `OpenBlockDevice` / `StripImageSuffix` across ISO, split ISO, CISO, CCI and ZAR |
 
 See [Archival](archival.md) and [Compression](compression.md).
 

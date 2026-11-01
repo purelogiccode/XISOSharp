@@ -161,6 +161,17 @@ public class CliCommandsTests
             CliCommands.Compress("game.iso", null, 6, 1, null, overwrite: false));
     }
 
+    /// <summary>Verifies CCI compress uses the format and CCI-specific flags.</summary>
+    [Fact]
+    public void Compress_Cci_Exact()
+    {
+        Assert.Equal(["compress", "--format", "cci", "--cci-level", "7", "--cci-split", "4G",
+                "game.iso", "game.cci", "-y"],
+            CliCommands.Compress("game.iso", "game.cci", 7, 2, "4G", overwrite: true, "cci"));
+        Assert.Equal(["compress", "--format", "cci", "--cci-level", "9", "game.iso", "-n"],
+            CliCommands.Compress("game.iso", null, 9, 2, null, overwrite: false, "cci"));
+    }
+
     /// <summary>Verifies ZAR emits policy and output before the source.</summary>
     [Fact]
     public void Zar_Exact()

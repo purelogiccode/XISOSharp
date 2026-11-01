@@ -88,6 +88,11 @@ Output: `hex tab path` (silent → hex only). Exit `0` on all, deterministic hex
 
 **Implementation:** `XISOSharp.Core/XisoChecksum.cs` `ComputeImageChecksum` / `ComputeImageChecksumHex` (streaming) over `SortedDictionary<string,Node> StringComparer.Ordinal` (`/`-prefixed paths e.g. `/DIR/FILE` UTF-8 Latin1/`WINDOWS_1252` path bytes + streamed file data via `ReadData`). No `SHA3.Net`/`NSec` dep — BCL `SHA3_256` when `SHA3_256.IsSupported`, otherwise the pure-managed FIPS 202 fallback (`XISOSharp/Sha3.cs`); digests are identical either way (OSes without a SHA3 provider — Windows 10 CNG, OpenSSL 1.x — threw `PlatformNotSupportedException` before the fallback). Documented `NOT SHA256 of full image` parity warning.
 
+**Container input:** `ComputeImageChecksum` opens CISO/CCI/split ISO through
+`XisoImageSource.OpenBlockDevice`, so the digest is identical to the source ISO;
+`ComputeZarChecksum` hashes the ZAR name tree with the same sorted `/path` +
+file-data rule, so equivalent trees hash equally across ISO and ZAR.
+
 **Also:** `--checksum` as CLI flag `Program.cs:533` + `checksumFlagMode` supports `checksum a.iso b.iso` and `--silent`.
 
 ---
@@ -105,6 +110,8 @@ Output: `hex tab path` (silent → hex only). Exit `0` on all, deterministic hex
 | `MemoryBlockDevice` | in-memory `byte[]` — golden `.iso` blobs without temp files (mirrors `no_std` usage) |
 | `OffsetBlockDevice` | `OffsetWrapper` parity — probes `[0, Global, Xgd3, Hybrid, Xgd1]` skip-sectors + CISO wrapper |
 | `CisoBlockDevice` | CISO random-access (single-sector cache, `index[totalBlocks+1]` LE u32 offsets, DEFLATE/LZ4 on-demand decompress, single + split `*.N.cso` input) |
+| `CciBlockDevice` | CCI/CCIM random-access over CCISharp (single + split `*.N.cci` input) |
+| `StreamBlockDevice` | Any seekable stream (split ISO, archives, tests) |
 
 **Overloads:**
 
@@ -130,7 +137,7 @@ public static AuditResult AuditXiso(IBlockDevice dev);
 | `WaxGlob` | `new(string pattern)`, `Regex Pattern`, `IsMatch(string path)`, `GetCapture(string path)`, `{0}`/`{n}` groups, `*`/`**`/`?`/`[]`/`{a,b}` |
 | `RemapFilesystem` | `RemapRule { string HostGlob; string ImagePath; bool IsExclusion; }`, `DryRunRemap(sourceDir, rules)`, `BuildImage(sourceDir, outputIsoPath, rules, progress, ct)`, `GenerateSpecText`, `ParseSpecFile`, `WriteSpec` |
 | `CisoWriter` / `CisoReader` | `CompressToCso`/`DecompressToIso` — see [Compression](compression.md) |
-| `XisoChecksum` | `ComputeImageChecksum(string isoPath)`, `ComputeImageChecksumHex` (SHA3-256) |
-| `BlockDevice/*` | `IBlockDevice`, `FileBlockDevice`, `MemoryBlockDevice`, `OffsetBlockDevice`, `CisoBlockDevice` |
+| `XisoChecksum` | `ComputeImageChecksum(string isoPath)`, `ComputeImageChecksumHex` (SHA3-256), `ComputeZarChecksum`/`ComputeZarChecksumHex` |
+| `BlockDevice/*` | `IBlockDevice`, `FileBlockDevice`, `MemoryBlockDevice`, `OffsetBlockDevice`, `StreamBlockDevice`, `CisoBlockDevice`, `CciBlockDevice` |
 
 See also: [CLI](cli.md) · [Compression](compression.md) · [XISO Format](xiso-format.md) · [Library](library.md)

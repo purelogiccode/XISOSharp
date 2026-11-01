@@ -1,5 +1,108 @@
 # Release Notes
 
+## 1.4.5
+
+Container-input, traversal-hardening and batch-conversion release. XISOSharp now
+reads **CCI/CCIM** images (via the new `CCISharp` 1.0.0 dependency), split
+plain-ISO sets (`game.1.iso` …), and **ZArchive** (`.zar`) inputs, and exposes
+one unified detection/open layer (`XisoImageSource`) for every sector-based
+format. The CLI gains `compress --format cci`, `--cci-level`/`--cci-split`,
+`cci`/`uncci` aliases, `convert` for ZAR ↔ ISO, ZAR-aware
+list/extract/checksum, and `--batch` conversion on `compress`, `decompress`,
+`convert` and `split`; the GUI gains a CISO/CCI format selector and routes
+`.cci`/`.zar` drops to the matching tab. The reader's directory walk is now an
+explicit in-order stack, so a pathological left-skewed table can no longer
+exhaust the process stack or trip the subdirectory depth cap.
+
+Full suite green on all three targets: **1841 passed / 1 opt-in skip (1842) on
+net8.0/net9.0** and **1903 passed / 1 opt-in skip (1904) on net10.0**.
+
+### Library
+
+- **`XisoImageSource`** (`XisoImageFormat`, `XisoImageSourceInfo`): extension-led
+  detection with a `CISO`/`CCIM` magic sniff fallback; `OpenRead`/`OpenBlockDevice`
+  return the decompressed/concatenated view for ISO, split ISO, CISO, CCI and
+  their split variants. Plain files remain ISO candidates.
+- **CCI/CCIM**: `XisoCci` (`CompressToCci`, `DecompressToIso`,
+  `DeriveDefaultCciPath`, `DeriveDefaultIsoPath`), `CciBlockDevice`, and
+  `CciNaming`; backed by [CCISharp](https://github.com/purelogiccode/CCISharp)
+  1.0.0 (MIT, pure managed, LZ4). Single-part and `.1.cci` … `.9.cci` sets are
+  supported.
+- **Split ISO input**: `SplitIsoFile`/`SplitIsoStream` concatenate
+  `<base>.1.iso`, `.2.iso`, … (multi-digit indices included); a missing middle
+  part raises `InvalidDataException` instead of silently truncating.
+- **ZAR input**: `XisoZarchive.ListZar`, `ExtractZar`, `ConvertZarToIso`;
+  `XisoChecksum.ComputeZarChecksum`/`ComputeZarChecksumHex` produce the same
+  SHA3-256 tree hash as the equivalent ISO. Unsafe entry names are rejected.
+- **Unified readers**: `XisoReader.OpenImageStream` now routes CCI and split ISO
+  through the factory; `XisoChecksum` opens every format through
+  `OpenBlockDevice`. Output naming strips `.cso`/`.cci`/`.1.*` suffixes.
+- **In-place guards**: `Repair`, `CopyIntoImage` and `SetFileTime` refuse CISO
+  and CCI containers with a clear "decompress first" error, even when the file
+  is missing or corrupt.
+- **Recompression**: `CisoWriter.CompressToCso` and `XisoCci.CompressToCci`
+  accept split ISO/CISO/CCI sources by materializing the decompressed image to a
+  temporary ISO; directory sources still pack then compress.
+- `StreamBlockDevice` exposes any seekable stream as an `IBlockDevice`.
+- **Pathological TOC traversal**: `TraverseXiso` now walks each directory table
+  with an explicit in-order stack instead of left-subtree recursion. `MaxTocDepth`
+  bounds subdirectory nesting only; intra-table depth is bounded by
+  `MaxTocEntriesPerTable` and `Constants.MaxTocStackFrames` (100k). A 4,096-entry
+  left-skewed chain lists/trees/extracts/rewrites, and the rewrite checksum
+  matches the balanced form. `ContinueOnError` still skips just the corrupt
+  subtree.
+- Runtime dependencies are now `ZArchiveSharp` 1.4.0 and `CCISharp` 1.0.0.
+
+### CLI
+
+- `compress --format cso|cci` (default `cso`), `--cci-level 0..9`,
+  `--cci-split <bytes>`; `-l`/`--level` and `--split` remain format-neutral.
+- `cci` alias for `compress --format cci`; `uncci` joins `decompress`.
+- Format-specific flag validation: `--ciso-*` is rejected for CCI output and
+  `--cci-*` for CISO output.
+- `decompress` auto-detects CISO vs CCI (extension plus magic sniff).
+- `convert <src.zar|src.iso> <out.iso|out.zar>`; `-l`, `-t`, `-x`, `--unpack`
+  and `checksum` accept `.zar` directly.
+- **Batch conversion**: `--batch <dir>` / `--batch-recursive` on `compress`,
+  `decompress`, `convert` and `split`; `--skip-existing` resumes, `--continue-on-error`
+  keeps going after a failed file (partial outputs are removed), `--jobs 1..64`
+  converts in parallel, and `--output-name` supports `{name}`/`{ext}`/`{format}`.
+  Duplicate outputs and outputs that would clobber another input are refused
+  before any write. `convert --batch --format iso|zar` covers both directions.
+- Help text and the GUI self-test cover the new flags.
+
+### GUI
+
+- Compress tab: **Format** selector (CISO/CCI); output/save dialog and split
+  placeholder follow the selected format.
+- Picker filters and drop routing include `.cci`/`.1.cci`; a dropped `.zar`
+  opens the Extract tab for list/extract/checksum, and compressed drops route to
+  Decompress.
+- Decompress picker accepts CISO and CCI; collision guards use the matching
+  default output naming.
+
+### Tests
+
+- `XisoImageSourceTests`: detection table for ISO/XISO/IMG/CISO/split CISO/
+  CCI/split CCI/split ISO, CCI round-trip, cross-part seeks, magic sniffing,
+  suffix stripping and missing files.
+- `CciAutoDetectTests`: list/tree/extract/unpack/rewrite/checksum parity,
+  default output naming, CCI decompression and the in-place refusal contracts.
+- `SplitIsoAutoDetectTests`: extract/list/checksum parity, split CISO/CCI
+  recompression, default `game/` naming and missing-middle-part errors.
+- `CliCciTests`: CCI compress/decompress, split sets, aliases, list and
+  format-specific flag rejection.
+- `ZarInputTests`: ZAR listing/extraction/checksum/convert and CLI wiring.
+- `PathologicalTocTests`: 4,096-entry left-skewed, right-skewed, alternating and
+  balanced tables; list/tree/extract/rewrite parity, a left self-cycle, and
+  continue-on-error subtree skipping.
+- `CliBatchConvertTests`: CISO/CCI batch compress, batch decompress, ISO to ZAR
+  convert, batch split, recursive discovery, naming templates (including
+  subdirectories), duplicate-output refusal, `--skip-existing` resume,
+  `--continue-on-error` partial-output cleanup, and parallel `--jobs`.
+- **net8.0/net9.0 - 1842 tests (1841 passed, 1 opt-in skip)**;
+  **net10.0 - 1904 tests (1903 passed, 1 opt-in skip, adds the GUI tests)**.
+
 ## 1.4.4
 
 Extraction-cleanup and static-analysis release. A failed or cancelled extraction no

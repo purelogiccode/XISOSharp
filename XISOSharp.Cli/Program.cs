@@ -294,13 +294,18 @@ internal static class Program
             return RunImageSpec(args, 1);
         }
         else if (args.Length > 0 && (string.Equals(args[0], "compress", StringComparison.OrdinalIgnoreCase) ||
-                                     string.Equals(args[0], "cso", StringComparison.OrdinalIgnoreCase)))
+                                     string.Equals(args[0], "cso", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(args[0], "cci", StringComparison.OrdinalIgnoreCase)))
         {
-            return RunCompressMode(args, 1);
+            string defaultFormat = string.Equals(args[0], "cci", StringComparison.OrdinalIgnoreCase)
+                ? "cci"
+                : "cso";
+            return RunCompressMode(args, 1, defaultFormat);
         }
         else if (args.Length > 0 && (string.Equals(args[0], "decompress", StringComparison.OrdinalIgnoreCase) ||
                                      string.Equals(args[0], "uncso", StringComparison.OrdinalIgnoreCase) ||
-                                     string.Equals(args[0], "decso", StringComparison.OrdinalIgnoreCase)))
+                                     string.Equals(args[0], "decso", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(args[0], "uncci", StringComparison.OrdinalIgnoreCase)))
         {
             return RunDecompressMode(args, 1);
         }
@@ -317,6 +322,10 @@ internal static class Program
                                      string.Equals(args[0], "joinsplit", StringComparison.OrdinalIgnoreCase)))
         {
             return RunJoinMode(args, 1);
+        }
+        else if (args.Length > 0 && string.Equals(args[0], "convert", StringComparison.OrdinalIgnoreCase))
+        {
+            return RunConvertMode(args, 1);
         }
 
         for (int i = optind; i < args.Length; i++)
@@ -2314,6 +2323,36 @@ internal static class Program
             Logger.TotalBytes = Logger.TotalFiles = 0;
 
             string xisoPath = isoFiles[i];
+
+            if (IsZarPath(xisoPath))
+            {
+                try
+                {
+                    if (rewrite)
+                    {
+                        Logger.LogErr($"Error: cannot rewrite ZArchive '{xisoPath}'; convert it to ISO first\n");
+                        err = 1;
+                    }
+                    else if (extract)
+                    {
+                        string destination = path ?? DeriveZarExtractDirectory(xisoPath);
+                        Logger.Log($"extracting {Path.GetFileName(xisoPath)}:\n\n");
+                        XisoZarchive.ExtractZar(xisoPath, destination);
+                    }
+                    else
+                    {
+                        PrintZarEntries(xisoPath, tree);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+                {
+                    Logger.LogErr($"Error processing ZArchive {xisoPath}: {ex.Message}\n");
+                    err = 1;
+                }
+
+                continue;
+            }
+
             bool optimized;
 
             try
@@ -2573,6 +2612,13 @@ internal static class Program
 
         try
         {
+            if (IsZarPath(xisoPath))
+            {
+                XisoZarchive.ExtractZar(xisoPath, destPath ?? DeriveZarExtractDirectory(xisoPath),
+                    skipExisting);
+                return 0;
+            }
+
             UnpackOptions? unpackOptions = skipExisting || continueOnError
                 ? new UnpackOptions { SkipExisting = skipExisting, ContinueOnError = continueOnError }
                 : null;
@@ -3125,24 +3171,40 @@ internal static class Program
         return 0;
     }
 
-    private static int RunCompressMode(string[] args, int optind)
+    private static int RunCompressMode(string[] args, int optind, string defaultFormat = "cso")
     {
         string? output = null;
         int level = 9;
+        string format = defaultFormat;
         // xdvdfs compress always writes through ciso::split::SplitOutput (split point 0xffbf6000,
         // ~4 GiB). Match that by default; --ciso-split overrides the point, --ciso-split 0
-        // writes a single .cso.
-        long? splitBytes = CisoWriter.DefaultSplitPoint;
+        // writes a single .cso. CCI uses the same ~4 GiB default.
+        long? cisoSplitBytes = CisoWriter.DefaultSplitPoint;
+        long? cciSplitBytes = XisoCci.DefaultSplitBytes;
         byte version = CisoWriter.VersionLz4;
         bool assumeYes = false;
         bool assumeNo = false;
+        bool cisoLevelSpecified = false;
+        bool cciLevelSpecified = false;
+        bool cisoVersionSpecified = false;
+        bool cisoSplitSpecified = false;
+        bool cciSplitSpecified = false;
+        BatchOptions batch = new();
         List<string> positionals = new();
 
         for (int i = optind; i < args.Length; i++)
         {
             string a = args[i];
-            if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            if (BatchConversion.TryConsume(args, ref i, batch, out string? batchFlagError))
+            {
+                if (batchFlagError != null)
+                {
+                    Logger.LogErr($"Error: {batchFlagError}\n");
+                    return 1;
+                }
+            }
+            else if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length)
                 {
@@ -3151,6 +3213,31 @@ internal static class Program
                 }
 
                 output = args[++i];
+            }
+            else if (string.Equals(a, "--format", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: --format requires cso or cci\n");
+                    return 1;
+                }
+
+                string value = args[++i];
+                if (string.Equals(value, "cso", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(value, "ciso", StringComparison.OrdinalIgnoreCase))
+                {
+                    format = "cso";
+                }
+                else if (string.Equals(value, "cci", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(value, "ccim", StringComparison.OrdinalIgnoreCase))
+                {
+                    format = "cci";
+                }
+                else
+                {
+                    Logger.LogErr("Error: --format requires cso or cci\n");
+                    return 1;
+                }
             }
             else if (string.Equals(a, "--ciso-level", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(a, "-l", StringComparison.OrdinalIgnoreCase) ||
@@ -3163,6 +3250,19 @@ internal static class Program
                     return 1;
                 }
 
+                cisoLevelSpecified = string.Equals(a, "--ciso-level", StringComparison.OrdinalIgnoreCase);
+                i++;
+            }
+            else if (string.Equals(a, "--cci-level", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length || !int.TryParse(args[i + 1], CultureInfo.InvariantCulture, out level) ||
+                    level < 0 || level > 9)
+                {
+                    Logger.LogErr("Error: --cci-level requires an integer 0..9\n");
+                    return 1;
+                }
+
+                cciLevelSpecified = true;
                 i++;
             }
             else if (string.Equals(a, "--ciso-version", StringComparison.OrdinalIgnoreCase))
@@ -3188,9 +3288,10 @@ internal static class Program
                     Logger.LogErr("Error: --ciso-version requires 1, 2 or auto\n");
                     return 1;
                 }
+
+                cisoVersionSpecified = true;
             }
-            else if (string.Equals(a, "--ciso-split", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(a, "--split", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(a, "--ciso-split", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length || !long.TryParse(args[i + 1], CultureInfo.InvariantCulture, out long sb) ||
                     sb < 0)
@@ -3199,7 +3300,34 @@ internal static class Program
                     return 1;
                 }
 
-                splitBytes = sb == 0 ? null : sb;
+                cisoSplitBytes = sb == 0 ? null : sb;
+                cisoSplitSpecified = true;
+                i++;
+            }
+            else if (string.Equals(a, "--cci-split", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length || !long.TryParse(args[i + 1], CultureInfo.InvariantCulture, out long sb) ||
+                    sb < 0)
+                {
+                    Logger.LogErr("Error: --cci-split requires a non-negative integer (bytes)\n");
+                    return 1;
+                }
+
+                cciSplitBytes = sb == 0 ? null : sb;
+                cciSplitSpecified = true;
+                i++;
+            }
+            else if (string.Equals(a, "--split", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length || !long.TryParse(args[i + 1], CultureInfo.InvariantCulture, out long sb) ||
+                    sb < 0)
+                {
+                    Logger.LogErr("Error: --split requires a non-negative integer (bytes)\n");
+                    return 1;
+                }
+
+                cisoSplitBytes = sb == 0 ? null : sb;
+                cciSplitBytes = sb == 0 ? null : sb;
                 i++;
             }
             else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
@@ -3244,9 +3372,66 @@ internal static class Program
             }
         }
 
+        if (assumeYes && assumeNo)
+        {
+            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
+            return 1;
+        }
+
+        bool cci = string.Equals(format, "cci", StringComparison.OrdinalIgnoreCase);
+        if (cci && cisoLevelSpecified)
+        {
+            Logger.LogErr("Error: --ciso-level is only valid for CISO output; use --cci-level\n");
+            return 1;
+        }
+
+        if (!cci && cciLevelSpecified)
+        {
+            Logger.LogErr("Error: --cci-level is only valid for CCI output; use --ciso-level\n");
+            return 1;
+        }
+
+        if (cci && cisoVersionSpecified)
+        {
+            Logger.LogErr("Error: --ciso-version is only valid for CISO output\n");
+            return 1;
+        }
+
+        if (cci && cisoSplitSpecified)
+        {
+            Logger.LogErr("Error: --ciso-split is only valid for CISO output; use --cci-split\n");
+            return 1;
+        }
+
+        if (!cci && cciSplitSpecified)
+        {
+            Logger.LogErr("Error: --cci-split is only valid for CCI output; use --ciso-split\n");
+            return 1;
+        }
+
+        string? batchError = BatchConversion.Validate(batch);
+        if (batchError != null)
+        {
+            Logger.LogErr($"Error: {batchError}\n");
+            return 1;
+        }
+
+        if (batch.Directory != null)
+        {
+            if (positionals.Count > 0 || output != null)
+            {
+                Logger.LogErr("Error: --batch cannot be combined with an explicit source or output\n");
+                return 1;
+            }
+
+            batch.AssumeYes = assumeYes;
+            batch.AssumeNo = assumeNo;
+            return RunCompressBatch(batch, cci, level, cisoSplitBytes, cciSplitBytes, version);
+        }
+
         if (positionals.Count < 1 || positionals.Count > 2)
         {
-            Logger.LogErr("Error: compress requires <source> [output.cso]\n");
+            Logger.LogErr("Error: compress requires <source> [output.cso|output.cci]\n");
             PrintUsage();
             return 1;
         }
@@ -3255,54 +3440,64 @@ internal static class Program
         // positional used to win and -o was silently dropped.
         if (positionals.Count == 2 && output != null)
         {
-            Logger.LogErr("Error: compress takes either [output.cso] or -o <output>, not both\n");
-            return 1;
-        }
-
-        if (assumeYes && assumeNo)
-        {
-            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
+            Logger.LogErr("Error: compress takes either [output] or -o <output>, not both\n");
             return 1;
         }
 
         string source = positionals[0];
-        string? outCso = positionals.Count == 2 ? positionals[1] : output;
+        string? outPath = positionals.Count == 2 ? positionals[1] : output;
+        long? effectiveSplit = cci ? cciSplitBytes : cisoSplitBytes;
 
         // #15 (xdvdfs #36): refuse before the -y/-n prompt, not after it.
-        string probeCsoBase = outCso ?? CisoWriter.DeriveDefaultCsoPath(source, Directory.Exists(source));
-        string? compressRefusal = CliOutputGuard.CheckImageOutput(source, probeCsoBase);
+        string probeBase = outPath ?? (cci
+            ? XisoCci.DeriveDefaultCciPath(source, Directory.Exists(source))
+            : CisoWriter.DeriveDefaultCsoPath(source, Directory.Exists(source)));
+        string? compressRefusal = CliOutputGuard.CheckImageOutput(source, probeBase);
         if (compressRefusal != null)
         {
             Logger.LogErr(compressRefusal);
             return 1;
         }
 
-        // Item #36: the base-name check cannot see split parts; a source named
-        // like its own first part used to pass and fail later inside CisoWriter.
-        if (splitBytes.HasValue)
+        // Resolve the path the writer will create (first split part when
+        // splitting) so an existing output triggers the -y/-n prompt instead
+        // of a silent overwrite.
+        string probePath = probeBase;
+        if (effectiveSplit.HasValue)
         {
-            string firstPart = Path.ChangeExtension(probeCsoBase, "1.cso");
-            if (XisoPaths.AreSamePath(source, firstPart))
+            probePath = cci
+                ? Path.ChangeExtension(probeBase, "1.cci")
+                : Path.ChangeExtension(probeBase, "1.cso");
+        }
+        else if (cci && !probePath.EndsWith(".cci", StringComparison.OrdinalIgnoreCase))
+        {
+            probePath += ".cci";
+        }
+
+        // Item #36: the base-name check cannot see split parts; a source named
+        // like its own first part used to pass and fail later inside the writer.
+        if (effectiveSplit.HasValue)
+        {
+            if (XisoPaths.AreSamePath(source, probePath))
             {
-                Logger.LogErr($"Error: output part {firstPart} is the same file as the input {source};" +
+                Logger.LogErr($"Error: output part {probePath} is the same file as the input {source};" +
                               " choose another name\n");
                 return 1;
             }
         }
 
-        // Resolve the path CompressToCso will write (first split part when splitting)
-        // so an existing output triggers the -y/-n prompt instead of silent overwrite.
-        string probeCso = probeCsoBase;
-        if (splitBytes.HasValue)
-            probeCso = Path.ChangeExtension(probeCso, "1.cso"); // CisoSplitFile.PartPath(_, 0) parity
-        if (!OverwritePrompt.ConfirmOverwrite(probeCso, assumeYes, assumeNo))
+        if (!OverwritePrompt.ConfirmOverwrite(probePath, assumeYes, assumeNo))
             return 1;
 
         try
         {
             Logger.Log(Constants.Banner);
-            int rc = CisoWriter.CompressToCso(source, outCso, level, splitBytes, version);
-            return rc;
+            if (cci)
+            {
+                return XisoCci.CompressToCci(source, outPath, level, cciSplitBytes ?? 0, overwrite: true);
+            }
+
+            return CisoWriter.CompressToCso(source, outPath, level, cisoSplitBytes, version);
         }
         catch (Exception ex)
         {
@@ -3311,18 +3506,84 @@ internal static class Program
         }
     }
 
+    /// <summary>
+    /// Phase 5: <c>compress --batch</c>. Converts every plain ISO in the batch
+    /// directory to CISO or CCI, with the shared skip/continue/parallel and
+    /// naming-template policy from <see cref="BatchConversion"/>.
+    /// </summary>
+    private static int RunCompressBatch(
+        BatchOptions batch,
+        bool cci,
+        int level,
+        long? cisoSplitBytes,
+        long? cciSplitBytes,
+        byte version)
+    {
+        string format = cci ? "cci" : "cso";
+        string partExtension = cci ? "1.cci" : "1.cso";
+        bool split = cci ? cciSplitBytes.HasValue : cisoSplitBytes.HasValue;
+
+        List<string> sources;
+        try
+        {
+            sources = BatchConversion.EnumerateSources(batch.Directory!, batch.Recursive,
+                includeFirstPart: true, ".iso", ".xiso");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.LogErr($"Error: {ex.Message}\n");
+            return 1;
+        }
+
+        if (sources.Count == 0)
+        {
+            Logger.LogErr($"Error: no .iso/.xiso files found in {batch.Directory}\n");
+            return 1;
+        }
+
+        Logger.Log(Constants.Banner);
+        return BatchConversion.Run(
+            "compress",
+            batch,
+            sources,
+            source => BatchConversion.OutputPath(source, batch.OutputName, format, appendExtension: true),
+            (source, output) => split ? [Path.ChangeExtension(output, partExtension)] : [output],
+            (source, output) => cci
+                ? XisoCci.CompressToCci(source, output, level, cciSplitBytes ?? 0, overwrite: true)
+                : CisoWriter.CompressToCso(source, output, level, cisoSplitBytes, version),
+            (source, output) =>
+            {
+                string? refusal = CliOutputGuard.CheckImageOutput(source, output);
+                if (refusal != null)
+                    return refusal;
+
+                return split
+                    ? CliOutputGuard.CheckImageOutput(source, Path.ChangeExtension(output, partExtension))
+                    : null;
+            });
+    }
+
     private static int RunDecompressMode(string[] args, int optind)
     {
         string? output = null;
         bool assumeYes = false;
         bool assumeNo = false;
+        BatchOptions batch = new();
         List<string> positionals = new();
 
         for (int i = optind; i < args.Length; i++)
         {
             string a = args[i];
-            if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            if (BatchConversion.TryConsume(args, ref i, batch, out string? batchFlagError))
+            {
+                if (batchFlagError != null)
+                {
+                    Logger.LogErr($"Error: {batchFlagError}\n");
+                    return 1;
+                }
+            }
+            else if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
             {
                 if (i + 1 >= args.Length)
                 {
@@ -3374,9 +3635,35 @@ internal static class Program
             }
         }
 
+        if (assumeYes && assumeNo)
+        {
+            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
+            return 1;
+        }
+
+        string? batchError = BatchConversion.Validate(batch);
+        if (batchError != null)
+        {
+            Logger.LogErr($"Error: {batchError}\n");
+            return 1;
+        }
+
+        if (batch.Directory != null)
+        {
+            if (positionals.Count > 0 || output != null)
+            {
+                Logger.LogErr("Error: --batch cannot be combined with an explicit source or output\n");
+                return 1;
+            }
+
+            batch.AssumeYes = assumeYes;
+            batch.AssumeNo = assumeNo;
+            return RunDecompressBatch(batch);
+        }
+
         if (positionals.Count < 1 || positionals.Count > 2)
         {
-            Logger.LogErr("Error: decompress requires <cso> [output.iso]\n");
+            Logger.LogErr("Error: decompress requires <cso|cci> [output.iso]\n");
             PrintUsage();
             return 1;
         }
@@ -3389,17 +3676,19 @@ internal static class Program
             return 1;
         }
 
-        if (assumeYes && assumeNo)
-        {
-            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
-            return 1;
-        }
-
         string source = positionals[0];
         string? outIso = positionals.Count == 2 ? positionals[1] : output;
 
+        bool isCci = Path.GetExtension(source).Equals(".cci", StringComparison.OrdinalIgnoreCase);
+        if (!isCci && XisoImageSource.TryDetect(source, out XisoImageSourceInfo? info) && info is not null)
+        {
+            isCci = info.Format is XisoImageFormat.Cci or XisoImageFormat.SplitCci;
+        }
+
         // #15 (xdvdfs #36): refuse before the -y/-n prompt, not after it.
-        string probeIso = outIso ?? CisoReader.DeriveDefaultIsoPath(source);
+        string probeIso = outIso ?? (isCci
+            ? XisoCci.DeriveDefaultIsoPath(source)
+            : CisoReader.DeriveDefaultIsoPath(source));
         string? decompressRefusal = CliOutputGuard.CheckImageOutput(source, probeIso);
         if (decompressRefusal != null)
         {
@@ -3407,8 +3696,8 @@ internal static class Program
             return 1;
         }
 
-        // Resolve the path DecompressToIso will write so an existing output
-        // triggers the -y/-n prompt instead of silent overwrite.
+        // Resolve the path the decompressor will write so an existing output
+        // triggers the -y/-n prompt instead of a silent overwrite.
         if (!OverwritePrompt.ConfirmOverwrite(probeIso, assumeYes,
                 assumeNo))
         {
@@ -3418,7 +3707,9 @@ internal static class Program
         try
         {
             Logger.Log(Constants.Banner);
-            int rc = CisoReader.DecompressToIso(source, outIso);
+            int rc = isCci
+                ? XisoCci.DecompressToIso(source, outIso, overwrite: true)
+                : CisoReader.DecompressToIso(source, outIso);
             return rc;
         }
         catch (Exception ex)
@@ -3426,6 +3717,92 @@ internal static class Program
             Logger.LogErr($"Error decompressing: {ex.Message}\n");
             return 1;
         }
+    }
+
+    /// <summary>
+    /// Phase 5: <c>decompress --batch</c>. Converts every CISO/CCI (single or
+    /// split first part) in the batch directory back to a plain ISO.
+    /// </summary>
+    private static int RunDecompressBatch(BatchOptions batch)
+    {
+        List<string> sources;
+        try
+        {
+            sources = BatchConversion.EnumerateSources(batch.Directory!, batch.Recursive,
+                includeFirstPart: true, ".cso", ".cci");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.LogErr($"Error: {ex.Message}\n");
+            return 1;
+        }
+
+        if (sources.Count == 0)
+        {
+            Logger.LogErr($"Error: no .cso/.cci files found in {batch.Directory}\n");
+            return 1;
+        }
+
+        Logger.Log(Constants.Banner);
+        return BatchConversion.Run(
+            "decompress",
+            batch,
+            sources,
+            source => BatchConversion.OutputPath(source, batch.OutputName, "iso", appendExtension: true),
+            (source, output) => [output],
+            (source, output) =>
+            {
+                bool isCci = Path.GetExtension(source).Equals(".cci", StringComparison.OrdinalIgnoreCase);
+                if (!isCci && XisoImageSource.TryDetect(source, out XisoImageSourceInfo? info) && info is not null)
+                {
+                    isCci = info.Format is XisoImageFormat.Cci or XisoImageFormat.SplitCci;
+                }
+
+                return isCci
+                    ? XisoCci.DecompressToIso(source, output, overwrite: true)
+                    : CisoReader.DecompressToIso(source, output);
+            },
+            CliOutputGuard.CheckImageOutput);
+    }
+
+    private static bool IsZarPath(string path) =>
+        Path.GetExtension(path).Equals(".zar", StringComparison.OrdinalIgnoreCase);
+
+    private static string DeriveZarExtractDirectory(string zarPath)
+    {
+        string directory = Path.GetDirectoryName(zarPath) ?? string.Empty;
+        string name = Path.GetFileNameWithoutExtension(zarPath);
+        return Path.Combine(directory, name);
+    }
+
+    private static void PrintZarEntries(string zarPath, bool tree)
+    {
+        IReadOnlyList<ZarEntry> entries = XisoZarchive.ListZar(zarPath);
+        string name = Path.GetFileName(zarPath);
+        Logger.Log($"{(tree ? "tree" : "listing")} {name}:\n\n");
+
+        foreach (ZarEntry entry in entries)
+        {
+            if (tree)
+            {
+                int depth = Math.Max(0, entry.Path.Count(static c => c == '/') - 1);
+                string leaf = entry.Path[(entry.Path.LastIndexOf('/') + 1)..];
+                Logger.Log($"{new string(' ', depth * 2)}{leaf}{(entry.IsDirectory ? "\\" : "")} ({entry.Size} bytes)\n");
+            }
+            else
+            {
+                Logger.Log($"{entry.Path.Replace('/', '\\')} ({entry.Size} bytes)\n");
+            }
+        }
+
+        long files = entries.LongCount(static entry => !entry.IsDirectory);
+        ulong total = 0;
+        foreach (ZarEntry entry in entries)
+        {
+            if (!entry.IsDirectory) total += entry.Size;
+        }
+
+        Logger.Log($"\n{files} files in {name} total {total} bytes\n");
     }
 
     private static int RunChecksumMode(string[] args, int optind)
@@ -3485,7 +3862,9 @@ internal static class Program
         {
             try
             {
-                byte[] hash = XisoChecksum.ComputeImageChecksum(iso);
+                byte[] hash = IsZarPath(iso)
+                    ? XisoChecksum.ComputeZarChecksum(iso)
+                    : XisoChecksum.ComputeImageChecksum(iso);
                 string hex = Convert.ToHexString(hash).ToLowerInvariant();
                 if (silent)
                     Logger.Log($"{hex}\n");
@@ -3549,18 +3928,218 @@ internal static class Program
         return existing;
     }
 
+    private static int RunConvertMode(string[] args, int optind)
+    {
+        bool assumeYes = false;
+        bool assumeNo = false;
+        string? format = null;
+        BatchOptions batch = new();
+        List<string> positionals = new();
+
+        for (int i = optind; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (BatchConversion.TryConsume(args, ref i, batch, out string? batchFlagError))
+            {
+                if (batchFlagError != null)
+                {
+                    Logger.LogErr($"Error: {batchFlagError}\n");
+                    return 1;
+                }
+            }
+            else if (string.Equals(a, "--format", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: convert --format requires iso or zar\n");
+                    return 1;
+                }
+
+                string value = args[++i];
+                if (string.Equals(value, "iso", StringComparison.OrdinalIgnoreCase))
+                {
+                    format = "iso";
+                }
+                else if (string.Equals(value, "zar", StringComparison.OrdinalIgnoreCase))
+                {
+                    format = "zar";
+                }
+                else
+                {
+                    Logger.LogErr("Error: convert --format requires iso or zar\n");
+                    return 1;
+                }
+            }
+            else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeYes = true;
+            }
+            else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeNo = true;
+            }
+            else if (string.Equals(a, "-q", StringComparison.Ordinal))
+            {
+                Logger.Quiet = true;
+            }
+            else if (string.Equals(a, "-Q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = Logger.RealQuiet = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for convert: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (assumeYes && assumeNo)
+        {
+            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
+            return 1;
+        }
+
+        string? batchError = BatchConversion.Validate(batch);
+        if (batchError != null)
+        {
+            Logger.LogErr($"Error: {batchError}\n");
+            return 1;
+        }
+
+        if (batch.Directory != null)
+        {
+            if (positionals.Count > 0)
+            {
+                Logger.LogErr("Error: --batch cannot be combined with explicit source or output paths\n");
+                return 1;
+            }
+
+            batch.AssumeYes = assumeYes;
+            batch.AssumeNo = assumeNo;
+            return RunConvertBatch(batch, format ?? "zar");
+        }
+
+        if (format != null)
+        {
+            Logger.LogErr("Error: --format requires --batch; single-file convert infers the direction from the extensions\n");
+            return 1;
+        }
+
+        if (positionals.Count != 2)
+        {
+            Logger.LogErr("Error: convert requires <source.zar|source.iso> <output.iso|output.zar>\n");
+            return 1;
+        }
+
+        string source = positionals[0];
+        string output = positionals[1];
+        if (!OverwritePrompt.ConfirmOverwrite(output, assumeYes, assumeNo)) return 1;
+
+        try
+        {
+            bool sourceZar = IsZarPath(source);
+            bool outputZar = IsZarPath(output);
+            if (sourceZar && !outputZar)
+            {
+                return XisoZarchive.ConvertZarToIso(source, output, overwrite: true) == 0 ? 0 : 1;
+            }
+
+            if (!sourceZar && outputZar)
+            {
+                if (!File.Exists(source))
+                {
+                    Logger.LogErr($"Error: source image not found: {source}\n");
+                    return 1;
+                }
+
+                return XisoZarchive.CreateZar(source, output) ? 0 : 1;
+            }
+
+            Logger.LogErr("Error: convert supports .zar -> .iso and .iso -> .zar\n");
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogErr($"Error converting: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// Phase 5: <c>convert --batch --format iso|zar</c>. <c>zar</c> (the
+    /// default) packs every plain ISO into a ZArchive; <c>iso</c> expands every
+    /// ZArchive back to a plain ISO.
+    /// </summary>
+    private static int RunConvertBatch(BatchOptions batch, string format)
+    {
+        bool toZar = string.Equals(format, "zar", StringComparison.OrdinalIgnoreCase);
+
+        List<string> sources;
+        try
+        {
+            sources = BatchConversion.EnumerateSources(batch.Directory!, batch.Recursive,
+                includeFirstPart: false,
+                extensions: toZar ? [".iso", ".xiso"] : [".zar"]);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.LogErr($"Error: {ex.Message}\n");
+            return 1;
+        }
+
+        if (sources.Count == 0)
+        {
+            string kind = toZar ? "unsplit .iso/.xiso" : ".zar";
+            Logger.LogErr($"Error: no {kind} files found in {batch.Directory}\n");
+            return 1;
+        }
+
+        return BatchConversion.Run(
+            "convert",
+            batch,
+            sources,
+            source => BatchConversion.OutputPath(source, batch.OutputName, format, appendExtension: true),
+            (source, output) => [output],
+            (source, output) => toZar
+                ? (XisoZarchive.CreateZar(source, output) ? 0 : 1)
+                : XisoZarchive.ConvertZarToIso(source, output, overwrite: true),
+            CliOutputGuard.CheckImageOutput);
+    }
+
     private static int RunSplitMode(string[] args, int optind)
     {
         string? sizeText = null;
         string? outputBase = null;
         bool assumeYes = false;
         bool assumeNo = false;
+        BatchOptions batch = new();
         List<string> positionals = new();
 
         for (int i = optind; i < args.Length; i++)
         {
             string a = args[i];
-            if (string.Equals(a, "--size", StringComparison.OrdinalIgnoreCase))
+            if (BatchConversion.TryConsume(args, ref i, batch, out string? batchFlagError))
+            {
+                if (batchFlagError != null)
+                {
+                    Logger.LogErr($"Error: {batchFlagError}\n");
+                    return 1;
+                }
+            }
+            else if (string.Equals(a, "--size", StringComparison.OrdinalIgnoreCase))
             {
                 if (++i >= args.Length)
                 {
@@ -3625,19 +4204,6 @@ internal static class Program
             }
         }
 
-        if (positionals.Count == 0)
-        {
-            Logger.LogErr("Error: split requires at least one image\n");
-            PrintUsage();
-            return 1;
-        }
-
-        if (outputBase != null && positionals.Count > 1)
-        {
-            Logger.LogErr("Error: --output accepts a single base path; pass one image at a time\n");
-            return 1;
-        }
-
         bool halves = false;
         long partSize = XisoSplitter.DefaultPartSizeBytes;
         if (sizeText != null)
@@ -3653,6 +4219,45 @@ internal static class Program
                 Logger.LogErr($"Error: --size must be at least one sector ({Constants.SectorSize} bytes)\n");
                 return 1;
             }
+        }
+
+        if (assumeYes && assumeNo)
+        {
+            Logger.LogErr("[ERROR] Cannot use both --no (-n) and --yes (-y)\n");
+            return 1;
+        }
+
+        string? batchError = BatchConversion.Validate(batch);
+        if (batchError != null)
+        {
+            Logger.LogErr($"Error: {batchError}\n");
+            return 1;
+        }
+
+        if (batch.Directory != null)
+        {
+            if (positionals.Count > 0 || outputBase != null)
+            {
+                Logger.LogErr("Error: --batch cannot be combined with explicit images or --output\n");
+                return 1;
+            }
+
+            batch.AssumeYes = assumeYes;
+            batch.AssumeNo = assumeNo;
+            return RunSplitBatch(batch, partSize, halves);
+        }
+
+        if (positionals.Count == 0)
+        {
+            Logger.LogErr("Error: split requires at least one image\n");
+            PrintUsage();
+            return 1;
+        }
+
+        if (outputBase != null && positionals.Count > 1)
+        {
+            Logger.LogErr("Error: --output accepts a single base path; pass one image at a time\n");
+            return 1;
         }
 
         int exit = 0;
@@ -3715,6 +4320,54 @@ internal static class Program
         }
 
         return exit;
+    }
+
+    /// <summary>
+    /// Phase 5: <c>split --batch</c>. Splits every unsplit ISO in the batch
+    /// directory, reusing the shared skip/continue/parallel policy.
+    /// </summary>
+    private static int RunSplitBatch(BatchOptions batch, long partSize, bool halves)
+    {
+        List<string> sources;
+        try
+        {
+            sources = BatchConversion.EnumerateSources(batch.Directory!, batch.Recursive,
+                includeFirstPart: false, ".iso", ".xiso");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.LogErr($"Error: {ex.Message}\n");
+            return 1;
+        }
+
+        if (sources.Count == 0)
+        {
+            Logger.LogErr($"Error: no unsplit .iso/.xiso files found in {batch.Directory}\n");
+            return 1;
+        }
+
+        return BatchConversion.Run(
+            "split",
+            batch,
+            sources,
+            source => BatchConversion.OutputPath(source, batch.OutputName, "iso", appendExtension: false),
+            (source, output) => BatchConversion.SplitTargets(source, output, partSize, halves),
+            (source, output) =>
+            {
+                // The runner confirmed every existing part before this point.
+                foreach (string target in BatchConversion.SplitTargets(source, output, partSize, halves))
+                {
+                    if (File.Exists(target))
+                        File.Delete(target);
+                }
+
+                IReadOnlyList<string> parts = halves
+                    ? XisoReader.SplitXisoHalves(source, output)
+                    : XisoReader.SplitXiso(source, output, partSize);
+                foreach (string part in parts)
+                    Logger.Log($"split: {part}\n");
+                return 0;
+            });
     }
 
     private static int RunJoinMode(string[] args, int optind)
@@ -4816,8 +5469,9 @@ internal static class Program
                                                       --filetime <image>   Show FILETIME header field (ISO-8601 + raw u64, xdvdfs compatible; 0 = 1601-01-01).
                                                       --set-filetime <image> <value>  Set FILETIME field: value may be ISO-8601 (2023-08-26T15:00:00Z), decimal raw, 0x hex, 'now', or '0'.
                                                       --batch <dir>        Process all .iso files in <dir> instead of
-                                                                           explicit filenames. Works with extract,
-                                                                           list, tree, rewrite (-r), and audit (-V).
+                                                                           explicit filenames (extract, list, tree, rewrite
+                                                                           (-r), audit (-V)); on compress/decompress/convert/split,
+                                                                           the verb's own inputs.
                                                      --batch-recursive    With --batch, search subdirectories recursively.
                                                      --pack <input> [name]  Pack a directory into an ISO (name defaults
                                                                            to the directory name; may include a path),
@@ -4826,6 +5480,8 @@ internal static class Program
                                                      -x                  Extract xiso(s) (the default mode if none is given).
                                                      --unpack <file> [dest]  Unpack the whole image to <dest>, or to a
                                                                            directory named after the ISO when omitted.
+                                                                           -l/-t/-x/--unpack/checksum accept .zar
+                                                                           archives directly (ZArchive name tree).
                                                      -X <glob_pattern>   In create mode (-c), exclude files/directories
                                                                            matching the glob pattern from the image.
                                                                            Repeatable. Examples: "*.tmp", "**/node_modules/**",
@@ -4862,24 +5518,48 @@ internal static class Program
                                                      --compress <iso>           Alias: --petrify --update --video --zar
                                                       --security-sectors <sectors.txt>  Override security sector ranges (start-end, 4096 sectors).
 
-                                                      CISO / Compression modes:
+                                                      CISO / CCI / Compression modes:
 
-                                                      compress <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
-                                                                            Pack and compress to CISO (CSO). Source may be a directory (packed then compressed)
-                                                                            or an existing ISO. Level 0=store, 1=fastest … 9=smallest. Default 9.
-                                                                            Version 2 (default) writes LZ4 sectors with fixed align 2 — byte-compatible
-                                                                            with modern `xdvdfs compress`; version 1 writes classic DEFLATE sectors.
-                                                                            Like xdvdfs, output is split at 0xffbf6000 (~4 GiB) into .1.cso/.2.cso parts;
-                                                                            --ciso-split bytes overrides the split point, --ciso-split 0 writes a single .cso.
-                                                                            Alias: cso.
-                                                      decompress <cso|.1.cso> [output.iso]    Decompress CISO/CSO to ISO (DEFLATE v1 and LZ4 v2,
-                                                                            single files and split .1.cso/.2.cso… parts).
-                                                                            Aliases: uncso, decso.
+                                                      compress <sourceDir|image> [output] [--format cso|cci]
+                                                               [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
+                                                               [--cci-level 0..9] [--cci-split bytes] [--batch <dir>]
+                                                                            Pack and compress to CISO/CSO (default) or CCI.
+                                                                            Source may be a directory (packed then compressed),
+                                                                            an ISO, or a split ISO/CISO/CCI image (decompressed
+                                                                            to a temporary ISO first).
+                                                                            Level 0=store, 1=fastest … 9=smallest. Default 9.
+                                                                            CISO version 2 (default) writes LZ4 sectors with fixed
+                                                                            align 2 — byte-compatible with modern `xdvdfs compress`;
+                                                                            version 1 writes classic DEFLATE sectors.
+                                                                            Like xdvdfs, CISO output is split at 0xffbf6000
+                                                                            (~4 GiB) into .1.cso/.2.cso parts; --ciso-split bytes
+                                                                            overrides the point, --ciso-split 0 writes a single .cso.
+                                                                            CCI output is split at 0xffbf6000 into .1.cci/.2.cci …
+                                                                            parts; --cci-split 0 writes a single .cci.
+                                                                            Aliases: cso (CISO), cci (CCI).
+                                                      decompress <cso|cci> [output.iso] [--batch <dir>]    Decompress CISO/CSO or CCI to ISO (DEFLATE v1,
+                                                                            LZ4 v2 and CCI LZ4; single files and split parts).
+                                                                            Aliases: uncso, decso, uncci.
                                                        checksum <image> [images...] [--silent]  Compute SHA3-256 image checksum (xdvdfs-compatible:
                                                                              SHA3-256 over sorted path bytes + file data). Output: hex tab path.
-                                                       split <image> [images...] [--size <bytes|half>] [--output <base>]  Split ISO into sector-aligned
+                                                       split <image> [images...] [--size <bytes|half>] [--output <base>] [--batch <dir>]  Split ISO into sector-aligned
                                                                              .1.iso/.2.iso… parts (default size 4G FATX cap; 'half' splits in two).
                                                        join <first.1.iso> [...] [--output <file>]  Reassemble split parts (output validated as XISO).
+                                                       convert <src.zar|src.iso> <out.iso|out.zar>  Convert ZArchive to ISO (extract + repack)
+                                                                             or ISO to ZArchive. Existing outputs follow -y/-n.
+                                                                             --batch <dir> --format iso|zar converts a whole
+                                                                             directory (default format: zar).
+                                                       Batch container verbs (compress/decompress/convert/split):
+                                                       --skip-existing      With --batch, skip sources whose output exists.
+                                                       --continue-on-error  With --batch, keep going after a failed file
+                                                                            and exit 1 after the summary.
+                                                       --jobs <n>           With --batch, run up to <n> conversions in
+                                                                            parallel (1..64; default 1).
+                                                       --output-name <t>    With --batch, name outputs from a template:
+                                                                            {name} (source stem, split marker stripped),
+                                                                            {ext} (source extension), {format} (output format).
+                                                                            Example: "{name}.xiso.{format}". A template
+                                                                            without an extension gets the format's extension.
                                                        --filetime <image>             Show FILETIME header field (human-readable + raw, supports --skip-sectors).
                                                        --set-filetime <image> <value> Set FILETIME header field (value: ISO-8601, decimal raw, 0x hex, 'now', '0').
                                                        --sector-layout <image>      Show the full sector map: volume summary, per-file extents, used/free ranges.

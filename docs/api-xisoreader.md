@@ -36,7 +36,7 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 | `Rewrite` | Rewrite an image into the optimized layout |
 | `DecodeXiso` | Main entry point (all modes) |
 | `DecodeXisoAsync` | Async wrapper of `DecodeXiso` |
-| `OpenImageStream` | Open an image for reading (`.cso`-aware); caller owns the stream |
+| `OpenImageStream` | Open an image for reading (CISO/CCI/split-aware via `XisoImageSource`); caller owns the stream |
 | `IsOptimizedImage` | Probe the optimized tag (path or stream overload) |
 | `GetVolumeInfo` | Volume descriptor metadata without throwing |
 | `ListDirectory` | Metadata of entries in a directory |
@@ -129,11 +129,11 @@ each have a `Stream` overload taking `(Stream imageStream, string imageName, ...
 in place of the input path — for memory, network, or embedded-resource images.
 The random-access primitives have them too (TODO #19): `GetVolumeInfo`,
 `ListDirectory`, `GetEntryInfo`, `CopyOut`, `ComputeFileHash`, and `GetXexInfo` —
-these are what `XisoExplorer` uses to support `.cso` inputs.
+these are what `XisoExplorer` uses to support `.cso`, `.cci` and split inputs.
 The stream must be readable and seekable (`ArgumentException` otherwise) and is
 left open; `imageName` (typically the file name) drives output naming and
 messages. `IsOptimizedImage` has a matching `Stream` overload (position
-restored), and `OpenImageStream` — the `.cso`-aware opener the path APIs use
+restored), and `OpenImageStream` - the `XisoImageSource` opener the path APIs use
 internally — is public too. Rewrite stays path-only (it is file-identity based,
 the `.old` dance), so the stream `DecodeXiso` refuses `ExtractMode.Rewrite`
 with `ArgumentException`.
@@ -199,6 +199,12 @@ an uncreatable directory skips its subtree. The run still throws at the end —
 an `ExtractErrorException` with code `ErrExtractFailed` listing every failure
 (the xdvdfs `Failed to unpack image` wrapper) — so the failure is visible to
 callers. Structural table corruption still aborts immediately (TODO #16).
+
+The directory walk itself is iterative within a table: an explicit in-order stack
+bounds intra-table AVL depth by `Constants.MaxTocEntriesPerTable` and
+`Constants.MaxTocStackFrames`, while `MaxTocDepth` now applies only to
+subdirectory nesting. A pathological left-skewed table therefore lists, trees,
+extracts and rewrites without exhausting the process stack.
 
 ## Extraction errors
 
@@ -290,7 +296,7 @@ public static int ReadFileBytes(Stream imageStream, string imageName, string int
 One-shot in-place file read with no extraction to disk (VFS/Dokan `ReadFile` shape).
 The read is clamped to the entry's own `FileSize`, never the image length, so a
 corrupt TOC cannot leak the next file's sectors; `fileOffset` at/past the file end
-returns 0. Plain `.iso`, `.cso`, and split `.1.cso` inputs all work. Throws
+returns 0. Plain `.iso`, `.cso`, `.cci` and split `.1.cso`/`.1.cci`/`.1.iso` inputs all work. Throws
 `InvalidDataException` for a missing path or a directory target, and
 `ArgumentOutOfRangeException` for a negative offset.
 
@@ -516,7 +522,7 @@ public static AuditResult AuditXiso(IBlockDevice dev, string isoName, bool requi
 public static IReadOnlyList<EntryInfo> ListDirectory(IBlockDevice dev, string internalPath = "/");
 ```
 
-`IBlockDevice` stack under `XISOSharp.Core/BlockDevice/` (`FileBlockDevice`/`MemoryBlockDevice`/`OffsetBlockDevice`/`CisoBlockDevice`). Mirror `xdvdfs-core/src/blockdev.rs` — enables in-memory golden fixtures + CISO random-access via `CisoBlockDevice` single-sector cache without `no_std` target. All `FileStream` overloads delegate to these.
+`IBlockDevice` stack under `XISOSharp.Core/BlockDevice/` (`FileBlockDevice`/`MemoryBlockDevice`/`OffsetBlockDevice`/`StreamBlockDevice`/`CisoBlockDevice`/`CciBlockDevice`). Mirror `xdvdfs-core/src/blockdev.rs` - enables in-memory golden fixtures + CISO/CCI random-access via single-sector caches without `no_std` target. All `FileStream` overloads delegate to these.
 
 ## AuditXiso
 

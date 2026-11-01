@@ -74,11 +74,14 @@ XISOSharp validate <source.iso> <output.iso> [options]
 XISOSharp rebuild <xiso|game.zar> [video.iso] [filler|seed] [su...] -o <redump.iso>
 XISOSharp build-image [sourceDir] [output.iso] -m "host:image" [-f <toml>] [-O output] [-D|--dry-run]
 XISOSharp image-spec from -O <out> -m "host:image" ... [specPath]
-XISOSharp compress|cso <sourceDir|image.iso> [output.cso] [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
-XISOSharp decompress|uncso|decso <cso|.1.cso> [output.iso]
+XISOSharp compress|cso|cci <sourceDir|image> [output] [--format cso|cci]
+    [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
+    [--cci-level 0..9] [--cci-split bytes] [--batch <dir>]
+XISOSharp decompress|uncso|decso|uncci <cso|cci> [output.iso] [--batch <dir>]
 XISOSharp checksum [--silent] <image> [images...]
-XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...]
+XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...] [--batch <dir>]
 XISOSharp join [--output <file>] <first.1.iso> [...]
+XISOSharp convert <src.zar|src.iso> <out.iso|out.zar> [--batch <dir> --format iso|zar]
 ```
 
 Rules: flags must precede positional arguments (the first non-flag token ends option
@@ -111,13 +114,14 @@ is printed and the tool exits 1.
 | `-r` | Rewrite as optimized ISO (byte-identical to `extract-xiso -r`) |
 | `validate <src> <out>` | Validate conversion between two images (+ `--validate*` flags; mismatch exits 2) |
 | `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum (`--silent` → hex only) |
-| `split` / `join` (`joinsplit`) | Split into `<base>.1.iso`… parts / reassemble (`--size`, `--output`) |
+| `split` / `join` (`joinsplit`) | Split into `<base>.1.iso`… parts / reassemble (`--size`, `--output`, `--batch`) |
 | `--filetime <image>` / `--set-filetime <image> <value>` | Show / set the FILETIME volume field |
 | `--sector-layout <image>` | Full sector map: volume summary, per-file extents, used/free ranges |
 | `--ranges <image>` | System (bone) vs file sector ranges (inclusive spans) |
 | `--is-optimized <image>` | Print whether the image carries the optimized tag (supports `--skip-sectors`) |
-| `--batch <dir>` (+ `--batch-recursive`) | Process all `.iso` in `<dir>` (extract/list/tree/rewrite/audit only) |
-| `compress` (`cso`) / `decompress` (`uncso`, `decso`) | CISO v2 LZ4 (default) / v1 DEFLATE round-trip (`--ciso-level`, `--ciso-version`, `--ciso-split`) |
+| `--batch <dir>` (+ `--batch-recursive`) | Process all `.iso` in `<dir>` (extract/list/tree/rewrite/audit), or the verb's inputs (`compress`/`decompress`/`convert`/`split`) |
+| `compress` (`cso`, `cci`) / `decompress` (`uncso`, `decso`, `uncci`) | CISO v2 LZ4 (default) / v1 DEFLATE and CCI LZ4 round-trip (`--format`, `--ciso-*`, `--cci-*`, `--batch`) |
+| `convert` | ZArchive to ISO / ISO to ZArchive (`--batch --format iso\|zar` for whole directories) |
 | `build-image` / `image-spec` | xdvdfs-parity ordered packing from globs / TOML spec generation |
 | `--video` / `--random` / `--seed` / `--wipe` / `--trim` / `--petrify` / `--update` / `--zar` | Redump archival verbs (`--jobs`/`--policy` for `--zar`; `--all`/`--best`/`--compress` aliases; `--security-sectors` for rebuild) |
 | `rebuild` | Rebuild a lossless Redump image from components (`-o <redump.iso>`) |
@@ -142,14 +146,16 @@ is printed and the tool exits 1.
 | `--prepend-sectors N` | Write N empty sectors before the filesystem (create/rewrite) |
 | `--preserve-attrs` | Rewrite: keep source RO/HID/SYS/NOR bits instead of DIR/ARC defaults |
 | `--file-time <value>` | Fixed volume FILETIME on create/pack/build-image (ISO-8601, decimal, `0x` hex, `now`, `0` = deterministic) |
-| `--skip-existing` | Extract/unpack/copy-out: skip files already on disk with matching sizes (resume) |
-| `--continue-on-error` | Extract/unpack/copy-out: log per-file failures and continue (still exits non-zero) |
+| `--skip-existing` | Extract/unpack/copy-out: skip files already on disk with matching sizes (resume). Batch verbs: skip sources whose output exists |
+| `--continue-on-error` | Extract/unpack/copy-out: log per-file failures and continue (still exits non-zero). Batch verbs: keep converting after a failure |
+| `--output-name <template>` | Batch verbs only: name outputs from `{name}`, `{ext}` and `{format}` (e.g. `"{name}.xiso.{format}"`) |
 | `--no-backup` | Skip the `<iso>.old` backup (copy-in/repair only) |
 | `--dry-run` | Preview `--repair` fixes without changing anything (repair only) |
 | `--repair-out <path>` | Salvage output override (salvage only) |
 | `--validate` / `--validate-checksums` / `--validate-strict` / `--validate-report <file>` | Post-rewrite/conversion validation (require `-r` or `validate`) |
 | `--ciso-level 0..9` / `--ciso-version 1\|2\|auto` / `--ciso-split <bytes>` | CISO codec options (compress only) |
-| `--jobs <n>` / `--policy <skip\|overwrite\|auto-rename>` | Parallel + overwrite handling for `--zar` |
+| `--format cso\|cci` / `--cci-level 0..9` / `--cci-split <bytes>` | CCI output and codec options (compress only) |
+| `--jobs <n>` / `--policy <skip\|overwrite\|auto-rename>` | Parallel + overwrite handling for `--zar`; batch verbs accept `--jobs 1..64` |
 | `--security-sectors <file>` (`--sectors`) | Rebuild-only security-sector range override |
 | `-f <toml>` / `-m "host:image"` (`--map`) / `-O <out>` (`--output`) | `build-image`/`image-spec` inputs |
 
@@ -210,9 +216,20 @@ XISOSharp rebuild x.iso video.iso filler.bin su20076000_00000000 -o rebuilt.redu
 XISOSharp build-image ./src -m "bin:/" -m "assets/**:/assets/{1}" -O out.iso
 XISOSharp compress game.iso game.cso --ciso-level 9
 XISOSharp decompress game.cso game.iso
+XISOSharp compress --format cci game.iso game.cci --cci-split 0
+XISOSharp decompress game.1.cci game.iso
 XISOSharp checksum game.iso
+XISOSharp checksum game.zar
+XISOSharp convert game.zar game.iso
 XISOSharp split --size half --output base game.iso
 XISOSharp join --output rejoined.iso base.1.iso
+
+# Batch container conversion
+XISOSharp compress --batch ./isos --format cci --cci-split 0 -y
+XISOSharp decompress --batch ./compressed --skip-existing -y
+XISOSharp convert --batch ./isos --format zar -y
+XISOSharp split --batch ./isos --size half -y
+XISOSharp compress --batch ./isos --output-name "{name}.xiso.{format}" --jobs 4 -y
 ```
 
 ## Full reference

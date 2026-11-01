@@ -1,11 +1,12 @@
 # Library Overview
 
 `XISOSharp.Core` is the class library behind the CLI. It is published to NuGet as
-**`XISOSharp`** and contains the complete XISO read/write engine with no runtime
-dependencies.
+**`XISOSharp`** and contains the complete XISO read/write engine plus CCI
+(`CCISharp`) and ZAR (`ZArchiveSharp`) container support.
 
 - [Packaging & compatibility](#packaging--compatibility)
 - [Namespaces and types](#namespaces-and-types)
+- [Container input](#container-input)
 - [Design notes](#design-notes)
 - [Error handling](#error-handling)
 - [Logging](#logging)
@@ -18,7 +19,7 @@ dependencies.
 |---|---|
 | Package ID | `XISOSharp` |
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
-| Dependencies | none (runtime) |
+| Dependencies | `ZArchiveSharp` (ZAR), `CCISharp` (CCI/CCIM) |
 | Signing | strong-named assembly |
 | Trimming / AOT | `IsTrimmable`, `IsAotCompatible` |
 | Versioning | MinVer from git tags (format `v1.0.2` / `1.0.2`) |
@@ -37,6 +38,9 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | Type | Purpose |
 |---|---|
 | [`XisoReader`](api-xisoreader.md) | Verify, extract, list, tree, rewrite, info, `ls`, audit, repair, salvage, hash, copy-out, copy-in, checksum, filetime, split/join, XEX/XBE info, BlockDevice overloads |
+| `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` | Unified detection and open (`TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`) for ISO, split ISO, CISO, CCI, split variants and ZAR |
+| `XisoCci` / `CciBlockDevice` | CCI/CCIM compression, extraction, default names and random access (CCISharp-backed) |
+| `XisoZarchive` (read APIs) | `ListZar`, `ExtractZar`, `ConvertZarToIso` alongside the existing `CreateZar` |
 | [`XisoExplorer`](api-utilities.md#xisoexplorer--xisoattributes) / [`XisoAttributes`](api-utilities.md#xisoexplorer--xisoattributes) | In-place exploration (list/get/copy/hash/XEX/XBE, bounded `OpenReadStream`, keep-open VFS mode) + Windows attribute mapping |
 | [`XisoWriter`](api-xisowriter.md) | Create and rewrite images + `build-image` remap (`CreateFromRemapTree`) |
 | [`XisoPatcher`](api-xisoreader.md#copyin) / [`DirectoryEntryTableWriter`](api-xisowriter.md#directoryentrytablewriter) | In-place file patching (`CopyIntoImage`) + single-table build/serialize primitive |
@@ -50,10 +54,35 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | [`XisoRanges`/`XisoSkeleton`/`XgdTables`/`XboxPrng`/`SecuritySectors`](api-utilities.md) | Redump archival: ranges, skeleton/SHA-1, wave tables, PRNG seed, `sectors.txt` |
 | [`XisoRedump`/`XisoOperations`/`XisoZarchive`](api-utilities.md) | Video/filler/wipe/trim/petrify/update/ZAR/rebuild |
 | [`XisoChecksum` / `CisoWriter`/`CisoReader`](api-utilities.md) | SHA3-256 image checksum + CISO compress/decompress |
-| [`BlockDevice/*`](api-utilities.md#blockdevice) | `IBlockDevice` + `File`/`Memory`/`Offset`/`Ciso` (`CisoBlockDevice`) |
+| [`BlockDevice/*`](api-utilities.md#blockdevice) | `IBlockDevice` + `File`/`Memory`/`Offset`/`Stream`/`Ciso`/`Cci` devices |
 | [`RemapFilesystem`](api-utilities.md) | Ordered `host→image` remapping, `xdvdfs.toml`, `GenerateSpecText`, `DryRunRemap` |
 | Records/enums | `VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `RemapRule`, `ProgressInfo`, `ExtractMode`, … |
 | Exceptions | `XisoFormatException`, `XisoEmptyException`, `XisoFileTooLargeException`, `ExtractErrorException` |
+
+## Container input
+
+Use `XisoImageSource` when you need the same format coverage as the CLI:
+
+```csharp
+if (XisoImageSource.TryDetect(path, out XisoImageSourceInfo? info) && info is not null)
+{
+    Console.WriteLine($"{info.Format}: {info.Length} bytes, {info.Parts.Count} part(s)");
+}
+
+using Stream image = XisoImageSource.OpenRead(@"C:\games\game.1.cci");
+using IBlockDevice dev = XisoImageSource.OpenBlockDevice(@"C:\games\game.1.iso");
+```
+
+| Format | Detection | Open behavior |
+|---|---|---|
+| `Iso` | `.iso`/`.xiso`/`.img` or any unknown plain file | `FileStream` / `FileBlockDevice` |
+| `SplitIso` | `<base>.1.iso` | `SplitIsoStream` concatenates consecutive parts |
+| `Ciso` / `SplitCiso` | `.cso`/`.1.cso`, magic sniff fallback | `CisoBlockDevice` |
+| `Cci` / `SplitCci` | `.cci`/`.1.cci`, magic sniff fallback | `CciBlockDevice` |
+| `Zar` | `.zar` | Not a sector image; use `XisoZarchive.ExtractZar`/`ConvertZarToIso` |
+
+`OpenRead`/`OpenBlockDevice` throw `FileNotFoundException`, `InvalidDataException`
+or `NotSupportedException` (ZAR) rather than returning a partially valid view.
 
 ## Design notes
 

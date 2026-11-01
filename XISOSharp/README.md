@@ -17,7 +17,7 @@
 [![Release date](https://img.shields.io/github/release-date/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/releases/latest)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://purelogiccode.github.io/XISOSharp/)
 
-A pure C# class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. A direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool from C to C# — byte-identical output, no native dependencies — extended with the archival power of [XboxKit](https://github.com/Deterous/XboxKit) (Redump video/filler/seed/wipe/trim/petrify/update/rebuild, ZAR) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) (build-image remapping, CISO compress/decompress, checksums). All logic — including the AVL tree, Boyer-Moore search, XISO header verification, directory traversal, format rewriting, and media-enable patching — is ported directly from the reference C implementation.
+A pure C# class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. A direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool from C to C# - byte-identical output, no native dependencies - extended with the archival power of [XboxKit](https://github.com/Deterous/XboxKit) (Redump video/filler/seed/wipe/trim/petrify/update/rebuild, ZAR) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) (build-image remapping, CISO compress/decompress, checksums). Container input is unified through `XisoImageSource`: plain ISO, split `.1.iso` sets, CISO/CSO (v1/v2, single or split), CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), and ZAR for listing/extraction/conversion. All logic - including the AVL tree, Boyer-Moore search, XISO header verification, directory traversal, format rewriting, and media-enable patching - is ported directly from the reference C implementation.
 
 Full documentation (getting started, CLI reference, archival workflows, library API) lives in the [docs folder on GitHub](https://github.com/purelogiccode/XISOSharp/tree/master/docs).
 
@@ -88,6 +88,27 @@ Release history: [Release Notes](https://github.com/purelogiccode/XISOSharp/blob
 
 The library automatically detects the disc format during verification by probing each known offset, plus the rebuilt sector-0 layout (descriptor at absolute offset 0). Standard images keep offset 0 zeroed, so the candidates never collide.
 
+### Container input (`XisoImageSource`)
+
+Every reader verb (`Extract`, `List`, `Tree`, `UnpackImage`, `GetVolumeInfo`,
+`VerifyXiso`, `AuditXiso`, `GetSectorLayout`, `ReadFileBytes`, `Rewrite`, checksum)
+accepts these sources through `XisoReader.OpenImageStream`:
+
+| Input | Behavior |
+|---|---|
+| `.iso`, `.xiso`, `.img` | Opened directly. |
+| `game.1.iso` … | Split plain ISO, concatenated and seekable; a missing middle part throws. |
+| `.cso`, `.1.cso` | CISO v1/v2, single or split, decompressed on demand (`CisoBlockDevice`). |
+| `.cci`, `.1.cci` | CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), single or split (`CciBlockDevice`). |
+| `.zar` | ZArchive name tree: list/extract/checksum/convert (`XisoZarchive`), not a sector image. |
+
+Detection is extension-led with a `CISO`/`CCIM` magic sniff fallback, so renamed
+containers (including the CLI rewrite backup `game.cso.old`) still resolve.
+Compressed and split inputs are read through the decompressed view; output names
+strip the container suffix and `.1` part marker (`game.1.cci` → `game`).
+In-place operations (`Repair`, `CopyIntoImage`, `SetFileTime`) refuse compressed
+containers and require decompressing first.
+
 ---
 
 ## Quick Start
@@ -156,6 +177,11 @@ public static int DecodeXiso(
 - `InvalidDataException` — file is not a valid XISO image
 - `IOException` — read errors
 - `ExtractErrorException` — non-fatal extraction error (see error code)
+
+The directory walk is iterative within each table (explicit in-order stack), so
+deep left-skewed tables do not consume stack frames; `MaxTocDepth` bounds
+subdirectory nesting only. Corrupt offsets and cycles still throw
+`XisoFormatException` with an `invalid TOC entry` message.
 
 #### `DecodeXisoAsync`
 
@@ -1438,7 +1464,7 @@ The core processing engine is **not thread-safe** for concurrent operations on t
 | .NET 9 | `net9.0` |
 | .NET 10 | `net10.0` |
 
-The library targets `net8.0`, `net9.0`, and `net10.0`. Its only runtime dependency beyond the .NET runtime is [ZArchiveSharp](https://www.nuget.org/packages/ZArchiveSharp) (for ZAR archive support); everything else is BCL-only.
+The library targets `net8.0`, `net9.0`, and `net10.0`. Its runtime dependencies beyond the .NET runtime are [ZArchiveSharp](https://www.nuget.org/packages/ZArchiveSharp) (ZAR archive support) and [CCISharp](https://www.nuget.org/packages/CCISharp) (CCI/CCIM containers); everything else is BCL-only.
 
 ---
 
