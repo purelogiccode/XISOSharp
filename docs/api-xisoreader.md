@@ -206,6 +206,14 @@ bounds intra-table AVL depth by `Constants.MaxTocEntriesPerTable` and
 subdirectory nesting. A pathological left-skewed table therefore lists, trees,
 extracts and rewrites without exhausting the process stack.
 
+The same treatment covers every other table walker: `AuditXiso`, the
+`XisoRanges` sector/entry maps, `XisoRepairer`, `XisoSalvager` and
+`XisoZarchive.CreateZar` all use an explicit in-order stack inside a table and
+keep `MaxTocDepth` for real subdirectory nesting only. A 4,096-entry left spine
+audits, maps, repairs, salvages and packs to ZAR just like a balanced table;
+cycles and out-of-table pointers still fail with the named TOC error (or are
+reported/dropped by the audit, repair and salvage gates).
+
 ## Extraction errors
 
 ```csharp
@@ -600,10 +608,12 @@ Rebuilds a readable image from a corrupt one — the answer to the audit's
 truncation and structural classes, which no in-place patch can fix (TODO #26,
 Phase 2):
 
-- A bounded walk reusing the auditor's hardening limits (depth cap, per-table
-  entry cap, cycle tracking) copies every entry reachable without tripping a
-  truncation or structural gate into a staging directory, then repacks it
-  through the `CreateXiso` pipeline into a fresh plain `.iso`.
+- A bounded walk reusing the auditor's hardening limits (subdirectory depth cap,
+  per-table entry cap, cycle tracking) copies every entry reachable without
+  tripping a truncation or structural gate into a staging directory, then
+  repacks it through the `CreateXiso` pipeline into a fresh plain `.iso`.
+- Intra-table left/right skew is walked with an explicit stack, so only real
+  subdirectory nesting counts toward the depth cap.
 - Class-C quirks do not block salvage: reserved bits are masked and path
   separators in names are sanitized to `_`. Anything uncarriable is reported
   in `Skipped`: unreadable entries, orphaned right-link tails,

@@ -110,7 +110,7 @@ Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXis
 | Type | Purpose |
 |---|---|
 | `XgdTables` | Port of `LibXGD/XGD.cs:11` — `XISO_OFFSET[4]` (incl. `0x89D80000` hybrid), `REDUMP_ISO_LENGTH[9]`, `VIDEO_L0_LENGTH[19]`, `VIDEO_L1_LENGTH[19]`, `WAVE_PVD[24]`, `GetVideoType`, `GetRedumpIsoTypeBySize`, `GetWave` (PVD at `0x832D`) |
-| `XisoRanges` | `GetXisoRanges`/`GetValidSectors`/`MergeRanges`/`CollectFileEntries` (sorted by `Offset`, `quiet` → `Logger.Quiet`) — recursive `cur=isoOffset+rootOffset+childOffset`, `left==0xFFFF` sentinel; `Stream` overloads read container-backed images (CISO/CCI/split ISO) |
+| `XisoRanges` | `GetXisoRanges`/`GetValidSectors`/`MergeRanges`/`CollectFileEntries` (sorted by `Offset`, `quiet` → `Logger.Quiet`) — in-order `cur=isoOffset+rootOffset+childOffset` table walk with an explicit stack (any legal left/right skew), `left==0xFFFF` sentinel; `Stream` overloads read container-backed images (CISO/CCI/split ISO) |
 | `XboxPrng` | RC4-like PRNG (`XboxPRNG.cs`) — `BruteForceSeed(ReadOnlySpan<byte>)`, `SimulateSectors(long)`, `WriteSectors(Stream,long)` (XGD1 seed extraction) |
 | `XisoOperations` | `ExtractFiller`, `TryExtractSeed`/`ExtractSeed`, `WipeFiller`/`ProcessWipe`, `TrimXiso`/`WipeAndTrim` |
 | `XisoSkeleton` | `Petrify` (zeroed XISO + SHA-1 `hex + " " + path` lines, `CollectFileEntries` sorted) |

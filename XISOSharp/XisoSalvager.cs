@@ -170,6 +170,10 @@ public static class XisoSalvager
         // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
     {
+        // Subdirectory nesting stays recursive and bounded; intra-table AVL
+        // depth is walked with the explicit in-order stack below, so a
+        // pathological left-skewed table is salvaged instead of being dropped
+        // at MaxTocDepth (Phase 4 follow-up).
         if (depth > Constants.MaxTocDepth)
         {
             state.Skipped.Add(
@@ -183,146 +187,219 @@ public static class XisoSalvager
         Span<byte> byteBuf = stackalloc byte[1];
         Span<byte> headerRest = stackalloc byte[12];
 
+        List<SalvageEntry> pending = [];
+        long? next = dirStart;
+
         while (true)
         {
-            if (++entriesInTable > Constants.MaxTocEntriesPerTable)
+            if (next is long offset)
             {
-                state.Skipped.Add(
-                    $"'{path}': too many entries in one directory table (rest of table dropped).");
-                return;
-            }
+                next = null;
+                if (++entriesInTable > Constants.MaxTocEntriesPerTable)
+                {
+                    state.Skipped.Add(
+                        $"'{path}': too many entries in one directory table (rest of table dropped).");
+                    return;
+                }
 
-            if (dirStart < 0 || dirStart >= fileLength || dirStart >= tableStart + tableSize)
-            {
-                state.Skipped.Add(
-                    $"Directory offset {dirStart} ({path}) exceeds the directory table (table at {tableStart}, size {tableSize}) (dropped).");
-                return;
-            }
+                if (offset < 0 || offset >= fileLength || offset >= tableStart + tableSize)
+                {
+                    state.Skipped.Add(
+                        $"Directory offset {offset} ({path}) exceeds the directory table (table at {tableStart}, size {tableSize}) (dropped).");
+                    return;
+                }
 
-            if (!visited.Add(dirStart))
-            {
-                state.Skipped.Add(
-                    $"Cycle detected: directory entry at offset {dirStart} ({path}) was already visited (branch dropped).");
-                return;
-            }
+                if (!visited.Add(offset))
+                {
+                    state.Skipped.Add(
+                        $"Cycle detected: directory entry at offset {offset} ({path}) was already visited (branch dropped).");
+                    return;
+                }
 
-            long entryStart;
-            ushort lOffset;
-            try
-            {
-                image.Seek(dirStart, SeekOrigin.Begin);
-                ReadExact(image, shortBuf);
-                lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
-                entryStart = dirStart;
-            }
-            catch (IOException)
-            {
-                state.Skipped.Add($"'{path}': truncated entry header at offset {dirStart} (dropped).");
-                return;
-            }
-
-            if (lOffset == Constants.PadShort && dirStart == tableStart)
-                return;
-
-            if (lOffset == Constants.EmptyDirectorySentinel && dirStart == tableStart)
-            {
-                long peekPos = image.Position;
-                bool isAllZeros;
+                ushort lOffset;
                 try
                 {
-                    ReadExact(image, headerRest);
-                    isAllZeros = true;
-                    foreach (byte b in headerRest)
-                    {
-                        if (b != 0)
-                        {
-                            isAllZeros = false;
-                            break;
-                        }
-                    }
+                    image.Seek(offset, SeekOrigin.Begin);
+                    ReadExact(image, shortBuf);
+                    lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
                 }
                 catch (IOException)
                 {
-                    isAllZeros = false;
-                }
-
-                image.Seek(peekPos, SeekOrigin.Begin);
-                if (isAllZeros)
+                    state.Skipped.Add($"'{path}': truncated entry header at offset {offset} (dropped).");
                     return;
-            }
-
-            if (lOffset != 0 && lOffset != Constants.PadShort)
-            {
-                long leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
-                if (leftSeek < 0 || leftSeek >= fileLength || leftSeek >= tableStart + tableSize)
-                {
-                    state.Skipped.Add(
-                        $"Left child offset {lOffset} (seek {leftSeek}) exceeds the directory table in {path} (subtree dropped).");
                 }
-                else
+
+                if (lOffset == Constants.PadShort && offset == tableStart)
+                    return;
+
+                if (lOffset == Constants.EmptyDirectorySentinel && offset == tableStart)
                 {
-                    SalvageWalk(image, leftSeek, tableStart, tableSize, path, stagingDir, fileLength, discLseek,
-                        new HashSet<long>(visited), state, depth + 1);
+                    long peekPos = image.Position;
+                    bool isAllZeros;
+                    try
+                    {
+                        ReadExact(image, headerRest);
+                        isAllZeros = true;
+                        foreach (byte b in headerRest)
+                        {
+                            if (b != 0)
+                            {
+                                isAllZeros = false;
+                                break;
+                            }
+                        }
+                    }
+                    catch (IOException)
+                    {
+                        isAllZeros = false;
+                    }
+
+                    image.Seek(peekPos, SeekOrigin.Begin);
+                    if (isAllZeros)
+                        return;
+                }
+
+                bool descendLeft = false;
+                long leftSeek = 0;
+                if (lOffset != 0 && lOffset != Constants.PadShort)
+                {
+                    leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
+                    if (leftSeek < 0 || leftSeek >= fileLength || leftSeek >= tableStart + tableSize)
+                    {
+                        state.Skipped.Add(
+                            $"Left child offset {lOffset} (seek {leftSeek}) exceeds the directory table in {path} (subtree dropped).");
+                    }
+                    else
+                    {
+                        descendLeft = true;
+                    }
+                }
+
+                uint startSector;
+                uint fileSize;
+                string filename;
+                byte rawAttributes;
+                ushort rOffset;
+                try
+                {
+                    image.Seek(offset + 2, SeekOrigin.Begin);
+                    ReadExact(image, shortBuf);
+                    rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+
+                    ReadExact(image, intBuf);
+                    startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+                    ReadExact(image, intBuf);
+                    fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+                    ReadExact(image, byteBuf);
+                    rawAttributes = byteBuf[0];
+
+                    ReadExact(image, byteBuf);
+                    byte filenameLength = byteBuf[0];
+
+                    byte[] nameBuf = new byte[filenameLength];
+                    ReadExact(image, nameBuf);
+                    filename = Latin1Encoding.Instance.GetString(nameBuf);
+                }
+                catch (IOException)
+                {
+                    state.Skipped.Add($"'{path}': truncated entry header at offset {offset} (dropped).");
+                    return;
+                }
+
+                SalvageEntry entry = new(rOffset, startSector, fileSize, rawAttributes, filename,
+                    filename is "." or "..");
+
+                if (descendLeft)
+                {
+                    // Stage the left subtree first (in-order); the entry itself is
+                    // staged when the descent unwinds.
+                    pending.Add(entry);
+                    if (pending.Count > Constants.MaxTocStackFrames)
+                    {
+                        state.Skipped.Add(
+                            $"'{path}': intra-table traversal stack exceeded {Constants.MaxTocStackFrames} frames (rest of table dropped).");
+                        return;
+                    }
+
+                    next = leftSeek;
+                    continue;
+                }
+
+                SalvageParsedEntry(image, entry, path, stagingDir, fileLength, discLseek, state, depth);
+
+                if (rOffset != 0 && rOffset != Constants.PadShort)
+                {
+                    long rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
+                    if (rightSeek < 0 || rightSeek >= fileLength || rightSeek >= tableStart + tableSize)
+                    {
+                        state.Skipped.Add(
+                            $"Right child offset {rOffset} (seek {rightSeek}) exceeds the directory table in {path} (rest of table dropped).");
+                        return;
+                    }
+
+                    next = rightSeek;
+                    continue;
                 }
             }
 
-            uint startSector;
-            uint fileSize;
-            string filename;
-            byte rawAttributes;
-            ushort rOffset;
-            try
+            bool resumed = false;
+            while (pending.Count > 0)
             {
-                image.Seek(entryStart + 2, SeekOrigin.Begin);
-                ReadExact(image, shortBuf);
-                rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
-
-                ReadExact(image, intBuf);
-                startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
-
-                ReadExact(image, intBuf);
-                fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
-
-                ReadExact(image, byteBuf);
-                rawAttributes = byteBuf[0];
-
-                ReadExact(image, byteBuf);
-                byte filenameLength = byteBuf[0];
-
-                byte[] nameBuf = new byte[filenameLength];
-                ReadExact(image, nameBuf);
-                filename = Latin1Encoding.Instance.GetString(nameBuf);
-            }
-            catch (IOException)
-            {
-                state.Skipped.Add($"'{path}': truncated entry header at offset {entryStart} (dropped).");
-                return;
-            }
-
-            // Structural "." / ".." records are skipped (children still traversed).
-            if (filename is not ("." or ".."))
-            {
-                StageEntry(image, filename, rawAttributes, startSector, fileSize, path, stagingDir,
-                    fileLength, discLseek, state, depth);
-            }
-
-            if (rOffset != 0 && rOffset != Constants.PadShort)
-            {
-                long rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
-                if (rightSeek < 0 || rightSeek >= fileLength || rightSeek >= tableStart + tableSize)
+                SalvageEntry entry = pending[^1];
+                pending.RemoveAt(pending.Count - 1);
+                SalvageParsedEntry(image, entry, path, stagingDir, fileLength, discLseek, state, depth);
+                if (entry.Right != 0 && entry.Right != Constants.PadShort)
                 {
-                    state.Skipped.Add(
-                        $"Right child offset {rOffset} (seek {rightSeek}) exceeds the directory table in {path} (rest of table dropped).");
+                    long rightSeek = tableStart + ((long)entry.Right * Constants.DwordSize);
+                    if (rightSeek < 0 || rightSeek >= fileLength || rightSeek >= tableStart + tableSize)
+                    {
+                        state.Skipped.Add(
+                            $"Right child offset {entry.Right} (seek {rightSeek}) exceeds the directory table in {path} (rest of table dropped).");
+                        return;
+                    }
+
+                    next = rightSeek;
+                    resumed = true;
                     break;
                 }
-
-                dirStart = rightSeek;
-                continue;
             }
 
-            break;
+            if (!resumed) return;
         }
     }
+
+    /// <summary>
+    /// Stages one parsed directory entry (files copy their bytes; directories
+    /// recurse into their table, bounded by <see cref="Constants.MaxTocDepth"/>).
+    /// </summary>
+    private static void SalvageParsedEntry(
+        Stream image,
+        SalvageEntry entry,
+        string path,
+        string stagingDir,
+        long fileLength,
+        long discLseek,
+        SalvageState state,
+        int depth)
+    {
+        // Structural "." / ".." records are skipped (children still traversed).
+        if (entry.Structural)
+            return;
+
+        StageEntry(image, entry.Filename, entry.RawAttributes, entry.StartSector, entry.FileSize, path, stagingDir,
+            fileLength, discLseek, state, depth);
+    }
+
+    /// <summary>One parsed table entry awaiting in-order salvage.</summary>
+    private readonly record struct SalvageEntry(
+        ushort Right,
+        uint StartSector,
+        uint FileSize,
+        byte RawAttributes,
+        string Filename,
+        bool Structural);
 
     private static void StageEntry(
         Stream image,

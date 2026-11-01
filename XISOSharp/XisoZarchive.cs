@@ -518,8 +518,11 @@ public static class XisoZarchive
         }
 
         if (childOffset >= dirSize) return;
-        // Hardening (#16): bound the walk — a corrupt cycle previously recursed
-        // until the stack overflowed instead of failing with a named error.
+        // Hardening (#16): bound subdirectory nesting — a corrupt subdir cycle
+        // throws a named error instead of recursing until the stack overflows.
+        // Intra-table AVL depth is bounded by the explicit in-order stack below,
+        // so a pathological left-skewed table is packed instead of being cut off
+        // at MaxTocDepth (Phase 4 follow-up).
         if (depth > Constants.MaxTocDepth)
         {
             throw new XisoFormatException(
@@ -527,78 +530,137 @@ public static class XisoZarchive
         }
 
         visited ??= [];
-        if (!visited.Add(childOffset))
-        {
-            throw new XisoFormatException(
-                $"invalid TOC entry: directory cycle detected — table offset {childOffset} was already visited.");
-        }
+        List<ParseEntry> pending = [];
+        long? next = childOffset;
 
-        if (visited.Count > Constants.MaxTocEntriesPerTable)
+        while (true)
         {
-            throw new XisoFormatException(
-                "invalid TOC entry: too many entries in one directory table (possible corrupt offset chain).");
-        }
-
-        long pos = isoOffset + dirOffset + childOffset;
-        isoFs.Seek(pos, SeekOrigin.Begin);
-        ushort left = ReadUShort(isoFs);
-        if (childOffset == 0 && IsEmptyTable(isoFs, left)) return;
-        ushort right = ReadUShort(isoFs);
-        uint entrySector = ReadUInt(isoFs);
-        uint entrySize = ReadUInt(isoFs);
-        byte attrs = (byte)isoFs.ReadByte();
-        byte nameLen = (byte)isoFs.ReadByte();
-        byte[] nameBytes = new byte[nameLen];
-        if (nameLen > 0)
-        {
-            int read = 0;
-            while (read < nameLen)
+            if (next is long offset)
             {
-                int n = isoFs.Read(nameBytes, read, nameLen - read);
-                if (n == 0)
+                next = null;
+                if (offset < dirSize)
                 {
-                    // A truncated name used to return silently, dropping the
-                    // entry and its right subtree while reporting success
-                    // (Todo #58); CreateZar maps this to false.
-                    throw new EndOfStreamException();
+                    if (!visited.Add(offset))
+                    {
+                        throw new XisoFormatException(
+                            $"invalid TOC entry: directory cycle detected — table offset {offset} was already visited.");
+                    }
+
+                    if (visited.Count > Constants.MaxTocEntriesPerTable)
+                    {
+                        throw new XisoFormatException(
+                            "invalid TOC entry: too many entries in one directory table (possible corrupt offset chain).");
+                    }
+
+                    long pos = isoOffset + dirOffset + offset;
+                    isoFs.Seek(pos, SeekOrigin.Begin);
+                    ushort left = ReadUShort(isoFs);
+                    if (offset == 0 && IsEmptyTable(isoFs, left)) return;
+                    ushort right = ReadUShort(isoFs);
+                    uint entrySector = ReadUInt(isoFs);
+                    uint entrySize = ReadUInt(isoFs);
+                    byte attrs = (byte)isoFs.ReadByte();
+                    byte nameLen = (byte)isoFs.ReadByte();
+                    byte[] nameBytes = new byte[nameLen];
+                    if (nameLen > 0)
+                    {
+                        int read = 0;
+                        while (read < nameLen)
+                        {
+                            int n = isoFs.Read(nameBytes, read, nameLen - read);
+                            if (n == 0)
+                            {
+                                // A truncated name used to return silently, dropping the
+                                // entry and its right subtree while reporting success
+                                // (Todo #58); CreateZar maps this to false.
+                                throw new EndOfStreamException();
+                            }
+
+                            read += n;
+                        }
+                    }
+
+                    // Xbox names are WINDOWS_1252 bytes; decode via Latin1 like every other
+                    // reader path (ASCII would corrupt bytes >= 0x80 into '?').
+                    string name = Latin1Encoding.Instance.GetString(nameBytes);
+                    ParseEntry entry = new(right, (long)entrySector * Constants.SectorSize, entrySize,
+                        (attrs & 0x10) != 0, name);
+
+                    if (left != 0 && left != 0xFFFF)
+                    {
+                        // Parse the left subtree first (in-order); this node is
+                        // added to its parent when the descent unwinds.
+                        pending.Add(entry);
+                        if (pending.Count > Constants.MaxTocStackFrames)
+                        {
+                            throw new XisoFormatException(
+                                "invalid TOC entry: intra-table traversal stack exceeded " +
+                                $"{Constants.MaxTocStackFrames} frames (possible corrupt offset chain).");
+                        }
+
+                        next = (long)left * 4;
+                        continue;
+                    }
+
+                    AddParseNode(isoFs, isoOffset, parent, names, lookup, entry, depth);
+
+                    if (right != 0 && right != 0xFFFF)
+                    {
+                        next = (long)right * 4;
+                        continue;
+                    }
                 }
-
-                read += n;
             }
+
+            bool resumed = false;
+            while (pending.Count > 0)
+            {
+                ParseEntry entry = pending[^1];
+                pending.RemoveAt(pending.Count - 1);
+                AddParseNode(isoFs, isoOffset, parent, names, lookup, entry, depth);
+                if (entry.Right != 0 && entry.Right != 0xFFFF)
+                {
+                    next = (long)entry.Right * 4;
+                    resumed = true;
+                    break;
+                }
+            }
+
+            if (!resumed) return;
         }
+    }
 
-        // Xbox names are WINDOWS_1252 bytes; decode via Latin1 like every other
-        // reader path (ASCII would corrupt bytes >= 0x80 into '?').
-        string name = Latin1Encoding.Instance.GetString(nameBytes);
-        bool isDir = (attrs & 0x10) != 0;
-        long entryOffset = (long)entrySector * Constants.SectorSize;
-
-        if (left != 0 && left != 0xFFFF)
+    /// <summary>
+    /// Adds one parsed entry to the ZAR tree: registers its name, recurses into
+    /// a subdirectory table (bounded by <see cref="Constants.MaxTocDepth"/>),
+    /// and appends the node to its parent.
+    /// </summary>
+    private static void AddParseNode(FileStream isoFs, long isoOffset, PathNode parent, List<string> names,
+        Dictionary<string, int> lookup, ParseEntry entry, int depth)
+    {
+        int nameIdx = GetOrAddName(names, lookup, entry.Name);
+        PathNode node = new() { IsFile = !entry.IsDirectory, NameIndex = nameIdx };
+        if (entry.IsDirectory)
         {
-            ParseNode(isoFs, isoOffset, dirOffset, dirSize, (long)left * 4, parent, names, lookup, visited,
-                depth + 1);
-        }
-
-        int nameIdx = GetOrAddName(names, lookup, name);
-        PathNode node = new() { IsFile = !isDir, NameIndex = nameIdx };
-        if (isDir)
-        {
-            ParseNode(isoFs, isoOffset, entryOffset, entrySize, 0, node, names, lookup, null, depth + 1);
+            ParseNode(isoFs, isoOffset, entry.EntryOffset, entry.EntrySize, 0, node, names, lookup, null, depth + 1);
             node.Subnodes.Sort((a, b) => CompareNodeName(names[a.NameIndex], names[b.NameIndex]));
         }
         else
         {
-            node.SourceOffset = entryOffset;
-            node.FileSize = entrySize;
+            node.SourceOffset = entry.EntryOffset;
+            node.FileSize = entry.EntrySize;
         }
 
         parent.Subnodes.Add(node);
-        if (right != 0 && right != 0xFFFF)
-        {
-            ParseNode(isoFs, isoOffset, dirOffset, dirSize, (long)right * 4, parent, names, lookup, visited,
-                depth + 1);
-        }
     }
+
+    /// <summary>One parsed table entry awaiting in-order ZAR tree construction.</summary>
+    private readonly record struct ParseEntry(
+        ushort Right,
+        long EntryOffset,
+        uint EntrySize,
+        bool IsDirectory,
+        string Name);
 
     /// <summary>
     /// Empty directory tables are filled with 0xFF (or 0x00) — the first entry's

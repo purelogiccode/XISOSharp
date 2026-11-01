@@ -181,7 +181,9 @@ public static int DecodeXiso(
 The directory walk is iterative within each table (explicit in-order stack), so
 deep left-skewed tables do not consume stack frames; `MaxTocDepth` bounds
 subdirectory nesting only. Corrupt offsets and cycles still throw
-`XisoFormatException` with an `invalid TOC entry` message.
+`XisoFormatException` with an `invalid TOC entry` message. The audit,
+sector-range, repair, salvage and ZAR walks use the same explicit stack, so a
+pathological table behaves identically across every read path.
 
 #### `DecodeXisoAsync`
 

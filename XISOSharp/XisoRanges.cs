@@ -46,11 +46,15 @@ public static class XisoRanges
     }
 
     // -----------------------------------------------------------------------
-    // Recursive traversal — mirrors XDVDFS.GetValidSectors exactly
+    // Traversal — mirrors XDVDFS.GetValidSectors exactly, with an explicit
+    // in-order stack per table (Phase 4 follow-up)
     // -----------------------------------------------------------------------
 
     /// <summary>
-    /// Recursively collects valid filesystem and file sectors from an XISO directory tree.
+    /// Collects valid filesystem and file sectors from an XISO directory tree.
+    /// Each directory table is walked in order (left subtree, entry, right
+    /// siblings) with an explicit stack; only subdirectory descent recurses,
+    /// bounded by <see cref="Constants.MaxTocDepth"/>.
     /// </summary>
     /// <param name="isoFs">Open ISO stream.</param>
     /// <param name="isoOffset">Byte offset of the XISO partition.</param>
@@ -84,98 +88,160 @@ public static class XisoRanges
         // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
     {
-        // Hardening (#16): bound the walk — a corrupt cycle (or DAG fanning out
-        // exponentially) throws a named error instead of recursing until the
-        // stack overflows. Out-of-table offsets keep the historical silent
-        // truncate (linked-list compat quirk); cycles never occur legitimately.
+        // Hardening (#16): bound subdirectory nesting — a corrupt subdir cycle
+        // throws a named error instead of recursing until the stack overflows.
+        // Intra-table AVL depth is not counted here: the explicit stack below
+        // bounds it by the per-table entry cap, so a left-skewed table is read
+        // instead of being mistaken for directory nesting (Phase 4 follow-up).
+        // Out-of-table offsets keep the historical silent truncate (linked-list
+        // compat quirk); cycles never occur legitimately.
         if (depth > Constants.MaxTocDepth)
         {
             throw new XisoFormatException(
                 $"invalid TOC entry: maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
         }
 
+        if (childOffset >= rootSize) return;
+
         visited ??= [];
+        List<SectorWalkEntry> pending = [];
+        long? next = childOffset;
+
         while (true)
         {
-            if (childOffset >= rootSize) return;
-
-            if (!visited.Add(childOffset))
+            if (next is long offset)
             {
-                throw new XisoFormatException(
-                    $"invalid TOC entry: directory cycle detected — table offset {childOffset} was already visited.");
+                next = null;
+                if (offset < rootSize)
+                {
+                    if (!visited.Add(offset))
+                    {
+                        throw new XisoFormatException(
+                            $"invalid TOC entry: directory cycle detected — table offset {offset} was already visited.");
+                    }
+
+                    if (visited.Count > Constants.MaxTocEntriesPerTable)
+                    {
+                        throw new XisoFormatException(
+                            "invalid TOC entry: too many entries in one directory table (possible corrupt offset chain).");
+                    }
+
+                    long cur = isoOffset + rootOffset + offset;
+                    long curOffset = cur / SectorSize;
+                    long curSize = (rootSize - offset + SectorSize - 1) / SectorSize;
+                    for (long i = curOffset; i < curOffset + curSize; i++) sysSectors.Add((uint)i);
+
+                    isoFs.Seek(cur, SeekOrigin.Begin);
+
+                    ushort leftChildOffset = ReadUShort(isoFs);
+                    // BUG-LIB-036: 0xFFFF marks an empty table only at the table start
+                    // (mirrors TraverseXiso/ReadDirectoryEntries/CollectFileEntries which
+                    // require offset == 0). Deeper nodes use it as "no left child" and
+                    // must still be processed, or their right siblings get dropped.
+                    if (leftChildOffset == 0xFFFF && offset == 0) return;
+
+                    // All-zero empty-table sentinel (parity with the other walkers):
+                    // without this the 14 zero bytes parse as a bogus entry.
+                    if (leftChildOffset == 0 && offset == 0 && IsAllZeroEntryHeader(isoFs))
+                        return;
+
+                    ushort rightChildOffset = ReadUShort(isoFs);
+                    long entryOffset = ReadUInt(isoFs) * SectorSize;
+                    uint entrySize = ReadUInt(isoFs);
+                    bool isDirectory = ((byte)isoFs.ReadByte() & 0x10) != 0;
+                    byte nameLength = (byte)isoFs.ReadByte();
+                    byte[] nameBuf = new byte[nameLength];
+                    if (nameLength > 0)
+                    {
+                        // A truncated name must fail, not silently drop the entry and
+                        // its right-sibling chain from the sector map.
+                        ReadExact(isoFs, nameBuf);
+                    }
+
+                    string name = Latin1Encoding.Instance.GetString(nameBuf);
+                    SectorWalkEntry entry = new(rightChildOffset, entryOffset, entrySize, isDirectory,
+                        name is "." or "..");
+
+                    if (leftChildOffset != 0 && leftChildOffset != 0xFFFF)
+                    {
+                        // The entry is processed after its left subtree (in-order);
+                        // the explicit stack bounds the descent.
+                        pending.Add(entry);
+                        if (pending.Count > Constants.MaxTocStackFrames)
+                        {
+                            throw new XisoFormatException(
+                                "invalid TOC entry: intra-table traversal stack exceeded " +
+                                $"{Constants.MaxTocStackFrames} frames (possible corrupt offset chain).");
+                        }
+
+                        next = (long)leftChildOffset * 4;
+                        continue;
+                    }
+
+                    AddSectorEntry(isoFs, isoOffset, sysSectors, fileSectors, entry, depth);
+
+                    if (rightChildOffset != 0 && rightChildOffset != 0xFFFF)
+                    {
+                        next = (long)rightChildOffset * 4;
+                        continue;
+                    }
+                }
             }
 
-            if (visited.Count > Constants.MaxTocEntriesPerTable)
+            // No new node: process the nearest ancestor whose left subtree is
+            // complete, then descend into its right subtree when it has one.
+            bool resumed = false;
+            while (pending.Count > 0)
             {
-                throw new XisoFormatException(
-                    "invalid TOC entry: too many entries in one directory table (possible corrupt offset chain).");
+                SectorWalkEntry entry = pending[^1];
+                pending.RemoveAt(pending.Count - 1);
+                AddSectorEntry(isoFs, isoOffset, sysSectors, fileSectors, entry, depth);
+                if (entry.Right != 0 && entry.Right != 0xFFFF)
+                {
+                    next = (long)entry.Right * 4;
+                    resumed = true;
+                    break;
+                }
             }
 
-            long cur = isoOffset + rootOffset + childOffset;
-            long curOffset = cur / SectorSize;
-            long curSize = (rootSize - childOffset + SectorSize - 1) / SectorSize;
-            for (long i = curOffset; i < curOffset + curSize; i++) sysSectors.Add((uint)i);
-
-            isoFs.Seek(cur, SeekOrigin.Begin);
-
-            ushort leftChildOffset = ReadUShort(isoFs);
-            // BUG-LIB-036: 0xFFFF marks an empty table only at the table start
-            // (mirrors TraverseXiso/ReadDirectoryEntries/CollectFileEntries which
-            // require offset == 0). Deeper nodes use it as "no left child" and
-            // must still be processed, or their right siblings get dropped.
-            if (leftChildOffset == 0xFFFF && childOffset == 0) return;
-
-            // All-zero empty-table sentinel (parity with the other walkers):
-            // without this the 14 zero bytes parse as a bogus entry.
-            if (leftChildOffset == 0 && childOffset == 0 && IsAllZeroEntryHeader(isoFs))
-                return;
-
-            ushort rightChildOffset = ReadUShort(isoFs);
-            long entryOffset = ReadUInt(isoFs) * SectorSize;
-            uint entrySize = ReadUInt(isoFs);
-            bool isDirectory = ((byte)isoFs.ReadByte() & 0x10) != 0;
-            byte nameLength = (byte)isoFs.ReadByte();
-            byte[] nameBuf = new byte[nameLength];
-            if (nameLength > 0)
-            {
-                // A truncated name must fail, not silently drop the entry and
-                // its right-sibling chain from the sector map.
-                ReadExact(isoFs, nameBuf);
-            }
-
-            string name = Latin1Encoding.Instance.GetString(nameBuf);
-
-            if (leftChildOffset != 0 && leftChildOffset != 0xFFFF)
-            {
-                GetValidSectorsCore(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize,
-                    (long)leftChildOffset * 4, visited, depth + 1);
-            }
-
-            if (name is "." or "..")
-            {
-                // Structural entry: not a real extent; children still walked.
-            }
-            else if (isDirectory)
-            {
-                GetValidSectorsCore(isoFs, isoOffset, sysSectors, fileSectors, entryOffset, entrySize, 0, null,
-                    depth + 1);
-            }
-            else
-            {
-                long fileOffset = (isoOffset + entryOffset) / SectorSize;
-                long fileSize = (entrySize + SectorSize - 1) / SectorSize;
-                for (long i = fileOffset; i < fileOffset + fileSize; i++) fileSectors.Add((uint)i);
-            }
-
-            if (rightChildOffset != 0 && rightChildOffset != 0xFFFF)
-            {
-                childOffset = (long)rightChildOffset * 4;
-                continue;
-            }
-
-            break;
+            if (!resumed) return;
         }
     }
+
+    /// <summary>
+    /// Applies one parsed directory entry to the sector maps: a subdirectory is
+    /// walked recursively (bounded by <see cref="Constants.MaxTocDepth"/>), a
+    /// file contributes its data sectors, and structural <c>.</c>/<c>..</c>
+    /// records contribute nothing.
+    /// </summary>
+    private static void AddSectorEntry(Stream isoFs, long isoOffset, List<uint> sysSectors,
+        List<uint> fileSectors, SectorWalkEntry entry, int depth)
+    {
+        if (entry.Structural)
+        {
+            // Structural entry: not a real extent; children still walked.
+            return;
+        }
+
+        if (entry.IsDirectory)
+        {
+            GetValidSectorsCore(isoFs, isoOffset, sysSectors, fileSectors, entry.EntryOffset, entry.EntrySize, 0,
+                null, depth + 1);
+            return;
+        }
+
+        long fileOffset = (isoOffset + entry.EntryOffset) / SectorSize;
+        long fileSize = (entry.EntrySize + SectorSize - 1) / SectorSize;
+        for (long i = fileOffset; i < fileOffset + fileSize; i++) fileSectors.Add((uint)i);
+    }
+
+    /// <summary>One parsed table entry awaiting in-order processing.</summary>
+    private readonly record struct SectorWalkEntry(
+        ushort Right,
+        long EntryOffset,
+        uint EntrySize,
+        bool IsDirectory,
+        bool Structural);
 
     /// <summary>
     /// Peeks the 12 bytes after a left-child offset and reports whether they are
@@ -411,7 +477,8 @@ public static class XisoRanges
     {
         if (childOffset >= dirSize) return;
 
-        // Hardening (#16): bound the walk like GetValidSectors above.
+        // Hardening (#16): bound subdirectory nesting like GetValidSectors above;
+        // intra-table AVL depth is bounded by the explicit in-order stack.
         if (depth > Constants.MaxTocDepth)
         {
             throw new XisoFormatException(
@@ -419,96 +486,159 @@ public static class XisoRanges
         }
 
         visited ??= [];
-        if (!visited.Add(childOffset))
+        List<FileWalkEntry> pending = [];
+        long? next = childOffset;
+
+        while (true)
         {
-            throw new XisoFormatException(
-                $"invalid TOC entry at '{dirPath}': directory cycle detected — table offset {childOffset} was already visited.");
-        }
-
-        if (visited.Count > Constants.MaxTocEntriesPerTable)
-        {
-            throw new XisoFormatException(
-                $"invalid TOC entry at '{dirPath}': too many entries in one directory table (possible corrupt offset chain).");
-        }
-
-        long pos = isoOffset + dirOffset + childOffset;
-        if (pos < 0 || pos >= isoFs.Length)
-        {
-            throw new XisoFormatException(
-                $"invalid TOC entry at '{dirPath}': table offset {childOffset} (seek {pos}) points outside the image (length {isoFs.Length}).");
-        }
-
-        isoFs.Seek(pos, SeekOrigin.Begin);
-
-        ushort leftChild = ReadUShort(isoFs);
-        // Empty-directory sentinel (all-0xFF table): without this, the 0xFF bytes
-        // parse as a garbage entry (name length 255, entry sector ~4G) that either
-        // poisons the result set or sends later seeks past EOF. Mirrors the
-        // leftChild == 0xFFFF check in GetValidSectors above and extract-xiso.
-        // BUG-LIB-036: only at the table start — deeper 0xFFFF nodes are "no left
-        // child" markers whose right siblings must still be collected.
-        if (leftChild == 0xFFFF && childOffset == 0)
-            return;
-
-        // All-zero empty-table sentinel (parity with the other walkers):
-        // without this the 14 zero bytes parse as a phantom file entry.
-        if (leftChild == 0 && childOffset == 0 && IsAllZeroEntryHeader(isoFs))
-            return;
-
-        ushort rightChild = ReadUShort(isoFs);
-        uint entrySector = ReadUInt(isoFs);
-        uint entrySize = ReadUInt(isoFs);
-        byte attributes = (byte)isoFs.ReadByte();
-        byte nameLength = (byte)isoFs.ReadByte();
-        byte[] nameBuf = new byte[nameLength];
-        if (nameLength > 0)
-        {
-            // A truncated name must fail, not silently drop the entry and its
-            // right-sibling chain (parity with GetValidSectors above).
-            int read = 0;
-            while (read < nameLength)
+            if (next is long offset)
             {
-                int n = isoFs.Read(nameBuf, read, nameLength - read);
-                if (n == 0)
+                next = null;
+                if (offset < dirSize)
                 {
-                    throw new EndOfStreamException(
-                        $"invalid TOC entry at '{dirPath}': truncated filename (expected {nameLength} bytes, got {read}).");
+                    if (!visited.Add(offset))
+                    {
+                        throw new XisoFormatException(
+                            $"invalid TOC entry at '{dirPath}': directory cycle detected — table offset {offset} was already visited.");
+                    }
+
+                    if (visited.Count > Constants.MaxTocEntriesPerTable)
+                    {
+                        throw new XisoFormatException(
+                            $"invalid TOC entry at '{dirPath}': too many entries in one directory table (possible corrupt offset chain).");
+                    }
+
+                    long pos = isoOffset + dirOffset + offset;
+                    if (pos < 0 || pos >= isoFs.Length)
+                    {
+                        throw new XisoFormatException(
+                            $"invalid TOC entry at '{dirPath}': table offset {offset} (seek {pos}) points outside the image (length {isoFs.Length}).");
+                    }
+
+                    isoFs.Seek(pos, SeekOrigin.Begin);
+
+                    ushort leftChild = ReadUShort(isoFs);
+                    // Empty-directory sentinel (all-0xFF table): without this, the 0xFF bytes
+                    // parse as a garbage entry (name length 255, entry sector ~4G) that either
+                    // poisons the result set or sends later seeks past EOF. Mirrors the
+                    // leftChild == 0xFFFF check in GetValidSectors above and extract-xiso.
+                    // BUG-LIB-036: only at the table start — deeper 0xFFFF nodes are "no left
+                    // child" markers whose right siblings must still be collected.
+                    if (leftChild == 0xFFFF && offset == 0)
+                        return;
+
+                    // All-zero empty-table sentinel (parity with the other walkers):
+                    // without this the 14 zero bytes parse as a phantom file entry.
+                    if (leftChild == 0 && offset == 0 && IsAllZeroEntryHeader(isoFs))
+                        return;
+
+                    ushort rightChild = ReadUShort(isoFs);
+                    uint entrySector = ReadUInt(isoFs);
+                    uint entrySize = ReadUInt(isoFs);
+                    byte attributes = (byte)isoFs.ReadByte();
+                    byte nameLength = (byte)isoFs.ReadByte();
+                    byte[] nameBuf = new byte[nameLength];
+                    if (nameLength > 0)
+                    {
+                        // A truncated name must fail, not silently drop the entry and its
+                        // right-sibling chain (parity with GetValidSectors above).
+                        int read = 0;
+                        while (read < nameLength)
+                        {
+                            int n = isoFs.Read(nameBuf, read, nameLength - read);
+                            if (n == 0)
+                            {
+                                throw new EndOfStreamException(
+                                    $"invalid TOC entry at '{dirPath}': truncated filename (expected {nameLength} bytes, got {read}).");
+                            }
+
+                            read += n;
+                        }
+                    }
+
+                    // Xbox names are WINDOWS_1252 bytes; decode via Latin1 like every other
+                    // reader path (ASCII would corrupt bytes >= 0x80 into '?').
+                    string name = Latin1Encoding.Instance.GetString(nameBuf);
+                    bool isDirectory = (attributes & 0x10) != 0;
+                    long entryOffset = entrySector * SectorSize;
+                    string entryPath = dirPath.Length > 0 ? dirPath + "/" + name : name;
+                    FileWalkEntry entry = new(rightChild, entryOffset, entrySize, isDirectory,
+                        name is "." or "..", entryPath);
+
+                    if (leftChild != 0 && leftChild != 0xFFFF)
+                    {
+                        // Process the entry after its left subtree (in-order).
+                        pending.Add(entry);
+                        if (pending.Count > Constants.MaxTocStackFrames)
+                        {
+                            throw new XisoFormatException(
+                                $"invalid TOC entry at '{dirPath}': intra-table traversal stack exceeded " +
+                                $"{Constants.MaxTocStackFrames} frames (possible corrupt offset chain).");
+                        }
+
+                        next = (long)leftChild * 4;
+                        continue;
+                    }
+
+                    AddFileEntry(isoFs, isoOffset, results, entry, depth);
+
+                    if (rightChild != 0 && rightChild != 0xFFFF)
+                    {
+                        next = (long)rightChild * 4;
+                        continue;
+                    }
                 }
-
-                read += n;
             }
-        }
 
-        // Xbox names are WINDOWS_1252 bytes; decode via Latin1 like every other
-        // reader path (ASCII would corrupt bytes >= 0x80 into '?').
-        string name = Latin1Encoding.Instance.GetString(nameBuf);
-        bool isDirectory = (attributes & 0x10) != 0;
-        long entryOffset = entrySector * SectorSize;
-        string entryPath = dirPath.Length > 0 ? dirPath + "/" + name : name;
+            bool resumed = false;
+            while (pending.Count > 0)
+            {
+                FileWalkEntry entry = pending[^1];
+                pending.RemoveAt(pending.Count - 1);
+                AddFileEntry(isoFs, isoOffset, results, entry, depth);
+                if (entry.Right != 0 && entry.Right != 0xFFFF)
+                {
+                    next = (long)entry.Right * 4;
+                    resumed = true;
+                    break;
+                }
+            }
 
-        if (leftChild != 0 && leftChild != 0xFFFF)
-        {
-            CollectFileEntries(isoFs, isoOffset, dirOffset, dirSize, (long)leftChild * 4, dirPath, results,
-                visited, depth + 1);
-        }
-
-        if (name is "." or "..")
-        {
-            // Structural entry: not a real file; children still walked below.
-        }
-        else if (isDirectory)
-        {
-            CollectFileEntries(isoFs, isoOffset, entryOffset, entrySize, 0, entryPath, results, null, depth + 1);
-        }
-        else
-        {
-            results.Add((Path: entryPath, Offset: isoOffset + entryOffset, Size: entrySize));
-        }
-
-        if (rightChild != 0 && rightChild != 0xFFFF)
-        {
-            CollectFileEntries(isoFs, isoOffset, dirOffset, dirSize, (long)rightChild * 4, dirPath, results,
-                visited, depth + 1);
+            if (!resumed) return;
         }
     }
+
+    /// <summary>
+    /// Applies one parsed directory entry to the file list: a subdirectory is
+    /// walked recursively (bounded by <see cref="Constants.MaxTocDepth"/>), a
+    /// regular file contributes its extent, and structural <c>.</c>/<c>..</c>
+    /// records contribute nothing.
+    /// </summary>
+    private static void AddFileEntry(Stream isoFs, long isoOffset,
+        List<(string Path, long Offset, uint Size)> results, FileWalkEntry entry, int depth)
+    {
+        if (entry.Structural)
+        {
+            // Structural entry: not a real file; children still walked below.
+            return;
+        }
+
+        if (entry.IsDirectory)
+        {
+            CollectFileEntries(isoFs, isoOffset, entry.EntryOffset, entry.EntrySize, 0, entry.Path, results, null,
+                depth + 1);
+            return;
+        }
+
+        results.Add((Path: entry.Path, Offset: isoOffset + entry.EntryOffset, Size: entry.EntrySize));
+    }
+
+    /// <summary>One parsed table entry awaiting in-order processing.</summary>
+    private readonly record struct FileWalkEntry(
+        ushort Right,
+        long EntryOffset,
+        uint EntrySize,
+        bool IsDirectory,
+        bool Structural,
+        string Path);
 }

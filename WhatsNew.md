@@ -6,9 +6,13 @@ text spec), and `-c`, `--pack <dir>` or `build-image` will place matching files
 and directory tables at exactly those sectors while allocating the rest
 first-fit around them. A round-trip of an unchanged tree is byte-identical.
 
+The Phase 4 TOC hardening follow-up also lands here: the audit, sector-range,
+repair, salvage and ZAR walks use the same explicit in-order table traversal as
+extract/list/rewrite, so `MaxTocDepth` bounds real subdirectory nesting only.
+
 Targets remain `net8.0` / `net9.0` / `net10.0`. Full suite green on all three:
-**1908 passed / 1 opt-in skip (1909) on net8.0/net9.0** and **1970 passed / 1
-opt-in skip (1971) on net10.0**.
+**1913 passed / 1 opt-in skip (1914) on net8.0/net9.0** and **1975 passed / 1
+opt-in skip (1976) on net10.0**.
 
 ## Highlights
 
@@ -25,6 +29,8 @@ opt-in skip (1971) on net10.0**.
 - **All create paths**: `CreateXiso`, `CreateXisoAsync`, `PackFromDirectory`,
   `PackFromDirectoryAsync`, `RemapFilesystem.BuildImage`, and the CLI's `-c`,
   `--pack <dir>` and `build-image`.
+- **Every table walker hardened**: a 4,096-entry left-skewed table audits, maps,
+  repairs, salvages and packs to ZAR instead of failing at `MaxTocDepth`.
 
 ## CLI
 
@@ -65,8 +71,10 @@ round-trips, fixed/first-fit placement, reserved JSON extents, total-sector
 preservation, prepended partitions, case-insensitive paths, empty entries,
 `build-image`, and CLI `-c`/`--pack`/`build-image` with usage errors. Seven new
 `SectorAllocatorTests.SeedUsedRanges` cases cover the one-pass bulk seeding used
-by large layouts. Net8/net9: **1908 passed / 1 skipped (1909)**; net10:
-**1970 passed / 1 skipped (1971)**.
+by large layouts. Five new `PathologicalTocTests` prove the 4,096-entry left
+spine audits/maps, repairs its deepest entry, salvages and packs to ZAR.
+Net8/net9: **1913 passed / 1 skipped (1914)**; net10:
+**1975 passed / 1 skipped (1976)**.
 
 ---
 

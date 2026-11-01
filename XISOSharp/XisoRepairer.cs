@@ -202,6 +202,10 @@ public static class XisoRepairer
         // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
     {
+        // Subdirectory nesting stays recursive and bounded; intra-table AVL
+        // depth is walked with the explicit in-order stack below, so a
+        // pathological left-skewed table is repaired instead of being cut off
+        // at MaxTocDepth (Phase 4 follow-up).
         if (depth > Constants.MaxTocDepth)
             return;
 
@@ -211,119 +215,195 @@ public static class XisoRepairer
         Span<byte> byteBuf = stackalloc byte[1];
         Span<byte> headerRest = stackalloc byte[12];
 
+        List<CollectEntry> pending = [];
+        long? next = dirStart;
+
         while (true)
         {
-            if (++entriesInTable > Constants.MaxTocEntriesPerTable)
-                return;
-
-            if (dirStart >= fileLength || dirStart >= tableStart + tableSize || !visited.Add(dirStart))
-                return;
-
-            try
+            if (next is long offset)
             {
-                fs.Seek(dirStart, SeekOrigin.Begin);
-                ReadExact(fs, shortBuf);
-                ushort lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
-
-                if (lOffset == Constants.PadShort && dirStart == tableStart)
+                next = null;
+                if (offset >= fileLength || offset >= tableStart + tableSize || !visited.Add(offset))
                     return;
 
-                if (lOffset == Constants.EmptyDirectorySentinel && dirStart == tableStart)
+                if (++entriesInTable > Constants.MaxTocEntriesPerTable)
+                    return;
+
+                try
                 {
-                    long peekPos = fs.Position;
-                    bool isAllZeros;
-                    try
+                    fs.Seek(offset, SeekOrigin.Begin);
+                    ReadExact(fs, shortBuf);
+                    ushort lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+
+                    if (lOffset == Constants.PadShort && offset == tableStart)
+                        return;
+
+                    if (lOffset == Constants.EmptyDirectorySentinel && offset == tableStart)
                     {
-                        ReadExact(fs, headerRest);
-                        isAllZeros = true;
-                        foreach (byte b in headerRest)
+                        long peekPos = fs.Position;
+                        bool isAllZeros;
+                        try
                         {
-                            if (b != 0)
+                            ReadExact(fs, headerRest);
+                            isAllZeros = true;
+                            foreach (byte b in headerRest)
                             {
-                                isAllZeros = false;
-                                break;
+                                if (b != 0)
+                                {
+                                    isAllZeros = false;
+                                    break;
+                                }
                             }
                         }
-                    }
-                    catch (IOException)
-                    {
-                        isAllZeros = false;
-                    }
-
-                    fs.Seek(peekPos, SeekOrigin.Begin);
-                    if (isAllZeros)
-                        return;
-                }
-
-                if (lOffset != 0 && lOffset != Constants.PadShort)
-                {
-                    long leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
-                    if (leftSeek >= 0 && leftSeek < fileLength && leftSeek < tableStart + tableSize)
-                    {
-                        CollectWalk(fs, leftSeek, tableStart, tableSize, path, fileLength, discLseek,
-                            new HashSet<long>(visited), trustedAttrs, entries, depth + 1);
-                    }
-                }
-
-                fs.Seek(dirStart + 2, SeekOrigin.Begin);
-                ReadExact(fs, shortBuf);
-                ushort rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
-
-                ReadExact(fs, intBuf);
-                uint startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
-
-                ReadExact(fs, intBuf);
-                uint fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
-
-                ReadExact(fs, byteBuf);
-                byte rawAttributes = byteBuf[0];
-
-                ReadExact(fs, byteBuf);
-                byte filenameLength = byteBuf[0];
-
-                byte[] nameBuf = new byte[filenameLength];
-                ReadExact(fs, nameBuf);
-                string filename = Latin1Encoding.Instance.GetString(nameBuf);
-
-                // Structural "." / ".." records are skipped (children still walked).
-                if (filename is not ("." or ".."))
-                {
-                    entries.Add(new RawEntry(dirStart + 12, rawAttributes, dirStart + 14, filename, tableStart,
-                        path));
-
-                    byte attributes = Constants.MaskAttributes(rawAttributes);
-                    bool trusted = (rawAttributes & Constants.AttributeReservedMask) == 0 ||
-                                   trustedAttrs.Contains(dirStart + 12);
-                    if (trusted && (attributes & Constants.AttributeDir) != 0 && fileSize > 0)
-                    {
-                        long sectorOffset = ((long)startSector * Constants.SectorSize) + discLseek;
-                        if (sectorOffset >= 0 && sectorOffset < fileLength)
+                        catch (IOException)
                         {
-                            CollectWalk(fs, sectorOffset, sectorOffset, fileSize, path + filename + "/",
-                                fileLength, discLseek, new HashSet<long>(), trustedAttrs, entries, depth + 1);
+                            isAllZeros = false;
                         }
+
+                        fs.Seek(peekPos, SeekOrigin.Begin);
+                        if (isAllZeros)
+                            return;
+                    }
+
+                    bool descendLeft = false;
+                    long leftSeek = 0;
+                    if (lOffset != 0 && lOffset != Constants.PadShort)
+                    {
+                        leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
+                        descendLeft = leftSeek >= 0 && leftSeek < fileLength && leftSeek < tableStart + tableSize;
+                    }
+
+                    fs.Seek(offset + 2, SeekOrigin.Begin);
+                    ReadExact(fs, shortBuf);
+                    ushort rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+
+                    ReadExact(fs, intBuf);
+                    uint startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+                    ReadExact(fs, intBuf);
+                    uint fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+                    ReadExact(fs, byteBuf);
+                    byte rawAttributes = byteBuf[0];
+
+                    ReadExact(fs, byteBuf);
+                    byte filenameLength = byteBuf[0];
+
+                    byte[] nameBuf = new byte[filenameLength];
+                    ReadExact(fs, nameBuf);
+                    string filename = Latin1Encoding.Instance.GetString(nameBuf);
+
+                    CollectEntry entry = new(offset, rOffset, startSector, fileSize, rawAttributes, filename,
+                        filename is "." or "..");
+
+                    if (descendLeft)
+                    {
+                        // Collect the left subtree first (in-order); the entry is
+                        // recorded when the descent unwinds.
+                        pending.Add(entry);
+                        if (pending.Count > Constants.MaxTocStackFrames)
+                            return;
+
+                        next = leftSeek;
+                        continue;
+                    }
+
+                    CollectParsedEntry(fs, entry, tableStart, path, fileLength, discLseek, trustedAttrs, entries,
+                        depth);
+
+                    if (rOffset != 0 && rOffset != Constants.PadShort)
+                    {
+                        long rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
+                        if (rightSeek < 0 || rightSeek >= fileLength || rightSeek >= tableStart + tableSize)
+                            return;
+
+                        next = rightSeek;
+                        continue;
                     }
                 }
-
-                if (rOffset != 0 && rOffset != Constants.PadShort)
+                catch (IOException)
                 {
-                    long rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
-                    if (rightSeek < 0 || rightSeek >= fileLength || rightSeek >= tableStart + tableSize)
-                        break;
+                    // Truncated entry header: class T, reported by the re-audit.
+                    return;
+                }
+            }
 
-                    dirStart = rightSeek;
-                    continue;
+            bool resumed = false;
+            while (pending.Count > 0)
+            {
+                CollectEntry entry = pending[^1];
+                pending.RemoveAt(pending.Count - 1);
+                try
+                {
+                    CollectParsedEntry(fs, entry, tableStart, path, fileLength, discLseek, trustedAttrs, entries,
+                        depth);
+                }
+                catch (IOException)
+                {
+                    return;
                 }
 
-                break;
+                if (entry.Right != 0 && entry.Right != Constants.PadShort)
+                {
+                    long rightSeek = tableStart + ((long)entry.Right * Constants.DwordSize);
+                    if (rightSeek < 0 || rightSeek >= fileLength || rightSeek >= tableStart + tableSize)
+                        return;
+
+                    next = rightSeek;
+                    resumed = true;
+                    break;
+                }
             }
-            catch (IOException)
+
+            if (!resumed) return;
+        }
+    }
+
+    /// <summary>
+    /// Records one parsed directory entry (and, for a trusted subdirectory,
+    /// walks its table recursively — bounded by <see cref="Constants.MaxTocDepth"/>).
+    /// </summary>
+    private static void CollectParsedEntry(
+        FileStream fs,
+        CollectEntry entry,
+        long tableStart,
+        string path,
+        long fileLength,
+        long discLseek,
+        HashSet<long> trustedAttrs,
+        List<RawEntry> entries,
+        int depth)
+    {
+        // Structural "." / ".." records are skipped (children still walked).
+        if (entry.Structural)
+            return;
+
+        entries.Add(new RawEntry(entry.Offset + 12, entry.RawAttributes, entry.Offset + 14, entry.Filename,
+            tableStart, path));
+
+        byte attributes = Constants.MaskAttributes(entry.RawAttributes);
+        bool trusted = (entry.RawAttributes & Constants.AttributeReservedMask) == 0 ||
+                       trustedAttrs.Contains(entry.Offset + 12);
+        if (trusted && (attributes & Constants.AttributeDir) != 0 && entry.FileSize > 0)
+        {
+            long sectorOffset = ((long)entry.StartSector * Constants.SectorSize) + discLseek;
+            if (sectorOffset >= 0 && sectorOffset < fileLength)
             {
-                // Truncated entry header: class T, reported by the re-audit.
-                return;
+                CollectWalk(fs, sectorOffset, sectorOffset, entry.FileSize, path + entry.Filename + "/",
+                    fileLength, discLseek, new HashSet<long>(), trustedAttrs, entries, depth + 1);
             }
         }
     }
+
+    /// <summary>One parsed table entry awaiting in-order collection.</summary>
+    private readonly record struct CollectEntry(
+        long Offset,
+        ushort Right,
+        uint StartSector,
+        uint FileSize,
+        byte RawAttributes,
+        string Filename,
+        bool Structural);
 
     private static void ReadExact(FileStream fs, Span<byte> buffer)
     {

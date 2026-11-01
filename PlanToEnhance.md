@@ -1,6 +1,6 @@
 # Plan to Enhance XISOSharp
 
-**Status:** CCISharp 1.0.0 published on NuGet (2026-11-01). XISOSharp 1.6.0 implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input, Phase 4 pathological-TOC traversal hardening, Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests).
+**Status:** CCISharp 1.0.0 published on NuGet (2026-11-01). XISOSharp 1.6.0 implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input, Phase 4 pathological-TOC traversal hardening (extract/list/rewrite plus the audit, sector-range, repair, salvage and ZAR follow-up walkers), Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests).
 **Baseline:** XISOSharp `1.4.4` (tag), extract-xiso build `202609111233`, xdvdfs `0.8.3`
 **Reference:** CCI spec/implementation copied to `References/libCCI-0.1.0-1b0087e` (commit `1b0087e`, GPL-2.0-or-later; reference only) and verified to build/round-trip.
 **CCISharp repo:** <https://github.com/purelogiccode/CCISharp> — package <https://www.nuget.org/packages/CCISharp/1.0.0>.
@@ -664,15 +664,22 @@ public static class XisoImageSource
 
 **Tests:**
 - Left-skewed chain of 4,096 entries; right-skewed chain; alternating; a cyclic left pointer.
+- The same left chain audits, maps (`GetXisoRanges`/`GetFileEntries`), repairs a deep
+  reserved-attribute bit, salvages to a fresh image, and packs to ZAR.
 - Compare list/tree/extract/rewrite output against the same tree written in balanced form.
 - Full suite + BattleTests parity must stay green.
 
 **Acceptance:** a 4k left-chain image lists/extracts/rewrites successfully; corrupt cycles still fail with the existing named error.
 
-**Scope note:** `TraverseXiso` (extract/list/tree/rewrite/unpack) is hardened.
-The audit, sector-range, repair and salvage walkers still use recursive left
-descent and therefore retain the 64-level intra-table bound; they are
-candidates for the same explicit-stack treatment in a follow-up.
+**Scope note (closed):** `TraverseXiso` (extract/list/tree/rewrite/unpack) was
+hardened first. The follow-up is now implemented too: the audit
+(`AuditWalk`), sector-range (`XisoRanges.GetValidSectorsCore` /
+`CollectFileEntries`), repair (`XisoRepairer.CollectWalk`), salvage
+(`XisoSalvager.SalvageWalk`) and ZAR pack (`XisoZarchive.ParseNode`) walks all
+use an explicit in-order stack within a table. `MaxTocDepth` bounds real
+subdirectory nesting only, so a 4,096-entry left spine audits, maps, repairs,
+salvages and packs to ZAR; cycles and out-of-table pointers still hit the
+existing named error or report/drop gate.
 
 ### 8.6 Phase 5 — batch conversion and naming — done in 1.4.5
 
@@ -860,8 +867,8 @@ candidates for the same explicit-stack treatment in a follow-up.
   - `XisoZarchive.ListZar`/`ExtractZar`/`ConvertZarToIso`; `XisoChecksum.ComputeZarChecksum`.
   - CLI: `compress --format cci`, `--cci-level`/`--cci-split`, `cci`/`uncci`, `convert`, ZAR-aware list/extract/checksum.
   - GUI: CISO/CCI format selector, `.cci` filters/drop routing, ZAR input through Extract.
-  - **Full suite green:** 1908 passed / 1 skipped (1909) on net8.0/net9.0; 1970 passed / 1 skipped (1971) on net10.0.
-  - **Phase 4:** `TraverseXiso` walks each directory table with an explicit in-order stack; a 4,096-entry left-skewed chain lists/trees/extracts/rewrites (the rewrite checksum matches the balanced form). `Constants.MaxTocStackFrames` backstops the stack; subdirectory nesting still uses `MaxTocDepth`.
+  - **Full suite green:** 1913 passed / 1 skipped (1914) on net8.0/net9.0; 1975 passed / 1 skipped (1976) on net10.0.
+  - **Phase 4:** `TraverseXiso` walks each directory table with an explicit in-order stack; a 4,096-entry left-skewed chain lists/trees/extracts/rewrites (the rewrite checksum matches the balanced form). `Constants.MaxTocStackFrames` backstops the stack; subdirectory nesting still uses `MaxTocDepth`. **Follow-up done:** `AuditWalk`, `XisoRanges.GetValidSectorsCore`/`CollectFileEntries`, `XisoRepairer.CollectWalk`, `XisoSalvager.SalvageWalk` and `XisoZarchive.ParseNode` use the same explicit stack, so the left spine audits/maps/repairs/salvages/packs to ZAR too.
   - **Phase 5:** `compress`/`decompress`/`convert`/`split` accept `--batch`/`--batch-recursive`, `--skip-existing`, `--continue-on-error`, `--jobs 1..64` and `--output-name` templates (`{name}`, `{ext}`, `{format}`); duplicate outputs and input clobbers are refused before writing, and failed conversions remove partial outputs.
   - **Phase 6:** `--json` on read-only verbs with a source-generated `JsonOutputContext`; stdout JSON/stderr logs; `CliJsonTests`.
   - **Phase 7:** `IFilesystem.CreateFile(path, expectedLength)`, `SequentialScan` sources/destinations, writer layout pre-sizing; `PreallocationTests`.

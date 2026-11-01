@@ -46,6 +46,7 @@ Highlights:
 | Table writer (offsets, encoding, byte-identity with writer output) | `DirectoryEntryTableWriterTests.cs` |
 | Snapshot (`Fixtures/test_fixture.iso` byte-identity; extract/rewrite SHA-256 per file) | `XisoSnapshotTests.cs` |
 | Corruption resilience (truncated tables, bad pointers, huge sizes, bad names, >4 GB, zero-size directories) | `XisoCorruptionResilienceTests.cs` |
+| Pathological TOC (4,096-entry left/right/alternating/balanced chains; audit, ranges, repair, salvage and ZAR parity) | `PathologicalTocTests.cs`, `CorruptTocTests.cs` |
 | Review hardening (path escapes, table bounds, sentinels, split naming, partial/pre-existing output cleanup, offset-image tag repair) | `XisoCorruptionResilienceTests.cs`, `XisoRedumpAndSkeletonTests.cs`, `CisoTests.cs`, `XisoRepairTests.cs` |
 | Reader gap-closers (multi-sector tables, disc probes, device errors, sentinels) | `XisoCoverageTests.cs` |
 | Legacy interop (reference extract-xiso legacy-layout images via `llCompat` extract/list/rewrite) | `XisoLegacyInteropTests.cs` |

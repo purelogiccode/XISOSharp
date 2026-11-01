@@ -2774,9 +2774,10 @@ public static class XisoReader
         // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
     {
-        // Hardening (#16): bound the audit walk like the extract walk — a corrupt
-        // offset chain reports an issue instead of looping, and a corrupt
-        // subdir cycle reports instead of overflowing the stack.
+        // Hardening (#16): bound subdirectory nesting — a corrupt subdir cycle
+        // reports instead of overflowing the stack. Intra-table AVL depth is
+        // bounded by the explicit in-order stack below, so a pathological
+        // left-skewed table is audited instead of being rejected as nesting.
         if (depth > Constants.MaxTocDepth)
         {
             issues.Add($"Invalid TOC entry at '{path}': maximum directory depth {Constants.MaxTocDepth} exceeded.");
@@ -2789,174 +2790,251 @@ public static class XisoReader
         Span<byte> byteBuf = stackalloc byte[1];
         Span<byte> headerRest = stackalloc byte[12];
 
+        List<AuditEntry> pending = [];
+        long? next = dirStart;
+
         while (true)
         {
-            if (++entriesInTable > Constants.MaxTocEntriesPerTable)
+            if (next is long offset)
             {
-                issues.Add(
-                    $"Invalid TOC entry at '{path}': too many entries in one directory table (possible corrupt offset chain).");
-                return;
-            }
-
-            if (dirStart >= fileLength || dirStart >= tableStart + tableSize)
-            {
-                issues.Add(
-                    $"Directory offset {dirStart} ({path}) exceeds the directory table (table at {tableStart}, size {tableSize}, image length {fileLength}).");
-                return;
-            }
-
-            if (!visited.Add(dirStart))
-            {
-                issues.Add(
-                    $"Cycle detected: directory entry at offset {dirStart} ({path}) was already visited on this path.");
-                return;
-            }
-
-            fs.Seek(dirStart, SeekOrigin.Begin);
-
-            ReadExact(fs, shortBuf);
-            ushort lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
-
-            // xdvdfs semantics (mirrors GetFileEntries): 0xFFFF and the all-zero 0x0000
-            // sentinel mark an empty directory table only at the table start. Deeper nodes
-            // use them as "no left child" markers and must still be processed.
-            if (lOffset == Constants.PadShort && dirStart == tableStart)
-            {
-                return;
-            }
-
-            if (lOffset == Constants.EmptyDirectorySentinel && dirStart == tableStart)
-            {
-                long peekPos = fs.Position;
-                bool isAllZeros;
-                try
+                next = null;
+                if (++entriesInTable > Constants.MaxTocEntriesPerTable)
                 {
-                    ReadExact(fs, headerRest);
-                    isAllZeros = headerRest[0] == 0 && headerRest[1] == 0 && headerRest[2] == 0 &&
-                                 headerRest[3] == 0 && headerRest[4] == 0 && headerRest[5] == 0 &&
-                                 headerRest[6] == 0 && headerRest[7] == 0 && headerRest[8] == 0 &&
-                                 headerRest[9] == 0 && headerRest[10] == 0 && headerRest[11] == 0;
-                }
-                catch
-                {
-                    isAllZeros = false;
+                    issues.Add(
+                        $"Invalid TOC entry at '{path}': too many entries in one directory table (possible corrupt offset chain).");
+                    return;
                 }
 
-                fs.Seek(peekPos, SeekOrigin.Begin);
+                if (offset >= fileLength || offset >= tableStart + tableSize)
+                {
+                    issues.Add(
+                        $"Directory offset {offset} ({path}) exceeds the directory table (table at {tableStart}, size {tableSize}, image length {fileLength}).");
+                    return;
+                }
 
-                if (isAllZeros)
+                if (!visited.Add(offset))
+                {
+                    issues.Add(
+                        $"Cycle detected: directory entry at offset {offset} ({path}) was already visited on this path.");
+                    return;
+                }
+
+                fs.Seek(offset, SeekOrigin.Begin);
+
+                ReadExact(fs, shortBuf);
+                ushort lOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+
+                // xdvdfs semantics (mirrors GetFileEntries): 0xFFFF and the all-zero 0x0000
+                // sentinel mark an empty directory table only at the table start. Deeper nodes
+                // use them as "no left child" markers and must still be processed.
+                if (lOffset == Constants.PadShort && offset == tableStart)
                 {
                     return;
                 }
-            }
 
-            if (lOffset != 0 && lOffset != Constants.PadShort)
-            {
-                long leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
-                if (leftSeek >= fileLength || leftSeek >= tableStart + tableSize)
+                if (lOffset == Constants.EmptyDirectorySentinel && offset == tableStart)
                 {
-                    issues.Add(
-                        $"Left child offset {lOffset} (seek {leftSeek}) exceeds the directory table in {path} (table at {tableStart}, size {tableSize}).");
-                }
-                else
-                {
-                    HashSet<long> childVisited = new(visited);
-                    AuditWalk(fs, leftSeek, tableStart, tableSize, path, fileLength, discLseek, issues, childVisited,
-                        ref filesChecked,
-                        ref dirsChecked, depth + 1);
-                }
-            }
-
-            fs.Seek(dirStart + 2, SeekOrigin.Begin);
-            ReadExact(fs, shortBuf);
-            ushort rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
-
-            ReadExact(fs, intBuf);
-            uint startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
-
-            ReadExact(fs, intBuf);
-            uint fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
-
-            ReadExact(fs, byteBuf);
-            byte rawAttributes = byteBuf[0];
-
-            ReadExact(fs, byteBuf);
-            byte filenameLength = byteBuf[0];
-
-            byte[] nameBuf = new byte[filenameLength];
-            ReadExact(fs, nameBuf);
-            string filename = Latin1Encoding.Instance.GetString(nameBuf);
-
-            // Structural "." / ".." records are skipped by every walker (their
-            // children are still traversed); real entries with host-unsafe
-            // names are reported so repair can sanitize them.
-            bool structuralEntry = filename is "." or "..";
-            if (!structuralEntry)
-            {
-                if (filename.Contains('/') || filename.Contains('\\'))
-                {
-                    issues.Add($"Filename '{filename}' contains path separator in {path}.");
-                }
-                else if (XisoEntryNames.IsInvalidEntryName(filename))
-                {
-                    issues.Add($"Filename '{filename}' contains invalid character(s) in {path}.");
-                }
-
-                long sectorOffset = ((long)startSector * Constants.SectorSize) + discLseek;
-                if (sectorOffset >= fileLength)
-                {
-                    issues.Add(
-                        $"Sector {startSector} (offset {sectorOffset}) for '{path}{filename}' exceeds file length {fileLength}.");
-                }
-
-                if ((rawAttributes & Constants.AttributeReservedMask) != 0)
-                {
-                    issues.Add($"Reserved attribute bits set in '{path}{filename}': 0x{rawAttributes:X2}.");
-                }
-
-                byte attributes = Constants.MaskAttributes(rawAttributes);
-                bool isDir = (attributes & Constants.AttributeDir) != 0;
-
-                if (isDir)
-                {
-                    dirsChecked++;
-
-                    if (fileSize > 0 && sectorOffset < fileLength)
+                    long peekPos = fs.Position;
+                    bool isAllZeros;
+                    try
                     {
-                        long endOffset = sectorOffset + fileSize;
-                        if (endOffset > fileLength)
-                        {
-                            issues.Add(
-                                $"Directory '{path}{filename}' size {fileSize} (ends at {endOffset}) exceeds file length {fileLength}.");
-                        }
+                        ReadExact(fs, headerRest);
+                        isAllZeros = headerRest[0] == 0 && headerRest[1] == 0 && headerRest[2] == 0 &&
+                                     headerRest[3] == 0 && headerRest[4] == 0 && headerRest[5] == 0 &&
+                                     headerRest[6] == 0 && headerRest[7] == 0 && headerRest[8] == 0 &&
+                                     headerRest[9] == 0 && headerRest[10] == 0 && headerRest[11] == 0;
+                    }
+                    catch
+                    {
+                        isAllZeros = false;
+                    }
 
-                        AuditWalk(fs, sectorOffset, sectorOffset, fileSize, path + filename + "/", fileLength,
-                            discLseek, issues, new HashSet<long>(), ref filesChecked, ref dirsChecked, depth + 1);
+                    fs.Seek(peekPos, SeekOrigin.Begin);
+
+                    if (isAllZeros)
+                    {
+                        return;
                     }
                 }
-                else
+
+                bool descendLeft = lOffset != 0 && lOffset != Constants.PadShort;
+                long leftSeek = 0;
+                if (descendLeft)
                 {
-                    filesChecked++;
+                    leftSeek = tableStart + ((long)lOffset * Constants.DwordSize);
+                    if (leftSeek >= fileLength || leftSeek >= tableStart + tableSize)
+                    {
+                        issues.Add(
+                            $"Left child offset {lOffset} (seek {leftSeek}) exceeds the directory table in {path} (table at {tableStart}, size {tableSize}).");
+                        descendLeft = false;
+                    }
+                }
+
+                fs.Seek(offset + 2, SeekOrigin.Begin);
+                ReadExact(fs, shortBuf);
+                ushort rOffset = BinaryPrimitives.ReadUInt16LittleEndian(shortBuf);
+
+                ReadExact(fs, intBuf);
+                uint startSector = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+                ReadExact(fs, intBuf);
+                uint fileSize = BinaryPrimitives.ReadUInt32LittleEndian(intBuf);
+
+                ReadExact(fs, byteBuf);
+                byte rawAttributes = byteBuf[0];
+
+                ReadExact(fs, byteBuf);
+                byte filenameLength = byteBuf[0];
+
+                byte[] nameBuf = new byte[filenameLength];
+                ReadExact(fs, nameBuf);
+                string filename = Latin1Encoding.Instance.GetString(nameBuf);
+
+                AuditEntry entry = new(rOffset, startSector, fileSize, rawAttributes, filename,
+                    filename is "." or "..");
+
+                if (descendLeft)
+                {
+                    // Audit the left subtree first (in-order); the entry itself is
+                    // processed when the descent unwinds.
+                    pending.Add(entry);
+                    if (pending.Count > Constants.MaxTocStackFrames)
+                    {
+                        issues.Add(
+                            $"Invalid TOC entry at '{path}': intra-table traversal stack exceeded {Constants.MaxTocStackFrames} frames (possible corrupt offset chain).");
+                        return;
+                    }
+
+                    next = leftSeek;
+                    continue;
+                }
+
+                AuditParsedEntry(fs, entry, path, fileLength, discLseek, issues, ref filesChecked, ref dirsChecked,
+                    depth);
+
+                if (rOffset != 0 && rOffset != Constants.PadShort)
+                {
+                    long rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
+                    if (rightSeek >= fileLength || rightSeek >= tableStart + tableSize)
+                    {
+                        issues.Add(
+                            $"Right child offset {rOffset} (seek {rightSeek}) exceeds the directory table in {path} (table at {tableStart}, size {tableSize}).");
+                        return;
+                    }
+
+                    next = rightSeek;
+                    continue;
                 }
             }
 
-            if (rOffset != 0 && rOffset != Constants.PadShort)
+            // No new node: process the nearest ancestor whose left subtree is
+            // complete, then continue into its right subtree when it has one.
+            bool resumed = false;
+            while (pending.Count > 0)
             {
-                long rightSeek = tableStart + ((long)rOffset * Constants.DwordSize);
-                if (rightSeek >= fileLength || rightSeek >= tableStart + tableSize)
+                AuditEntry entry = pending[^1];
+                pending.RemoveAt(pending.Count - 1);
+                AuditParsedEntry(fs, entry, path, fileLength, discLseek, issues, ref filesChecked, ref dirsChecked,
+                    depth);
+                if (entry.Right != 0 && entry.Right != Constants.PadShort)
                 {
-                    issues.Add(
-                        $"Right child offset {rOffset} (seek {rightSeek}) exceeds the directory table in {path} (table at {tableStart}, size {tableSize}).");
+                    long rightSeek = tableStart + ((long)entry.Right * Constants.DwordSize);
+                    if (rightSeek >= fileLength || rightSeek >= tableStart + tableSize)
+                    {
+                        issues.Add(
+                            $"Right child offset {entry.Right} (seek {rightSeek}) exceeds the directory table in {path} (table at {tableStart}, size {tableSize}).");
+                        return;
+                    }
+
+                    next = rightSeek;
+                    resumed = true;
                     break;
                 }
-
-                dirStart = rightSeek;
-                continue;
             }
 
-            break;
+            if (!resumed) return;
         }
     }
+
+    /// <summary>
+    /// Applies one parsed directory entry to the audit: reports naming/attribute/
+    /// bounds issues, counts files and directories, and audits a subdirectory
+    /// table recursively (bounded by <see cref="Constants.MaxTocDepth"/>).
+    /// </summary>
+    private static void AuditParsedEntry(
+        Stream fs,
+        AuditEntry entry,
+        string path,
+        long fileLength,
+        long discLseek,
+        List<string> issues,
+        ref int filesChecked,
+        ref int dirsChecked,
+        int depth)
+    {
+        // Structural "." / ".." records are skipped by every walker (their
+        // children are still traversed); real entries with host-unsafe
+        // names are reported so repair can sanitize them.
+        if (entry.Structural)
+        {
+            return;
+        }
+
+        if (entry.Filename.Contains('/') || entry.Filename.Contains('\\'))
+        {
+            issues.Add($"Filename '{entry.Filename}' contains path separator in {path}.");
+        }
+        else if (XisoEntryNames.IsInvalidEntryName(entry.Filename))
+        {
+            issues.Add($"Filename '{entry.Filename}' contains invalid character(s) in {path}.");
+        }
+
+        long sectorOffset = ((long)entry.StartSector * Constants.SectorSize) + discLseek;
+        if (sectorOffset >= fileLength)
+        {
+            issues.Add(
+                $"Sector {entry.StartSector} (offset {sectorOffset}) for '{path}{entry.Filename}' exceeds file length {fileLength}.");
+        }
+
+        if ((entry.RawAttributes & Constants.AttributeReservedMask) != 0)
+        {
+            issues.Add($"Reserved attribute bits set in '{path}{entry.Filename}': 0x{entry.RawAttributes:X2}.");
+        }
+
+        byte attributes = Constants.MaskAttributes(entry.RawAttributes);
+        bool isDir = (attributes & Constants.AttributeDir) != 0;
+
+        if (isDir)
+        {
+            dirsChecked++;
+
+            if (entry.FileSize > 0 && sectorOffset < fileLength)
+            {
+                long endOffset = sectorOffset + entry.FileSize;
+                if (endOffset > fileLength)
+                {
+                    issues.Add(
+                        $"Directory '{path}{entry.Filename}' size {entry.FileSize} (ends at {endOffset}) exceeds file length {fileLength}.");
+                }
+
+                AuditWalk(fs, sectorOffset, sectorOffset, entry.FileSize, path + entry.Filename + "/", fileLength,
+                    discLseek, issues, new HashSet<long>(), ref filesChecked, ref dirsChecked, depth + 1);
+            }
+        }
+        else
+        {
+            filesChecked++;
+        }
+    }
+
+    /// <summary>One parsed table entry awaiting in-order audit processing.</summary>
+    private readonly record struct AuditEntry(
+        ushort Right,
+        uint StartSector,
+        uint FileSize,
+        byte RawAttributes,
+        string Filename,
+        bool Structural);
 
     /// <summary>
     /// Returns the names of all entries in the specified directory within an XISO image,

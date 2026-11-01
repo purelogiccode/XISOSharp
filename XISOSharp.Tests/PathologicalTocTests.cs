@@ -158,6 +158,108 @@ public sealed class PathologicalTocTests : IDisposable
     }
 
     [Fact]
+    public void LeftSkewedChain_AuditAndRangesSucceed()
+    {
+        // Phase 4 follow-up: the audit and sector-range walkers no longer count
+        // intra-table left descent as directory nesting, so the same 4,096-entry
+        // left spine that lists/extracts also audits and maps.
+        string work = CreateTempDir("xiso_path_toc");
+        string iso = CreateTreeIso(work, "audit.iso", ChainLength, BuildLayout(Skew.Left, ChainLength), withData: true);
+
+        AuditResult audit = XisoReader.AuditXiso(iso, requireOptimizedTag: false);
+        Assert.True(audit.IsValid);
+        Assert.Equal(ChainLength, audit.FilesChecked);
+        Assert.Empty(audit.Issues);
+
+        List<(string Path, long Offset, uint Size)> entries = XisoRanges.GetFileEntries(iso);
+        Assert.Equal(ChainLength, entries.Count);
+        Assert.Contains(entries, static e => string.Equals(e.Path, "file0000", StringComparison.Ordinal));
+        Assert.Contains(entries, e => string.Equals(e.Path, $"file{ChainLength - 1:D4}", StringComparison.Ordinal));
+        Assert.All(entries, static e => Assert.Equal(1u, e.Size));
+
+        (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> files) = XisoRanges.GetXisoRanges(iso);
+        Assert.NotEmpty(sys);
+        Assert.Equal((uint)ChainLength, files.Sum(static r => r.End - r.Start + 1));
+    }
+
+    [Fact]
+    public void LeftSkewedChain_AuditReportsDeepCycle()
+    {
+        // Point the deepest entry's left child back at entry 1 (an ancestor):
+        // the explicit stack must detect the revisit and report it instead of
+        // looping or growing without bound.
+        string work = CreateTempDir("xiso_path_toc");
+        string iso = CreateTreeIso(work, "audit-cycle.iso", ChainLength, BuildLayout(Skew.Left, ChainLength));
+
+        using (FileStream fs = new(iso, FileMode.Open, FileAccess.Write, FileShare.None))
+        {
+            fs.Seek(((long)RootSector * Constants.SectorSize) + ((ChainLength - 1) * EntrySize), SeekOrigin.Begin);
+            Span<byte> offset = stackalloc byte[2];
+            BinaryPrimitives.WriteUInt16LittleEndian(offset, EntrySize / Constants.DwordSize);
+            fs.Write(offset);
+        }
+
+        AuditResult audit = XisoReader.AuditXiso(iso, requireOptimizedTag: false);
+        Assert.False(audit.IsValid);
+        Assert.Contains(audit.Issues, i => i.Contains("Cycle detected", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LeftSkewedChain_RepairFixesDeepestEntry()
+    {
+        // The deepest entry sits at the end of the left spine: only a walk that
+        // reads past MaxTocDepth can reach (and repair) it.
+        string work = CreateTempDir("xiso_path_toc");
+        string iso = CreateTreeIso(work, "repair.iso", ChainLength, BuildLayout(Skew.Left, ChainLength));
+
+        const int deepest = ChainLength - 1;
+        long entryAbs = ((long)RootSector * Constants.SectorSize) + (deepest * EntrySize);
+        using (FileStream fs = new(iso, FileMode.Open, FileAccess.Write, FileShare.None))
+        {
+            fs.Seek(entryAbs + 12, SeekOrigin.Begin);
+            fs.WriteByte((byte)(Constants.AttributeArc | Constants.AttributeReservedMask));
+        }
+
+        Assert.Contains(XisoReader.AuditXiso(iso).Issues,
+            i => i.Contains($"file{deepest:D4}", StringComparison.Ordinal));
+
+        RepairResult repair = XisoRepairer.RepairInPlace(iso, createBackup: false);
+        Assert.Contains(repair.Fixed, f => f.Contains($"file{deepest:D4}", StringComparison.Ordinal));
+        Assert.True(repair.Success);
+        Assert.Empty(XisoReader.AuditXiso(iso).Issues);
+    }
+
+    [Fact]
+    public void LeftSkewedChain_SalvageCarriesEveryFile()
+    {
+        string work = CreateTempDir("xiso_path_toc");
+        string iso = CreateTreeIso(work, "salvage.iso", ChainLength, BuildLayout(Skew.Left, ChainLength));
+
+        string output = Path.Combine(work, "salvaged.iso");
+        SalvageResult result = XisoReader.Salvage(iso, output);
+
+        Assert.Equal(ChainLength, result.Copied.Count);
+        Assert.Empty(result.Skipped);
+        Assert.True(result.Success);
+        Assert.True(File.Exists(output));
+    }
+
+    [Fact]
+    public void LeftSkewedChain_CreateZarSucceeds()
+    {
+        // The ZAR pack walk reads the same tables: it must not mistake the
+        // left spine for directory nesting either.
+        string work = CreateTempDir("xiso_path_toc");
+        string iso = CreateTreeIso(work, "zar.iso", ChainLength, BuildLayout(Skew.Left, ChainLength), withData: true);
+        string zar = Path.Combine(work, "game.zar");
+
+        Assert.True(XisoZarchive.CreateZar(iso, zar, quiet: true));
+
+        IReadOnlyList<ZarEntry> entries = XisoZarchive.ListZar(zar);
+        Assert.Equal(ChainLength, entries.Count);
+    }
+
+    [Fact]
     public void LeftSubtreeCorruption_ContinueOnError_SkipsSubtreeAndKeepsSiblings()
     {
         string work = CreateTempDir("xiso_path_toc");
@@ -242,16 +344,21 @@ public sealed class PathologicalTocTests : IDisposable
         return layout;
     }
 
-    private string CreateTreeIso(string work, string name, int count, NodeLayout[] layout)
+    private string CreateTreeIso(string work, string name, int count, NodeLayout[] layout, bool withData = false)
     {
         string path = Path.Combine(work, name);
         long rootAbs = (long)RootSector * Constants.SectorSize;
         uint rootSize = (uint)(count * EntrySize);
+        uint tableSectors = (rootSize + Constants.SectorSize - 1) / Constants.SectorSize;
+        long dataStartSector = RootSector + tableSectors;
 
         using (FileStream fs = new(path, FileMode.Create, FileAccess.Write, FileShare.None))
         {
             // At least one whole sector so the root sector itself is inside the image.
-            fs.SetLength(rootAbs + Math.Max(rootSize, (uint)Constants.SectorSize));
+            long imageLength = withData
+                ? (dataStartSector + count + 1) * Constants.SectorSize
+                : rootAbs + Math.Max(rootSize, (uint)Constants.SectorSize);
+            fs.SetLength(imageLength);
 
             fs.Seek(Constants.HeaderOffset, SeekOrigin.Begin);
             fs.Write(Encoding.ASCII.GetBytes(Constants.HeaderData));
@@ -273,11 +380,26 @@ public sealed class PathologicalTocTests : IDisposable
                     node.Left < 0 ? (ushort)0 : (ushort)(node.Left * (EntrySize / Constants.DwordSize)));
                 BinaryPrimitives.WriteUInt16LittleEndian(entry.AsSpan(2),
                     node.Right < 0 ? (ushort)0 : (ushort)(node.Right * (EntrySize / Constants.DwordSize)));
+                if (withData)
+                {
+                    BinaryPrimitives.WriteUInt32LittleEndian(entry.AsSpan(4), (uint)(dataStartSector + i));
+                    BinaryPrimitives.WriteUInt32LittleEndian(entry.AsSpan(8), 1);
+                }
+
                 entry[12] = Constants.AttributeArc;
                 byte[] nameBytes = Encoding.ASCII.GetBytes(node.Name);
                 entry[13] = (byte)nameBytes.Length;
                 nameBytes.CopyTo(entry, 14);
                 fs.Write(entry);
+            }
+
+            if (withData)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    fs.Seek((dataStartSector + i) * Constants.SectorSize, SeekOrigin.Begin);
+                    fs.WriteByte((byte)('A' + (i % 26)));
+                }
             }
         }
 

@@ -107,9 +107,10 @@ public static class Constants
     /// (TODO #16). Genuine Xbox images nest a handful of levels, so this never
     /// fires on valid images; it converts a malicious subdir cycle (Burnout PAL
     /// style) from a <c>StackOverflowException</c> into a named error.
-    /// <see cref="XisoReader"/>'s extraction walk applies this to subdirectory
-    /// descent only (intra-table AVL depth is bounded by its explicit stack); the
-    /// repair, salvage, range and audit walkers still use it as a combined bound.
+    /// Every table walker applies this to subdirectory descent only: intra-table
+    /// AVL depth is bounded by an explicit in-order stack (the reader, audit,
+    /// sector-range, repair, salvage and ZAR walks), so a pathological
+    /// left-skewed table is read instead of being mistaken for nesting.
     /// </summary>
     public const int MaxTocDepth = 64;
 

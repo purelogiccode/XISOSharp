@@ -2,14 +2,18 @@
 
 ## 1.6.0
 
-Sector-layout packing release (PlanToEnhance Phase 8). Images can now be repacked at
+Sector-layout packing release (PlanToEnhance Phase 8), plus the Phase 4 TOC
+hardening follow-up. Images can now be repacked at
 an explicit layout: `XisoLayoutSpec` accepts the JSON emitted by
 `--sector-layout --json` (or a compact `path=sector` text spec), fixes the sectors of
 matching files and directory tables, and allocates every other entry first-fit around
 the reserved extents. `-c`, `--pack <dir>` and `build-image` gain `--layout <file>`.
+The audit, sector-range, repair, salvage and ZAR walks now use the same explicit
+in-order table traversal as extract/list/rewrite, so `MaxTocDepth` bounds real
+subdirectory nesting only.
 
-Full suite green on all three targets: **1908 passed / 1 opt-in skip (1909) on
-net8.0/net9.0** and **1970 passed / 1 opt-in skip (1971) on net10.0**.
+Full suite green on all three targets: **1913 passed / 1 opt-in skip (1914) on
+net8.0/net9.0** and **1975 passed / 1 opt-in skip (1976) on net10.0**.
 
 ### Library
 
@@ -30,6 +34,21 @@ net8.0/net9.0** and **1970 passed / 1 opt-in skip (1971) on net10.0**.
   source tree; JSON extra entries are reserved (with a warning) so a subset repack
   cannot reuse their bytes.
 
+### TOC hardening (Phase 4 follow-up)
+
+- `XisoReader.AuditWalk`, `XisoRanges.GetValidSectorsCore`/`CollectFileEntries`,
+  `XisoRepairer.CollectWalk`, `XisoSalvager.SalvageWalk` and
+  `XisoZarchive.ParseNode` now walk each directory table with an explicit
+  in-order stack (left subtree, entry, right siblings) instead of recursing on
+  the left child. `MaxTocDepth` (64) bounds real subdirectory nesting only.
+- A 4,096-entry left-skewed table now audits, maps (`--ranges`,
+  `GetFileEntries`), repairs a reserved-attribute bit on its deepest entry,
+  salvages into a fresh image and packs to ZAR; cycles and out-of-table
+  pointers still hit the existing named errors or report/drop gates.
+- The visited-offset set and `MaxTocEntriesPerTable` / `MaxTocStackFrames`
+  backstops are unchanged; a shared (DAG) subtree now reports the same cycle
+  error the reader has always raised.
+
 ### CLI
 
 - `--layout <file>` on `-c <dir>`, `--pack <dir>` and `build-image`; rejected for
@@ -48,8 +67,10 @@ net8.0/net9.0** and **1970 passed / 1 opt-in skip (1971) on net10.0**.
 - `SectorAllocatorTests` (+7 `SeedUsedRanges` cases): one-pass bulk seeding
   sorts/coalesces, rejects overlaps and out-of-bounds ranges, refuses to seed after
   allocations, handles null and zero-count ranges.
-- **net8.0/net9.0 - 1909 tests (1908 passed, 1 opt-in skip)**;
-  **net10.0 - 1971 tests (1970 passed, 1 opt-in skip, adds the GUI tests)**.
+- `PathologicalTocTests` (+5): the 4,096-entry left spine audits and maps, repairs
+  its deepest entry, salvages to a passing image, and packs to a valid ZAR.
+- **net8.0/net9.0 - 1914 tests (1913 passed, 1 opt-in skip)**;
+  **net10.0 - 1976 tests (1975 passed, 1 opt-in skip, adds the GUI tests)**.
 
 ## 1.5.0
 
