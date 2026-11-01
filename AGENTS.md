@@ -40,7 +40,7 @@ reproducible or re-downloadable. Never delete them.
   extract-xiso/xdvdfs/xboxkit oracles). Keep InspectCode at 0 warnings; the
   floor is enforced in CI.
 - Coverage: the Windows test job writes merged line/branch coverage to the job
-  summary and fails below `MIN_LINE_COVERAGE` (75%) or
+  summary and fails below `MIN_LINE_COVERAGE` (70%) or
   `MIN_BRANCH_COVERAGE` (60%).
 - Formatting: `dotnet format whitespace --verify-no-changes` runs on the Windows
   runner (the CRLF working tree matches `.editorconfig`); run it locally before

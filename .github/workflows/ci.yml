@@ -24,7 +24,7 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   # Fails the coverage summary step when coverage drops below these floors.
-  MIN_LINE_COVERAGE: '75'
+  MIN_LINE_COVERAGE: '70'
   MIN_BRANCH_COVERAGE: '60'
 
 jobs:

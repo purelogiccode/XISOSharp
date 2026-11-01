@@ -137,9 +137,9 @@ dotnet pack XISOSharp -c Release -o ./artifacts
 tags (`v*` or bare `[0-9]*`, both accepted by MinVer and the publish gate):
 
 1. **build-and-test** - matrix over `ubuntu-latest`, `windows-latest`,
-   `macos-latest`: restore → format verification (Linux) → build (Release) →
+   `macos-latest`: restore → format verification (Windows) → build (Release) →
    test the `XISOSharp.Tests` project with XPlat code coverage. The merged
-   line/branch coverage lands in the job summary (fails below **75% line / 60%
+   line/branch coverage lands in the job summary (fails below **70% line / 60%
    branch**), and the trx + coverage reports are uploaded as artifacts.
 2. **gui-smoke** - Windows: `XISOSharp -v`, `XISOSharp.Gui --probe-cli` and
    `XISOSharp.Gui --self-test`, the headless contract the GUI ships with.

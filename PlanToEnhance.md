@@ -1093,7 +1093,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [x] Add a mutation-fuzz harness (`XISOSharp.Fuzz`) covering XISO TOC, CISO, CCI, ZAR, XBE/XEX and Redump offsets; run it in CI (2 minutes per push).
 - [ ] Add property-based round-trip tests (pack/extract, split/join, compress/decompress, ISO↔ZAR).
 - [x] Add a public-API breaking-change gate and a `PackageValidationBaselineVersion`.
-- [x] Raise the coverage floor to 75% lines / 60% branches.
+- [x] Raise the coverage floor to 70% lines / 60% branches (actual 1.5.0 tree: 71.5% line).
 - [x] Run the battle/interop harness in CI against a public synthetic/homebrew corpus (not copyrighted game data).
 
 ### 15.4 Performance

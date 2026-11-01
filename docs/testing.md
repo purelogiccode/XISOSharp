@@ -169,7 +169,7 @@ dotnet test XISOSharp.Tests --collect:"XPlat Code Coverage"
 
 The report (`coverage.cobertura.xml`) is uploaded as a CI artifact, and the
 merged line/branch coverage is written to the job summary. The job fails when
-line coverage drops below `MIN_LINE_COVERAGE` (75%) or branch coverage below
+line coverage drops below `MIN_LINE_COVERAGE` (70%) or branch coverage below
 `MIN_BRANCH_COVERAGE` (60%), both set in `.github/workflows/ci.yml`.
 
 Measured line coverage (coverlet, full net10.0 suite, 1.4.2): `XisoReader.cs`
