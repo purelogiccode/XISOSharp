@@ -1,0 +1,68 @@
+version: 2
+
+# Dependabot keeps NuGet packages and GitHub Actions current. Security updates
+# are enabled repository-wide (Settings > Code security); this file covers the
+# scheduled version updates.
+
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: 'chore(deps)'
+    labels:
+      - dependencies
+      - nuget
+    groups:
+      # Analyzers change diagnostics, not runtime behavior: one PR per week.
+      analyzers:
+        patterns:
+          - Meziantou.Analyzer
+          - Roslynator.*
+          - MinVer
+      # Test harness updates move together.
+      testing:
+        patterns:
+          - xunit*
+          - Microsoft.NET.Test.Sdk
+          - coverlet.*
+          - Microsoft.CodeCoverage
+      # UI stack updates together (Avalonia packages must stay in lockstep).
+      avalonia:
+        patterns:
+          - Avalonia*
+          - SkiaSharp*
+          - HarfBuzzSharp*
+      # Logging stack.
+      serilog:
+        patterns:
+          - Serilog*
+    ignore:
+      # MinVer is pinned to the major that matches the tag scheme; a major bump
+      # needs a manual migration.
+      - dependency-name: MinVer
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:30'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(ci)'
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      # Actions are versioned by major tag; one PR keeps them in sync.
+      github-actions:
+        patterns:
+          - '*'

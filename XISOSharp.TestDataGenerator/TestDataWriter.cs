@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace XISOSharp.TestDataGenerator;
 
 /// <summary>
@@ -18,6 +20,18 @@ public static class TestDataWriter
     public const string IsoFileName = "source.iso";
 
     /// <summary>
+    /// Bump when the generated tree or ISO layout changes so every host rebuilds.
+    /// </summary>
+    private const int FixtureRevision = 1;
+
+    /// <summary>
+    /// Records which build produced <see cref="IsoFileName"/>; a matching stamp
+    /// lets a second test host reuse the image instead of deleting and rebuilding
+    /// it under the first host's running tests.
+    /// </summary>
+    private const string StampFileName = "fixture.stamp";
+
+    /// <summary>
     /// Cross-process fixture gate (BUG-TEST-007). Session-local so it does not
     /// collide across users; a fixed name is fine — worst case two different
     /// TestData roots merely serialize against each other.
@@ -32,19 +46,22 @@ public static class TestDataWriter
 
     /// <summary>
     /// Ensures the TestData fixture exists at <paramref name="testDataRoot"/>,
-    /// creating any missing source files and rebuilding the derived ISO.
+    /// creating any missing source files and rebuilding the derived ISO when it
+    /// was produced by another build (or its sources changed).
     /// Sources are canonicalized on every call (BUG-TEST-005): an existing file
     /// whose bytes differ from the canonical content is rewritten even when
     /// <paramref name="force"/> is <c>false</c>, so a stale incremental tree
-    /// converges to the same bytes as a clean checkout before the ISO — always
-    /// rebuilt from those sources — is packed. The ISO is packed with
-    /// <c>fileTime: 0</c> so its bytes are deterministic across runs/hosts
-    /// (snapshot tests pack with fileTime 0 as well).
+    /// converges to the same bytes as a clean checkout before the ISO — rebuilt
+    /// from those sources — is packed. The ISO is packed with <c>fileTime: 0</c>
+    /// so its bytes are deterministic across runs/hosts (snapshot tests pack
+    /// with fileTime 0 as well), and a stamp lets parallel TFM hosts share one
+    /// image instead of deleting it under each other.
     /// </summary>
     /// <param name="testDataRoot">Path of the TestData root directory (created if missing).</param>
     /// <param name="force">
-    /// When <c>true</c>, rewrites existing source files with the canonical content;
-    /// when <c>false</c>, existing files are left untouched.
+    /// When <c>true</c>, rewrites existing source files with the canonical content
+    /// and always rebuilds the derived ISO; when <c>false</c>, existing files are
+    /// left untouched and a current ISO is reused.
     /// </param>
     /// <returns>Human-readable descriptions of every action taken.</returns>
     public static IReadOnlyList<string> EnsureTestData(string testDataRoot, bool force = false)
@@ -129,28 +146,70 @@ public static class TestDataWriter
 
         // The ISO is a derived artifact: always rebuild so it matches the current writer.
         // Sources above were canonicalized, so the rebuild is deterministic.
+        // Concurrent test hosts (net8/9/10 run in parallel) share this tree; rebuilding
+        // unconditionally deleted the image under a host that was already running tests
+        // (FileNotFoundException in XisoReaderTests). The stamp records the build that
+        // produced the image, so only the first host rebuilds and the others reuse it.
         {
             string isoPath = Path.Combine(outputDir, IsoFileName);
+            string stampPath = Path.Combine(outputDir, StampFileName);
+            bool sourcesChanged = actions.Count > 0;
+            string stamp = FixtureStamp(isoPath);
 
-            // The rebuild writes/deletes several files in sequence; a transient
-            // external lock (Dropbox sync, AV, indexer) landing anywhere in the
-            // window must not fail the whole suite's ModuleInitializer.
-            for (int attempt = 1;; attempt++)
+            if (force || sourcesChanged || !IsCurrentFixture(isoPath, stampPath, stamp))
             {
-                try
+                // The rebuild writes/deletes several files in sequence; a transient
+                // external lock (Dropbox sync, AV, indexer) landing anywhere in the
+                // window must not fail the whole suite's ModuleInitializer.
+                for (int attempt = 1;; attempt++)
                 {
-                    DeleteWithRetry(isoPath);
-                    RebuildIso(actions, sourceDir, outputDir, isoPath);
-                    break;
-                }
-                catch (Exception ex) when (attempt < 3 && ex is IOException or UnauthorizedAccessException)
-                {
-                    Thread.Sleep(200 * attempt);
+                    try
+                    {
+                        DeleteWithRetry(isoPath);
+                        RebuildIso(actions, sourceDir, outputDir, isoPath);
+                        File.WriteAllText(stampPath, FixtureStamp(isoPath));
+                        break;
+                    }
+                    catch (Exception ex) when (attempt < 3 && ex is IOException or UnauthorizedAccessException)
+                    {
+                        Thread.Sleep(200 * attempt);
+                    }
                 }
             }
         }
 
         return actions;
+    }
+
+    /// <summary>
+    /// True when <paramref name="isoPath"/> was produced by this build (revision,
+    /// writer version and image length all match the recorded stamp).
+    /// </summary>
+    private static bool IsCurrentFixture(string isoPath, string stampPath, string stamp)
+    {
+        try
+        {
+            return File.Exists(isoPath) &&
+                   File.Exists(stampPath) &&
+                   string.Equals(File.ReadAllText(stampPath).Trim(), stamp, StringComparison.Ordinal);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Identity of the fixture produced by this build. The image length catches a
+    /// truncated file left by a host that died mid-write.
+    /// </summary>
+    private static string FixtureStamp(string isoPath)
+    {
+        string version = typeof(XisoWriter).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? "unknown";
+        long length = File.Exists(isoPath) ? new FileInfo(isoPath).Length : -1;
+        return $"revision {FixtureRevision}; writer {version}; length {length}";
     }
 
     private static void RebuildIso(List<string> actions, string sourceDir, string outputDir, string isoPath)

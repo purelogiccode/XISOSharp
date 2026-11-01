@@ -1,0 +1,288 @@
+name: Release
+
+# Builds the six framework-dependent app bundles from AGENTS.md's bundle
+# recipe, smoke-tests the native ones, and attaches them to the GitHub
+# release for the pushed tag. NuGet publishing stays in ci.yml.
+#
+# workflow_dispatch exists to rehearse the pipeline without tagging:
+# set dry_run=true to build + smoke-test the bundles only.
+
+on:
+  push:
+    tags: ['v*', '[0-9]*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. 1.6.0); the tag must exist for a real release.'
+        required: true
+        type: string
+      dry_run:
+        description: 'Build and smoke-test the bundles without creating a GitHub release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  resolve:
+    name: resolve version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      dry_run: ${{ steps.version.outputs.dry_run }}
+    steps:
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
+            dry_run="${{ inputs.dry_run }}"
+          else
+            version="${GITHUB_REF_NAME}"
+            dry_run="false"
+          fi
+          version="${version#v}"
+          if [ -z "$version" ]; then
+            echo "::error::Could not resolve a release version."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+
+  bundle:
+    name: bundle (${{ matrix.zip_rid }})
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            zip_rid: win-x64
+          - rid: win-arm64
+            zip_rid: win-arm64
+          - rid: linux-x64
+            zip_rid: linux-x64
+          - rid: linux-arm64
+            zip_rid: linux-arm64
+          - rid: osx-x64
+            zip_rid: MacOsX-x64
+          - rid: osx-arm64
+            zip_rid: MacOsX-arm64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.Build.props
+            global.json
+
+      - name: Publish GUI
+        run: >-
+          dotnet publish XISOSharp.Gui/XISOSharp.Gui.csproj
+          -c Release -r ${{ matrix.rid }} --no-self-contained
+          -o "$RUNNER_TEMP/stage"
+
+      - name: Publish CLI
+        run: >-
+          dotnet publish XISOSharp.Cli/XISOSharp.Cli.csproj
+          -c Release -f net10.0 -r ${{ matrix.rid }} --no-self-contained
+          -p:PublishTrimmed=false
+          -o "$RUNNER_TEMP/stage"
+
+      - name: Assemble bundle
+        # AGENTS.md contract: exactly the GUI app, XISOSharp(.exe), README.md,
+        # LICENSE and WhatsNew.md — no *.pdb / *.xml (the native Skia/HarfBuzz
+        # pdbs alone are ~100 MB).
+        run: |
+          set -euo pipefail
+          stage="$RUNNER_TEMP/stage"
+          cli="XISOSharp"
+          gui="XISOSharp.Gui"
+          case "${{ matrix.rid }}" in
+            win-*) cli="XISOSharp.exe"; gui="XISOSharp.Gui.exe" ;;
+          esac
+
+          find "$stage" -type f \( -name '*.pdb' -o -name '*.xml' \) -delete
+          cp README.md LICENSE WhatsNew.md "$stage"/
+
+          for expected in "$cli" "$gui" README.md LICENSE WhatsNew.md; do
+            if [ ! -f "$stage/$expected" ]; then
+              echo "::error::Bundle is missing $expected"
+              ls -la "$stage"
+              exit 1
+            fi
+          done
+
+          count=$(find "$stage" -type f | wc -l)
+          if [ "$count" -ne 5 ]; then
+            echo "::error::Bundle has $count files; expected exactly 5."
+            find "$stage" -type f
+            exit 1
+          fi
+
+          zip_path="$GITHUB_WORKSPACE/release_${{ needs.resolve.outputs.version }}_${{ matrix.zip_rid }}.zip"
+          cd "$stage"
+          zip -q -r "$zip_path" "$cli" "$gui" README.md LICENSE WhatsNew.md
+          echo "Created $zip_path"
+          unzip -l "$zip_path"
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.zip_rid }}
+          path: release_*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  smoke:
+    name: smoke (${{ matrix.zip_rid }})
+    needs: [resolve, bundle]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - zip_rid: win-x64
+            os: windows-latest
+          - zip_rid: linux-x64
+            os: ubuntu-latest
+          - zip_rid: MacOsX-arm64
+            os: macos-latest
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: release-${{ matrix.zip_rid }}
+          path: dist
+
+      - name: Smoke-test (unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          unzip -q release_*.zip -d bundle
+          cd bundle
+          chmod +x XISOSharp XISOSharp.Gui
+
+          ./XISOSharp -v | tee cli.txt
+          grep -Eq '^XISOSharp v[0-9]+\.[0-9]+\.[0-9]+' cli.txt
+
+          ./XISOSharp.Gui --probe-cli ./XISOSharp | tee probe.txt
+          grep -Eq 'XISOSharp [0-9]+\.[0-9]+\.[0-9]+' probe.txt
+
+          ./XISOSharp.Gui --self-test ./XISOSharp | tee selftest.txt
+          grep -q 'SELF-TEST: all passed' selftest.txt
+
+      - name: Smoke-test (windows)
+        # WinExe: PowerShell does not wait for `&`, so Start-Process -Wait
+        # captures the exit code and redirected output.
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Expand-Archive -Path (Get-ChildItem dist/*.zip).FullName -DestinationPath dist/bundle
+          Set-Location dist/bundle
+
+          $banner = & ./XISOSharp.exe -v
+          if ($LASTEXITCODE -ne 0) { throw "CLI -v exited $LASTEXITCODE" }
+          if ($banner -notmatch '^XISOSharp v\d+\.\d+\.\d+') { throw "Unexpected CLI banner: $banner" }
+          Write-Host $banner
+
+          function Invoke-Gui([string[]]$Arguments) {
+            $stdout = Join-Path $env:RUNNER_TEMP ("gui-out-" + [guid]::NewGuid().ToString('N') + ".txt")
+            $stderr = Join-Path $env:RUNNER_TEMP ("gui-err-" + [guid]::NewGuid().ToString('N') + ".txt")
+            $process = Start-Process -FilePath './XISOSharp.Gui.exe' -ArgumentList $Arguments -Wait -NoNewWindow -PassThru `
+              -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+            $text = (Get-Content -LiteralPath $stdout -Raw) + (Get-Content -LiteralPath $stderr -Raw)
+            if ($process.ExitCode -ne 0) {
+              Write-Host $text
+              throw "GUI $($Arguments -join ' ') exited $($process.ExitCode)"
+            }
+            return $text
+          }
+
+          $probe = Invoke-Gui @('--probe-cli', './XISOSharp.exe')
+          Write-Host $probe
+          if ($probe -notmatch 'XISOSharp \d+\.\d+\.\d+') { throw 'GUI --probe-cli did not print the product label.' }
+
+          $selfTest = Invoke-Gui @('--self-test', './XISOSharp.exe')
+          Write-Host $selfTest
+          if ($selfTest -notmatch 'SELF-TEST: all passed') { throw 'GUI --self-test did not pass.' }
+
+  release:
+    name: create GitHub release
+    needs: [resolve, smoke]
+    if: needs.resolve.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download bundles
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Extract release notes
+        run: |
+          set -euo pipefail
+          version="${{ needs.resolve.outputs.version }}"
+          awk -v v="$version" '
+            $0 == "## " v { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' docs/release-notes.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "Release $version" > release-notes.md
+          fi
+          echo '--- release notes ---'
+          cat release-notes.md
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ needs.resolve.outputs.version }}"
+          ls -la dist
+          if gh release view "$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Re-run: refresh the same-named assets, never delete anything else.
+            gh release upload "$version" dist/*.zip --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$version" --verify-tag --title "$version" \
+              --notes-file release-notes.md --repo "$GITHUB_REPOSITORY" dist/*.zip
+          fi
+          gh release view "$version" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'

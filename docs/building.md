@@ -138,11 +138,50 @@ tags (`v*` or bare `[0-9]*`, both accepted by MinVer and the publish gate):
 
 1. **build-and-test** — matrix over `ubuntu-latest`, `windows-latest`,
    `macos-latest`: restore → build (Release) → test the `XISOSharp.Tests`
-   project with XPlat code coverage;
-   the coverage report is uploaded as an artifact.
-2. **pack** (after tests) — `dotnet pack` the core project and upload the nupkgs.
-3. **publish** (only on version tags, environment `nuget`) — push the nupkgs to
+   project with XPlat code coverage on Windows. The merged line/branch coverage
+   lands in the job summary (the job fails below **65% line coverage**), and the
+   trx + coverage reports are uploaded as artifacts.
+2. **gui-smoke** — Windows: `XISOSharp -v`, `XISOSharp.Gui --probe-cli` and
+   `XISOSharp.Gui --self-test`, the headless contract the GUI ships with.
+3. **inspectcode** — JetBrains InspectCode (pinned `2026.2.3.1`) over the whole
+   solution; any warning or error fails the job and the SARIF report is uploaded
+   to **Security → Code scanning**.
+4. **dependency-audit** — `dotnet list package --vulnerable --include-transitive`
+   fails on any known-vulnerable direct or transitive package.
+5. **pack** — after every gate: `dotnet pack` the core project and upload the
+   nupkgs.
+6. **publish** (only on version tags, environment `nuget`) — push the nupkgs to
    nuget.org using the `NUGET_API_KEY` secret.
+
+Companion workflows:
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| `codeql.yml` | push/PR to `master`, weekly | CodeQL C# analysis → code scanning |
+| `dependency-review.yml` | pull requests | Blocks high/critical vulnerable dependencies; PR summary |
+| `scorecard.yml` | weekly, push to `master` | OpenSSF Scorecard supply-chain score → code scanning |
+| `release.yml` | version tags | Builds the six RID bundles, smoke-tests them, creates the GitHub release |
+| `pages.yml` / `wiki.yml` | `docs/**` on `master` | Publish the Docsify site and mirror it to the wiki |
+
+Dependabot (`.github/dependabot.yml`) opens grouped weekly PRs for NuGet
+packages and GitHub Actions, and security updates are enabled repository-wide.
+
+## Releases
+
+Pushing a version tag (`1.6.0` or `v1.6.0`) does two independent things:
+
+- `ci.yml` packs and publishes `XISOSharp.<version>.nupkg` + `.snupkg` to NuGet.
+- `release.yml` builds the six framework-dependent bundles
+  (`release_<version>_<rid>.zip` for `win-x64`, `win-arm64`, `linux-x64`,
+  `linux-arm64`, `MacOsX-x64`, `MacOsX-arm64`) from the same tag, smoke-tests
+  the native ones, and attaches them to the GitHub release. Its body is the
+  version's section of [`release-notes.md`](release-notes.md).
+
+`release.yml` also has a `workflow_dispatch` entry with a `dry_run` switch to
+rehearse the bundle build + smoke tests without creating a release. The manual
+`publish-cli.ps1` / `publish-gui.ps1` recipe in
+[`AGENTS.md`](../AGENTS.md) remains the offline fallback.
+
 
 The reference-binary cross-checks (extract-xiso / xdvdfs / xboxkit oracles) early-return
 when the gitignored `References/` binaries are absent, so a green pipeline means the suite

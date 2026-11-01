@@ -31,8 +31,21 @@ reproducible or re-downloadable. Never delete them.
   and runs the test suite on `windows-latest` only: the suite mutates the
   process-wide current directory, which is not safe to parallelize on Unix
   runners. Cross-platform test hardening is a known follow-up.
+- The same workflow gates on `gui-smoke` (CLI `-v`, GUI `--probe-cli` /
+  `--self-test`), `inspectcode` (JetBrains InspectCode, pinned
+  `2026.2.3.1`, fails on any warning/error and uploads SARIF) and
+  `dependency-audit` (`dotnet list package --vulnerable`). Keep InspectCode at
+  0 warnings; the floor is enforced in CI.
+- Coverage: the Windows test job writes merged line/branch coverage to the job
+  summary and fails below `MIN_LINE_COVERAGE` (65%).
+- Companion workflows: `codeql.yml` (CodeQL C#), `dependency-review.yml` (PRs),
+  `scorecard.yml` (OpenSSF Scorecard), `release.yml` (tag: six RID bundles +
+  GitHub release), `pages.yml`/`wiki.yml` (docs).
 - Tag pushes trigger the tag-only `publish-nuget` job; PR/branch runs stop at
-  pack.
+  pack. `release.yml` runs in parallel and creates the GitHub release.
+- The three TFM test hosts run in parallel and share one `TestData/` tree; the
+  fixture stamps `TestData/output/fixture.stamp` so only the first host rebuilds
+  the ISO (`TestDataWriter`). Do not make the ISO rebuild unconditional again.
 - `XISOSharp.Tests` is strong-named with `XISOSharp/XISOSharp.snk` because the
   library grants it `InternalsVisibleTo` with the matching public key embedded
   in `XISOSharp.csproj`; keep the key file, the test `SignAssembly` settings,
@@ -89,6 +102,15 @@ GitHub releases carry only the six RID app bundles; the library packages stay
 NuGet-only (user decision). The CLI's `[UPDATE]` check downloads
 `release_<version>_<rid>.zip` from the latest release, so asset names and the
 release tag must match the version exactly.
+
+**Automated path (default):** `.github/workflows/release.yml` runs on the tag
+push, builds all six bundles on `ubuntu-latest` with the recipe below, smoke-tests
+`win-x64`/`linux-x64`/`MacOsX-arm64`, and creates the release from the tag with
+the version's `docs/release-notes.md` section as the body. Re-runs refresh the
+same-named assets (`gh release upload --clobber`) and never delete other assets.
+To rehearse without tagging, dispatch the workflow with `dry_run: true`.
+
+**Manual fallback (CI unavailable or local verification):**
 
 1. Build the bundles (recipe below) for: `win-x64`, `win-arm64`, `linux-x64`,
    `linux-arm64`, `MacOsX-x64`, `MacOsX-arm64`.

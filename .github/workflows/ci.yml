@@ -23,6 +23,8 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  # Fails the coverage summary step when line coverage drops below this floor.
+  MIN_LINE_COVERAGE: '65'
 
 jobs:
   build-and-test:
@@ -80,6 +82,52 @@ jobs:
           --blame-hang-timeout 15m
           --blame-hang-dump-type none
 
+      - name: Coverage summary
+        # Reports merged line/branch coverage in the job summary and enforces
+        # the MIN_LINE_COVERAGE floor. Informational when no report exists.
+        if: always() && matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem TestResults -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue)
+          if ($files.Count -eq 0) {
+            Write-Warning 'No coverage report found.'
+            exit 0
+          }
+
+          $linesValid = 0; $linesCovered = 0; $branchesValid = 0; $branchesCovered = 0
+          foreach ($file in $files) {
+            [xml]$report = Get-Content -LiteralPath $file.FullName
+            $linesValid += [int]$report.coverage.'lines-valid'
+            $linesCovered += [int]$report.coverage.'lines-covered'
+            $branchesValid += [int]$report.coverage.'branches-valid'
+            $branchesCovered += [int]$report.coverage.'branches-covered'
+          }
+
+          if ($linesValid -eq 0) {
+            Write-Warning 'Coverage report contains no lines.'
+            exit 0
+          }
+
+          $lineRate = 100.0 * $linesCovered / $linesValid
+          $branchRate = if ($branchesValid -gt 0) { 100.0 * $branchesCovered / $branchesValid } else { 0 }
+          $floor = [double]$env:MIN_LINE_COVERAGE
+
+          @(
+            '### Test coverage',
+            '',
+            '| Metric | Covered | Total | Rate |',
+            '| --- | ---: | ---: | ---: |',
+            ('| Lines | {0:N0} | {1:N0} | {2:N1}% |' -f $linesCovered, $linesValid, $lineRate),
+            ('| Branches | {0:N0} | {1:N0} | {2:N1}% |' -f $branchesCovered, $branchesValid, $branchRate),
+            '',
+            ('Line-coverage floor: {0:N0}%.' -f $floor)
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+          if ($lineRate -lt $floor) {
+            Write-Error ('Line coverage {0:N1}% is below the {1:N0}% floor.' -f $lineRate, $floor)
+            exit 1
+          }
+
       - name: Upload test results
         # Always: the trx of a crashed/hung run carries the last-running-test
         # and per-test timings for post-mortems.
@@ -98,11 +146,176 @@ jobs:
           path: TestResults/**/coverage.cobertura.xml
           if-no-files-found: warn
 
+  gui-smoke:
+    name: gui-smoke (windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.Build.props
+            global.json
+
+      - name: Build CLI and GUI
+        # -m:1: the GUI build stages the CLI beside itself out-of-band.
+        run: |
+          dotnet build XISOSharp.Cli/XISOSharp.Cli.csproj -c Release -f net10.0 -m:1
+          dotnet build XISOSharp.Gui/XISOSharp.Gui.csproj -c Release -m:1
+
+      - name: Headless GUI contract
+        # Verifies the documented smoke contract (AGENTS.md): CLI -v banner,
+        # GUI --probe-cli, GUI --self-test. The GUI is a WinExe, so PowerShell
+        # does not wait for `&`; Start-Process -Wait captures output and exit code.
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $cli = (Resolve-Path 'XISOSharp.Cli/bin/Release/net10.0/XISOSharp.exe').Path
+          $gui = (Resolve-Path 'XISOSharp.Gui/bin/Release/net10.0/XISOSharp.Gui.exe').Path
+
+          $banner = & $cli -v
+          if ($LASTEXITCODE -ne 0) { throw "CLI -v exited $LASTEXITCODE" }
+          if ($banner -notmatch '^XISOSharp v\d+\.\d+\.\d+') { throw "Unexpected CLI banner: $banner" }
+          Write-Host $banner
+
+          function Invoke-Gui([string[]]$Arguments) {
+            $stdout = Join-Path $env:RUNNER_TEMP ("gui-out-" + [guid]::NewGuid().ToString('N') + ".txt")
+            $stderr = Join-Path $env:RUNNER_TEMP ("gui-err-" + [guid]::NewGuid().ToString('N') + ".txt")
+            $process = Start-Process -FilePath $gui -ArgumentList $Arguments -Wait -NoNewWindow -PassThru `
+              -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+            $text = (Get-Content -LiteralPath $stdout -Raw) + (Get-Content -LiteralPath $stderr -Raw)
+            if ($process.ExitCode -ne 0) {
+              Write-Host $text
+              throw "GUI $($Arguments -join ' ') exited $($process.ExitCode)"
+            }
+            return $text
+          }
+
+          $probe = Invoke-Gui @('--probe-cli', $cli)
+          Write-Host $probe
+          if ($probe -notmatch 'XISOSharp \d+\.\d+\.\d+') { throw 'GUI --probe-cli did not print the product label.' }
+
+          $selfTest = Invoke-Gui @('--self-test', $cli)
+          Write-Host $selfTest
+          if ($selfTest -notmatch 'SELF-TEST: all passed') { throw 'GUI --self-test did not pass.' }
+
+  inspectcode:
+    name: inspectcode (windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      # Upload the SARIF report to the Security > Code scanning tab.
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.Build.props
+            global.json
+
+      - name: Install InspectCode
+        # Pinned: the tool's rule set changes between releases, so a floating
+        # version would turn unrelated PRs red. Bump deliberately.
+        shell: pwsh
+        run: |
+          dotnet tool install --global JetBrains.ReSharper.GlobalTools --version 2026.2.3.1
+          # setup-dotnet does not add the global-tool shim directory to PATH.
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Build solution
+        run: dotnet build CSharp_XISOSharp.sln -c Release -m:1
+
+      - name: Inspect
+        shell: pwsh
+        run: |
+          jb inspectcode CSharp_XISOSharp.sln --output=inspectcode.sarif --format=Sarif `
+            --severity=WARNING --no-build --no-updates --verbosity=WARN
+          if (-not (Test-Path inspectcode.sarif)) { throw 'InspectCode did not produce a SARIF report.' }
+
+          $sarif = Get-Content inspectcode.sarif -Raw | ConvertFrom-Json
+          $results = @($sarif.runs | ForEach-Object { $_.results } | Where-Object { $_ })
+          if ($results.Count -eq 0) {
+            Write-Host 'InspectCode: 0 warnings, 0 errors.'
+            exit 0
+          }
+
+          $results | Select-Object -First 50 | ForEach-Object {
+            $location = $_.locations[0].physicalLocation
+            Write-Host ("{0}:{1}: {2} [{3}]" -f $location.artifactLocation.uri, $location.region.startLine,
+              $_.message.text, $_.ruleId)
+          }
+          throw "InspectCode reported $($results.Count) warning(s)/error(s)."
+
+      - name: Upload SARIF
+        # Fork PRs get a read-only token, so the upload is skipped there.
+        if: >-
+          always() && hashFiles('inspectcode.sarif') != '' &&
+          (github.event_name != 'pull_request' ||
+           github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: inspectcode.sarif
+          category: inspectcode
+
+  dependency-audit:
+    name: dependency-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.Build.props
+            global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Fail on vulnerable NuGet packages
+        # NuGet audit already surfaces advisories during restore; this gate makes
+        # a known-vulnerable direct or transitive package fail the build.
+        run: |
+          dotnet list CSharp_XISOSharp.sln package --vulnerable --include-transitive --no-restore | tee vulnerable.txt
+          if grep -q "has the following vulnerable packages" vulnerable.txt; then
+            echo "::error::Vulnerable NuGet packages detected (see the step log)."
+            exit 1
+          fi
+
+      - name: Deprecated packages (informational)
+        continue-on-error: true
+        run: dotnet list CSharp_XISOSharp.sln package --deprecated --no-restore
+
   pack:
     name: pack
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: build-and-test
+    # Package only when every gate is green: a tag push then publishes exactly
+    # what CI validated.
+    needs: [build-and-test, gui-smoke, inspectcode, dependency-audit]
     steps:
       - uses: actions/checkout@v7
         with:

@@ -1,0 +1,54 @@
+name: Scorecard
+
+# OpenSSF Scorecard: checks the repository's supply-chain posture (branch
+# protection, pinned dependencies, token permissions, dangerous workflows,
+# signed releases, ...) and publishes the score for the project.
+# https://github.com/ossf/scorecard
+
+on:
+  branch_protection_rule:
+  schedule:
+    # Weekly, Monday 05:41 UTC (offset from CodeQL).
+    - cron: '41 5 * * 1'
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: scorecard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Run Scorecard
+        uses: ossf/scorecard-action@v2.5.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Public repository: publish to the OpenSSF REST API so the score
+          # shows up on the project's scorecard badge/API.
+          publish_results: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: scorecard-results
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload to code scanning
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
+          category: scorecard
