@@ -1,5 +1,4 @@
 using CCISharp;
-using XISOSharp.BlockDevice;
 using XISOSharp.Models;
 
 namespace XISOSharp;
@@ -322,9 +321,9 @@ public static class XisoCci
         public void Report(CciProgress value) =>
             _inner.Report(new ProgressInfo(
                 ProgressInfoType.FileProgress,
-                Count: (long)(value.TotalSectors * CciFormat.SectorSize),
+                Count: value.TotalSectors * CciFormat.SectorSize,
                 Path: null,
-                Sector: (long)value.SectorsDone,
+                Sector: value.SectorsDone,
                 Size: value.BytesIn));
     }
 }

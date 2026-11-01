@@ -10,9 +10,6 @@ namespace XISOSharp;
 /// </summary>
 internal static class CciNaming
 {
-    /// <summary>Length of a <c>.1.cci</c> part suffix.</summary>
-    private const int PartSuffixLength = 6;
-
     /// <summary>Returns true when the path names a numbered CCI part (<c>.1.cci</c> … <c>.9.cci</c>).</summary>
     internal static bool IsSplitPath(string? path)
     {
@@ -53,7 +50,7 @@ internal static class CciNaming
     {
         string directory = Path.GetDirectoryName(baseName) ?? string.Empty;
         if (directory.Length == 0) directory = ".";
-        string stem = Path.GetFileName(baseName) ?? string.Empty;
+        string stem = Path.GetFileName(baseName);
         if (stem.Length == 0) return;
 
         string prefix = stem + ".";

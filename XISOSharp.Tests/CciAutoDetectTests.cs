@@ -175,12 +175,12 @@ public sealed class CciAutoDetectTests : IDisposable
         Assert.Equal(isoLayout.FreeRanges.Count, cciLayout.FreeRanges.Count);
         Assert.Equal(isoLayout.TotalSectors, cciLayout.TotalSectors);
 
-        (List<(uint Start, uint End)> IsoSys, List<(uint Start, uint End)> IsoFiles) =
+        (List<(uint Start, uint End)> isoSys, List<(uint Start, uint End)> isoFiles) =
             XisoRanges.GetXisoRanges(iso);
-        (List<(uint Start, uint End)> CciSys, List<(uint Start, uint End)> CciFiles) =
+        (List<(uint Start, uint End)> cciSys, List<(uint Start, uint End)> cciFiles) =
             XisoRanges.GetXisoRanges(cci);
-        Assert.Equal(IsoSys, CciSys);
-        Assert.Equal(IsoFiles, CciFiles);
+        Assert.Equal(isoSys, cciSys);
+        Assert.Equal(isoFiles, cciFiles);
     }
 
     [Fact]
@@ -444,7 +444,7 @@ public sealed class CciAutoDetectTests : IDisposable
             Logger.RealQuiet = false;
         }
 
-        internal string Output => _out.ToString() + _err.ToString();
+        internal string Output => string.Concat(_out, _err);
 
         public void Dispose()
         {

@@ -230,7 +230,7 @@ public sealed class CliBatchConvertTests : IDisposable
         for (int i = 0; i < 3; i++)
             CreateIso(work, isoDir, $"game{i}");
 
-        using (LogCapture capture = new())
+        using (new LogCapture())
         {
             Assert.Equal(0, Program.Main(
                 ["compress", "--batch", isoDir, "--ciso-split", "0", "--jobs", "2", "-Q", "-y"]));
@@ -486,7 +486,7 @@ public sealed class CliBatchConvertTests : IDisposable
             Logger.RealQuiet = false;
         }
 
-        internal string Output => _out.ToString() + _err.ToString();
+        internal string Output => string.Concat(_out, _err);
 
         public void Dispose()
         {

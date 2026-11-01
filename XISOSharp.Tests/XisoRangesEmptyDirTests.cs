@@ -7,7 +7,7 @@ namespace XISOSharp.Tests;
 /// Regression tests for <see cref="XisoRanges.GetFileEntries(FileStream, long)"/>:
 /// an empty subdirectory is stored as an all-0xFF directory table whose first
 /// entry parses as leftChild == 0xFFFF. The collector must treat that as an
-/// empty-table sentinel (like <see cref="XisoRanges.GetValidSectors"/> does);
+/// empty-table sentinel (like <see cref="XisoRanges.GetValidSectors(FileStream,long,List{uint},List{uint},long,uint,long,bool)"/> does);
 /// otherwise the 0xFF bytes decode into a garbage entry with an entry sector
 /// near 4 billion, poisoning results and later throwing EndOfStreamException
 /// in consumers (e.g. <c>XisoSkeleton.Petrify</c>).

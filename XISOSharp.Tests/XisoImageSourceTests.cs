@@ -1,5 +1,3 @@
-using CCISharp;
-
 namespace XISOSharp.Tests;
 
 /// <summary>

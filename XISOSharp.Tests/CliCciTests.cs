@@ -62,7 +62,7 @@ public sealed class CliCciTests : IDisposable
             Assert.True(File.Exists(Path.Combine(work, "game.1.cci")), capture.Output);
         }
 
-        using (LogCapture capture = new())
+        using (new LogCapture())
         {
             Assert.Equal(0, Program.Main(["decompress", Path.Combine(work, "game.1.cci"), outIso, "-y"]));
         }
@@ -84,7 +84,7 @@ public sealed class CliCciTests : IDisposable
             Assert.True(File.Exists(cci), capture.Output);
         }
 
-        using (LogCapture capture = new())
+        using (new LogCapture())
         {
             Assert.Equal(0, Program.Main(["uncci", cci, outIso, "-y"]));
         }
@@ -169,7 +169,7 @@ public sealed class CliCciTests : IDisposable
             Logger.RealQuiet = false;
         }
 
-        internal string Output => _out.ToString() + _err.ToString();
+        internal string Output => string.Concat(_out, _err);
 
         public void Dispose()
         {

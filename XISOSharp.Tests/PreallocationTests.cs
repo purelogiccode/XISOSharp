@@ -1,5 +1,4 @@
 using XISOSharp.Interfaces;
-using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
 

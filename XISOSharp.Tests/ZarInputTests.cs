@@ -238,7 +238,7 @@ public sealed class ZarInputTests : IDisposable
             Logger.RealQuiet = false;
         }
 
-        internal string Output => _out.ToString() + _err.ToString();
+        internal string Output => string.Concat(_out, _err);
 
         public void Dispose()
         {

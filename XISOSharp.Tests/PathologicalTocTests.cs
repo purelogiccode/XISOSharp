@@ -179,7 +179,7 @@ public sealed class PathologicalTocTests : IDisposable
 
         (List<(uint Start, uint End)> sys, List<(uint Start, uint End)> files) = XisoRanges.GetXisoRanges(iso);
         Assert.NotEmpty(sys);
-        Assert.Equal((uint)ChainLength, files.Sum(static r => r.End - r.Start + 1));
+        Assert.Equal(ChainLength, files.Sum(static r => r.End - r.Start + 1));
     }
 
     [Fact]
@@ -217,7 +217,7 @@ public sealed class PathologicalTocTests : IDisposable
         using (FileStream fs = new(iso, FileMode.Open, FileAccess.Write, FileShare.None))
         {
             fs.Seek(entryAbs + 12, SeekOrigin.Begin);
-            fs.WriteByte((byte)(Constants.AttributeArc | Constants.AttributeReservedMask));
+            fs.WriteByte(Constants.AttributeArc | Constants.AttributeReservedMask);
         }
 
         Assert.Contains(XisoReader.AuditXiso(iso).Issues,
@@ -357,7 +357,7 @@ public sealed class PathologicalTocTests : IDisposable
             // At least one whole sector so the root sector itself is inside the image.
             long imageLength = withData
                 ? (dataStartSector + count + 1) * Constants.SectorSize
-                : rootAbs + Math.Max(rootSize, (uint)Constants.SectorSize);
+                : rootAbs + Math.Max(rootSize, Constants.SectorSize);
             fs.SetLength(imageLength);
 
             fs.Seek(Constants.HeaderOffset, SeekOrigin.Begin);

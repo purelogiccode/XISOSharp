@@ -5,7 +5,7 @@ using XISOSharp.Models;
 namespace XISOSharp.Tests;
 
 /// <summary>
-/// Tests for <see cref="XisoReader.GetSectorLayout"/> (TODO #4, xdvdfs #49):
+/// Tests for <see cref="XisoReader.GetSectorLayout(string)"/> (TODO #4, xdvdfs #49):
 /// every file and directory table mapped to its sector range, with merged used
 /// ranges and free gaps tiling the partition.
 /// </summary>

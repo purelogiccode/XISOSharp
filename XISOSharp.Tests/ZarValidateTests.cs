@@ -85,7 +85,7 @@ public sealed class ZarValidateTests : IDisposable
         string modifiedSrc = Path.Combine(work, "src2");
         CopyDirectory(Path.Combine(work, "src"), modifiedSrc);
         byte[] bytes = File.ReadAllBytes(Path.Combine(modifiedSrc, "a.txt"));
-        bytes[0] = (byte)(bytes[0] == (byte)'X' ? (byte)'Y' : (byte)'X');
+        bytes[0] = bytes[0] == (byte)'X' ? (byte)'Y' : (byte)'X';
         File.WriteAllBytes(Path.Combine(modifiedSrc, "a.txt"), bytes);
         string modifiedIso = CreateIso(work, "src2", "modified");
 

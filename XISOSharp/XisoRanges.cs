@@ -109,7 +109,7 @@ public static class XisoRanges
 
         while (true)
         {
-            if (next is long offset)
+            if (next is { } offset)
             {
                 next = null;
                 if (offset < rootSize)
@@ -491,7 +491,7 @@ public static class XisoRanges
 
         while (true)
         {
-            if (next is long offset)
+            if (next is { } offset)
             {
                 next = null;
                 if (offset < dirSize)
@@ -630,7 +630,7 @@ public static class XisoRanges
             return;
         }
 
-        results.Add((Path: entry.Path, Offset: isoOffset + entry.EntryOffset, Size: entry.EntrySize));
+        results.Add((entry.Path, isoOffset + entry.EntryOffset, entry.EntrySize));
     }
 
     /// <summary>One parsed table entry awaiting in-order processing.</summary>

@@ -60,7 +60,7 @@ internal static class SplitIsoFile
     {
         string directory = Path.GetDirectoryName(baseName) ?? string.Empty;
         if (directory.Length == 0) directory = ".";
-        string stem = Path.GetFileName(baseName) ?? string.Empty;
+        string stem = Path.GetFileName(baseName);
         if (stem.Length == 0) return;
 
         string prefix = stem + ".";

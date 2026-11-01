@@ -505,6 +505,9 @@ internal static class BatchConversion
                         {
                             Interlocked.Increment(ref parallelFailed);
                             if (!options.ContinueOnError)
+                                // Parallel.ForEach returns only after every iteration
+                                // finishes, so the CTS is still alive here.
+                                // ReSharper disable once AccessToDisposedClosure
                                 cancellation.Cancel();
                         }
                     });

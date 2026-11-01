@@ -2795,7 +2795,7 @@ public static class XisoReader
 
         while (true)
         {
-            if (next is long offset)
+            if (next is { } offset)
             {
                 next = null;
                 if (++entriesInTable > Constants.MaxTocEntriesPerTable)

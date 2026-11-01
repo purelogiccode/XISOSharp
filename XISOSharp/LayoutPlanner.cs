@@ -35,7 +35,7 @@ internal sealed class LayoutPlanner
         ArgumentNullException.ThrowIfNull(spec);
 
         _spec = spec;
-        if (spec.TotalSectors is long total &&
+        if (spec.TotalSectors is { } total &&
             (total < Constants.RootDirectorySector || total > uint.MaxValue))
         {
             throw new InvalidDataException(
@@ -126,7 +126,7 @@ internal sealed class LayoutPlanner
                     $"Sector layout entry '{entry.Path}' was not found in the source tree.");
             }
 
-            if (entry.SectorCount is uint count && count > 0)
+            if (entry.SectorCount is { } count && count > 0)
             {
                 AddReserved(entry.StartSector, count, entry.Path);
                 Logger.LogErr(
@@ -175,7 +175,7 @@ internal sealed class LayoutPlanner
 
         _matchedPaths.Add(path);
 
-        if (entry.IsDirectory is bool declaredDirectory && declaredDirectory != isDirectory)
+        if (entry.IsDirectory is { } declaredDirectory && declaredDirectory != isDirectory)
         {
             throw new InvalidDataException(
                 $"Sector layout entry '{path}' is a " +
@@ -185,7 +185,7 @@ internal sealed class LayoutPlanner
 
         uint required = RequiredSectors(node, isDirectory);
         uint reserved = required;
-        if (entry.SectorCount is uint declaredCount)
+        if (entry.SectorCount is { } declaredCount)
         {
             if (declaredCount < required)
             {
@@ -239,7 +239,7 @@ internal sealed class LayoutPlanner
                 "the addressable sector space.");
         }
 
-        if (_spec.TotalSectors is long total && end > (ulong)total)
+        if (_spec.TotalSectors is { } total && end > (ulong)total)
         {
             throw new InvalidDataException(
                 $"Sector layout entry '{path}' at [{startSector}, {end}) is out of range: the layout " +

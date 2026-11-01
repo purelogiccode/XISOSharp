@@ -1694,7 +1694,7 @@ internal static class Program
 
                 Logger.Log(
                     $"using sector layout {layoutFile} ({layout.Entries.Count} fixed extent(s)" +
-                    (layout.TotalSectors is long total ? $", {total} total sector(s)" : "") + ")\n");
+                    (layout.TotalSectors is { } total ? $", {total} total sector(s)" : "") + ")\n");
             }
 
             foreach ((string dir, string? name) in createList)
@@ -2949,6 +2949,8 @@ internal static class Program
         int? skipSectors,
         List<JsonEntry> entries,
         HashSet<(uint Sector, uint Size)> visitedDirectories,
+        // Recursion-depth bound (#16 hardening); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth,
         ref int fileCount,
         ref long totalBytes)
@@ -3983,7 +3985,7 @@ internal static class Program
             batch,
             sources,
             source => BatchConversion.OutputPath(source, batch.OutputName, format, appendExtension: true),
-            (source, output) => split ? [Path.ChangeExtension(output, partExtension)] : [output],
+            (_, output) => split ? [Path.ChangeExtension(output, partExtension)] : [output],
             (source, output) => cci
                 ? XisoCci.CompressToCci(source, output, level, cciSplitBytes ?? 0, overwrite: true)
                 : CisoWriter.CompressToCso(source, output, level, cisoSplitBytes, version),
@@ -4185,7 +4187,7 @@ internal static class Program
             batch,
             sources,
             source => BatchConversion.OutputPath(source, batch.OutputName, "iso", appendExtension: true),
-            (source, output) => [output],
+            (_, output) => [output],
             (source, output) =>
             {
                 bool isCci = Path.GetExtension(source).Equals(".cci", StringComparison.OrdinalIgnoreCase);
@@ -4604,7 +4606,7 @@ internal static class Program
             batch,
             sources,
             source => BatchConversion.OutputPath(source, batch.OutputName, format, appendExtension: true),
-            (source, output) => [output],
+            (_, output) => [output],
             (source, output) => toZar
                 ? (XisoZarchive.CreateZar(source, output) ? 0 : 1)
                 : XisoZarchive.ConvertZarToIso(source, output, overwrite: true),

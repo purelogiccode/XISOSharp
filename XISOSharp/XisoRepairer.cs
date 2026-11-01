@@ -220,7 +220,7 @@ public static class XisoRepairer
 
         while (true)
         {
-            if (next is long offset)
+            if (next is { } offset)
             {
                 next = null;
                 if (offset >= fileLength || offset >= tableStart + tableSize || !visited.Add(offset))

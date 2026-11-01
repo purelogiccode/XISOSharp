@@ -53,8 +53,6 @@ public sealed class RedumpInputGuardTests : IDisposable
                 // ignored
             }
         }
-
-        GC.SuppressFinalize(this);
     }
 
     [Theory]
@@ -75,7 +73,7 @@ public sealed class RedumpInputGuardTests : IDisposable
         int rc = Program.Main([mode, "-y", cci]);
 
         Assert.Equal(1, rc);
-        string text = _outCapture.ToString() + _errCapture.ToString();
+        string text = string.Concat(_outCapture, _errCapture);
         Assert.Contains("require a plain ISO", text, StringComparison.Ordinal);
         Assert.Contains("decompress", text, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Unhandled", text, StringComparison.Ordinal);
@@ -94,7 +92,7 @@ public sealed class RedumpInputGuardTests : IDisposable
         int rc = Program.Main(["--wipe", "-y", cso]);
 
         Assert.Equal(1, rc);
-        string text = _outCapture.ToString() + _errCapture.ToString();
+        string text = string.Concat(_outCapture, _errCapture);
         Assert.Contains("CISO", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("decompress", text, StringComparison.OrdinalIgnoreCase);
         AssertNoDerivedOutputs(work, "game");
@@ -113,7 +111,7 @@ public sealed class RedumpInputGuardTests : IDisposable
         int rc = Program.Main(["--wipe", "-y", parts[0]]);
 
         Assert.Equal(1, rc);
-        string text = _outCapture.ToString() + _errCapture.ToString();
+        string text = string.Concat(_outCapture, _errCapture);
         Assert.Contains("split-ISO", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("join", text, StringComparison.OrdinalIgnoreCase);
         AssertNoDerivedOutputs(splitDir, "game");
@@ -130,7 +128,7 @@ public sealed class RedumpInputGuardTests : IDisposable
         int rc = Program.Main(["--wipe", "-y", zar]);
 
         Assert.Equal(1, rc);
-        string text = _outCapture.ToString() + _errCapture.ToString();
+        string text = string.Concat(_outCapture, _errCapture);
         Assert.Contains("ZArchive", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("convert", text, StringComparison.OrdinalIgnoreCase);
         AssertNoDerivedOutputs(work, "game", checkZar: false);

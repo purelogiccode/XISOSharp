@@ -5,7 +5,7 @@ namespace XISOSharp.Tests;
 /// <summary>
 /// Tests for the layout-inspection CLI verbs <c>--sector-layout</c>,
 /// <c>--ranges</c>, and <c>--is-optimized</c> (library APIs
-/// <see cref="XisoReader.GetSectorLayout"/>, <see cref="XisoRanges.GetXisoRanges(FileStream, long, bool)"/>,
+/// <see cref="XisoReader.GetSectorLayout(string)"/>, <see cref="XisoRanges.GetXisoRanges(FileStream, long, bool)"/>,
 /// and <see cref="XisoReader.IsOptimizedImage(Stream, int?)"/> surfaced for users).
 /// CLI runs go through <see cref="Program.Main"/> end to end.
 /// </summary>

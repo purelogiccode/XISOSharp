@@ -473,7 +473,10 @@ public static class XisoZarchive
         };
     }
 
-    private static void WalkZar(ZArchiveReader reader, uint node, string parent, List<ZarEntry> entries, int depth)
+    private static void WalkZar(ZArchiveReader reader, uint node, string parent, List<ZarEntry> entries,
+        // Recursion-depth bound (#16 hardening); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
+        int depth)
     {
         if (depth > Constants.MaxTocDepth)
         {
@@ -501,12 +504,14 @@ public static class XisoZarchive
     private sealed class ZarExtractState
     {
         internal int Files;
-        internal long Bytes;
     }
 
     private static void ExtractZarNode(ZArchiveReader reader, uint node, string outputDirectory,
         string parent, bool skipExisting, IProgress<ProgressInfo>? progress, CancellationToken ct,
-        ZarExtractState state, int depth)
+        ZarExtractState state,
+        // Recursion-depth bound (#16 hardening); kept explicit by design.
+        // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
+        int depth)
     {
         if (depth > Constants.MaxTocDepth)
         {
@@ -550,11 +555,12 @@ public static class XisoZarchive
             string? directory = Path.GetDirectoryName(destination);
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
-            using Stream source = reader.OpenRead(child);
-            using FileStream target = new(destination, FileMode.Create, FileAccess.Write, FileShare.None,
-                1 << 20, FileOptions.SequentialScan);
             try
             {
+                using Stream source = reader.OpenRead(child);
+                using FileStream target = new(destination, FileMode.Create, FileAccess.Write, FileShare.None,
+                    1 << 20, FileOptions.SequentialScan);
+
                 // Phase 7: the name tree carries the exact length, so size the
                 // destination before the first write and copy exactly that many
                 // bytes (a truncated archive now fails instead of silently
@@ -565,9 +571,9 @@ public static class XisoZarchive
             catch
             {
                 // A failed or canceled copy must not leave a partial destination
-                // behind (same rule as XisoReader extraction). Close the handle
-                // first so Windows can delete it.
-                target.Dispose();
+                // behind (same rule as XisoReader extraction). The using
+                // declarations above close the handle before this handler runs,
+                // so Windows can delete it.
                 TryDeleteFile(destination);
                 throw;
             }
@@ -591,7 +597,6 @@ public static class XisoZarchive
             ct);
 
         state.Files++;
-        state.Bytes += size;
         progress?.Report(new ProgressInfo(
             ProgressInfoType.FileAdded,
             Count: state.Files,
@@ -702,7 +707,7 @@ public static class XisoZarchive
 
         while (true)
         {
-            if (next is long offset)
+            if (next is { } offset)
             {
                 next = null;
                 if (offset < dirSize)

@@ -1494,7 +1494,7 @@ public static class XisoWriter
     private static long PreallocatedImageLength(OffsetCalcContext ctx, long prependOffset)
     {
         ulong end = ctx.Allocator.NextFree;
-        if (ctx.TotalSectors is long total && (ulong)total > end)
+        if (ctx.TotalSectors is { } total && (ulong)total > end)
             end = (ulong)total;
 
         return prependOffset + ((long)end * Constants.SectorSize);

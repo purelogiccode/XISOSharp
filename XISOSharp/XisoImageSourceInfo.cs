@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace XISOSharp;
 
 /// <summary>
@@ -7,6 +9,8 @@ namespace XISOSharp;
 /// <param name="DisplayName">File name used in logs and error messages (the first part for split sets).</param>
 /// <param name="Length">Logical uncompressed image length in bytes.</param>
 /// <param name="Parts">Part paths in image order; a single element for non-split images.</param>
+[SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global",
+    Justification = "Public detection payload: consumers read DisplayName, the library itself does not.")]
 public sealed record XisoImageSourceInfo(
     XisoImageFormat Format,
     string DisplayName,

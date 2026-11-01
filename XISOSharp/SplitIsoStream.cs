@@ -180,7 +180,7 @@ internal sealed class SplitIsoStream : Stream
     {
         foreach (FileStream part in _parts)
         {
-            part?.Dispose();
+            part.Dispose();
         }
     }
 }
