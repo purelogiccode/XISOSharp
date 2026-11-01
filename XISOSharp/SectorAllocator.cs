@@ -271,7 +271,7 @@ public sealed class SectorAllocator
     }
 
     /// <summary>
-    /// Seeds an allocator from an explicit layout (<see cref="XisoReader.GetSectorLayout"/>):
+    /// Seeds an allocator from an explicit layout (<see cref="XisoReader.GetSectorLayout(string)"/>):
     /// every used range is marked, the partition size bounds the image, and later
     /// allocations first-fit into the layout's free gaps. Reallocation primitive for
     /// in-place patching (TODO #5).

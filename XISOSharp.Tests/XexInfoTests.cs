@@ -1,4 +1,6 @@
 using System.Buffers.Binary;
+using System.Text.Json;
+using XISOSharp.Cli;
 using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
@@ -143,6 +145,32 @@ public class XexInfoTests : IDisposable
         Assert.Equal(2, xex.DiscCount);
         Assert.Equal(1, xex.EncryptionType);
         Assert.Equal(2, xex.CompressionType);
+    }
+
+    [Fact]
+    public void Cli_XexInfo_Json_EmitsDocument()
+    {
+        string isoPath = CreateIsoWithFile("default.xex", BuildXex2());
+        StringWriter outWriter = new();
+        StringWriter errWriter = new();
+        TextWriter savedOut = Logger.Out;
+        TextWriter savedErr = Logger.Error;
+        try
+        {
+            Logger.Out = outWriter;
+            Logger.Error = errWriter;
+            Assert.Equal(0, Program.Main(["--xex-info", "--json", isoPath, "/default.xex"]));
+        }
+        finally
+        {
+            Logger.Out = savedOut;
+            Logger.Error = savedErr;
+        }
+
+        using JsonDocument doc = JsonDocument.Parse(outWriter.ToString());
+        Assert.Equal("xex-info", doc.RootElement.GetProperty("command").GetString());
+        Assert.Equal(0x4D5307D3u, doc.RootElement.GetProperty("titleId").GetUInt32());
+        Assert.Contains("XEX info:", errWriter.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

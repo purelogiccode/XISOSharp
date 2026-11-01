@@ -17,7 +17,7 @@ namespace XISOSharp;
 /// (with <c>0xFF</c> tail fill) and only the parent table's entry record
 /// (start sector + file size, 8 bytes) is updated.</item>
 /// <item>Replacement is larger, or the file is new: a free run is allocated via
-/// <see cref="SectorAllocator"/> seeded from <see cref="XisoReader.GetSectorLayout"/>,
+/// <see cref="SectorAllocator"/> seeded from <see cref="XisoReader.GetSectorLayout(string)"/>,
 /// and the parent table is re-serialized with <see cref="DirectoryEntryTableWriter"/>.
 /// Value-only changes to ancestor tables (or the volume header, when the root
 /// table moves) are applied as surgical 8-byte record patches — ancestor tables

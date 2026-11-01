@@ -1,6 +1,6 @@
 # Plan to Enhance XISOSharp
 
-**Status:** CCISharp 1.0.0 published on NuGet (2026-11-01). XISOSharp 1.4.5 implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input, Phase 4 pathological-TOC traversal hardening and Phase 5 batch conversion/naming (library + CLI + GUI + tests). Remaining roadmap: JSON output, preallocation and explicit sector-layout packing.
+**Status:** CCISharp 1.0.0 published on NuGet (2026-11-01). XISOSharp 1.5.0 implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input, Phase 4 pathological-TOC traversal hardening, Phase 5 batch conversion/naming, Phase 6 `--json` output and Phase 7 preallocation/sequential I/O (library + CLI + GUI + tests). Remaining roadmap: explicit sector-layout packing (Phase 8, design only).
 **Baseline:** XISOSharp `1.4.4` (tag), extract-xiso build `202609111233`, xdvdfs `0.8.3`
 **Reference:** CCI spec/implementation copied to `References/libCCI-0.1.0-1b0087e` (commit `1b0087e`, GPL-2.0-or-later; reference only) and verified to build/round-trip.
 **CCISharp repo:** <https://github.com/purelogiccode/CCISharp> — package <https://www.nuget.org/packages/CCISharp/1.0.0>.
@@ -20,8 +20,8 @@ A full review of the upstream trackers — 56 extract-xiso issues, 54 extract-xi
 | C | **ZAR as an input format** | xdvdfs #119; XboxKit ZAR workflows | ZAR is write-only today; `list`/`extract`/`checksum`/convert are missing |
 | D | **Pathological directory tables** | extract-xiso PR #80, #95, #76/#77 | Left-skewed tables deeper than 64 entries are rejected instead of read |
 | E | Batch conversion + naming | xdvdfs #93/#114; extract-xiso #60 | `compress`/`decompress` accept only one source |
-| F | Machine-readable output | — (differentiator) | Only `--validate-report` is JSON |
-| G | Preallocation / sequential I/O | extract-xiso PR #26 | Extraction writes without sizing the destination first |
+| F | Machine-readable output | — (differentiator) | Only `--validate-report` is JSON — **done in 1.5.0** |
+| G | Preallocation / sequential I/O | extract-xiso PR #26 | Extraction writes without sizing the destination first — **done in 1.5.0** |
 
 **Headline recommendation:** create a standalone **`CCISharp`** package (read + write + split), then integrate it into XISOSharp through a new unified image-source layer, alongside split-ISO input and ZAR input. That would make XISOSharp the only library we know of — managed or native — that reads and writes the full OG-Xbox matrix: ISO, Redump, XGD1/2/3, split ISO, CSO v1/v2, split CSO, CCI, split CCI, and ZAR.
 
@@ -63,7 +63,7 @@ A full review of the upstream trackers — 56 extract-xiso issues, 54 extract-xi
 - `XISOSharp/XisoZarchive.cs` — `CreateZar`, `ListZar`, `ExtractZar` and `ConvertZarToIso`.
 - `XISOSharp/XisoPatcher.cs`, `SectorAllocator.cs`, `XisoValidator.cs`, `XisoChecksum.cs` — sector layout, copy-in, audit and SHA3-256 checksum already exist.
 - `XISOSharp.Cli/Program.cs` — `--batch` covers extract/list/tree/rewrite/audit and the container verbs (`compress`/`decompress`/`convert`/`split`); JSON only via `--validate-report` (Phase 6).
-- `XISOSharp.Tests` - current suite: 1841 passed / 1 opt-in skip on net8.0/net9.0; 1903 passed / 1 opt-in skip on net10.0.
+- `XISOSharp.Tests` - current suite: 1860 passed / 1 opt-in skip on net8.0/net9.0; 1922 passed / 1 opt-in skip on net10.0.
 
 ---
 
@@ -689,18 +689,20 @@ candidates for the same explicit-stack treatment in a follow-up.
 
 **Acceptance:** `compress --batch dir --format cci` converts every image; an interrupted run resumes with `--skip-existing`; naming templates are covered by tests. **Done:** `CliBatchConvertTests` (19 tests) covers CISO/CCI compress, decompress, ISO↔ZAR convert, split, recursion, templates (including subdirectories), duplicate-output refusal, skip-existing resume, continue-on-error partial cleanup, and parallel jobs.
 
-### 8.7 Phase 6 — `--json` output
+### 8.7 Phase 6 — `--json` output — done in 1.5.0
 
 - Scope: `info`, `list`, `tree`, `checksum`, `sector-layout`, `ranges`, `filetime`, `xbe-info`, `xex-info`, `validate`.
 - `--json` writes JSON to stdout; all human logs go to stderr.
-- Add `XisoJsonContext` (`JsonSerializerContext`, source-generated) to keep trim/AOT compatibility.
+- Add `JsonOutputContext` (`JsonSerializerContext`, source-generated) to keep trim/AOT compatibility.
 - Schema: `{ "schemaVersion": 1, "command": "...", ... }`; arrays for lists; stable names; omit nulls.
 - Add golden-schema tests and trim-analyzer checks.
 - Enrich `-v` / `--version` (and its JSON form) with XISOSharp, CCISharp, ZArchiveSharp, runtime and commit info — closes extract-xiso #21.
 
 **Acceptance:** `XISOSharp info --json game.iso | ConvertFrom-Json` works; schema snapshots are stable; no reflection-based serialization.
 
-### 8.8 Phase 7 — preallocation and sequential I/O
+**Implementation (1.5.0):** `XISOSharp.Cli/JsonOutput.cs` defines the versioned DTOs and a source-generated `JsonOutputContext` (camelCase, nulls omitted). `Logger.RouteInfoToError` keeps human progress on stderr while JSON owns stdout; `--json` is accepted by `-i`, `-l`, `-t`, `--checksum`/`checksum`, `--sector-layout`, `--ranges`, `--filetime`, `--xex-info`, `--xbe-info`, `validate` and `-v`/`--version`. `CliJsonTests` covers every payload, stdout/stderr separation, multi-image list documents and CCI input. `-v` now reports XISOSharp, CCISharp, ZArchiveSharp, runtime, OS, architecture and the MinVer commit.
+
+### 8.8 Phase 7 — preallocation and sequential I/O — done in 1.5.0
 
 - Add an optional default interface member to `IFilesystem`:
   ```csharp
@@ -712,6 +714,8 @@ candidates for the same explicit-stack treatment in a follow-up.
 - No behavior change; benchmark before/after with `XISOSharp.Benchmarks`.
 
 **Acceptance:** extraction/creation output is byte-identical; benchmarks show no regression and a measurable improvement on spinning disks/large files.
+
+**Implementation (1.5.0):** `IFilesystem.CreateFile(path, expectedLength)` is an additive default interface member; `LocalFilesystem` opens with `FileOptions.SequentialScan` and calls `SetLength` before the first write, `MemoryFilesystem` preallocates its buffer, and custom stores keep the old behavior through the default member. `XisoReader.ExtractFile`/`CopyOutFile` pass the entry size, `XisoWriter` sizes the output to the exact post-layout extent before the data phase, and plain-ISO sources open with `SequentialScan`. `PreallocationTests` verifies pre-sizing, the default-member fallback, and that extraction passes each entry's size to the destination.
 
 ### 8.9 Phase 8 — explicit sector-layout packing (design only, deferred)
 
@@ -755,10 +759,12 @@ candidates for the same explicit-stack treatment in a follow-up.
 | `XISOSharp/XisoChecksum.cs` | use the factory; add `ComputeZarChecksum` |
 | `XISOSharp/XisoRepairer.cs` | refuse CCI/split in-place with a clear message |
 | `XISOSharp/XisoZarchive.cs` | `ListZar`, `ExtractZar`, `ConvertZarToIso` |
-| `XISOSharp/XisoWriter.cs` | preallocation; future layout mode |
-| `XISOSharp/XisoFileCopier.cs` | expected-length preallocation, sequential hints |
+| `XISOSharp/XisoWriter.cs` | layout pre-sizing; sequential output; future layout mode |
+| `XISOSharp/XisoReader.cs` | pre-sized extraction/copy-out; offset-aware `GetVolumeInfo`/`ListDirectory`/`GetSectorLayout` |
+| `XISOSharp/LocalFilesystem.cs` / `MemoryFilesystem.cs` | `CreateFile(path, expectedLength)` pre-sizing + `SequentialScan` |
 | `XISOSharp/Interfaces/IFilesystem.cs` | optional `CreateFile(path, expectedLength)` default member |
-| `XISOSharp.Cli/Program.cs` | `--format`, `--cci-*`, `decompress` autodetect, batch, `--json` |
+| `XISOSharp.Cli/Program.cs` | `--format`, `--cci-*`, `decompress` autodetect, batch, `--json`, enriched `--version` |
+| `XISOSharp.Cli/JsonOutput.cs` (new, phase 6) | JSON DTOs + source-generated `JsonOutputContext` |
 | `XISOSharp.Cli/BatchConversion.cs` (new, phase 5) | batch discovery, naming templates, collision guards, prompts, jobs, summary |
 | `XISOSharp.Cli/CliCommands.cs` | GUI command builders for CCI/format/batch |
 | `XISOSharp.Gui/**` | format selector, filters, drop routing |
@@ -829,27 +835,28 @@ candidates for the same explicit-stack treatment in a follow-up.
   - Reader, writer, split sets, seekable stream, ISO extraction, validation.
   - **39 tests green on all three TFMs**, including `libCCI` -> CCISharp and CCISharp -> `libCCI` interop.
   - CI green on Windows/Linux/macOS; tag `v1.0.0` builds/publishes `1.0.0` (nupkg + snupkg).
-- **XISOSharp 1.4.5 (in tree, untagged):**
+- **XISOSharp 1.5.0 (in tree, untagged):**
   - `XisoImageSource` factory (ISO/split ISO/CISO/split CISO/CCI/split CCI/ZAR).
   - `CciBlockDevice`, `XisoCci`, `StreamBlockDevice`, `SplitIsoFile`/`SplitIsoStream`.
   - `XisoZarchive.ListZar`/`ExtractZar`/`ConvertZarToIso`; `XisoChecksum.ComputeZarChecksum`.
   - CLI: `compress --format cci`, `--cci-level`/`--cci-split`, `cci`/`uncci`, `convert`, ZAR-aware list/extract/checksum.
   - GUI: CISO/CCI format selector, `.cci` filters/drop routing, ZAR input through Extract.
-  - **Full suite green:** 1841 passed / 1 skipped (1842) on net8.0/net9.0; 1903 passed / 1 skipped (1904) on net10.0.
+  - **Full suite green:** 1860 passed / 1 skipped (1861) on net8.0/net9.0; 1922 passed / 1 skipped (1923) on net10.0.
   - **Phase 4:** `TraverseXiso` walks each directory table with an explicit in-order stack; a 4,096-entry left-skewed chain lists/trees/extracts/rewrites (the rewrite checksum matches the balanced form). `Constants.MaxTocStackFrames` backstops the stack; subdirectory nesting still uses `MaxTocDepth`.
   - **Phase 5:** `compress`/`decompress`/`convert`/`split` accept `--batch`/`--batch-recursive`, `--skip-existing`, `--continue-on-error`, `--jobs 1..64` and `--output-name` templates (`{name}`, `{ext}`, `{format}`); duplicate outputs and input clobbers are refused before writing, and failed conversions remove partial outputs.
-- **Remaining roadmap:** JSON output (Phase 6), preallocation (Phase 7), optional layout packing (Phase 8).
+  - **Phase 6:** `--json` on read-only verbs with a source-generated `JsonOutputContext`; stdout JSON/stderr logs; `CliJsonTests`.
+  - **Phase 7:** `IFilesystem.CreateFile(path, expectedLength)`, `SequentialScan` sources/destinations, writer layout pre-sizing; `PreallocationTests`.
+  - **Phase 1 gap closed:** `XisoRanges.GetXisoRanges`/`GetFileEntries` are container-aware (`Stream` overloads + `XisoImageSource`), so `--ranges` reads split ISO/CISO/CCI.
+- **Remaining roadmap:** optional explicit layout packing (Phase 8).
 
 ### 12.1 Dependency graph
 
 ```
 CCISharp bootstrap ──► CCISharp 1.0.0 ─┐
                                        ▼
-XISOSharp 1.4.5 (factory + split ISO + CCI + ZAR input + traversal hardening + batch)
+XISOSharp 1.5.0 (factory + split ISO + CCI + ZAR input + traversal hardening + batch + JSON + preallocation)
                                              │
-                                             ├─► 1.6.2 (JSON)
-                                             └─► 1.6.3 (preallocation)
-                                                   └─► 1.7.0 (layout, optional)
+                                             └─► 1.6.0 (layout, optional)
 ```
 
 ### 12.2 Recommended order
@@ -864,9 +871,9 @@ XISOSharp 1.4.5 (factory + split ISO + CCI + ZAR input + traversal hardening + b
 | 5 | XISOSharp ZAR input | done (1.4.5) | `ListZar`/`ExtractZar`/`ConvertZarToIso`, `ComputeZarChecksum`, CLI `convert` |
 | 6 | Traversal hardening | done (1.4.5) | explicit in-order stack, 4k left-chain tests |
 | 7 | Batch convert + naming | done (1.4.5) | `--batch` on compress/decompress/convert/split, templates, jobs, resume |
-| 8 | JSON output | pending | 1.6.2 |
-| 9 | Preallocation | pending | 1.6.3 |
-| 10 | Layout packing | pending (optional) | 1.7.0 |
+| 8 | JSON output | done (1.5.0) | `--json` on read-only verbs, `JsonOutputContext`, stderr logs |
+| 9 | Preallocation | done (1.5.0) | `CreateFile(path, expectedLength)`, `SequentialScan`, writer pre-sizing |
+| 10 | Layout packing | pending (optional) | 1.6.0 |
 
 Effort figures are indicative, not commitments; they exclude review, docs polish and release overhead.
 
@@ -882,10 +889,8 @@ Effort figures are indicative, not commitments; they exclude review, docs polish
 ### 12.4 Suggested version labels
 
 - **CCISharp 1.0.0** — read/write/split/validate.
-- **XISOSharp 1.5.0** — image-source factory + split ISO input.
-- **XISOSharp 1.6.0** — CCI + ZAR input, format matrix.
-- **XISOSharp 1.6.x** — batch, JSON, preallocation.
-- **XISOSharp 1.7.0** — explicit layout packing (optional).
+- **XISOSharp 1.5.0** — factory + split ISO + CCI/ZAR input + batch + JSON + preallocation.
+- **XISOSharp 1.6.0** — explicit layout packing (optional).
 
 ---
 
@@ -914,10 +919,10 @@ Effort figures are indicative, not commitments; they exclude review, docs polish
 
 ## Appendix A — upstream issue map (actionable items)
 
-| Upstream | Status in XISOSharp 1.4.5 | Plan |
+| Upstream | Status in XISOSharp 1.5.0 | Plan |
 |---|---|---|
 | extract-xiso #25 OOM invalid TOC | covered | keep |
-| extract-xiso #21 version command | partial (banner only) | enrich in Phase 6 |
+| extract-xiso #21 version command | covered (`-v`/`--version` + JSON) | keep |
 | extract-xiso #28 Xbox 360 | covered (XGD offsets, XEX info) | keep |
 | extract-xiso #32/#33 Redump offset | covered | keep |
 | extract-xiso #60/#61 bulk | covered | `--batch` extended to convert verbs (Phase 5) |
@@ -930,7 +935,7 @@ Effort figures are indicative, not commitments; they exclude review, docs polish
 | extract-xiso #85 multiple ISOs | covered by batch | done (Phase 5) |
 | extract-xiso #92 empty dirs | covered | keep |
 | extract-xiso #95 AVL/tree | covered (pack validates sizes) | keep |
-| extract-xiso PR #26 preallocation | not covered | Phase 7 |
+| extract-xiso PR #26 preallocation | covered | Phase 7 done |
 | extract-xiso PR #80 traversal | covered | explicit in-order stack (Phase 4) |
 | extract-xiso PR #83 symlinks | covered | keep |
 | xdvdfs #36 output==input | covered | keep |

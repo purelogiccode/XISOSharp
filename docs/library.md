@@ -119,6 +119,7 @@ Logger.Out = TextWriter.Null;     // discard normal output
 Logger.Error = Console.Error;     // keep errors
 Logger.Quiet = true;              // suppress non-error output
 Logger.RealQuiet = true;          // suppress everything
+Logger.RouteInfoToError = true;   // send info to Error, keep Out for JSON
 ```
 
 Progress during extraction/creation is reported through `Logger` and — for write
@@ -168,6 +169,9 @@ XisoReader.UnpackImage(image, "game.iso", "./out");
 var memory = new MemoryFilesystem();
 XisoReader.UnpackImage("game.iso", memory);
 byte[] xbe = memory.ReadAllBytes("default.xbe");
+
+// Extraction pre-sizes known-length destinations (LocalFilesystem: SetLength +
+// SequentialScan; MemoryFilesystem: capacity) before copying (Phase 7).
 
 // Explore an image in-process (no extraction; .iso or .cso)
 var explorer = new XisoExplorer("game.iso");   // probes the volume, fails fast

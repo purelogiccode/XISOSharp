@@ -1054,7 +1054,7 @@ public static class XisoReader
     /// </param>
     /// <param name="filesystem">
     /// Optional destination filesystem (TODO #7): when set, the file is created
-    /// through <see cref="IFilesystem.CreateFile"/> at the destination-root-relative
+    /// through <see cref="IFilesystem.CreateFile(string)"/> at the destination-root-relative
     /// path (<c>path</c> + <c>filename</c>) and the skip/post-write checks probe the
     /// same filesystem. When <c>null</c>, the file lands in the process working
     /// directory under its bare name (legacy chdir-based behavior).
@@ -1130,16 +1130,34 @@ public static class XisoReader
         {
             if (filesystem != null)
             {
-                outFile = filesystem.CreateFile(dest);
+                outFile = filesystem.CreateFile(dest, fileSize);
             }
             else
             {
-                outFile = new FileStream(
+                FileStream direct = new(
                     filename,
                     new FileStreamOptions
                     {
-                        Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
+                        Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536,
+                        Options = FileOptions.SequentialScan
                     });
+
+                // The entry's size is known up front: size the destination before
+                // copying (PlanToEnhance Phase 7). A zero-length entry stays empty.
+                try
+                {
+                    if (fileSize > 0)
+                    {
+                        direct.SetLength(fileSize);
+                    }
+                }
+                catch
+                {
+                    direct.Dispose();
+                    throw;
+                }
+
+                outFile = direct;
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -1847,7 +1865,7 @@ public static class XisoReader
     /// opens (and owns) the stream; the public stream overload validates it.
     /// The trailing <c>filesystem</c> parameter (extract mode) redirects the whole
     /// unpack into an <see cref="IFilesystem"/> destination — files land at its root
-    /// via <see cref="IFilesystem.CreateFile"/>/<see cref="IFilesystem.CreateDirectory"/>
+    /// via <see cref="IFilesystem.CreateFile(string)"/>/<see cref="IFilesystem.CreateDirectory"/>
     /// with no working-directory changes; <c>null</c> keeps the legacy
     /// working-directory-based extraction.
     /// </summary>
@@ -2153,6 +2171,24 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Reads the XISO volume descriptor at an explicit partition offset.
+    /// Equivalent to <see cref="GetVolumeInfo(string)"/>, but when
+    /// <paramref name="skipSectors"/> is set the header is probed only at that
+    /// sector (Redump-style images with a video partition) instead of every
+    /// known layout offset.
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="skipSectors">Sectors to skip before the XISO filesystem, or <c>null</c> to probe.</param>
+    /// <returns>Volume information including root directory location and disc format.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="skipSectors"/> is negative.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static VolumeInfo GetVolumeInfo(string isoPath, int? skipSectors)
+    {
+        using Stream fs = OpenImageStream(isoPath);
+        return GetVolumeInfo(fs, isoPath, skipSectors);
+    }
+
+    /// <summary>
     /// Stream overload of <see cref="GetVolumeInfo(string)"/>: probes an already-open
     /// image (plain or CISO-backed) without throwing on validation errors. The stream
     /// must be readable + seekable and is left open.
@@ -2160,9 +2196,28 @@ public static class XisoReader
     /// <param name="imageStream">Open image stream.</param>
     /// <param name="imageName">Display name of the image (unused; kept for symmetry).</param>
     /// <returns>Volume information including root directory location and disc format.</returns>
-    public static VolumeInfo GetVolumeInfo(Stream imageStream, string imageName = "memory")
+    public static VolumeInfo GetVolumeInfo(Stream imageStream, string imageName = "memory") =>
+        GetVolumeInfo(imageStream, imageName, null);
+
+    /// <summary>
+    /// Stream overload of <see cref="GetVolumeInfo(string, int?)"/>: probes an
+    /// already-open image at an optional explicit partition offset. The stream
+    /// must be readable + seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name of the image (unused; kept for symmetry).</param>
+    /// <param name="skipSectors">Sectors to skip before the XISO filesystem, or <c>null</c> to probe.</param>
+    /// <returns>Volume information including root directory location and disc format.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="skipSectors"/> is negative.</exception>
+    public static VolumeInfo GetVolumeInfo(Stream imageStream, string imageName, int? skipSectors)
     {
         _ = imageName;
+        if (skipSectors is < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value,
+                "Skip sectors must be non-negative.");
+        }
+
         Stream fs = imageStream;
         long fileLength = fs.Length;
         long totalSectors = fileLength / Constants.SectorSize;
@@ -2177,57 +2232,79 @@ public static class XisoReader
 
         try
         {
-            // Same candidate order as FindHeaderBaseForFileTime. Probes past EOF
-            // are skipped instead of aborting the search, so a later candidate
-            // can still match (e.g. a trimmed XGD3 image whose file is smaller
-            // than the XGD2/global candidate offset).
-            ReadOnlySpan<long> probes =
-            [
-                0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
-                Constants.Xgd1LseekOffset
-            ];
-            foreach (long probe in probes)
+            if (skipSectors.HasValue)
             {
-                long probeOffset = Constants.HeaderOffset + probe;
-                if (probeOffset + Constants.HeaderDataLength > fileLength)
-                    continue;
-
-                fs.Seek(probeOffset, SeekOrigin.Begin);
-                try
+                // Explicit partition offset: only that candidate is valid (same
+                // contract as VerifyXiso), so a stray descriptor elsewhere cannot
+                // silently win.
+                long skip = (long)skipSectors.Value * Constants.SectorSize;
+                long probeOffset = Constants.HeaderOffset + skip;
+                if (probeOffset + Constants.HeaderDataLength <= fileLength)
                 {
-                    ReadExact(fs, buffer);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
-                {
-                    discLseek = probe;
-                    headerBase = probeOffset;
-                    isValid = true;
-                    break;
-                }
-            }
-
-            // Rebuilt XISO: descriptor at the very start of the image.
-            if (!isValid)
-            {
-                fs.Seek(0, SeekOrigin.Begin);
-                try
-                {
+                    fs.Seek(probeOffset, SeekOrigin.Begin);
                     ReadExact(fs, buffer);
                     if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
                     {
-                        discLseek = 0;
-                        headerBase = 0;
+                        discLseek = skip;
+                        headerBase = probeOffset;
                         isValid = true;
                     }
                 }
-                catch
+            }
+            else
+            {
+                // Same candidate order as FindHeaderBaseForFileTime. Probes past EOF
+                // are skipped instead of aborting the search, so a later candidate
+                // can still match (e.g. a trimmed XGD3 image whose file is smaller
+                // than the XGD2/global candidate offset).
+                ReadOnlySpan<long> probes =
+                [
+                    0, Constants.GlobalLseekOffset, Constants.Xgd3LseekOffset, Constants.Xgd2HybridLseekOffset,
+                    Constants.Xgd1LseekOffset
+                ];
+                foreach (long probe in probes)
                 {
-                    // No descriptor at offset 0; the image is invalid below.
+                    long probeOffset = Constants.HeaderOffset + probe;
+                    if (probeOffset + Constants.HeaderDataLength > fileLength)
+                        continue;
+
+                    fs.Seek(probeOffset, SeekOrigin.Begin);
+                    try
+                    {
+                        ReadExact(fs, buffer);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+                    {
+                        discLseek = probe;
+                        headerBase = probeOffset;
+                        isValid = true;
+                        break;
+                    }
+                }
+
+                // Rebuilt XISO: descriptor at the very start of the image.
+                if (!isValid)
+                {
+                    fs.Seek(0, SeekOrigin.Begin);
+                    try
+                    {
+                        ReadExact(fs, buffer);
+                        if (buffer.SequenceEqual(HeaderDataBytes.AsSpan()))
+                        {
+                            discLseek = 0;
+                            headerBase = 0;
+                            isValid = true;
+                        }
+                    }
+                    catch
+                    {
+                        // No descriptor at offset 0; the image is invalid below.
+                    }
                 }
             }
 
@@ -2911,10 +2988,26 @@ public static class XisoReader
     /// <exception cref="XisoFormatException">Thrown when the ISO is not a valid XISO image.</exception>
     /// <exception cref="InvalidDataException">Thrown when the path does not exist in the ISO.</exception>
     /// <exception cref="IOException">Thrown on read errors.</exception>
-    public static IReadOnlyList<EntryInfo> ListDirectory(string isoPath, string internalPath = "/")
+    public static IReadOnlyList<EntryInfo> ListDirectory(string isoPath, string internalPath = "/") =>
+        ListDirectory(isoPath, internalPath, null);
+
+    /// <summary>
+    /// Lists a directory at an explicit partition offset (Redump/XGD images
+    /// whose XISO filesystem starts after a video partition).
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file (plain or container-backed).</param>
+    /// <param name="internalPath">Path within the image (<c>"/"</c> for the root).</param>
+    /// <param name="skipSectors">Sectors to skip before the XISO filesystem, or <c>null</c> to probe.</param>
+    /// <returns>List of directory entries, or empty if the directory is empty.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="skipSectors"/> is negative.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="XisoFormatException">Thrown when the ISO is not a valid XISO image.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the path does not exist in the ISO.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static IReadOnlyList<EntryInfo> ListDirectory(string isoPath, string internalPath, int? skipSectors)
     {
         using Stream fs = OpenImageStream(isoPath);
-        return ListDirectory(fs, isoPath, internalPath);
+        return ListDirectory(fs, isoPath, internalPath, skipSectors);
     }
 
     /// <summary>
@@ -2933,11 +3026,29 @@ public static class XisoReader
     /// <exception cref="InvalidDataException">Thrown when the path does not exist in the image.</exception>
     /// <exception cref="IOException">Thrown on read errors.</exception>
     public static IReadOnlyList<EntryInfo> ListDirectory(Stream imageStream, string imageName,
-        string internalPath = "/")
+        string internalPath = "/") =>
+        ListDirectory(imageStream, imageName, internalPath, null);
+
+    /// <summary>
+    /// Stream overload of <see cref="ListDirectory(string, string, int?)"/>: lists
+    /// a directory at an explicit partition offset over an already-open image.
+    /// The stream must be readable + seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name of the image (used in error messages).</param>
+    /// <param name="internalPath">Path within the image (<c>"/"</c> for the root).</param>
+    /// <param name="skipSectors">Sectors to skip before the XISO filesystem, or <c>null</c> to probe.</param>
+    /// <returns>List of directory entries, or empty if the directory is empty.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="skipSectors"/> is negative.</exception>
+    /// <exception cref="XisoFormatException">Thrown when the image is not a valid XISO image.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the path does not exist in the image.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static IReadOnlyList<EntryInfo> ListDirectory(Stream imageStream, string imageName,
+        string internalPath, int? skipSectors)
     {
         Stream fs = imageStream;
         string isoPath = imageName;
-        VolumeInfo volInfo = GetVolumeInfo(fs);
+        VolumeInfo volInfo = GetVolumeInfo(fs, imageName, skipSectors);
         if (!volInfo.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");
 
@@ -3035,12 +3146,28 @@ public static class XisoReader
     /// points outside the image or the tables form a cycle (TODO #16 hardening).
     /// </exception>
     /// <exception cref="IOException">Thrown on read errors.</exception>
-    public static SectorLayout GetSectorLayout(string isoPath)
+    public static SectorLayout GetSectorLayout(string isoPath) => GetSectorLayout(isoPath, null);
+
+    /// <summary>
+    /// Returns the explicit sector layout at an explicit partition offset
+    /// (Redump/XGD images whose XISO filesystem starts after a video partition).
+    /// </summary>
+    /// <param name="isoPath">Path to the XISO file (plain or container-backed).</param>
+    /// <param name="skipSectors">Sectors to skip before the XISO filesystem, or <c>null</c> to probe.</param>
+    /// <returns>The image's per-entry and free/used sector layout.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="skipSectors"/> is negative.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="XisoFormatException">
+    /// Thrown when the ISO is not a valid XISO image, or when an entry's extent
+    /// points outside the image or the tables form a cycle.
+    /// </exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static SectorLayout GetSectorLayout(string isoPath, int? skipSectors)
     {
         // BUG-LIB-037: same CISO-aware routing as GetVolumeInfo above.
         using Stream fs = OpenImageStream(isoPath);
 
-        VolumeInfo volInfo = GetVolumeInfo(isoPath);
+        VolumeInfo volInfo = GetVolumeInfo(fs, isoPath, skipSectors);
         if (!volInfo.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");
 
@@ -3585,12 +3712,29 @@ public static class XisoReader
         FileStream outFile;
         try
         {
-            outFile = new FileStream(
+            FileStream direct = new(
                 destPath,
                 new FileStreamOptions
                 {
-                    Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
+                    Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536,
+                    Options = FileOptions.SequentialScan
                 });
+
+            // Entry size is known: pre-size the destination (PlanToEnhance Phase 7).
+            try
+            {
+                if (entry.FileSize > 0)
+                {
+                    direct.SetLength(entry.FileSize);
+                }
+            }
+            catch
+            {
+                direct.Dispose();
+                throw;
+            }
+
+            outFile = direct;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

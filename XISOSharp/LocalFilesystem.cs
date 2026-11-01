@@ -65,13 +65,45 @@ public sealed class LocalFilesystem(string? root = null) : IFilesystem
     }
 
     /// <inheritdoc/>
-    public Stream CreateFile(string path) =>
-        new FileStream(
+    public Stream CreateFile(string path) => CreateFile(path, null);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Opens the destination with <see cref="FileOptions.SequentialScan"/> and
+    /// pre-sizes it to <paramref name="expectedLength"/> before the first write
+    /// (PlanToEnhance Phase 7), so large extractions do not repeatedly grow the
+    /// file's extents.
+    /// </remarks>
+    public Stream CreateFile(string path, long? expectedLength)
+    {
+        FileStream stream = new(
             Resolve(path),
             new FileStreamOptions
             {
-                Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 65536
+                Mode = FileMode.Create,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                BufferSize = 65536,
+                Options = FileOptions.SequentialScan,
             });
+
+        if (expectedLength is >= 0)
+        {
+            try
+            {
+                stream.SetLength(expectedLength.Value);
+            }
+            catch
+            {
+                // A store that cannot pre-size still gets the correctly opened
+                // stream; the copy loop and post-write length check stay authoritative.
+                stream.Dispose();
+                throw;
+            }
+        }
+
+        return stream;
+    }
 
     /// <inheritdoc/>
     public void CreateDirectory(string path) => Directory.CreateDirectory(Resolve(path));

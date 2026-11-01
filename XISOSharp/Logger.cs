@@ -61,6 +61,17 @@ public static class Logger
     /// <summary>When <c>true</c>, suppresses all non-error output.</summary>
     public static bool Quiet { get; set; }
 
+    /// <summary>
+    /// When <c>true</c>, informational output (<see cref="Log"/>/<see cref="LogLine"/>)
+    /// is written to <see cref="Error"/> instead of <see cref="Out"/>. The CLI sets
+    /// this in <c>--json</c> mode so machine-readable JSON can own stdout while
+    /// human progress/status stays on stderr.
+    /// </summary>
+    public static bool RouteInfoToError { get; set; }
+
+    /// <summary>The sink informational writes currently use.</summary>
+    private static TextWriter InfoWriter => RouteInfoToError ? Error : Out;
+
     /// <summary>When <c>true</c>, suppresses all output including errors.</summary>
     public static bool RealQuiet { get; set; }
 
@@ -183,10 +194,11 @@ public static class Logger
         {
             // Call sites pass pre-interpolated text (file names, tool output) that may
             // itself contain braces; only run composite formatting when args exist.
+            TextWriter writer = InfoWriter;
             if (args.Length == 0)
-                Out.Write(message);
+                writer.Write(message);
             else
-                Out.Write(message, args);
+                writer.Write(message, args);
         }
 
         Forward(ForwardInfo, message, args);
@@ -199,7 +211,7 @@ public static class Logger
     /// <param name="message">The line of text to write (no format arguments).</param>
     public static void LogLine(string message)
     {
-        if (!Quiet && !RealQuiet) Out.WriteLine(message);
+        if (!Quiet && !RealQuiet) InfoWriter.WriteLine(message);
         Forward(ForwardInfo, message, Array.Empty<object?>());
     }
 
@@ -224,7 +236,7 @@ public static class Logger
     /// </summary>
     public static void Flush()
     {
-        if (!Quiet && !RealQuiet) Out.Flush();
+        if (!Quiet && !RealQuiet) InfoWriter.Flush();
     }
 
     /// <summary>

@@ -1,5 +1,73 @@
 # Release Notes
 
+## 1.5.0
+
+Machine-readable-output and I/O-efficiency release. Read-only verbs gain a
+stable `--json` schema (source-generated, trim/AOT-safe) with human logs moved
+to stderr, and extraction/creation now pre-size known-length destinations and
+use sequential-scan hints. `-v`/`--version` also reports the CCISharp,
+ZArchiveSharp, runtime and commit metadata.
+
+Full suite green on all three targets: **1860 passed / 1 opt-in skip (1861) on
+net8.0/net9.0** and **1922 passed / 1 opt-in skip (1923) on net10.0**.
+
+### Library
+
+- **Preallocation / sequential I/O** (PlanToEnhance Phase 7): new additive
+  `IFilesystem.CreateFile(string path, long? expectedLength)` default member.
+  `LocalFilesystem` opens with `FileOptions.SequentialScan` and applies
+  `SetLength` before the first write; `MemoryFilesystem` preallocates its
+  buffer; custom stores keep the old behavior through the default member.
+  `XisoReader.ExtractFile`/`CopyOutFile` pass each entry's size, and plain-ISO
+  sources open with `SequentialScan`.
+- **`XisoWriter` pre-sizing**: after the sector layout is computed, the output
+  is sized once to the exact post-layout extent (plus any prepended partition)
+  before the data phase. The final 64 KiB alignment padding and image bytes are
+  unchanged.
+- **Offset-aware read helpers**: new overloads
+  `GetVolumeInfo(string, int?)`, `GetVolumeInfo(Stream, string, int?)`,
+  `ListDirectory(string, string, int?)`, `ListDirectory(Stream, string, string, int?)`
+  and `GetSectorLayout(string, int?)` probe the XISO header at an explicit
+  Redump/XGD partition offset instead of the automatic candidates.
+- **Container-aware ranges**: `XisoRanges.GetXisoRanges`/`GetFileEntries` gained
+  `Stream` overloads and open through `XisoImageSource`, so `--ranges` and
+  range-based archival helpers read split ISO, CISO and CCI inputs.
+- **`Logger.RouteInfoToError`**: optional switch that sends `Log`/`LogLine`/
+  `Flush` to `Error`, keeping stdout free for machine-readable output.
+
+### CLI
+
+- **`--json`** on `-i`, `-l`, `-t`, `--checksum`/`checksum`,
+  `--sector-layout`, `--ranges`, `--filetime`, `--xex-info`, `--xbe-info`,
+  `validate` and `-v`/`--version`. Every document carries
+  `"schemaVersion": 1` and a `command`; list/tree wrap results in an `images`
+  array (one document for multiple inputs), checksum returns a `checksums`
+  array. JSON goes to stdout; banners/progress/warnings/errors go to stderr.
+- Serialization uses the source-generated `JsonOutputContext` (camelCase, nulls
+  omitted), so the trimmed single-file CLI has no reflection fallback.
+- `--json` is rejected for mutating modes (extract, rewrite, create,
+  compress/decompress, redump) with a clear error.
+- **Version enrichment**: `-v` keeps its historical first line, then prints
+  XISOSharp, CCISharp, ZArchiveSharp, runtime, OS, architecture and the MinVer
+  commit. `-v --json` emits the same data as a JSON document.
+- Help text documents `--json`, `--version`, and the new read-only schema.
+
+### Tests
+
+- `CliJsonTests` (12): every JSON payload parses, stdout/stderr are separated,
+  multi-image list output stays one document, CCI input matches the ISO tree,
+  checksum matches the library digest, `validate` reports summaries, version
+  metadata is populated, and `--json` rejects extract mode.
+- `XbeInfoTests`/`XexInfoTests`: JSON payloads for `--xbe-info`/`--xex-info`
+  (plus the existing end-to-end text checks).
+- `PreallocationTests` (5): `LocalFilesystem` pre-sizing, empty default,
+  `MemoryFilesystem` capacity behavior, the default interface-member fallback,
+  and extraction passing each entry size to a custom `IFilesystem`.
+- `CliHelpFlagTests` now asserts the enriched version output while keeping the
+  first-line banner contract.
+- **net8.0/net9.0 - 1861 tests (1860 passed, 1 opt-in skip)**;
+  **net10.0 - 1923 tests (1922 passed, 1 opt-in skip, adds the GUI tests)**.
+
 ## 1.4.5
 
 Container-input, traversal-hardening and batch-conversion release. XISOSharp now

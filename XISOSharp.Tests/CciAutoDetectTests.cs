@@ -174,6 +174,13 @@ public sealed class CciAutoDetectTests : IDisposable
         Assert.Equal(isoLayout.UsedRanges.Count, cciLayout.UsedRanges.Count);
         Assert.Equal(isoLayout.FreeRanges.Count, cciLayout.FreeRanges.Count);
         Assert.Equal(isoLayout.TotalSectors, cciLayout.TotalSectors);
+
+        (List<(uint Start, uint End)> IsoSys, List<(uint Start, uint End)> IsoFiles) =
+            XisoRanges.GetXisoRanges(iso);
+        (List<(uint Start, uint End)> CciSys, List<(uint Start, uint End)> CciFiles) =
+            XisoRanges.GetXisoRanges(cci);
+        Assert.Equal(IsoSys, CciSys);
+        Assert.Equal(IsoFiles, CciFiles);
     }
 
     [Fact]

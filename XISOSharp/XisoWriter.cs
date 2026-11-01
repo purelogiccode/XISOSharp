@@ -405,6 +405,11 @@ public static class XisoWriter
             return 0;
         }, offsetCtx, AvlTraversalMethod.Prefix, 0);
 
+        // Every file and table extent is placed now, so the final image length is
+        // known before the data phase: pre-size the output once instead of growing
+        // it sector by sector (PlanToEnhance Phase 7).
+        long preallocatedLength = PreallocatedImageLength(offsetCtx, prependOffset);
+
         int bufSize = Math.Max(Constants.ReadWriteBufferSize, Constants.HeaderOffset);
         byte[] buf = new byte[bufSize];
 
@@ -416,16 +421,18 @@ public static class XisoWriter
                     Mode = FileMode.Create,
                     Access = FileAccess.ReadWrite,
                     Share = FileShare.None,
-                    BufferSize = 65536
+                    BufferSize = 65536,
+                    Options = FileOptions.SequentialScan
                 });
 
             outIsoPath = xisoPath;
             partialOutput = xisoPath;
 
+            xisoFs.SetLength(preallocatedLength);
+
             if (prependOffset > 0)
             {
-                // Extend the file with zero-filled space for the video partition / header area.
-                xisoFs.SetLength(prependOffset);
+                // The filesystem starts after the video partition / header area.
                 xisoFs.Seek(prependOffset, SeekOrigin.Begin);
             }
 
@@ -1174,18 +1181,20 @@ public static class XisoWriter
             int bufSize = Math.Max(Constants.ReadWriteBufferSize, Constants.HeaderOffset);
             byte[] buf = new byte[bufSize];
 
+            long preallocatedLength = PreallocatedImageLength(offsetCtx, prependOffset);
             using FileStream xisoFs = new(xisoPath,
                 new FileStreamOptions
                 {
                     Mode = FileMode.Create,
                     Access = FileAccess.ReadWrite,
                     Share = FileShare.None,
-                    BufferSize = 65536
+                    BufferSize = 65536,
+                    Options = FileOptions.SequentialScan
                 });
             partialOutput = xisoPath;
+            xisoFs.SetLength(preallocatedLength);
             if (prependOffset > 0)
             {
-                xisoFs.SetLength(prependOffset);
                 xisoFs.Seek(prependOffset, SeekOrigin.Begin);
             }
 
@@ -1438,6 +1447,16 @@ public static class XisoWriter
     /// <summary>Local helper for sector count calculation (ceiling division).</summary>
     private static uint NumSectors(uint size) =>
         (size / Constants.SectorSize) + (size % Constants.SectorSize != 0 ? 1u : 0u);
+
+    /// <summary>
+    /// Returns the exact image length implied by the finished sector layout:
+    /// the end of the last allocated file/table sector plus any prepended
+    /// partition. Used to pre-size the output before the data phase
+    /// (PlanToEnhance Phase 7); the final 64 KiB alignment padding is added by
+    /// the writer afterwards and is never truncated.
+    /// </summary>
+    private static long PreallocatedImageLength(OffsetCalcContext ctx, long prependOffset) =>
+        prependOffset + ((long)ctx.Allocator.NextFree * Constants.SectorSize);
 
     /// <summary>
     /// Traversal callback that assigns sector positions to directory entries

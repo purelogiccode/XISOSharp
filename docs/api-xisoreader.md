@@ -266,7 +266,9 @@ the output path.
 
 ```csharp
 public static VolumeInfo GetVolumeInfo(string isoPath)
+public static VolumeInfo GetVolumeInfo(string isoPath, int? skipSectors) // explicit Redump offset
 public static VolumeInfo GetVolumeInfo(Stream imageStream, string imageName = "memory") // TODO #19
+public static VolumeInfo GetVolumeInfo(Stream imageStream, string imageName, int? skipSectors)
 ```
 
 Reads the volume descriptor **without throwing** on validation errors. Returns a
@@ -313,7 +315,9 @@ seekable `Stream` over the file's extent.
 
 ```csharp
 public static IReadOnlyList<EntryInfo> ListDirectory(string isoPath, string internalPath = "/")
+public static IReadOnlyList<EntryInfo> ListDirectory(string isoPath, string internalPath, int? skipSectors)
 public static IReadOnlyList<EntryInfo> ListDirectory(Stream imageStream, string imageName, string internalPath = "/") // TODO #19
+public static IReadOnlyList<EntryInfo> ListDirectory(Stream imageStream, string imageName, string internalPath, int? skipSectors)
 public static IReadOnlyList<string> ListDirectoryFlat(string isoPath, string internalPath = "/")
 public static EntryInfo? GetEntryInfo(string isoPath, string internalPath)
 public static EntryInfo? GetEntryInfo(Stream imageStream, string imageName, string internalPath) // TODO #19
@@ -331,6 +335,7 @@ public static EntryInfo? GetEntryInfo(Stream imageStream, string imageName, stri
 
 ```csharp
 public static SectorLayout GetSectorLayout(string isoPath)
+public static SectorLayout GetSectorLayout(string isoPath, int? skipSectors)
 ```
 
 Explicit sector layout (xdvdfs #49, TODO #4) — the library behind low-level disk

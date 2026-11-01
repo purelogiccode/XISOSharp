@@ -159,6 +159,7 @@ public static class XisoImageSource
                     Access = FileAccess.Read,
                     Share = share,
                     BufferSize = 65536,
+                    Options = FileOptions.SequentialScan,
                 }),
             XisoImageFormat.SplitIso => new SplitIsoStream(info.Parts, share),
             XisoImageFormat.Ciso or XisoImageFormat.SplitCiso =>

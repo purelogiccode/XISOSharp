@@ -20,21 +20,21 @@ public static class XisoRanges
     // Low-level readers
     // -----------------------------------------------------------------------
 
-    private static ushort ReadUShort(FileStream fs)
+    private static ushort ReadUShort(Stream fs)
     {
         Span<byte> buf = stackalloc byte[2];
         ReadExact(fs, buf);
         return BinaryPrimitives.ReadUInt16LittleEndian(buf);
     }
 
-    private static uint ReadUInt(FileStream fs)
+    private static uint ReadUInt(Stream fs)
     {
         Span<byte> buf = stackalloc byte[4];
         ReadExact(fs, buf);
         return BinaryPrimitives.ReadUInt32LittleEndian(buf);
     }
 
-    private static void ReadExact(FileStream fs, Span<byte> buffer)
+    private static void ReadExact(Stream fs, Span<byte> buffer)
     {
         int offset = 0;
         while (offset < buffer.Length)
@@ -64,11 +64,22 @@ public static class XisoRanges
         long rootOffset, uint rootSize, long childOffset, bool quiet)
     {
         _ = quiet;
-        GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize, childOffset);
+        GetValidSectorsCore(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize, childOffset);
     }
 
-    private static void GetValidSectors(FileStream isoFs, long isoOffset, List<uint> sysSectors, List<uint> fileSectors,
-        long rootOffset, uint rootSize, long childOffset, HashSet<long>? visited = null,
+    /// <summary>
+    /// Stream overload of <see cref="GetValidSectors(FileStream,long,List{uint},List{uint},long,uint,long,bool)"/>
+    /// for container-backed images (CISO/CCI/split ISO).
+    /// </summary>
+    public static void GetValidSectors(Stream isoFs, long isoOffset, List<uint> sysSectors, List<uint> fileSectors,
+        long rootOffset, uint rootSize, long childOffset, bool quiet)
+    {
+        _ = quiet;
+        GetValidSectorsCore(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize, childOffset);
+    }
+
+    private static void GetValidSectorsCore(Stream isoFs, long isoOffset, List<uint> sysSectors,
+        List<uint> fileSectors, long rootOffset, uint rootSize, long childOffset, HashSet<long>? visited = null,
         // Threaded recursion-depth bound (#16 hardening, proven by deep-tree tests); kept explicit by design.
         // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         int depth = 0)
@@ -136,7 +147,7 @@ public static class XisoRanges
 
             if (leftChildOffset != 0 && leftChildOffset != 0xFFFF)
             {
-                GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize,
+                GetValidSectorsCore(isoFs, isoOffset, sysSectors, fileSectors, rootOffset, rootSize,
                     (long)leftChildOffset * 4, visited, depth + 1);
             }
 
@@ -146,7 +157,7 @@ public static class XisoRanges
             }
             else if (isDirectory)
             {
-                GetValidSectors(isoFs, isoOffset, sysSectors, fileSectors, entryOffset, entrySize, 0, null,
+                GetValidSectorsCore(isoFs, isoOffset, sysSectors, fileSectors, entryOffset, entrySize, 0, null,
                     depth + 1);
             }
             else
@@ -171,7 +182,7 @@ public static class XisoRanges
     /// all zero (the xdvdfs all-zero empty-table sentinel). Restores the stream
     /// position; a short read counts as not-all-zero.
     /// </summary>
-    private static bool IsAllZeroEntryHeader(FileStream isoFs)
+    private static bool IsAllZeroEntryHeader(Stream isoFs)
     {
         long peekPos = isoFs.Position;
         Span<byte> rest = stackalloc byte[12];
@@ -242,7 +253,15 @@ public static class XisoRanges
     /// <paramref name="offset"/> (byte offset of the XISO partition within the file).
     /// </summary>
     public static (List<(uint Start, uint End)> Sys, List<(uint Start, uint End)> Files) GetXisoRanges(
-        FileStream isoFs, long offset, bool quiet)
+        FileStream isoFs, long offset, bool quiet) =>
+        GetXisoRanges((Stream)isoFs, offset, quiet);
+
+    /// <summary>
+    /// Stream overload of <see cref="GetXisoRanges(FileStream,long,bool)"/> for
+    /// container-backed images (CISO/CCI/split ISO) and memory streams.
+    /// </summary>
+    public static (List<(uint Start, uint End)> Sys, List<(uint Start, uint End)> Files) GetXisoRanges(
+        Stream isoFs, long offset, bool quiet)
     {
         _ = quiet;
         List<uint> sysSectors = [];
@@ -291,7 +310,7 @@ public static class XisoRanges
                 $"invalid TOC entry: root directory size {rootSize} (ends at {rootAbs + rootSize}) exceeds image length {isoFs.Length}.");
         }
 
-        GetValidSectors(isoFs, offset, sysSectors, fileSectors, rootOffset * SectorSize, rootSize, 0);
+        GetValidSectorsCore(isoFs, offset, sysSectors, fileSectors, rootOffset * SectorSize, rootSize, 0);
 
         List<(uint, uint)> sysRanges = BuildRanges(sysSectors);
         List<(uint, uint)> fileRanges = BuildRanges(fileSectors);
@@ -335,7 +354,9 @@ public static class XisoRanges
         string isoPath, long offset = 0, bool quiet = false)
     {
         _ = quiet;
-        using FileStream fs = new(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        // Container-aware open: plain ISO, split ISO, CISO and CCI all expose a
+        // seekable decompressed view (Phase 1 acceptance: --ranges on CCI).
+        using Stream fs = XisoImageSource.OpenRead(isoPath);
         return GetXisoRanges(fs, offset, quiet);
     }
 
@@ -347,7 +368,14 @@ public static class XisoRanges
     /// Returns all regular file entries (not directories) with their path, byte offset
     /// and size, sorted by offset ascending (XboxKit <c>CollectFileEntries</c> order).
     /// </summary>
-    public static List<(string Path, long Offset, uint Size)> GetFileEntries(FileStream isoFs, long isoOffset)
+    public static List<(string Path, long Offset, uint Size)> GetFileEntries(FileStream isoFs, long isoOffset) =>
+        GetFileEntries((Stream)isoFs, isoOffset);
+
+    /// <summary>
+    /// Stream overload of <see cref="GetFileEntries(FileStream,long)"/> for
+    /// container-backed images and memory streams.
+    /// </summary>
+    public static List<(string Path, long Offset, uint Size)> GetFileEntries(Stream isoFs, long isoOffset)
     {
         long headerOffset = XisoReader.TryFindHeaderBase(isoFs, isoOffset, out long detectedHeader)
             ? detectedHeader
@@ -370,11 +398,11 @@ public static class XisoRanges
     /// <returns>List of file entries with path, offset, and size.</returns>
     public static List<(string Path, long Offset, uint Size)> GetFileEntries(string isoPath, long isoOffset = 0)
     {
-        using FileStream fs = new(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        using Stream fs = XisoImageSource.OpenRead(isoPath);
         return GetFileEntries(fs, isoOffset);
     }
 
-    private static void CollectFileEntries(FileStream isoFs, long isoOffset, long dirOffset, uint dirSize,
+    private static void CollectFileEntries(Stream isoFs, long isoOffset, long dirOffset, uint dirSize,
         long childOffset, string dirPath, List<(string Path, long Offset, uint Size)> results,
         HashSet<long>? visited = null,
         // Threaded recursion-depth bound (#16 hardening, proven by deep-tree tests); kept explicit by design.

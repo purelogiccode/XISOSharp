@@ -88,8 +88,8 @@ Rules: flags must precede positional arguments (the first non-flag token ends op
 parsing, except the first-token verbs above). Flags match exactly — combined shorts
 like `-lr` are NOT supported. An unknown flag is treated as a filename; a *known*
 flag in a filename slot fails fast (`must come before ISO filenames`). Help is `-h`
-ONLY — `--help` is treated as a filename. `-h`/`-v` exit 0; with no arguments usage
-is printed and the tool exits 1.
+or `--help`; both exit 0, as does `-v`/`--version`; with no arguments usage is
+printed and the tool exits 1.
 
 ## Modes (mutually exclusive; extract is the default)
 
@@ -140,7 +140,7 @@ is printed and the tool exits 1.
 | `-q` | Quiet (suppress non-error output) |
 | `-Q` | Silent (suppress all output) |
 | `-s` | Skip `$SystemUpdate` folder (create: implies `-X "**/$SystemUpdate/**"`) |
-| `-v` | Print version and exit |
+| `-v`, `--version` | Print the version banner plus XISOSharp/CCISharp/ZArchiveSharp/runtime/commit details and exit |
 | `-X <glob>` | Create mode only: exclude files/dirs by glob (repeatable; `/` separator, case-insensitive) |
 | `--skip-sectors N` | Filesystem starts N sectors into the file (Redump video partition); extract/list/tree/rewrite/unpack/filetime |
 | `--prepend-sectors N` | Write N empty sectors before the filesystem (create/rewrite) |
@@ -158,6 +158,7 @@ is printed and the tool exits 1.
 | `--jobs <n>` / `--policy <skip\|overwrite\|auto-rename>` | Parallel + overwrite handling for `--zar`; batch verbs accept `--jobs 1..64` |
 | `--security-sectors <file>` (`--sectors`) | Rebuild-only security-sector range override |
 | `-f <toml>` / `-m "host:image"` (`--map`) / `-O <out>` (`--output`) | `build-image`/`image-spec` inputs |
+| `--json` | Machine-readable output for read-only verbs (`-i`, `-l`, `-t`, `checksum`, `--sector-layout`, `--ranges`, `--filetime`, `--xex-info`, `--xbe-info`, `validate`, `-v`). JSON on stdout, human logs on stderr |
 
 ## Exit codes
 
@@ -230,6 +231,13 @@ XISOSharp decompress --batch ./compressed --skip-existing -y
 XISOSharp convert --batch ./isos --format zar -y
 XISOSharp split --batch ./isos --size half -y
 XISOSharp compress --batch ./isos --output-name "{name}.xiso.{format}" --jobs 4 -y
+
+# Machine-readable output (stdout JSON, stderr logs)
+XISOSharp -i --json game.iso
+XISOSharp -l --json game.iso | ConvertFrom-Json
+XISOSharp checksum --json game.iso game.cci
+XISOSharp validate --json game.iso rewritten.iso
+XISOSharp -v --json
 ```
 
 ## Full reference

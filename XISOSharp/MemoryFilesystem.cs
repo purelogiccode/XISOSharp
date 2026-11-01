@@ -7,7 +7,7 @@ namespace XISOSharp;
 /// <see cref="IFilesystem"/> backed by process memory: extraction without
 /// touching the disk (xdvdfs #166, TODO #7 — the web/wasm unpacker's
 /// destination, and the library/GUI route for previewing or piping files).
-/// Files are committed byte snapshots: each <see cref="CreateFile"/> stream
+/// Files are committed byte snapshots: each <see cref="CreateFile(string)"/> stream
 /// buffers in memory and publishes its bytes on dispose, so completed files
 /// are visible to <see cref="FileExists"/>, <see cref="FileLength"/>,
 /// <see cref="ReadAllBytes"/>, and <see cref="FileNames"/> immediately after the
@@ -24,7 +24,7 @@ public sealed class MemoryFilesystem : IFilesystem
     /// A <see cref="MemoryStream"/> whose bytes are published to the owning
     /// filesystem when disposed (the unpack closes each file on completion).
     /// </summary>
-    private sealed class SinkStream(MemoryFilesystem owner, string key) : MemoryStream
+    private sealed class SinkStream(MemoryFilesystem owner, string key, int capacity) : MemoryStream(capacity)
     {
         private readonly MemoryFilesystem _owner = owner;
         private readonly string _key = key;
@@ -55,7 +55,14 @@ public sealed class MemoryFilesystem : IFilesystem
     }
 
     /// <inheritdoc/>
-    public Stream CreateFile(string path)
+    public Stream CreateFile(string path) => CreateFile(path, null);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A known length preallocates the in-memory buffer (PlanToEnhance Phase 7);
+    /// lengths beyond <see cref="int.MaxValue"/> fall back to a growable stream.
+    /// </remarks>
+    public Stream CreateFile(string path, long? expectedLength)
     {
         string key = Normalize(path);
         if (key.Length == 0)
@@ -64,7 +71,8 @@ public sealed class MemoryFilesystem : IFilesystem
         }
 
         MaterializeParents(key);
-        return new SinkStream(this, key);
+        int capacity = expectedLength is > 0 and <= int.MaxValue ? (int)expectedLength.Value : 0;
+        return new SinkStream(this, key, capacity);
     }
 
     /// <inheritdoc/>

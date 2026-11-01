@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Serilog;
 using XISOSharp.Cli.Logging;
 using XISOSharp.Models;
@@ -81,6 +83,11 @@ internal static class Program
     {
         ConfigureConsoleEncoding();
         AppLogging.Configure("XISOSharp");
+        // Machine-readable output (--json) owns stdout: route every human log to
+        // stderr for the duration of the run (PlanToEnhance Phase 6).
+        bool jsonRequested = Array.Exists(args, static a => string.Equals(a, "--json", StringComparison.Ordinal));
+        bool priorRouteInfoToError = Logger.RouteInfoToError;
+        if (jsonRequested) Logger.RouteInfoToError = true;
         // Launch ping for usage stats (fire-and-forget, opt out with
         // XISO_DISABLE_STATS=1; test hosts are skipped).
         ApplicationStats.RecordLaunch("xisosharp");
@@ -112,6 +119,7 @@ internal static class Program
         }
         finally
         {
+            Logger.RouteInfoToError = priorRouteInfoToError;
             // X-003: deliver pending bug-report sends before the process exits;
             // a short-lived CLI would otherwise drop crash reports every time.
             try
@@ -245,6 +253,7 @@ internal static class Program
         bool sectorLayoutMode = false;
         bool rangesMode = false;
         bool isOptimizedMode = false;
+        bool jsonMode = false;
 
         // XboxKit redump / archival modes
         bool videoMode = false;
@@ -272,6 +281,8 @@ internal static class Program
             Array.Exists(args, static a => string.Equals(a, "--silent", StringComparison.Ordinal));
         bool checksumRequestedAnywhere =
             Array.Exists(args, static a => string.Equals(a, "--checksum", StringComparison.Ordinal));
+        bool jsonRequestedAnywhere =
+            Array.Exists(args, static a => string.Equals(a, "--json", StringComparison.Ordinal));
 
         // Handle standalone verb commands early (don't start with '-')
         if (args.Length > 0 && string.Equals(args[0], "validate", StringComparison.OrdinalIgnoreCase))
@@ -336,13 +347,20 @@ internal static class Program
                 switch (arg)
                 {
                     case "-v":
+                    case "--version":
                         if (silentRequestedAnywhere && !checksumRequestedAnywhere)
                         {
                             Logger.LogErr("Error: --silent requires --checksum\n");
                             return 1;
                         }
 
-                        Console.Write(Constants.Banner);
+                        if (jsonRequestedAnywhere)
+                        {
+                            WriteJsonVersion();
+                            return 0;
+                        }
+
+                        WriteVersionInfo();
                         return 0;
                     case "-h":
                     case "--help":
@@ -944,6 +962,9 @@ internal static class Program
                         // worked (Todo #32).
                         silentFlag = true;
                         break;
+                    case "--json":
+                        jsonMode = true;
+                        break;
                     default:
                         optind = i;
                         goto parse_done;
@@ -959,6 +980,18 @@ internal static class Program
         }
 
         parse_done:
+
+        if (jsonMode)
+        {
+            bool readOnlyJsonMode = info || listMode || tree || checksumFlagMode || sectorLayoutMode ||
+                                    rangesMode || filetimeMode || xexInfoMode || xbeInfoMode || validateMode;
+            if (!readOnlyJsonMode)
+            {
+                Logger.LogErr(
+                    "Error: --json requires a read-only mode (-i, -l, -t, --checksum, --sector-layout, --ranges, --filetime, --xex-info, --xbe-info, or validate)\n");
+                return 1;
+            }
+        }
 
         // Upstream #61: `game.iso -d ./new/` silently probed `-d` as an image
         // ("open error: -d"). Flags must precede filenames, so name the mistake
@@ -1278,6 +1311,11 @@ internal static class Program
                 DateTimeOffset dto = FileTimeHelper.FromFileTimeRaw(raw);
                 string iso8601 = dto.ToString("O", CultureInfo.InvariantCulture);
                 Logger.Log($"FileTime: {iso8601} ({raw}) 0x{raw:X16}\n");
+                if (jsonMode)
+                {
+                    WriteJson(new JsonFileTime(1, "filetime", isoPath, iso8601, raw, $"0x{raw:X16}"));
+                }
+
                 // Also emit raw only to stdout for scripting when quiet? Match xdvdfs raw behavior on --silent?
                 return 0;
             }
@@ -1393,6 +1431,26 @@ internal static class Program
                     Logger.Log($"    {range.StartSector}-{range.StartSector + range.SectorCount - 1}\n");
                 }
 
+                if (jsonMode)
+                {
+                    JsonSectorLayout payload = new(
+                        1,
+                        "sector-layout",
+                        isoPath,
+                        ToJsonVolume(volume, null, volume.FileTimeRaw),
+                        fileCount,
+                        dirCount,
+                        layout.Entries.Select(static e => new JsonExtent(
+                            e.Path,
+                            e.IsDirectory,
+                            e.StartSector,
+                            e.SectorCount,
+                            e.FileSize)).ToList(),
+                        layout.UsedRanges.Select(static r => new JsonRange(r.StartSector, r.SectorCount)).ToList(),
+                        layout.FreeRanges.Select(static r => new JsonRange(r.StartSector, r.SectorCount)).ToList());
+                    WriteJson(payload);
+                }
+
                 return 0;
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException or ExtractErrorException)
@@ -1438,6 +1496,17 @@ internal static class Program
                 foreach ((uint start, uint end) in files)
                 {
                     Logger.Log($"    {start}-{end}\n");
+                }
+
+                if (jsonMode)
+                {
+                    JsonRanges payload = new(
+                        1,
+                        "ranges",
+                        isoPath,
+                        sys.Select(static r => new JsonRange(r.Start, r.End - r.Start + 1)).ToList(),
+                        files.Select(static r => new JsonRange(r.Start, r.End - r.Start + 1)).ToList());
+                    WriteJson(payload);
                 }
 
                 return 0;
@@ -1497,6 +1566,7 @@ internal static class Program
             }
 
             int cExit = 0;
+            List<JsonChecksum>? jsonChecksums = jsonMode ? [] : null;
             for (int k = optind; k < args.Length; k++)
             {
                 string iso = args[k];
@@ -1508,12 +1578,18 @@ internal static class Program
                         Logger.Log($"{hex}\n");
                     else
                         Logger.Log($"{hex}\t{iso}\n");
+                    jsonChecksums?.Add(new JsonChecksum(iso, "sha3-256", hex));
                 }
                 catch (Exception ex)
                 {
                     Logger.LogErr($"Error checksumming {iso}: {ex.Message}\n");
                     cExit = 1;
                 }
+            }
+
+            if (jsonChecksums != null)
+            {
+                WriteJson(new JsonChecksums(1, "checksum", jsonChecksums));
             }
 
             return cExit;
@@ -1653,7 +1729,7 @@ internal static class Program
 
             try
             {
-                VolumeInfo volInfo = XisoReader.GetVolumeInfo(xisoPath);
+                VolumeInfo volInfo = XisoReader.GetVolumeInfo(xisoPath, skipSectors);
 
                 if (!volInfo.IsValid)
                 {
@@ -1684,7 +1760,7 @@ internal static class Program
 
                 Logger.Log("\n");
 
-                IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(xisoPath, internalPath);
+                IReadOnlyList<EntryInfo> entries = XisoReader.ListDirectory(xisoPath, internalPath, skipSectors);
                 if (entries.Count == 0)
                 {
                     Logger.Log($"{internalPath}: empty directory\n");
@@ -1704,6 +1780,39 @@ internal static class Program
                             $"    R-Offset:  {(entry.RightChildOffset == 0 ? "none" : entry.RightChildOffset.ToString())}\n");
                         Logger.Log("\n");
                     }
+                }
+
+                if (jsonMode)
+                {
+                    string? fileTimeIso = null;
+                    ulong fileTimeRaw = 0;
+                    try
+                    {
+                        fileTimeRaw = XisoReader.GetFileTimeRaw(xisoPath, skipSectors);
+                        fileTimeIso = FileTimeHelper.FromFileTimeRaw(fileTimeRaw)
+                            .ToString("O", CultureInfo.InvariantCulture);
+                    }
+                    catch (Exception ex) when (ex is XisoFormatException or IOException)
+                    {
+                        // JSON keeps fileTime null when the descriptor tail is unreadable.
+                    }
+
+                    JsonInfo payload = new(
+                        1,
+                        "info",
+                        xisoPath,
+                        internalPath,
+                        ToJsonVolume(volInfo, fileTimeIso, fileTimeRaw),
+                        entries.Select(static e => new JsonInfoEntry(
+                            e.Name,
+                            e.IsDirectory,
+                            e.StartSector,
+                            e.FileSize,
+                            e.Attributes,
+                            e.LeftChildOffset,
+                            e.RightChildOffset)).ToList());
+                    WriteJson(payload);
+                    return 0;
                 }
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
@@ -1808,6 +1917,31 @@ internal static class Program
                 Logger.Log($"  Encryption:        {xex.EncryptionType} ({FormatXexEncryption(xex.EncryptionType)})\n");
                 Logger.Log(
                     $"  Compression:       {xex.CompressionType} ({FormatXexCompression(xex.CompressionType)})\n");
+
+                if (jsonMode)
+                {
+                    WriteJson(new JsonXexInfo(
+                        1,
+                        "xex-info",
+                        xisoPath,
+                        internalPath,
+                        xex.ModuleFlags,
+                        xex.HeaderSize,
+                        xex.EntryPoint,
+                        xex.ImageBaseAddress,
+                        xex.ImageSize,
+                        xex.LoadAddress,
+                        xex.Region,
+                        xex.AllowedMediaTypes,
+                        xex.MediaId,
+                        xex.TitleId,
+                        xex.Version,
+                        xex.Platform,
+                        xex.DiscNumber,
+                        xex.DiscCount,
+                        xex.EncryptionType,
+                        xex.CompressionType));
+                }
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
             {
@@ -1862,6 +1996,29 @@ internal static class Program
                 Logger.Log($"  Ratings:         0x{xbe.GameRatings:X8}\n");
                 Logger.Log($"  Disc:            {xbe.DiskNumber}\n");
                 Logger.Log($"  Version:         0x{xbe.Version:X8}\n");
+
+                if (jsonMode)
+                {
+                    WriteJson(new JsonXbeInfo(
+                        1,
+                        "xbe-info",
+                        xisoPath,
+                        internalPath,
+                        xbe.BaseAddress,
+                        xbe.EntryPoint,
+                        xbe.SectionCount,
+                        xbe.InitFlags,
+                        xbe.CertSize,
+                        xbe.CertTimeDate,
+                        xbe.TitleId,
+                        xbe.TitleName,
+                        xbe.AlternateTitleIds,
+                        xbe.AllowedMedia,
+                        xbe.GameRegion,
+                        xbe.GameRatings,
+                        xbe.DiskNumber,
+                        xbe.Version));
+                }
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
             {
@@ -2282,6 +2439,29 @@ internal static class Program
                     Logger.Log($"[VALIDATE] Report written to {validateReport}\n");
                 }
 
+                if (jsonMode)
+                {
+                    JsonValidation payload = new(
+                        1,
+                        "validate",
+                        sourcePath,
+                        outputPath,
+                        validateChecksums,
+                        result.Passed,
+                        new JsonValidationSide(sourcePath, result.SourceFileCount, result.SourceDirCount,
+                            result.SourceTotalBytes),
+                        new JsonValidationSide(outputPath, result.OutputFileCount, result.OutputDirCount,
+                            result.OutputTotalBytes),
+                        result.Issues.Select(static i => new JsonValidationIssue(
+                            i.Type.ToString(),
+                            i.Path,
+                            i.SourceSize,
+                            i.OutputSize,
+                            i.SourceHash == null ? null : Convert.ToHexString(i.SourceHash).ToLowerInvariant(),
+                            i.OutputHash == null ? null : Convert.ToHexString(i.OutputHash).ToLowerInvariant())).ToList());
+                    WriteJson(payload);
+                }
+
                 return result.Passed ? 0 : 2;
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException or XisoFormatException)
@@ -2316,6 +2496,8 @@ internal static class Program
                 return 1;
         }
 
+        List<JsonImageListing>? jsonListings = jsonMode && !rewrite && !extract ? [] : null;
+
         for (int i = 0; i < isoFiles.Count; i++)
         {
             isos++;
@@ -2338,6 +2520,29 @@ internal static class Program
                         string destination = path ?? DeriveZarExtractDirectory(xisoPath);
                         Logger.Log($"extracting {Path.GetFileName(xisoPath)}:\n\n");
                         XisoZarchive.ExtractZar(xisoPath, destination);
+                    }
+                    else if (jsonListings != null)
+                    {
+                        List<JsonEntry> entries = [];
+                        int fileCount = 0;
+                        long totalBytes = 0;
+                        foreach (ZarEntry entry in XisoZarchive.ListZar(xisoPath))
+                        {
+                            entries.Add(new JsonEntry(
+                                entry.Path,
+                                Path.GetFileName(entry.Path),
+                                entry.IsDirectory,
+                                0,
+                                entry.Size > long.MaxValue ? long.MaxValue : (long)entry.Size,
+                                0));
+                            if (!entry.IsDirectory)
+                            {
+                                fileCount++;
+                                if (entry.Size <= long.MaxValue) totalBytes += (long)entry.Size;
+                            }
+                        }
+
+                        jsonListings.Add(new JsonImageListing(xisoPath, fileCount, totalBytes, entries));
                     }
                     else
                     {
@@ -2481,6 +2686,21 @@ internal static class Program
             }
             else
             {
+                if (jsonListings != null)
+                {
+                    List<JsonEntry> entries = [];
+                    int fileCount = 0;
+                    long totalBytes = 0;
+                    using (Stream stream = XisoReader.OpenImageStream(xisoPath))
+                    {
+                        CollectJsonEntries(stream, xisoPath, "/", skipSectors, entries,
+                            new HashSet<(uint Sector, uint Size)>(), 0, ref fileCount, ref totalBytes);
+                    }
+
+                    jsonListings.Add(new JsonImageListing(xisoPath, fileCount, totalBytes, entries));
+                    continue;
+                }
+
                 try
                 {
                     if (extract)
@@ -2527,6 +2747,12 @@ internal static class Program
                 else
                     Logger.Log($"\n{Logger.TotalFiles} files in {xisoPath} total {Logger.TotalBytes} bytes\n");
             }
+        }
+
+        if (jsonListings != null)
+        {
+            WriteJson(new JsonListing(1, tree ? "tree" : "list", jsonListings));
+            return err;
         }
 
         if (err == 0 && isos > 1)
@@ -2582,7 +2808,147 @@ internal static class Program
     }
 
     /// <summary>
-    /// Executes the <c>--unpack</c> mode: unpack one ISO to a destination directory
+    /// Serializes one <c>--json</c> payload with the source-generated context.
+    /// Writes to <see cref="Logger.Out"/> so redirected hosts and tests observe
+    /// the same stream as a real stdout.
+    /// </summary>
+    private static void WriteJson<T>(T payload) where T : class
+    {
+        string json = JsonSerializer.Serialize(payload, typeof(T), JsonOutputContext.Default);
+        Logger.Out.WriteLine(json);
+        Logger.Out.Flush();
+    }
+
+    /// <summary>Reads the MinVer informational version (build metadata trimmed).</summary>
+    private static string GetVersion(Type type)
+    {
+        string? info = type.Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(info))
+        {
+            int plus = info.IndexOf('+', StringComparison.Ordinal);
+            return (plus >= 0 ? info[..plus] : info).Trim();
+        }
+
+        Version? version = type.Assembly.GetName().Version;
+        return version?.ToString(3) ?? "unknown";
+    }
+
+    /// <summary>Reads the commit suffix MinVer appends to the informational version.</summary>
+    private static string? GetCommit(Type type)
+    {
+        string? info = type.Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+        if (string.IsNullOrWhiteSpace(info)) return null;
+        int plus = info.IndexOf('+', StringComparison.Ordinal);
+        return plus >= 0 && plus + 1 < info.Length ? info[(plus + 1)..].Trim() : null;
+    }
+
+    /// <summary>
+    /// Prints the enriched <c>-v</c>/<c>--version</c> banner: the historical
+    /// one-line banner first (scripts parse that line), then component, runtime
+    /// and commit details (PlanToEnhance Phase 6, extract-xiso #21).
+    /// </summary>
+    private static void WriteVersionInfo()
+    {
+        Console.Write(Constants.Banner);
+        Console.Write($"  XISOSharp:      {GetVersion(typeof(Constants))}\n");
+        Console.Write($"  CCISharp:       {GetVersion(typeof(CCISharp.CciFile))}\n");
+        Console.Write($"  ZArchiveSharp:  {GetVersion(typeof(ZArchiveSharp.ZArchiveReader))}\n");
+        Console.Write($"  Runtime:        {RuntimeInformation.FrameworkDescription}\n");
+        Console.Write($"  OS:             {RuntimeInformation.OSDescription}\n");
+        Console.Write($"  Architecture:   {RuntimeInformation.ProcessArchitecture}\n");
+        string? commit = GetCommit(typeof(Constants));
+        if (commit != null) Console.Write($"  Commit:         {commit}\n");
+    }
+
+    /// <summary>Emits the <c>--json</c> form of the version report.</summary>
+    private static void WriteJsonVersion()
+    {
+        JsonVersion payload = new(
+            1,
+            "version",
+            GetVersion(typeof(Constants)),
+            GetVersion(typeof(CCISharp.CciFile)),
+            GetVersion(typeof(ZArchiveSharp.ZArchiveReader)),
+            RuntimeInformation.FrameworkDescription,
+            RuntimeInformation.OSDescription,
+            RuntimeInformation.ProcessArchitecture.ToString(),
+            GetCommit(typeof(Constants)));
+        WriteJson(payload);
+    }
+
+    /// <summary>Maps a <see cref="VolumeInfo"/> to the JSON volume shape.</summary>
+    private static JsonVolume ToJsonVolume(VolumeInfo volume, string? fileTimeIso, ulong fileTimeRaw) =>
+        new(
+            volume.IsValid,
+            volume.DiscFormat,
+            volume.FileLength,
+            volume.TotalSectors,
+            volume.DiscLseek,
+            volume.DescriptorSector,
+            volume.RootDirSector,
+            volume.RootDirSize,
+            fileTimeIso,
+            fileTimeRaw);
+
+    /// <summary>
+    /// Recursively collects every entry under <paramref name="dirPath"/> for
+    /// <c>--json -l</c>/<c>-t</c>. Uses the same directory reader as the text
+    /// walk (all image containers and skip offsets) and fails on a table cycle
+    /// instead of recursing forever.
+    /// </summary>
+    private static void CollectJsonEntries(
+        Stream imageStream,
+        string imageName,
+        string dirPath,
+        int? skipSectors,
+        List<JsonEntry> entries,
+        HashSet<(uint Sector, uint Size)> visitedDirectories,
+        int depth,
+        ref int fileCount,
+        ref long totalBytes)
+    {
+        if (depth > Constants.MaxTocDepth)
+        {
+            throw new XisoFormatException(
+                $"invalid TOC entry at '{dirPath}': maximum directory depth {Constants.MaxTocDepth} exceeded (possible directory cycle).");
+        }
+
+        foreach (EntryInfo entry in XisoReader.ListDirectory(imageStream, imageName, dirPath, skipSectors))
+        {
+            string path = string.Equals(dirPath, "/", StringComparison.Ordinal)
+                ? "/" + entry.Name
+                : dirPath.TrimEnd('/') + "/" + entry.Name;
+
+            entries.Add(new JsonEntry(
+                path,
+                entry.Name,
+                entry.IsDirectory,
+                entry.StartSector,
+                entry.FileSize,
+                entry.Attributes));
+
+            if (entry.IsDirectory)
+            {
+                if (entry.FileSize > 0 && !visitedDirectories.Add((entry.StartSector, entry.FileSize)))
+                {
+                    throw new XisoFormatException(
+                        $"invalid TOC entry at '{path}': directory cycle detected at sector {entry.StartSector}.");
+                }
+
+                CollectJsonEntries(imageStream, imageName, path, skipSectors, entries, visitedDirectories,
+                    depth + 1, ref fileCount, ref totalBytes);
+            }
+            else
+            {
+                fileCount++;
+                totalBytes += entry.FileSize;
+            }
+        }
+    }
+
+    /// <summary>Executes the <c>--unpack</c> mode: unpack one ISO to a destination directory
     /// (defaulting to the ISO name). Returns the process exit code.
     /// </summary>
     private static int RunUnpackMode(string[] args, int optind, string? path, int? skipSectors, bool skipExisting,
@@ -3808,6 +4174,7 @@ internal static class Program
     private static int RunChecksumMode(string[] args, int optind)
     {
         bool silent = false;
+        bool json = false;
         List<string> positionals = new();
 
         for (int i = optind; i < args.Length; i++)
@@ -3817,6 +4184,10 @@ internal static class Program
                 string.Equals(a, "-s", StringComparison.OrdinalIgnoreCase))
             {
                 silent = true;
+            }
+            else if (string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase))
+            {
+                json = true;
             }
             else if (string.Equals(a, "-q", StringComparison.Ordinal))
             {
@@ -3835,7 +4206,8 @@ internal static class Program
             else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
             {
-                Console.Write(Constants.Banner);
+                if (json) WriteJsonVersion();
+                else WriteVersionInfo();
                 return 0;
             }
             else if (a.StartsWith('-'))
@@ -3858,6 +4230,7 @@ internal static class Program
         }
 
         int exit = 0;
+        List<JsonChecksum>? jsonChecksums = json ? [] : null;
         foreach (string iso in positionals)
         {
             try
@@ -3870,12 +4243,18 @@ internal static class Program
                     Logger.Log($"{hex}\n");
                 else
                     Logger.Log($"{hex}\t{iso}\n");
+                jsonChecksums?.Add(new JsonChecksum(iso, "sha3-256", hex));
             }
             catch (Exception ex)
             {
                 Logger.LogErr($"Error checksumming {iso}: {ex.Message}\n");
                 exit = 1;
             }
+        }
+
+        if (jsonChecksums != null)
+        {
+            WriteJson(new JsonChecksums(1, "checksum", jsonChecksums));
         }
 
         return exit;
@@ -5633,7 +6012,15 @@ internal static class Program
                                                     -q                  Run quiet (suppress all non-error output).
                                                     -Q                  Run silent (suppress all output).
                                                     -s                  Skip $SystemUpdate folder.
-                                                    -v                  Print version information and exit.
+                                                    -v, --version       Print version information (XISOSharp, CCISharp,
+                                                                        ZArchiveSharp, runtime, commit) and exit.
+                                                    --json              Machine-readable output for read-only modes
+                                                                        (-i, -l, -t, --checksum, --sector-layout,
+                                                                        --ranges, --filetime, --xex-info, --xbe-info,
+                                                                        validate, -v/--version). JSON goes to stdout;
+                                                                        human logs go to stderr. List/tree output is
+                                                                        {"schemaVersion":1,"command":"list","images":[...]};
+                                                                        checksum output is a "checksums" array.
 
                                                     Validation options (with -r or validate command):
 

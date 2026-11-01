@@ -50,9 +50,13 @@ public class CliHelpFlagTests : IDisposable
 
         Assert.Equal(0, rc);
         string outText = _outCapture.ToString();
-        Assert.StartsWith("XISOSharp v", outText, StringComparison.Ordinal);
+        string firstLine = outText.Split('\n')[0];
+        Assert.StartsWith("XISOSharp v", firstLine, StringComparison.Ordinal);
         Assert.DoesNotContain("extract-xiso", outText, StringComparison.Ordinal);
-        Assert.Matches(@"^XISOSharp v\S+ for (win|linux|macos|cross-platform)", outText.TrimEnd());
+        Assert.Matches(@"^XISOSharp v\S+ for (win|linux|macos|cross-platform)", firstLine.TrimEnd());
+        Assert.Contains("CCISharp:", outText, StringComparison.Ordinal);
+        Assert.Contains("ZArchiveSharp:", outText, StringComparison.Ordinal);
+        Assert.Contains("Runtime:", outText, StringComparison.Ordinal);
     }
 
     [Fact]

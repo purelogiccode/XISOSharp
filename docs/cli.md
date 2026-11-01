@@ -39,7 +39,7 @@ XISOSharp convert <src.zar|src.iso> <out.iso|out.zar> [--batch <dir> --format is
 - Flags must precede positional arguments; the first non-flag token ends option parsing (except verbs above which are detected as first token).
 - Flags are matched exactly — combined shorts such as `-lr` are **not** supported.
 - An unknown flag is treated as a filename (it will then fail with an "open error"); a *known* flag in a filename slot fails fast with `must come before ISO filenames` (see [Misplaced flags](#misplaced-flags-upstream-61)).
-- `-h`/`--help` print help; `-v` prints the banner (`XISOSharp v<version> for <platform> - https://github.com/purelogiccode/XISOSharp`); all three exit 0. A `--help` token after the first filename is refused by the misplaced-flag guard (`must come before ISO filenames`).
+- `-h`/`--help` print help; `-v`/`--version` print the banner (`XISOSharp v<version> for <platform> - https://github.com/purelogiccode/XISOSharp`) plus component/runtime/commit details; all exit 0. A `--help` token after the first filename is refused by the misplaced-flag guard (`must come before ISO filenames`).
 - stdout/stderr are always UTF-8, independent of the host console code page, so Latin-1 filenames such as `café.txt` render and pipe identically on every platform.
 - With no arguments at all, usage is printed and the tool exits 1. On an interactive
   double-click launch (Explorer, no redirection) the window additionally waits for a
@@ -113,6 +113,8 @@ Image inputs accept `.cso`/`.1.cso` and `.cci`/`.1.cci` files directly (auto-det
 | `-o <filename>` | Rewrite/rebuild/compress output filename (default: original name with `.iso`/`.cso` extension). Relative names resolve against `-d`; rooted (absolute) paths are used as-is. For `rebuild` must be `-o <redump.iso>`; for `compress` optional positional. |
 | `-q` | Quiet — suppress all non-error output. |
 | `-Q` | Silent — suppress all output, including errors. |
+| `-v`, `--version` | Print the version banner (first line unchanged) followed by XISOSharp, CCISharp, ZArchiveSharp, runtime, OS, architecture and MinVer commit. |
+| `--json` | Machine-readable output for read-only modes: `-i`, `-l`, `-t`, `--checksum`/`checksum`, `--sector-layout`, `--ranges`, `--filetime`, `--xex-info`, `--xbe-info`, `validate`, and `-v`/`--version`. JSON is written to stdout; human logs move to stderr. See [JSON output](#json-output). |
 | `-s` | Skip `$SystemUpdate` entries. On create this is equivalent to `-X "**/$SystemUpdate/**"`; on extract/rewrite it filters `$SystemUpdate` paths while reading. |
 | `-X <glob_pattern>` | **Create mode only.** Exclude files/directories matching the glob pattern. Repeatable. See [Exclude patterns](#exclude-patterns). `WaxGlob` engine also supports `{0}`/`{n}` captures for `build-image`. |
 | `-y`, `--yes` | Always overwrite output files without prompting (`rebuild`, rewrite `-o`, `compress`, `decompress`, redump batch outputs). |
@@ -124,7 +126,7 @@ Image inputs accept `.cso`/`.1.cso` and `.cci`/`.1.cci` files directly (auto-det
 | `--filetime <image>` | Show the FILETIME volume-descriptor field (ISO-8601 + raw u64; `0` = 1601-01-01, xdvdfs compatible). See [FILETIME](api-xisoreader.md#filetime). |
 | `--set-filetime <image> <value>` | Set the FILETIME field (values: ISO-8601, decimal raw, `0x` hex, `'now'`, or `'0'`). Cannot be combined with other modes. See [FILETIME](api-xisoreader.md#filetime). |
 | `--sector-layout <image>` | **Sector layout** — full on-disk map (`XisoReader.GetSectorLayout`): volume summary (format, root dir sector/size, total sectors), per-file extents (`path`, start sector, sector count, bytes), and used/free sector ranges (inclusive spans). Offset-0 only (`--skip-sectors` rejected). |
-| `--ranges <image>` | **Sector ranges** (`XisoRanges.GetXisoRanges`): system (bone) vs file sector ranges as inclusive `start-end` spans, with counts. Offset-0 only (`--skip-sectors` rejected). |
+| `--ranges <image>` | **Sector ranges** (`XisoRanges.GetXisoRanges`): system (bone) vs file sector ranges as inclusive `start-end` spans, with counts. Reads plain ISO, split ISO, CISO and CCI through the container-aware view. Offset-0 only (`--skip-sectors` rejected). |
 | `--is-optimized <image>` | Print `<iso>: optimized` or `<iso>: not optimized` (`XisoReader.IsOptimizedImage` tag probe at offset 31337); supports `--skip-sectors`. Always exits 0 on a readable image. |
 | `--skip-existing` | In extract, `--unpack`, and `--copy-out` modes, skip files already on disk with matching sizes (logged as `skip: <path>`) instead of overwriting them. Re-run an interrupted unpack to resume it; pairs with `--batch`. On a batch container verb (`compress`, `decompress`, `convert`, `split`), skip a source whose output already exists (for `split`, every expected part must exist; a partial set is resumed). See [Resume interrupted unpacks](#resume-interrupted-unpacks). |
 | `--continue-on-error` | In extract, `--unpack`, and `--copy-out` modes, log per-file failures (`Error: Failed to extract ...`) and continue with the next entry instead of aborting. An uncreatable directory skips its subtree. The run still ends with a `Failed to unpack image` summary and a non-zero exit code. On a batch container verb, keep converting after a failed file, remove any partial output, and return exit code `1` after the summary. See [Extraction robustness](#extraction-robustness). |
@@ -325,6 +327,40 @@ Enforced at parse time; violations print an error and exit 1:
 Flags that take arguments (`-c`, `-d`, `-o`, `-X`, `--skip-sectors`, `--prepend-sectors`,
 `--validate-report`, `--security-sectors`/`--sectors`, `--ciso-level`, `--ciso-version`, `--ciso-split`, `--jobs`, `--policy`, `--repair-out`, `-f`, `-m`/`--map`, `-O`/`--output`) consume the next token. For `-c`, the optional `name` is consumed
 only when the next token does not start with `-`.
+
+## JSON output
+
+`--json` turns every read-only verb into a stable, source-generated JSON document
+(`schemaVersion: 1`). JSON owns stdout; banners, progress, warnings and errors
+stay on stderr, so pipes and `ConvertFrom-Json` are safe.
+
+```bash
+XISOSharp -i --json game.iso
+XISOSharp -l --json game.iso | ConvertFrom-Json
+XISOSharp checksum --json game.iso game.cci
+XISOSharp validate --json game.iso rewritten.iso
+XISOSharp -v --json
+```
+
+| Command | Top-level shape |
+|---|---|
+| `info` | `{ schemaVersion, command, source, path, volume, entries[] }` |
+| `list` / `tree` | `{ schemaVersion, command, images[{ source, fileCount, totalBytes, entries[] }] }` |
+| `checksum` | `{ schemaVersion, command, checksums[{ path, algorithm, hash }] }` |
+| `sector-layout` | `{ schemaVersion, command, source, volume, fileCount, dirCount, entries[], usedRanges[], freeRanges[] }` |
+| `ranges` | `{ schemaVersion, command, source, system[{ startSector, sectorCount }], files[...] }` |
+| `filetime` | `{ schemaVersion, command, source, iso8601, raw, hex }` |
+| `xex-info` / `xbe-info` | `{ schemaVersion, command, source, path, ...parsed fields }` |
+| `validate` | `{ schemaVersion, command, source, output, checksums, passed, sourceSummary, outputSummary, issues[] }` |
+| `-v` / `--version` | `{ schemaVersion, command, xisoSharp, cciSharp, zArchiveSharp, runtime, os, architecture, commit }` |
+
+- Property names are camelCase; nulls are omitted.
+- `list` and `tree` always wrap their results in an `images` array, even for a
+  single input, so multi-image runs stay one JSON document.
+- `--json` is rejected for mutating/streaming modes (extract, rewrite, create,
+  compress/decompress, redump, etc.); use the text output there.
+- Serialization uses `JsonOutputContext` (System.Text.Json source generation), so
+  the trimmed single-file CLI keeps working with no reflection fallback.
 
 ## Exit codes
 

@@ -238,8 +238,8 @@ Built-in implementations:
 
 | Type | Behavior |
 |------|----------|
-| `LocalFilesystem(string? root = null)` | Local disk under `root` (cwd-relative when `null`, matching the legacy unpack); `LocalFilesystem.Instance` is the shared cwd-relative instance; parent directories are not auto-created |
-| `MemoryFilesystem` | In-process byte snapshots committed when the unpack closes each file's stream; re-creating a file truncates it; parents auto-created; inspect via `ReadAllBytes(path)`, `FileNames`, `DirectoryNames` |
+| `LocalFilesystem(string? root = null)` | Local disk under `root` (cwd-relative when `null`, matching the legacy unpack); `LocalFilesystem.Instance` is the shared cwd-relative instance; parent directories are not auto-created. Files open with `SequentialScan` and are pre-sized when the entry size is known |
+| `MemoryFilesystem` | In-process byte snapshots committed when the unpack closes each file's stream; re-creating a file truncates it; known sizes preallocate the buffer; parents auto-created; inspect via `ReadAllBytes(path)`, `FileNames`, `DirectoryNames` |
 
 ```csharp
 var memory = new MemoryFilesystem();
@@ -700,6 +700,7 @@ Static class providing configurable text output. All output is thread-safe and c
 |-------|------|---------|-------------|
 | `Quiet` | `bool` | `false` | When `true`, suppresses all non-error output. |
 | `RealQuiet` | `bool` | `false` | When `true`, suppresses all output including errors. |
+| `RouteInfoToError` | `bool` | `false` | When `true`, `Log`/`LogLine`/`Flush` write to `Error` instead of `Out` (CLI `--json` keeps stdout machine-readable). |
 | `Warned` | `bool` | `false` | Set to `true` when a warning is issued during processing. |
 | `TotalBytes` | `long` | `0` | Cumulative bytes written across the current operation. |
 | `TotalFiles` | `int` | `0` | Cumulative files processed in the current operation. |

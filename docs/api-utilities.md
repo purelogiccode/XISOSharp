@@ -27,6 +27,7 @@ helpers, format constants, records, enums, delegates, and exceptions.
 | `Error` | `TextWriter` | Error output (default `Console.Error`) |
 | `Quiet` | `bool` | Suppress non-error output |
 | `RealQuiet` | `bool` | Suppress all output including errors |
+| `RouteInfoToError` | `bool` | Send `Log`/`LogLine`/`Flush` to `Error` instead of `Out` (CLI `--json` keeps stdout machine-readable) |
 | `Warned` | `bool` | Set when a warning is issued |
 | `TotalBytes` / `TotalFiles` | `long` / `int` | Per-operation totals |
 | `TotalBytesAllIsos` / `TotalFilesAllIsos` | `long` / `int` | Cross-operation totals |
@@ -109,7 +110,7 @@ Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXis
 | Type | Purpose |
 |---|---|
 | `XgdTables` | Port of `LibXGD/XGD.cs:11` — `XISO_OFFSET[4]` (incl. `0x89D80000` hybrid), `REDUMP_ISO_LENGTH[9]`, `VIDEO_L0_LENGTH[19]`, `VIDEO_L1_LENGTH[19]`, `WAVE_PVD[24]`, `GetVideoType`, `GetRedumpIsoTypeBySize`, `GetWave` (PVD at `0x832D`) |
-| `XisoRanges` | `GetXisoRanges`/`GetValidSectors`/`MergeRanges`/`CollectFileEntries` (sorted by `Offset`, `quiet` → `Logger.Quiet`) — recursive `cur=isoOffset+rootOffset+childOffset`, `left==0xFFFF` sentinel |
+| `XisoRanges` | `GetXisoRanges`/`GetValidSectors`/`MergeRanges`/`CollectFileEntries` (sorted by `Offset`, `quiet` → `Logger.Quiet`) — recursive `cur=isoOffset+rootOffset+childOffset`, `left==0xFFFF` sentinel; `Stream` overloads read container-backed images (CISO/CCI/split ISO) |
 | `XboxPrng` | RC4-like PRNG (`XboxPRNG.cs`) — `BruteForceSeed(ReadOnlySpan<byte>)`, `SimulateSectors(long)`, `WriteSectors(Stream,long)` (XGD1 seed extraction) |
 | `XisoOperations` | `ExtractFiller`, `TryExtractSeed`/`ExtractSeed`, `WipeFiller`/`ProcessWipe`, `TrimXiso`/`WipeAndTrim` |
 | `XisoSkeleton` | `Petrify` (zeroed XISO + SHA-1 `hex + " " + path` lines, `CollectFileEntries` sorted) |
@@ -296,6 +297,7 @@ for resume.
 | Member | Description |
 |---|---|
 | `Stream CreateFile(string path)` | Create/truncate the file for writing; the stream's final length must match the image's reported size |
+| `Stream CreateFile(string path, long? expectedLength)` | Optional overload (default calls the single-argument member): pre-size the destination when the size is known (PlanToEnhance Phase 7) |
 | `void CreateDirectory(string path)` | Create the directory and all parents; root is a no-op |
 | `bool FileExists(string path)` | `true` when a file (not a directory) exists — resume probe |
 | `long FileLength(string path)` | Byte length, or `-1` when unresolvable (never skipped, reports as truncated) |
@@ -307,8 +309,8 @@ Paths are destination-root-relative, forward-slash separated, case-insensitive
 
 | Implementation | Behavior |
 |---|---|
-| `LocalFilesystem(string? root = null)` | Local disk under `root` (cwd-relative when `null`, matching the legacy unpack). `static LocalFilesystem Instance` is the shared cwd-relative instance. File creation matches the reader's direct path (`FileMode.Create`, 64 KiB buffered, no sharing); parent directories are **not** auto-created |
-| `MemoryFilesystem` | In-process memory: files are byte snapshots committed when the unpack closes each stream (visible to `FileExists`/`FileLength`/`ReadAllBytes`/`FileNames` immediately after). Re-creating a file truncates it; parent directories are materialized automatically. `ReadAllBytes(path)`, `FileNames`, `DirectoryNames` for inspection |
+| `LocalFilesystem(string? root = null)` | Local disk under `root` (cwd-relative when `null`, matching the legacy unpack). `static LocalFilesystem Instance` is the shared cwd-relative instance. File creation matches the reader's direct path (`FileMode.Create`, 64 KiB buffered, no sharing, `SequentialScan`); a known `expectedLength` is applied with `SetLength` before the first write. Parent directories are **not** auto-created |
+| `MemoryFilesystem` | In-process memory: files are byte snapshots committed when the unpack closes each stream (visible to `FileExists`/`FileLength`/`ReadAllBytes`/`FileNames` immediately after). Re-creating a file truncates it; a known `expectedLength` preallocates the buffer; parent directories are materialized automatically. `ReadAllBytes(path)`, `FileNames`, `DirectoryNames` for inspection |
 | custom | Zip archives, network uploads, GUI preview panes — implement the members (the `DeleteFile` default may stay a no-op) |
 
 ## Records

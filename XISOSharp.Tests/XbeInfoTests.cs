@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
+using System.Text.Json;
 using XISOSharp.Cli;
 using XISOSharp.Models;
 
@@ -235,6 +236,33 @@ public class XbeInfoTests : IDisposable
         string isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
 
         Assert.Equal(0, Program.Main(["--xbe-info", isoPath, "/default.xbe"]));
+    }
+
+    [Fact]
+    public void Cli_XbeInfo_Json_EmitsDocument()
+    {
+        string isoPath = CreateIsoWithFile("default.xbe", BuildXbe());
+        StringWriter outWriter = new();
+        StringWriter errWriter = new();
+        TextWriter savedOut = Logger.Out;
+        TextWriter savedErr = Logger.Error;
+        try
+        {
+            Logger.Out = outWriter;
+            Logger.Error = errWriter;
+            Assert.Equal(0, Program.Main(["--xbe-info", "--json", isoPath, "/default.xbe"]));
+        }
+        finally
+        {
+            Logger.Out = savedOut;
+            Logger.Error = savedErr;
+        }
+
+        using JsonDocument doc = JsonDocument.Parse(outWriter.ToString());
+        Assert.Equal("xbe-info", doc.RootElement.GetProperty("command").GetString());
+        Assert.Equal("Halo: Combat Evolved",
+            doc.RootElement.GetProperty("titleName").GetString());
+        Assert.Contains("XBE info:", errWriter.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

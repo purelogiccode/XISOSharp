@@ -1,3 +1,79 @@
+# What's New in 1.5.0 (since 1.4.5)
+
+XISOSharp now speaks **JSON** on every read-only verb, and extraction/creation
+sizes destinations before writing them. `--json` gives scripts a stable,
+source-generated schema (`schemaVersion: 1`) while human logs move to stderr;
+`-v`/`--version` reports the full component/runtime/commit stack. The new
+preallocation and sequential-scan path keeps large extractions from growing
+files sector by sector, and the writer sizes the image once the layout is
+known.
+
+Targets remain `net8.0` / `net9.0` / `net10.0`. Full suite green on all three:
+**1860 passed / 1 opt-in skip (1861) on net8.0/net9.0** and **1922 passed / 1
+opt-in skip (1923) on net10.0**.
+
+## Highlights
+
+- **`--json` for read-only verbs**: `-i`, `-l`, `-t`, `checksum`,
+  `--sector-layout`, `--ranges`, `--filetime`, `--xex-info`, `--xbe-info`,
+  `validate`, and `-v`/`--version`.
+- **Clean stdout/stderr split**: JSON owns stdout; banners, progress, warnings
+  and errors go to stderr (`Logger.RouteInfoToError`).
+- **Stable schema**: `{ "schemaVersion": 1, "command": "...", ... }`; list/tree
+  use an `images` array so multi-image runs stay one document; checksum uses a
+  `checksums` array.
+- **Trim/AOT-safe serialization**: source-generated `JsonOutputContext`, no
+  reflection fallback.
+- **Preallocation**: `IFilesystem.CreateFile(path, expectedLength)`, disk
+  `SetLength` before writes, in-memory capacity reservation, writer output
+  sized once from the computed layout.
+- **Sequential I/O**: `FileOptions.SequentialScan` on plain-ISO sources and
+  extraction/writer destinations.
+- **Version enrichment**: XISOSharp, CCISharp, ZArchiveSharp, runtime, OS,
+  architecture and MinVer commit (`-v`, `--version`, `-v --json`).
+
+## CLI
+
+```bash
+XISOSharp -i --json game.iso
+XISOSharp -l --json game.iso | ConvertFrom-Json
+XISOSharp -t --json game.iso
+XISOSharp checksum --json game.iso game.cci
+XISOSharp --sector-layout --json game.iso
+XISOSharp --ranges --json game.iso
+XISOSharp --filetime --json game.iso
+XISOSharp validate --json game.iso rewritten.iso
+XISOSharp -v --json
+```
+
+- Flags still precede positional arguments (`-i --json game.iso`, not
+  `-i game.iso --json`).
+- `--json` is rejected for mutating modes (extract, rewrite, create,
+  compress/decompress, redump) with a clear error.
+- `-v` keeps its historical first line for scripts, then prints the component
+  details.
+
+## Library
+
+- `IFilesystem.CreateFile(string path, long? expectedLength)` - additive default
+  member; `LocalFilesystem` and `MemoryFilesystem` override it.
+- `Logger.RouteInfoToError` - route informational output to `Logger.Error`.
+- `GetVolumeInfo`/`ListDirectory`/`GetSectorLayout` overloads accepting
+  `skipSectors` for explicit Redump/XGD partition offsets.
+- `XisoRanges.GetXisoRanges`/`GetFileEntries` `Stream` overloads + container-aware
+  `string` overloads (split ISO/CISO/CCI).
+- `XisoReader.ExtractFile`/`CopyOutFile` and `XisoWriter` pre-size known-length
+  destinations; plain-ISO opens use `SequentialScan`.
+
+## Tests
+
+New `CliJsonTests` (12) and `PreallocationTests` (5), plus `--xbe-info`/
+`--xex-info` JSON cases; `CliHelpFlagTests` now covers the enriched version
+banner. Net8/net9: **1860 passed / 1 skipped (1861)**; net10: **1922 passed /
+1 skipped (1923)**.
+
+---
+
 # What's New in 1.4.5 (since 1.4.4)
 
 XISOSharp now reads **CCI/CCIM** images, **split plain-ISO** sets, and

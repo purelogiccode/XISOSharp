@@ -28,6 +28,23 @@ public interface IFilesystem
     Stream CreateFile(string path);
 
     /// <summary>
+    /// Creates or truncates the file at <paramref name="path"/> for writing and
+    /// pre-sizes it to <paramref name="expectedLength"/> when the destination
+    /// supports preallocation (PlanToEnhance Phase 7, extract-xiso PR #26).
+    /// Extraction knows every file's size before copying, so sizing the
+    /// destination first avoids repeated metadata/extent updates while the file
+    /// grows. Stores that cannot preallocate keep the plain
+    /// <see cref="CreateFile(string)"/> behavior.
+    /// </summary>
+    /// <param name="path">Destination-root-relative path of the file.</param>
+    /// <param name="expectedLength">
+    /// Final byte length the file will receive, or <c>null</c> when it is not
+    /// known yet. Negative values are treated as unknown.
+    /// </param>
+    /// <returns>A writable, seekable stream for the file's contents.</returns>
+    Stream CreateFile(string path, long? expectedLength) => CreateFile(path);
+
+    /// <summary>
     /// Creates all directories and subdirectories in <paramref name="path"/>
     /// (<c>Directory.CreateDirectory</c> semantics). Creating the root is a
     /// no-op for implementations without one.
