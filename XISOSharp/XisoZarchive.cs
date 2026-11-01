@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Security.Cryptography;
 using XISOSharp.Models;
 using ZArchiveSharp;
 using ZArchiveSharp.Pipeline;
@@ -247,6 +248,131 @@ public static class XisoZarchive
         List<ZarEntry> entries = new();
         WalkZar(reader, ZArchiveReader.RootNode, string.Empty, entries, 0);
         return entries;
+    }
+
+    /// <summary>
+    /// Computes the hash of a single file inside a ZArchive (<c>.zar</c>),
+    /// mirroring <see cref="XisoReader.ComputeFileHash(string,string,HashAlgorithmName)"/>
+    /// so an archive can be compared with the ISO it was packed from (for
+    /// example through <see cref="XisoValidator.ValidateConversion"/>).
+    /// </summary>
+    /// <param name="zarPath">Path to the <c>.zar</c> archive.</param>
+    /// <param name="internalPath">Archive path (e.g. <c>"/subdir/file.xbe"</c>; case-insensitive).</param>
+    /// <param name="algorithm">Hash algorithm to use (<see cref="HashAlgorithmName.MD5"/> or <see cref="HashAlgorithmName.SHA256"/>).</param>
+    /// <returns>Hash bytes, or <c>null</c> when the file does not exist.</returns>
+    /// <exception cref="ArgumentException"><paramref name="zarPath"/> is null or empty.</exception>
+    /// <exception cref="FileNotFoundException">The archive does not exist.</exception>
+    /// <exception cref="UnauthorizedAccessException">The archive cannot be read.</exception>
+    /// <exception cref="InvalidDataException">The archive is malformed, the path is a directory, or the entry is truncated.</exception>
+    /// <exception cref="NotSupportedException">The hash algorithm is not supported.</exception>
+    public static byte[]? ComputeFileHash(string zarPath, string internalPath, HashAlgorithmName algorithm)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(zarPath);
+        ArgumentNullException.ThrowIfNull(internalPath);
+
+        using ZArchiveReader reader = OpenZarOrThrow(zarPath);
+        if (!TryResolveZarFile(reader, internalPath, out uint node, out ulong size, out bool isDirectory))
+            return null;
+        if (isDirectory)
+            throw new InvalidDataException($"Cannot hash a directory: {internalPath}");
+
+        using HashAlgorithm hasher = CreateHashAlgorithm(algorithm);
+        if (size == 0) return hasher.ComputeHash(Array.Empty<byte>());
+
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(Constants.ReadWriteBufferSize);
+        try
+        {
+            ulong consumed = 0;
+            ulong remaining = size;
+            while (remaining > 0)
+            {
+                int toRead = (int)Math.Min((ulong)buffer.Length, remaining);
+                ulong read = reader.ReadFromFile(node, consumed, buffer.AsSpan(0, toRead));
+                if (read == 0)
+                {
+                    throw new InvalidDataException(
+                        $"Truncated ZArchive file data for {internalPath}: expected {size}, remaining {remaining}.");
+                }
+
+                hasher.TransformBlock(buffer, 0, (int)read, null, 0);
+                consumed += read;
+                remaining -= read;
+            }
+
+            hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            return hasher.Hash;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    private static HashAlgorithm CreateHashAlgorithm(HashAlgorithmName algorithm)
+    {
+        if (algorithm == HashAlgorithmName.MD5) return MD5.Create();
+        if (algorithm == HashAlgorithmName.SHA256) return SHA256.Create();
+        if (algorithm == HashAlgorithmName.SHA1) return SHA1.Create();
+        if (algorithm == HashAlgorithmName.SHA384) return SHA384.Create();
+        if (algorithm == HashAlgorithmName.SHA512) return SHA512.Create();
+
+        throw new NotSupportedException($"Hash algorithm '{algorithm.Name}' is not supported.");
+    }
+
+    /// <summary>
+    /// Resolves an archive path (<c>/a/b/c.txt</c>) to its name-tree node.
+    /// Returns <c>false</c> when any segment is missing; reports whether the
+    /// final match is a directory so callers can reject hashing it.
+    /// </summary>
+    private static bool TryResolveZarFile(ZArchiveReader reader, string internalPath, out uint node, out ulong size,
+        out bool isDirectory)
+    {
+        node = 0;
+        size = 0;
+        isDirectory = false;
+
+        string[] segments = internalPath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0) return false;
+
+        uint current = ZArchiveReader.RootNode;
+        for (int s = 0; s < segments.Length; s++)
+        {
+            uint count = reader.GetDirEntryCount(current);
+            bool found = false;
+            for (uint index = 0; index < count; index++)
+            {
+                if (!reader.TryGetDirEntry(current, index, out uint child, out ZArchiveReader.DirEntry entry))
+                {
+                    throw new InvalidDataException($"Invalid ZArchive directory entry under '{internalPath}'.");
+                }
+
+                if (!string.Equals(entry.Name, segments[s], StringComparison.OrdinalIgnoreCase)) continue;
+
+                found = true;
+                if (entry.IsDirectory)
+                {
+                    if (s == segments.Length - 1)
+                    {
+                        isDirectory = true;
+                        return true;
+                    }
+
+                    current = child;
+                    break;
+                }
+
+                // A file in the middle of the path cannot be descended into.
+                if (s != segments.Length - 1) return false;
+
+                node = child;
+                size = entry.Size;
+                return true;
+            }
+
+            if (!found) return false;
+        }
+
+        return false;
     }
 
     /// <summary>

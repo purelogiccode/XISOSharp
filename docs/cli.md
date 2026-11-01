@@ -50,7 +50,7 @@ XISOSharp convert <src.zar|src.iso> <out.iso|out.zar> [--batch <dir> --format is
 
 Modes are mutually exclusive unless noted as aliases. If no mode is given, **extract** is the default.
 
-Image inputs accept `.cso`/`.1.cso` and `.cci`/`.1.cci` files directly (auto-detected by extension with a magic-sniff fallback, `xdvdfs img.rs` parity): `extract`, `--unpack`, `-l`/`-t`, `--pack` (iso→rewrite), `-r`, and `checksum` all operate on the decompressed view, with outputs named after the game stem (`game.cso` → `game.iso`, extract dir `game/`). Split plain-ISO sets (`game.1.iso`) are also read directly. `.zar` archives are accepted by `-l`, `-t`, `-x`, `--unpack` and `checksum`, and converted with `convert`.
+Image inputs accept `.cso`/`.1.cso` and `.cci`/`.1.cci` files directly (auto-detected by extension with a magic-sniff fallback, `xdvdfs img.rs` parity): `extract`, `--unpack`, `-l`/`-t`, `--pack` (iso→rewrite), `-r`, and `checksum` all operate on the decompressed view, with outputs named after the game stem (`game.cso` → `game.iso`, extract dir `game/`). Split plain-ISO sets (`game.1.iso`) are also read directly. `.zar` archives are accepted by `-l`, `-t`, `-x`, `--unpack`, `checksum` and `validate`, and converted with `convert`. Sector-only verbs (`-i`, `--ls`, `-V`, `--filetime`, `--sector-layout`, `--ranges`, `--repair`, …) reject a `.zar` with a clean error naming the archive verbs instead of probing compressed bytes.
 
 | Flag | Description |
 |---|---|
@@ -78,7 +78,7 @@ Image inputs accept `.cso`/`.1.cso` and `.cci`/`.1.cci` files directly (auto-det
 | `--copy-in <iso> <host> <path>` | Copy a host file **into** an ISO, modifying it in place: replaces `<path>` when it exists, adds it as a new file otherwise. A host directory is rejected fast (`InvalidDataException`, nothing written). Writes an `<iso>.old` backup first unless `--no-backup`. See [CopyIn](api-xisoreader.md#copyin). |
 | `--no-backup` | With `--copy-in` or `--repair`, skip the `<iso>.old` backup (rejected without either). |
 | `-r` | **Rewrite** each ISO as an optimized ISO (see [Optimized-tag detection](#optimized-tag-detection)). Already-optimized images are skipped. Output is **byte-identical** to `extract-xiso -r` (SHA-256 verified on real dumps): dirent attributes are re-encoded with the DIR/ARC defaults; pass `--preserve-attrs` to keep the source bits instead. |
-| `validate <src> <out>` | Standalone **validation** command — must be the **first** token. See [Validation](validation.md). |
+| `validate <src> <out>` | Standalone **validation** command — must be the **first** token. Both sides accept ISO, CISO/CCI (single or split), split plain-ISO sets and `.zar`. See [Validation](validation.md). |
 | `--video` | **Redump:** extract video partition (`L0` head + `L1` tail) via `XisoRedump.TryExtractVideo` + `XgdTables` wave tables; writes `*.video.iso`. Fails gracefully when `videoType==-1`. See [Archival](archival.md#video). |
 | `--random` | **Redump:** extract random filler/padding (`XisoOperations.ExtractFiller` via `GetXisoRanges`/`MergeRanges`); writes `*.filler`. See [Archival](archival.md#random). |
 | `--seed` | **Redump:** extract XGD1 RNG seed (brute-force `XboxPrng`, XGD1 only); writes `*.seed`. See [Archival](archival.md#seed). |

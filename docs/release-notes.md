@@ -12,8 +12,8 @@ The audit, sector-range, repair, salvage and ZAR walks now use the same explicit
 in-order table traversal as extract/list/rewrite, so `MaxTocDepth` bounds real
 subdirectory nesting only.
 
-Full suite green on all three targets: **1913 passed / 1 opt-in skip (1914) on
-net8.0/net9.0** and **1975 passed / 1 opt-in skip (1976) on net10.0**.
+Full suite green on all three targets: **1923 passed / 1 opt-in skip (1924) on
+net8.0/net9.0** and **1985 passed / 1 opt-in skip (1986) on net10.0**.
 
 ### Library
 
@@ -49,6 +49,19 @@ net8.0/net9.0** and **1975 passed / 1 opt-in skip (1976) on net10.0**.
   backstops are unchanged; a shared (DAG) subtree now reports the same cycle
   error the reader has always raised.
 
+### ZAR validation (Phase 3 follow-up)
+
+- `XisoValidator.ValidateConversion` accepts a ZArchive (`.zar`) on either side:
+  the tree comes from `XisoZarchive.ListZar`, and `--validate-checksums` hashes
+  each name-tree entry through the new `XisoZarchive.ComputeFileHash` (no
+  extraction to disk). ISO↔ZAR conversions can now be verified directly.
+- The CLI `validate` verb accepts `.zar` (including `--json` and
+  `--validate-report`), matching the `-l`/`-t`/`-x`/`checksum` ZAR input support.
+- A `.zar` handed to a sector-only verb (`-i`, `--ls`, `-V`, `--filetime`,
+  `--sector-layout`, `--ranges`, `--repair`, `--copy-in`/`--copy-out`, …) now
+  reports a clean `Error:` naming the archive verbs instead of an unhandled
+  `NotSupportedException` stack trace.
+
 ### CLI
 
 - `--layout <file>` on `-c <dir>`, `--pack <dir>` and `build-image`; rejected for
@@ -69,8 +82,12 @@ net8.0/net9.0** and **1975 passed / 1 opt-in skip (1976) on net10.0**.
   allocations, handles null and zero-count ranges.
 - `PathologicalTocTests` (+5): the 4,096-entry left spine audits and maps, repairs
   its deepest entry, salvages to a passing image, and packs to a valid ZAR.
-- **net8.0/net9.0 - 1914 tests (1913 passed, 1 opt-in skip)**;
-  **net10.0 - 1976 tests (1975 passed, 1 opt-in skip, adds the GUI tests)**.
+- `ZarValidateTests` (10): ZAR↔ISO/CCI tree comparison, per-entry SHA-256/MD5
+  hashing (case-insensitive paths, missing/directory paths), missing-file and
+  checksum-mismatch detection, CLI `validate --json`/`--validate-report`, and a
+  clean sector-only rejection for `.zar` inputs.
+- **net8.0/net9.0 - 1924 tests (1923 passed, 1 opt-in skip)**;
+  **net10.0 - 1986 tests (1985 passed, 1 opt-in skip, adds the GUI tests)**.
 
 ## 1.5.0
 

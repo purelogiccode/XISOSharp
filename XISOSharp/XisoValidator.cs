@@ -12,11 +12,13 @@ namespace XISOSharp;
 public static class XisoValidator
 {
     /// <summary>
-    /// Validates a conversion by comparing the file trees of two XISO images.
-    /// Works for both Redump→XISO and rewrite (−r) conversions.
+    /// Validates a conversion by comparing the file trees of two images.
+    /// Works for both Redump→XISO and rewrite (−r) conversions, and accepts a
+    /// ZArchive (<c>.zar</c>) on either side so an ISO↔ZAR conversion can be
+    /// verified without extracting first.
     /// </summary>
-    /// <param name="sourcePath">Path to the source ISO (Redump or original XISO).</param>
-    /// <param name="outputPath">Path to the output XISO.</param>
+    /// <param name="sourcePath">Path to the source image (ISO, CISO/CCI, split set, or <c>.zar</c>).</param>
+    /// <param name="outputPath">Path to the output image (ISO, CISO/CCI, split set, or <c>.zar</c>).</param>
     /// <param name="verifyChecksums">If <c>true</c>, also verify SHA-256 checksums for each file.</param>
     /// <returns>A <see cref="ValidationResult"/> describing the outcome.</returns>
     public static ValidationResult ValidateConversion(
@@ -98,8 +100,8 @@ public static class XisoValidator
             }
             else if (verifyChecksums && srcEntry.Size > 0)
             {
-                byte[]? srcHash = XisoReader.ComputeFileHash(sourcePath, path, HashAlgorithmName.SHA256);
-                byte[]? outHash = XisoReader.ComputeFileHash(outputPath, path, HashAlgorithmName.SHA256);
+                byte[]? srcHash = ComputeFileHash(sourcePath, path);
+                byte[]? outHash = ComputeFileHash(outputPath, path);
 
                 if (srcHash != null && outHash != null && !srcHash.AsSpan().SequenceEqual(outHash))
                 {
@@ -127,16 +129,42 @@ public static class XisoValidator
     }
 
     /// <summary>
-    /// Collects a flat list of all file and directory entries from an XISO image.
+    /// Collects a flat list of all file and directory entries from an image
+    /// (ISO, compressed container, split set, or ZArchive).
     /// </summary>
-    /// <param name="isoPath">Path to the XISO file.</param>
+    /// <param name="isoPath">Path to the image.</param>
     /// <returns>List of <see cref="FileTreeEntry"/> for all entries in the image.</returns>
     private static List<FileTreeEntry> CollectFileTree(string isoPath)
     {
+        if (IsZarPath(isoPath))
+        {
+            List<FileTreeEntry> zarEntries = new();
+            foreach (ZarEntry entry in XisoZarchive.ListZar(isoPath))
+            {
+                zarEntries.Add(new FileTreeEntry(entry.Path, (long)entry.Size, entry.IsDirectory));
+            }
+
+            return zarEntries;
+        }
+
         List<FileTreeEntry> entries = new();
         CollectEntries(isoPath, "/", entries);
         return entries;
     }
+
+    /// <summary>True for a <c>.zar</c> path (an archive, not a sector image).</summary>
+    private static bool IsZarPath(string path) =>
+        path.EndsWith(".zar", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// SHA-256 of one file in an image, dispatching to the ZArchive reader for
+    /// <c>.zar</c> sources and to <see cref="XisoReader.ComputeFileHash(string,string,HashAlgorithmName)"/>
+    /// for sector images.
+    /// </summary>
+    private static byte[]? ComputeFileHash(string imagePath, string internalPath) =>
+        IsZarPath(imagePath)
+            ? XisoZarchive.ComputeFileHash(imagePath, internalPath, HashAlgorithmName.SHA256)
+            : XisoReader.ComputeFileHash(imagePath, internalPath, HashAlgorithmName.SHA256);
 
     /// <summary>
     /// Recursively collects entries from a directory within an XISO image.

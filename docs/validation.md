@@ -13,11 +13,11 @@ standalone command and as a post-rewrite step.
 
 ## Standalone `validate` command
 
-The `validate` command compares two existing ISO images and must be the **first**
+The `validate` command compares two existing images and must be the **first**
 token on the command line (it does not start with `-`):
 
 ```bash
-XISOSharp validate <source.iso> <output.iso> [--validate-checksums] [--validate-strict] [--validate-report <file>]
+XISOSharp validate <source> <output> [--validate-checksums] [--validate-strict] [--validate-report <file>]
 ```
 
 | Flag | Effect |
@@ -28,7 +28,10 @@ XISOSharp validate <source.iso> <output.iso> [--validate-checksums] [--validate-
 | `-q` / `-Q` | Apply as usual. |
 
 The source may be a Redump image (game partition auto-detected at its known offset) or
-an ordinary XISO; the output is the image produced by a conversion.
+an ordinary XISO; the output is the image produced by a conversion. Compressed
+containers (`.cso`/`.cci`, single or split) and split plain-ISO sets are read
+through their decompressed view, and a **ZArchive (`.zar`)** is accepted on
+either side, so an ISO↔ZAR conversion can be verified without extracting first.
 
 ## Post-rewrite validation
 
@@ -64,6 +67,7 @@ used elsewhere they are rejected (exit 1). A mismatch exits 2.
 2. **File paths** — case-insensitive matching per the XDVDFS spec.
 3. **File sizes** — byte-accurate.
 4. **Checksums** — SHA-256 per file, only when `--validate-checksums` is given.
+   A `.zar` side hashes its name-tree entries directly (no extraction).
 
 Reported issue types: `MissingInOutput`, `ExtraInOutput`, `SizeMismatch`,
 `ChecksumMismatch`.
@@ -119,6 +123,9 @@ Each issue entry carries `type`, `path`, `sourceSize`, `outputSize`, `sourceHash
 ```bash
 # Compare a Redump source with a rebuilt XISO, including checksums
 XISOSharp validate --validate-checksums game.redump.iso rebuilt.xiso
+
+# Verify an ISO → ZAR conversion (or ZAR → ISO) without extracting
+XISOSharp validate --validate-checksums game.zar game.iso
 
 # Rewrite and validate with a JSON report; fail the build on mismatch
 XISOSharp -r --validate --validate-strict --validate-report report.json game.iso

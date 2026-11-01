@@ -25,6 +25,14 @@ public static class XisoImageSource
     private const uint CisoBlockSize = 2048;
 
     /// <summary>
+    /// Shared message for a <c>.zar</c> handed to a sector-based API: an archive
+    /// is a name tree, not an image with 2048-byte sectors.
+    /// </summary>
+    private const string ZarNotSectorImageMessage =
+        "ZArchive (.zar) files are not sector images; use XisoZarchive.ListZar/ExtractZar/ConvertZarToIso " +
+        "or the CLI's list/extract/checksum/validate/convert verbs.";
+
+    /// <summary>
     /// Attempts to classify <paramref name="path"/> and read its logical length.
     /// Returns <c>false</c> when the path is empty, a known container header is
     /// invalid, or a split part set has no existing parts. Plain files always
@@ -166,8 +174,7 @@ public static class XisoImageSource
                 new BlockDeviceStream(new CisoBlockDevice(path, share)),
             XisoImageFormat.Cci or XisoImageFormat.SplitCci =>
                 new BlockDeviceStream(new CciBlockDevice(path, share)),
-            XisoImageFormat.Zar => throw new NotSupportedException(
-                "ZArchive (.zar) files are not sector images; use XisoZarchive.ExtractZar or ConvertZarToIso."),
+            XisoImageFormat.Zar => throw new NotSupportedException(ZarNotSectorImageMessage),
             _ => throw new InvalidDataException($"Unsupported image format for '{path}'."),
         };
     }
@@ -193,8 +200,7 @@ public static class XisoImageSource
             XisoImageFormat.SplitIso => new StreamBlockDevice(new SplitIsoStream(info.Parts, share)),
             XisoImageFormat.Ciso or XisoImageFormat.SplitCiso => new CisoBlockDevice(path, share),
             XisoImageFormat.Cci or XisoImageFormat.SplitCci => new CciBlockDevice(path, share),
-            XisoImageFormat.Zar => throw new NotSupportedException(
-                "ZArchive (.zar) files are not sector images; use XisoZarchive.ExtractZar or ConvertZarToIso."),
+            XisoImageFormat.Zar => throw new NotSupportedException(ZarNotSectorImageMessage),
             _ => throw new InvalidDataException($"Unsupported image format for '{path}'."),
         };
     }

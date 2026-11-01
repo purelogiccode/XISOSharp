@@ -11,8 +11,8 @@ repair, salvage and ZAR walks use the same explicit in-order table traversal as
 extract/list/rewrite, so `MaxTocDepth` bounds real subdirectory nesting only.
 
 Targets remain `net8.0` / `net9.0` / `net10.0`. Full suite green on all three:
-**1913 passed / 1 opt-in skip (1914) on net8.0/net9.0** and **1975 passed / 1
-opt-in skip (1976) on net10.0**.
+**1923 passed / 1 opt-in skip (1924) on net8.0/net9.0** and **1985 passed / 1
+opt-in skip (1986) on net10.0**.
 
 ## Highlights
 
@@ -31,6 +31,10 @@ opt-in skip (1976) on net10.0**.
   `--pack <dir>` and `build-image`.
 - **Every table walker hardened**: a 4,096-entry left-skewed table audits, maps,
   repairs, salvages and packs to ZAR instead of failing at `MaxTocDepth`.
+- **ZAR validation**: `validate game.zar game.iso` (and the reverse) compares the
+  archive's name tree with the image, with `--validate-checksums` hashing each
+  entry through `XisoZarchive.ComputeFileHash` without extracting. `.zar` on a
+  sector-only verb is now a clean error instead of a stack trace.
 
 ## CLI
 
@@ -49,6 +53,9 @@ XISOSharp --pack ./game_files game.iso --layout layout.txt
 
 # build-image remapping also honours a layout
 XISOSharp build-image -m "**:{0}" ./src out.iso --layout layout.txt
+
+# Validate an ISO → ZAR (or ZAR → ISO) conversion without extracting
+XISOSharp validate --validate-checksums game.zar game.iso
 ```
 
 - `--layout` is create-only: it is rejected with rewrite/extract/list modes and
@@ -72,9 +79,12 @@ preservation, prepended partitions, case-insensitive paths, empty entries,
 `build-image`, and CLI `-c`/`--pack`/`build-image` with usage errors. Seven new
 `SectorAllocatorTests.SeedUsedRanges` cases cover the one-pass bulk seeding used
 by large layouts. Five new `PathologicalTocTests` prove the 4,096-entry left
-spine audits/maps, repairs its deepest entry, salvages and packs to ZAR.
-Net8/net9: **1913 passed / 1 skipped (1914)**; net10:
-**1975 passed / 1 skipped (1976)**.
+spine audits/maps, repairs its deepest entry, salvages and packs to ZAR. Ten new
+`ZarValidateTests` cover ZAR↔ISO/CCI tree and checksum validation, per-entry
+`ComputeFileHash`, CLI `validate --json`/`--validate-report`, and the clean
+sector-only rejection for `.zar` inputs.
+Net8/net9: **1923 passed / 1 skipped (1924)**; net10:
+**1985 passed / 1 skipped (1986)**.
 
 ---
 

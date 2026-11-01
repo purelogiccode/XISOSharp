@@ -100,7 +100,7 @@ accepts these sources through `XisoReader.OpenImageStream`:
 | `game.1.iso` … | Split plain ISO, concatenated and seekable; a missing middle part throws. |
 | `.cso`, `.1.cso` | CISO v1/v2, single or split, decompressed on demand (`CisoBlockDevice`). |
 | `.cci`, `.1.cci` | CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), single or split (`CciBlockDevice`). |
-| `.zar` | ZArchive name tree: list/extract/checksum/convert (`XisoZarchive`), not a sector image. |
+| `.zar` | ZArchive name tree: list/extract/checksum/validate/convert (`XisoZarchive`), not a sector image. |
 
 Detection is extension-led with a `CISO`/`CCIM` magic sniff fallback, so renamed
 containers (including the CLI rewrite backup `game.cso.old`) still resolve.

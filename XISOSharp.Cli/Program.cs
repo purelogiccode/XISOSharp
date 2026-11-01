@@ -103,6 +103,13 @@ internal static class Program
         {
             return MainInner(args);
         }
+        catch (NotSupportedException ex)
+        {
+            // Expected user error (for example a .zar archive passed to a
+            // sector-only verb): report it without a stack trace.
+            Logger.LogErr($"Error: {ex.Message}\n");
+            return 1;
+        }
         catch (Exception ex)
         {
             try

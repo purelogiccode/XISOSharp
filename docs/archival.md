@@ -111,10 +111,11 @@ discovery order (not pack order), so output is byte-identical to xboxkit's
 (`--zar` battle-verified SHA-256 match).
 
 Read side: `XisoZarchive.ListZar`, `ExtractZar` (path-safe, skip-existing,
-progress) and `ConvertZarToIso` (extract to a temp tree, repack with
-`XisoWriter.PackFromDirectory`). `XisoChecksum.ComputeZarChecksum` returns the
+progress), `ConvertZarToIso` (extract to a temp tree, repack with
+`XisoWriter.PackFromDirectory`) and `ComputeFileHash` (per-entry MD5/SHA-256).
+`XisoChecksum.ComputeZarChecksum` returns the
 same SHA3-256 tree digest as the equivalent ISO. The CLI accepts `.zar` for
-`-l`, `-t`, `-x`, `--unpack`, `checksum` and `convert`.
+`-l`, `-t`, `-x`, `--unpack`, `checksum`, `validate` and `convert`.
 
 ## Security sectors
 

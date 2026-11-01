@@ -112,7 +112,7 @@ printed and the tool exits 1.
 | `--repair <file>` | Fix audit issues in place (`.old` backup; `--dry-run` previews; `--no-backup` skips) |
 | `--salvage <file>` | Rebuild reachable entries from a corrupt image (`--repair-out` overrides output) |
 | `-r` | Rewrite as optimized ISO (byte-identical to `extract-xiso -r`) |
-| `validate <src> <out>` | Validate conversion between two images (+ `--validate*` flags; mismatch exits 2) |
+| `validate <src> <out>` | Validate conversion between two images (+ `--validate*` flags; mismatch exits 2). Both sides accept ISO, CISO/CCI (single or split), split ISO sets and `.zar` |
 | `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum (`--silent` → hex only) |
 | `split` / `join` (`joinsplit`) | Split into `<base>.1.iso`… parts / reassemble (`--size`, `--output`, `--batch`) |
 | `--filetime <image>` / `--set-filetime <image> <value>` | Show / set the FILETIME volume field |
@@ -227,6 +227,7 @@ XISOSharp compress --format cci game.iso game.cci --cci-split 0
 XISOSharp decompress game.1.cci game.iso
 XISOSharp checksum game.iso
 XISOSharp checksum game.zar
+XISOSharp validate --validate-checksums game.zar game.iso
 XISOSharp convert game.zar game.iso
 XISOSharp split --size half --output base game.iso
 XISOSharp join --output rejoined.iso base.1.iso

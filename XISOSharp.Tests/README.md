@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1976-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1986-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![Test SDK](https://img.shields.io/badge/test--sdk-18.10.1-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
@@ -44,7 +44,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Image splitting** - `XisoSplitter` split/halves/join round-trips, sector alignment, guards, progress/cancel, `split`/`join` CLI verbs
 - **Container input** - `XisoImageSource` detection table (ISO/XISO/IMG/CISO/split CISO/CCI/split CCI/split ISO/ZAR), magic sniffing, `CciBlockDevice`, split-ISO seeks, and CCI/split-ISO/ZAR reader-verb parity with plain ISO
 - **CCI** - `XisoCci` single/split round-trips, default-path helpers, CLI `--format cci`, `--cci-level`/`--cci-split`, `cci`/`uncci` aliases, and in-place refusal guards
-- **ZAR input** - `XisoZarchive.ListZar`/`ExtractZar`/`ConvertZarToIso`, unsafe-name rejection, `ComputeZarChecksum` parity with `ComputeImageChecksum`, and CLI `-l`/`-x`/`checksum`/`convert`
+- **ZAR input** - `XisoZarchive.ListZar`/`ExtractZar`/`ConvertZarToIso`, unsafe-name rejection, `ComputeZarChecksum` parity with `ComputeImageChecksum`, per-entry `ComputeFileHash`, ZAR↔ISO/CCI validation (tree + checksums), and CLI `-l`/`-x`/`checksum`/`validate`/`convert`
 - **Pathological TOC traversal** - 4,096-entry left-skewed/right-skewed/alternating/balanced tables: list/tree/extract/rewrite parity, rewrite-checksum equality with the balanced form, audit/sector-range/repair/salvage/ZAR parity on the left spine, left self-cycle refusal, and continue-on-error subtree skipping
 - **Batch conversion** - `compress`/`decompress`/`convert`/`split` `--batch`/`--batch-recursive`, naming templates (`{name}`/`{ext}`/`{format}`), `--skip-existing` resume, `--continue-on-error` partial-output cleanup, duplicate-output refusal, and `--jobs` parallelism
 - **JSON output** - `--json` schema for `info`/`list`/`tree`/`checksum`/`sector-layout`/`ranges`/`filetime`/`xex-info`/`xbe-info`/`validate`/`version`, stdout/stderr separation, multi-image list documents, CCI input, and rejection for mutating modes
