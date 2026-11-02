@@ -2527,6 +2527,33 @@ internal static class Program
                 string xisoPath = isoFiles[i];
                 try
                 {
+                    if (StfsPackage.IsStfsPackage(xisoPath))
+                    {
+                        using StfsPackage package = StfsPackage.Open(xisoPath);
+                        StfsValidationReport report = package.Validate();
+                        Logger.Log($"Auditing {xisoPath}:\n\n");
+                        Logger.Log($"  Files checked:  {report.FilesChecked}\n");
+                        Logger.Log($"  Blocks checked: {report.BlocksChecked}\n");
+                        Logger.Log($"  Hash tables:    {report.HashTablesChecked}\n");
+
+                        if (report.IsValid)
+                        {
+                            Logger.Log("  Result:         PASS\n");
+                        }
+                        else
+                        {
+                            allValid = false;
+                            Logger.Log($"  Result:         FAIL ({report.Issues.Count} issue(s))\n");
+                            foreach (StfsValidationIssue issue in report.Issues)
+                            {
+                                Logger.LogErr($"    - {issue.Area}: {issue.Reason}\n");
+                            }
+                        }
+
+                        Logger.Log("\n");
+                        continue;
+                    }
+
                     // Integrity audit: a missing optimized tag is reported through
                     // IsOptimized but does not fail the audit, so raw (unconverted)
                     // images pass. Use --is-optimized to require the tag.
@@ -6903,7 +6930,9 @@ internal static class Program
                                                       -V <file1.xiso> ...  Deep-audit xiso(s): validate header, tree,
                                                                            sectors, and attributes; the optimized tag
                                                                            is reported but not required (see
-                                                                           --is-optimized).
+                                                                           --is-optimized). An XBLA/XBLIG STFS
+                                                                           package is audited through its block
+                                                                           hash tree instead.
                                                      --repair <file>     Repair fixable issues in place (reserved
                                                                            attribute bits, missing optimized tag,
                                                                            separators in names); writes <file>.old

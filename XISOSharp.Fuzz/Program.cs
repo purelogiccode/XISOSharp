@@ -236,6 +236,7 @@ internal static class Program
         if (string.Equals(format, "stfs", StringComparison.Ordinal))
         {
             using StfsPackage package = StfsPackage.Open(path);
+            _ = package.Validate();
             foreach (StfsEntry entry in package.Entries)
             {
                 if (!entry.IsDirectory && entry.Size <= 1_000_000)

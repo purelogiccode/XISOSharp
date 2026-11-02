@@ -439,6 +439,7 @@ public sealed class StfsPackage : IDisposable
     public int ExtractTo(string outputDirectory, ExtractNamePolicy namePolicy,
         bool skipExisting = false, IProgress<ProgressInfo>? progress = null,
         CancellationToken ct = default);
+    public StfsValidationReport Validate(CancellationToken ct = default);
 }
 ```
 
@@ -448,6 +449,14 @@ timestamps. The reader handles contiguous files, hash-chain block lists and
 writable-format packages with primary/secondary hash tables. STFS writing and
 rebuilding remain out of scope. `XisoChecksum.ComputeStfsChecksum` hashes the
 same sorted-path tree as ISO and ZAR, so equivalent trees compare equal.
+
+`StfsPackage.Validate` performs a deep read-only integrity check: it hashes
+every logical data block and compares it with its level-0 hash entry, walks each
+file's block chain for truncation/cycles, verifies the level-0/1/2 tables, and
+checks the top hash and header hash in the volume descriptor. It returns a
+`StfsValidationReport` with the counts and a `StfsValidationIssue` per mismatch;
+package signatures are not verified. The CLI exposes the same check through
+`-V`/audit for an XBLA/XBLIG package.
 
 #### `VerifyXiso`
 

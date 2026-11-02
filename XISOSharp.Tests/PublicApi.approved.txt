@@ -55,6 +55,8 @@ C:XISOSharp.Models.SectorRange(System.UInt32,System.UInt32)
 C:XISOSharp.Models.StfsEntry(System.String,System.String,System.Boolean,System.Int64,System.UInt32,System.UInt32,System.Boolean,System.Nullable<System.DateTimeOffset>,System.Nullable<System.DateTimeOffset>)
 C:XISOSharp.Models.StfsPackageInfo(System.String,XISOSharp.Models.StfsPackageKind,System.String,System.UInt32,System.String,System.Byte,System.Byte,System.UInt32,System.Int64,System.UInt32,System.Int64,System.UInt32,System.UInt32,System.UInt16,System.UInt32,System.Boolean,System.Int32,System.Int32,System.Int64)
 C:XISOSharp.Models.StfsTitleInfo(System.String,XISOSharp.Models.StfsPackageKind,System.String,System.UInt32,System.String,System.Byte,System.Byte,System.UInt32)
+C:XISOSharp.Models.StfsValidationIssue(System.String,System.String)
+C:XISOSharp.Models.StfsValidationReport(System.Boolean,System.Int32,System.Int32,System.Int32,System.Int64,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.StfsValidationIssue>)
 C:XISOSharp.Models.TitleInfo(System.String,System.String,System.UInt32,System.String,System.UInt32,System.String,System.UInt32,System.UInt32,XISOSharp.Models.XbeInfo)
 C:XISOSharp.Models.UnpackOptions()
 C:XISOSharp.Models.ValidationIssue(XISOSharp.Models.ValidationIssueType,System.String,System.Int64,System.Int64,System.Byte[],System.Byte[])
@@ -486,6 +488,18 @@ M:XISOSharp.Models.StfsTitleInfo.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.StfsTitleInfo.Equals(XISOSharp.Models.StfsTitleInfo)->System.Boolean
 M:XISOSharp.Models.StfsTitleInfo.GetHashCode()->System.Int32
 M:XISOSharp.Models.StfsTitleInfo.ToString()->System.String
+M:XISOSharp.Models.StfsValidationIssue.<Clone>$()->XISOSharp.Models.StfsValidationIssue
+M:XISOSharp.Models.StfsValidationIssue.Deconstruct(out System.String,out System.String)->System.Void
+M:XISOSharp.Models.StfsValidationIssue.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.StfsValidationIssue.Equals(XISOSharp.Models.StfsValidationIssue)->System.Boolean
+M:XISOSharp.Models.StfsValidationIssue.GetHashCode()->System.Int32
+M:XISOSharp.Models.StfsValidationIssue.ToString()->System.String
+M:XISOSharp.Models.StfsValidationReport.<Clone>$()->XISOSharp.Models.StfsValidationReport
+M:XISOSharp.Models.StfsValidationReport.Deconstruct(out System.Boolean,out System.Int32,out System.Int32,out System.Int32,out System.Int64,out System.Collections.Generic.IReadOnlyList<XISOSharp.Models.StfsValidationIssue>)->System.Void
+M:XISOSharp.Models.StfsValidationReport.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.StfsValidationReport.Equals(XISOSharp.Models.StfsValidationReport)->System.Boolean
+M:XISOSharp.Models.StfsValidationReport.GetHashCode()->System.Int32
+M:XISOSharp.Models.StfsValidationReport.ToString()->System.String
 M:XISOSharp.Models.TitleInfo.<Clone>$()->XISOSharp.Models.TitleInfo
 M:XISOSharp.Models.TitleInfo.Deconstruct(out System.String,out System.String,out System.UInt32,out System.String,out System.UInt32,out System.String,out System.UInt32,out System.UInt32,out XISOSharp.Models.XbeInfo)->System.Void
 M:XISOSharp.Models.TitleInfo.Equals(System.Object)->System.Boolean
@@ -587,6 +601,7 @@ M:XISOSharp.StfsPackage.IsStfsPackage(System.String)->System.Boolean
 M:XISOSharp.StfsPackage.Open(System.String,System.IO.FileShare)->XISOSharp.StfsPackage
 M:XISOSharp.StfsPackage.ReadAllBytes(XISOSharp.Models.StfsEntry)->System.Byte[]
 M:XISOSharp.StfsPackage.TryOpen(System.String,out XISOSharp.StfsPackage)->System.Boolean
+M:XISOSharp.StfsPackage.Validate(System.Threading.CancellationToken)->XISOSharp.Models.StfsValidationReport
 M:XISOSharp.ToolLocator.FindOnPath(System.String)->System.String
 M:XISOSharp.ToolLocator.GetFileName(System.String)->System.String
 M:XISOSharp.ToolLocator.ProbeVersionAsync(System.String,System.Nullable<System.TimeSpan>,System.Threading.CancellationToken)->System.Threading.Tasks.Task<System.String>
@@ -976,6 +991,14 @@ P:XISOSharp.Models.StfsTitleInfo.PackagePath:System.String:get;set;
 P:XISOSharp.Models.StfsTitleInfo.TitleId:System.UInt32:get;set;
 P:XISOSharp.Models.StfsTitleInfo.TitleIdHex:System.String:get;set;
 P:XISOSharp.Models.StfsTitleInfo.TitleName:System.String:get;set;
+P:XISOSharp.Models.StfsValidationIssue.Area:System.String:get;set;
+P:XISOSharp.Models.StfsValidationIssue.Reason:System.String:get;set;
+P:XISOSharp.Models.StfsValidationReport.BlocksChecked:System.Int32:get;set;
+P:XISOSharp.Models.StfsValidationReport.BytesChecked:System.Int64:get;set;
+P:XISOSharp.Models.StfsValidationReport.FilesChecked:System.Int32:get;set;
+P:XISOSharp.Models.StfsValidationReport.HashTablesChecked:System.Int32:get;set;
+P:XISOSharp.Models.StfsValidationReport.IsValid:System.Boolean:get;set;
+P:XISOSharp.Models.StfsValidationReport.Issues:System.Collections.Generic.IReadOnlyList<XISOSharp.Models.StfsValidationIssue>:get;set;
 P:XISOSharp.Models.TitleInfo.DiskNumber:System.UInt32:get;set;
 P:XISOSharp.Models.TitleInfo.GameRegion:System.UInt32:get;set;
 P:XISOSharp.Models.TitleInfo.GameRegionName:System.String:get;set;
@@ -1174,6 +1197,8 @@ T:XISOSharp.Models.StfsEntry
 T:XISOSharp.Models.StfsPackageInfo
 T:XISOSharp.Models.StfsPackageKind
 T:XISOSharp.Models.StfsTitleInfo
+T:XISOSharp.Models.StfsValidationIssue
+T:XISOSharp.Models.StfsValidationReport
 T:XISOSharp.Models.TitleInfo
 T:XISOSharp.Models.TitleKind
 T:XISOSharp.Models.UnpackOptions

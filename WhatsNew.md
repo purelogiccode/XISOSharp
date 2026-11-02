@@ -39,6 +39,11 @@ listing/extraction.
   and `-l/--json` accept an XBLA/XBLIG package directly. `XisoChecksum.ComputeStfsChecksum`
   uses the same sorted-path SHA3-256 tree hash as ISO and ZAR. STFS writing
   stays out of scope.
+- **STFS hash-tree validation**: `StfsPackage.Validate` checks every data
+  block against its SHA-1 hash entry, walks each file's block chain, verifies
+  the level-0/1/2 hash tables, the top hash and the header hash, and returns a
+  `StfsValidationReport`. `-V`/audit now accepts an XBLA/XBLIG package and
+  reports `Files checked` / `Blocks checked` / `Hash tables` / `Result`.
 - **FATX-safe split default**: plain-ISO splits now default to
   `Constants.FatxMaxFileSize` (`0xFF000000`, 4 GiB − 16 MiB); an explicit
   larger `--size` warns.

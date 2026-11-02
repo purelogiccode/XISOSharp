@@ -642,6 +642,7 @@ public byte[] ReadAllBytes(StfsEntry entry)
 public void CopyTo(StfsEntry entry, Stream destination)
 public int ExtractTo(string outputDirectory, bool skipExisting = false,
     IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
+public StfsValidationReport Validate(CancellationToken ct = default)
 ```
 
 `StfsPackage` reads the STFS file table, follows contiguous and hash-chain
@@ -650,8 +651,10 @@ writable-format primary/secondary tables) and exposes the package as a
 read-only tree. `StfsPackageInfo` reports the XContent title fields plus the
 volume layout; `StfsEntry` carries the path, size, block range, contiguity flag
 and FAT timestamps. `XisoChecksum.ComputeStfsChecksum` hashes the same
-sorted-path tree as ISO/ZAR, so equivalent trees compare equal. STFS writing and
-rebuilding remain out of scope.
+sorted-path tree as ISO/ZAR, so equivalent trees compare equal. `Validate`
+performs a deep SHA-1 hash-tree check (per-block hashes, level tables, top hash
+and header hash) and returns a `StfsValidationReport`; package signatures are
+not verified. STFS writing and rebuilding remain out of scope.
 
 ## Checksum (SHA3-256)
 

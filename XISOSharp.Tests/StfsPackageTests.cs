@@ -401,6 +401,249 @@ public sealed class StfsPackageTests : IDisposable
             XisoReader.Rewrite(packagePath, Path.Combine(work, "rewrite"), out _));
     }
 
+    [Fact]
+    public void Validate_ReportsValidPackage()
+    {
+        string work = CreateTempDir("xiso_stfs_pkg");
+        byte[] payload = CreatePayload((171 * 0x1000) + 123);
+        foreach (bool readOnly in new[] { true, false })
+        {
+            foreach (bool rootActive in readOnly ? new[] { false } : new[] { false, true })
+            {
+                string packagePath = Path.Combine(work, $"valid-{readOnly}-{rootActive}");
+                SyntheticStfsPackage.Create(packagePath, [
+                    new SyntheticStfsFile("default.xex", [1, 2, 3]),
+                    new SyntheticStfsFile("data/big.bin", payload),
+                ], readOnlyFormat: readOnly, rootActiveIndex: rootActive);
+
+                using StfsPackage package = StfsPackage.Open(packagePath);
+                StfsValidationReport report = package.Validate();
+
+                Assert.True(
+                    report.IsValid,
+                    string.Join("; ", report.Issues.Select(static issue => $"{issue.Area}: {issue.Reason}")));
+                Assert.Equal(2, report.FilesChecked);
+                Assert.Equal((int)package.Info.TotalBlockCount, report.BlocksChecked);
+                Assert.True(report.HashTablesChecked >= 1);
+                Assert.Equal(package.Info.TotalBlockCount * 0x1000L, report.BytesChecked);
+            }
+        }
+    }
+
+    [Fact]
+    public void Validate_DetectsCorruptDataBlock()
+    {
+        string work = CreateTempDir("xiso_stfs_pkg");
+        string packagePath = Path.Combine(work, "game");
+        SyntheticStfsPackage.Create(packagePath, [
+            new SyntheticStfsFile("payload.bin", CreatePayload(5000)),
+        ]);
+
+        StfsPackageInfo info;
+        using (StfsPackage package = StfsPackage.Open(packagePath))
+        {
+            info = package.Info;
+        }
+
+        byte[] bytes = File.ReadAllBytes(packagePath);
+        int dataOffset = DataBlockOffset(info, 1); // block 0 is the file table
+        bytes[dataOffset + 17] ^= 0x5A;
+
+        using StfsPackage corrupt = StfsPackage.Open(WriteVariant(work, "corrupt-data", bytes));
+        StfsValidationReport report = corrupt.Validate();
+
+        Assert.False(report.IsValid);
+        Assert.Contains(report.Issues, static issue =>
+            string.Equals(issue.Area, "block 1", StringComparison.Ordinal) &&
+            issue.Reason.Contains("SHA-1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_DetectsCorruptHashTableAndTopHash()
+    {
+        string work = CreateTempDir("xiso_stfs_pkg");
+        string packagePath = Path.Combine(work, "game");
+        SyntheticStfsPackage.Create(packagePath, [
+            new SyntheticStfsFile("payload.bin", CreatePayload(3000)),
+        ]);
+
+        StfsPackageInfo info;
+        using (StfsPackage package = StfsPackage.Open(packagePath))
+        {
+            info = package.Info;
+        }
+
+        byte[] corruptTable = File.ReadAllBytes(packagePath);
+        corruptTable[(int)info.FirstBlockOffset] ^= 0xFF; // first level-0 hash byte
+        using (StfsPackage corrupt = StfsPackage.Open(
+                   WriteVariant(work, "corrupt-table", corruptTable)))
+        {
+            StfsValidationReport report = corrupt.Validate();
+            Assert.False(report.IsValid);
+            Assert.Contains(report.Issues, static issue =>
+                string.Equals(issue.Area, "block 0", StringComparison.Ordinal) &&
+                issue.Reason.Contains("SHA-1", StringComparison.Ordinal));
+        }
+
+        byte[] corruptTop = File.ReadAllBytes(packagePath);
+        corruptTop[0x381] ^= 0xFF;
+        using (StfsPackage corrupt = StfsPackage.Open(
+                   WriteVariant(work, "corrupt-top", corruptTop)))
+        {
+            StfsValidationReport report = corrupt.Validate();
+            Assert.False(report.IsValid);
+            Assert.Contains(report.Issues, static issue =>
+                string.Equals(issue.Area, "top hash", StringComparison.Ordinal));
+        }
+
+        byte[] corruptHeader = File.ReadAllBytes(packagePath);
+        corruptHeader[0x32C] ^= 0xFF;
+        using (StfsPackage corrupt = StfsPackage.Open(
+                   WriteVariant(work, "corrupt-header", corruptHeader)))
+        {
+            StfsValidationReport report = corrupt.Validate();
+            Assert.False(report.IsValid);
+            Assert.Contains(report.Issues, static issue =>
+                string.Equals(issue.Area, "header hash", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public void Validate_DetectsCorruptLevel0TableInLevel1Hash()
+    {
+        string work = CreateTempDir("xiso_stfs_pkg");
+        string packagePath = Path.Combine(work, "game");
+        SyntheticStfsPackage.Create(packagePath, [
+            new SyntheticStfsFile("payload.bin", CreatePayload((171 * 0x1000) + 123)),
+        ]);
+
+        StfsPackageInfo info;
+        using (StfsPackage package = StfsPackage.Open(packagePath))
+        {
+            info = package.Info;
+        }
+
+        byte[] bytes = File.ReadAllBytes(packagePath);
+        bytes[(int)info.FirstBlockOffset] ^= 0xFF; // level-0 table entry 0 hash
+
+        using StfsPackage corrupt = StfsPackage.Open(WriteVariant(work, "corrupt-level0", bytes));
+        StfsValidationReport report = corrupt.Validate();
+
+        Assert.False(report.IsValid);
+        Assert.Contains(report.Issues, static issue =>
+            string.Equals(issue.Area, "block 0", StringComparison.Ordinal));
+        Assert.Contains(report.Issues, static issue =>
+            issue.Area.StartsWith("hash table level 0", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Cli_AuditValidatesStfsHashTree()
+    {
+        string work = CreateTempDir("xiso_stfs_pkg");
+        string packagePath = Path.Combine(work, "game");
+        SyntheticStfsPackage.Create(packagePath, [
+            new SyntheticStfsFile("default.xex", [1, 2, 3]),
+            new SyntheticStfsFile("data/payload.bin", CreatePayload(5000)),
+        ]);
+
+        using (LogCapture capture = new())
+        {
+            Assert.Equal(0, Program.Main(["-V", packagePath]));
+            Assert.Contains("Result:         PASS", capture.Output, StringComparison.Ordinal);
+            Assert.Contains("Hash tables:", capture.Output, StringComparison.Ordinal);
+        }
+
+        byte[] bytes = File.ReadAllBytes(packagePath);
+        bytes[0x381] ^= 0xFF;
+        string corruptPath = WriteVariant(work, "corrupt", bytes);
+        using (LogCapture capture = new())
+        {
+            Assert.Equal(1, Program.Main(["-V", corruptPath]));
+            Assert.Contains("Result:         FAIL", capture.Output, StringComparison.Ordinal);
+            Assert.Contains("top hash", capture.Output, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Validate_DetectsBrokenBlockChain()
+    {
+        string work = CreateTempDir("xiso_stfs_pkg");
+        string packagePath = Path.Combine(work, "game");
+        SyntheticStfsPackage.Create(packagePath, [
+            new SyntheticStfsFile("payload.bin", CreatePayload(5000)),
+        ]);
+
+        StfsPackageInfo info;
+        using (StfsPackage package = StfsPackage.Open(packagePath))
+        {
+            info = package.Info;
+        }
+
+        // The file starts at logical block 1 and spans two blocks. Point its
+        // level-0 next-block field at EndOfChain so the declared chain is short.
+        int entryOffset = checked((int)info.FirstBlockOffset) + ((1 % 170) * 0x18) + 0x14;
+        byte[] bytes = File.ReadAllBytes(packagePath);
+        BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(entryOffset), 0x00FFFFFF);
+
+        using StfsPackage corrupt = StfsPackage.Open(WriteVariant(work, "short-chain", bytes));
+        StfsValidationReport report = corrupt.Validate();
+
+        Assert.False(report.IsValid);
+        Assert.Contains(report.Issues, static issue =>
+            string.Equals(issue.Area, "payload.bin", StringComparison.Ordinal) &&
+            issue.Reason.Contains("block chain ends after 1 of 2", StringComparison.Ordinal));
+
+        // Point the same entry at itself to exercise the cycle guard.
+        byte[] cycle = File.ReadAllBytes(packagePath);
+        BinaryPrimitives.WriteUInt32BigEndian(cycle.AsSpan(entryOffset), 0x00000001);
+        using StfsPackage cyclic = StfsPackage.Open(WriteVariant(work, "cycle", cycle));
+        StfsValidationReport cycleReport = cyclic.Validate();
+
+        Assert.False(cycleReport.IsValid);
+        Assert.Contains(cycleReport.Issues, static issue =>
+            string.Equals(issue.Area, "payload.bin", StringComparison.Ordinal) &&
+            issue.Reason.Contains("cycle", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_RejectsImplausibleBlockCount()
+    {
+        string work = CreateTempDir("xiso_stfs_pkg");
+        string packagePath = Path.Combine(work, "game");
+        SyntheticStfsPackage.Create(packagePath, [
+            new SyntheticStfsFile("payload.bin", CreatePayload(3000)),
+        ]);
+
+        byte[] bytes = File.ReadAllBytes(packagePath);
+        BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(0x395), 0xFFFFFF);
+
+        using StfsPackage corrupt = StfsPackage.Open(WriteVariant(work, "huge-block-count", bytes));
+        StfsValidationReport report = corrupt.Validate();
+
+        Assert.False(report.IsValid);
+        Assert.Contains(report.Issues, static issue =>
+            string.Equals(issue.Area, "volume", StringComparison.Ordinal));
+    }
+
+    private static int DataBlockOffset(StfsPackageInfo info, uint logicalBlock)
+    {
+        int tablesPerLevel = info.IsReadOnlyFormat ? 1 : 2;
+        long baseSize = 170;
+        long mapped = logicalBlock;
+        for (int level = 0; level < 3; level++)
+        {
+            mapped += ((logicalBlock + baseSize) / baseSize) * tablesPerLevel;
+            if (logicalBlock < baseSize)
+            {
+                break;
+            }
+
+            baseSize *= 170;
+        }
+
+        return checked((int)(info.FirstBlockOffset + (mapped * 0x1000)));
+    }
+
     private static byte[] CreatePayload(int length)
     {
         byte[] data = new byte[length];

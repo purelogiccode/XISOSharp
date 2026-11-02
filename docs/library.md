@@ -43,7 +43,7 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` | Unified detection and open (`TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`) for ISO, split ISO, CISO, CCI, GOD/SVOD, split variants and ZAR |
 | `XisoCci` / `CciBlockDevice` | CCI/CCIM compression, extraction, default names and random access (CCISharp-backed) |
 | `XisoZarchive` (read APIs) | `ListZar`, `ExtractZar`, `ConvertZarToIso` alongside the existing `CreateZar` |
-| `StfsPackage` / `StfsEntry` / `StfsPackageInfo` | Read-only XBLA/XBLIG single-file STFS package: file table, hash-chain block lists, `Find`, `ReadAllBytes`, `CopyTo`, `ExtractTo` and volume/title metadata |
+| `StfsPackage` / `StfsEntry` / `StfsPackageInfo` | Read-only XBLA/XBLIG single-file STFS package: file table, hash-chain block lists, `Find`, `ReadAllBytes`, `CopyTo`, `ExtractTo`, `Validate` hash-tree verification and volume/title metadata |
 | [`XisoExplorer`](api-utilities.md#xisoexplorer--xisoattributes) / [`XisoAttributes`](api-utilities.md#xisoexplorer--xisoattributes) | In-place exploration (list/get/copy/hash/XEX/XBE, bounded `OpenReadStream`, keep-open VFS mode) + Windows attribute mapping |
 | [`XisoWriter`](api-xisowriter.md) | Create and rewrite images + `build-image` remap (`CreateFromRemapTree`) |
 | [`XisoPatcher`](api-xisoreader.md#copyin) / [`DirectoryEntryTableWriter`](api-xisowriter.md#directoryentrytablewriter) | In-place file patching (`CopyIntoImage`) + single-table build/serialize primitive |
@@ -127,7 +127,10 @@ hash-table interleave, including writable-format packages with primary and
 secondary tables. `XisoChecksum.ComputeStfsChecksum` uses the same sorted-path
 SHA3-256 tree hash as ISO and ZAR, so equivalent trees compare equal. The reader
 is read-only; STFS writing/rebuilding is out of scope. `ExtractTo` has an
-`ExtractNamePolicy` overload for hostile entry names (reject/sanitize/skip).
+`ExtractNamePolicy` overload for hostile entry names (reject/sanitize/skip), and
+`Validate` verifies the SHA-1 hash tree (per-block hashes, level tables, top
+hash and header hash) and returns a `StfsValidationReport`; package signatures
+are not verified.
 
 ## Design notes
 

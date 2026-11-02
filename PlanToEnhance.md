@@ -1,6 +1,6 @@
 # Plan to Enhance XISOSharp
 
-**Status:** CCISharp 1.0.1 published on NuGet (2026-11-01; 1.0.0 was the first release, 1.0.1 adds hostile-index hardening). XISOSharp **1.5.0** (published 2026-11-01) implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input (including `validate`/`--validate-checksums`), Phase 4 pathological-TOC traversal hardening (extract/list/rewrite plus the audit, sector-range, repair, salvage and ZAR follow-up walkers), Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests); follow-ups make CISO compression read split/container sources directly and harden ZAR extraction (depth bound, pre-sized exact copies, partial cleanup). **Phase 10 Tier A is the 1.6.0 work:** A1 (Xbox 360 XDBF/XSRC title metadata), A2 (XBE logo/title/save image assets), A3 (FATX cap), A4 (`--delete-source`) and A5 (GOD title naming, extended to single-file XBLA/XBLIG STFS package headers) are implemented. **Tier B (1.7.0) is in progress:** B1's read-only GOD/SVOD sector input is implemented in-repo (`GodBlockDevice`, `GodHeader.TryReadVolume`, `XisoImageSource` detection, CLI `decompress`/`convert`), and full XBLA/XBLIG single-file STFS package listing/extraction is implemented in-repo (`StfsPackage`, `StfsEntry`, `StfsPackageInfo`, `XisoChecksum.ComputeStfsChecksum`, CLI `-l`/`-t`/`-x`/`--unpack`/`checksum`); extracting the readers into the standalone `StfsSharp` package remains.
+**Status:** CCISharp 1.0.1 published on NuGet (2026-11-01; 1.0.0 was the first release, 1.0.1 adds hostile-index hardening). XISOSharp **1.5.0** (published 2026-11-01) implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input (including `validate`/`--validate-checksums`), Phase 4 pathological-TOC traversal hardening (extract/list/rewrite plus the audit, sector-range, repair, salvage and ZAR follow-up walkers), Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests); follow-ups make CISO compression read split/container sources directly and harden ZAR extraction (depth bound, pre-sized exact copies, partial cleanup). **Phase 10 Tier A is the 1.6.0 work:** A1 (Xbox 360 XDBF/XSRC title metadata), A2 (XBE logo/title/save image assets), A3 (FATX cap), A4 (`--delete-source`) and A5 (GOD title naming, extended to single-file XBLA/XBLIG STFS package headers) are implemented. **Tier B (1.7.0) is in progress:** B1's read-only GOD/SVOD sector input is implemented in-repo (`GodBlockDevice`, `GodHeader.TryReadVolume`, `XisoImageSource` detection, CLI `decompress`/`convert`), and full XBLA/XBLIG single-file STFS package listing/extraction is implemented in-repo (`StfsPackage`, `StfsEntry`, `StfsPackageInfo`, `XisoChecksum.ComputeStfsChecksum`, `StfsPackage.Validate` hash-tree verification, CLI `-l`/`-t`/`-x`/`--unpack`/`-V`/`checksum`); extracting the readers into the standalone `StfsSharp` package remains.
 **Baseline:** XISOSharp `1.4.4` (tag), extract-xiso build `202609111233`, xdvdfs `0.8.3`
 **Reference:** CCI spec/implementation copied to `References/libCCI-0.1.0-1b0087e` (commit `1b0087e`, GPL-2.0-or-later; reference only) and verified to build/round-trip.
 **CCISharp repo:** <https://github.com/purelogiccode/CCISharp> — package <https://www.nuget.org/packages/CCISharp/1.0.1>.
@@ -64,7 +64,7 @@ A full review of the upstream trackers — 56 extract-xiso issues, 54 extract-xi
 - `XISOSharp/XisoZarchive.cs` — `CreateZar`, `ListZar`, `ExtractZar` and `ConvertZarToIso`.
 - `XISOSharp/XisoPatcher.cs`, `SectorAllocator.cs`, `XisoValidator.cs`, `XisoChecksum.cs` — sector layout, copy-in, audit and SHA3-256 checksum already exist.
 - `XISOSharp.Cli/Program.cs` — `--batch` covers extract/list/tree/rewrite/audit and the container verbs (`compress`/`decompress`/`convert`/`split`); JSON only via `--validate-report` (Phase 6).
-- `XISOSharp.Tests` - current suite: 2091 passed / 1 opt-in skip on net8.0/net9.0; 2155 passed / 1 opt-in skip on net10.0.
+- `XISOSharp.Tests` - current suite: 2098 passed / 1 opt-in skip on net8.0/net9.0; 2162 passed / 1 opt-in skip on net10.0.
 
 ---
 
@@ -892,9 +892,10 @@ existing named error or report/drop gate.
   - **Parallel CISO compression:** `CisoWriter.CompressToCso`/`CompressStream` gain a `jobs` overload (1..64) that compresses sector batches on a bounded worker pool and writes payloads in sector order, so output stays byte-identical; `compress`/`cso --jobs <n>` exposes it (single-file mode). CCI stays single-threaded until CCISharp 1.1.
   - **Parallel extraction:** `UnpackOptions.MaxDegreeOfParallelism` (1..64) queues independent files during the sequential tree walk and copies them on a bounded pool; output is byte-identical, `FileAdded` progress and completion logs stay in traversal order, and `-x`/`--unpack --jobs <n>` exposes it. CISO/CCI/GOD/split and in-memory sources serialize reads, and destination filesystem calls are serialized so non-thread-safe stores stay correct. `ParallelExtractionTests`.
   - **Safe-extract name policy:** `ExtractNamePolicy` (`Reject`/`Sanitize`/`Skip`) and `UnpackOptions.NamePolicy`; sanitized names are collision-safe (`~N`), a skipped directory omits its subtree, and `StfsPackage.ExtractTo`/`XisoZarchive.ExtractZar` have policy overloads. CLI `--name-policy` on `-x`/`--unpack`; `ExtractNamePolicyTests`.
+  - **STFS hash-tree validation:** `StfsPackage.Validate` hashes every logical data block against its level-0 SHA-1 entry, walks each file's block chain, verifies the level-0/1/2 tables, top hash and header hash, and returns a `StfsValidationReport`; CLI `-V`/audit accepts XBLA/XBLIG packages. `StfsPackageTests` adds valid/corrupt data/table/top/header/chain coverage and the fuzzer runs `Validate`.
   - **Writer concurrency:** `XisoWriter.CreateXiso`/`PackFromDirectory` now resolve the source once and walk it with absolute `HostPath`s, keep byte/file counters in `WriteTreeContext`, and take no process-wide `CreateLock`; concurrent creates run independently and never change the process CWD. Caller-supplied trees without `HostPath` are resolved once against the caller's CWD. `PackFromDirectoryTests` adds an overlap test (a second create finishes while the first is blocked in its progress callback), a relative-source test and a prebuilt-tree test.
    - **Reader CWD removal:** `DecodeXisoCore` routes extraction through a destination `IFilesystem` (a caller-supplied store, or a `LocalFilesystem` rooted at the output directory), so `Extract`/`UnpackImage`/`DecodeXiso` never call `Directory.SetCurrentDirectory` and concurrent extracts are independent. Log/progress text keeps the historical host-separator prefix through a separate display path. `UnpackImageTests` covers CWD stability with and without `-d`, two concurrent extracts and a mid-run CWD change.
-- **Remaining roadmap:** Tier B B1's read-only GOD/SVOD sector input is implemented in-repo (`GodBlockDevice`, `GodHeader.TryReadVolume`, CLI `decompress`/`convert`), and XBLA/XBLIG STFS package listing/extraction is implemented in-repo (`StfsPackage`, `StfsEntry`, `StfsPackageInfo`, `ComputeStfsChecksum`, CLI read verbs); extracting both readers into the standalone `StfsSharp` package remains for `1.7.0`, as do the unchecked §15 quality items. CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work.
+- **Remaining roadmap:** Tier B B1's read-only GOD/SVOD sector input is implemented in-repo (`GodBlockDevice`, `GodHeader.TryReadVolume`, CLI `decompress`/`convert`), and XBLA/XBLIG STFS package listing/extraction and SHA-1 hash-tree validation are implemented in-repo (`StfsPackage`, `StfsEntry`, `StfsPackageInfo`, `ComputeStfsChecksum`, `StfsPackage.Validate`, CLI read verbs and `-V`); extracting both readers into the standalone `StfsSharp` package remains for `1.7.0`, as do the unchecked §15 quality items. CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work.
 
 ### 12.1 Dependency graph
 
@@ -1140,6 +1141,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [x] Fuzz the XBE/XEX parsers and CCI/CISO index decoders.
 - [x] Add memory/entry caps and malformed-index/alignment validation for CISO on hostile inputs.
 - [x] Add memory/entry caps for CCI indexes on hostile inputs (CCISharp 1.0.1: 64 MiB cap, checked cast, hostile-header tests).
+- [x] Add STFS hash-tree verification (per-block SHA-1, level-0/1/2 tables, top hash and header hash) and expose it through `StfsPackage.Validate` and the `-V` audit. **Done:** `StfsValidationReport`/`StfsValidationIssue`, `StfsPackageTests.Validate_*`, fuzzer coverage.
 - [x] Document a threat model and a “hostile image” test corpus.
 
 ### 15.6 Feature completeness (beyond the references)
@@ -1151,7 +1153,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [x] Split ISO input.
 - [x] ZAR input for list/extract/checksum/validate/convert.
 - [x] GOD/SVOD read-only sector input (`GodBlockDevice`, `GodHeader.TryReadVolume`, all read verbs, CLI decompress/convert); standalone `StfsSharp` package extraction remains.
-- [x] XBLA/XBLIG single-file STFS package listing/extraction (`StfsPackage`, `StfsEntry`, `StfsPackageInfo`, `XisoChecksum.ComputeStfsChecksum`, CLI `-l`/`-t`/`-x`/`--unpack`/`checksum`).
+- [x] XBLA/XBLIG single-file STFS package listing/extraction (`StfsPackage`, `StfsEntry`, `StfsPackageInfo`, `XisoChecksum.ComputeStfsChecksum`, CLI `-l`/`-t`/`-x`/`--unpack`/`checksum`) and hash-tree validation (`StfsPackage.Validate`, `-V`).
 - [x] Add `verify-hashes <image> <hash-file>` to verify a rebuilt image against the `.hash` sidecar emitted by `--petrify` (works for ISO/CISO/CCI/ZAR).
 - [x] Add `hash <image>` with streaming CRC32/MD5/SHA1/SHA256/SHA3-256, `--json`, and per-file/full-image modes.
 - [x] Add `--title-info`/`GetTitleInfo` that finds `default.xbe`, parses the certificate and reports title name/ID/region/disc.
@@ -1396,7 +1398,8 @@ roll-over, security-sector mapping), `GodHeader.TryReadVolume`/`GodVolumeInfo`,
 `.data` folder, and CLI `decompress`/`convert`. Every read verb works; in-place
 write verbs and redump modes refuse GOD. XBLA/XBLIG single-file STFS package
 listing/extraction is also implemented in-repo (`StfsPackage`, `StfsEntry`,
-`StfsPackageInfo`, `XisoChecksum.ComputeStfsChecksum`, CLI read verbs); the
+`StfsPackageInfo`, `XisoChecksum.ComputeStfsChecksum`, `StfsPackage.Validate`
+SHA-1 hash-tree verification, CLI read verbs and `-V` audit); the
 standalone `StfsSharp` package extraction remains.
 
 **Problem.** `XisoImageSource` covers ISO, split ISO, CISO, split CISO, CCI, split
@@ -1462,16 +1465,17 @@ standalone `StfsSharp` package remains future work.
 | `XISOSharp/BlockDevice/GodBlockDevice.cs` (new) | read-only `IBlockDevice` over GOD/SVOD fragments (B1 partial) |
 | `XISOSharp/StfsHeader.cs` (new) | single-file XBLA/XBLIG `XContent` title parser (A5 extension) |
 | `XISOSharp/Models/StfsTitleInfo.cs` (new) | XBLA/XBLIG title metadata record + kind enum (A5 extension) |
-| `XISOSharp/StfsPackage.cs` (new) | read-only STFS file table, hash-chain block lists, `ReadAllBytes`/`CopyTo`/`ExtractTo` |
+| `XISOSharp/StfsPackage.cs` (new) | read-only STFS file table, hash-chain block lists, `ReadAllBytes`/`CopyTo`/`ExtractTo`, `Validate` SHA-1 hash-tree verification |
 | `XISOSharp/Models/StfsEntry.cs` / `StfsPackageInfo.cs` (new) | package entry and volume/title metadata records |
+| `XISOSharp/Models/StfsValidationReport.cs` / `StfsValidationIssue.cs` (new) | hash-tree validation result and per-area issue records |
 | `XISOSharp/XisoChecksum.cs` | `ComputeStfsChecksum`/`ComputeStfsChecksumHex` (ISO/ZAR-compatible tree hash) |
 | `XISOSharp/XisoRepairer.cs` / `XisoPatcher.cs` / `XisoSplitter.cs` / `XisoReader.cs` | STFS extract-first guards for in-place writes and split/rewrite |
 | `XISOSharp/XisoImageFormat.cs` / `XisoImageSource.cs` | `God` + detection (header and `.data` folder) (B1) |
 | `XISOSharp/BlockDevice/GodBlockDevice.cs` (new) | `IBlockDevice` over `StfsFile` (B1) |
-| `XISOSharp.Cli/Program.cs` | `--delete-source` (A4), GOD + XBLA/XBLIG `title-info` (A5), 360 `title-info`/`--xex-info` (A1), `--xbe-image` (A2), GOD `decompress`/`convert` and redump/in-place guards (B1 partial), STFS `-l`/`-t`/`-x`/`--unpack`/`checksum`/`--json` and container/redump/rewrite guards |
+| `XISOSharp.Cli/Program.cs` | `--delete-source` (A4), GOD + XBLA/XBLIG `title-info` (A5), 360 `title-info`/`--xex-info` (A1), `--xbe-image` (A2), GOD `decompress`/`convert` and redump/in-place guards (B1 partial), STFS `-l`/`-t`/`-x`/`--unpack`/`-V`/`checksum`/`--json` and container/redump/rewrite guards |
 | `XISOSharp.Cli/JsonOutput.cs` | `JsonGodTitleInfo` + `JsonStfsTitleInfo` (A5), 360 `title-info`/`--xex-info` fields (A1), `xbe-info` presence flags (A2) |
 | `XISOSharp.Gui/**` | 360 title panel, XBE image preview, GOD/STFS filter/drop routing (future; A1/A2 and STFS are library + CLI) |
-| `XISOSharp.Tests/*` | XDBF, XBE assets, DXT/PNG, FATX cut, delete-source, GOD + XBLA/XBLIG header metadata, STFS package listing/extraction (`StfsPackageTests`) |
+| `XISOSharp.Tests/*` | XDBF, XBE assets, DXT/PNG, FATX cut, delete-source, GOD + XBLA/XBLIG header metadata, STFS package listing/extraction and hash-tree validation (`StfsPackageTests`) |
 | `XISOSharp.TestDataGenerator/*` | synthetic XDBF, XBE-with-images, GOD set, STFS package (`SyntheticStfsPackage`) |
 | `docs/*`, `WhatsNew.md`, `docs/release-notes.md`, READMEs | feature + limitation docs |
 
@@ -1484,7 +1488,7 @@ standalone `StfsSharp` package remains future work.
   reflection-free).
 - Public API additive only; `PackageValidationBaselineVersion` stays green.
 - New JSON fields covered by `GodHeaderTests` (GOD), `StfsHeaderTests` (XBLA/XBLIG) and `CliJsonTests` (existing payloads).
-- STFS package fixtures are synthetic (`SyntheticStfsPackage`); `StfsPackageTests` covers the file table, contiguous/hash-chain blocks, writable primary/secondary tables and the level-1 boundary, and the fuzzer mutates a base package through `StfsPackage.Open`/`ReadAllBytes`/`ExtractTo`/`ComputeStfsChecksum`.
+- STFS package fixtures are synthetic (`SyntheticStfsPackage`); `StfsPackageTests` covers the file table, contiguous/hash-chain blocks, writable primary/secondary tables and the level-1 boundary, and the fuzzer mutates a base package through `StfsPackage.Open`/`Validate`/`ReadAllBytes`/`ExtractTo`/`ComputeStfsChecksum`.
 - Fuzzer seeds: XDBF, XBE section table, DXT block, GOD `XContent`/block map (XDBF/XBE/DXT have synthetic coverage; the GOD header + fragment mapping is now in `XISOSharp.Fuzz`).
 
 ### 16.6 Companion repositories
@@ -1544,3 +1548,4 @@ viewers. Cross-repo work is tracked in §15.9.
 | 2026-11-02 | Phase 10 Tier B partial: read-only GOD/SVOD sector input (`GodBlockDevice`, `GodHeader.TryReadVolume`, `GodVolumeInfo`, `XisoImageFormat.God`, `XisoImageSource` header/`.data` detection, CLI `decompress`/`convert`, in-place guards); `GodBlockDeviceTests` (11); GOD header/fragment target added to `XISOSharp.Fuzz`; docs/release notes updated. Standalone `StfsSharp` extraction and full XBLA/XBLIG package listing remain. | — |
 | 2026-11-02 | XBLA/XBLIG STFS package listing/extraction: `StfsPackage`/`StfsEntry`/`StfsPackageInfo` read the STFS file table and hash-chain block lists (read-only and writable primary/secondary tables, level-1 boundary), `XisoChecksum.ComputeStfsChecksum` adds the ISO/ZAR-compatible tree hash, CLI `-l`/`-t`/`-x`/`--unpack`/`checksum`/`--json` accept packages, container/redump/rewrite verbs refuse them, `SyntheticStfsPackage` fixtures, `StfsPackageTests` (11), fuzzer target; docs/plan/release notes updated. | — |
 | 2026-11-02 | Safe-extract name policy: `ExtractNamePolicy` (`Reject`/`Sanitize`/`Skip`), `UnpackOptions.NamePolicy`, collision-safe `~N` renaming, skipped directory subtrees, `StfsPackage.ExtractTo` and `XisoZarchive.ExtractZar` policy overloads, CLI `--name-policy` on `-x`/`--unpack`, `ExtractNamePolicyTests`, docs/release notes updated. | — |
+| 2026-11-02 | STFS hash-tree validation: `StfsPackage.Validate` verifies every logical data block against its level-0 SHA-1 entry, walks each file's block chain, checks level-0/1/2 tables, the top hash and the header hash; `StfsValidationReport`/`StfsValidationIssue`; `-V` audit accepts XBLA/XBLIG packages; `SyntheticStfsPackage` now writes real SHA-1 tables; `StfsPackageTests` validation/corruption coverage and fuzzer target; docs/plan/release notes updated. | — |

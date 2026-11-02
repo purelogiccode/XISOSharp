@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace XISOSharp.TestDataGenerator;
@@ -13,9 +14,10 @@ public sealed record SyntheticStfsFile(string Path, byte[] Data);
 /// <summary>
 /// Builds small, deterministic single-file XBLA/XBLIG STFS packages for tests
 /// and the fuzzer. The fixture is not a real package and carries no game data:
-/// it writes the XContent header, one level-0 hash table, the STFS file table
-/// and the file data. Packages are limited to 170 logical data blocks so the
-/// level-1/level-2 tables are not needed.
+/// it writes the XContent header, level-0 hash tables (and a level-1 table for
+/// packages over 170 blocks) with real SHA-1 hashes, the STFS file table and
+/// the file data. Packages are limited to 170 logical data blocks so the
+/// level-2 table is not needed.
 /// </summary>
 public static class SyntheticStfsPackage
 {
@@ -138,8 +140,6 @@ public static class SyntheticStfsPackage
         WriteHeader(package, xblig, titleName, readOnlyFormat, rootActiveIndex,
             fileTableBlocks, totalBlocks);
 
-        WriteHashTables(package, nodes, fileTableBlocks, totalBlocks, blocksPerHashTable,
-            readOnlyFormat, rootActiveIndex);
         WriteFileTable(package, nodes, fileTableBlocks, blocksPerHashTable);
 
         foreach (Node node in nodes)
@@ -157,6 +157,9 @@ public static class SyntheticStfsPackage
                 Array.Copy(node.Data, index * BlockSize, package, offset, length);
             }
         }
+
+        WriteHashTables(package, nodes, fileTableBlocks, totalBlocks, blocksPerHashTable,
+            readOnlyFormat, rootActiveIndex);
 
         return package;
     }
@@ -212,8 +215,10 @@ public static class SyntheticStfsPackage
             }
         }
 
-        uint groupCount = (totalBlocks + 169) / 170;
         bool topLevelZero = totalBlocks <= 170;
+        uint groupCount = (totalBlocks + 169) / 170;
+
+        // Level 0: next-block info plus the SHA-1 of each logical data block.
         for (uint group = 0; group < groupCount; group++)
         {
             uint firstBlock = group * 170;
@@ -227,29 +232,64 @@ public static class SyntheticStfsPackage
             int tableOffset = HeaderSize + (tableBlock * BlockSize);
             for (uint block = firstBlock; block <= lastBlock; block++)
             {
+                int entryOffset = tableOffset + ((int)(block % 170) * 0x18);
                 if (nextByBlock.TryGetValue(block, out uint next))
                 {
                     WriteHashEntry(package, tableOffset, (int)(block % 170), next);
                 }
+
+                int dataOffset = HeaderSize +
+                                 ((int)BlockToBacking(block, blocksPerHashTable) * BlockSize);
+                SHA1.HashData(
+                    package.AsSpan(dataOffset, BlockSize),
+                    package.AsSpan(entryOffset, 20));
             }
         }
 
-        if (totalBlocks > 170)
+        // Level 1: hash every level-0 table into its parent. The generator is
+        // capped at 170*170 logical blocks, so level 2 is never needed.
+        if (!topLevelZero)
         {
             int level1Block = (int)HashTableBlockNumber(0, 1, blocksPerHashTable);
             if (!readOnlyFormat && rootActiveIndex)
             {
-                level1Block++;
+                level1Block++; // The top-level (level-1) table uses its secondary block.
             }
 
             int tableOffset = HeaderSize + (level1Block * BlockSize);
             for (uint group = 0; group < groupCount; group++)
             {
+                uint firstBlock = group * 170;
+                int childBlock = (int)HashTableBlockNumber(firstBlock, 0, blocksPerHashTable);
+                int childOffset = HeaderSize + (childBlock * BlockSize);
+                int entryOffset = tableOffset + ((int)group * 0x18);
+
                 // Active-index bit 0 selects the primary level-0 table.
                 BinaryPrimitives.WriteUInt32BigEndian(
-                    package.AsSpan(tableOffset + ((int)group * 0x18) + 0x14), 0);
+                    package.AsSpan(entryOffset + 0x14), 0);
+                SHA1.HashData(
+                    package.AsSpan(childOffset, BlockSize),
+                    package.AsSpan(entryOffset, 20));
             }
         }
+
+        // Top hash: SHA-1 of the active top-level hash table.
+        int topBlock = topLevelZero
+            ? (int)HashTableBlockNumber(0, 0, blocksPerHashTable)
+            : (int)HashTableBlockNumber(0, 1, blocksPerHashTable);
+        if (!readOnlyFormat && rootActiveIndex)
+        {
+            topBlock++;
+        }
+
+        SHA1.HashData(
+            package.AsSpan(HeaderSize + (topBlock * BlockSize), BlockSize),
+            package.AsSpan(0x381, 20));
+
+        // Header hash: SHA-1 of the XContent body from 0x344 to the first block.
+        SHA1.HashData(
+            package.AsSpan(0x344, HeaderSize - 0x344),
+            package.AsSpan(0x32C, 20));
     }
 
     private static void WriteHashEntry(byte[] package, int tableOffset, int index, uint next)

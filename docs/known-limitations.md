@@ -15,7 +15,8 @@ Xbox container. This page lists deliberate boundaries and current workarounds.
 
 XISO/XDVDFS, Redump full-disc images, split ISO, CISO/CSO, CCI/CCIM, ZAR,
 read-only GOD/SVOD sector input, GOD and single-file XBLA/XBLIG header title
-metadata, XBLA/XBLIG STFS package listing/extraction, Xbox 360 XDBF/XSRC title
+metadata, XBLA/XBLIG STFS package listing/extraction and SHA-1 hash-tree
+validation, Xbox 360 XDBF/XSRC title
 metadata, XBE logo/title/save image extraction, and XBE/XEX **read-only**
 metadata are in scope.
 
@@ -24,10 +25,10 @@ Deliberately out of scope:
 - STFS/CON/LIVE/PIRS **writing**, package rebuild and re-signing. Read-only
   GOD/SVOD input is supported through `GodBlockDevice`, and single-file
   XBLA/XBLIG package listing/extraction is supported through `StfsPackage`;
-  STFS writes stay out of scope. `StfsPackage` follows the hash tables for block
-  chains but does not verify per-block SHA-1 hashes or package signatures, and
-  it accepts XBLA/XBLIG/Community Game content types (not saves, profiles or
-  DLC packages).
+  STFS writes stay out of scope. `StfsPackage.Validate` verifies the per-block
+  SHA-1 hash tree (level-0/1/2 tables, top hash and header hash), but package
+  signatures are not verified and the reader accepts XBLA/XBLIG/Community Game
+  content types (not saves, profiles or DLC packages).
 - CHD containers
 - XEX decryption or XBE editing
 - FUSE/Dokan mounting (see SimpleXisoDrive)

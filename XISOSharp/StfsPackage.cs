@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using XISOSharp.Models;
 
@@ -11,6 +12,7 @@ namespace XISOSharp;
 /// the file table, per-file block chains and the file data behind the STFS
 /// hash tables. The package file itself starts with the <c>XContent</c>
 /// header; there is no <c>.data</c> directory (that layout is GOD/SVOD).
+/// <see cref="Validate"/> performs a deep SHA-1 hash-tree check.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -50,8 +52,12 @@ public sealed class StfsPackage : IDisposable
     private const int DirectoryEntrySize = 0x40;
     private const int EntriesPerBlock = BlockSize / DirectoryEntrySize;
     private const int HashEntrySize = 0x18;
+    private const int HashSize = 20;
     private const int EntriesPerHashTable = 0xAA;
     private const int BlocksPerHashLevel1 = 0x70E4;
+    private const int HeaderHashOffset = 0x32C;
+    private const int ContentStartOffset = 0x344;
+    private const int TopHashOffset = 0x381;
     private const uint EndOfChain = 0xFFFFFF;
     private const uint VolumeTypeStfs = 0;
     private const int MaxHashTableCacheEntries = 16;
@@ -565,6 +571,233 @@ public sealed class StfsPackage : IDisposable
         return written;
     }
 
+    /// <summary>
+    /// Performs a deep integrity check of the package: every logical data block
+    /// is hashed and compared with its level-0 hash-table entry, every file
+    /// block chain is walked for truncation/cycles, every level-0 table is
+    /// checked against its parent table, and the top hash and header hash in
+    /// the volume descriptor are verified. Signatures are not verified.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The validation report; <see cref="StfsValidationReport.IsValid"/> is <c>true</c> when every check passed.</returns>
+    /// <exception cref="ObjectDisposedException">The package has been disposed.</exception>
+    /// <exception cref="OperationCanceledException">The operation was cancelled.</exception>
+    public StfsValidationReport Validate(CancellationToken ct = default)
+    {
+        lock (_sync)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            List<StfsValidationIssue> issues = [];
+            byte[] block = new byte[BlockSize];
+            byte[] expected = new byte[HashSize];
+            byte[] actual = new byte[HashSize];
+
+            // A hostile header can claim far more blocks than the file can
+            // hold; cap the walk at the physical block count so validation
+            // cannot spin on a small, malformed package.
+            long availableBlocks = Math.Max(0, (_stream.Length - _firstBlockOffset) / BlockSize);
+            long blocksToCheck = Math.Min(_totalBlockCount, availableBlocks);
+            if (_totalBlockCount > availableBlocks)
+            {
+                issues.Add(new StfsValidationIssue(
+                    "volume",
+                    $"declared block count {_totalBlockCount} exceeds the {availableBlocks} blocks the package can hold."));
+            }
+
+            // 1. Every logical block against its level-0 hash entry. This covers
+            //    the file table and file data; hash-table blocks are not logical
+            //    data blocks.
+            int blocksChecked = 0;
+            long bytesChecked = 0;
+            for (uint logical = 0; logical < blocksToCheck; logical++)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!TryReadDataBlock(logical, block, out string? readError))
+                {
+                    issues.Add(new StfsValidationIssue($"block {logical}", readError!));
+                    continue;
+                }
+
+                if (!TryReadHashEntry(logical, 0, expected, out string? hashError))
+                {
+                    issues.Add(new StfsValidationIssue($"block {logical}", hashError!));
+                    continue;
+                }
+
+                SHA1.HashData(block, actual);
+                if (!actual.AsSpan().SequenceEqual(expected))
+                {
+                    issues.Add(new StfsValidationIssue(
+                        $"block {logical}",
+                        "SHA-1 hash does not match the level-0 hash table."));
+                }
+
+                blocksChecked++;
+                bytesChecked += BlockSize;
+            }
+
+            // 2. Walk each file's block chain so a broken or cyclic chain is
+            //    reported even when every referenced block still hashes.
+            int filesChecked = 0;
+            foreach (StfsEntry entry in _entries)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (entry.IsDirectory)
+                {
+                    continue;
+                }
+
+                filesChecked++;
+                if (entry.BlockCount == 0)
+                {
+                    continue;
+                }
+
+                HashSet<uint> visited = [];
+                uint current = entry.StartBlock;
+                for (uint index = 0; index < entry.BlockCount; index++)
+                {
+                    if (current >= _totalBlockCount)
+                    {
+                        issues.Add(new StfsValidationIssue(
+                            entry.Path,
+                            $"block {current} is outside the package block range."));
+                        break;
+                    }
+
+                    if (!visited.Add(current))
+                    {
+                        issues.Add(new StfsValidationIssue(
+                            entry.Path,
+                            $"block chain contains a cycle at block {current}."));
+                        break;
+                    }
+
+                    if (index + 1 >= entry.BlockCount)
+                    {
+                        break;
+                    }
+
+                    try
+                    {
+                        current = NextBlock(current);
+                    }
+                    catch (InvalidDataException ex)
+                    {
+                        issues.Add(new StfsValidationIssue(entry.Path, ex.Message));
+                        break;
+                    }
+
+                    if (current == EndOfChain)
+                    {
+                        issues.Add(new StfsValidationIssue(
+                            entry.Path,
+                            $"block chain ends after {index + 1} of {entry.BlockCount} blocks."));
+                        break;
+                    }
+                }
+            }
+
+            // 3. Level-0 tables against their level-1 parent (and level-1
+            //    tables against level 2 when the package is that large).
+            int hashTablesChecked = 0;
+            long level0Count = (blocksToCheck + EntriesPerHashTable - 1) / EntriesPerHashTable;
+            for (long group = 0; group < level0Count; group++)
+            {
+                ct.ThrowIfCancellationRequested();
+                uint firstBlock = (uint)(group * EntriesPerHashTable);
+                if (!TryReadHashTable(firstBlock, 0, out byte[] table, out string? tableError))
+                {
+                    issues.Add(new StfsValidationIssue(
+                        $"hash table level 0 group {group}", tableError!));
+                    continue;
+                }
+
+                hashTablesChecked++;
+                if (_topLevel >= 1)
+                {
+                    VerifyTableHash(firstBlock, 1, (int)(group % EntriesPerHashTable),
+                        table, expected, actual, issues);
+                }
+            }
+
+            long level1Count = (level0Count + EntriesPerHashTable - 1) / EntriesPerHashTable;
+            for (long group = 0; group < level1Count && _topLevel >= 1; group++)
+            {
+                ct.ThrowIfCancellationRequested();
+                uint firstBlock = (uint)(group * EntriesPerHashTable * EntriesPerHashTable);
+                if (!TryReadHashTable(firstBlock, 1, out byte[] table, out string? tableError))
+                {
+                    issues.Add(new StfsValidationIssue(
+                        $"hash table level 1 group {group}", tableError!));
+                    continue;
+                }
+
+                hashTablesChecked++;
+                if (_topLevel >= 2)
+                {
+                    VerifyTableHash(firstBlock, 2, (int)(group % EntriesPerHashTable),
+                        table, expected, actual, issues);
+                }
+            }
+
+            // 4. Top hash: SHA-1 of the top-level hash table, stored in the
+            //    volume descriptor at 0x381.
+            if (TryReadHashTable(0, _topLevel, out byte[] topTable, out string? topError))
+            {
+                ReadStreamBytes(TopHashOffset, expected);
+                SHA1.HashData(topTable, actual);
+                if (!actual.AsSpan().SequenceEqual(expected))
+                {
+                    issues.Add(new StfsValidationIssue(
+                        "top hash",
+                        "SHA-1 hash does not match the top-level hash table."));
+                }
+            }
+            else
+            {
+                issues.Add(new StfsValidationIssue("top hash", topError!));
+            }
+
+            // 5. Header hash: SHA-1 of the XContent header body from 0x344 to
+            //    the first block offset, stored at 0x32C. Streamed so a hostile
+            //    header size cannot force a large allocation.
+            long headerLength = _firstBlockOffset - ContentStartOffset;
+            if (headerLength > 0)
+            {
+                using IncrementalHash headerHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
+                byte[] headerBuffer = new byte[64 * 1024];
+                long remaining = headerLength;
+                _stream.Position = ContentStartOffset;
+                while (remaining > 0)
+                {
+                    int chunk = (int)Math.Min(headerBuffer.Length, remaining);
+                    _stream.ReadExactly(headerBuffer.AsSpan(0, chunk));
+                    headerHash.AppendData(headerBuffer, 0, chunk);
+                    remaining -= chunk;
+                }
+
+                ReadStreamBytes(HeaderHashOffset, expected);
+                byte[] headerDigest = headerHash.GetHashAndReset();
+                if (!headerDigest.AsSpan().SequenceEqual(expected))
+                {
+                    issues.Add(new StfsValidationIssue(
+                        "header hash",
+                        "SHA-1 hash does not match the package header."));
+                }
+            }
+
+            return new StfsValidationReport(
+                issues.Count == 0,
+                filesChecked,
+                blocksChecked,
+                hashTablesChecked,
+                bytesChecked,
+                issues);
+        }
+    }
+
     /// <summary>Returns the parent portion of an STFS path (<c>""</c> at the root).</summary>
     private static string GetParentPath(string path)
     {
@@ -939,6 +1172,91 @@ public sealed class StfsPackage : IDisposable
     {
         byte[] table = GetHashTable(tableOffset);
         return table.AsSpan(index * HashEntrySize, HashEntrySize).ToArray();
+    }
+
+    private bool TryReadDataBlock(uint block, Span<byte> destination, out string? error)
+    {
+        try
+        {
+            _stream.Position = BlockToOffset(block);
+            _stream.ReadExactly(destination);
+            error = null;
+            return true;
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private bool TryReadHashEntry(uint block, int level, Span<byte> destination, out string? error)
+    {
+        try
+        {
+            long offset = HashTableOffset(block, level);
+            byte[] table = GetHashTable(offset);
+            int index = level switch
+            {
+                0 => (int)(block % EntriesPerHashTable),
+                1 => (int)((block / EntriesPerHashTable) % EntriesPerHashTable),
+                _ => (int)((block / BlocksPerHashLevel1) % EntriesPerHashTable),
+            };
+            table.AsSpan(index * HashEntrySize, HashSize).CopyTo(destination);
+            error = null;
+            return true;
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private bool TryReadHashTable(uint block, int level, out byte[] table, out string? error)
+    {
+        try
+        {
+            table = GetHashTable(HashTableOffset(block, level));
+            error = null;
+            return true;
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException)
+        {
+            table = [];
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private void VerifyTableHash(uint firstBlock, int parentLevel, int index, byte[] table,
+        byte[] expected, byte[] actual, List<StfsValidationIssue> issues)
+    {
+        try
+        {
+            byte[] parent = GetHashTable(HashTableOffset(firstBlock, parentLevel));
+            parent.AsSpan(index * HashEntrySize, HashSize).CopyTo(expected);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException)
+        {
+            issues.Add(new StfsValidationIssue(
+                $"hash table level {parentLevel - 1} block {firstBlock}", ex.Message));
+            return;
+        }
+
+        SHA1.HashData(table, actual);
+        if (!actual.AsSpan().SequenceEqual(expected))
+        {
+            issues.Add(new StfsValidationIssue(
+                $"hash table level {parentLevel - 1} block {firstBlock}",
+                $"SHA-1 hash does not match the level-{parentLevel} hash table."));
+        }
+    }
+
+    private void ReadStreamBytes(int offset, Span<byte> destination)
+    {
+        _stream.Position = offset;
+        _stream.ReadExactly(destination);
     }
 
     private byte[] GetHashTable(long offset)

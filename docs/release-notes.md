@@ -52,6 +52,14 @@
   `XContent` title fields and the volume layout. `XisoChecksum.ComputeStfsChecksum`
   uses the same sorted-path SHA3-256 tree hash as ISO and ZAR, so equivalent
   trees compare equal. Read-only: STFS writing/rebuilding stays out of scope.
+- **STFS hash-tree validation**: `StfsPackage.Validate` hashes every logical
+  data block and compares it with its level-0 hash entry, walks each file's
+  block chain for truncation/cycles, verifies every level-0 table against its
+  level-1 parent (and level-1 tables against level 2), and checks the top hash and
+  header hash in the volume descriptor. `StfsValidationReport` carries the
+  counts and every mismatch as a `StfsValidationIssue`. Read-only: package
+  signatures are not verified, and STFS writing/rebuilding remains out of
+  scope.
 - **Xbox 360 title metadata**: `XexDbdf` reads the plaintext XDBF/XSTR/XSRC
   resources from the XEX header-section table. `XexTitleInfo` carries title
   name, publisher, developer, genre, description and optional thumbnail;
@@ -82,6 +90,9 @@
   table directly. Extraction honours `-d` and `--skip-existing`; `checksum`
   uses the ISO/ZAR-compatible tree hash. `compress`, `decompress`, `convert`,
   rewrite and the raw redump modes refuse STFS with an "extract first" message.
+  `-V`/audit verifies the package's SHA-1 hash tree (per-block hashes, level
+  tables, top hash and header hash) and reports `Files checked` /
+  `Blocks checked` / `Hash tables` / `Result`.
 - **`title-info`** accepts a GOD header or its `.data` folder, a single-file
   XBLA/XBLIG STFS package, or an XISO image's `default.xbe`/`default.xex`/
   `default_mp.xbe` and reports the available title name, title ID, disc and
