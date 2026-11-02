@@ -4223,6 +4223,62 @@ public static class XisoReader
         return ParseXexHeader(header);
     }
 
+    /// <summary>
+    /// Reads the plaintext XDBF/XSRC title metadata carried in an Xbox 360 XEX2
+    /// header section. The XDBF resource is not encrypted, so no keys or image
+    /// decompression are required.
+    /// </summary>
+    /// <param name="isoPath">Path to the image.</param>
+    /// <param name="internalPath">Path of the <c>.xex</c> file within the image.</param>
+    /// <returns>
+    /// Title metadata (possibly with empty strings when the executable carries
+    /// no readable XDBF resource), or <c>null</c> when the path is not an XEX2
+    /// executable.
+    /// </returns>
+    /// <exception cref="FileNotFoundException">Thrown when the image file does not exist.</exception>
+    /// <exception cref="XisoFormatException">Thrown when the image is not a valid XISO image.</exception>
+    /// <exception cref="IOException">Thrown on read errors.</exception>
+    public static XexTitleInfo? GetXexTitleInfo(string isoPath, string internalPath)
+    {
+        using Stream fs = OpenImageStream(isoPath);
+        return GetXexTitleInfo(fs, isoPath, internalPath);
+    }
+
+    /// <summary>
+    /// Stream overload of <see cref="GetXexTitleInfo(string, string)"/> over an
+    /// already-open image. The stream must be readable and seekable and is left open.
+    /// </summary>
+    /// <param name="imageStream">Open image stream.</param>
+    /// <param name="imageName">Display name of the image (used in error messages).</param>
+    /// <param name="internalPath">Path of the <c>.xex</c> file within the image.</param>
+    /// <returns>
+    /// Title metadata (possibly with empty strings when the executable carries
+    /// no readable XDBF resource), or <c>null</c> when the path is not an XEX2
+    /// executable.
+    /// </returns>
+    public static XexTitleInfo? GetXexTitleInfo(Stream imageStream, string imageName, string internalPath)
+    {
+        ArgumentNullException.ThrowIfNull(imageStream);
+
+        XexInfo? xex = GetXexInfo(imageStream, imageName, internalPath);
+        if (xex is null)
+            return null;
+
+        EntryInfo? entry = GetEntryInfo(imageStream, imageName, internalPath);
+        if (entry?.IsDirectory != false)
+            return null;
+
+        VolumeInfo volInfo = GetVolumeInfo(imageStream);
+        if (!volInfo.IsValid)
+            throw new XisoFormatException($"Not a valid XISO: {imageName}");
+
+        long start = ((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek;
+        return XexDbdf.TryReadTitle(imageStream, start, entry.FileSize, internalPath, xex,
+            out XexTitleInfo? title)
+            ? title
+            : new XexTitleInfo(internalPath, string.Empty, null, null, null, null, null, xex);
+    }
+
     private static XexInfo? ParseXexHeader(byte[] header)
     {
         // Magic: 'XEX2'
@@ -4392,13 +4448,13 @@ public static class XisoReader
     }
 
     /// <summary>
-    /// Parses the root <c>default.xbe</c> of an image and returns game title
-    /// metadata (name, title ID, region mask, disc number, version), or
-    /// <c>null</c> when the image has no root executable or it is not XBEH.
-    /// Plain ISO, split ISO, CISO and CCI inputs are accepted.
+    /// Resolves the root executable of an image and returns game title metadata.
+    /// The lookup order is <c>default.xbe</c> (original Xbox), then
+    /// <c>default.xex</c> (Xbox 360), then <c>default_mp.xbe</c>. Plain ISO,
+    /// split ISO, CISO and CCI inputs are accepted.
     /// </summary>
     /// <param name="isoPath">Image path.</param>
-    /// <returns>Title metadata, or <c>null</c> when no root XBE is present.</returns>
+    /// <returns>Title metadata, or <c>null</c> when no supported root executable is present.</returns>
     /// <exception cref="XisoFormatException">The image is not a valid XISO.</exception>
     /// <exception cref="IOException">The image cannot be read.</exception>
     public static TitleInfo? GetTitleInfo(string isoPath)
@@ -4413,21 +4469,37 @@ public static class XisoReader
     /// </summary>
     /// <param name="imageStream">Open image stream.</param>
     /// <param name="imageName">Display name for error messages.</param>
-    /// <returns>Title metadata, or <c>null</c> when no root XBE is present.</returns>
+    /// <returns>Title metadata, or <c>null</c> when no supported root executable is present.</returns>
     public static TitleInfo? GetTitleInfo(Stream imageStream, string imageName)
     {
         ArgumentNullException.ThrowIfNull(imageStream);
-        EntryInfo? xbe = ListDirectory(imageStream, imageName)
-            .FirstOrDefault(static entry => !entry.IsDirectory &&
-                                            string.Equals(entry.Name, "default.xbe", StringComparison.OrdinalIgnoreCase));
-        if (xbe is null)
+
+        IReadOnlyList<EntryInfo> root = ListDirectory(imageStream, imageName);
+        ReadOnlySpan<string> executables = ["default.xbe", "default.xex", "default_mp.xbe"];
+        foreach (string executable in executables)
         {
-            return null;
+            EntryInfo? entry = root.FirstOrDefault(candidate =>
+                !candidate.IsDirectory &&
+                string.Equals(candidate.Name, executable, StringComparison.OrdinalIgnoreCase));
+            if (entry is null)
+                continue;
+
+            string path = "/" + entry.Name;
+            if (string.Equals(executable, "default.xex", StringComparison.OrdinalIgnoreCase))
+            {
+                XexTitleInfo? xex = GetXexTitleInfo(imageStream, imageName, path);
+                if (xex is not null)
+                    return TitleInfoFactory.CreateXex(path, xex);
+            }
+            else
+            {
+                XbeInfo? info = GetXbeInfo(imageStream, imageName, path);
+                if (info is not null)
+                    return TitleInfoFactory.Create(path, info);
+            }
         }
 
-        string path = "/" + xbe.Name;
-        XbeInfo? info = GetXbeInfo(imageStream, imageName, path);
-        return info is null ? null : TitleInfoFactory.Create(path, info);
+        return null;
     }
 
     private static XbeInfo? ParseXbeHeader(byte[] header)
@@ -4442,8 +4514,15 @@ public static class XisoReader
         uint baseAddress = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x104));
         uint certAddress = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x118));
         uint sectionCount = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x11C));
+        uint sectionHeadersAddress = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x120));
         uint initFlags = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x124));
         uint entryPoint = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x128));
+        uint logoAddress = header.Length >= 0x178
+            ? BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x170))
+            : 0;
+        uint logoSize = header.Length >= 0x178
+            ? BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x174))
+            : 0;
 
         // The certificate address is a load pointer: file offset = address - base.
         // Long arithmetic keeps the bounds check overflow-safe for malformed headers.
@@ -4473,6 +4552,13 @@ public static class XisoReader
         uint diskNumber = BinaryPrimitives.ReadUInt32LittleEndian(cert[0xA8..]);
         uint version = BinaryPrimitives.ReadUInt32LittleEndian(cert[0xAC..]);
 
+        (bool hasTitleImage, bool hasSaveImage) = FindXbeImageSections(
+            header, baseAddress, sectionCount, sectionHeadersAddress);
+
+        bool hasLogoBitmap = logoAddress != 0 && logoSize > 0 &&
+                             (long)logoAddress - baseAddress >= 0 &&
+                             (long)logoAddress - baseAddress + logoSize <= header.Length;
+
         return new XbeInfo(
             baseAddress,
             entryPoint,
@@ -4487,7 +4573,57 @@ public static class XisoReader
             gameRegion,
             gameRatings,
             diskNumber,
-            version);
+            version)
+        {
+            HasLogoBitmap = hasLogoBitmap,
+            HasTitleImage = hasTitleImage,
+            HasSaveImage = hasSaveImage,
+        };
+    }
+
+    /// <summary>
+    /// Walks the bounded XBE section table and reports whether the executable
+    /// carries the title and save image sections. Section headers and names
+    /// outside the already-read header block are ignored rather than guessed.
+    /// </summary>
+    private static (bool HasTitleImage, bool HasSaveImage) FindXbeImageSections(
+        byte[] header, uint baseAddress, uint sectionCount, uint sectionHeadersAddress)
+    {
+        const int sectionHeaderSize = 0x38;
+        const uint maxSections = 256;
+
+        if (sectionCount == 0 || sectionCount > maxSections)
+            return (false, false);
+
+        long tableOffset = (long)sectionHeadersAddress - baseAddress;
+        if (tableOffset < 0 || tableOffset + ((long)sectionCount * sectionHeaderSize) > header.Length)
+            return (false, false);
+
+        bool hasTitleImage = false;
+        bool hasSaveImage = false;
+        for (uint i = 0; i < sectionCount; i++)
+        {
+            int section = (int)(tableOffset + (i * sectionHeaderSize));
+            uint nameAddress = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(section + 0x14));
+            if (nameAddress == 0)
+                continue;
+
+            long nameOffset = (long)nameAddress - baseAddress;
+            if (nameOffset < 0 || nameOffset + 20 > header.Length)
+                continue;
+
+            string name = Encoding.ASCII.GetString(header, (int)nameOffset, 20);
+            int nul = name.IndexOf('\0');
+            if (nul >= 0)
+                name = name[..nul];
+
+            if (string.Equals(name, "$$XTIMAGE", StringComparison.Ordinal))
+                hasTitleImage = true;
+            else if (string.Equals(name, "$$XSIMAGE", StringComparison.Ordinal))
+                hasSaveImage = true;
+        }
+
+        return (hasTitleImage, hasSaveImage);
     }
 
     private static void CollectHashes(

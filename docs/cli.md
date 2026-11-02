@@ -34,6 +34,7 @@ XISOSharp --checksum <image> [--silent]            # flag form
 XISOSharp hash <image> [images...] [--json]
 XISOSharp verify-hashes <image> <hash-file> [--ignore-extra] [--json]
 XISOSharp title-info <image> [--json]
+XISOSharp xbe-image <image> <path> --type logo|title|save -o <out.png|out.dds>
 XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...] [--batch <dir>]
 XISOSharp join [--output <file>] <first.1.iso> [...]
 XISOSharp convert <src.zar|src.iso> <out.iso|out.zar> [--batch <dir> --format iso|zar]
@@ -65,8 +66,9 @@ Image inputs accept `.cso`/`.1.cso` and `.cci`/`.1.cci` files directly (auto-det
 | `-t` | **Tree** — recursive listing with full paths, sizes, and totals. |
 | `-i <file> [path]` | **Info** — volume descriptor metadata (incl. detected disc format: `RAW` / `GLOBAL (XGD2)` / `XGD3` / `XGD2 Hybrid` / `XGD1`) plus per-entry details (sector, size, attributes, left/right child offsets). `path` defaults to `/`. |
 | `--ls <file> [path]` | **List directory** — entry names of a directory (default `/`), **without recursion**. Prints one name per line; `/path: empty directory` when empty. Mirrors `ls` on the image. |
-| `--xex-info <file> <path>` | **XEX info** — parse and display the Xbox 360 XEX2 executable header of a `.xex` file inside the image (module flags, entry point, image base/size, region, media types, media/title ID, version, disc, encryption/compression). |
-| `--xbe-info <file> <path>` | **XBE info** — parse and display the original-Xbox XBEH header + certificate of a `.xbe` file inside the image (base, entry point, sections, title ID/name, media, region, ratings, disc, version). No reference tool offers this. |
+| `--xex-info <file> <path>` | **XEX info** — parse and display the Xbox 360 XEX2 executable header of a `.xex` file inside the image (module flags, entry point, image base/size, region, media types, media/title ID, version, disc, encryption/compression). XDBF/XSRC title name, publisher, developer, genre and description are printed when present. |
+| `--xbe-info <file> <path>` | **XBE info** — parse and display the original-Xbox XBEH header + certificate of a `.xbe` file inside the image (base, entry point, sections, title ID/name, media, region, ratings, disc, version). `--json` also reports `hasLogoBitmap` / `hasTitleImage` / `hasSaveImage`. |
+| `--xbe-image <file> <path> --type logo\|title\|save -o <out.png\|out.dds>` | **XBE image** — extract the Microsoft logo bitmap, the `$$XTIMAGE` title image or the `$$XSIMAGE` save image as PNG or DDS. DXT1/3/5, BGR24/BGRA32, XPR0 and the 54-byte title-image header are decoded; an unsupported payload is a clean error. |
 | `--md5 <file> [path]` | Compute **MD5** hashes of files **inside** the image. No `path` → hash every file in the image; directory → recursive; file → single hash. Output: lowercase hex + two spaces + path. |
 | `--sha256 <file> [path]` | Compute **SHA-256** hashes of files inside the image (same semantics as `--md5`). |
 | `-V <file1.xiso> ...` | **Audit** — deep integrity check of one or more images: header, tree walk, sector bounds, cycle detection, reserved attribute bits `0x48` masked, `0x0000` sentinel. The optimized tag is reported (`Optimized: yes/no`) but is **not required**, so raw/unconverted dumps pass; run `--is-optimized` for a strict tag-only check. Prints `Files checked` / `Dirs checked` / `Optimized` / `Result: PASS|FAIL (N issue(s))`. |
@@ -104,7 +106,7 @@ Image inputs accept `.cso`/`.1.cso` and `.cci`/`.1.cci` files directly (auto-det
 | `checksum [--silent] <image> [images...]` / `--checksum <image> [--silent]` | **SHA3-256** image checksum (`XisoChecksum.ComputeImageChecksum`, `SortedDictionary Ordinal` `/path` UTF-8 + streamed data, `xdvdfs` compat). `.cso`/`.1.cso`, `.cci`/`.1.cci` and split `.1.iso` inputs are auto-detected and read through the decompressed/concatenated view - result identical to the source ISO. `.zar` inputs use `ComputeZarChecksum` (same tree hash) - also identical. Prints `hex tab path` (`--silent` = hex only). Also `flag` form `--checksum` supports multiple ISOs (`--silent` requires `--checksum` in flag form). See [xdvdfs Compat](xdvdfs-compat.md#checksum). |
 | `hash <image> [images...] [--json]` | **Full-image hashes** (`XisoImageHash.Compute`): CRC32, MD5, SHA-1, SHA-256 and SHA3-256 in one streaming pass over the decompressed view, so ISO, split ISO, CISO and CCI agree. `--json` emits a `hashes` array. |
 | `verify-hashes <image> <hash-file> [--ignore-extra] [--json]` | **Verify a `.hash` sidecar** produced by `--petrify` (or XboxKit). Each line is `sha1hex path`; works for ISO, split ISO, CISO, CCI and ZAR. Missing/mismatched files fail; extra image files are reported and can be ignored with `--ignore-extra`. |
-| `title-info <image> [--json]` | **Title metadata**: finds the root `default.xbe`, parses its certificate and reports title name, title ID, region, disc number and version. A GOD header or its `.data` folder is also accepted; it reports the `XContent` title name, title ID, disc number and disc count (no mount). Single-file XBLA/XBLIG STFS packages are accepted too (`StfsHeader`, content types `0x000D0000` / `0x00000002`). |
+| `title-info <image> [--json]` | **Title metadata**: finds the root `default.xbe`, `default.xex` or `default_mp.xbe` and reports title name, title ID, region, disc number and version. Xbox 360 titles additionally report publisher, developer, genre, description and thumbnail presence from the plaintext XDBF/XSRC resources. A GOD header or its `.data` folder is also accepted; it reports the `XContent` title name, title ID, disc number and disc count (no mount). Single-file XBLA/XBLIG STFS packages are accepted too (`StfsHeader`, content types `0x000D0000` / `0x00000002`). |
 | `split [--size <bytes\|half>] [--output <base>] <image> [images...] [--batch <dir>]` | **Split** a plain ISO into sector-aligned `<base>.1.iso`, `<base>.2.iso`, … parts (`XisoSplitter.Split`, TODO #17 / xdvdfs #97 — the plain-ISO counterpart to CSO `--ciso-split`). `--size` accepts bytes with `K`/`M`/`G` suffixes or `half`/`halves`; default `0xFF000000` (4 GiB − 16 MiB, conservative FATX cap); an explicit larger size warns. Base defaults to the input stem. Existing parts are refused; partial parts are removed on failure/cancel. With `--batch`, splits every unsplit `.iso`/`.xiso` in `<dir>`. |
 | `join\|joinsplit [--output <file>] <first.1.iso> [...]` | **Reassemble** split parts (`XisoSplitter.Join`). Output defaults to the part stem + `.iso` and must not exist; the result is validated as an XISO afterwards. |
 | `convert <src.zar\|src.iso> <out.iso\|out.zar> [-y\|-n] [--batch <dir> --format iso\|zar]` | **Convert** ZArchive to ISO (`XisoZarchive.ConvertZarToIso`: extract to a temp directory then `XisoWriter.PackFromDirectory`) or ISO to ZArchive (`CreateZar`). Existing outputs follow `-y`/`-n`. With `--batch`, converts every unsplit `.iso`/`.xiso` to `.zar` (`--format zar`, default) or every `.zar` to `.iso` (`--format iso`). |
@@ -364,8 +366,8 @@ XISOSharp -v --json
 | `sector-layout` | `{ schemaVersion, command, source, volume, fileCount, dirCount, entries[], usedRanges[], freeRanges[] }` |
 | `ranges` | `{ schemaVersion, command, source, system[{ startSector, sectorCount }], files[...] }` |
 | `filetime` | `{ schemaVersion, command, source, iso8601, raw, hex }` |
-| `xex-info` / `xbe-info` | `{ schemaVersion, command, source, path, ...parsed fields }` |
-| `title-info` | GOD: `{ schemaVersion, command, source, kind: "god", headerPath, titleName, titleId, titleIdHex, discNumber, discCount }`; XBLA/XBLIG: `{ schemaVersion, command, source, kind: "xbla"\|"xblig", packagePath, titleName, titleId, titleIdHex, discNumber, discCount, contentType }`; XBE: `{ schemaVersion, command, source, xbePath, titleName, titleId, titleIdHex, gameRegion, gameRegionName, diskNumber, version }` |
+| `xex-info` / `xbe-info` | `{ schemaVersion, command, source, path, ...parsed fields }`; `xex-info` adds optional `titleName` / `publisher` / `developer` / `genre` / `description` / `hasThumbnail` when XDBF is present, and `xbe-info` adds `hasLogoBitmap` / `hasTitleImage` / `hasSaveImage`. |
+| `title-info` | GOD: `{ schemaVersion, command, source, kind: "god", headerPath, titleName, titleId, titleIdHex, discNumber, discCount }`; XBLA/XBLIG: `{ schemaVersion, command, source, kind: "xbla"\|"xblig", packagePath, titleName, titleId, titleIdHex, discNumber, discCount, contentType }`; XBE: `{ schemaVersion, command, source, kind: "xbe", xbePath, titleName, titleId, titleIdHex, gameRegion, gameRegionName, diskNumber, version }`; XEX: `{ schemaVersion, command, source, kind: "xex", xbePath, xexPath, titleName, titleId, titleIdHex, gameRegion, gameRegionName, diskNumber, version, discCount, publisher?, developer?, genre?, description?, hasThumbnail? }` |
 | `validate` | `{ schemaVersion, command, source, output, checksums, passed, sourceSummary, outputSummary, issues[] }` |
 | `-v` / `--version` | `{ schemaVersion, command, xisoSharp, cciSharp, zArchiveSharp, runtime, os, architecture, commit }` |
 
@@ -499,6 +501,13 @@ XISOSharp --xex-info game360.iso /default.xex
 # Show the original-Xbox executable header + certificate
 # (title ID/name, media, region, ...)
 XISOSharp --xbe-info game.iso /default.xbe
+
+# Read Xbox 360 XDBF title metadata (also used by `title-info`)
+XISOSharp title-info game360.iso
+
+# Extract an XBE title image or logo as PNG/DDS
+XISOSharp --xbe-image game.iso /default.xbe --type title -o title.png
+XISOSharp --xbe-image game.iso /default.xbe --type logo -o logo.dds
 
 # Copy one directory out of an image
 XISOSharp --copy-out game.iso /media ./media_out

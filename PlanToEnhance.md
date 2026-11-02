@@ -1,6 +1,6 @@
 # Plan to Enhance XISOSharp
 
-**Status:** CCISharp 1.0.1 published on NuGet (2026-11-01; 1.0.0 was the first release, 1.0.1 adds hostile-index hardening). XISOSharp **1.5.0** (published 2026-11-01) implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input (including `validate`/`--validate-checksums`), Phase 4 pathological-TOC traversal hardening (extract/list/rewrite plus the audit, sector-range, repair, salvage and ZAR follow-up walkers), Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests); follow-ups make CISO compression read split/container sources directly and harden ZAR extraction (depth bound, pre-sized exact copies, partial cleanup). **Phase 10 Tier A is the 1.6.0 work in progress:** A3 (FATX cap), A4 (`--delete-source`) and A5 (GOD title naming, extended to single-file XBLA/XBLIG STFS package headers) are implemented; A1 (Xbox 360 title metadata) and A2 (XBE image assets) remain.
+**Status:** CCISharp 1.0.1 published on NuGet (2026-11-01; 1.0.0 was the first release, 1.0.1 adds hostile-index hardening). XISOSharp **1.5.0** (published 2026-11-01) implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input (including `validate`/`--validate-checksums`), Phase 4 pathological-TOC traversal hardening (extract/list/rewrite plus the audit, sector-range, repair, salvage and ZAR follow-up walkers), Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests); follow-ups make CISO compression read split/container sources directly and harden ZAR extraction (depth bound, pre-sized exact copies, partial cleanup). **Phase 10 Tier A is the 1.6.0 work:** A1 (Xbox 360 XDBF/XSRC title metadata), A2 (XBE logo/title/save image assets), A3 (FATX cap), A4 (`--delete-source`) and A5 (GOD title naming, extended to single-file XBLA/XBLIG STFS package headers) are implemented.
 **Baseline:** XISOSharp `1.4.4` (tag), extract-xiso build `202609111233`, xdvdfs `0.8.3`
 **Reference:** CCI spec/implementation copied to `References/libCCI-0.1.0-1b0087e` (commit `1b0087e`, GPL-2.0-or-later; reference only) and verified to build/round-trip.
 **CCISharp repo:** <https://github.com/purelogiccode/CCISharp> — package <https://www.nuget.org/packages/CCISharp/1.0.1>.
@@ -64,7 +64,7 @@ A full review of the upstream trackers — 56 extract-xiso issues, 54 extract-xi
 - `XISOSharp/XisoZarchive.cs` — `CreateZar`, `ListZar`, `ExtractZar` and `ConvertZarToIso`.
 - `XISOSharp/XisoPatcher.cs`, `SectorAllocator.cs`, `XisoValidator.cs`, `XisoChecksum.cs` — sector layout, copy-in, audit and SHA3-256 checksum already exist.
 - `XISOSharp.Cli/Program.cs` — `--batch` covers extract/list/tree/rewrite/audit and the container verbs (`compress`/`decompress`/`convert`/`split`); JSON only via `--validate-report` (Phase 6).
-- `XISOSharp.Tests` - current suite: 2002 passed / 1 opt-in skip on net8.0/net9.0; 2066 passed / 1 opt-in skip on net10.0.
+- `XISOSharp.Tests` - current suite: 2021 passed / 1 opt-in skip on net8.0/net9.0; 2085 passed / 1 opt-in skip on net10.0.
 
 ---
 
@@ -882,12 +882,13 @@ existing named error or report/drop gate.
   - **Phase 1 gap closed:** `XisoRanges.GetXisoRanges`/`GetFileEntries` are container-aware (`Stream` overloads + `XisoImageSource`), so `--ranges` reads split ISO/CISO/CCI.
   - **Container guard:** the raw-sector redump modes (`--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`) refuse `.cso`/`.cci`, split ISO and `.zar` inputs with a decompress/convert/join message instead of parsing container bytes as an XISO; `RedumpInputGuardTests` covers every mode.
   - **CCI part naming:** a split CCI opened through `.2.cci` … `.9.cci` names extraction/rewrite/compress outputs after the game (`game/`, `game.iso`, `game.cci`); `StripImageSuffix` strips a part marker only for split-capable extensions (`.1` for ISO/CISO, any digit for CCI, never for `.zar`).
-- **XISOSharp 1.6.0 (in progress, untagged):**
+- **XISOSharp 1.6.0 (complete, untagged):**
   - **A3:** `Constants.FatxMaxFileSize` (`0xFF000000`, 4 GiB − 16 MiB) is the plain-ISO split default; explicit `--size` values above it warn but are honoured. CISO/CCI keep `0xffbf6000` as their xdvdfs-compatible compression default.
   - **A4:** batch `compress`/`decompress`/`convert`/`split` accept `--delete-source` (requires `-y`; refused with `-n`); deletion happens only after a successful conversion, split sets delete every part, and the summary reports the deleted count.
   - **A5:** `GodHeader`/`GodTitleInfo` read the plaintext GOD/SVOD `XContent` header (title name, title ID, disc number/count); `title-info` accepts a GOD header or its `.data` folder in text and `--json` form, with FATX-safe name sanitisation and a hex-title-ID fallback. **Extension:** `StfsHeader`/`StfsTitleInfo` read the same XContent fields from single-file XBLA (`0x000D0000`) and XBLIG (`0x00000002`) STFS packages, which have no `.data` folder.
-  - **A1/A2:** Xbox 360 XDBF title metadata and XBE image assets remain to be implemented.
-- **Remaining roadmap:** Phase 10 Tier A A1/A2 for `1.6.0`, Tier B B1 (`StfsSharp` + read-only GOD) for `1.7.0`, full XBLA/XBLIG STFS package listing/extraction (future; 1.6.0 has header metadata only), and the unchecked §15 quality items. CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work.
+  - **A1:** `XexDbdf` reads the plaintext XDBF/XSTR/XSRC resources from the XEX header-section table; `XexTitleInfo` carries title name, publisher, developer, genre, description and optional thumbnail. `TitleInfo` gains `Kind` (`Xbe`/`Xex`) and `Xex` init properties without changing the positional record; `GetTitleInfo` resolves `default.xbe` → `default.xex` → `default_mp.xbe`; `title-info`/`--xex-info` print and serialize the 360 fields.
+  - **A2:** `XbeAssets` reads the logo bitmap and `$$XTIMAGE`/`$$XSIMAGE` sections; `DxtDecoder`/`PngWriter` decode DXT1/3/5, BGR24/BGRA32 and XPR0 payloads to PNG, and DDS is passed through or generated. `XbeInfo` gains `HasLogoBitmap`/`HasTitleImage`/`HasSaveImage`; `--xbe-image` extracts logo/title/save as PNG or DDS.
+- **Remaining roadmap:** Tier B B1 (`StfsSharp` + read-only GOD) for `1.7.0`, full XBLA/XBLIG STFS package listing/extraction (future; 1.6.0 has header metadata only), and the unchecked §15 quality items. CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work.
 
 ### 12.1 Dependency graph
 
@@ -1220,7 +1221,7 @@ dotnet run --project XISOSharp.Fuzz -c Release -- --seconds 60
 
 ## 16. Phase 10 — cross-reference harvest (Xbox360Convert / XboxToolkit / XDVDFS-TR / XeCrypt)
 
-**Status:** proposed 2026-11-01; Tier A (`1.6.0`) is in progress (A3, A4 and A5 implemented 2026-11-02; A1/A2 pending); Tier B ships in **`1.7.0`**. Scope is deliberately narrow: only items judged *worthy and useful* are included, and every rejected candidate is recorded in §16.7 with a reason so it is not re-litigated.
+**Status:** proposed 2026-11-01; Tier A (`1.6.0`) is complete (A1–A5 implemented 2026-11-02); Tier B ships in **`1.7.0`**. Scope is deliberately narrow: only items judged *worthy and useful* are included, and every rejected candidate is recorded in §16.7 with a reason so it is not re-litigated.
 
 **References reviewed:** `References/Xbox360Convert-1.0.1`, `References/XboxToolkit-main`, `References/XDVDFS-TR-0.8.4-TR`, `References/XeCrypt-main`, re-checked against `extract-xiso-build-202609111233`, `libCCI-0.1.0-1b0087e`, `XboxKit-0.7` and `xdvdfs-0.8.3`.
 
@@ -1257,6 +1258,8 @@ is implemented from on-disk format facts and verified against synthetic fixtures
 
 #### A1. Xbox 360 title metadata (`title-info` on 360 discs)
 
+**Status:** implemented 2026-11-02 (`XexDbdf`, `XexTitleInfo`, `TitleInfo.Kind`/`Xex`, `GetXexTitleInfo`, `title-info`/`--xex-info` text + JSON; tests in `XexTitleInfoTests`).
+
 **Problem.** `XisoReader.GetTitleInfo` resolves only `/default.xbe`, so on a 360
 XISO it returns `null` and the CLI prints *"no root default.xbe with an XBEH
 certificate"*. `GetXexInfo` parses the fixed header, security info (image size,
@@ -1283,6 +1286,8 @@ and version; output for OG XISOs is byte-identical to today; `CliJsonTests`
 snapshots updated; a synthetic XDBF fixture round-trips.
 
 #### A2. XBE image assets (`--xbe-image`)
+
+**Status:** implemented 2026-11-02 (`XbeAssets`, `XbeImage`, `DxtDecoder`, `PngWriter`, `XbeInfo` presence flags, `--xbe-image`; tests in `XbeAssetsTests`).
 
 **Problem.** `--xbe-info` reports the certificate only; the artwork is unreachable.
 
@@ -1413,13 +1418,15 @@ XBLA/XBLIG package listing/extraction remains future work; the 1.6.0
 
 | File | Change |
 |---|---|
-| `XISOSharp/Models/TitleInfo.cs` | additive `Kind`, `Xex` properties |
+| `XISOSharp/Models/TitleInfo.cs` | additive `Kind`, `Xex` properties; `Xbe` nullable for XEX titles |
+| `XISOSharp/Models/TitleKind.cs` (new) | `Xbe`/`Xex` enum |
 | `XISOSharp/Models/XexTitleInfo.cs` (new) | XDBF-derived 360 metadata |
-| `XISOSharp/XexDbdf.cs` (new) | XEX header-section table + XDBF/XSRC parser |
-| `XISOSharp/XisoReader.cs` | `GetTitleInfo` xbe→xex resolution; `GetXexInfo` enrichment |
+| `XISOSharp/XexDbdf.cs` (new) | XEX header-section table + XDBF/XSTR/XSRC parser |
+| `XISOSharp/XisoReader.cs` | `GetTitleInfo` xbe→xex→mp resolution; `GetXexTitleInfo`; XBE image-presence flags |
 | `XISOSharp/Models/XbeInfo.cs` | additive image-presence properties |
 | `XISOSharp/XbeAssets.cs` (new) | logo / `$$XTIMAGE` / `$$XSIMAGE` extraction |
-| `XISOSharp/DxtDecoder.cs` (new) | DXT1/3/5 + BGR24 decode |
+| `XISOSharp/Models/XbeImage.cs` (new) | extracted image record (`Raw`/`Png`/`Dds`) |
+| `XISOSharp/DxtDecoder.cs` (new) | DXT1/3/5 + BGR24/BGRA32 decode |
 | `XISOSharp/PngWriter.cs` (new) | BCL-only PNG encode |
 | `XISOSharp/Constants.cs` | `FatxMaxFileSize` (A3) |
 | `XISOSharp/XisoSplitter.cs` | FATX-safe default part size (A3) |
@@ -1430,9 +1437,9 @@ XBLA/XBLIG package listing/extraction remains future work; the 1.6.0
 | `XISOSharp/Models/StfsTitleInfo.cs` (new) | XBLA/XBLIG title metadata record + kind enum (A5 extension) |
 | `XISOSharp/XisoImageFormat.cs` / `XisoImageSource.cs` | `God` + detection (header and `.data` folder) (B1) |
 | `XISOSharp/BlockDevice/GodBlockDevice.cs` (new) | `IBlockDevice` over `StfsFile` (B1) |
-| `XISOSharp.Cli/Program.cs` | `--delete-source` (A4), GOD + XBLA/XBLIG `title-info` (A5), pending `--xbe-image`/GOD verbs |
-| `XISOSharp.Cli/JsonOutput.cs` | `JsonGodTitleInfo` + `JsonStfsTitleInfo` (A5), pending 360/XBE fields |
-| `XISOSharp.Gui/**` | 360 title panel, XBE image preview, GOD filter/drop routing |
+| `XISOSharp.Cli/Program.cs` | `--delete-source` (A4), GOD + XBLA/XBLIG `title-info` (A5), 360 `title-info`/`--xex-info` (A1), `--xbe-image` (A2) |
+| `XISOSharp.Cli/JsonOutput.cs` | `JsonGodTitleInfo` + `JsonStfsTitleInfo` (A5), 360 `title-info`/`--xex-info` fields (A1), `xbe-info` presence flags (A2) |
+| `XISOSharp.Gui/**` | 360 title panel, XBE image preview, GOD filter/drop routing (future; A1/A2 are library + CLI) |
 | `XISOSharp.Tests/*` | XDBF, XBE assets, DXT/PNG, FATX cut, delete-source, GOD + XBLA/XBLIG header metadata |
 | `XISOSharp.TestDataGenerator/*` | synthetic XDBF, XBE-with-images, GOD set |
 | `docs/*`, `WhatsNew.md`, `docs/release-notes.md`, READMEs | feature + limitation docs |
@@ -1446,7 +1453,7 @@ XBLA/XBLIG package listing/extraction remains future work; the 1.6.0
   reflection-free).
 - Public API additive only; `PackageValidationBaselineVersion` stays green.
 - New JSON fields covered by `GodHeaderTests` (GOD), `StfsHeaderTests` (XBLA/XBLIG) and `CliJsonTests` (existing payloads).
-- Fuzzer seeds: XDBF, XBE section table, DXT block, GOD `XContent`/block map (XDBF/XBE/DXT and the full GOD block map are pending with A1/A2/B1; the A5 header parser has synthetic coverage).
+- Fuzzer seeds: XDBF, XBE section table, DXT block, GOD `XContent`/block map (XDBF/XBE/DXT have synthetic coverage; the full GOD block map is pending with B1).
 
 ### 16.6 Companion repositories
 
@@ -1501,3 +1508,4 @@ viewers. Cross-repo work is tracked in §15.9.
 |---|---|---|
 | 2026-11-01 | Phase 10 scope agreed from the reference review: 5 items accepted, GOD read-only proposed; owner exclusions recorded (WASM/web, Python bindings/native ABI, direct optical-drive reading, executable signature verification); §13/§15.6/§15.7/§15.10 and Appendix A amended | — |
 | 2026-11-02 | Phase 10 Tier A partial: A3 FATX cap (`Constants.FatxMaxFileSize`), A4 `--delete-source`, A5 GOD header title naming (`GodHeader`/`GodTitleInfo`, `title-info` text/JSON) extended to single-file XBLA/XBLIG STFS headers (`StfsHeader`/`StfsTitleInfo`); plan/document drift corrected (1.5.0 release state, counts, benchmark scope, coverage floor) | — |
+| 2026-11-02 | Phase 10 Tier A complete: A1 XEX header-section table + XDBF/XSTR/XSRC parser (`XexDbdf`, `XexTitleInfo`, `GetXexTitleInfo`, `TitleInfo.Kind`/`Xex`, `default.xbe`→`default.xex`→`default_mp.xbe`, 360 `title-info`/`--xex-info` text+JSON); A2 XBE logo/`$$XTIMAGE`/`$$XSIMAGE` extraction (`XbeAssets`, `XbeImage`, DXT1/3/5 + BGR24/BGRA32 + XPR0 decode, BCL PNG writer, DDS passthrough/generation, `XbeInfo` presence flags, `--xbe-image`); synthetic XDBF/XBE fixtures and CLI tests | — |

@@ -541,6 +541,28 @@ public static XexInfo? GetXexInfo(Stream imageStream, string imageName, string i
 - `XisoFormatException` — not a valid XISO image
 - `IOException` — read errors
 
+#### `GetXexTitleInfo`
+
+Reads the plaintext XDBF resource from the XEX header-section table: title name, publisher, developer, genre, description and optional thumbnail. No decryption or image decompression is involved. Path and `Stream` overloads.
+
+```csharp
+public static XexTitleInfo? GetXexTitleInfo(string isoPath, string internalPath)
+public static XexTitleInfo? GetXexTitleInfo(Stream imageStream, string imageName, string internalPath)
+```
+
+**Returns**: An `XexTitleInfo` record (with an empty title name when a valid XEX has no readable XDBF), or `null` when the entry is missing, a directory, or not an XEX2 executable. `GetTitleInfo` uses this for `default.xex` and sets `TitleInfo.Kind = TitleKind.Xex`.
+
+#### `GetTitleInfo`
+
+Resolves the root executable in order: `default.xbe` (original Xbox), then `default.xex` (Xbox 360), then `default_mp.xbe`. Path and `Stream` overloads.
+
+```csharp
+public static TitleInfo? GetTitleInfo(string isoPath)
+public static TitleInfo? GetTitleInfo(Stream imageStream, string imageName)
+```
+
+**Returns**: A `TitleInfo` with the title name, ID, region, disc and version, or `null` when no supported root executable is present. `TitleInfo.Kind` is `Xbe` or `Xex`; `TitleInfo.Xbe` and `TitleInfo.Xex` carry the source-specific metadata.
+
 #### `GetXbeInfo`
 
 Parses the original-Xbox XBEH header + certificate of a `.xbe` file inside the image — no reference tool does this: base address, entry point, section count, init flags, cert size/timestamp, title ID and UTF-16 title name (+ 16 alternate title IDs), allowed-media, region, and ratings bitmasks, disc number, version. All multi-byte fields are read little-endian (cert address is a load pointer: file offset = address − base). Path and `Stream` overloads.
@@ -556,6 +578,21 @@ public static XbeInfo? GetXbeInfo(Stream imageStream, string imageName, string i
 - `FileNotFoundException` — input file does not exist (path overload)
 - `XisoFormatException` — not a valid XISO image
 - `IOException` — read errors
+
+#### `XbeAssets`
+
+Extracts the Microsoft logo bitmap, `$$XTIMAGE` title image or `$$XSIMAGE` save image from an XBE. The section walk is bounded by the XBE header/section table; DXT1/3/5, BGR24/BGRA32, XPR0 and the 54-byte title-image header are decoded with a BCL-only PNG writer. DDS output is a passthrough when the payload already is a DDS, otherwise a standard header is written around the decoded texture.
+
+```csharp
+public static XbeImage? GetLogo(string imagePath, string internalPath)
+public static XbeImage? GetTitleImage(string imagePath, string internalPath)
+public static XbeImage? GetSaveImage(string imagePath, string internalPath)
+public static XbeImage? GetImage(string imagePath, string internalPath, XbeImageKind kind)
+public static XbeImage? GetImage(Stream imageStream, string imageName, string internalPath,
+    XbeImageKind kind)
+```
+
+**Returns**: An `XbeImage` (`Raw`, `Png`, `Dds`, dimensions and detected pixel format), or `null` when the asset is absent. Unsupported payloads return the record with `Png`/`Dds` set to `null` instead of throwing. `XbeInfo.HasLogoBitmap`, `HasTitleImage` and `HasSaveImage` report presence without decoding. The CLI exposes this as `--xbe-image`.
 
 #### `AuditXiso`
 
@@ -1087,6 +1124,20 @@ Xbox 360 XEX2 header of an executable inside the image (`GetXexInfo`).
 | `EncryptionType` | `ushort` | Encryption type. |
 | `CompressionType` | `ushort` | File compression type (0 = none, 1 = basic, 2 = normal, 3 = delta). |
 
+#### `XexTitleInfo`
+
+XDBF/XSRC title metadata of an Xbox 360 executable inside the image (`GetXexTitleInfo`).
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `XexPath` | `string` | Image-internal path of the executable. |
+| `TitleName` | `string` | Title name from XSRC/XSTR (empty when absent). |
+| `Publisher` / `Developer` / `Genre` / `Description` | `string?` | XSRC product-information strings. |
+| `Thumbnail` | `byte[]?` | Raw XDBF `0x8000` thumbnail payload (usually PNG/JPEG). |
+| `HasThumbnail` | `bool` | Whether a thumbnail payload was present. |
+| `TitleId` / `TitleIdHex` | `uint` / `string` | Title ID from the XEX execution info. |
+| `Info` | `XexInfo` | Full XEX2 header metadata. |
+
 #### `XbeInfo`
 
 Original-Xbox XBEH header + certificate of an executable inside the image (`GetXbeInfo`).
@@ -1107,6 +1158,23 @@ Original-Xbox XBEH header + certificate of an executable inside the image (`GetX
 | `GameRatings` | `uint` | Game-ratings bitmask (ESRB etc.). |
 | `DiskNumber` | `uint` | Disc number of a multi-disc title. |
 | `Version` | `uint` | Game version from the certificate. |
+| `HasLogoBitmap` | `bool` | Whether the image header points at a logo bitmap. |
+| `HasTitleImage` | `bool` | Whether the executable has a `$$XTIMAGE` section. |
+| `HasSaveImage` | `bool` | Whether the executable has a `$$XSIMAGE` section. |
+
+#### `XbeImage`
+
+An image extracted from an XBE (`XbeAssets`).
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Kind` | `XbeImageKind` | `Logo`, `Title` or `Save`. |
+| `SectionName` | `string` | Section name (`$$XTIMAGE`/`$$XSIMAGE`) or `logo`. |
+| `Width` / `Height` | `int` | Decoded dimensions (0 when unknown). |
+| `PixelFormat` | `string` | Detected source format (for example `DXT1`, `BGR24`, `XPR0/DXT5`). |
+| `Raw` | `byte[]` | Raw on-disk payload. |
+| `Png` | `byte[]?` | BCL-generated PNG, or `null` when unsupported. |
+| `Dds` | `byte[]?` | DDS passthrough/generated DDS, or `null` when unsupported. |
 
 ---
 

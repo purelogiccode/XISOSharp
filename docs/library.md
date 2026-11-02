@@ -38,7 +38,8 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | Type | Purpose |
 |---|---|
 | [`XisoImage`](api-utilities.md#xisoimage) / `XisoImageHash` | Open-once disposable facade (list/read/extract/validate/title/hash, async wrappers) + full-image CRC32/MD5/SHA-1/SHA-256/SHA3-256 |
-| [`XisoReader`](api-xisoreader.md) | Verify, extract, list, tree, rewrite, info, `ls`, audit, repair, salvage, hash, copy-out, copy-in, checksum, filetime, split/join, XEX/XBE info, BlockDevice overloads |
+| [`XisoReader`](api-xisoreader.md) | Verify, extract, list, tree, rewrite, info, `ls`, audit, repair, salvage, hash, copy-out, copy-in, checksum, filetime, split/join, XEX/XBE info, XEX title metadata, BlockDevice overloads |
+| `XbeAssets` | XBE logo / `$$XTIMAGE` / `$$XSIMAGE` extraction with BCL-only PNG and DDS output |
 | `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` | Unified detection and open (`TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`) for ISO, split ISO, CISO, CCI, split variants and ZAR |
 | `XisoCci` / `CciBlockDevice` | CCI/CCIM compression, extraction, default names and random access (CCISharp-backed) |
 | `XisoZarchive` (read APIs) | `ListZar`, `ExtractZar`, `ConvertZarToIso` alongside the existing `CreateZar` |
@@ -57,7 +58,7 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | [`XisoChecksum` / `CisoWriter`/`CisoReader`](api-utilities.md) | SHA3-256 image checksum + CISO compress/decompress |
 | [`BlockDevice/*`](api-utilities.md#blockdevice) | `IBlockDevice` + `File`/`Memory`/`Offset`/`Stream`/`Ciso`/`Cci` devices |
 | [`RemapFilesystem`](api-utilities.md) | Ordered `host→image` remapping, `xdvdfs.toml`, `GenerateSpecText`, `DryRunRemap` |
-| Records/enums | `VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `RemapRule`, `XisoLayoutSpec`, `XisoLayoutEntry`, `ProgressInfo`, `ExtractMode`, … |
+| Records/enums | `VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `XexTitleInfo`, `XbeInfo`, `XbeImage`, `TitleInfo`/`TitleKind`, `RemapRule`, `XisoLayoutSpec`, `XisoLayoutEntry`, `ProgressInfo`, `ExtractMode`, … |
 | Exceptions | `XisoFormatException`, `XisoEmptyException`, `XisoFileTooLargeException`, `ExtractErrorException` |
 
 ## Container input
@@ -88,7 +89,7 @@ foreach (ExplorerNode node in image.ListFlat("/"))
 
 byte[] readme = image.ReadFile("/readme.txt");
 XisoImageHashResult hash = image.ComputeImageHash();   // CRC32/MD5/SHA1/SHA256/SHA3-256
-TitleInfo? title = image.GetTitleInfo();               // root default.xbe certificate
+TitleInfo? title = image.GetTitleInfo();               // default.xbe / default.xex / default_mp.xbe
 AuditResult audit = image.Validate();
 ```
 

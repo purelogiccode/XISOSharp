@@ -29,7 +29,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) fo
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) - full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) - extract-xiso-compatible flags + 35+ extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (2066 tests on net10.0; 2002 on net8.0/net9.0) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + CCI/libCCI interop + split-ISO input + ZAR input + pathological TOC chains (list/tree/extract/rewrite/audit/ranges/repair/salvage/ZAR) + batch container conversion + JSON output/preallocation + explicit sector-layout packing + GOD and XBLA/XBLIG header title metadata + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (2085 tests on net10.0; 2021 on net8.0/net9.0) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + XDBF/XSRC 360 title metadata + XBE logo/title/save images + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + CCI/libCCI interop + split-ISO input + ZAR input + pathological TOC chains (list/tree/extract/rewrite/audit/ranges/repair/salvage/ZAR) + batch container conversion + JSON output/preallocation + explicit sector-layout packing + GOD and XBLA/XBLIG header title metadata + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command coverage |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 1 of `H:\XBOXTest`, seeded): `extract-xiso.exe` (reference build `202609111233`; `list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
@@ -171,6 +171,8 @@ XISOSharp --copy-in game.iso ./my-config.ini /config.ini  # patch one file in (k
 XISOSharp --md5 game.iso                 # or --sha256
 XISOSharp --xex-info game360.iso /default.xex
 XISOSharp --xbe-info game.iso /default.xbe  # title ID/name, media, region
+XISOSharp title-info game360.iso            # 360 XDBF/XSRC title name, publisher, disc
+XISOSharp --xbe-image game.iso /default.xbe --type title -o title.png
 XISOSharp --sector-layout game.iso          # full sector map (extents, used/free ranges)
 XISOSharp --sector-layout --json game.iso > game.layout.json
 XISOSharp -c ./game_files --layout game.layout.json game.iso  # pack at the recorded sectors
@@ -371,6 +373,8 @@ XisoValidator.WriteReport(vr, "src.iso", "out.iso", "report.json");
 // XEX2 (Xbox 360)
 XexInfo? xex = XisoReader.GetXexInfo("game360.iso", "/default.xex");
 Console.WriteLine($"{xex?.TitleId:X8} entry 0x{xex?.EntryPoint:X8} region {xex?.Region}");
+XexTitleInfo? title = XisoReader.GetXexTitleInfo("game360.iso", "/default.xex");
+Console.WriteLine($"{title?.TitleName} by {title?.Publisher}");
 ```
 
 ### Repair, salvage & executable info (no reference tool does this)
@@ -393,6 +397,12 @@ Console.WriteLine($"carried {salv.Copied.Count}, dropped {salv.Skipped.Count}, p
 // XBE (original Xbox): header + certificate of an executable inside the image
 XbeInfo? xbe = XisoReader.GetXbeInfo("game.iso", "/default.xbe");
 Console.WriteLine($"{xbe?.TitleName} [{xbe?.TitleId:X8}] media 0x{xbe?.AllowedMedia:X8}");
+
+// XBE artwork: logo, title image, save image (PNG + DDS)
+XbeImage? logo = XbeAssets.GetLogo("game.iso", "/default.xbe");
+XbeImage? art = XbeAssets.GetTitleImage("game.iso", "/default.xbe");
+File.WriteAllBytes("logo.png", logo!.Png!);
+File.WriteAllBytes("title.dds", art!.Dds!);
 
 // Split / join FATX-friendly parts (xdvdfs #97)
 IReadOnlyList<string> parts = XisoReader.SplitXiso("game.iso", "game", 4L * 1024 * 1024 * 1024);
@@ -665,7 +675,7 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (same outputs; no implicit pack)
-dotnet test -c Release                       # 2066 tests on net10.0 (2002 on net8/9; `XISOSharp.Tests`; ZArchiveSharp/CCISharp come from NuGet)
+dotnet test -c Release                       # 2085 tests on net10.0 (2021 on net8/9; `XISOSharp.Tests`; ZArchiveSharp/CCISharp come from NuGet)
 ```
 
 Layout: every project lives in its own top-level folder beside the solution — `XISOSharp` (library), `XISOSharp.Cli`, `XISOSharp.Gui`, `XISOSharpTester`, the verification harnesses (`XISOSharp.Tests`, `XISOSharp.BattleTests`, `XISOSharp.Benchmarks`, `XISOSharp.Fuzz`, `XISOSharp.AotSmoke`, `XISOSharp.TestDataGenerator`) and the `XISOSharp.Sample` walkthrough. There are no `src`/`apps`/`tests`/`samples` grouping folders.

@@ -15,13 +15,29 @@
 - **XBLA/XBLIG header metadata**: `StfsHeader`/`StfsTitleInfo` read the same
   XContent fields from single-file Xbox 360 STFS packages (XBLA `0x000D0000`,
   XBLIG `0x00000002`), which have no `.data` directory.
+- **Xbox 360 title metadata**: `XexDbdf` reads the plaintext XDBF/XSTR/XSRC
+  resources from the XEX header-section table. `XexTitleInfo` carries title
+  name, publisher, developer, genre, description and optional thumbnail;
+  `GetXexTitleInfo` exposes it directly. `TitleInfo` gains additive `Kind`
+  (`Xbe`/`Xex`) and `Xex` properties, and `GetTitleInfo` resolves
+  `default.xbe` → `default.xex` → `default_mp.xbe`.
+- **XBE image assets**: `XbeAssets` reads the logo bitmap and the
+  `$$XTIMAGE`/`$$XSIMAGE` sections. DXT1/3/5, BGR24/BGRA32 and XPR0 payloads
+  are decoded to PNG by the new BCL-only `DxtDecoder`/`PngWriter`; DDS is
+  passed through or generated. `XbeInfo` gains `HasLogoBitmap`,
+  `HasTitleImage` and `HasSaveImage` init properties.
 
 ### CLI
 
 - **`title-info`** accepts a GOD header or its `.data` folder, a single-file
-  XBLA/XBLIG STFS package, or an XISO image's `default.xbe` and reports the
-  available title name, title ID, disc and version fields in text and `--json`
-  form.
+  XBLA/XBLIG STFS package, or an XISO image's `default.xbe`/`default.xex`/
+  `default_mp.xbe` and reports the available title name, title ID, disc and
+  version fields in text and `--json` form. Xbox 360 titles also report
+  publisher, developer, genre, description and thumbnail presence.
+- **`--xbe-image <image> <path> --type logo|title|save -o out.png|out.dds`**
+  extracts XBE artwork. `--xbe-info --json` adds `hasLogoBitmap`,
+  `hasTitleImage` and `hasSaveImage`; `--xex-info` prints the XDBF title name,
+  publisher, developer, genre and description when present.
 - **`--delete-source`** on batch `compress`, `decompress`, `convert` and
   `split`: deletes each source only after a successful conversion, requires
   `-y`/`--yes` (refused with `-n`/`--no`), removes every part of a split set,

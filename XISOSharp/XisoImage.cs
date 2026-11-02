@@ -293,22 +293,14 @@ public sealed class XisoImage : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Parses the root <c>default.xbe</c> and returns title metadata, or
-    /// <c>null</c> when the image has no root executable or it is not XBEH.
+    /// Resolves the root <c>default.xbe</c>, <c>default.xex</c> or
+    /// <c>default_mp.xbe</c> and returns title metadata, or <c>null</c> when no
+    /// supported root executable is present.
     /// </summary>
     public TitleInfo? GetTitleInfo()
     {
         ThrowIfDisposed();
-        ExplorerNode? xbe = _explorer.ListChildren("/")
-            .FirstOrDefault(static node => !node.IsDirectory &&
-                                           string.Equals(node.Name, "default.xbe", StringComparison.OrdinalIgnoreCase));
-        if (xbe is null)
-        {
-            return null;
-        }
-
-        XbeInfo? info = _explorer.GetXbeInfo(xbe.FullPath);
-        return info is null ? null : TitleInfoFactory.Create(xbe.FullPath, info);
+        return XisoReader.GetTitleInfo(Path);
     }
 
     /// <summary>Parses an XBE file anywhere in the image.</summary>
@@ -390,6 +382,21 @@ internal static class TitleInfoFactory
         info.Version,
         info);
 
+    internal static TitleInfo CreateXex(string xexPath, XexTitleInfo title) => new(
+        xexPath,
+        title.TitleName,
+        title.Info.TitleId,
+        title.TitleIdHex,
+        title.Info.Region,
+        FormatXexRegion(title.Info.Region),
+        title.Info.DiscNumber,
+        title.Info.Version,
+        null)
+    {
+        Kind = TitleKind.Xex,
+        Xex = title,
+    };
+
     internal static string FormatRegion(uint region) => region switch
     {
         0 => "None",
@@ -400,6 +407,17 @@ internal static class TitleInfoFactory
         5 => "North America, Rest of World",
         6 => "Japan, Rest of World",
         7 => "Worldwide",
+        _ => $"0x{region:X8}",
+    };
+
+    internal static string FormatXexRegion(uint region) => region switch
+    {
+        0 => "None",
+        0xFFFFFFFF => "All",
+        _ when (region & 0x000000FF) != 0 => "NTSC-U",
+        _ when (region & 0x0000FF00) != 0 => "NTSC-J",
+        _ when (region & 0x00FF0000) != 0 => "PAL",
+        _ when (region & 0xFF000000) != 0 => "Other",
         _ => $"0x{region:X8}",
     };
 }

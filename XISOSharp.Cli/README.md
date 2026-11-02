@@ -104,8 +104,9 @@ printed and the tool exits 1.
 | `-i <file> [path]` | Volume info + directory entry metadata (sector, size, attributes) |
 | `--ls <file> [path]` | Flat directory listing, names only (mirrors `ls`) |
 | `--md5 <file> [path]` / `--sha256 <file> [path]` | Hash files inside the image (whole image / directory / single file) |
-| `--xex-info <file> <path>` | Xbox 360 XEX2 header (module flags, entry point, title ID, region, ...) |
-| `--xbe-info <file> <path>` | Original-Xbox XBEH header + certificate (title ID/name, media, region) |
+| `--xex-info <file> <path>` | Xbox 360 XEX2 header (module flags, entry point, title ID, region, ...) plus XDBF/XSRC title name, publisher, developer, genre and description when present |
+| `--xbe-info <file> <path>` | Original-Xbox XBEH header + certificate (title ID/name, media, region); `--json` adds `hasLogoBitmap` / `hasTitleImage` / `hasSaveImage` |
+| `--xbe-image <file> <path> --type logo\|title\|save -o <out.png\|out.dds>` | Extract an XBE logo, `$$XTIMAGE` title image or `$$XSIMAGE` save image as PNG or DDS |
 | `--copy-out <iso> <path> <dest>` | Copy a file or directory out of an image |
 | `--copy-in <iso> <host> <path>` | Patch a host file into an image (replace or add; writes `<iso>.old` unless `--no-backup`) |
 | `-V <file1.xiso> ...` | Deep integrity audit: header, tree, sector bounds, cycles, attributes; prints `Optimized: yes/no` (the tag is reported, not required) |
@@ -114,7 +115,7 @@ printed and the tool exits 1.
 | `-r` | Rewrite as optimized ISO (byte-identical to `extract-xiso -r`) |
 | `validate <src> <out>` | Validate conversion between two images (+ `--validate*` flags; mismatch exits 2). Both sides accept ISO, CISO/CCI (single or split), split ISO sets and `.zar` |
 | `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum (`--silent` → hex only) |
-| `title-info <image> [--json]` | Root `default.xbe` title metadata (name, ID, region, disc, version); a GOD header or its `.data` folder, or a single-file XBLA/XBLIG STFS package, reports `XContent` name/ID/disc metadata |
+| `title-info <image> [--json]` | Root `default.xbe`, `default.xex` or `default_mp.xbe` title metadata (name, ID, region, disc, version); Xbox 360 XDBF adds publisher/developer/genre/description/thumbnail presence. A GOD header or its `.data` folder, or a single-file XBLA/XBLIG STFS package, reports `XContent` name/ID/disc metadata |
 | `split` / `join` (`joinsplit`) | Split into `<base>.1.iso`… parts / reassemble (`--size`, `--output`, `--batch`; default size `0xFF000000`, 4 GiB − 16 MiB) |
 | `--filetime <image>` / `--set-filetime <image> <value>` | Show / set the FILETIME volume field |
 | `--sector-layout <image>` | Full sector map: volume summary, per-file extents, used/free ranges |
@@ -200,6 +201,8 @@ XISOSharp --copy-out game.iso /media ./media_out
 XISOSharp --copy-in game.iso ./my-config.ini /config.ini
 XISOSharp --sha256 game.iso
 XISOSharp --xbe-info game.iso /default.xbe
+XISOSharp title-info game360.iso
+XISOSharp --xbe-image game.iso /default.xbe --type title -o title.png
 
 # Sector map, sector ranges, optimized-tag probe
 XISOSharp --sector-layout game.iso

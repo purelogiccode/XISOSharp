@@ -55,8 +55,10 @@ C:XISOSharp.Models.UnpackOptions()
 C:XISOSharp.Models.ValidationIssue(XISOSharp.Models.ValidationIssueType,System.String,System.Int64,System.Int64,System.Byte[],System.Byte[])
 C:XISOSharp.Models.ValidationResult(System.Boolean,System.Int32,System.Int32,System.Int32,System.Int32,System.Int64,System.Int64,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.ValidationIssue>)
 C:XISOSharp.Models.VolumeInfo(System.Boolean,System.UInt32,System.UInt32,System.Int64,System.Int64,System.Int64)
+C:XISOSharp.Models.XbeImage(XISOSharp.Models.XbeImageKind,System.String,System.Int32,System.Int32,System.String,System.Byte[],System.Byte[],System.Byte[])
 C:XISOSharp.Models.XbeInfo(System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.String,System.UInt32[],System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32)
 C:XISOSharp.Models.XexInfo(System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.Byte,System.Byte,System.Byte,System.UInt16,System.UInt16)
+C:XISOSharp.Models.XexTitleInfo(System.String,System.String,System.String,System.String,System.String,System.String,System.Byte[],XISOSharp.Models.XexInfo)
 C:XISOSharp.Models.XisoExplorerOptions()
 C:XISOSharp.Models.XisoLayoutEntry(System.String,System.UInt32,System.Nullable<System.UInt32>,System.Nullable<System.UInt32>,System.Nullable<System.Boolean>)
 C:XISOSharp.Models.ZarEntry(System.String,System.Boolean,System.UInt64)
@@ -225,11 +227,18 @@ F:XISOSharp.Models.ProgressInfoType.value__:System.Int32
 F:XISOSharp.Models.StfsPackageKind.Xbla:XISOSharp.Models.StfsPackageKind
 F:XISOSharp.Models.StfsPackageKind.Xblig:XISOSharp.Models.StfsPackageKind
 F:XISOSharp.Models.StfsPackageKind.value__:System.Int32
+F:XISOSharp.Models.TitleKind.Xbe:XISOSharp.Models.TitleKind
+F:XISOSharp.Models.TitleKind.Xex:XISOSharp.Models.TitleKind
+F:XISOSharp.Models.TitleKind.value__:System.Int32
 F:XISOSharp.Models.ValidationIssueType.ChecksumMismatch:XISOSharp.Models.ValidationIssueType
 F:XISOSharp.Models.ValidationIssueType.ExtraInOutput:XISOSharp.Models.ValidationIssueType
 F:XISOSharp.Models.ValidationIssueType.MissingInOutput:XISOSharp.Models.ValidationIssueType
 F:XISOSharp.Models.ValidationIssueType.SizeMismatch:XISOSharp.Models.ValidationIssueType
 F:XISOSharp.Models.ValidationIssueType.value__:System.Int32
+F:XISOSharp.Models.XbeImageKind.Logo:XISOSharp.Models.XbeImageKind
+F:XISOSharp.Models.XbeImageKind.Save:XISOSharp.Models.XbeImageKind
+F:XISOSharp.Models.XbeImageKind.Title:XISOSharp.Models.XbeImageKind
+F:XISOSharp.Models.XbeImageKind.value__:System.Int32
 F:XISOSharp.XgdTables.RedumpIsoLength:System.Int64[]
 F:XISOSharp.XgdTables.VideoL0Length:System.Int64[]
 F:XISOSharp.XgdTables.VideoL1Length:System.Int64[]
@@ -465,6 +474,12 @@ M:XISOSharp.Models.VolumeInfo.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.VolumeInfo.Equals(XISOSharp.Models.VolumeInfo)->System.Boolean
 M:XISOSharp.Models.VolumeInfo.GetHashCode()->System.Int32
 M:XISOSharp.Models.VolumeInfo.ToString()->System.String
+M:XISOSharp.Models.XbeImage.<Clone>$()->XISOSharp.Models.XbeImage
+M:XISOSharp.Models.XbeImage.Deconstruct(out XISOSharp.Models.XbeImageKind,out System.String,out System.Int32,out System.Int32,out System.String,out System.Byte[],out System.Byte[],out System.Byte[])->System.Void
+M:XISOSharp.Models.XbeImage.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.XbeImage.Equals(XISOSharp.Models.XbeImage)->System.Boolean
+M:XISOSharp.Models.XbeImage.GetHashCode()->System.Int32
+M:XISOSharp.Models.XbeImage.ToString()->System.String
 M:XISOSharp.Models.XbeInfo.<Clone>$()->XISOSharp.Models.XbeInfo
 M:XISOSharp.Models.XbeInfo.Deconstruct(out System.UInt32,out System.UInt32,out System.UInt32,out System.UInt32,out System.UInt32,out System.UInt32,out System.UInt32,out System.String,out System.UInt32[],out System.UInt32,out System.UInt32,out System.UInt32,out System.UInt32,out System.UInt32)->System.Void
 M:XISOSharp.Models.XbeInfo.Equals(System.Object)->System.Boolean
@@ -477,6 +492,12 @@ M:XISOSharp.Models.XexInfo.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.XexInfo.Equals(XISOSharp.Models.XexInfo)->System.Boolean
 M:XISOSharp.Models.XexInfo.GetHashCode()->System.Int32
 M:XISOSharp.Models.XexInfo.ToString()->System.String
+M:XISOSharp.Models.XexTitleInfo.<Clone>$()->XISOSharp.Models.XexTitleInfo
+M:XISOSharp.Models.XexTitleInfo.Deconstruct(out System.String,out System.String,out System.String,out System.String,out System.String,out System.String,out System.Byte[],out XISOSharp.Models.XexInfo)->System.Void
+M:XISOSharp.Models.XexTitleInfo.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.XexTitleInfo.Equals(XISOSharp.Models.XexTitleInfo)->System.Boolean
+M:XISOSharp.Models.XexTitleInfo.GetHashCode()->System.Int32
+M:XISOSharp.Models.XexTitleInfo.ToString()->System.String
 M:XISOSharp.Models.XisoExplorerOptions.<Clone>$()->XISOSharp.Models.XisoExplorerOptions
 M:XISOSharp.Models.XisoExplorerOptions.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.XisoExplorerOptions.Equals(XISOSharp.Models.XisoExplorerOptions)->System.Boolean
@@ -530,6 +551,12 @@ M:XISOSharp.TraversalCallback.Invoke(XISOSharp.DataStructures.AvlNode,System.Obj
 M:XISOSharp.WaxGlob.GetCapture(System.String,System.Int32)->System.String
 M:XISOSharp.WaxGlob.GetCaptures(System.String)->System.Collections.Generic.IReadOnlyList<System.String>
 M:XISOSharp.WaxGlob.IsMatch(System.String)->System.Boolean
+M:XISOSharp.XbeAssets.GetImage(System.IO.Stream,System.String,System.String,XISOSharp.Models.XbeImageKind)->XISOSharp.Models.XbeImage
+M:XISOSharp.XbeAssets.GetImage(System.String,System.String,XISOSharp.Models.XbeImageKind)->XISOSharp.Models.XbeImage
+M:XISOSharp.XbeAssets.GetLogo(System.String,System.String)->XISOSharp.Models.XbeImage
+M:XISOSharp.XbeAssets.GetSaveImage(System.String,System.String)->XISOSharp.Models.XbeImage
+M:XISOSharp.XbeAssets.GetTitleImage(System.String,System.String)->XISOSharp.Models.XbeImage
+M:XISOSharp.XbeAssets.TryGetImage(System.String,System.String,XISOSharp.Models.XbeImageKind,out XISOSharp.Models.XbeImage)->System.Boolean
 M:XISOSharp.XboxPrng.ExtractSeed(System.IO.FileStream,System.Int64,System.Boolean)->System.Nullable<System.UInt32>
 M:XISOSharp.XboxPrng.ExtractSeed(System.String,System.Int64,System.Boolean)->System.Nullable<System.UInt32>
 M:XISOSharp.XboxPrng.SimulateSectors(System.Int64)->System.Void
@@ -670,6 +697,8 @@ M:XISOSharp.XisoReader.GetXbeInfo(System.IO.Stream,System.String,System.String)-
 M:XISOSharp.XisoReader.GetXbeInfo(System.String,System.String)->XISOSharp.Models.XbeInfo
 M:XISOSharp.XisoReader.GetXexInfo(System.IO.Stream,System.String,System.String)->XISOSharp.Models.XexInfo
 M:XISOSharp.XisoReader.GetXexInfo(System.String,System.String)->XISOSharp.Models.XexInfo
+M:XISOSharp.XisoReader.GetXexTitleInfo(System.IO.Stream,System.String,System.String)->XISOSharp.Models.XexTitleInfo
+M:XISOSharp.XisoReader.GetXexTitleInfo(System.String,System.String)->XISOSharp.Models.XexTitleInfo
 M:XISOSharp.XisoReader.IsOptimizedImage(System.IO.Stream,System.Nullable<System.Int32>)->System.Boolean
 M:XISOSharp.XisoReader.IsOptimizedImage(System.String,System.Nullable<System.Int32>)->System.Boolean
 M:XISOSharp.XisoReader.JoinSplitXiso(System.String,System.String,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>)->System.String
@@ -859,12 +888,14 @@ P:XISOSharp.Models.StfsTitleInfo.TitleName:System.String:get;set;
 P:XISOSharp.Models.TitleInfo.DiskNumber:System.UInt32:get;set;
 P:XISOSharp.Models.TitleInfo.GameRegion:System.UInt32:get;set;
 P:XISOSharp.Models.TitleInfo.GameRegionName:System.String:get;set;
+P:XISOSharp.Models.TitleInfo.Kind:XISOSharp.Models.TitleKind:get;set;
 P:XISOSharp.Models.TitleInfo.TitleId:System.UInt32:get;set;
 P:XISOSharp.Models.TitleInfo.TitleIdHex:System.String:get;set;
 P:XISOSharp.Models.TitleInfo.TitleName:System.String:get;set;
 P:XISOSharp.Models.TitleInfo.Version:System.UInt32:get;set;
 P:XISOSharp.Models.TitleInfo.Xbe:XISOSharp.Models.XbeInfo:get;set;
 P:XISOSharp.Models.TitleInfo.XbePath:System.String:get;set;
+P:XISOSharp.Models.TitleInfo.Xex:XISOSharp.Models.XexTitleInfo:get;set;
 P:XISOSharp.Models.UnpackOptions.ContinueOnError:System.Boolean:get;set;
 P:XISOSharp.Models.UnpackOptions.SkipExisting:System.Boolean:get;set;
 P:XISOSharp.Models.ValidationIssue.OutputHash:System.Byte[]:get;set;
@@ -891,6 +922,14 @@ P:XISOSharp.Models.VolumeInfo.IsValid:System.Boolean:get;set;
 P:XISOSharp.Models.VolumeInfo.RootDirSector:System.UInt32:get;set;
 P:XISOSharp.Models.VolumeInfo.RootDirSize:System.UInt32:get;set;
 P:XISOSharp.Models.VolumeInfo.TotalSectors:System.Int64:get;set;
+P:XISOSharp.Models.XbeImage.Dds:System.Byte[]:get;set;
+P:XISOSharp.Models.XbeImage.Height:System.Int32:get;set;
+P:XISOSharp.Models.XbeImage.Kind:XISOSharp.Models.XbeImageKind:get;set;
+P:XISOSharp.Models.XbeImage.PixelFormat:System.String:get;set;
+P:XISOSharp.Models.XbeImage.Png:System.Byte[]:get;set;
+P:XISOSharp.Models.XbeImage.Raw:System.Byte[]:get;set;
+P:XISOSharp.Models.XbeImage.SectionName:System.String:get;set;
+P:XISOSharp.Models.XbeImage.Width:System.Int32:get;set;
 P:XISOSharp.Models.XbeInfo.AllowedMedia:System.UInt32:get;set;
 P:XISOSharp.Models.XbeInfo.AlternateTitleIds:System.UInt32[]:get;set;
 P:XISOSharp.Models.XbeInfo.BaseAddress:System.UInt32:get;set;
@@ -900,6 +939,9 @@ P:XISOSharp.Models.XbeInfo.DiskNumber:System.UInt32:get;set;
 P:XISOSharp.Models.XbeInfo.EntryPoint:System.UInt32:get;set;
 P:XISOSharp.Models.XbeInfo.GameRatings:System.UInt32:get;set;
 P:XISOSharp.Models.XbeInfo.GameRegion:System.UInt32:get;set;
+P:XISOSharp.Models.XbeInfo.HasLogoBitmap:System.Boolean:get;set;
+P:XISOSharp.Models.XbeInfo.HasSaveImage:System.Boolean:get;set;
+P:XISOSharp.Models.XbeInfo.HasTitleImage:System.Boolean:get;set;
 P:XISOSharp.Models.XbeInfo.InitFlags:System.UInt32:get;set;
 P:XISOSharp.Models.XbeInfo.SectionCount:System.UInt32:get;set;
 P:XISOSharp.Models.XbeInfo.TitleId:System.UInt32:get;set;
@@ -921,6 +963,17 @@ P:XISOSharp.Models.XexInfo.Platform:System.Byte:get;set;
 P:XISOSharp.Models.XexInfo.Region:System.UInt32:get;set;
 P:XISOSharp.Models.XexInfo.TitleId:System.UInt32:get;set;
 P:XISOSharp.Models.XexInfo.Version:System.UInt32:get;set;
+P:XISOSharp.Models.XexTitleInfo.Description:System.String:get;set;
+P:XISOSharp.Models.XexTitleInfo.Developer:System.String:get;set;
+P:XISOSharp.Models.XexTitleInfo.Genre:System.String:get;set;
+P:XISOSharp.Models.XexTitleInfo.HasThumbnail:System.Boolean:get;
+P:XISOSharp.Models.XexTitleInfo.Info:XISOSharp.Models.XexInfo:get;set;
+P:XISOSharp.Models.XexTitleInfo.Publisher:System.String:get;set;
+P:XISOSharp.Models.XexTitleInfo.Thumbnail:System.Byte[]:get;set;
+P:XISOSharp.Models.XexTitleInfo.TitleId:System.UInt32:get;
+P:XISOSharp.Models.XexTitleInfo.TitleIdHex:System.String:get;
+P:XISOSharp.Models.XexTitleInfo.TitleName:System.String:get;set;
+P:XISOSharp.Models.XexTitleInfo.XexPath:System.String:get;set;
 P:XISOSharp.Models.XisoExplorerOptions.KeepOpen:System.Boolean:get;set;
 P:XISOSharp.Models.XisoExplorerOptions.Share:System.IO.FileShare:get;set;
 P:XISOSharp.Models.XisoLayoutEntry.FileSize:System.Nullable<System.UInt32>:get;set;
@@ -1022,13 +1075,17 @@ T:XISOSharp.Models.SectorRange
 T:XISOSharp.Models.StfsPackageKind
 T:XISOSharp.Models.StfsTitleInfo
 T:XISOSharp.Models.TitleInfo
+T:XISOSharp.Models.TitleKind
 T:XISOSharp.Models.UnpackOptions
 T:XISOSharp.Models.ValidationIssue
 T:XISOSharp.Models.ValidationIssueType
 T:XISOSharp.Models.ValidationResult
 T:XISOSharp.Models.VolumeInfo
+T:XISOSharp.Models.XbeImage
+T:XISOSharp.Models.XbeImageKind
 T:XISOSharp.Models.XbeInfo
 T:XISOSharp.Models.XexInfo
+T:XISOSharp.Models.XexTitleInfo
 T:XISOSharp.Models.XisoExplorerOptions
 T:XISOSharp.Models.XisoLayoutEntry
 T:XISOSharp.Models.XisoLayoutSpec
@@ -1043,6 +1100,7 @@ T:XISOSharp.ToolLocator
 T:XISOSharp.TraversalCallback
 T:XISOSharp.TruncatedCopyException
 T:XISOSharp.WaxGlob
+T:XISOSharp.XbeAssets
 T:XISOSharp.XboxPrng
 T:XISOSharp.XgdTables
 T:XISOSharp.XisoAttributes

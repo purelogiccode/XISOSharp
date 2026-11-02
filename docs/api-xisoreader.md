@@ -49,7 +49,10 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 | `ComputeFileHash` | Hash one file (MD5/SHA-256/… via `HashAlgorithmName`) |
 | `ComputeDirectoryHashes` | Hash every file under a path |
 | `GetXexInfo` | Parse the Xbox 360 XEX2 header of a `.xex` file |
+| `GetXexTitleInfo` | Read XDBF/XSRC title metadata from an Xbox 360 `.xex` |
+| `GetTitleInfo` | Resolve `default.xbe`/`default.xex`/`default_mp.xbe` title metadata |
 | `GetXbeInfo` | Parse the original-Xbox XBEH header + certificate of a `.xbe` file |
+| `XbeAssets.GetImage` | Extract an XBE logo, `$$XTIMAGE` title image or `$$XSIMAGE` save image as PNG/DDS (separate `XbeAssets` class) |
 | `GodHeader.TryReadTitle` | Read GOD/SVOD `XContent` title metadata (separate `GodHeader` class) |
 | `StfsHeader.TryReadTitle` | Read single-file XBLA/XBLIG STFS `XContent` title metadata (separate `StfsHeader` class) |
 | `AuditXiso` | Deep integrity audit |
@@ -462,6 +465,36 @@ Returns `null` when the path does not exist, points to a directory, or the file 
 an XEX2 executable. Validated against retail Xbox 360 Redump images (`Perfect Dark
 Zero`, `Payday 2`). The CLI exposes this as `--xex-info`.
 
+## GetXexTitleInfo
+
+```csharp
+public static XexTitleInfo? GetXexTitleInfo(string isoPath, string internalPath)
+public static XexTitleInfo? GetXexTitleInfo(Stream imageStream, string imageName, string internalPath)
+```
+
+Reads the plaintext XDBF resource from the XEX header-section table and returns
+the title name plus publisher, developer, genre, description and optional
+thumbnail. No decryption or image decompression is involved: XDBF lives in a
+header section named after the title ID, and its XSTR/XSRC entries are read
+directly. Returns `null` when the path is not an XEX2 executable; a valid XEX
+without a readable XDBF returns an `XexTitleInfo` with an empty title name.
+`TitleInfo` (from `GetTitleInfo`) sets `Kind = TitleKind.Xex` and exposes this
+record through `TitleInfo.Xex`.
+
+## GetTitleInfo
+
+```csharp
+public static TitleInfo? GetTitleInfo(string isoPath)
+public static TitleInfo? GetTitleInfo(Stream imageStream, string imageName)
+```
+
+Resolves the root executable in order: `default.xbe` (original Xbox), then
+`default.xex` (Xbox 360), then `default_mp.xbe`. Returns title name, title ID,
+region, disc and version. `TitleInfo.Kind` identifies the source (`Xbe` or
+`Xex`); `TitleInfo.Xbe` is set for XBE titles and `TitleInfo.Xex` (with the full
+`XexTitleInfo`) for XEX titles. Returns `null` when no supported root
+executable is present. Plain ISO, split ISO, CISO and CCI inputs are accepted.
+
 ## GetXbeInfo
 
 ```csharp
@@ -494,6 +527,29 @@ out-of-range, below-base, and truncated certificates return `null` instead of
 reading out of bounds. Returns `null` when the path does not exist, points to
 a directory, or the file is not an XBEH executable. The CLI exposes this as
 `--xbe-info`; `XisoExplorer` has a matching `GetXbeInfo` method.
+
+## XBE image assets (`XbeAssets`)
+
+```csharp
+public static XbeImage? GetImage(string imagePath, string internalPath, XbeImageKind kind)
+public static XbeImage? GetImage(Stream imageStream, string imageName, string internalPath,
+    XbeImageKind kind)
+public static XbeImage? GetLogo(string imagePath, string internalPath)
+public static XbeImage? GetTitleImage(string imagePath, string internalPath)
+public static XbeImage? GetSaveImage(string imagePath, string internalPath)
+```
+
+Extracts the Microsoft logo bitmap, the `$$XTIMAGE` title image or the
+`$$XSIMAGE` save image from an XBE. The section walk is bounded by the XBE
+header/section table. `XbeImage` carries the raw payload plus a BCL-generated
+PNG and a DDS (passthrough when the payload already is a DDS, otherwise a
+standard header is written around the decoded texture). Supported payloads are
+DDS/DXT1/DXT3/DXT5/BGR24/BGRA32, XPR0/DXT1/DXT3/DXT5, the 54-byte
+DDS-like title-image header followed by BGR24/DXT data, and the 100×17 logo
+bitmap (BGRA32, grayscale or RLE). Unsupported payloads are returned with
+`Png`/`Dds` set to `null` rather than throwing. `XbeInfo.HasLogoBitmap`,
+`HasTitleImage` and `HasSaveImage` report presence without decoding. The CLI
+exposes this as `--xbe-image <image> <path> --type logo|title|save -o out.png|out.dds`.
 
 ## GOD header title metadata (`GodHeader`)
 

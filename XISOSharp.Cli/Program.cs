@@ -360,6 +360,12 @@ internal static class Program
         {
             return RunTitleInfoMode(args, 1);
         }
+        else if (args.Length > 0 && (string.Equals(args[0], "xbe-image", StringComparison.OrdinalIgnoreCase) ||
+                                     Array.Exists(args, static a =>
+                                         string.Equals(a, "--xbe-image", StringComparison.OrdinalIgnoreCase))))
+        {
+            return RunXbeImageMode(args);
+        }
 
         for (int i = optind; i < args.Length; i++)
         {
@@ -1957,6 +1963,8 @@ internal static class Program
                     return 1;
                 }
 
+                XexTitleInfo? xexTitle = XisoReader.GetXexTitleInfo(xisoPath, internalPath);
+
                 Logger.Log($"XEX info: {internalPath}\n");
                 Logger.Log($"  Module flags:      0x{xex.ModuleFlags:X8}{FormatXexModuleFlags(xex.ModuleFlags)}\n");
                 Logger.Log($"  Header size:       0x{xex.HeaderSize:X8}\n");
@@ -1975,6 +1983,19 @@ internal static class Program
                 Logger.Log($"  Encryption:        {xex.EncryptionType} ({FormatXexEncryption(xex.EncryptionType)})\n");
                 Logger.Log(
                     $"  Compression:       {xex.CompressionType} ({FormatXexCompression(xex.CompressionType)})\n");
+
+                if (!string.IsNullOrEmpty(xexTitle?.TitleName))
+                    Logger.Log($"  Title name:        {xexTitle.TitleName}\n");
+                if (!string.IsNullOrEmpty(xexTitle?.Publisher))
+                    Logger.Log($"  Publisher:         {xexTitle.Publisher}\n");
+                if (!string.IsNullOrEmpty(xexTitle?.Developer))
+                    Logger.Log($"  Developer:         {xexTitle.Developer}\n");
+                if (!string.IsNullOrEmpty(xexTitle?.Genre))
+                    Logger.Log($"  Genre:             {xexTitle.Genre}\n");
+                if (!string.IsNullOrEmpty(xexTitle?.Description))
+                    Logger.Log($"  Description:       {xexTitle.Description}\n");
+                if (xexTitle?.HasThumbnail == true)
+                    Logger.Log("  Thumbnail:         present\n");
 
                 if (jsonMode)
                 {
@@ -1998,7 +2019,13 @@ internal static class Program
                         xex.DiscNumber,
                         xex.DiscCount,
                         xex.EncryptionType,
-                        xex.CompressionType));
+                        xex.CompressionType,
+                        xexTitle?.TitleName,
+                        xexTitle?.Publisher,
+                        xexTitle?.Developer,
+                        xexTitle?.Genre,
+                        xexTitle?.Description,
+                        xexTitle?.HasThumbnail));
                 }
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
@@ -2075,7 +2102,10 @@ internal static class Program
                         xbe.GameRegion,
                         xbe.GameRatings,
                         xbe.DiskNumber,
-                        xbe.Version));
+                        xbe.Version,
+                        xbe.HasLogoBitmap,
+                        xbe.HasTitleImage,
+                        xbe.HasSaveImage));
                 }
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
@@ -4575,8 +4605,9 @@ internal static class Program
     }
 
     /// <summary>
-    /// <c>title-info &lt;image&gt; [--json]</c>: finds the root <c>default.xbe</c>
-    /// and reports the certificate title name, title ID, region, disc and version.
+    /// <c>title-info &lt;image&gt; [--json]</c>: finds the root
+    /// <c>default.xbe</c>/<c>default.xex</c>/<c>default_mp.xbe</c> and reports
+    /// the available title name, title ID, region, disc and version fields.
     /// </summary>
     private static int RunTitleInfoMode(string[] args, int optind)
     {
@@ -4676,15 +4707,52 @@ internal static class Program
             TitleInfo? title = XisoReader.GetTitleInfo(positionals[0]);
             if (title is null)
             {
-                Logger.LogErr($"Error: no root default.xbe with an XBEH certificate in {positionals[0]}\n");
+                Logger.LogErr($"Error: no root default.xbe, default.xex or default_mp.xbe with readable " +
+                              $"title metadata in {positionals[0]}\n");
                 return 1;
             }
 
             if (json)
             {
-                WriteJson(new JsonTitleInfo(1, "title-info", positionals[0], title.XbePath, title.TitleName,
-                    title.TitleId, title.TitleIdHex, title.GameRegion, title.GameRegionName,
-                    title.DiskNumber, title.Version));
+                if (title.Kind == TitleKind.Xex && title.Xex is not null)
+                {
+                    WriteJson(new JsonTitleInfo(1, "title-info", positionals[0], title.XbePath,
+                        title.TitleName, title.TitleId, title.TitleIdHex, title.GameRegion,
+                        title.GameRegionName, title.DiskNumber, title.Version,
+                        Kind: "xex",
+                        XexPath: title.Xex.XexPath,
+                        Publisher: title.Xex.Publisher,
+                        Developer: title.Xex.Developer,
+                        Genre: title.Xex.Genre,
+                        Description: title.Xex.Description,
+                        HasThumbnail: title.Xex.HasThumbnail,
+                        DiscCount: title.Xex.Info.DiscCount));
+                }
+                else
+                {
+                    WriteJson(new JsonTitleInfo(1, "title-info", positionals[0], title.XbePath,
+                        title.TitleName, title.TitleId, title.TitleIdHex, title.GameRegion,
+                        title.GameRegionName, title.DiskNumber, title.Version, Kind: "xbe"));
+                }
+            }
+            else if (title.Kind == TitleKind.Xex && title.Xex is not null)
+            {
+                Logger.Log($"Title:          {title.TitleName}\n");
+                Logger.Log($"Title ID:       {title.TitleIdHex}\n");
+                Logger.Log($"Region:         {title.GameRegionName} (0x{title.GameRegion:X8})\n");
+                Logger.Log($"Disc number:    {title.DiskNumber}/{title.Xex.Info.DiscCount}\n");
+                Logger.Log($"Version:        0x{title.Version:X8}\n");
+                Logger.Log($"XEX:            {title.XbePath}\n");
+                if (!string.IsNullOrEmpty(title.Xex.Publisher))
+                    Logger.Log($"Publisher:      {title.Xex.Publisher}\n");
+                if (!string.IsNullOrEmpty(title.Xex.Developer))
+                    Logger.Log($"Developer:      {title.Xex.Developer}\n");
+                if (!string.IsNullOrEmpty(title.Xex.Genre))
+                    Logger.Log($"Genre:          {title.Xex.Genre}\n");
+                if (!string.IsNullOrEmpty(title.Xex.Description))
+                    Logger.Log($"Description:    {title.Xex.Description}\n");
+                if (title.Xex.HasThumbnail)
+                    Logger.Log("Thumbnail:      present\n");
             }
             else
             {
@@ -4701,6 +4769,132 @@ internal static class Program
         catch (Exception ex)
         {
             Logger.LogErr($"Error reading title info from {positionals[0]}: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// <c>xbe-image &lt;image&gt; &lt;internal-path&gt; --type logo|title|save -o &lt;out.png|out.dds&gt;</c>:
+    /// extracts a logo, <c>$$XTIMAGE</c> title image or <c>$$XSIMAGE</c> save
+    /// image from an XBE inside an image.
+    /// </summary>
+    private static int RunXbeImageMode(string[] args)
+    {
+        string? type = null;
+        string? output = null;
+        List<string> positionals = new();
+        for (int i = 0; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (string.Equals(a, "--xbe-image", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "xbe-image", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (string.Equals(a, "--type", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: --type requires logo, title or save\n");
+                    return 1;
+                }
+
+                type = args[++i];
+            }
+            else if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -o requires an output path\n");
+                    return 1;
+                }
+
+                output = args[++i];
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for xbe-image: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count != 2)
+        {
+            Logger.LogErr("Error: xbe-image requires exactly <image> <internal-path>\n");
+            PrintUsage();
+            return 1;
+        }
+
+        if (string.IsNullOrEmpty(type) || string.IsNullOrEmpty(output))
+        {
+            Logger.LogErr("Error: xbe-image requires --type and -o\n");
+            PrintUsage();
+            return 1;
+        }
+
+        XbeImageKind kind;
+        if (string.Equals(type, "logo", StringComparison.OrdinalIgnoreCase))
+            kind = XbeImageKind.Logo;
+        else if (string.Equals(type, "title", StringComparison.OrdinalIgnoreCase))
+            kind = XbeImageKind.Title;
+        else if (string.Equals(type, "save", StringComparison.OrdinalIgnoreCase))
+            kind = XbeImageKind.Save;
+        else
+        {
+            Logger.LogErr($"Error: unknown XBE image type '{type}' (expected logo, title or save)\n");
+            return 1;
+        }
+
+        string extension = Path.GetExtension(output);
+        bool png = string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase);
+        bool dds = string.Equals(extension, ".dds", StringComparison.OrdinalIgnoreCase);
+        if (!png && !dds)
+        {
+            Logger.LogErr("Error: output must end in .png or .dds\n");
+            return 1;
+        }
+
+        try
+        {
+            XbeImage? image = XbeAssets.GetImage(positionals[0], positionals[1], kind);
+            if (image is null)
+            {
+                Logger.LogErr($"Error: no {type} image in {positionals[0]} at {positionals[1]}\n");
+                return 1;
+            }
+
+            byte[]? data = png ? image.Png : image.Dds;
+            if (data is null)
+            {
+                Logger.LogErr($"Error: {type} image in {positionals[1]} could not be decoded to " +
+                              $"{(png ? "PNG" : "DDS")} (format: {image.PixelFormat})\n");
+                return 1;
+            }
+
+            string? directory = Path.GetDirectoryName(Path.GetFullPath(output));
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            File.WriteAllBytes(output, data);
+            Logger.Log($"Wrote {type} image ({image.Width}x{image.Height}, {image.PixelFormat}) to {output}\n");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogErr($"Error reading XBE image from {positionals[0]}: {ex.Message}\n");
             return 1;
         }
     }
@@ -6302,6 +6496,9 @@ internal static class Program
                                                      --xbe-info <file> <path>  Show the original-Xbox XBEH executable
                                                                            header + certificate of a .xbe file inside
                                                                            the image (title ID/name, media, region).
+                                                     --xbe-image <file> <path> --type logo|title|save -o <out>
+                                                                           Extract the XBE logo, $$XTIMAGE title image
+                                                                           or $$XSIMAGE save image as PNG or DDS.
                                                      -l                  List files in xiso(s).
                                                      --md5 <file> [path] Compute MD5 hash of file(s) in xiso.
                                                      -r                  Rewrite xiso(s) as optimized xiso(s).
@@ -6403,7 +6600,7 @@ internal static class Program
                                                        hash <image> [images...] [--json]  Full-image CRC32/MD5/SHA-1/SHA-256/SHA3-256 in one pass.
                                                        verify-hashes <image> <hash-file> [--ignore-extra] [--json]
                                                                              Verify a --petrify/XboxKit .hash sidecar against the image.
-                                                       title-info <image> [--json]  Find the root default.xbe (or a GOD header) and report title name, title ID, region, disc, version.
+                                                       title-info <image> [--json]  Find the root default.xbe/default.xex (or a GOD/STFS package) and report title name, title ID, region, disc, version.
                                                        split <image> [images...] [--size <bytes|half>] [--output <base>] [--batch <dir>]  Split ISO into sector-aligned
                                                                              .1.iso/.2.iso… parts (default 0xFF000000 = 4 GiB − 16 MiB FATX cap; 'half' splits in two).
                                                        join <first.1.iso> [...] [--output <file>]  Reassemble split parts (output validated as XISO).

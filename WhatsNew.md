@@ -1,7 +1,17 @@
 # What's New in 1.6.0 (unreleased)
 
-XISOSharp 1.6.0 is the Phase 10 Tier A release (A3–A5 are implemented; A1/A2 are pending).
+XISOSharp 1.6.0 is the Phase 10 Tier A release (A1-A5).
 
+- **Xbox 360 title metadata**: `title-info` and `--xex-info` read the plaintext
+  XDBF/XSTR/XSRC resources from `default.xex` and report the title name,
+  publisher, developer, genre, description, thumbnail presence and XEX header
+  fields (`XexTitleInfo`, `GetXexTitleInfo`). `GetTitleInfo` resolves
+  `default.xbe` → `default.xex` → `default_mp.xbe`, and `TitleInfo` now exposes
+  `Kind` (`Xbe`/`Xex`) and `Xex`.
+- **XBE image assets**: `XbeAssets` and `--xbe-image` extract the Microsoft
+  logo, `$$XTIMAGE` title image and `$$XSIMAGE` save image as PNG or DDS.
+  DXT1/3/5, BGR24/BGRA32 and XPR0 payloads are decoded with a BCL-only PNG
+  writer; `XbeInfo` reports `HasLogoBitmap`/`HasTitleImage`/`HasSaveImage`.
 - **GOD title metadata**: `title-info` reads a GOD header or its `.data`
   folder and reports title name, title ID, disc number and disc count without
   mounting the container (`GodHeader`/`GodTitleInfo`).

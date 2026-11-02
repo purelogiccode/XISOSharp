@@ -40,4 +40,14 @@ public sealed record XbeInfo(
     uint GameRegion,
     uint GameRatings,
     uint DiskNumber,
-    uint Version);
+    uint Version)
+{
+    /// <summary>Whether the image header points at a logo bitmap.</summary>
+    public bool HasLogoBitmap { get; init; }
+
+    /// <summary>Whether the executable has a <c>$$XTIMAGE</c> section.</summary>
+    public bool HasTitleImage { get; init; }
+
+    /// <summary>Whether the executable has a <c>$$XSIMAGE</c> section.</summary>
+    public bool HasSaveImage { get; init; }
+}

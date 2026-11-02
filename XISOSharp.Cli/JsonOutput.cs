@@ -149,7 +149,13 @@ internal sealed record JsonXexInfo(
     byte DiscNumber,
     byte DiscCount,
     ushort EncryptionType,
-    ushort CompressionType);
+    ushort CompressionType,
+    string? TitleName = null,
+    string? Publisher = null,
+    string? Developer = null,
+    string? Genre = null,
+    string? Description = null,
+    bool? HasThumbnail = null);
 
 /// <summary><c>xbe-info</c> command payload.</summary>
 internal sealed record JsonXbeInfo(
@@ -170,7 +176,10 @@ internal sealed record JsonXbeInfo(
     uint GameRegion,
     uint GameRatings,
     uint DiskNumber,
-    uint Version);
+    uint Version,
+    bool HasLogoBitmap = false,
+    bool HasTitleImage = false,
+    bool HasSaveImage = false);
 
 /// <summary>One side of a conversion validation report.</summary>
 internal sealed record JsonValidationSide(
@@ -249,7 +258,15 @@ internal sealed record JsonTitleInfo(
     uint GameRegion,
     string GameRegionName,
     uint DiskNumber,
-    uint Version);
+    uint Version,
+    string? Kind = null,
+    string? XexPath = null,
+    string? Publisher = null,
+    string? Developer = null,
+    string? Genre = null,
+    string? Description = null,
+    bool? HasThumbnail = null,
+    byte? DiscCount = null);
 
 /// <summary><c>title-info</c> command payload for a GOD/SVOD container.</summary>
 internal sealed record JsonGodTitleInfo(

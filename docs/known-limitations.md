@@ -14,7 +14,8 @@ Xbox container. This page lists deliberate boundaries and current workarounds.
 ## Scope
 
 XISO/XDVDFS, Redump full-disc images, split ISO, CISO/CSO, CCI/CCIM, ZAR,
-GOD and single-file XBLA/XBLIG header title metadata, and XBE/XEX **read-only**
+GOD and single-file XBLA/XBLIG header title metadata, Xbox 360 XDBF/XSRC title
+metadata, XBE logo/title/save image extraction, and XBE/XEX **read-only**
 metadata are in scope.
 
 Deliberately out of scope:
