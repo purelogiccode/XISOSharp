@@ -74,6 +74,23 @@ public class CliFlagContractExtraTests : IDisposable
     }
 
     [Fact]
+    public void NamePolicy_WithoutExtract_IsRejected()
+    {
+        int rc = Program.Main(["--name-policy", "sanitize", "-l", "no-such-flag-test.iso"]);
+
+        Assert.Equal(1, rc);
+        Assert.Contains("--name-policy is only supported", AllError(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NamePolicy_InvalidValue_IsRejected()
+    {
+        int rc = Program.Main(["--name-policy", "bogus", "-x", "no-such-flag-test.iso"]);
+
+        Assert.Equal(1, rc);
+    }
+
+    [Fact]
     public void Silent_BeforeVersion_IsRejected()
     {
         // -v/-h return before the post-parse validation, so they must run the

@@ -46,7 +46,9 @@ not change the CWD.
 
 The CLI and GUI manifests opt into `longPathAware`, and extraction rejects or
 sanitizes path separators, drive-relative colons, trailing dots/spaces and DOS
-device names (`CON`, `NUL`, `COM1`…). The OS must still have long paths enabled
+device names (`CON`, `NUL`, `COM1`…). `--name-policy reject|sanitize|skip` (and
+`UnpackOptions.NamePolicy`) chooses fail-fast, collision-safe renaming, or
+skipping for a recovery run. The OS must still have long paths enabled
 (`LongPathsEnabled`) on Windows 10 1607+.
 
 ## Archival metadata

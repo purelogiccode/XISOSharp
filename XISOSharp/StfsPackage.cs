@@ -399,19 +399,112 @@ public sealed class StfsPackage : IDisposable
     /// <exception cref="IOException">A destination file cannot be written.</exception>
     /// <exception cref="OperationCanceledException">The operation was cancelled.</exception>
     public int ExtractTo(string outputDirectory, bool skipExisting = false,
-        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default) =>
+        ExtractTo(outputDirectory, ExtractNamePolicy.Reject, skipExisting, progress, ct);
+
+    /// <summary>
+    /// Extracts every file and directory into <paramref name="outputDirectory"/>
+    /// using <paramref name="namePolicy"/> for entry names that are unsafe on
+    /// the host (path separators, drive-relative colons, trailing dots/spaces,
+    /// DOS device names).
+    /// </summary>
+    /// <param name="outputDirectory">Destination directory (created when missing).</param>
+    /// <param name="namePolicy">
+    /// <see cref="ExtractNamePolicy.Reject"/> (fail fast),
+    /// <see cref="ExtractNamePolicy.Sanitize"/> (replace unsafe characters and
+    /// disambiguate collisions) or <see cref="ExtractNamePolicy.Skip"/> (omit
+    /// the entry and a skipped directory's subtree).
+    /// </param>
+    /// <param name="skipExisting">Skip files that already exist instead of overwriting them.</param>
+    /// <param name="progress">Optional progress channel.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of files written.</returns>
+    /// <exception cref="ArgumentException"><paramref name="outputDirectory"/> is null or empty.</exception>
+    /// <exception cref="InvalidDataException">An entry name is unsafe or its data is truncated.</exception>
+    /// <exception cref="IOException">A destination file cannot be written.</exception>
+    /// <exception cref="OperationCanceledException">The operation was cancelled.</exception>
+    public int ExtractTo(string outputDirectory, ExtractNamePolicy namePolicy,
+        bool skipExisting = false, IProgress<ProgressInfo>? progress = null,
+        CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(outputDirectory);
         ct.ThrowIfCancellationRequested();
         Directory.CreateDirectory(outputDirectory);
         string root = Path.GetFullPath(outputDirectory);
 
+        // Entries are parent-first (the file table validates parent < child),
+        // so a parent's resolved path is always available before its children.
+        Dictionary<string, string> resolvedPaths = new(StringComparer.OrdinalIgnoreCase)
+        {
+            [string.Empty] = string.Empty,
+        };
+        Dictionary<string, HashSet<string>> usedNamesByDirectory = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> skippedDirectories = new(StringComparer.OrdinalIgnoreCase);
+
         int written = 0;
         foreach (StfsEntry entry in _entries)
         {
             ct.ThrowIfCancellationRequested();
-            string relative = ToHostRelativePath(entry);
-            string destination = Path.GetFullPath(Path.Combine(root, relative));
+            string parentOriginal = GetParentPath(entry.Path);
+            if (skippedDirectories.Contains(parentOriginal))
+            {
+                if (entry.IsDirectory)
+                {
+                    skippedDirectories.Add(entry.Path);
+                }
+
+                continue;
+            }
+
+            if (!resolvedPaths.TryGetValue(parentOriginal, out string? parentResolved))
+            {
+                throw new InvalidDataException(
+                    $"STFS entry '{entry.Path}' has no resolved parent directory.");
+            }
+
+            if (!usedNamesByDirectory.TryGetValue(parentOriginal, out HashSet<string>? usedNames))
+            {
+                usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                usedNamesByDirectory[parentOriginal] = usedNames;
+            }
+
+            bool accepted;
+            string resolvedName;
+            bool renamed;
+            try
+            {
+                accepted = XisoEntryNames.TryResolveExtractionName(entry.Name, namePolicy, usedNames,
+                    out resolvedName, out renamed);
+            }
+            catch (XisoFormatException ex)
+            {
+                // STFS callers have always seen InvalidDataException for an
+                // unsafe entry name; keep that public contract.
+                throw new InvalidDataException(ex.Message, ex);
+            }
+
+            if (!accepted)
+            {
+                if (entry.IsDirectory)
+                {
+                    skippedDirectories.Add(entry.Path);
+                }
+
+                Logger.LogErr($"warning: skipped unsafe STFS entry '{entry.Path}'\n");
+                continue;
+            }
+
+            string relative = parentResolved.Length == 0
+                ? resolvedName
+                : parentResolved + "/" + resolvedName;
+            if (renamed)
+            {
+                Logger.LogErr($"warning: renamed unsafe STFS entry '{entry.Path}' to '{relative}'\n");
+            }
+
+            resolvedPaths[entry.Path] = relative;
+            string destination = Path.GetFullPath(Path.Combine(
+                root, relative.Replace('/', Path.DirectorySeparatorChar)));
             string relativeCheck = Path.GetRelativePath(root, destination);
             if (Path.IsPathRooted(relativeCheck) ||
                 string.Equals(relativeCheck, "..", StringComparison.Ordinal) ||
@@ -426,7 +519,7 @@ public sealed class StfsPackage : IDisposable
                 Directory.CreateDirectory(destination);
                 progress?.Report(new ProgressInfo(
                     ProgressInfoType.DirAdded,
-                    Path: "/" + entry.Path,
+                    Path: "/" + relative,
                     Sector: entry.StartBlock));
                 continue;
             }
@@ -464,12 +557,19 @@ public sealed class StfsPackage : IDisposable
             written++;
             progress?.Report(new ProgressInfo(
                 ProgressInfoType.FileAdded,
-                Path: "/" + entry.Path,
+                Path: "/" + relative,
                 Sector: entry.StartBlock,
                 Size: entry.Size));
         }
 
         return written;
+    }
+
+    /// <summary>Returns the parent portion of an STFS path (<c>""</c> at the root).</summary>
+    private static string GetParentPath(string path)
+    {
+        int slash = path.LastIndexOf('/');
+        return slash < 0 ? string.Empty : path[..slash];
     }
 
     /// <inheritdoc/>
@@ -874,18 +974,6 @@ public sealed class StfsPackage : IDisposable
 
     private static uint ReadUInt24LittleEndian(ReadOnlySpan<byte> buffer, int offset) =>
         (uint)(buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16));
-
-    private static string ToHostRelativePath(StfsEntry entry)
-    {
-        if (entry.Name.Length == 0 ||
-            entry.Name is "." or ".." ||
-            XisoEntryNames.IsInvalidEntryName(entry.Name))
-        {
-            throw new InvalidDataException($"Unsafe STFS entry name: '{entry.Name}'.");
-        }
-
-        return entry.Path.Replace('/', Path.DirectorySeparatorChar);
-    }
 
     private static DateTimeOffset? DecodeFatTimestamp(ushort date, ushort time)
     {

@@ -218,6 +218,10 @@ F:XISOSharp.Models.ExtractMode.Rewrite:XISOSharp.Models.ExtractMode
 F:XISOSharp.Models.ExtractMode.Tree:XISOSharp.Models.ExtractMode
 F:XISOSharp.Models.ExtractMode.Verify:XISOSharp.Models.ExtractMode
 F:XISOSharp.Models.ExtractMode.value__:System.Int32
+F:XISOSharp.Models.ExtractNamePolicy.Reject:XISOSharp.Models.ExtractNamePolicy
+F:XISOSharp.Models.ExtractNamePolicy.Sanitize:XISOSharp.Models.ExtractNamePolicy
+F:XISOSharp.Models.ExtractNamePolicy.Skip:XISOSharp.Models.ExtractNamePolicy
+F:XISOSharp.Models.ExtractNamePolicy.value__:System.Int32
 F:XISOSharp.Models.HashVerificationStatus.Extra:XISOSharp.Models.HashVerificationStatus
 F:XISOSharp.Models.HashVerificationStatus.Match:XISOSharp.Models.HashVerificationStatus
 F:XISOSharp.Models.HashVerificationStatus.Mismatch:XISOSharp.Models.HashVerificationStatus
@@ -577,6 +581,7 @@ M:XISOSharp.StfsHeader.TryReadTitle(System.String,out XISOSharp.Models.StfsTitle
 M:XISOSharp.StfsPackage.CopyTo(XISOSharp.Models.StfsEntry,System.IO.Stream)->System.Void
 M:XISOSharp.StfsPackage.Dispose()->System.Void
 M:XISOSharp.StfsPackage.ExtractTo(System.String,System.Boolean,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Int32
+M:XISOSharp.StfsPackage.ExtractTo(System.String,XISOSharp.Models.ExtractNamePolicy,System.Boolean,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Int32
 M:XISOSharp.StfsPackage.Find(System.String)->XISOSharp.Models.StfsEntry
 M:XISOSharp.StfsPackage.IsStfsPackage(System.String)->System.Boolean
 M:XISOSharp.StfsPackage.Open(System.String,System.IO.FileShare)->XISOSharp.StfsPackage
@@ -799,6 +804,7 @@ M:XISOSharp.XisoZarchive.ConvertZarToIso(System.String,System.String,System.Bool
 M:XISOSharp.XisoZarchive.CreateZar(System.IO.FileStream,System.Int64,System.String,System.Boolean,System.Boolean,System.Threading.CancellationToken,ZArchiveSharp.IZarBlockCompressor,System.IProgress<ZArchiveSharp.Pipeline.ZarProgress>)->System.Boolean
 M:XISOSharp.XisoZarchive.CreateZar(System.String,System.String,System.Int64,System.Boolean,System.Threading.CancellationToken,ZArchiveSharp.IZarBlockCompressor,System.IProgress<ZArchiveSharp.Pipeline.ZarProgress>)->System.Boolean
 M:XISOSharp.XisoZarchive.ExtractZar(System.String,System.String,System.Boolean,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken,System.Nullable<System.Int64>,System.Nullable<System.Int32>)->System.Int32
+M:XISOSharp.XisoZarchive.ExtractZar(System.String,System.String,XISOSharp.Models.ExtractNamePolicy,System.Boolean,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken,System.Nullable<System.Int64>,System.Nullable<System.Int32>)->System.Int32
 M:XISOSharp.XisoZarchive.ListZar(System.String)->System.Collections.Generic.IReadOnlyList<XISOSharp.Models.ZarEntry>
 P:XISOSharp.BlockDevice.BlockDeviceStream.CanRead:System.Boolean:get;
 P:XISOSharp.BlockDevice.BlockDeviceStream.CanSeek:System.Boolean:get;
@@ -983,6 +989,7 @@ P:XISOSharp.Models.TitleInfo.XbePath:System.String:get;set;
 P:XISOSharp.Models.TitleInfo.Xex:XISOSharp.Models.XexTitleInfo:get;set;
 P:XISOSharp.Models.UnpackOptions.ContinueOnError:System.Boolean:get;set;
 P:XISOSharp.Models.UnpackOptions.MaxDegreeOfParallelism:System.Int32:get;set;
+P:XISOSharp.Models.UnpackOptions.NamePolicy:XISOSharp.Models.ExtractNamePolicy:get;set;
 P:XISOSharp.Models.UnpackOptions.SkipExisting:System.Boolean:get;set;
 P:XISOSharp.Models.ValidationIssue.OutputHash:System.Byte[]:get;set;
 P:XISOSharp.Models.ValidationIssue.OutputSize:System.Int64:get;set;
@@ -1148,6 +1155,7 @@ T:XISOSharp.Models.EntryInfo
 T:XISOSharp.Models.ExplorerNode
 T:XISOSharp.Models.ExtractError
 T:XISOSharp.Models.ExtractMode
+T:XISOSharp.Models.ExtractNamePolicy
 T:XISOSharp.Models.FileSectorExtent
 T:XISOSharp.Models.GodTitleInfo
 T:XISOSharp.Models.GodVolumeInfo

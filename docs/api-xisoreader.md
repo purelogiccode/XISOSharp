@@ -186,6 +186,7 @@ public sealed class UnpackOptions
     public const int MaxParallelism = 64;
     public bool SkipExisting { get; set; }
     public bool ContinueOnError { get; set; }
+    public ExtractNamePolicy NamePolicy { get; set; } // Reject (default) / Sanitize / Skip
     public int MaxDegreeOfParallelism { get; set; } // 1..64, default 1
     public bool ShouldSkip(string destPath, long fileSize);
     public bool ShouldSkip(string destPath, long fileSize, IFilesystem filesystem);
@@ -206,7 +207,9 @@ truncated data, failed write) is recorded and skipped instead of aborting;
 an uncreatable directory skips its subtree. The run still throws at the end —
 an `ExtractErrorException` with code `ErrExtractFailed` listing every failure
 (the xdvdfs `Failed to unpack image` wrapper) — so the failure is visible to
-callers. Structural table corruption still aborts immediately (TODO #16).
+callers. Corrupt directory tables are contained by the traversal hardening:
+under `ContinueOnError` the bad subtree is skipped and recorded; otherwise the
+named TOC error aborts.
 
 When `MaxDegreeOfParallelism` is greater than `1`, `Extract` / `UnpackImage`
 walk the directory tree and create directories on one thread, queue the file
@@ -217,6 +220,23 @@ semantics. Plain ISO sources are read positionally; CISO/CCI/GOD/split and
 in-memory sources serialize reads behind a lock. Destination filesystem calls
 are serialized, so non-thread-safe stores such as `MemoryFilesystem` remain
 correct. `CopyOut` ignores the option (it copies one file).
+
+`NamePolicy` controls entry names that are unsafe on the destination host.
+`Reject` (the default) preserves the historical fail-fast behavior;
+`Sanitize` replaces separators, drive-relative colons, trailing dots/spaces,
+DOS device names and other Windows-invalid punctuation with `_`, appends `~N`
+when the result collides in the same directory, and logs each rename;
+`Skip` omits the entry and, for a directory, its whole subtree. The policy
+applies to the ISO-family walkers, `StfsPackage.ExtractTo` and
+`XisoZarchive.ExtractZar`; an explicit `CopyOut` destination is caller-chosen
+and is unaffected.
+
+```csharp
+XisoReader.UnpackImage("damaged.iso", "out", options: new UnpackOptions
+{
+    NamePolicy = ExtractNamePolicy.Sanitize,
+});
+```
 
 The directory walk itself is iterative within a table: an explicit in-order stack
 bounds intra-table AVL depth by `Constants.MaxTocEntriesPerTable` and

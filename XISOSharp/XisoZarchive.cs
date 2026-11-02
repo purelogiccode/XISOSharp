@@ -399,6 +399,41 @@ public static class XisoZarchive
     /// <exception cref="OperationCanceledException">The operation was cancelled.</exception>
     public static int ExtractZar(string zarPath, string outputDirectory, bool skipExisting = false,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default,
+        long? maxTotalBytes = null, int? maxEntries = null) =>
+        ExtractZar(zarPath, outputDirectory, ExtractNamePolicy.Reject, skipExisting, progress, ct,
+            maxTotalBytes, maxEntries);
+
+    /// <summary>
+    /// Extracts every file and directory from a ZArchive into
+    /// <paramref name="outputDirectory"/> using <paramref name="namePolicy"/>
+    /// for entry names that are unsafe on the host.
+    /// </summary>
+    /// <param name="zarPath">Path to the <c>.zar</c> archive.</param>
+    /// <param name="outputDirectory">Destination directory (created when missing).</param>
+    /// <param name="namePolicy">
+    /// <see cref="ExtractNamePolicy.Reject"/> (fail fast),
+    /// <see cref="ExtractNamePolicy.Sanitize"/> (replace unsafe characters and
+    /// disambiguate collisions) or <see cref="ExtractNamePolicy.Skip"/> (omit
+    /// the entry and a skipped directory's subtree).
+    /// </param>
+    /// <param name="skipExisting">Skip files that already exist instead of overwriting.</param>
+    /// <param name="progress">Optional progress channel (<see cref="ProgressInfoType.FileProgress"/> per chunk and <see cref="ProgressInfoType.FileAdded"/> per file).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <param name="maxTotalBytes">Optional cap on the total bytes written; <c>null</c> means no cap.</param>
+    /// <param name="maxEntries">Optional cap on the number of files and directories visited; <c>null</c> means no cap.</param>
+    /// <returns><c>0</c> on success.</returns>
+    /// <exception cref="ArgumentException">A path is null or empty.</exception>
+    /// <exception cref="FileNotFoundException">The archive does not exist.</exception>
+    /// <exception cref="UnauthorizedAccessException">The archive or an output path cannot be accessed.</exception>
+    /// <exception cref="InvalidDataException">
+    /// The archive is malformed, contains an unsafe entry name, nests directories deeper than
+    /// <see cref="Constants.MaxTocDepth"/>, or declares an entry too large to extract.
+    /// </exception>
+    /// <exception cref="TruncatedCopyException">An entry's data ends before its declared size.</exception>
+    /// <exception cref="IOException">An output file cannot be written.</exception>
+    /// <exception cref="OperationCanceledException">The operation was cancelled.</exception>
+    public static int ExtractZar(string zarPath, string outputDirectory, ExtractNamePolicy namePolicy,
+        bool skipExisting = false, IProgress<ProgressInfo>? progress = null, CancellationToken ct = default,
         long? maxTotalBytes = null, int? maxEntries = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(zarPath);
@@ -421,8 +456,10 @@ public static class XisoZarchive
             MaxTotalBytes = maxTotalBytes,
             MaxEntries = maxEntries,
         };
-        ExtractZarNode(reader, ZArchiveReader.RootNode, outputDirectory, string.Empty, skipExisting,
-            progress, ct, state, depth: 0);
+        HashSet<string> usedNames = new(
+            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        ExtractZarNode(reader, ZArchiveReader.RootNode, outputDirectory, string.Empty, namePolicy,
+            usedNames, skipExisting, progress, ct, state, depth: 0);
         return 0;
     }
 
@@ -527,7 +564,8 @@ public static class XisoZarchive
     }
 
     private static void ExtractZarNode(ZArchiveReader reader, uint node, string outputDirectory,
-        string parent, bool skipExisting, IProgress<ProgressInfo>? progress, CancellationToken ct,
+        string parent, ExtractNamePolicy namePolicy, HashSet<string> usedNames, bool skipExisting,
+        IProgress<ProgressInfo>? progress, CancellationToken ct,
         ZarExtractState state,
         // Recursion-depth bound (#16 hardening); kept explicit by design.
         // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
@@ -555,7 +593,34 @@ public static class XisoZarchive
                     $"ZArchive extraction exceeds the {maxEntries} entry limit.");
             }
 
-            string relative = CombineZarPath(parent, entry.Name);
+            string displayPath = parent.Length == 0 ? entry.Name : parent + "/" + entry.Name;
+            bool accepted;
+            string resolvedName;
+            bool renamed;
+            try
+            {
+                accepted = XisoEntryNames.TryResolveExtractionName(entry.Name, namePolicy, usedNames,
+                    out resolvedName, out renamed);
+            }
+            catch (XisoFormatException ex)
+            {
+                // ZArchive callers have always seen InvalidDataException for an
+                // unsafe entry name; keep that public contract.
+                throw new InvalidDataException(ex.Message, ex);
+            }
+
+            if (!accepted)
+            {
+                Logger.Log($"skip: {displayPath} (unsafe entry name)\n");
+                continue;
+            }
+
+            if (renamed)
+            {
+                Logger.LogErr($"warning: renamed unsafe ZArchive entry '{displayPath}' to '{resolvedName}'\n");
+            }
+
+            string relative = CombineZarPath(parent, resolvedName);
             string destination = Path.Combine(outputDirectory, relative);
             if (entry.IsDirectory)
             {
@@ -565,8 +630,10 @@ public static class XisoZarchive
                     Count: state.Files,
                     Path: "/" + relative.Replace(Path.DirectorySeparatorChar, '/'),
                     Sector: 0));
-                ExtractZarNode(reader, child, outputDirectory, relative, skipExisting, progress, ct, state,
-                    depth + 1);
+                HashSet<string> childNames = new(
+                    OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+                ExtractZarNode(reader, child, outputDirectory, relative, namePolicy, childNames,
+                    skipExisting, progress, ct, state, depth + 1);
                 continue;
             }
 

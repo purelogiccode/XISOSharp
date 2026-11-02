@@ -145,6 +145,7 @@ a "decompress/convert/join/extract first" error (use `decompress`, `convert`,
 | `--is-optimized <image>` | Print `<iso>: optimized` or `<iso>: not optimized` (`XisoReader.IsOptimizedImage` tag probe at offset 31337); supports `--skip-sectors`. Always exits 0 on a readable image. |
 | `--skip-existing` | In extract, `--unpack`, and `--copy-out` modes, skip files already on disk with matching sizes (logged as `skip: <path>`) instead of overwriting them. Re-run an interrupted unpack to resume it; pairs with `--batch`. On a batch container verb (`compress`, `decompress`, `convert`, `split`), skip a source whose output already exists (for `split`, every expected part must exist; a partial set is resumed). See [Resume interrupted unpacks](#resume-interrupted-unpacks). |
 | `--continue-on-error` | In extract, `--unpack`, and `--copy-out` modes, log per-file failures (`Error: Failed to extract ...`) and continue with the next entry instead of aborting. An uncreatable directory skips its subtree. The run still ends with a `Failed to unpack image` summary and a non-zero exit code. On a batch container verb, keep converting after a failed file, remove any partial output, and return exit code `1` after the summary. XBLA/XBLIG STFS extraction is all-or-nothing and rejects this flag. See [Extraction robustness](#extraction-robustness). |
+| `--name-policy reject\|sanitize\|skip` | In extract (`-x`) and `--unpack` modes, choose how host-unsafe entry names are handled: `reject` (default; named error and abort), `sanitize` (replace unsafe characters with `_`, add `~N` on collisions), or `skip` (omit the entry and a skipped directory's subtree). Applies to ISO/split ISO/CISO/CCI/GOD, ZAR and XBLA/XBLIG STFS extraction. See [Hostile entry names](#hostile-entry-names). |
 | `--delete-source` | On a batch container verb (`compress`, `decompress`, `convert`, `split`), delete each source after its conversion succeeds. Requires `-y`/`--yes`; rejected with `-n`/`--no`. A split set deletes every part. Failed conversions keep their source, and the batch summary reports the deleted count. |
 | `--ciso-level 0..9` | CISO compression level (`compress`/`cso`, default `9`). v1: maps to `CompressionLevel` for BCL DEFLATE (`0` NoCompression, `1..3` Fastest, `4..6` Optimal, `7..9` SmallestSize). v2: `0` = store all plain, `1..9` = LZ4 acceleration `10 - level` (level 9 byte-identical to xdvdfs). |
 | `--ciso-version 1\|2\|auto` | CISO payload codec (`compress`/`cso`). Default `2` (LZ4, `align 2` — modern xdvdfs parity); `1` = classic DEFLATE. |
@@ -266,12 +267,36 @@ XISOSharp --continue-on-error --unpack game.iso ./out
 
 Notes:
 
-- Structural corruption (an unreadable directory table) still aborts immediately:
-  after a mid-table failure the stream position is unknowable, so continuing
-  siblings would be unsound. Table hardening is TODO #16.
+- Structural corruption (an unreadable directory table) is contained by the
+  traversal hardening: under `--continue-on-error` the bad subtree is skipped and
+  recorded like any other failure; without it, the named TOC error aborts.
 - Failed files are excluded from the file/byte totals and `FileAdded` progress.
 - `--continue-on-error` is rejected outside extract / `--unpack` / `--copy-out`
   (exit 1), and pairs with `--skip-existing` and `--batch`.
+
+### Hostile entry names
+
+Image names are Latin-1 byte strings, so a hostile or damaged image can contain
+path separators, drive-relative colons, trailing dots/spaces or DOS device names
+(`CON`, `NUL`, `COM1`…). By default extraction **rejects** such an entry with a
+named error and aborts the walk. `--name-policy` lets a recovery run choose a
+different outcome:
+
+```bash
+# Rename unsafe entries to host-safe names; collisions get ~1, ~2, ...
+XISOSharp --name-policy sanitize --unpack game.iso ./out
+
+# Omit unsafe files (and a skipped directory's whole subtree), extract the rest
+XISOSharp --name-policy skip --unpack game.iso ./out
+```
+
+`sanitize` replaces unsafe characters with `_` and disambiguates names that
+collide in the same directory (for example `a:b.txt` and `a?b.txt` become
+`a_b.txt` and `a_b~1.txt`). Every rename is logged to stderr. `skip` logs
+`skip: <path> (unsafe entry name)` and is not counted as a failure. The policy
+applies to ISO, split ISO, CISO, CCI, GOD, ZAR and XBLA/XBLIG STFS extraction;
+an explicit `--copy-out` destination is caller-chosen and is unaffected. The
+flag is rejected outside extract/`--unpack` (exit 1).
 
 ### Destination directory edge cases (`-d`)
 
@@ -353,6 +378,7 @@ Enforced at parse time; violations print an error and exit 1:
 | `-X` without `-c` | Error |
 | `--skip-existing` without extract/`--unpack`/`--copy-out` (e.g. with `-l`, `-t`, `-r`, `-c`, redump verbs) or a batch container verb (`compress`, `decompress`, `convert`, `split`) | Error |
 | `--continue-on-error` without extract/`--unpack`/`--copy-out` or a batch container verb | Error |
+| `--name-policy` without extract (`-x`) or `--unpack` | Error |
 | `--jobs` without a lone `--zar`, a batch container verb, or a single-file CISO `compress` | Error |
 | `--output-name` without a batch container verb | Error |
 | `--batch` without extract/list/tree/rewrite/audit or a container verb (`compress`, `decompress`, `convert`, `split`) (e.g. with `--copy-out`, `--copy-in`, `validate`, redump, `checksum`, `--filetime`, `--sector-layout`, `--ranges`, `--is-optimized`) | Error |

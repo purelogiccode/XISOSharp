@@ -1,3 +1,6 @@
+using System.Globalization;
+using XISOSharp.Models;
+
 namespace XISOSharp;
 
 /// <summary>
@@ -6,10 +9,12 @@ namespace XISOSharp;
 /// separators, the drive-relative colon on Windows (<c>C:evil</c> would resolve
 /// against another directory), and trailing dots/spaces that Win32 strips
 /// during path normalization (<c>".. "</c> normalizes to <c>".."</c>). Used by
-/// the extract walkers (reject), the salvager/repairer (sanitize) and the
-/// auditor (report) so every path agrees on what is representable. Other
-/// host-invalid characters (NUL, <c>&lt;</c>, …) fail per-file at create time
-/// with a named error instead of aborting the whole walk.
+/// the extract walkers (reject/sanitize/skip under
+/// <see cref="Models.ExtractNamePolicy"/>), the salvager/repairer (sanitize)
+/// and the auditor (report) so every path agrees on what is representable.
+/// Other host-invalid characters (NUL, <c>&lt;</c>, …) fail per-file at create
+/// time with a named error under the default policy; sanitize replaces them on
+/// Windows.
 /// </summary>
 internal static class XisoEntryNames
 {
@@ -95,7 +100,7 @@ internal static class XisoEntryNames
 
         if (OperatingSystem.IsWindows())
         {
-            if (IsReservedWindowsName(name))
+            if (chars.Length > 0 && IsReservedWindowsName(name))
             {
                 chars[0] = '_';
             }
@@ -112,6 +117,106 @@ internal static class XisoEntryNames
 
         return new string(chars);
     }
+
+    /// <summary>
+    /// Resolves an entry name for extraction under <paramref name="policy"/>.
+    /// Returns <c>false</c> when the entry should be skipped; otherwise
+    /// <paramref name="resolvedName"/> is unique within
+    /// <paramref name="usedNames"/> (the current destination directory).
+    /// </summary>
+    internal static bool TryResolveExtractionName(
+        string name,
+        ExtractNamePolicy policy,
+        HashSet<string> usedNames,
+        out string resolvedName,
+        out bool renamed)
+    {
+        ArgumentNullException.ThrowIfNull(usedNames);
+        renamed = false;
+
+        switch (policy)
+        {
+            case ExtractNamePolicy.Sanitize:
+                resolvedName = SanitizeEntryName(name);
+                if (resolvedName.Length == 0 || resolvedName is "." or "..")
+                {
+                    resolvedName = "_";
+                }
+
+                renamed = !string.Equals(resolvedName, name, StringComparison.Ordinal);
+                break;
+
+            case ExtractNamePolicy.Skip:
+                // A name that SanitizeEntryName would change is unsafe on this
+                // host; skip it instead of creating a surprising replacement.
+                if (IsInvalidEntryName(name) ||
+                    !string.Equals(SanitizeEntryName(name), name, StringComparison.Ordinal))
+                {
+                    resolvedName = name;
+                    return false;
+                }
+
+                resolvedName = name;
+                break;
+
+            case ExtractNamePolicy.Reject:
+                // Preserve the historical fail-fast rule: only the escape-
+                // capable names flagged by IsInvalidEntryName abort the walk.
+                // Other host-invalid characters still fail per-file at create
+                // time with their natural named error.
+                if (IsInvalidEntryName(name))
+                {
+                    Logger.LogErr($"filename '{name}' contains invalid character(s), aborting.\n");
+                    throw new XisoFormatException($"Filename '{name}' contains invalid character(s).");
+                }
+
+                resolvedName = name;
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(policy), policy, "Unknown extract name policy.");
+        }
+
+        string unique = MakeUniqueExtractionName(resolvedName, usedNames);
+        if (!string.Equals(unique, resolvedName, StringComparison.Ordinal))
+        {
+            renamed = true;
+        }
+
+        resolvedName = unique;
+        return true;
+    }
+
+    /// <summary>
+    /// Adds <paramref name="name"/> to <paramref name="usedNames"/>, appending
+    /// <c>~1</c>, <c>~2</c> … before the extension when it is already taken.
+    /// </summary>
+    private static string MakeUniqueExtractionName(string name, HashSet<string> usedNames)
+    {
+        if (usedNames.Add(name))
+        {
+            return name;
+        }
+
+        int dot = name.LastIndexOf('.');
+        bool hasExtension = dot > 0 && dot < name.Length - 1;
+        string stem = hasExtension ? name[..dot] : name;
+        string extension = hasExtension ? name[dot..] : string.Empty;
+
+        for (int index = 1; ; index++)
+        {
+            string suffix = "~" + index.ToString(CultureInfo.InvariantCulture);
+            int maxStemLength = Math.Max(1, MaxHostFileNameLength - suffix.Length - extension.Length);
+            string candidate = (stem.Length > maxStemLength ? stem[..maxStemLength] : stem) + suffix + extension;
+            if (usedNames.Add(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    /// <summary>Longest host file-name component used when disambiguating.</summary>
+    private const int MaxHostFileNameLength = 255;
 
     /// <summary>
     /// Returns true when <paramref name="name"/> is a DOS device name on
@@ -150,13 +255,16 @@ internal static class XisoEntryNames
         return false;
     }
 
-    // Escape-capable characters only. The colon is drive-relative on Windows
+    // Escape-capable characters plus the Windows-invalid punctuation that a
+    // sanitized extraction replaces. The colon is drive-relative on Windows
     // (`C:evil` resolves against another directory) but a perfectly valid host
     // character on Unix, where the writer/patcher accept it — rejecting it
     // there would make XISOSharp unable to read images it just created.
     // Other host-invalid characters (NUL, `<`, `>` …) still fail per-file at
-    // create time with a named ExtractFileException, which continue-on-error
-    // can record.
+    // create time with a named ExtractFileException under Reject, which
+    // continue-on-error can record; Sanitize replaces them on Windows.
     private static bool IsInvalidEntryChar(char c) =>
-        c is '/' or '\\' || (c == ':' && OperatingSystem.IsWindows());
+        c is '/' or '\\' ||
+        (OperatingSystem.IsWindows() &&
+         (c == ':' || c is '<' or '>' or '"' or '|' or '?' or '*' || c < ' '));
 }

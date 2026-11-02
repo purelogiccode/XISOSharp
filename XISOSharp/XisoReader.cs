@@ -491,6 +491,8 @@ public static class XisoReader
         }
 
         HashSet<long> visited = [];
+        HashSet<string> usedNames = new(
+            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         List<TocEntry> stack = [];
         long readPos = dirStart;
 
@@ -563,7 +565,7 @@ public static class XisoReader
                 try
                 {
                     ProcessTocEntry(fs, node, path, mode, discLseek, unpackOptions, cancellationToken,
-                        progress, filesystem, depth, llCompat, pendingFiles);
+                        progress, filesystem, depth, llCompat, pendingFiles, usedNames);
                 }
                 catch (Exception ex) when (IsTocCatchable(ex, mode, unpackOptions))
                 {
@@ -751,16 +753,12 @@ public static class XisoReader
             ReadExact(fs, nameBuf);
             string filename = Latin1Encoding.Instance.GetString(nameBuf);
 
-            // Extract builds host paths: host-unsafe names (separators,
-            // drive-relative colons, Windows trailing dots/spaces) abort the
-            // walk instead of reaching CreateDirectory/FileStream where they
-            // could escape the destination. List/Tree/GenerateAvl only read or
-            // serialize the tree, so they follow the reference tool and accept
-            // every structurally valid name on every host.
-            bool nameInvalid = mode == ExtractMode.Extract
-                ? XisoEntryNames.IsInvalidEntryName(filename)
-                : XisoEntryNames.IsStructurallyInvalidEntryName(filename);
-            if (nameInvalid)
+            // Extraction resolves names under UnpackOptions.NamePolicy in
+            // ProcessTocEntry, so a sanitize/skip run can handle hostile names.
+            // List/Tree/GenerateAvl only read or serialize the tree, so they
+            // follow the reference tool and accept every structurally valid
+            // name on every host.
+            if (mode != ExtractMode.Extract && XisoEntryNames.IsStructurallyInvalidEntryName(filename))
             {
                 Logger.LogErr($"filename '{filename}' contains invalid character(s), aborting.\n");
                 throw new XisoFormatException($"Filename '{filename}' contains invalid character(s).");
@@ -830,7 +828,8 @@ public static class XisoReader
         IFilesystem? filesystem,
         int depth,
         bool llCompat,
-        List<ExtractJob>? pendingFiles = null)
+        List<ExtractJob>? pendingFiles = null,
+        HashSet<string>? usedNames = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -840,6 +839,27 @@ public static class XisoReader
         }
 
         string filename = entry.Filename;
+        if (mode == ExtractMode.Extract)
+        {
+            HashSet<string> names = usedNames ?? new(
+                OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+            if (!XisoEntryNames.TryResolveExtractionName(filename,
+                    unpackOptions?.NamePolicy ?? ExtractNamePolicy.Reject,
+                    names, out string resolvedName, out bool renamed))
+            {
+                Logger.Log($"skip: {path}{filename} (unsafe entry name)\n");
+                Logger.Flush();
+                return;
+            }
+
+            if (renamed)
+            {
+                Logger.LogErr($"warning: renamed unsafe entry '{filename}' to '{resolvedName}'\n");
+            }
+
+            filename = resolvedName;
+        }
+
         if ((entry.Attributes & Constants.AttributeDir) != 0)
         {
             // Destination-relative paths chain with '/' under a custom

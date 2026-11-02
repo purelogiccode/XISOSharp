@@ -243,6 +243,12 @@ byte-identical to a sequential unpack, `FileAdded` progress stays in traversal
 order, and destination filesystem calls are serialized, so a non-thread-safe
 store such as `MemoryFilesystem` remains correct.
 
+`UnpackOptions.NamePolicy` controls hostile entry names: `Reject` (default,
+named error), `Sanitize` (replace unsafe characters with `_`, add `~N` on
+collisions) or `Skip` (omit the entry and a skipped directory's subtree).
+`StfsPackage.ExtractTo` and `XisoZarchive.ExtractZar` expose the same policy on
+their `ExtractNamePolicy` overloads.
+
 Built-in implementations:
 
 | Type | Behavior |
@@ -430,6 +436,9 @@ public sealed class StfsPackage : IDisposable
     public void CopyTo(StfsEntry entry, Stream destination);
     public int ExtractTo(string outputDirectory, bool skipExisting = false,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default);
+    public int ExtractTo(string outputDirectory, ExtractNamePolicy namePolicy,
+        bool skipExisting = false, IProgress<ProgressInfo>? progress = null,
+        CancellationToken ct = default);
 }
 ```
 

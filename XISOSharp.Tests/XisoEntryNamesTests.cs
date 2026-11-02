@@ -1,3 +1,5 @@
+using XISOSharp.Models;
+
 namespace XISOSharp.Tests;
 
 /// <summary>
@@ -52,5 +54,56 @@ public class XisoEntryNamesTests
         Assert.False(XisoEntryNames.IsReservedWindowsName(name));
         Assert.False(XisoEntryNames.IsInvalidEntryName(name));
         Assert.Equal(name, XisoEntryNames.SanitizeEntryName(name));
+    }
+
+    [Fact]
+    public void ResolveExtractionName_Sanitize_ReplacesSeparatorAndDisambiguates()
+    {
+        HashSet<string> used = new(StringComparer.Ordinal);
+
+        Assert.True(XisoEntryNames.TryResolveExtractionName(
+            "a/b.txt", ExtractNamePolicy.Sanitize, used, out string first, out bool renamed));
+        Assert.True(renamed);
+        Assert.Equal("a_b.txt", first);
+
+        Assert.True(XisoEntryNames.TryResolveExtractionName(
+            "a\\b.txt", ExtractNamePolicy.Sanitize, used, out string second, out renamed));
+        Assert.True(renamed);
+        Assert.Equal("a_b~1.txt", second);
+    }
+
+    [Fact]
+    public void ResolveExtractionName_Skip_ReturnsFalseForUnsafeName()
+    {
+        HashSet<string> used = new(StringComparer.Ordinal);
+
+        Assert.False(XisoEntryNames.TryResolveExtractionName(
+            "a/b.txt", ExtractNamePolicy.Skip, used, out _, out _));
+        Assert.Empty(used);
+    }
+
+    [Fact]
+    public void ResolveExtractionName_Reject_ThrowsForUnsafeName()
+    {
+        HashSet<string> used = new(StringComparer.Ordinal);
+
+        Assert.Throws<XisoFormatException>(() => XisoEntryNames.TryResolveExtractionName(
+            "a/b.txt", ExtractNamePolicy.Reject, used, out _, out _));
+        Assert.Empty(used);
+    }
+
+    [Fact]
+    public void ResolveExtractionName_Sanitize_ReplacesWindowsInvalidPunctuation()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        HashSet<string> used = new(StringComparer.OrdinalIgnoreCase);
+        Assert.True(XisoEntryNames.TryResolveExtractionName(
+            "a?b*c.txt", ExtractNamePolicy.Sanitize, used, out string resolved, out bool renamed));
+        Assert.True(renamed);
+        Assert.Equal("a_b_c.txt", resolved);
     }
 }

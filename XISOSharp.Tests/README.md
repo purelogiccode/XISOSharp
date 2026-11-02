@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-2133-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2148-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![Test SDK](https://img.shields.io/badge/test--sdk-18.10.1-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
@@ -53,6 +53,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Preallocation / sequential I/O** - `IFilesystem.CreateFile(path, expectedLength)` pre-sizing, `LocalFilesystem`/`MemoryFilesystem` overrides, default-member fallback for custom stores, and entry sizes passed through extraction
 - **Parallel CISO compression** - `CisoWriter.CompressToCso`/`CompressStream` `jobs` overloads produce byte-identical v1/v2 single and split output, keep per-sector progress ordered, and reject `jobs` outside 1..64; CLI `compress --jobs 4` matches the sequential output byte-for-byte and refuses CCI single-file parallelism
 - **Parallel extraction** - `UnpackOptions.MaxDegreeOfParallelism` queues independent files during the tree walk and copies them on a bounded pool with ordered `FileAdded` progress; byte-identical ISO/CISO/split output, `MemoryFilesystem` destinations, `--skip-existing` resume, `--continue-on-error` summaries, fail-fast named errors, cancellation cleanup, and CLI `-x`/`--unpack --jobs` contracts
+- **Safe-extract name policy** - `ExtractNamePolicy.Reject`/`Sanitize`/`Skip` through `UnpackOptions.NamePolicy`, collision-safe `~N` renames, unsafe directory subtrees, parallel/filesystem destinations, STFS and ZAR overloads, and CLI `--name-policy` contracts
 - **Explicit sector-layout packing** - `XisoLayoutSpec` JSON/text parsing, `FromSectorLayout`, fixed-extent placement, first-fit allocation around reserved gaps, byte-identical JSON round-trips, total-sector preservation, prepended partitions, `build-image`/`-c`/`--pack --layout`, and overlap/out-of-range/system-area/too-small/unknown-path failures
 - **In-place repair** - `XisoRepairer` class-C fixes (reserved bits, tag, separator renames + collision refusal), convergence, backup/dry-run semantics, CISO/CCI/split refusals, `--repair` CLI
 - **Salvage rebuild** — `XisoSalvager` carry/drop exactness (forged sizes/sectors, real truncation, cycles, depth gate), CISO→plain ISO, re-salvage stability, `--salvage`/`--repair-out` CLI

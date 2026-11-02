@@ -270,6 +270,7 @@ already-masked `ExplorerNode.Attributes` / `EntryInfo.Attributes`.
 | `const int MaxParallelism` | Ceiling for `MaxDegreeOfParallelism` (`64`) |
 | `bool SkipExisting { get; set; }` | Skip destinations already holding a same-size file (`skip: <path>`) |
 | `bool ContinueOnError { get; set; }` | Record per-file failures and continue; the run ends with the `ErrExtractFailed` summary |
+| `ExtractNamePolicy NamePolicy { get; set; }` | Handle host-unsafe entry names: `Reject` (default), `Sanitize` (replace unsafe characters and disambiguate collisions) or `Skip` (omit the entry/subtree) |
 | `int MaxDegreeOfParallelism { get; set; }` | Copy independent files with 1..64 workers (`1` = sequential); output and `FileAdded` order are unchanged |
 | `bool ShouldSkip(string destPath, long fileSize)` | The size-match predicate (never skips unresolvable paths) |
 | `bool ShouldSkip(string destPath, long fileSize, IFilesystem filesystem)` | Same predicate against any destination filesystem (disk, memory, custom) |
@@ -339,6 +340,7 @@ Paths are destination-root-relative, forward-slash separated, case-insensitive
 | Enum | Values |
 |---|---|
 | `ExtractMode` | `GenerateAvl`, `Extract`, `List`, `Rewrite`, `Tree`, `Verify` |
+| `ExtractNamePolicy` | `Reject` (default), `Sanitize`, `Skip` — hostile-name handling for extraction |
 | `ExtractError` | `ErrEndOfSector` (−5001), `ErrIsoRewritten` (−5002), `ErrIsoNoFiles` (−5003) |
 | `AvlResult` | `NoErr`, `AvlError`, `AvlBalanced` |
 | `AvlTraversalMethod` | `Prefix`, `Infix`, `Postfix` |

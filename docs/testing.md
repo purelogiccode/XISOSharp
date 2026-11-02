@@ -44,6 +44,7 @@ Highlights:
 | Skip/prepend sectors | `SkipPrependSectorsTests.cs` |
 | Unpack resume (`UnpackOptions.SkipExisting`, cancel+resume, copy-out) | `UnpackResumeTests.cs` |
 | Parallel unpack (`UnpackOptions.MaxDegreeOfParallelism`, ordered progress, CISO/split sources, CLI `--jobs`) | `ParallelExtractionTests.cs` |
+| Safe-extract name policy (`ExtractNamePolicy`/`UnpackOptions.NamePolicy`, CLI `--name-policy`, ISO/STFS/ZAR) | `ExtractNamePolicyTests.cs` |
 | Table writer (offsets, encoding, byte-identity with writer output) | `DirectoryEntryTableWriterTests.cs` |
 | Snapshot (`Fixtures/test_fixture.iso` byte-identity; extract/rewrite SHA-256 per file) | `XisoSnapshotTests.cs` |
 | Corruption resilience (truncated tables, bad pointers, huge sizes, bad names, >4 GB, zero-size directories) | `XisoCorruptionResilienceTests.cs` |

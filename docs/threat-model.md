@@ -26,7 +26,7 @@ boundaries, the main threats and the controls that mitigate them.
 |---|---|
 | TOC cycles / absurd entry counts / deep nesting | explicit in-order stack, visited-offset set, `MaxTocEntriesPerTable`, `MaxTocDepth`, `MaxTocStackFrames`; named `XisoFormatException`. |
 | Out-of-table offsets / truncated image | bounds checks before every read; `ReadExact`; `TruncatedCopyException`; per-file `ExtractFileException` context. |
-| Path traversal / absolute paths / drive-relative names | `XisoPaths`/`XisoEntryNames`; separators, `..`, colons, trailing dots/spaces and DOS device names rejected or sanitized. |
+| Path traversal / absolute paths / drive-relative names | `XisoPaths`/`XisoEntryNames`; separators, `..`, colons, trailing dots/spaces and DOS device names rejected or sanitized. `UnpackOptions.NamePolicy` / `--name-policy` selects reject (default), sanitize or skip for recovery runs. |
 | Case collisions on case-insensitive hosts | duplicate-name rejection at table parse/write; first-wins remap rules documented. |
 | Decompression bombs | CISO/CCI sector-sized blocks; ZAR `maxEntries`/`maxTotalBytes` caps; CISO compressed-span cap; bounded allocations. |
 | Malformed CISO/CCI indexes | alignment/version/block-size validation, monotonic positions, file-bounds checks, sane span caps (the mutation fuzzer found an `OverflowException` here in 1.5.0). |

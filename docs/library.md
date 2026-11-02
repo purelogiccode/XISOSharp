@@ -126,7 +126,8 @@ package.ExtractTo(@"C:\games\4D5307E6-extracted", skipExisting: true);
 hash-table interleave, including writable-format packages with primary and
 secondary tables. `XisoChecksum.ComputeStfsChecksum` uses the same sorted-path
 SHA3-256 tree hash as ISO and ZAR, so equivalent trees compare equal. The reader
-is read-only; STFS writing/rebuilding is out of scope.
+is read-only; STFS writing/rebuilding is out of scope. `ExtractTo` has an
+`ExtractNamePolicy` overload for hostile entry names (reject/sanitize/skip).
 
 ## Design notes
 
@@ -205,6 +206,10 @@ catch (ExtractErrorException ex)  // summary: every failure listed
 {
     Console.Error.WriteLine(ex.Message);
 }
+
+// Recover a hostile image: rename unsafe entry names instead of aborting
+int recovered = XisoReader.UnpackImage("damaged.iso", "./out",
+    options: new UnpackOptions { NamePolicy = ExtractNamePolicy.Sanitize });
 
 // List
 XisoReader.List("game.iso", llCompat: false);

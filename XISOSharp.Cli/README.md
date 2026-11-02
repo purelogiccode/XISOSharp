@@ -151,6 +151,7 @@ printed and the tool exits 1.
 | `--file-time <value>` | Fixed volume FILETIME on create/pack/build-image (ISO-8601, decimal, `0x` hex, `now`, `0` = deterministic) |
 | `--skip-existing` | Extract/unpack/copy-out: skip files already on disk with matching sizes (resume). Batch verbs: skip sources whose output exists |
 | `--continue-on-error` | Extract/unpack/copy-out: log per-file failures and continue (still exits non-zero). Batch verbs: keep converting after a failure |
+| `--name-policy reject\|sanitize\|skip` | Extract/unpack: handle host-unsafe entry names (default `reject`; `sanitize` renames with collision-safe `~N`; `skip` omits the entry/subtree). Applies to ISO/CISO/CCI/GOD/ZAR/STFS extraction |
 | `--delete-source` | Batch verbs only: delete each source after a successful conversion (requires `-y`; refused with `-n`; split sets delete every part) |
 | `--output-name <template>` | Batch verbs only: name outputs from `{name}`, `{ext}` and `{format}` (e.g. `"{name}.xiso.{format}"`) |
 | `--no-backup` | Skip the `<iso>.old` backup (copy-in/repair only) |

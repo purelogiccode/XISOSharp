@@ -54,6 +54,13 @@
   are decoded to PNG by the new BCL-only `DxtDecoder`/`PngWriter`; DDS is
   passed through or generated. `XbeInfo` gains `HasLogoBitmap`,
   `HasTitleImage` and `HasSaveImage` init properties.
+- **Safe-extract name policy**: `ExtractNamePolicy` (`Reject` default,
+  `Sanitize`, `Skip`) and `UnpackOptions.NamePolicy` choose how hostile entry
+  names are handled. `Sanitize` replaces unsafe characters with `_` and adds
+  `~N` on collisions; `Skip` omits the entry (and a skipped directory's
+  subtree). `StfsPackage.ExtractTo` and `XisoZarchive.ExtractZar` gained
+  matching `ExtractNamePolicy` overloads. The existing overloads keep the
+  fail-fast default.
 
 ### CLI
 
@@ -88,6 +95,9 @@
   `FileAdded` progress stays in traversal order, and `--skip-existing`/
   `--continue-on-error` work unchanged. ZAR/STFS unpacking and non-extract modes
   reject the flag with a clear message.
+- **`--name-policy reject|sanitize|skip`** on `-x`/`--unpack`: choose fail-fast
+  rejection (default), collision-safe sanitized names, or skipping hostile
+  entries during ISO/CISO/CCI/GOD/ZAR/STFS extraction.
 - `split` warns when an explicit `--size` exceeds the conservative FATX cap.
 
 ### Dependencies

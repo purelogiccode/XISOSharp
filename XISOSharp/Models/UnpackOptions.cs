@@ -58,6 +58,22 @@ public sealed class UnpackOptions
     }
 
     /// <summary>
+    /// How to handle entry names that are unsafe on the destination host
+    /// (path separators, drive-relative colons, trailing dots/spaces, DOS
+    /// device names). Defaults to <see cref="ExtractNamePolicy.Reject"/>,
+    /// which fails with a named format error.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ExtractNamePolicy.Sanitize"/> replaces unsafe characters with
+    /// <c>'_'</c> and appends <c>~N</c> when the result collides with another
+    /// entry in the same directory. <see cref="ExtractNamePolicy.Skip"/> omits
+    /// the entry (and a skipped directory's subtree) and continues. The policy
+    /// applies to ISO, split ISO, CISO, CCI, GOD, ZAR and STFS extraction; the
+    /// explicit <c>CopyOut</c> destination is caller-chosen and is unaffected.
+    /// </remarks>
+    public ExtractNamePolicy NamePolicy { get; set; }
+
+    /// <summary>
     /// When <c>true</c>, a file already present on disk with the same byte size
     /// is left untouched (logged as <c>skip: &lt;path&gt;</c>) instead of being
     /// overwritten. XISO stores no per-file timestamps, so size is the identity

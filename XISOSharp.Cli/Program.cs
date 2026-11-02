@@ -55,6 +55,34 @@ internal static class Program
     }
 
     /// <summary>
+    /// Parses a <c>--name-policy</c> value: <c>reject</c> (default),
+    /// <c>sanitize</c> or <c>skip</c>.
+    /// </summary>
+    private static bool TryParseExtractNamePolicy(string text, out ExtractNamePolicy policy)
+    {
+        if (string.Equals(text, "reject", StringComparison.OrdinalIgnoreCase))
+        {
+            policy = ExtractNamePolicy.Reject;
+            return true;
+        }
+
+        if (string.Equals(text, "sanitize", StringComparison.OrdinalIgnoreCase))
+        {
+            policy = ExtractNamePolicy.Sanitize;
+            return true;
+        }
+
+        if (string.Equals(text, "skip", StringComparison.OrdinalIgnoreCase))
+        {
+            policy = ExtractNamePolicy.Skip;
+            return true;
+        }
+
+        policy = ExtractNamePolicy.Reject;
+        return false;
+    }
+
+    /// <summary>
     /// Emits UTF-8 on stdout/stderr regardless of the host console code page so
     /// Latin-1 filenames render and pipe identically on every platform (and match
     /// xdvdfs's UTF-8 output). Best-effort: hosts that refuse the change keep the
@@ -251,6 +279,8 @@ internal static class Program
         bool batchRecursive = false;
         bool skipExisting = false;
         bool continueOnError = false;
+        bool namePolicySpecified = false;
+        ExtractNamePolicy namePolicy = ExtractNamePolicy.Reject;
         string? packInput = null;
         string? packName = null;
         string? packIsoFile = null;
@@ -760,6 +790,16 @@ internal static class Program
                     case "--continue-on-error":
                         continueOnError = true;
                         break;
+                    case "--name-policy":
+                        if (i + 1 >= args.Length || !TryParseExtractNamePolicy(args[i + 1], out namePolicy))
+                        {
+                            PrintUsage();
+                            return 1;
+                        }
+
+                        namePolicySpecified = true;
+                        i++;
+                        break;
                     case "--pack":
                         if (packInput != null || xSeen || rewrite || createList.Count > 0)
                         {
@@ -1210,6 +1250,14 @@ internal static class Program
         {
             Logger.LogErr(
                 "Error: --continue-on-error is only supported in extract (-x), --unpack, and --copy-out modes\n");
+            return 1;
+        }
+
+        // Safe-extract name policy only applies where image names become host
+        // paths; --copy-out already takes an explicit destination.
+        if (namePolicySpecified && !((extract && !rewrite && createList.Count == 0) || unpackMode))
+        {
+            Logger.LogErr("Error: --name-policy is only supported in extract (-x) and --unpack modes\n");
             return 1;
         }
 
@@ -2261,12 +2309,14 @@ internal static class Program
         // #9 (xdvdfs #187): with --continue-on-error, per-file failures are logged
         // and skipped instead of aborting the run; the summary still fails the exit code.
         // --jobs > 1 queues independent files and copies them on a bounded pool.
-        UnpackOptions? unpackOptions = skipExisting || continueOnError || jobs > 1
+        UnpackOptions? unpackOptions = skipExisting || continueOnError || jobs > 1 ||
+                                       namePolicy != ExtractNamePolicy.Reject
             ? new UnpackOptions
             {
                 SkipExisting = skipExisting,
                 ContinueOnError = continueOnError,
-                MaxDegreeOfParallelism = jobs
+                MaxDegreeOfParallelism = jobs,
+                NamePolicy = namePolicy
             }
             : null;
 
@@ -2276,7 +2326,8 @@ internal static class Program
             if (RejectIgnoredOutputFlags("--unpack"))
                 return 1;
 
-            return RunUnpackMode(args, optind, path, skipSectors, skipExisting, continueOnError, jobs);
+            return RunUnpackMode(args, optind, path, skipSectors, skipExisting, continueOnError, jobs,
+                namePolicy);
         }
 
         if (hashMode)
@@ -2629,7 +2680,8 @@ internal static class Program
                     {
                         string destination = path ?? DeriveZarExtractDirectory(xisoPath);
                         Logger.Log($"extracting {Path.GetFileName(xisoPath)}:\n\n");
-                        XisoZarchive.ExtractZar(xisoPath, destination);
+                        XisoZarchive.ExtractZar(xisoPath, destination, namePolicy,
+                            skipExisting: unpackOptions?.SkipExisting ?? false);
                     }
                     else if (jsonListings != null)
                     {
@@ -2697,7 +2749,8 @@ internal static class Program
                     {
                         string destination = path ?? DeriveStfsExtractDirectory(xisoPath);
                         Logger.Log($"extracting {Path.GetFileName(xisoPath)}:\n\n");
-                        package.ExtractTo(destination, skipExisting: unpackOptions?.SkipExisting ?? false);
+                        package.ExtractTo(destination, namePolicy,
+                            skipExisting: unpackOptions?.SkipExisting ?? false);
                         Logger.TotalFiles = package.Info.FileCount;
                         Logger.TotalBytes = package.Info.TotalFileSize;
                         Logger.Log(
@@ -3127,7 +3180,7 @@ internal static class Program
     /// (defaulting to the ISO name). Returns the process exit code.
     /// </summary>
     private static int RunUnpackMode(string[] args, int optind, string? path, int? skipSectors, bool skipExisting,
-        bool continueOnError, int jobs)
+        bool continueOnError, int jobs, ExtractNamePolicy namePolicy)
     {
         if (optind >= args.Length)
         {
@@ -3162,7 +3215,7 @@ internal static class Program
                 }
 
                 XisoZarchive.ExtractZar(xisoPath, destPath ?? DeriveZarExtractDirectory(xisoPath),
-                    skipExisting);
+                    namePolicy, skipExisting);
                 return 0;
             }
 
@@ -3187,16 +3240,19 @@ internal static class Program
                 }
 
                 using StfsPackage package = StfsPackage.Open(xisoPath);
-                package.ExtractTo(destPath ?? DeriveStfsExtractDirectory(xisoPath), skipExisting);
+                package.ExtractTo(destPath ?? DeriveStfsExtractDirectory(xisoPath), namePolicy,
+                    skipExisting);
                 return 0;
             }
 
-            UnpackOptions? unpackOptions = skipExisting || continueOnError || jobs > 1
+            UnpackOptions? unpackOptions = skipExisting || continueOnError || jobs > 1 ||
+                                           namePolicy != ExtractNamePolicy.Reject
                 ? new UnpackOptions
                 {
                     SkipExisting = skipExisting,
                     ContinueOnError = continueOnError,
-                    MaxDegreeOfParallelism = jobs
+                    MaxDegreeOfParallelism = jobs,
+                    NamePolicy = namePolicy
                 }
                 : null;
             int result = XisoReader.UnpackImage(xisoPath, destPath, skipSectors: skipSectors,
@@ -7048,6 +7104,12 @@ internal static class Program
                                                                           directory skips its subtree. The run still
                                                                           ends with a "Failed to unpack image"
                                                                           summary and a non-zero exit code.
+                                                     --name-policy <p>    In extract (-x) and --unpack modes, handle
+                                                                          host-unsafe entry names: reject (default;
+                                                                          named error), sanitize (replace unsafe
+                                                                          characters with '_' and add ~N on
+                                                                          collisions), or skip (omit the entry and
+                                                                          a skipped directory's subtree).
                                                      --jobs <n>           In extract (-x) and --unpack modes, copy
                                                                           independent files with up to <n> workers
                                                                           (1..64, default 1; output is byte-identical

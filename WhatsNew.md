@@ -48,6 +48,12 @@ listing/extraction.
   positionally; CISO/CCI/GOD/split and in-memory sources serialize reads, and
   destination filesystem calls are serialized so non-thread-safe stores stay
   correct.
+- **Safe-extract name policy**: `ExtractNamePolicy` (`Reject` default,
+  `Sanitize`, `Skip`) and `UnpackOptions.NamePolicy`, plus
+  `StfsPackage.ExtractTo`/`XisoZarchive.ExtractZar` overloads. `Sanitize`
+  replaces unsafe characters with `_` and adds `~N` on collisions; `Skip` omits
+  the entry (and a skipped directory's subtree). The CLI exposes
+  `--name-policy reject|sanitize|skip` on `-x`/`--unpack`.
 - **`--delete-source`**: batch `compress`/`decompress`/`convert`/`split` can
   delete each source after a successful conversion (requires `-y`; split sets
   delete every part; the summary reports the count).

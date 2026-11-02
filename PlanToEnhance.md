@@ -64,7 +64,7 @@ A full review of the upstream trackers — 56 extract-xiso issues, 54 extract-xi
 - `XISOSharp/XisoZarchive.cs` — `CreateZar`, `ListZar`, `ExtractZar` and `ConvertZarToIso`.
 - `XISOSharp/XisoPatcher.cs`, `SectorAllocator.cs`, `XisoValidator.cs`, `XisoChecksum.cs` — sector layout, copy-in, audit and SHA3-256 checksum already exist.
 - `XISOSharp.Cli/Program.cs` — `--batch` covers extract/list/tree/rewrite/audit and the container verbs (`compress`/`decompress`/`convert`/`split`); JSON only via `--validate-report` (Phase 6).
-- `XISOSharp.Tests` - current suite: 2069 passed / 1 opt-in skip on net8.0/net9.0; 2133 passed / 1 opt-in skip on net10.0.
+- `XISOSharp.Tests` - current suite: 2084 passed / 1 opt-in skip on net8.0/net9.0; 2148 passed / 1 opt-in skip on net10.0.
 
 ---
 
@@ -891,6 +891,7 @@ existing named error or report/drop gate.
   - **A2:** `XbeAssets` reads the logo bitmap and `$$XTIMAGE`/`$$XSIMAGE` sections; `DxtDecoder`/`PngWriter` decode DXT1/3/5, BGR24/BGRA32 and XPR0 payloads to PNG, and DDS is passed through or generated. `XbeInfo` gains `HasLogoBitmap`/`HasTitleImage`/`HasSaveImage`; `--xbe-image` extracts logo/title/save as PNG or DDS.
   - **Parallel CISO compression:** `CisoWriter.CompressToCso`/`CompressStream` gain a `jobs` overload (1..64) that compresses sector batches on a bounded worker pool and writes payloads in sector order, so output stays byte-identical; `compress`/`cso --jobs <n>` exposes it (single-file mode). CCI stays single-threaded until CCISharp 1.1.
   - **Parallel extraction:** `UnpackOptions.MaxDegreeOfParallelism` (1..64) queues independent files during the sequential tree walk and copies them on a bounded pool; output is byte-identical, `FileAdded` progress and completion logs stay in traversal order, and `-x`/`--unpack --jobs <n>` exposes it. CISO/CCI/GOD/split and in-memory sources serialize reads, and destination filesystem calls are serialized so non-thread-safe stores stay correct. `ParallelExtractionTests`.
+  - **Safe-extract name policy:** `ExtractNamePolicy` (`Reject`/`Sanitize`/`Skip`) and `UnpackOptions.NamePolicy`; sanitized names are collision-safe (`~N`), a skipped directory omits its subtree, and `StfsPackage.ExtractTo`/`XisoZarchive.ExtractZar` have policy overloads. CLI `--name-policy` on `-x`/`--unpack`; `ExtractNamePolicyTests`.
 - **Remaining roadmap:** Tier B B1's read-only GOD/SVOD sector input is implemented in-repo (`GodBlockDevice`, `GodHeader.TryReadVolume`, CLI `decompress`/`convert`), and XBLA/XBLIG STFS package listing/extraction is implemented in-repo (`StfsPackage`, `StfsEntry`, `StfsPackageInfo`, `ComputeStfsChecksum`, CLI read verbs); extracting both readers into the standalone `StfsSharp` package remains for `1.7.0`, as do the unchecked §15 quality items. CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work.
 
 ### 12.1 Dependency graph
@@ -1133,7 +1134,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [x] Add Windows long-path support (`longPathAware` manifest + `\\?\` path handling) and tests.
 - [x] Add Windows reserved-device-name handling (`CON`, `NUL`, `COM1`… `LPT9`, with extensions) and tests.
 - [x] Add explicit ZAR extraction caps (`MaxTotalBytes`, `MaxEntries`, compression-ratio guard) and tests.
-- [ ] Add a safe-extract policy (reject / sanitize / skip) for hostile names.
+- [x] Add a safe-extract policy (reject / sanitize / skip) for hostile names. **Done:** `ExtractNamePolicy` + `UnpackOptions.NamePolicy` (reject default), collision-safe `~N` sanitization, directory-subtree skipping, `StfsPackage.ExtractTo`/`XisoZarchive.ExtractZar` overloads, CLI `--name-policy`, and `ExtractNamePolicyTests`.
 - [x] Fuzz the XBE/XEX parsers and CCI/CISO index decoders.
 - [x] Add memory/entry caps and malformed-index/alignment validation for CISO on hostile inputs.
 - [x] Add memory/entry caps for CCI indexes on hostile inputs (CCISharp 1.0.1: 64 MiB cap, checked cast, hostile-header tests).
@@ -1538,3 +1539,4 @@ viewers. Cross-repo work is tracked in §15.9.
 | 2026-11-02 | Phase 10 Tier A complete: A1 XEX header-section table + XDBF/XSTR/XSRC parser (`XexDbdf`, `XexTitleInfo`, `GetXexTitleInfo`, `TitleInfo.Kind`/`Xex`, `default.xbe`→`default.xex`→`default_mp.xbe`, 360 `title-info`/`--xex-info` text+JSON); A2 XBE logo/`$$XTIMAGE`/`$$XSIMAGE` extraction (`XbeAssets`, `XbeImage`, DXT1/3/5 + BGR24/BGRA32 + XPR0 decode, BCL PNG writer, DDS passthrough/generation, `XbeInfo` presence flags, `--xbe-image`); synthetic XDBF/XBE fixtures and CLI tests | — |
 | 2026-11-02 | Phase 10 Tier B partial: read-only GOD/SVOD sector input (`GodBlockDevice`, `GodHeader.TryReadVolume`, `GodVolumeInfo`, `XisoImageFormat.God`, `XisoImageSource` header/`.data` detection, CLI `decompress`/`convert`, in-place guards); `GodBlockDeviceTests` (11); GOD header/fragment target added to `XISOSharp.Fuzz`; docs/release notes updated. Standalone `StfsSharp` extraction and full XBLA/XBLIG package listing remain. | — |
 | 2026-11-02 | XBLA/XBLIG STFS package listing/extraction: `StfsPackage`/`StfsEntry`/`StfsPackageInfo` read the STFS file table and hash-chain block lists (read-only and writable primary/secondary tables, level-1 boundary), `XisoChecksum.ComputeStfsChecksum` adds the ISO/ZAR-compatible tree hash, CLI `-l`/`-t`/`-x`/`--unpack`/`checksum`/`--json` accept packages, container/redump/rewrite verbs refuse them, `SyntheticStfsPackage` fixtures, `StfsPackageTests` (11), fuzzer target; docs/plan/release notes updated. | — |
+| 2026-11-02 | Safe-extract name policy: `ExtractNamePolicy` (`Reject`/`Sanitize`/`Skip`), `UnpackOptions.NamePolicy`, collision-safe `~N` renaming, skipped directory subtrees, `StfsPackage.ExtractTo` and `XisoZarchive.ExtractZar` policy overloads, CLI `--name-policy` on `-x`/`--unpack`, `ExtractNamePolicyTests`, docs/release notes updated. | — |
