@@ -253,7 +253,7 @@ Built-in implementations:
 
 | Type | Behavior |
 |------|----------|
-| `LocalFilesystem(string? root = null)` | Local disk under `root` (cwd-relative when `null`, matching the legacy unpack); `LocalFilesystem.Instance` is the shared cwd-relative instance; parent directories are not auto-created. Files open with `SequentialScan` and are pre-sized when the entry size is known |
+| `LocalFilesystem(string? root = null)` | Local disk under `root` (cwd-relative when `null`); `LocalFilesystem.Instance` is the shared cwd-relative instance; parent directories are not auto-created. Files open with `SequentialScan` and are pre-sized when the entry size is known |
 | `MemoryFilesystem` | In-process byte snapshots committed when the unpack closes each file's stream; re-creating a file truncates it; known sizes preallocate the buffer; parents auto-created; inspect via `ReadAllBytes(path)`, `FileNames`, `DirectoryNames` |
 
 ```csharp
@@ -1659,7 +1659,7 @@ catch (InvalidDataException ex)
 The core processing engine is **not thread-safe** for concurrent operations on the same file. However:
 
 - Each call to `DecodeXiso` or `CreateXiso` is self-contained and safe to call from different threads when processing different files.
-- `CreateXiso`/`PackFromDirectory` use absolute host paths and per-operation progress state: concurrent creates run independently and never change the process working directory. A caller-supplied `inRoot` without host paths is resolved once against the caller's CWD. The legacy `Extract` path still changes the CWD internally and restores it; use `UnpackImage(..., IFilesystem)` for a CWD-free extraction.
+- `CreateXiso`/`PackFromDirectory` use absolute host paths and per-operation progress state: concurrent creates run independently and never change the process working directory. A caller-supplied `inRoot` without host paths is resolved once against the caller's CWD. `Extract`/`UnpackImage` resolve entry paths through a `LocalFilesystem` rooted at the output directory, so extraction never changes the CWD either; `UnpackImage(..., IFilesystem)` targets any custom store.
 - `Logger` is safe for concurrent access across multiple operations.
 - Async overloads (`DecodeXisoAsync`, `CreateXisoAsync`) run the synchronous engine on a thread pool thread via `Task.Run`, which is safe for UI thread responsiveness.
 

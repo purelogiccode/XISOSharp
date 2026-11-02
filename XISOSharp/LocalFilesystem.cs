@@ -5,7 +5,7 @@ namespace XISOSharp;
 /// <summary>
 /// <see cref="IFilesystem"/> over the local disk: the default extraction
 /// destination. Paths resolve against <paramref name="root"/> (or the process
-/// current directory when no root is given, matching the legacy chdir-based
+/// current directory when no root is given, matching the older cwd-relative
 /// unpack). File creation uses the same options as the reader's direct
 /// extraction path (<c>FileMode.Create</c>, 64 KiB buffered, no sharing).
 /// </summary>
@@ -16,8 +16,8 @@ namespace XISOSharp;
 public sealed class LocalFilesystem(string? root = null) : IFilesystem
 {
     /// <summary>
-    /// Shared cwd-relative instance (root <c>null</c>): the destination used by
-    /// every legacy unpack/extract path.
+    /// Shared cwd-relative instance (root <c>null</c>): the fallback used when a
+    /// caller passes no destination filesystem (copy-out probes).
     /// </summary>
     public static LocalFilesystem Instance { get; } = new();
 

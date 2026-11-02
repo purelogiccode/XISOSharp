@@ -143,10 +143,11 @@ is read-only; STFS writing/rebuilding is out of scope. `ExtractTo` has an
   process working directory. Progress counters are per operation, and concurrent
   creates run independently without a process-wide lock. A caller-supplied `inRoot`
   without host paths is resolved once against the caller's CWD.
-- **Legacy extraction path**: `XisoReader.Extract` still walks the destination with
-  `Directory.SetCurrentDirectory` (like the C tool) and restores the original
-  directory afterwards, even on failure. `UnpackImage(..., IFilesystem)` is the
-  CWD-free extraction path.
+- **CWD-free extraction**: `XisoReader.Extract`/`UnpackImage` resolve entry paths
+  through a `LocalFilesystem` rooted at the output directory, so the process
+  working directory never changes and concurrent extracts stay independent.
+  `UnpackImage(..., IFilesystem)` targets a custom store (disk, memory, or any
+  caller implementation).
 
 ## Error handling
 
@@ -342,7 +343,7 @@ using var cts = new CancellationTokenSource();
 Async variants: `XisoReader.DecodeXisoAsync`, `XisoWriter.CreateXisoAsync`.
 
 Cancellation is honored per entry during extraction (an interrupted unpack throws
-`OperationCanceledException` and still restores the working directory), and extract
+`OperationCanceledException` without touching the process working directory), and extract
 mode reports `ProgressInfoType.FileAdded` per written file plus per-chunk
 `ProgressInfoType.FileProgress` while each file copies (driven by the shared
 `XisoFileCopier` core, which reuses one buffer instead of allocating per file).

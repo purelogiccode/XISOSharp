@@ -42,10 +42,11 @@ Concurrent creates run independently and never change the process working
 directory. A caller-supplied `inRoot` without host paths is resolved once against
 the caller's CWD, so it is CWD-free too.
 
-The legacy `XisoReader.Extract` path still walks the destination with
-`Directory.SetCurrentDirectory` (like the C tool) and restores the original
-directory afterwards. `XisoReader.UnpackImage(..., IFilesystem)` is the
-CWD-free extraction path; `-x`/`--unpack` still use the legacy path.
+`XisoReader.Extract`/`UnpackImage` also never change the process working
+directory: extraction resolves entry paths through a `LocalFilesystem` rooted at
+the output directory, and concurrent extracts into different destinations stay
+independent. `XisoReader.UnpackImage(..., IFilesystem)` remains the way to target
+a custom store.
 
 ## Windows paths and names
 

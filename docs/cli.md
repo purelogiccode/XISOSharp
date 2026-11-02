@@ -204,7 +204,7 @@ Notes:
   file is assumed to be a complete earlier write (even if its content differs — the
   flag means "don't touch what's there").
 - Cancellation is honored per entry, so Ctrl+C stops promptly; the working directory
-  is always restored.
+  never changes.
 - `--skip-existing` is rejected outside extract / `--unpack` / `--copy-out` (exit 1).
 
 ### Parallel extraction
@@ -312,7 +312,7 @@ tolerated (upstream #61):
 - An empty `-d` (`-d "%UNSET_VAR%"`) is rejected with
   `Output path must not be empty` (exit 1).
 - A `-d` pointing at an existing *file* fails with an `IOException`; the
-  process working directory is restored either way.
+  process working directory is unchanged either way.
 
 ### Misplaced flags (upstream #61)
 

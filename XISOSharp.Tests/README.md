@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-2151-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2155-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![Test SDK](https://img.shields.io/badge/test--sdk-18.10.1-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
@@ -53,6 +53,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Preallocation / sequential I/O** - `IFilesystem.CreateFile(path, expectedLength)` pre-sizing, `LocalFilesystem`/`MemoryFilesystem` overrides, default-member fallback for custom stores, and entry sizes passed through extraction
 - **Parallel CISO compression** - `CisoWriter.CompressToCso`/`CompressStream` `jobs` overloads produce byte-identical v1/v2 single and split output, keep per-sector progress ordered, and reject `jobs` outside 1..64; CLI `compress --jobs 4` matches the sequential output byte-for-byte and refuses CCI single-file parallelism
 - **Writer concurrency** - `XisoWriter.CreateXiso`/`PackFromDirectory` run independently without the process-wide lock: concurrent packs overlap, a second create completes while the first is blocked in its progress callback, relative source paths resolve against the caller CWD, caller-supplied trees without `HostPath` are resolved against the caller CWD without a chdir, and the CWD never changes
+- **Reader CWD removal** - `XisoReader.Extract`/`UnpackImage` route entry paths through a `LocalFilesystem` rooted at the output directory, so extraction never changes the process CWD; `UnpackImageTests` covers both output-path forms, two concurrent extracts into separate destinations, and a mid-run CWD change that must not redirect files
 - **Parallel extraction** - `UnpackOptions.MaxDegreeOfParallelism` queues independent files during the tree walk and copies them on a bounded pool with ordered `FileAdded` progress; byte-identical ISO/CISO/split output, `MemoryFilesystem` destinations, `--skip-existing` resume, `--continue-on-error` summaries, fail-fast named errors, cancellation cleanup, and CLI `-x`/`--unpack --jobs` contracts
 - **Safe-extract name policy** - `ExtractNamePolicy.Reject`/`Sanitize`/`Skip` through `UnpackOptions.NamePolicy`, collision-safe `~N` renames, unsafe directory subtrees, parallel/filesystem destinations, STFS and ZAR overloads, and CLI `--name-policy` contracts
 - **Explicit sector-layout packing** - `XisoLayoutSpec` JSON/text parsing, `FromSectorLayout`, fixed-extent placement, first-fit allocation around reserved gaps, byte-identical JSON round-trips, total-sector preservation, prepended partitions, `build-image`/`-c`/`--pack --layout`, and overlap/out-of-range/system-area/too-small/unknown-path failures
@@ -71,7 +72,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Hardening regressions** — path-escape names, table-size bounds, all-zero sentinel, zero-size directory listing, split part naming (dotted bases), partial-output cleanup and pre-existing-output preservation (`CreateZar`/`CompressToCso`), offset-image tag repair, same-CWD input==output guard
 - **CLI flag contracts** — `--silent` order independence (incl. `-v`/`--help`), `--file-time`/`--preserve-attrs`/`--jobs`/`--policy` mode rejection (incl. `--jobs` with `--compress`/multi-mode), `--ciso-split` first-part guard, Wipe/Trim flags-before-positionals
 - **Follow-up regressions** — `-c .` default output next to the source, colon names through list/tree/rewrite (extract refuses on Windows), audit root-size/extraction parity, header-only sector-layout reservations, `build-image` cancellation cleanup, child-offset `0xFFFF` sentinel guard
-- **Sequential execution** — assembly-wide `[CollectionBehavior(DisableTestParallelization = true)]` because the legacy extract path mutates the process CWD (creation no longer does)
+- **Sequential execution** — assembly-wide `[CollectionBehavior(DisableTestParallelization = true)]` because many tests set the process CWD themselves (creation and extraction no longer do)
 - **GUI command builders** (net10.0) — `CliCommands` argv for every verb, flags-before-positionals invariant, `CliLocator` version metadata fallbacks
 - **GUI services** (net10.0) — screenshot file naming/folder resolution/collision suffixes and update-check version comparison/release-URL fallback
 

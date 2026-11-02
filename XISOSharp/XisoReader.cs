@@ -445,8 +445,19 @@ public static class XisoReader
     /// Optional destination filesystem (TODO #7). When set (extract mode), directories
     /// are created through <see cref="IFilesystem.CreateDirectory"/> at the
     /// destination-root-relative path and no process working-directory changes happen;
-    /// path prefixes chain with <c>/</c>. When <c>null</c>, the legacy chdir-based
-    /// extraction into the current directory runs and prefixes keep the host separator.
+    /// path prefixes chain with <c>/</c>.
+    /// </param>
+    /// <param name="fsPath">
+    /// Destination-root-relative path prefix (always <c>/</c>-separated) used for
+    /// filesystem calls. <c>null</c> for list/tree/rewrite modes. Disk extraction
+    /// passes the display prefix in <paramref name="path"/> and a separate
+    /// <c>/</c>-rooted prefix here, so log lines keep their historical
+    /// host-separator form while no directory ever becomes the process CWD.
+    /// </param>
+    /// <param name="pathSeparator">
+    /// Separator appended to display path prefixes (<paramref name="path"/>):
+    /// the host separator for disk output, <c>/</c> for an
+    /// <see cref="IFilesystem"/> destination.
     /// </param>
     /// <param name="preserveAttributes">
     /// Rewrite-mode (GenerateAvl) only. When <c>false</c> (default), the source
@@ -470,6 +481,8 @@ public static class XisoReader
         Stream fs,
         long dirStart,
         string? path,
+        string? fsPath,
+        char pathSeparator,
         ExtractMode mode,
         ref AvlNode? avlRoot,
         bool llCompat,
@@ -564,8 +577,8 @@ public static class XisoReader
             {
                 try
                 {
-                    ProcessTocEntry(fs, node, path, mode, discLseek, unpackOptions, cancellationToken,
-                        progress, filesystem, depth, llCompat, pendingFiles, usedNames);
+                    ProcessTocEntry(fs, node, path, fsPath, pathSeparator, mode, discLseek, unpackOptions,
+                        cancellationToken, progress, filesystem, depth, llCompat, pendingFiles, usedNames);
                 }
                 catch (Exception ex) when (IsTocCatchable(ex, mode, unpackOptions))
                 {
@@ -820,6 +833,8 @@ public static class XisoReader
         Stream fs,
         TocEntry entry,
         string? path,
+        string? fsPath,
+        char pathSeparator,
         ExtractMode mode,
         long discLseek,
         UnpackOptions? unpackOptions,
@@ -862,10 +877,9 @@ public static class XisoReader
 
         if ((entry.Attributes & Constants.AttributeDir) != 0)
         {
-            // Destination-relative paths chain with '/' under a custom
-            // filesystem; the legacy chdir walk keeps the host separator.
-            string sep = filesystem != null ? "/" : Constants.PathCharStr;
+            string sep = pathSeparator.ToString();
             string? subPath = path is null ? null : path + filename + sep;
+            string? subFsPath = fsPath is null ? null : fsPath + filename + "/";
 
             if (!Logger.RemoveSystemUpdate || !filename.Contains("$SystemUpdate", StringComparison.Ordinal))
             {
@@ -877,15 +891,10 @@ public static class XisoReader
                 {
                     try
                     {
-                        if (filesystem != null)
-                        {
-                            filesystem.CreateDirectory(string.Concat(path, filename));
-                        }
-                        else
-                        {
-                            Directory.CreateDirectory(filename);
-                            Directory.SetCurrentDirectory(filename);
-                        }
+                        // Extraction always has a destination filesystem: a custom
+                        // store, or a LocalFilesystem rooted at the output directory
+                        // (the legacy path no longer changes the process CWD).
+                        filesystem!.CreateDirectory(string.Concat(fsPath, filename));
                     }
                     catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
                                                ex is not OperationCanceledException)
@@ -893,9 +902,7 @@ public static class XisoReader
                         ExtractFileException failure = ex as ExtractFileException
                                                        ?? ExtractFileException.ForDirectory(
                                                            string.Concat(path, filename),
-                                                           filesystem != null
-                                                               ? string.Concat(path, filename)
-                                                               : filename,
+                                                           string.Concat(fsPath, filename),
                                                            ex);
                         unpackOptions.RecordFailure(failure);
                         Logger.LogErr($"Error: {failure.Message}\n");
@@ -944,7 +951,7 @@ public static class XisoReader
                             if (mode == ExtractMode.GenerateAvl)
                             {
                                 TraverseXiso(
-                                    fs, subStart, subPath, mode,
+                                    fs, subStart, subPath, subFsPath, pathSeparator, mode,
                                     ref entry.Avl!.Subdirectory,
                                     llCompat, discLseek, unpackOptions, cancellationToken, progress,
                                     tableSize: entry.FileSize, depth: depth + 1, filesystem: filesystem,
@@ -954,7 +961,7 @@ public static class XisoReader
                             {
                                 AvlNode? unusedAvl = null;
                                 TraverseXiso(
-                                    fs, subStart, subPath, mode,
+                                    fs, subStart, subPath, subFsPath, pathSeparator, mode,
                                     ref unusedAvl,
                                     llCompat, discLseek, unpackOptions, cancellationToken, progress,
                                     tableSize: entry.FileSize, depth: depth + 1, filesystem: filesystem,
@@ -981,11 +988,6 @@ public static class XisoReader
                         // entry as a file (ARC + file data) instead of a directory.
                         entry.Avl.Subdirectory = AvlNode.EmptySubdirectory;
                     }
-
-                    if (mode == ExtractMode.Extract && filesystem == null)
-                    {
-                        Directory.SetCurrentDirectory("..");
-                    }
                 }
             }
         }
@@ -1003,7 +1005,7 @@ public static class XisoReader
                         Filename: filename,
                         InternalPath: internalPath,
                         ProgressPath: internalPath.Replace('\\', '/'),
-                        Destination: filesystem != null ? internalPath : Path.GetFullPath(filename),
+                        Destination: string.Concat(fsPath, filename),
                         StartSector: entry.StartSector,
                         FileSize: entry.FileSize));
                 }
@@ -1019,8 +1021,8 @@ public static class XisoReader
                         bool written;
                         try
                         {
-                            written = ExtractFile(fs, filename, entry.StartSector, entry.FileSize, path, discLseek,
-                                unpackOptions, cancellationToken, progress, filesystem);
+                            written = ExtractFile(fs, filename, entry.StartSector, entry.FileSize, path, fsPath,
+                                discLseek, unpackOptions, cancellationToken, progress, filesystem);
                         }
                         catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
                                                    ex is not OperationCanceledException)
@@ -1084,14 +1086,15 @@ public static class XisoReader
     }
 
     /// <summary>
-    /// Extracts a single file from the XISO stream to the current working directory,
+    /// Extracts a single file from the XISO stream to the destination filesystem,
     /// reporting progress via the logger.
     /// </summary>
     /// <param name="fs">File stream positioned at the file's starting sector.</param>
     /// <param name="filename">Name of the file to create.</param>
     /// <param name="startSector">Sector index where the file data begins.</param>
     /// <param name="fileSize">Reported size of the file in bytes.</param>
-    /// <param name="path">Path prefix for progress logging.</param>
+    /// <param name="path">Display path prefix for log lines.</param>
+    /// <param name="fsPath">Destination-root-relative path prefix (<c>/</c>-separated) for filesystem calls.</param>
     /// <param name="discLseek">Disc lseek offset for sector address calculation.</param>
     /// <param name="unpackOptions">
     /// Optional resume options; when <see cref="UnpackOptions.SkipExisting"/> is set and
@@ -1104,11 +1107,11 @@ public static class XisoReader
     /// <see cref="ProgressInfoType.FileProgress"/> event while the file copies.
     /// </param>
     /// <param name="filesystem">
-    /// Optional destination filesystem (TODO #7): when set, the file is created
-    /// through <see cref="IFilesystem.CreateFile(string)"/> at the destination-root-relative
-    /// path (<c>path</c> + <c>filename</c>) and the skip/post-write checks probe the
-    /// same filesystem. When <c>null</c>, the file lands in the process working
-    /// directory under its bare name (legacy chdir-based behavior).
+    /// Destination filesystem (TODO #7): the file is created through
+    /// <see cref="IFilesystem.CreateFile(string)"/> at <paramref name="fsPath"/> +
+    /// <paramref name="filename"/> and the skip/post-write checks probe the same
+    /// filesystem. Extraction always supplies one (custom store or rooted
+    /// <see cref="LocalFilesystem"/>), so the process CWD never changes.
     /// </param>
     /// <returns><c>true</c> when the file was written, <c>false</c> when it was skipped or excluded.</returns>
     /// <exception cref="ExtractFileException">
@@ -1123,6 +1126,7 @@ public static class XisoReader
         uint startSector,
         uint fileSize,
         string? path,
+        string? fsPath,
         long discLseek,
         UnpackOptions? unpackOptions = null,
         CancellationToken cancellationToken = default,
@@ -1138,10 +1142,10 @@ public static class XisoReader
 
         string internalPath = string.Concat(path, filename);
 
-        // Destination in the filesystem's own path form: for a custom
-        // IFilesystem that is the image-internal path ("sub/file.bin"); the
-        // legacy path keeps the cwd-relative bare name.
-        string dest = filesystem != null ? internalPath : filename;
+        // Destination in the destination filesystem's own path form
+        // ("/sub/file.bin"): the display prefix above keeps the historical
+        // host-separator log text, while this prefix is always '/'-rooted.
+        string dest = string.Concat(fsPath, filename);
 
         return ExtractFileCore(
             new ImageReader(fs),
@@ -1165,8 +1169,8 @@ public static class XisoReader
     /// <param name="InternalPath">Image path with the host separator (for log lines).</param>
     /// <param name="ProgressPath">Image path with <c>/</c> separators (for progress events).</param>
     /// <param name="Destination">
-    /// Destination path: the absolute host path for legacy disk extraction, or the
-    /// destination-root-relative path for an <see cref="IFilesystem"/>.
+    /// Destination-root-relative path (<c>/</c>-separated) for the destination
+    /// <see cref="IFilesystem"/>.
     /// </param>
     /// <param name="StartSector">Partition-relative start sector.</param>
     /// <param name="FileSize">Declared byte size.</param>
@@ -1667,7 +1671,7 @@ public static class XisoReader
     /// the cleanup failure is swallowed so it never masks the extraction error.
     /// </summary>
     /// <param name="filesystem">Destination filesystem, or <c>null</c> for the local disk.</param>
-    /// <param name="path">Destination path (host path for the legacy disk path).</param>
+    /// <param name="path">Destination path (host path when no filesystem is supplied).</param>
     /// <param name="sync">Optional parallel-pass lock serializing filesystem calls.</param>
     private static void TryDeletePartialFile(IFilesystem? filesystem, string path, object? sync = null)
     {
@@ -2305,9 +2309,9 @@ public static class XisoReader
     /// opens (and owns) the stream; the public stream overload validates it.
     /// The trailing <c>filesystem</c> parameter (extract mode) redirects the whole
     /// unpack into an <see cref="IFilesystem"/> destination — files land at its root
-    /// via <see cref="IFilesystem.CreateFile(string)"/>/<see cref="IFilesystem.CreateDirectory"/>
-    /// with no working-directory changes; <c>null</c> keeps the legacy
-    /// working-directory-based extraction.
+    /// via <see cref="IFilesystem.CreateFile(string)"/>/<see cref="IFilesystem.CreateDirectory"/>.
+    /// When <c>null</c>, a <see cref="LocalFilesystem"/> rooted at the output
+    /// directory is used, so extraction never changes the process working directory.
     /// </summary>
     private static int DecodeXisoCore(
         Stream imageStream,
@@ -2370,167 +2374,138 @@ public static class XisoReader
             shortName = XisoImageSource.StripImageSuffix(name);
         }
 
-        string? cwd = null;
-
-        // The caller's stream stays open: extraction reads through it under the
-        // destination-directory chdir below, and ownership never transfers.
+        // The caller's stream stays open; ownership never transfers.
         Stream fs = imageStream;
 
         (uint rootDirSect, uint rootDirSize, long discLseek) = VerifyXiso(fs, name, skipSectors);
 
         Logger.XboxDiscLseek = discLseek;
 
-        // Change into the output directory only after the image verified successfully,
-        // so an invalid image can never leave the process working directory modified.
-        // A custom destination filesystem replaces the chdir entirely: its root is
-        // materialized instead, then everything is created relative to it.
-        if (mode == ExtractMode.Extract && outputPath != null && filesystem == null)
-        {
-            cwd = Directory.GetCurrentDirectory();
-            try
-            {
-                Directory.CreateDirectory(outputPath);
-                Directory.SetCurrentDirectory(outputPath);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                Logger.LogErr($"Error: permission denied: {outputPath}\n");
-                throw new IOException($"Permission denied: {outputPath}", ex);
-            }
-            catch (IOException ex)
-            {
-                Logger.LogErr($"Error: cannot access output directory: {outputPath}: {ex.Message}\n");
-                throw;
-            }
-        }
-        else if (mode == ExtractMode.Extract && filesystem != null)
-        {
-            filesystem.CreateDirectory("/");
-        }
-
         string isoName = shortName ?? name;
 
-        // Everything below may change the process working directory (extract chdirs
-        // into the destination), so it runs under try/finally: an interrupted run
-        // (cancellation, disk error) must still restore the caller's directory.
-        try
+        // Extraction always runs against a destination filesystem: a custom store,
+        // or a LocalFilesystem rooted at the output directory. The process working
+        // directory is never changed (TODO #22), so concurrent extracts cannot race
+        // and an interrupted run needs no restore.
+        bool customFilesystem = filesystem != null;
+        if (mode == ExtractMode.Extract)
         {
-            if (mode != ExtractMode.Rewrite)
+            if (filesystem != null)
             {
-                Logger.Log($"{(mode == ExtractMode.Extract ? "extracting" : "listing")} {name}:\n\n");
-
-                if (mode == ExtractMode.Extract && outputPath == null && filesystem == null)
+                filesystem.CreateDirectory("/");
+            }
+            else
+            {
+                string destination = outputPath ?? isoName;
+                string root;
+                try
                 {
-                    try
-                    {
-                        Directory.CreateDirectory(isoName);
-                        // Capture the caller's directory so the finally below restores it:
-                        // without this, multi-image runs (e.g. --batch) would resolve
-                        // every later image relative to this ISO's subdirectory.
-                        cwd ??= Directory.GetCurrentDirectory();
-                        Directory.SetCurrentDirectory(isoName);
-                    }
-                    catch (UnauthorizedAccessException ex)
-                    {
-                        Logger.LogErr($"Error: permission denied: {isoName}\n");
-                        throw new IOException($"Permission denied: {isoName}", ex);
-                    }
-                    catch (IOException ex)
-                    {
-                        Logger.LogErr($"Error: cannot create output directory: {isoName}: {ex.Message}\n");
-                        throw;
-                    }
+                    // Resolve once: the rooted filesystem below must not follow a
+                    // concurrent caller's later CWD change.
+                    root = Path.GetFullPath(destination);
+                    Directory.CreateDirectory(root);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Logger.LogErr($"Error: permission denied: {destination}\n");
+                    throw new IOException($"Permission denied: {destination}", ex);
+                }
+                catch (IOException ex)
+                {
+                    Logger.LogErr(
+                        $"Error: cannot {(outputPath != null ? "access output" : "create output")} directory: {destination}: {ex.Message}\n");
+                    throw;
+                }
+
+                filesystem = new LocalFilesystem(root);
+            }
+        }
+
+        if (mode != ExtractMode.Rewrite)
+        {
+            Logger.Log($"{(mode == ExtractMode.Extract ? "extracting" : "listing")} {name}:\n\n");
+        }
+
+        if (rootDirSect != 0 && rootDirSize != 0)
+        {
+            string buf = string.Concat(
+                outputPath ?? "",
+                mode != ExtractMode.List && outputPath == null ? isoName : "",
+                Constants.PathCharStr);
+
+            if (mode == ExtractMode.Rewrite)
+            {
+                fs.Seek(((long)rootDirSect * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
+                AvlNode? avlRoot = null;
+                TraverseXiso(fs, ((long)rootDirSect * Constants.SectorSize) + discLseek,
+                    buf, null, Constants.PathChar, ExtractMode.GenerateAvl, ref avlRoot, llCompat, discLseek,
+                    cancellationToken: cancellationToken, tableSize: rootDirSize,
+                    preserveAttributes: preserveAttributes);
+
+                int rewriteResult = XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath,
+                    outputName, null, cancellationToken, prependSectors: prependSectors, progress: progress,
+                    sourceDiscLseek: discLseek);
+
+                // Surface write failures: callers (CLI, Rewrite) promise a
+                // non-zero result and must not report success for a rewrite
+                // that produced no file.
+                if (rewriteResult != 0)
+                {
+                    return rewriteResult;
                 }
             }
-
-            if (rootDirSect != 0 && rootDirSize != 0)
+            else
             {
-                int addSlash = 0;
-                if (outputPath != null && outputPath[^1] != Constants.PathChar)
-                {
-                    addSlash = 1;
-                }
+                // Disk extraction keeps its historical host-separator display
+                // prefix in logs; a custom filesystem uses '/'-rooted image
+                // paths for both display and destination.
+                string displayRoot = customFilesystem ? "/" : buf;
+                char pathSeparator = customFilesystem ? '/' : Constants.PathChar;
+                string? fsRoot = filesystem != null ? "/" : null;
 
-                string buf = string.Concat(
-                    outputPath ?? "",
-                    addSlash != 0 && outputPath == null ? Constants.PathCharStr : "",
-                    mode != ExtractMode.List && outputPath == null ? isoName : "",
-                    Constants.PathCharStr);
-
-                if (mode == ExtractMode.Rewrite)
+                fs.Seek(((long)rootDirSect * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
+                AvlNode? avlRoot = null;
+                int maxParallel = unpackOptions?.MaxDegreeOfParallelism ?? 1;
+                List<ExtractJob>? pendingFiles = mode == ExtractMode.Extract && maxParallel > 1 ? [] : null;
+                try
                 {
-                    fs.Seek(((long)rootDirSect * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
-                    AvlNode? avlRoot = null;
                     TraverseXiso(fs, ((long)rootDirSect * Constants.SectorSize) + discLseek,
-                        buf, ExtractMode.GenerateAvl, ref avlRoot, llCompat, discLseek,
-                        cancellationToken: cancellationToken, tableSize: rootDirSize,
-                        preserveAttributes: preserveAttributes);
-
-                    int rewriteResult = XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath,
-                        outputName, null, cancellationToken, prependSectors: prependSectors, progress: progress,
-                        sourceDiscLseek: discLseek);
-
-                    // Surface write failures: callers (CLI, Rewrite) promise a
-                    // non-zero result and must not report success for a rewrite
-                    // that produced no file.
-                    if (rewriteResult != 0)
-                    {
-                        return rewriteResult;
-                    }
+                        displayRoot, fsRoot, pathSeparator, mode, ref avlRoot, llCompat, discLseek,
+                        unpackOptions, cancellationToken, progress,
+                        tableSize: rootDirSize, filesystem: filesystem, pendingFiles: pendingFiles);
                 }
-                else
+                catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
+                                           mode == ExtractMode.Extract &&
+                                           ex is not OperationCanceledException)
                 {
-                    fs.Seek(((long)rootDirSect * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
-                    AvlNode? avlRoot = null;
-                    int maxParallel = unpackOptions?.MaxDegreeOfParallelism ?? 1;
-                    List<ExtractJob>? pendingFiles = mode == ExtractMode.Extract && maxParallel > 1 ? [] : null;
-                    try
-                    {
-                        TraverseXiso(fs, ((long)rootDirSect * Constants.SectorSize) + discLseek,
-                            filesystem != null ? "/" : buf, mode, ref avlRoot, llCompat, discLseek,
-                            unpackOptions, cancellationToken, progress,
-                            tableSize: rootDirSize, filesystem: filesystem, pendingFiles: pendingFiles);
-                    }
-                    catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
-                                               mode == ExtractMode.Extract &&
-                                               ex is not OperationCanceledException)
-                    {
-                        // A corrupt root table still yields the end-of-run
-                        // summary (TODO #16 over #9) instead of an unhandled
-                        // structural failure.
-                        ExtractFileException failure = ex as ExtractFileException
-                                                       ?? ExtractFileException.ForToc("/", outputPath ?? isoName,
-                                                           rootDirSect,
-                                                           rootDirSize, ex);
-                        unpackOptions.RecordFailure(failure);
-                        Logger.LogErr($"Error: {failure.Message}\n");
-                    }
-
-                    // The walk only created directories and queued file work;
-                    // copy the queued files now that every parent exists.
-                    if (pendingFiles is { Count: > 0 })
-                    {
-                        ExtractFilesParallel(fs, pendingFiles, discLseek, unpackOptions, cancellationToken,
-                            progress, filesystem, maxParallel);
-                    }
-
-                    // A continued run that hit per-file failures still fails the
-                    // run: the summary names every file (xdvdfs "Failed to unpack
-                    // image"), so callers and the CLI exit code see it.
-                    if (mode == ExtractMode.Extract)
-                        unpackOptions?.ThrowIfFailed(name);
+                    // A corrupt root table still yields the end-of-run
+                    // summary (TODO #16 over #9) instead of an unhandled
+                    // structural failure.
+                    ExtractFileException failure = ex as ExtractFileException
+                                                   ?? ExtractFileException.ForToc("/", outputPath ?? isoName,
+                                                       rootDirSect,
+                                                       rootDirSize, ex);
+                    unpackOptions.RecordFailure(failure);
+                    Logger.LogErr($"Error: {failure.Message}\n");
                 }
-            }
 
-            return 0;
-        }
-        finally
-        {
-            if (cwd != null)
-            {
-                Directory.SetCurrentDirectory(cwd);
+                // The walk only created directories and queued file work;
+                // copy the queued files now that every parent exists.
+                if (pendingFiles is { Count: > 0 })
+                {
+                    ExtractFilesParallel(fs, pendingFiles, discLseek, unpackOptions, cancellationToken,
+                        progress, filesystem, maxParallel);
+                }
+
+                // A continued run that hit per-file failures still fails the
+                // run: the summary names every file (xdvdfs "Failed to unpack
+                // image"), so callers and the CLI exit code see it.
+                if (mode == ExtractMode.Extract)
+                    unpackOptions?.ThrowIfFailed(name);
             }
         }
+
+        return 0;
     }
 
     /// <summary>

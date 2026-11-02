@@ -148,9 +148,9 @@ The engine uses thread-static scratch buffers, so independent operations on diff
 threads are safe. `CreateXiso`/`PackFromDirectory` resolve the source to absolute host
 paths and keep their progress state per call, so concurrent creates run independently
 and never change the process working directory; a caller-supplied `inRoot` is resolved
-once against the caller's CWD. The legacy `XisoReader.Extract` path still changes the
-working directory internally (like the C tool) and restores it; use
-`UnpackImage(..., IFilesystem)` for a CWD-free extraction.
+once against the caller's CWD. `Extract`/`UnpackImage` likewise resolve entry paths
+through a `LocalFilesystem` rooted at the output directory, so concurrent extracts are
+independent too; `UnpackImage(..., IFilesystem)` targets a custom store.
 
 **How do I suppress console output from the library?**
 

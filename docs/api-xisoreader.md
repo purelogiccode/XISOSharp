@@ -199,8 +199,8 @@ destination file already holding the same byte count untouched (logged as
 completes the missing files instead of redoing the finished ones. XISO stores no
 per-file timestamps, so **size is the identity signal**: a same-size file is assumed
 to be a complete earlier write, while a missing or short file (a torn write) is
-rewritten. Cancellation is honored per entry (`OperationCanceledException`), and the
-process working directory is restored even when the run aborts.
+rewritten. Cancellation is honored per entry (`OperationCanceledException`), and
+extraction never changes the process working directory, even when the run aborts.
 
 When `ContinueOnError` is set, a per-file failure (uncreatable destination,
 truncated data, failed write) is recorded and skipped instead of aborting;

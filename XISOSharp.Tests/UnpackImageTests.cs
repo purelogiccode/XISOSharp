@@ -238,11 +238,140 @@ public class UnpackImageTests : IDisposable
 
         // A small invalid file is too short to probe the XGD offsets, so verification
         // fails with IOException; a full-size invalid image fails with XisoFormatException.
-        // The working directory must be left unchanged (verification precedes the chdir).
+        // The working directory must be left unchanged (extraction never changes it).
         string originalCwd = Directory.GetCurrentDirectory();
         Exception? ex = Record.Exception(() => XisoReader.UnpackImage(junkFile));
         Assert.True(ex is XisoFormatException or IOException,
             $"Expected XisoFormatException or IOException, got {(ex == null ? "no exception" : ex.GetType().Name)}");
         Assert.Equal(originalCwd, Directory.GetCurrentDirectory());
+    }
+
+    [Fact]
+    public void Extract_WithOutputPath_NeverChangesWorkingDirectory()
+    {
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string workDir = CreateTempDir();
+        string dest = Path.Combine(workDir, "out");
+
+        string originalCwd = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(workDir);
+
+            int result = XisoReader.Extract(isoPath, dest, llCompat: false);
+
+            Assert.Equal(0, result);
+            Assert.Equal(Path.GetFullPath(workDir), Directory.GetCurrentDirectory());
+            Assert.Equal(HashTree(src), HashTree(dest));
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(originalCwd);
+        }
+    }
+
+    [Fact]
+    public void Extract_WithoutOutputPath_NeverChangesWorkingDirectory()
+    {
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string workDir = CreateTempDir();
+
+        string originalCwd = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(workDir);
+
+            int result = XisoReader.Extract(isoPath, null, llCompat: false);
+
+            Assert.Equal(0, result);
+            Assert.Equal(Path.GetFullPath(workDir), Directory.GetCurrentDirectory());
+            Assert.Equal(HashTree(src), HashTree(Path.Combine(workDir, "game")));
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(originalCwd);
+        }
+    }
+
+    [Fact]
+    public void Extract_ConcurrentRuns_DoNotRaceOnWorkingDirectoryOrOutput()
+    {
+        // The legacy chdir walk made two simultaneous extracts share (and restore)
+        // one process-wide CWD. Extraction now resolves against a rooted
+        // LocalFilesystem, so parallel runs stay independent.
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string workDir = CreateTempDir();
+        string first = Path.Combine(workDir, "first");
+        string second = Path.Combine(workDir, "second");
+
+        string originalCwd = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(workDir);
+            Logger.Quiet = true;
+
+            int[] results = new int[2];
+            Parallel.Invoke(
+                () => results[0] = XisoReader.Extract(isoPath, first, llCompat: false),
+                () => results[1] = XisoReader.Extract(isoPath, second, llCompat: false));
+
+            Assert.All(results, result => Assert.Equal(0, result));
+            Assert.Equal(Path.GetFullPath(workDir), Directory.GetCurrentDirectory());
+            Assert.Equal(HashTree(src), HashTree(first));
+            Assert.Equal(HashTree(src), HashTree(second));
+        }
+        finally
+        {
+            Logger.Quiet = false;
+            Directory.SetCurrentDirectory(originalCwd);
+        }
+    }
+
+    private sealed class CallbackProgress(Action<ProgressInfo> callback) : IProgress<ProgressInfo>
+    {
+        public void Report(ProgressInfo value) => callback(value);
+    }
+
+    [Fact]
+    public void Extract_RelativeDestination_IsNotRedirectedByMidRunCwdChange()
+    {
+        // The destination root is captured as an absolute path before the walk,
+        // so a caller (or another thread) changing the process CWD mid-extract
+        // cannot redirect the remaining files into a different directory.
+        string src = CreateSourceTree();
+        string isoPath = CreateIso(src, "game.iso");
+        string workDir = CreateTempDir();
+        string other = CreateTempDir();
+        string expected = Path.Combine(workDir, "out");
+
+        string originalCwd = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(workDir);
+            bool moved = false;
+            CallbackProgress progress = new(info =>
+            {
+                if (!moved && info.Type == ProgressInfoType.FileProgress)
+                {
+                    moved = true;
+                    Directory.SetCurrentDirectory(other);
+                }
+            });
+
+            int result = XisoReader.Extract(isoPath, "out", llCompat: false, progress: progress);
+
+            Assert.Equal(0, result);
+            Assert.True(moved, "expected at least one file-progress event");
+            Assert.Equal(HashTree(src), HashTree(expected));
+            Assert.False(Directory.Exists(Path.Combine(other, "out")),
+                "later files must stay under the captured destination root");
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(originalCwd);
+        }
     }
 }

@@ -314,7 +314,7 @@ Paths are destination-root-relative, forward-slash separated, case-insensitive
 
 | Implementation | Behavior |
 |---|---|
-| `LocalFilesystem(string? root = null)` | Local disk under `root` (cwd-relative when `null`, matching the legacy unpack). `static LocalFilesystem Instance` is the shared cwd-relative instance. File creation matches the reader's direct path (`FileMode.Create`, 64 KiB buffered, no sharing, `SequentialScan`); a known `expectedLength` is applied with `SetLength` before the first write. Parent directories are **not** auto-created |
+| `LocalFilesystem(string? root = null)` | Local disk under `root` (cwd-relative when `null`). `static LocalFilesystem Instance` is the shared cwd-relative instance. File creation matches the reader's direct path (`FileMode.Create`, 64 KiB buffered, no sharing, `SequentialScan`); a known `expectedLength` is applied with `SetLength` before the first write. Parent directories are **not** auto-created |
 | `MemoryFilesystem` | In-process memory: files are byte snapshots committed when the unpack closes each stream (visible to `FileExists`/`FileLength`/`ReadAllBytes`/`FileNames` immediately after). Re-creating a file truncates it; a known `expectedLength` preallocates the buffer; parent directories are materialized automatically. `ReadAllBytes(path)`, `FileNames`, `DirectoryNames` for inspection |
 | custom | Zip archives, network uploads, GUI preview panes — implement the members (the `DeleteFile` default may stay a no-op) |
 
