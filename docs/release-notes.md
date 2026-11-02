@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Dependencies
+
+- `CCISharp` 1.0.1: the CCI reader now rejects oversized or hostile indexes
+  with `InvalidIndex` instead of allocating a buffer sized by the part file.
+  No API change.
+
 ### Packaging
 
 - The CLI is no longer published as a NuGet dotnet tool (`XISOSharp.Tool`).
