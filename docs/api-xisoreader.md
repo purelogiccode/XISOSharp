@@ -49,6 +49,9 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 | `ComputeFileHash` | Hash one file (MD5/SHA-256/… via `HashAlgorithmName`) |
 | `ComputeDirectoryHashes` | Hash every file under a path |
 | `GetXexInfo` | Parse the Xbox 360 XEX2 header of a `.xex` file |
+| `GetXbeInfo` | Parse the original-Xbox XBEH header + certificate of a `.xbe` file |
+| `GodHeader.TryReadTitle` | Read GOD/SVOD `XContent` title metadata (separate `GodHeader` class) |
+| `StfsHeader.TryReadTitle` | Read single-file XBLA/XBLIG STFS `XContent` title metadata (separate `StfsHeader` class) |
 | `AuditXiso` | Deep integrity audit |
 | `Repair` | Fix safely-patchable issues in place (`.old` backup, dry-run) |
 | `Salvage` | Rebuild a readable image from a corrupt one (repack + re-audit) |
@@ -491,6 +494,42 @@ out-of-range, below-base, and truncated certificates return `null` instead of
 reading out of bounds. Returns `null` when the path does not exist, points to
 a directory, or the file is not an XBEH executable. The CLI exposes this as
 `--xbe-info`; `XisoExplorer` has a matching `GetXbeInfo` method.
+
+## GOD header title metadata (`GodHeader`)
+
+```csharp
+public static bool IsGodContainer(string path)
+public static bool TryReadTitle(string path, out GodTitleInfo? info)
+public static GodTitleInfo? ReadTitle(string path)
+```
+
+Reads the plaintext `XContent` header of a Games-on-Demand (GOD/SVOD)
+container without mounting it. `path` may be the header file or its
+`<header>.data` directory. The parser validates the CON/LIVE/PIRS signature
+and the GOD/NXE content type, then reads the title ID (`0x360`), disc
+number/count (`0x366`/`0x367`) and UTF-16BE title name (`0x411`, 0x80 bytes).
+Names are sanitised for FATX (non-ASCII/control characters removed,
+`\/:*?"<>|` replaced with `_`) and fall back to the 8-digit hex title ID when
+empty. `GodTitleInfo` carries `HeaderPath`, `TitleName`, `TitleId`,
+`TitleIdHex`, `DiscNumber` and `DiscCount`. The CLI exposes this as
+`title-info <header-or-.data-folder> [--json]`; full read-only GOD sector input
+through `StfsSharp` is planned for 1.7.0.
+
+## Single-file STFS package metadata (`StfsHeader`)
+
+```csharp
+public static bool IsStfsPackage(string path)
+public static bool TryReadTitle(string path, out StfsTitleInfo? info)
+public static StfsTitleInfo? ReadTitle(string path)
+```
+
+Reads the same XContent header from a single-file Xbox 360 STFS package:
+XBLA (content type `0x000D0000`) or XBLIG (`0x00000002`). These packages have
+no `<header>.data` directory, so the package file itself is passed. The parser
+returns `StfsTitleInfo` with `PackagePath`, `Kind` (`Xbla`/`Xblig`),
+`TitleName`, `TitleId`, `TitleIdHex`, `DiscNumber`, `DiscCount` and the raw
+`ContentType`. GOD/NXE containers are handled by `GodHeader`; full package
+listing/extraction remains future `StfsSharp` work.
 
 ## Checksum (SHA3-256)
 

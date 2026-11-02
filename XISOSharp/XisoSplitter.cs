@@ -24,10 +24,12 @@ namespace XISOSharp;
 public static class XisoSplitter
 {
     /// <summary>
-    /// Default maximum part size: the FATX 4 GiB file cap
-    /// (<c>0x100000000</c>, already a multiple of the 2048-byte sector).
+    /// Default maximum part size: the conservative FATX file-size cap
+    /// (<see cref="Constants.FatxMaxFileSize"/>, <c>0xFF000000</c> = 4 GiB −
+    /// 16 MiB, already a multiple of the 2048-byte sector). A part of exactly
+    /// 4 GiB is not representable by FATX, so the default stays below it.
     /// </summary>
-    public const long DefaultPartSizeBytes = 4294967296L;
+    public const long DefaultPartSizeBytes = Constants.FatxMaxFileSize;
 
     /// <summary>Length of the <c>.1.iso</c> part suffix, for base-name recovery.</summary>
     private const int PartSuffixLength = 6;

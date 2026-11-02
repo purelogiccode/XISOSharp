@@ -241,6 +241,241 @@ public sealed class CliBatchConvertTests : IDisposable
     }
 
     [Fact]
+    public void CompressBatch_DeleteSource_RequiresYes()
+    {
+        string work = CreateTempDir("xiso_cli_batch");
+        string isoDir = Path.Combine(work, "iso");
+        string iso = CreateIso(work, isoDir, "a");
+
+        using LogCapture capture = new();
+        int rc = Program.Main(
+            ["compress", "--batch", isoDir, "--ciso-split", "0", "--delete-source"]);
+
+        Assert.Equal(1, rc);
+        Assert.Contains("--delete-source requires -y", capture.Output, StringComparison.Ordinal);
+        Assert.True(File.Exists(iso));
+        Assert.False(File.Exists(Path.Combine(isoDir, "a.cso")));
+    }
+
+    [Fact]
+    public void CompressBatch_DeleteSource_WithNo_IsRejected()
+    {
+        string work = CreateTempDir("xiso_cli_batch");
+        string isoDir = Path.Combine(work, "iso");
+        string iso = CreateIso(work, isoDir, "a");
+
+        using LogCapture capture = new();
+        int rc = Program.Main(
+            ["compress", "--batch", isoDir, "--ciso-split", "0", "--delete-source", "-n"]);
+
+        Assert.Equal(1, rc);
+        Assert.Contains("cannot be combined with -n", capture.Output, StringComparison.Ordinal);
+        Assert.True(File.Exists(iso));
+        Assert.False(File.Exists(Path.Combine(isoDir, "a.cso")));
+    }
+
+    [Fact]
+    public void CompressBatch_DeleteSource_RefusesPlanThatClobbersInput()
+    {
+        string work = CreateTempDir("xiso_cli_batch");
+        string isoDir = Path.Combine(work, "iso");
+        string iso = CreateIso(work, isoDir, "a");
+        string xiso = Path.Combine(isoDir, "a.xiso");
+        File.Copy(iso, xiso);
+
+        using LogCapture capture = new();
+        int rc = Program.Main(
+            ["compress", "--batch", isoDir, "--ciso-split", "0", "--delete-source", "-y"]);
+
+        Assert.Equal(1, rc);
+        Assert.Contains("collide", capture.Output, StringComparison.OrdinalIgnoreCase);
+        Assert.True(File.Exists(iso));
+        Assert.True(File.Exists(xiso));
+        Assert.False(File.Exists(Path.Combine(isoDir, "a.cso")));
+    }
+
+    [Fact]
+    public void CompressBatch_DeleteSource_DeletesSourcesAfterSuccess()
+    {
+        string work = CreateTempDir("xiso_cli_batch");
+        string isoDir = Path.Combine(work, "iso");
+        string isoA = CreateIso(work, isoDir, "a");
+        string isoB = CreateIso(work, isoDir, "b");
+
+        using LogCapture capture = new();
+        Assert.Equal(0, Program.Main(
+            ["compress", "--batch", isoDir, "--ciso-split", "0", "--delete-source", "-y"]));
+
+        Assert.False(File.Exists(isoA));
+        Assert.False(File.Exists(isoB));
+        Assert.True(File.Exists(Path.Combine(isoDir, "a.cso")));
+        Assert.True(File.Exists(Path.Combine(isoDir, "b.cso")));
+        Assert.Contains("2 converted", capture.Output, StringComparison.Ordinal);
+        Assert.Contains("2 deleted", capture.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DecompressBatch_DeleteSource_KeepsSourceOnFailure()
+    {
+        string work = CreateTempDir("xiso_cli_batch");
+        string isoDir = Path.Combine(work, "iso");
+        string csoDir = Path.Combine(work, "cso");
+        string goodIso = CreateIso(work, isoDir, "good");
+
+        using (new LogCapture())
+        {
+            Assert.Equal(0, Program.Main(
+                ["compress", "--batch", isoDir, "--ciso-split", "0", "-y"]));
+        }
+
+        Directory.CreateDirectory(csoDir);
+        File.Move(Path.Combine(isoDir, "good.cso"), Path.Combine(csoDir, "good.cso"));
+        string badCso = Path.Combine(csoDir, "bad.cso");
+        File.WriteAllText(badCso, "not a ciso");
+        File.Delete(goodIso);
+
+        using LogCapture capture = new();
+        Assert.Equal(1, Program.Main(
+            ["decompress", "--batch", csoDir, "--delete-source",
+             "--continue-on-error", "-y"]));
+
+        Assert.False(File.Exists(Path.Combine(csoDir, "good.cso")));
+        Assert.True(File.Exists(badCso));
+        Assert.True(File.Exists(Path.Combine(csoDir, "good.iso")));
+        Assert.False(File.Exists(Path.Combine(csoDir, "bad.iso")));
+        Assert.Contains("1 converted", capture.Output, StringComparison.Ordinal);
+        Assert.Contains("1 failed", capture.Output, StringComparison.Ordinal);
+        Assert.Contains("1 deleted", capture.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DecompressBatch_DeleteSource_DeletesSplitCsoSet()
+    {
+        string work = CreateTempDir("xiso_cli_batch");
+        string isoDir = Path.Combine(work, "iso");
+        string csoDir = Path.Combine(work, "cso");
+        string iso = CreateLargeIso(work, isoDir, "large");
+
+        using (LogCapture capture = new())
+        {
+            Assert.Equal(0, Program.Main(
+                ["compress", "--batch", isoDir, "--ciso-split", "65536", "-y"]));
+            Assert.True(File.Exists(Path.Combine(isoDir, "large.1.cso")), capture.Output);
+            Assert.True(File.Exists(Path.Combine(isoDir, "large.2.cso")), capture.Output);
+        }
+
+        Directory.CreateDirectory(csoDir);
+        foreach (string part in Directory.GetFiles(isoDir, "large.*.cso"))
+            File.Move(part, Path.Combine(csoDir, Path.GetFileName(part)));
+        File.Delete(iso);
+
+        using (LogCapture capture = new())
+        {
+            Assert.Equal(0, Program.Main(
+                ["decompress", "--batch", csoDir, "--delete-source", "-y"]));
+            Assert.Contains("1 deleted", capture.Output, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(Path.Combine(csoDir, "large.1.cso")));
+        Assert.False(File.Exists(Path.Combine(csoDir, "large.2.cso")));
+        Assert.True(File.Exists(Path.Combine(csoDir, "large.iso")));
+    }
+
+    [Fact]
+    public void ConvertBatch_DeleteSource_DeletesZarAndBack()
+    {
+        string work = CreateTempDir("xiso_cli_batch");
+        string isoDir = Path.Combine(work, "iso");
+        string iso = CreateIso(work, isoDir, "game");
+
+        using (LogCapture capture = new())
+        {
+            Assert.Equal(0, Program.Main(
+                ["convert", "--batch", isoDir, "--format", "zar", "--delete-source", "-y"]));
+            Assert.Contains("1 deleted", capture.Output, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(iso));
+        Assert.True(File.Exists(Path.Combine(isoDir, "game.zar")));
+
+        string zarDir = Path.Combine(work, "zar");
+        Directory.CreateDirectory(zarDir);
+        File.Move(Path.Combine(isoDir, "game.zar"), Path.Combine(zarDir, "game.zar"));
+
+        using (LogCapture capture = new())
+        {
+            Assert.Equal(0, Program.Main(
+                ["convert", "--batch", zarDir, "--format", "iso", "--delete-source", "-y"]));
+            Assert.Contains("1 deleted", capture.Output, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(Path.Combine(zarDir, "game.zar")));
+        Assert.True(File.Exists(Path.Combine(zarDir, "game.iso")));
+    }
+
+    [Fact]
+    public void SplitBatch_DeleteSource_DeletesOriginalIso()
+    {
+        string work = CreateTempDir("xiso_cli_batch");
+        string isoDir = Path.Combine(work, "iso");
+        string iso = CreateIso(work, isoDir, "game");
+
+        using (LogCapture capture = new())
+        {
+            Assert.Equal(0, Program.Main(
+                ["split", "--batch", isoDir, "--size", "half", "--delete-source", "-y"]));
+            Assert.Contains("1 deleted", capture.Output, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(iso));
+        Assert.True(File.Exists(Path.Combine(isoDir, "game.1.iso")));
+        Assert.True(File.Exists(Path.Combine(isoDir, "game.2.iso")));
+    }
+
+    [Fact]
+    public void SourceFiles_ExpandsSplitSets()
+    {
+        string dir = CreateTempDir("xiso_cli_batch");
+        string iso1 = Path.Combine(dir, "game.1.iso");
+        string iso2 = Path.Combine(dir, "game.2.iso");
+        File.WriteAllText(iso1, "a");
+        File.WriteAllText(iso2, "b");
+        Assert.Equal(new[] { iso1, iso2 }, BatchConversion.SourceFiles(iso1));
+
+        string cso1 = Path.Combine(dir, "game.1.cso");
+        string cso2 = Path.Combine(dir, "game.2.cso");
+        File.WriteAllText(cso1, "a");
+        File.WriteAllText(cso2, "b");
+        Assert.Equal(new[] { cso1, cso2 }, BatchConversion.SourceFiles(cso1));
+
+        string cci1 = Path.Combine(dir, "game.1.cci");
+        string cci2 = Path.Combine(dir, "game.2.cci");
+        File.WriteAllText(cci1, "a");
+        File.WriteAllText(cci2, "b");
+        Assert.Equal(new[] { cci1, cci2 }, BatchConversion.SourceFiles(cci1));
+
+        string single = Path.Combine(dir, "single.iso");
+        Assert.Equal(new[] { single }, BatchConversion.SourceFiles(single));
+        string zar = Path.Combine(dir, "archive.1.zar");
+        Assert.Equal(new[] { zar }, BatchConversion.SourceFiles(zar));
+    }
+
+    private static string CreateLargeIso(string work, string isoDir, string name)
+    {
+        string src = Path.Combine(work, "src_large_" + name);
+        Directory.CreateDirectory(src);
+        byte[] data = new byte[300_000];
+        new Random(42).NextBytes(data);
+        File.WriteAllBytes(Path.Combine(src, "big.bin"), data);
+
+        Directory.CreateDirectory(isoDir);
+        Assert.Equal(0, XisoWriter.CreateXiso(src, isoDir, null, null,
+            out string? isoPath, name + ".iso", null));
+        Assert.NotNull(isoPath);
+        return isoPath;
+    }
+
+    [Fact]
     public void DecompressBatch_ContinueOnError_SkipsBadFileAndKeepsGoing()
     {
         string work = CreateTempDir("xiso_cli_batch");

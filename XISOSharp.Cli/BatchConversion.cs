@@ -20,6 +20,12 @@ internal sealed class BatchOptions
     /// <summary>Keep converting after a per-file failure and report the failures at the end.</summary>
     internal bool ContinueOnError { get; set; }
 
+    /// <summary>
+    /// Delete each source image after its conversion succeeds. Requires
+    /// <c>-y</c>/<c>--yes</c>; a split set deletes every part.
+    /// </summary>
+    internal bool DeleteSource { get; set; }
+
     /// <summary>Maximum conversions run in parallel (default 1).</summary>
     internal int Jobs { get; set; } = 1;
 
@@ -87,6 +93,12 @@ internal static class BatchConversion
             return true;
         }
 
+        if (string.Equals(a, "--delete-source", StringComparison.OrdinalIgnoreCase))
+        {
+            options.DeleteSource = true;
+            return true;
+        }
+
         if (string.Equals(a, "--jobs", StringComparison.OrdinalIgnoreCase))
         {
             if (i + 1 >= args.Length ||
@@ -134,6 +146,8 @@ internal static class BatchConversion
                 return "--skip-existing requires --batch <directory>";
             if (options.ContinueOnError)
                 return "--continue-on-error requires --batch <directory>";
+            if (options.DeleteSource)
+                return "--delete-source requires --batch <directory>";
             if (options.JobsSpecified)
                 return "--jobs requires --batch <directory>";
             if (options.OutputName != null)
@@ -321,6 +335,42 @@ internal static class BatchConversion
     }
 
     /// <summary>
+    /// Returns every file that belongs to a batch source. For a split set
+    /// (<c>game.1.iso</c>, <c>game.1.cso</c>, <c>game.1.cci</c>) this is every
+    /// contiguous part starting at 1; otherwise it is just the source file.
+    /// Used by <c>--delete-source</c> so a completed conversion removes the
+    /// whole set, not only its first part.
+    /// </summary>
+    internal static IReadOnlyList<string> SourceFiles(string source)
+    {
+        string full = Path.GetFullPath(source);
+        string extension = Path.GetExtension(full);
+        if (GetSplitPart(full) <= 0)
+            return [full];
+
+        string stem = Path.GetFileNameWithoutExtension(full);
+        int dot = stem.LastIndexOf('.');
+        if (dot <= 0)
+            return [full];
+
+        string baseName = stem[..dot];
+        string directory = Path.GetDirectoryName(full) ?? string.Empty;
+        List<string> files = [];
+        for (int part = 1; part <= 999; part++)
+        {
+            string candidate = Path.Combine(
+                directory,
+                string.Concat(baseName, ".", part.ToString(CultureInfo.InvariantCulture), extension));
+            if (!File.Exists(candidate))
+                break;
+
+            files.Add(candidate);
+        }
+
+        return files.Count > 0 ? files : [full];
+    }
+
+    /// <summary>
     /// Computes the part paths a split of <paramref name="isoPath"/> would
     /// write. Returns an empty list when the source cannot be probed; the
     /// split call itself then reports the real error.
@@ -385,11 +435,18 @@ internal static class BatchConversion
         Func<string, string, int> worker,
         Func<string, string, string?>? guard = null)
     {
+        if (options.DeleteSource && (options.AssumeNo || !options.AssumeYes))
+        {
+            Logger.LogErr("Error: --delete-source requires -y/--yes and cannot be combined with -n/--no\n");
+            return 1;
+        }
+
         Logger.Log($"batch {verb}: {sources.Count} file(s) from {options.Directory}" +
                    $"{(options.Recursive ? " (recursive)" : "")}\n");
 
         HashSet<string> sourceSet = new(sources, StringComparer.OrdinalIgnoreCase);
         HashSet<string> seenOutputs = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> targetSet = new(StringComparer.OrdinalIgnoreCase);
         List<BatchItem> plan = new(sources.Count);
 
         foreach (string source in sources)
@@ -424,14 +481,35 @@ internal static class BatchConversion
                                   "choose another name\n");
                     return 1;
                 }
+
+                targetSet.Add(Path.GetFullPath(target));
             }
 
             plan.Add(new BatchItem(source, output));
         }
 
+        if (options.DeleteSource)
+        {
+            // Never delete an input that another item writes. The planning
+            // checks above already reject such plans; this is the final guard.
+            foreach (string source in sources)
+            {
+                foreach (string sourceFile in SourceFiles(source))
+                {
+                    if (targetSet.Contains(sourceFile))
+                    {
+                        Logger.LogErr($"Error: {verb} cannot delete source {sourceFile}; " +
+                                      "it is also a batch output\n");
+                        return 1;
+                    }
+                }
+            }
+        }
+
         int converted = 0;
         int skipped = 0;
         int failed = 0;
+        int deleted = 0;
         List<BatchItem> ready = new(plan.Count);
 
         foreach (BatchItem item in plan)
@@ -537,7 +615,10 @@ internal static class BatchConversion
             }
         }
 
-        Logger.Log($"batch {verb}: {converted} converted, {skipped} skipped, {failed} failed\n");
+        string summary = $"batch {verb}: {converted} converted, {skipped} skipped, {failed} failed";
+        if (options.DeleteSource)
+            summary += $", {deleted} deleted";
+        Logger.Log(summary + "\n");
         return failed == 0 ? 0 : 1;
 
         int Execute(BatchItem item)
@@ -549,22 +630,61 @@ internal static class BatchConversion
                     Directory.CreateDirectory(outputDirectory);
 
                 int rc = worker(item.Source, item.Output);
-                if (rc == 0)
+                if (rc != 0)
                 {
-                    Logger.Log($"{verb}: {Path.GetFileName(item.Source)} -> " +
-                               $"{Path.GetFileName(item.Output)} [OK]\n");
-                    return 0;
+                    Logger.LogErr($"{verb}: {Path.GetFileName(item.Source)} [FAIL] exit code {rc}\n");
+                    DeleteFailedOutputs(item);
+                    return 1;
                 }
 
-                Logger.LogErr($"{verb}: {Path.GetFileName(item.Source)} [FAIL] exit code {rc}\n");
-                DeleteFailedOutputs(item);
-                return 1;
+                if (options.DeleteSource && !TryDeleteSource(item.Source, out string? deleteError))
+                {
+                    Logger.LogErr($"{verb}: {Path.GetFileName(item.Source)} [FAIL] converted but " +
+                                  $"could not delete source: {deleteError}\n");
+                    return 1;
+                }
+
+                Logger.Log($"{verb}: {Path.GetFileName(item.Source)} -> " +
+                           $"{Path.GetFileName(item.Output)} [OK]\n");
+                return 0;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Logger.LogErr($"{verb}: {Path.GetFileName(item.Source)} [FAIL] {ex.Message}\n");
                 DeleteFailedOutputs(item);
                 return 1;
+            }
+        }
+
+        bool TryDeleteSource(string source, out string? error)
+        {
+            error = null;
+            try
+            {
+                IReadOnlyList<string> files = SourceFiles(source);
+                foreach (string file in files)
+                {
+                    if (targetSet.Contains(file))
+                    {
+                        error = $"{file} is also a batch output";
+                        return false;
+                    }
+                }
+
+                foreach (string file in files)
+                {
+                    if (File.Exists(file))
+                        File.Delete(file);
+                }
+
+                Interlocked.Increment(ref deleted);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or
+                                           ArgumentException or NotSupportedException)
+            {
+                error = ex.Message;
+                return false;
             }
         }
 

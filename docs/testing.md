@@ -61,6 +61,10 @@ Highlights:
 | Destination filesystems (`IFilesystem`, `LocalFilesystem`, `MemoryFilesystem`, generic `UnpackImage` parity) | `XisoFilesystemTests.cs` |
 | Image explorer (`XisoExplorer` load/navigate/copy-out/hash/XEX/path helpers) | `XisoExplorerTests.cs` |
 | Image splitting (`XisoSplitter` split/halves/join, alignment, guards, CLI verbs) | `XisoSplitTests.cs` |
+| FATX-safe split default and explicit over-cap warning | `XisoSplitTests.cs` |
+| Batch `--delete-source` (success/failure, `-y`/`-n`, split sets, summary) | `CliBatchConvertTests.cs` |
+| GOD header title metadata (`GodHeader`, `title-info` text/JSON) | `GodHeaderTests.cs` |
+| Single-file XBLA/XBLIG STFS header metadata (`StfsHeader`, text/JSON) | `StfsHeaderTests.cs` |
 | Explicit sector-layout packing (`XisoLayoutSpec` JSON/text, fixed extents, first-fit, CLI/build-image) | `LayoutPackingTests.cs` |
 | CISO compress/decompress, split parts, `.cso` auto-detect | `CisoTests.cs`, `CisoAutoDetectTests.cs` |
 | Golden interop vs reference `xdvdfs-cli 0.8.3` (both directions, split layout) | `CisoSplitInteropTests.cs` |

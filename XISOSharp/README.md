@@ -325,7 +325,7 @@ outputs are removed on failure/cancel.
 ```csharp
 public static class XisoSplitter
 {
-    public const long DefaultPartSizeBytes = 4294967296L; // FATX 4 GiB cap
+    public const long DefaultPartSizeBytes = Constants.FatxMaxFileSize; // 0xFF000000 (4 GiB - 16 MiB)
     public static IReadOnlyList<string> Split(string isoPath, string outputBase, long partSizeBytes,
         CancellationToken cancellationToken = default, IProgress<ProgressInfo>? progress = null);
     public static IReadOnlyList<string> SplitHalves(string isoPath, string outputBase,
@@ -343,6 +343,54 @@ public static class XisoSplitter
 var parts = XisoReader.SplitXiso("game.iso", "game", XisoSplitter.DefaultPartSizeBytes);
 XisoReader.JoinSplitXiso(parts[0], "rejoined.iso");
 ```
+
+#### GOD header title metadata (`GodHeader`)
+
+A GOD/SVOD container is a header file beside a `<header>.data` directory. The
+plaintext `XContent` header carries the title name, title ID and disc
+number/count, so `title-info` can report them without mounting the container.
+Names are sanitised for FATX (ASCII, path-safe characters) and fall back to the
+hex title ID when empty.
+
+```csharp
+public static class GodHeader
+{
+    public static bool IsGodContainer(string path);
+    public static bool TryReadTitle(string path, out GodTitleInfo? info);
+    public static GodTitleInfo? ReadTitle(string path);
+}
+
+public sealed record GodTitleInfo(
+    string HeaderPath, string TitleName, uint TitleId, string TitleIdHex,
+    byte DiscNumber, byte DiscCount);
+```
+
+`path` may be the header file or its `.data` directory. Full read-only GOD
+sector input through `StfsSharp` is planned for 1.7.0.
+
+#### Single-file STFS package metadata (`StfsHeader`)
+
+XBLA and XBLIG downloads are single-file STFS packages, not GOD containers:
+they have no `.data` directory. The package file itself starts with the same
+XContent header, so `StfsHeader` reads the same title fields.
+
+```csharp
+public static class StfsHeader
+{
+    public static bool IsStfsPackage(string path);
+    public static bool TryReadTitle(string path, out StfsTitleInfo? info);
+    public static StfsTitleInfo? ReadTitle(string path);
+}
+
+public enum StfsPackageKind { Xbla, Xblig }
+
+public sealed record StfsTitleInfo(
+    string PackagePath, StfsPackageKind Kind, string TitleName, uint TitleId,
+    string TitleIdHex, byte DiscNumber, byte DiscCount, uint ContentType);
+```
+
+Supported content types are XBLA `0x000D0000` and XBLIG `0x00000002`. Full
+package listing/extraction remains future `StfsSharp` work.
 
 #### `VerifyXiso`
 

@@ -13,12 +13,17 @@ Xbox container. This page lists deliberate boundaries and current workarounds.
 
 ## Scope
 
-XISO/XDVDFS, Redump full-disc images, split ISO, CISO/CSO, CCI/CCIM, ZAR and
-XBE/XEX **read-only** metadata are in scope.
+XISO/XDVDFS, Redump full-disc images, split ISO, CISO/CSO, CCI/CCIM, ZAR,
+GOD and single-file XBLA/XBLIG header title metadata, and XBE/XEX **read-only**
+metadata are in scope.
 
 Deliberately out of scope:
 
-- GOD/STFS/CON (Xbox 360 Games-on-Demand) containers
+- GOD/STFS/CON (Xbox 360 Games-on-Demand) sector input. `title-info` reads a
+  GOD header or its `.data` folder, and single-file XBLA/XBLIG STFS package
+  headers, for title name/ID/disc metadata; full read-only GOD input through
+  `StfsSharp` is planned for 1.7.0, and full XBLA/XBLIG package listing remains
+  future work.
 - CHD containers
 - XEX decryption or XBE editing
 - FUSE/Dokan mounting (see SimpleXisoDrive)
@@ -68,6 +73,8 @@ device names (`CON`, `NUL`, `COM1`…). The OS must still have long paths enable
 - The test suite runs on Windows, Linux and macOS. The WPF `XISOSharpTester`
   harness only runs on Windows (it builds everywhere).
 - The per-file size field is 32-bit, so a single file cannot exceed ~4 GiB.
+  Plain-ISO `split` defaults to `0xFF000000` (4 GiB − 16 MiB) so parts fit FATX;
+  CISO/CCI keep `0xffbf6000` as their xdvdfs-compatible compression default.
 
 ## Distribution
 

@@ -70,6 +70,39 @@ public class XisoSplitTests : IDisposable
     private static string Sha(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
 
     [Fact]
+    public void DefaultPartSize_IsFatxSafe()
+    {
+        Assert.Equal(Constants.FatxMaxFileSize, XisoSplitter.DefaultPartSizeBytes);
+        Assert.True(XisoSplitter.DefaultPartSizeBytes < 1L << 32);
+        Assert.Equal(0, XisoSplitter.DefaultPartSizeBytes % Sector);
+    }
+
+    [Fact]
+    public void CliSplit_ExplicitSizeAboveFatxCap_WarnsAndSplits()
+    {
+        string iso = CreateSplitIso();
+        string work = CreateTempDir("xiso_split_work");
+        TextWriter originalError = Logger.Error;
+        StringWriter error = new();
+        try
+        {
+            Logger.Error = error;
+            Assert.Equal(0, Program.Main(
+            [
+                "split", "--size", "4294967296", "--output", Path.Combine(work, "game"), iso, "-y"
+            ]));
+        }
+        finally
+        {
+            Logger.Error = originalError;
+        }
+
+        Assert.Contains("Warning", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("FATX", error.ToString(), StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(work, "game.1.iso")));
+    }
+
+    [Fact]
     public void Split_Join_RoundTrip_ByteIdentical()
     {
         string iso = CreateSplitIso();

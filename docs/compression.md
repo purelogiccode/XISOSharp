@@ -68,7 +68,9 @@ byte for byte; `Decompress` implements the LZ4 block specification and decodes a
 Like `xdvdfs compress` (which always writes through `ciso::split::SplitOutput`), `compress` splits
 output at `0xffbf6000` (~4 GiB, `CisoWriter.DefaultSplitPoint`) into `<base>.1.cso`,
 `<base>.2.cso`, … parts. `--ciso-split <bytes>` overrides the split point; `--ciso-split 0` writes a
-single `.cso`.
+single `.cso`. This is a compression-format default, not a FATX-safe limit: plain-ISO `split`
+defaults to the more conservative `Constants.FatxMaxFileSize` (`0xFF000000`, 4 GiB − 16 MiB) so
+its parts fit FATX, while CISO/CCI keep `0xffbf6000` for xdvdfs byte parity.
 
 Format detail (`ciso::split` parity): each write that starts before the split point is written whole
 into the current part **at its absolute (global) position**, so part `k` is a sparse file whose data

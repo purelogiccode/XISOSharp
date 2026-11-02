@@ -4616,6 +4616,63 @@ internal static class Program
 
         try
         {
+            if (GodHeader.IsGodContainer(positionals[0]))
+            {
+                if (!GodHeader.TryReadTitle(positionals[0], out GodTitleInfo? god))
+                {
+                    Logger.LogErr($"Error: {positionals[0]} is a GOD container but its XContent " +
+                                  "header has no readable title block\n");
+                    return 1;
+                }
+
+                if (json)
+                {
+                    WriteJson(new JsonGodTitleInfo(1, "title-info", positionals[0], "god",
+                        god.HeaderPath, god.TitleName, god.TitleId, god.TitleIdHex,
+                        god.DiscNumber, god.DiscCount));
+                }
+                else
+                {
+                    Logger.Log($"Title:          {god.TitleName}\n");
+                    Logger.Log($"Title ID:       {god.TitleIdHex}\n");
+                    Logger.Log($"Disc number:    {god.DiscNumber}\n");
+                    Logger.Log($"Disc count:     {god.DiscCount}\n");
+                    Logger.Log($"GOD header:     {god.HeaderPath}\n");
+                }
+
+                return 0;
+            }
+
+            if (StfsHeader.TryReadTitle(positionals[0], out StfsTitleInfo? stfs))
+            {
+                string kind = stfs.Kind == StfsPackageKind.Xbla ? "xbla" : "xblig";
+                if (json)
+                {
+                    WriteJson(new JsonStfsTitleInfo(1, "title-info", positionals[0], kind,
+                        stfs.PackagePath, stfs.TitleName, stfs.TitleId, stfs.TitleIdHex,
+                        stfs.DiscNumber, stfs.DiscCount, stfs.ContentType));
+                }
+                else
+                {
+                    Logger.Log($"Title:          {stfs.TitleName}\n");
+                    Logger.Log($"Title ID:       {stfs.TitleIdHex}\n");
+                    Logger.Log($"Disc number:    {stfs.DiscNumber}\n");
+                    Logger.Log($"Disc count:     {stfs.DiscCount}\n");
+                    Logger.Log($"Package:        {kind.ToUpperInvariant()}\n");
+                    Logger.Log($"Package path:   {stfs.PackagePath}\n");
+                    Logger.Log($"Content type:   0x{stfs.ContentType:X8}\n");
+                }
+
+                return 0;
+            }
+
+            if (StfsHeader.IsStfsPackage(positionals[0]))
+            {
+                Logger.LogErr($"Error: {positionals[0]} is an STFS package but its XContent " +
+                              "header has no readable title block\n");
+                return 1;
+            }
+
             TitleInfo? title = XisoReader.GetTitleInfo(positionals[0]);
             if (title is null)
             {
@@ -4985,6 +5042,13 @@ internal static class Program
             {
                 Logger.LogErr($"Error: --size must be at least one sector ({Constants.SectorSize} bytes)\n");
                 return 1;
+            }
+
+            if (!halves && partSize > Constants.FatxMaxFileSize)
+            {
+                Logger.LogErr($"Warning: --size {partSize:N0} exceeds the conservative FATX " +
+                              $"file-size cap ({Constants.FatxMaxFileSize:N0} bytes); " +
+                              "FATX targets cannot store parts this large\n");
             }
         }
 
@@ -6339,9 +6403,9 @@ internal static class Program
                                                        hash <image> [images...] [--json]  Full-image CRC32/MD5/SHA-1/SHA-256/SHA3-256 in one pass.
                                                        verify-hashes <image> <hash-file> [--ignore-extra] [--json]
                                                                              Verify a --petrify/XboxKit .hash sidecar against the image.
-                                                       title-info <image> [--json]  Find the root default.xbe and report title name, title ID, region, disc, version.
+                                                       title-info <image> [--json]  Find the root default.xbe (or a GOD header) and report title name, title ID, region, disc, version.
                                                        split <image> [images...] [--size <bytes|half>] [--output <base>] [--batch <dir>]  Split ISO into sector-aligned
-                                                                             .1.iso/.2.iso… parts (default size 4G FATX cap; 'half' splits in two).
+                                                                             .1.iso/.2.iso… parts (default 0xFF000000 = 4 GiB − 16 MiB FATX cap; 'half' splits in two).
                                                        join <first.1.iso> [...] [--output <file>]  Reassemble split parts (output validated as XISO).
                                                        convert <src.zar|src.iso> <out.iso|out.zar>  Convert ZArchive to ISO (extract + repack)
                                                                              or ISO to ZArchive. Existing outputs follow -y/-n.
@@ -6351,6 +6415,8 @@ internal static class Program
                                                        --skip-existing      With --batch, skip sources whose output exists.
                                                        --continue-on-error  With --batch, keep going after a failed file
                                                                             and exit 1 after the summary.
+                                                       --delete-source      With --batch and -y, delete each source after a
+                                                                            successful conversion (split sets: every part).
                                                        --jobs <n>           With --batch, run up to <n> conversions in
                                                                             parallel (1..64; default 1).
                                                        --output-name <t>    With --batch, name outputs from a template:

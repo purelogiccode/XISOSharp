@@ -1,3 +1,20 @@
+# What's New in 1.6.0 (unreleased)
+
+XISOSharp 1.6.0 is the Phase 10 Tier A release (A3–A5 are implemented; A1/A2 are pending).
+
+- **GOD title metadata**: `title-info` reads a GOD header or its `.data`
+  folder and reports title name, title ID, disc number and disc count without
+  mounting the container (`GodHeader`/`GodTitleInfo`).
+- **XBLA/XBLIG header metadata**: `StfsHeader`/`StfsTitleInfo` read the same
+  fields from single-file XBLA/XBLIG STFS packages, which have no `.data`
+  folder.
+- **FATX-safe split default**: plain-ISO splits now default to
+  `Constants.FatxMaxFileSize` (`0xFF000000`, 4 GiB − 16 MiB); an explicit
+  larger `--size` warns.
+- **`--delete-source`**: batch `compress`/`decompress`/`convert`/`split` can
+  delete each source after a successful conversion (requires `-y`; split sets
+  delete every part; the summary reports the count).
+
 # What's New in 1.5.0
 
 XISOSharp 1.5.0 is the first public release since 1.4.4 and merges the

@@ -120,7 +120,7 @@ reproducible or re-downloadable. Never delete them.
      `202609111233`), not `v2.7.1`. Never change the on-disk optimized tag
      `in!xiso!2.7.1 (01.11.14)` or `Constants.ExisoVersion`.
 2. Run the full suite: `dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release`
-   (currently 1979 passed / 1 skipped on net8.0/net9.0 and 2043 passed / 1 skipped on
+   (currently 2002 passed / 1 skipped on net8.0/net9.0 and 2066 passed / 1 skipped on
    net10.0 — net10.0 adds the GUI-helper tests).
 3. Commit + push `master` (only when the user asks), then tag and push:
    `git tag <version> && git push origin <version>`.

@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Library
+
+- **FATX-safe split default**: `Constants.FatxMaxFileSize` (`0xFF000000`,
+  4 GiB − 16 MiB) is now the default maximum part size for plain-ISO splits.
+  An explicit `--size` above it is still honoured with a warning. CISO/CCI keep
+  their `0xffbf6000` xdvdfs-compatible compression default.
+- **GOD title metadata**: `GodHeader`/`GodTitleInfo` read the plaintext
+  `XContent` header of a GOD/SVOD container (title name, title ID, disc
+  number/count) without mounting it. Names are sanitised for FATX and fall back
+  to the hex title ID when empty.
+- **XBLA/XBLIG header metadata**: `StfsHeader`/`StfsTitleInfo` read the same
+  XContent fields from single-file Xbox 360 STFS packages (XBLA `0x000D0000`,
+  XBLIG `0x00000002`), which have no `.data` directory.
+
+### CLI
+
+- **`title-info`** accepts a GOD header or its `.data` folder, a single-file
+  XBLA/XBLIG STFS package, or an XISO image's `default.xbe` and reports the
+  available title name, title ID, disc and version fields in text and `--json`
+  form.
+- **`--delete-source`** on batch `compress`, `decompress`, `convert` and
+  `split`: deletes each source only after a successful conversion, requires
+  `-y`/`--yes` (refused with `-n`/`--no`), removes every part of a split set,
+  and reports the deleted count in the batch summary.
+- `split` warns when an explicit `--size` exceeds the conservative FATX cap.
+
 ### Dependencies
 
 - `CCISharp` 1.0.1: the CCI reader now rejects oversized or hostile indexes
@@ -43,7 +69,7 @@ net8.0/net9.0** and **2043 passed / 1 opt-in skip (2044) on net10.0**.
   rejection/sanitization, ZAR extraction byte/entry caps, CISO malformed-index
   and alignment validation (found by the new mutation fuzzer).
 - **Quality gates**: 3-OS test matrix, `dotnet format` gate, AOT publish smoke,
-  mutation fuzz job, 75% line / 60% branch coverage floors, package validation
+  mutation fuzz job, 70% line / 60% branch coverage floors, package validation
   against 1.4.4 with a reviewed suppression baseline.
 - **Packaging**: `XISOSharp.Tool` dotnet tool, SBOM + build provenance on
   releases, community files and a console sample.

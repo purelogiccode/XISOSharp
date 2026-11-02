@@ -16,7 +16,12 @@ namespace XISOSharp;
 /// </remarks>
 public static class XisoCci
 {
-    /// <summary>Default split point used by CCI output (~4 GiB, below the FATX per-file cap).</summary>
+    /// <summary>
+    /// Default split point used by CCI output (<c>0xffbf6000</c>, ~4 GiB). This
+    /// is the xdvdfs/CCISharp compression default, not a FATX-safe limit: it is
+    /// below the 32-bit file-size field but above
+    /// <see cref="Constants.FatxMaxFileSize"/>.
+    /// </summary>
     public const long DefaultSplitBytes = CciFormat.DefaultSplitBytes;
 
     /// <summary>

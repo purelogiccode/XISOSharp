@@ -33,7 +33,9 @@ public static class CisoWriter
 
     /// <summary>
     /// Default split point for split output (<c>ciso::split::FILE_SPLIT_POINT</c>, ~4 GiB) —
-    /// the threshold modern <c>xdvdfs compress</c> always writes through.
+    /// the threshold modern <c>xdvdfs compress</c> always writes through. This is
+    /// a compression-format default, not a FATX-safe limit: it stays below the
+    /// 32-bit file-size field but above <see cref="Constants.FatxMaxFileSize"/>.
     /// </summary>
     public const long DefaultSplitPoint = 0xffbf6000;
 

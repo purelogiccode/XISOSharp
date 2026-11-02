@@ -114,7 +114,8 @@ printed and the tool exits 1.
 | `-r` | Rewrite as optimized ISO (byte-identical to `extract-xiso -r`) |
 | `validate <src> <out>` | Validate conversion between two images (+ `--validate*` flags; mismatch exits 2). Both sides accept ISO, CISO/CCI (single or split), split ISO sets and `.zar` |
 | `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum (`--silent` → hex only) |
-| `split` / `join` (`joinsplit`) | Split into `<base>.1.iso`… parts / reassemble (`--size`, `--output`, `--batch`) |
+| `title-info <image> [--json]` | Root `default.xbe` title metadata (name, ID, region, disc, version); a GOD header or its `.data` folder, or a single-file XBLA/XBLIG STFS package, reports `XContent` name/ID/disc metadata |
+| `split` / `join` (`joinsplit`) | Split into `<base>.1.iso`… parts / reassemble (`--size`, `--output`, `--batch`; default size `0xFF000000`, 4 GiB − 16 MiB) |
 | `--filetime <image>` / `--set-filetime <image> <value>` | Show / set the FILETIME volume field |
 | `--sector-layout <image>` | Full sector map: volume summary, per-file extents, used/free ranges |
 | `--ranges <image>` | System (bone) vs file sector ranges (inclusive spans) |
@@ -149,6 +150,7 @@ printed and the tool exits 1.
 | `--file-time <value>` | Fixed volume FILETIME on create/pack/build-image (ISO-8601, decimal, `0x` hex, `now`, `0` = deterministic) |
 | `--skip-existing` | Extract/unpack/copy-out: skip files already on disk with matching sizes (resume). Batch verbs: skip sources whose output exists |
 | `--continue-on-error` | Extract/unpack/copy-out: log per-file failures and continue (still exits non-zero). Batch verbs: keep converting after a failure |
+| `--delete-source` | Batch verbs only: delete each source after a successful conversion (requires `-y`; refused with `-n`; split sets delete every part) |
 | `--output-name <template>` | Batch verbs only: name outputs from `{name}`, `{ext}` and `{format}` (e.g. `"{name}.xiso.{format}"`) |
 | `--no-backup` | Skip the `<iso>.old` backup (copy-in/repair only) |
 | `--dry-run` | Preview `--repair` fixes without changing anything (repair only) |
@@ -238,6 +240,7 @@ XISOSharp decompress --batch ./compressed --skip-existing -y
 XISOSharp convert --batch ./isos --format zar -y
 XISOSharp split --batch ./isos --size half -y
 XISOSharp compress --batch ./isos --output-name "{name}.xiso.{format}" --jobs 4 -y
+XISOSharp compress --batch ./isos --delete-source -y   # delete sources after success
 
 # Machine-readable output (stdout JSON, stderr logs)
 XISOSharp -i --json game.iso

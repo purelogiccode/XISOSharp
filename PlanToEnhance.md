@@ -1,6 +1,6 @@
 # Plan to Enhance XISOSharp
 
-**Status:** CCISharp 1.0.1 published on NuGet (2026-11-01; 1.0.0 was the first release, 1.0.1 adds hostile-index hardening). XISOSharp 1.6.0 implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input (including `validate`/`--validate-checksums`), Phase 4 pathological-TOC traversal hardening (extract/list/rewrite plus the audit, sector-range, repair, salvage and ZAR follow-up walkers), Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests); follow-ups make CISO compression read split/container sources directly and harden ZAR extraction (depth bound, pre-sized exact copies, partial cleanup).
+**Status:** CCISharp 1.0.1 published on NuGet (2026-11-01; 1.0.0 was the first release, 1.0.1 adds hostile-index hardening). XISOSharp **1.5.0** (published 2026-11-01) implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input (including `validate`/`--validate-checksums`), Phase 4 pathological-TOC traversal hardening (extract/list/rewrite plus the audit, sector-range, repair, salvage and ZAR follow-up walkers), Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests); follow-ups make CISO compression read split/container sources directly and harden ZAR extraction (depth bound, pre-sized exact copies, partial cleanup). **Phase 10 Tier A is the 1.6.0 work in progress:** A3 (FATX cap), A4 (`--delete-source`) and A5 (GOD title naming, extended to single-file XBLA/XBLIG STFS package headers) are implemented; A1 (Xbox 360 title metadata) and A2 (XBE image assets) remain.
 **Baseline:** XISOSharp `1.4.4` (tag), extract-xiso build `202609111233`, xdvdfs `0.8.3`
 **Reference:** CCI spec/implementation copied to `References/libCCI-0.1.0-1b0087e` (commit `1b0087e`, GPL-2.0-or-later; reference only) and verified to build/round-trip.
 **CCISharp repo:** <https://github.com/purelogiccode/CCISharp> — package <https://www.nuget.org/packages/CCISharp/1.0.1>.
@@ -64,7 +64,7 @@ A full review of the upstream trackers — 56 extract-xiso issues, 54 extract-xi
 - `XISOSharp/XisoZarchive.cs` — `CreateZar`, `ListZar`, `ExtractZar` and `ConvertZarToIso`.
 - `XISOSharp/XisoPatcher.cs`, `SectorAllocator.cs`, `XisoValidator.cs`, `XisoChecksum.cs` — sector layout, copy-in, audit and SHA3-256 checksum already exist.
 - `XISOSharp.Cli/Program.cs` — `--batch` covers extract/list/tree/rewrite/audit and the container verbs (`compress`/`decompress`/`convert`/`split`); JSON only via `--validate-report` (Phase 6).
-- `XISOSharp.Tests` - current suite: 1946 passed / 1 opt-in skip on net8.0/net9.0; 2010 passed / 1 opt-in skip on net10.0.
+- `XISOSharp.Tests` - current suite: 2002 passed / 1 opt-in skip on net8.0/net9.0; 2066 passed / 1 opt-in skip on net10.0.
 
 ---
 
@@ -727,7 +727,7 @@ existing named error or report/drop gate.
 
 **Implementation (1.5.0):** `IFilesystem.CreateFile(path, expectedLength)` is an additive default interface member; `LocalFilesystem` opens with `FileOptions.SequentialScan` and calls `SetLength` before the first write, `MemoryFilesystem` preallocates its buffer, and custom stores keep the old behavior through the default member. `XisoReader.ExtractFile`/`CopyOutFile` pass the entry size, `XisoWriter` sizes the output to the exact post-layout extent before the data phase, and plain-ISO sources open with `SequentialScan`. `PreallocationTests` verifies pre-sizing, the default-member fallback, and that extraction passes each entry's size to the destination.
 
-### 8.9 Phase 8 — explicit sector-layout packing — done in 1.6.0
+### 8.9 Phase 8 — explicit sector-layout packing — done in 1.5.0
 
 - `--layout <file>` accepts the JSON emitted by `--sector-layout --json`
   (`XisoLayoutSpec.ParseJson`) or a compact `path=sector` text spec
@@ -856,7 +856,7 @@ existing named error or report/drop gate.
 
 ## 12. Sequencing and releases
 
-### 12.0 Current state (2026-11-01)
+### 12.0 Current state (2026-11-02)
 
 - **Reference:** `References/libCCI-0.1.0-1b0087e` built; `cci_encode`/`cci_extract`/`cci_info` verified.
 - **CCISharp 1.0.1:** <https://github.com/purelogiccode/CCISharp> - published to NuGet at <https://www.nuget.org/packages/CCISharp/1.0.1>.
@@ -864,33 +864,42 @@ existing named error or report/drop gate.
   - Reader, writer, split sets, seekable stream, ISO extraction, validation.
   - **43 tests green on all three TFMs**, including `libCCI` -> CCISharp and CCISharp -> `libCCI` interop.
   - CI green on Windows/Linux/macOS; tag `v1.0.0` builds/publishes `1.0.0` (nupkg + snupkg).
-- **XISOSharp 1.6.0 (in tree, untagged):**
+- **XISOSharp 1.5.0 (published 2026-11-01):**
   - `XisoImageSource` factory (ISO/split ISO/CISO/split CISO/CCI/split CCI/ZAR).
   - `CciBlockDevice`, `XisoCci`, `StreamBlockDevice`, `SplitIsoFile`/`SplitIsoStream`.
   - `XisoZarchive.ListZar`/`ExtractZar`/`ConvertZarToIso`/`ComputeFileHash`; `XisoChecksum.ComputeZarChecksum`.
   - CLI: `compress --format cci`, `--cci-level`/`--cci-split`, `cci`/`uncci`, `convert`, ZAR-aware list/extract/checksum/validate.
   - GUI: CISO/CCI format selector, `.cci` filters/drop routing, ZAR input through Extract, and `.zar` → ISO conversion on the bidirectional ZAR tab.
-  - **Full suite green:** 1946 passed / 1 skipped (1947) on net8.0/net9.0; 2010 passed / 1 skipped (2011) on net10.0.
+  - **Full suite green:** 1979 passed / 1 skipped (1980) on net8.0/net9.0; 2043 passed / 1 skipped (2044) on net10.0 at the 1.5.0 tag. Current tree counts are recorded in §1.3.
   - **Phase 4:** `TraverseXiso` walks each directory table with an explicit in-order stack; a 4,096-entry left-skewed chain lists/trees/extracts/rewrites (the rewrite checksum matches the balanced form). `Constants.MaxTocStackFrames` backstops the stack; subdirectory nesting still uses `MaxTocDepth`. **Follow-up done:** `AuditWalk`, `XisoRanges.GetValidSectorsCore`/`CollectFileEntries`, `XisoRepairer.CollectWalk`, `XisoSalvager.SalvageWalk` and `XisoZarchive.ParseNode` use the same explicit stack, so the left spine audits/maps/repairs/salvages/packs to ZAR too.
   - **Phase 5:** `compress`/`decompress`/`convert`/`split` accept `--batch`/`--batch-recursive`, `--skip-existing`, `--continue-on-error`, `--jobs 1..64` and `--output-name` templates (`{name}`, `{ext}`, `{format}`); duplicate outputs and input clobbers are refused before writing, and failed conversions remove partial outputs.
   - **Phase 6:** `--json` on read-only verbs with a source-generated `JsonOutputContext`; stdout JSON/stderr logs; `CliJsonTests`.
   - **Phase 7:** `IFilesystem.CreateFile(path, expectedLength)`, `SequentialScan` sources/destinations, writer layout pre-sizing; `PreallocationTests`.
   - **Phase 8:** `XisoLayoutSpec` (JSON/text parsing), `LayoutPlanner`, fixed-extent placement + first-fit allocation, `TotalSectors` preservation, `--layout` on `-c`/`--pack`/`build-image`; `LayoutPackingTests`.
+  - **Phase 9:** `XisoImage` facade, full-image hashes, `verify-hashes`, `title-info`, long-path/reserved-name hardening, ZAR caps, fuzzing, AOT smoke, 3-OS CI and package validation; see §15.
   - **Phase 2 follow-up:** `CisoWriter.CompressToCso` compresses split ISO/CISO/CCI sources from the decompressed seekable view instead of materializing a joined temporary ISO; the split-output guard checks every source part.
   - **Phase 3/7 follow-up:** `XisoZarchive.ExtractZar` bounds directory nesting at `MaxTocDepth`, pre-sizes destinations from the name tree, copies exactly the declared length (`TruncatedCopyException` on short data), and deletes partial output on failure/cancel.
   - **Phase 1 gap closed:** `XisoRanges.GetXisoRanges`/`GetFileEntries` are container-aware (`Stream` overloads + `XisoImageSource`), so `--ranges` reads split ISO/CISO/CCI.
   - **Container guard:** the raw-sector redump modes (`--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`) refuse `.cso`/`.cci`, split ISO and `.zar` inputs with a decompress/convert/join message instead of parsing container bytes as an XISO; `RedumpInputGuardTests` covers every mode.
   - **CCI part naming:** a split CCI opened through `.2.cci` … `.9.cci` names extraction/rewrite/compress outputs after the game (`game/`, `game.iso`, `game.cci`); `StripImageSuffix` strips a part marker only for split-capable extensions (`.1` for ISO/CISO, any digit for CCI, never for `.zar`).
-- **Remaining roadmap:** none from this plan (CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work).
+- **XISOSharp 1.6.0 (in progress, untagged):**
+  - **A3:** `Constants.FatxMaxFileSize` (`0xFF000000`, 4 GiB − 16 MiB) is the plain-ISO split default; explicit `--size` values above it warn but are honoured. CISO/CCI keep `0xffbf6000` as their xdvdfs-compatible compression default.
+  - **A4:** batch `compress`/`decompress`/`convert`/`split` accept `--delete-source` (requires `-y`; refused with `-n`); deletion happens only after a successful conversion, split sets delete every part, and the summary reports the deleted count.
+  - **A5:** `GodHeader`/`GodTitleInfo` read the plaintext GOD/SVOD `XContent` header (title name, title ID, disc number/count); `title-info` accepts a GOD header or its `.data` folder in text and `--json` form, with FATX-safe name sanitisation and a hex-title-ID fallback. **Extension:** `StfsHeader`/`StfsTitleInfo` read the same XContent fields from single-file XBLA (`0x000D0000`) and XBLIG (`0x00000002`) STFS packages, which have no `.data` folder.
+  - **A1/A2:** Xbox 360 XDBF title metadata and XBE image assets remain to be implemented.
+- **Remaining roadmap:** Phase 10 Tier A A1/A2 for `1.6.0`, Tier B B1 (`StfsSharp` + read-only GOD) for `1.7.0`, full XBLA/XBLIG STFS package listing/extraction (future; 1.6.0 has header metadata only), and the unchecked §15 quality items. CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work.
 
 ### 12.1 Dependency graph
 
 ```
-CCISharp bootstrap ──► CCISharp 1.0.0 ─┐
-                                       ▼
-XISOSharp 1.5.0 (factory + split ISO + CCI + ZAR input + traversal hardening + batch + JSON + preallocation)
+CCISharp bootstrap ──► CCISharp 1.0.0/1.0.1 ─┐
+                                             ▼
+XISOSharp 1.5.0 (factory + split ISO + CCI + ZAR input + traversal hardening
+                 + batch + JSON + preallocation + layout packing)
                                              │
-                                             └─► 1.6.0 (layout packing)
+                                             ├─► 1.6.0 (Phase 10 Tier A: A1–A5)
+                                             │
+                                             └─► 1.7.0 (StfsSharp + read-only GOD)
 ```
 
 ### 12.2 Recommended order
@@ -907,7 +916,7 @@ XISOSharp 1.5.0 (factory + split ISO + CCI + ZAR input + traversal hardening + b
 | 7 | Batch convert + naming | done (1.4.5) | `--batch` on compress/decompress/convert/split, templates, jobs, resume |
 | 8 | JSON output | done (1.5.0) | `--json` on read-only verbs, `JsonOutputContext`, stderr logs |
 | 9 | Preallocation | done (1.5.0) | `CreateFile(path, expectedLength)`, `SequentialScan`, writer pre-sizing |
-| 10 | Layout packing | done (1.6.0) | `XisoLayoutSpec`, `LayoutPlanner`, `--layout` on create/pack/build-image, 41 tests |
+| 10 | Layout packing | done (1.5.0) | `XisoLayoutSpec`, `LayoutPlanner`, `--layout` on create/pack/build-image, 41 tests |
 
 Effort figures are indicative, not commitments; they exclude review, docs polish and release overhead.
 
@@ -923,8 +932,9 @@ Effort figures are indicative, not commitments; they exclude review, docs polish
 ### 12.4 Suggested version labels
 
 - **CCISharp 1.0.1** — read/write/split/validate, with hardened index parsing.
-- **XISOSharp 1.5.0** — factory + split ISO + CCI/ZAR input + batch + JSON + preallocation.
-- **XISOSharp 1.6.0** — explicit sector-layout packing (`--layout`, `XisoLayoutSpec`).
+- **XISOSharp 1.5.0** — factory + split ISO + CCI/ZAR input + traversal hardening + batch + JSON + preallocation + explicit sector-layout packing (published 2026-11-01).
+- **XISOSharp 1.6.0** — Phase 10 Tier A: FATX cap (A3), `--delete-source` (A4), GOD title naming (A5), 360 title metadata (A1), XBE image assets (A2).
+- **XISOSharp 1.7.0** — `StfsSharp` + read-only GOD input (Phase 10 Tier B).
 
 ---
 
@@ -947,9 +957,9 @@ Effort figures are indicative, not commitments; they exclude review, docs polish
 1. **CCISharp location:** standalone repo (recommended) vs second project in XISOSharp vs CHDStudio. Decision needed before step 1.
 2. **Signing:** keep CCISharp unsigned (like ZArchiveSharp) or add a strong-name key?
 3. **CLI scope:** ship `CCISharp.Cli` in 1.0.0 or defer to 1.1.0?
-4. **CCI split default:** FATX caps a file at `0xFFFFFFFF` bytes (4 GiB − 1), so a literal 4 GiB slice is not writable. Use a conservative default (e.g., `0xFFBF6000`, the same ~4 GiB point CISO uses) or `4 GiB − 64 KiB`, and confirm against a real Cerbios/Repackinator set.
+4. **CCI split default:** FATX caps a file at `0xFFFFFFFF` bytes (4 GiB − 1), so a literal 4 GiB slice is not writable. Use a conservative default (e.g., `0xFFBF6000`, the same ~4 GiB point CISO uses) or `4 GiB − 64 KiB`, and confirm against a real Cerbios/Repackinator set. **Resolved 2026-11-02 for plain ISO:** `Constants.FatxMaxFileSize` = `0xFF000000` (4 GiB − 16 MiB) is the split default; CISO/CCI keep `0xffbf6000` as their xdvdfs-compatible compression default (below `0xFFFFFFFF`, above the conservative FATX cap).
 5. **ZAR conversion:** v1 via temp directory (simple) vs direct `ISourceFilesystem` writer (clean, more work)?
-6. **Layout packing:** is it worth a 1.7.0, or should it stay a documented future item? **Resolved:** implemented in 1.6.0.
+6. **Layout packing:** is it worth a 1.7.0, or should it stay a documented future item? **Resolved:** implemented in 1.5.0.
 
 ---
 
@@ -1053,7 +1063,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 
 **Status:** **released** 2026-11-01. Linux full suite 2015 passed / 24 skipped, Windows 2043 passed / 1 skipped, macOS CI green, NativeAOT smoke green, NuGet `XISOSharp` 1.5.0 + `XISOSharp.Tool` 1.5.0 published, GitHub release 1.5.0 published with six bundles + SPDX SBOM. `[x]` = implemented and verified in this tree; `[ ]` = pending; `[-]` = evaluated and deliberately excluded (reason recorded).
 
-**Versioning note (2026-11-01):** `1.5.0` was never published, and `1.6.0` only exists in the tree. The next public release is **`1.5.0`**, containing everything from the old 1.5.0/1.6.0 notes plus this phase. Do not publish `1.6.0`.
+**Versioning note (2026-11-02):** `1.5.0` is published (2026-11-01). The next release is **`1.6.0`** (Phase 10 Tier A); do not reuse the `1.5.0` version or the `1.6.0` label for a different scope.
 
 ### 15.1 Release, packaging, versioning
 
@@ -1062,7 +1072,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [x] `AGENTS.md` release routine and bundle recipe document the automated path.
 - [x] Merge the tree's 1.5.0/1.6.0 notes into one `## 1.5.0` release section and refresh `WhatsNew.md` for the new features.
 - [x] Publish `1.5.0`: tag, NuGet nupkg/snupkg + `XISOSharp.Tool` (the tool package was dropped after 1.5.0), GitHub release with six bundles + SPDX SBOM; verified `api.nuget.org/v3-flatcontainer` and the release assets.
-- [x] Add a `dotnet tool` package (`XISOSharp.Tool`, command `xisosharp`) and a tag-only publish job. **Removed for 1.6.0**: the CLI ships only inside the six RID bundles; the NuGet feed carries the library alone.
+- [-] Add a `dotnet tool` package (`XISOSharp.Tool`, command `xisosharp`) and a tag-only publish job. **Added in 1.5.0 and removed for 1.6.0**: the CLI ships only inside the six RID bundles; the NuGet feed carries the library alone.
 - [x] Add SBOM generation (CycloneDX/SPDX) to the release workflow.
 - [x] Add GitHub build-provenance attestations for the six bundles.
 - [ ] Add optional NuGet author-signing and Windows Authenticode/macOS notarization steps gated on repository secrets.
@@ -1103,7 +1113,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 
 - [x] Pre-sized extraction/copy-out and `SequentialScan` hints.
 - [x] Writer layout pre-sizing.
-- [x] Add end-to-end BenchmarkDotNet suites: create, extract, checksum, CISO compress/decompress, CCI compress/decompress, large-image I/O.
+- [ ] Add end-to-end BenchmarkDotNet suites: create, extract, checksum, CISO compress/decompress, CCI compress/decompress, large-image I/O. **Partial:** `XisoEndToEndBenchmarks` covers pack, open/list, hash and CISO compress/decompress; extract, CCI and large-image I/O remain.
 - [ ] Add bounded parallel CISO sector compression and a `--jobs` option on `compress`/`cso`.
 - [ ] Add parallel CCI sector compression (CCISharp 1.1) and a `--jobs` option.
 - [ ] Add bounded parallel extraction (independent files) with ordered progress.
@@ -1140,7 +1150,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [ ] Add CCI LZ4-HC level 12 encoding in CCISharp for byte-parity with libCCI/Repackinator (keep the fast encoder as default).
 - [ ] Add optional multi-digit CCI part discovery (`game.10.cci`) while keeping reference-compatible single-digit output.
 - [-] XRD Redump metadata generation — deferred: XboxKit 0.7's implementation is itself a stub (zeroed hashes, TODO certificates). Implement only with a complete XRD spec and a verified oracle, not by porting the stub.
-- [-] GOD/STFS/CON containers — non-goal for the XISO library; belongs in a separate Xbox 360 container package. **Amended 2026-11-01:** read-only GOD input is planned for `1.7.0` via `StfsSharp` (Phase 10, §16.3); STFS writing/rebuild stays out.
+- [-] GOD/STFS/CON containers — non-goal for the XISO library; belongs in a separate Xbox 360 container package. **Amended 2026-11-01:** read-only GOD input is planned for `1.7.0` via `StfsSharp` (Phase 10, §16.3); STFS writing/rebuild stays out. **A5 (2026-11-02):** header-only GOD title metadata and single-file XBLA/XBLIG STFS package header metadata are implemented in `1.6.0` (`GodHeader`/`GodTitleInfo`, `StfsHeader`/`StfsTitleInfo`, `title-info`).
 
 ### 15.7 Documentation, samples, community
 
@@ -1156,7 +1166,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 
 ### 15.8 Distribution and supply chain
 
-- [x] `dotnet tool` package.
+- [-] `dotnet tool` package (added in 1.5.0, removed for 1.6.0).
 - [ ] winget/scoop/brew manifests (generated from release assets).
 - [ ] Shell completions and a man page.
 - [x] SBOM per release.
@@ -1182,7 +1192,8 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [-] Direct optical-drive reading — **permanent non-goal** (owner decision 2026-11-01); users implement `IBlockDevice` over their own drive reader.
 - [-] Bit-exact CCI output until CCISharp ships LZ4-HC.
 - [-] STFS/CON/LIVE/PIRS **writing**, package rebuild and re-signing; XRD (see 15.6).
-- [ ] GOD **read-only** input through `StfsSharp` — planned for `1.7.0` (Phase 10, §16.3); GOD writing stays a non-goal.
+- [ ] GOD **read-only** input through `StfsSharp` — planned for `1.7.0` (Phase 10, §16.3); GOD writing stays a non-goal. **A5 done in `1.6.0`:** header-only title metadata (`title-info`) for GOD and XBLA/XBLIG packages.
+- [ ] Full XBLA/XBLIG single-file STFS package listing/extraction (file table, hash tree, data blocks); `StfsHeader` reads only the XContent header.
 
 ### 15.11 Verification commands for this phase
 
@@ -1209,7 +1220,7 @@ dotnet run --project XISOSharp.Fuzz -c Release -- --seconds 60
 
 ## 16. Phase 10 — cross-reference harvest (Xbox360Convert / XboxToolkit / XDVDFS-TR / XeCrypt)
 
-**Status:** proposed 2026-11-01. Tier A ships in **`1.6.0`** (next release after the published `1.5.0` tag); Tier B ships in **`1.7.0`**. Scope is deliberately narrow: only items judged *worthy and useful* are included, and every rejected candidate is recorded in §16.7 with a reason so it is not re-litigated.
+**Status:** proposed 2026-11-01; Tier A (`1.6.0`) is in progress (A3, A4 and A5 implemented 2026-11-02; A1/A2 pending); Tier B ships in **`1.7.0`**. Scope is deliberately narrow: only items judged *worthy and useful* are included, and every rejected candidate is recorded in §16.7 with a reason so it is not re-litigated.
 
 **References reviewed:** `References/Xbox360Convert-1.0.1`, `References/XboxToolkit-main`, `References/XDVDFS-TR-0.8.4-TR`, `References/XeCrypt-main`, re-checked against `extract-xiso-build-202609111233`, `libCCI-0.1.0-1b0087e`, `XboxKit-0.7` and `xdvdfs-0.8.3`.
 
@@ -1298,6 +1309,8 @@ not an exception.
 
 #### A3. One FATX file-size constant
 
+**Status:** implemented 2026-11-02 (`Constants.FatxMaxFileSize`, plain-ISO split default and an explicit `--size` warning; tests in `XisoSplitTests`).
+
 **Problem.** `XisoSplitter.DefaultPartSizeBytes` is `4294967296` — exactly 4 GiB.
 FATX cannot represent a 4 GiB file, and a part can be exactly that size, so a
 "FATX-safe" split can currently produce an unwritable part. `CisoWriter` uses
@@ -1317,6 +1330,8 @@ default.
 
 #### A4. `--delete-source` for batch conversion
 
+**Status:** implemented 2026-11-02 (`BatchOptions.DeleteSource`, `BatchConversion.SourceFiles`, summary count; tests in `CliBatchConvertTests`).
+
 **Problem.** Xbox360Convert has `-d`; XISOSharp's batch verbs have no equivalent,
 so library cleanup needs a second pass.
 
@@ -1332,6 +1347,8 @@ summary reports deleted counts.
 
 #### A5. GOD title naming (header only, no mount)
 
+**Status:** implemented 2026-11-02 (`GodHeader`, `GodTitleInfo`, `title-info` text/JSON, FATX-safe name + title-ID fallback; tests in `GodHeaderTests`). **Extended 2026-11-02:** `StfsHeader`/`StfsTitleInfo` read single-file XBLA/XBLIG STFS package headers (same XContent layout, no `.data` folder); tests in `StfsHeaderTests`.
+
 **Problem.** A GOD container is a header file named by content hash next to a
 `<name>.data/` directory. Its title name (`0x411`, UTF-16, `0x80` bytes), title ID
 (`0x360`) and disc number/count (`0x366`/`0x367`) are readable without decoding a
@@ -1344,6 +1361,11 @@ the name is empty. Implemented as the first slice of B1 so it ships on its own.
 
 **Acceptance.** A synthetic GOD header reports the expected name/disc; a non-GOD
 file produces the existing clean error.
+
+**Scope note (2026-11-02).** A5 is **header metadata only**. It does not list or
+extract XBLA/XBLIG package contents. Full single-file STFS package reading (file
+table, hash tree and data blocks) remains future work — a natural extension of
+`StfsSharp`/B1, not part of the 1.6.0 A5 acceptance.
 
 ### 16.3 Tier B — `1.7.0`
 
@@ -1383,6 +1405,10 @@ remain non-goals."*
 validates and reads without materialising the image; corrupt hash tables fail
 with a named error, not an exception.
 
+**Scope note (2026-11-02).** B1 covers GOD/SVOD sector input. Full
+XBLA/XBLIG package listing/extraction remains future work; the 1.6.0
+`StfsHeader` only reads header metadata.
+
 ### 16.4 File-by-file change map
 
 | File | Change |
@@ -1395,14 +1421,19 @@ with a named error, not an exception.
 | `XISOSharp/XbeAssets.cs` (new) | logo / `$$XTIMAGE` / `$$XSIMAGE` extraction |
 | `XISOSharp/DxtDecoder.cs` (new) | DXT1/3/5 + BGR24 decode |
 | `XISOSharp/PngWriter.cs` (new) | BCL-only PNG encode |
-| `XISOSharp/Constants.cs` | `FatxMaxFileSize` |
-| `XISOSharp/XisoSplitter.cs` / `CisoWriter.cs` / `XisoCci.cs` | use the shared cap |
-| `XISOSharp/XisoImageFormat.cs` / `XisoImageSource.cs` | `God` + detection (header and `.data` folder) |
-| `XISOSharp/BlockDevice/GodBlockDevice.cs` (new) | `IBlockDevice` over `StfsFile` |
-| `XISOSharp.Cli/Program.cs` | `--xbe-image`, `--delete-source`, GOD verbs |
-| `XISOSharp.Cli/JsonOutput.cs` | additive title/xbe fields |
+| `XISOSharp/Constants.cs` | `FatxMaxFileSize` (A3) |
+| `XISOSharp/XisoSplitter.cs` | FATX-safe default part size (A3) |
+| `XISOSharp/CisoWriter.cs` / `XisoCci.cs` | document compression split defaults as non-FATX limits (A3) |
+| `XISOSharp/GodHeader.cs` (new) | GOD `XContent` title parser (A5) |
+| `XISOSharp/Models/GodTitleInfo.cs` (new) | GOD title metadata record (A5) |
+| `XISOSharp/StfsHeader.cs` (new) | single-file XBLA/XBLIG `XContent` title parser (A5 extension) |
+| `XISOSharp/Models/StfsTitleInfo.cs` (new) | XBLA/XBLIG title metadata record + kind enum (A5 extension) |
+| `XISOSharp/XisoImageFormat.cs` / `XisoImageSource.cs` | `God` + detection (header and `.data` folder) (B1) |
+| `XISOSharp/BlockDevice/GodBlockDevice.cs` (new) | `IBlockDevice` over `StfsFile` (B1) |
+| `XISOSharp.Cli/Program.cs` | `--delete-source` (A4), GOD + XBLA/XBLIG `title-info` (A5), pending `--xbe-image`/GOD verbs |
+| `XISOSharp.Cli/JsonOutput.cs` | `JsonGodTitleInfo` + `JsonStfsTitleInfo` (A5), pending 360/XBE fields |
 | `XISOSharp.Gui/**` | 360 title panel, XBE image preview, GOD filter/drop routing |
-| `XISOSharp.Tests/*` | XDBF, XBE assets, DXT/PNG, FATX cut, delete-source, GOD |
+| `XISOSharp.Tests/*` | XDBF, XBE assets, DXT/PNG, FATX cut, delete-source, GOD + XBLA/XBLIG header metadata |
 | `XISOSharp.TestDataGenerator/*` | synthetic XDBF, XBE-with-images, GOD set |
 | `docs/*`, `WhatsNew.md`, `docs/release-notes.md`, READMEs | feature + limitation docs |
 
@@ -1414,8 +1445,8 @@ with a named error, not an exception.
 - Trim/AOT analyzers clean (XDBF, DXT and PNG code are pure managed,
   reflection-free).
 - Public API additive only; `PackageValidationBaselineVersion` stays green.
-- New JSON fields covered by `CliJsonTests` golden snapshots.
-- Fuzzer seeds: XDBF, XBE section table, DXT block, GOD `XContent`/block map.
+- New JSON fields covered by `GodHeaderTests` (GOD), `StfsHeaderTests` (XBLA/XBLIG) and `CliJsonTests` (existing payloads).
+- Fuzzer seeds: XDBF, XBE section table, DXT block, GOD `XContent`/block map (XDBF/XBE/DXT and the full GOD block map are pending with A1/A2/B1; the A5 header parser has synthetic coverage).
 
 ### 16.6 Companion repositories
 
@@ -1462,9 +1493,11 @@ viewers. Cross-repo work is tracked in §15.9.
 | 4 | A2 XBE image assets | `1.6.0` | 1–2 d |
 | 5 | B1 `StfsSharp` + read-only GOD | `1.7.0` | 1–2 wk |
 | 6 | Companion upgrades (SimpleXisoDrive, XISOStudio) | after `1.7.0` | cross-repo |
+| 7 | Full XBLA/XBLIG STFS package listing/extraction (file table, hash tree, data blocks) | future | header metadata only in 1.6.0 (`StfsHeader`) |
 
 ### 16.9 Progress log
 
 | Date | Change | Commit |
 |---|---|---|
 | 2026-11-01 | Phase 10 scope agreed from the reference review: 5 items accepted, GOD read-only proposed; owner exclusions recorded (WASM/web, Python bindings/native ABI, direct optical-drive reading, executable signature verification); §13/§15.6/§15.7/§15.10 and Appendix A amended | — |
+| 2026-11-02 | Phase 10 Tier A partial: A3 FATX cap (`Constants.FatxMaxFileSize`), A4 `--delete-source`, A5 GOD header title naming (`GodHeader`/`GodTitleInfo`, `title-info` text/JSON) extended to single-file XBLA/XBLIG STFS headers (`StfsHeader`/`StfsTitleInfo`); plan/document drift corrected (1.5.0 release state, counts, benchmark scope, coverage floor) | — |

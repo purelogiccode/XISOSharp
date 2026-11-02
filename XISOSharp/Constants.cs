@@ -191,6 +191,16 @@ public static class Constants
     /// <summary>Size of the read/write buffer used for file copy operations (2 MB).</summary>
     public const int ReadWriteBufferSize = 0x00200000;
 
+    /// <summary>
+    /// Conservative FATX file-size cap: <c>0xFF000000</c> (4 GiB − 16 MiB).
+    /// FATX stores a file size in 32 bits, so a file of exactly 4 GiB cannot be
+    /// represented; this leaves headroom for the filesystem's cluster/size
+    /// arithmetic. It is the default maximum part size for plain ISO splits.
+    /// CISO/CCI keep their own <c>0xffbf6000</c> xdvdfs-compatible split point,
+    /// which is below the 32-bit field limit but above this conservative cap.
+    /// </summary>
+    public const long FatxMaxFileSize = 0xFF000000;
+
     /// <summary>File attribute: read-only.</summary>
     public const byte AttributeRo = 0x01;
 

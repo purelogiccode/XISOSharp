@@ -251,6 +251,33 @@ internal sealed record JsonTitleInfo(
     uint DiskNumber,
     uint Version);
 
+/// <summary><c>title-info</c> command payload for a GOD/SVOD container.</summary>
+internal sealed record JsonGodTitleInfo(
+    int SchemaVersion,
+    string Command,
+    string Source,
+    string Kind,
+    string HeaderPath,
+    string TitleName,
+    uint TitleId,
+    string TitleIdHex,
+    byte DiscNumber,
+    byte DiscCount);
+
+/// <summary><c>title-info</c> command payload for a single-file XBLA/XBLIG STFS package.</summary>
+internal sealed record JsonStfsTitleInfo(
+    int SchemaVersion,
+    string Command,
+    string Source,
+    string Kind,
+    string PackagePath,
+    string TitleName,
+    uint TitleId,
+    string TitleIdHex,
+    byte DiscNumber,
+    byte DiscCount,
+    uint ContentType);
+
 /// <summary>
 /// Trim/AOT-safe source-generation context for every <c>--json</c> payload.
 /// </summary>
@@ -270,4 +297,6 @@ internal sealed record JsonTitleInfo(
 [JsonSerializable(typeof(JsonImageHashes))]
 [JsonSerializable(typeof(JsonHashVerification))]
 [JsonSerializable(typeof(JsonTitleInfo))]
+[JsonSerializable(typeof(JsonGodTitleInfo))]
+[JsonSerializable(typeof(JsonStfsTitleInfo))]
 internal sealed partial class JsonOutputContext : JsonSerializerContext;
