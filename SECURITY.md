@@ -95,9 +95,9 @@ design. They are dismissed in **Security → Code scanning** with this rationale
 
 | Check | Why it is accepted |
 | --- | --- |
-| BinaryArtifacts | `extract-xiso.exe`, `xdvdfs.exe`, `xboxkit.exe` and `test_fixture.iso` are checked-in interop oracles and fixtures the test suite runs against. |
+| BinaryArtifacts | `tests/XISOSharp.BattleTests/{extract-xiso,xdvdfs,xboxkit}.exe`, `apps/XISOSharpTester/extract-xiso.exe` and `tests/XISOSharp.Tests/Fixtures/test_fixture.iso` are checked-in interop oracles and fixtures the test suite runs against. The comparison tests skip when an oracle is absent, and none of these files ship in the NuGet package or the release bundles. (The 1.6.0 `src`/`apps`/`tests` reorganisation moved the paths, so the finding is re-reported for the new locations.) |
 | TokenPermissions | The wiki-sync and release jobs need `contents: write` to push the wiki and create releases. The scope is job-level and the token is short-lived. |
-| PinnedDependencies | Every `PackageReference` pins its version, and Dependabot + NuGet audit + the `dependency-audit` CI gate cover known-vulnerable versions. Lock files are not used because the 13 RID/TFM publish combinations make `RestoreLockedMode` incompatible with the release matrix (NU1004). |
+| PinnedDependencies | Two separate sub-findings are accepted. **Package pinning:** every `PackageReference` pins its version, and Dependabot + NuGet audit + the `dependency-audit` CI gate cover known-vulnerable versions; lock files are not used because the 13 RID/TFM publish combinations make `RestoreLockedMode` incompatible with the release matrix (NU1004). **`nugetCommand`:** the flagged command is `dotnet nuget push` in the tag-only `publish-nuget` job, which runs on the .NET SDK installed by a commit-SHA-pinned `actions/setup-dotnet` and selected by `global.json`; there is no downloaded, unpinned `nuget.exe` anywhere in the build. |
 | BranchProtection / CodeReview | `master` is protected against deletion and force-push; requiring pull-request approvals would block the maintainer's direct-push workflow, and every push runs the full CI gate. |
 | CIIBestPractices | The project is not registered for the OpenSSF Best Practices badge. |
 | Fuzzing | The parsers are exercised by the corruption and pathological-TOC suites; there is no OSS-Fuzz integration. |
