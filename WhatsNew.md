@@ -22,8 +22,8 @@ conversion, JSON, preallocation and explicit layout packing) with the Phase 9
   `OverflowException` on a corrupt index).
 - **Quality**: 3-OS tests, formatting gate, AOT publish smoke, mutation fuzzing,
   75% line / 60% branch coverage floors, package validation against 1.4.4.
-- **Packaging**: `dotnet tool install -g XISOSharp.Tool`, SBOM + build
-  provenance, community files and a console sample.
+- **Packaging**: SBOM + build provenance, community files and a console sample;
+  the CLI ships as GitHub release bundles.
 
 ## Layout packing (Phase 8)
 

@@ -63,18 +63,7 @@ Install-Package XISOSharp
 
 Package targets `net8.0`, `net9.0`, `net10.0`, strong-named, `IsTrimmable`+`IsAotCompatible`, `snupkg` via SourceLink; runtime dependencies are `ZArchiveSharp` (ZAR) and `CCISharp` (CCI).
 
-### dotnet tool (CLI)
-
-```bash
-dotnet tool install --global XISOSharp.Tool
-xisosharp -v
-```
-
-The framework-dependent tool package is `XISOSharp.Tool`; the command is
-`xisosharp`. Release bundles remain the zero-runtime option for users without
-the .NET 10 runtime.
-
-### CLI (tool)
+### CLI (from source)
 
 ```bash
 git clone https://github.com/purelogiccode/XISOSharp.git
@@ -680,7 +669,7 @@ dotnet test -c Release                       # 2044 tests on net10.0 (1980 on ne
 
 Layout: shipped code lives in `src/` (library) and `apps/` (CLI, GUI, WPF Tester), every verification harness in `tests/`, runnable examples in `samples/`.
 
-Projects: `src/XISOSharp` (`net8.0`/`net9.0`/`net10.0`) packs explicitly (`dotnet pack`; `GeneratePackageOnBuild` is off); `apps/XISOSharp.Cli` (`net8.0`/`net9.0`/`net10.0`, ships net10.0, packs as `XISOSharp.Tool`); `tests/XISOSharp.Tests` (`net8.0`/`net9.0`/`net10.0`); `apps/XISOSharpTester` (`net10.0-windows` WPF); `tests/XISOSharp.Fuzz` (mutation fuzzer); `tests/XISOSharp.AotSmoke` (NativeAOT smoke); `samples/XISOSharp.Sample` (library walkthrough). `ZArchiveSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZArchiveSharp.Tests` + `ZArchiveSharp.Benchmarks` moved to the sibling `../CSharp_ZArchiveSharp` repo (own solution); `XISOSharp` consumes the library as NuGet package `ZArchiveSharp` 1.4.0. CI builds on `ubuntu`/`windows`/`macos`.
+Projects: `src/XISOSharp` (`net8.0`/`net9.0`/`net10.0`) packs explicitly (`dotnet pack`; `GeneratePackageOnBuild` is off); `apps/XISOSharp.Cli` (`net8.0`/`net9.0`/`net10.0`, ships net10.0 as the release-bundle executable); `tests/XISOSharp.Tests` (`net8.0`/`net9.0`/`net10.0`); `apps/XISOSharpTester` (`net10.0-windows` WPF); `tests/XISOSharp.Fuzz` (mutation fuzzer); `tests/XISOSharp.AotSmoke` (NativeAOT smoke); `samples/XISOSharp.Sample` (library walkthrough). `ZArchiveSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZArchiveSharp.Tests` + `ZArchiveSharp.Benchmarks` moved to the sibling `../CSharp_ZArchiveSharp` repo (own solution); `XISOSharp` consumes the library as NuGet package `ZArchiveSharp` 1.4.0. CI builds on `ubuntu`/`windows`/`macos`.
 
 ## Requirements
 

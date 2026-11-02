@@ -4,7 +4,7 @@
 
 | Target | Status | Notes |
 |---|---|---|
-| `net10.0` | **LTS** | Primary target; ships in the release bundles and the dotnet tool. |
+| `net10.0` | **LTS** | Primary target; ships in the release bundles. |
 | `net9.0` | EOL (12 May 2026) | Still built/tested for source compatibility; no new features depend on it. |
 | `net8.0` | Supported until 10 Nov 2026 | Kept through the 1.5.x line; will be dropped in the next major after EOL. |
 

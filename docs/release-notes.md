@@ -1,5 +1,14 @@
 # Release Notes
 
+## Unreleased
+
+### Packaging
+
+- The CLI is no longer published as a NuGet dotnet tool (`XISOSharp.Tool`).
+  `XISOSharp` (the library) remains the only NuGet package; get the CLI from
+  the GitHub release bundles (`release_<version>_<rid>.zip`) or build it from
+  source with `publish-cli.ps1`.
+
 ## 1.5.0
 
 **World-class library release.** This merges everything from the unreleased

@@ -2,23 +2,19 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- The CLI doubles as a dotnet tool (`dotnet tool install -g XISOSharp.Tool`,
-         command `xisosharp`) and as the release-bundle executable. -->
-    <IsPackable>true</IsPackable>
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>xisosharp</ToolCommandName>
-    <PackageId>XISOSharp.Tool</PackageId>
+    <!-- Ships only as a release-bundle executable (GitHub releases) and as the
+         self-contained publish output; there is no NuGet package for the CLI.
+         The library (src/XISOSharp) is the only published package. -->
+    <IsPackable>false</IsPackable>
     <Description>XISOSharp command-line tool: create, extract, list, rewrite, compress and archive Xbox XISO/XDVDFS images. Reads ISO, split ISO, CISO, CCI and ZAR; writes XISO, CISO, CCI and ZAR; includes Redump/XboxKit archival modes.</Description>
-    <PackageTags>xiso;xbox;iso;extract-xiso;xdvdfs;ciso;cci;zar;dotnet-tool</PackageTags>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <AssemblyName>XISOSharp.Cli</AssemblyName>
     <RootNamespace>XISOSharp.Cli</RootNamespace>
     <ApplicationIcon>icon\icon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <RuntimeIdentifiers Condition="'$(_IsPacking)' != 'true'">win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
-    <PublishSingleFile Condition="'$(_IsPacking)' != 'true'">true</PublishSingleFile>
-    <PublishTrimmed Condition="'$(_IsPacking)' != 'true'">true</PublishTrimmed>
+    <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>partial</TrimMode>
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
@@ -28,7 +24,6 @@
 
   <ItemGroup>
     <ProjectReference Include="$(RepoRoot)src\XISOSharp\XISOSharp.csproj" />
-    <None Include="$(RepoRoot)README.md" Pack="true" PackagePath="\" />
     <PackageReference Include="Serilog" Version="4.4.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />

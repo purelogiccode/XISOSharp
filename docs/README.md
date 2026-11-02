@@ -122,7 +122,7 @@ runnable examples in `samples/`.
 | Project | Description |
 |---|---|
 | `src/XISOSharp` | Class library (NuGet package `XISOSharp`) — complete read/write engine |
-| `apps/XISOSharp.Cli` | Command-line tool `XISOSharp` (extract-xiso-compatible flags); packs as `XISOSharp.Tool` |
+| `apps/XISOSharp.Cli` | Command-line tool `XISOSharp` (extract-xiso-compatible flags) |
 | `apps/XISOSharp.Gui` | Avalonia desktop app (dark-only, shells out to the CLI) |
 | `apps/XISOSharpTester` | WPF GUI for batch regression testing against the reference C tool (Windows-only) |
 | `tests/XISOSharp.Tests` | xUnit test suite |

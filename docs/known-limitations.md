@@ -71,8 +71,9 @@ device names (`CON`, `NUL`, `COM1`…). The OS must still have long paths enable
 
 ## Distribution
 
-- Release bundles and the NuGet package are built by CI with an SBOM and build
+- Release bundles and the NuGet library are built by CI with an SBOM and build
   provenance. Authenticode signing, macOS notarization and NuGet author signing
   require repository signing secrets and are not enabled by default.
-- The `dotnet tool` package is framework-dependent (needs the .NET 10 runtime);
-  the release zips are self-contained.
+- The CLI ships only through GitHub releases (no NuGet package). The release
+  zips are framework-dependent (need the .NET 10 runtime); the self-contained
+  single-file builds come from `publish-cli.ps1` / `publish-gui.ps1`.

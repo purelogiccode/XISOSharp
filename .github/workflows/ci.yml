@@ -448,13 +448,10 @@ jobs:
         run: dotnet build src/XISOSharp/XISOSharp.csproj --no-restore --configuration Release
 
       - name: Pack
-        # The library is the only project with package validation; the CLI is a
-        # framework-dependent dotnet tool (`dotnet tool install -g XISOSharp.Tool`,
-        # command `xisosharp`). Strict package validation runs as part of pack;
-        # .snupkg holds library symbols.
-        run: |
-          dotnet pack src/XISOSharp/XISOSharp.csproj --no-build --configuration Release --output artifacts
-          dotnet pack apps/XISOSharp.Cli/XISOSharp.Cli.csproj --configuration Release --output artifacts
+        # The library is the only packable project (it also carries strict
+        # package validation); .snupkg holds its symbols. The CLI ships as
+        # GitHub release bundles only.
+        run: dotnet pack src/XISOSharp/XISOSharp.csproj --no-build --configuration Release --output artifacts
 
       - name: Upload packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

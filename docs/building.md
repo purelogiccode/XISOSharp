@@ -158,8 +158,8 @@ tags (`v*` or bare `[0-9]*`, both accepted by MinVer and the publish gate):
    extract-xiso, xdvdfs and xboxkit oracles over a synthetic, copyright-free
    corpus (`--synthetic`) for list/extract/rewrite, checksum/md5, unpack/pack
    and CISO round-trip; reports are uploaded as artifacts.
-8. **pack** - after every gate: `dotnet pack` the core package and the
-   `XISOSharp.Tool` dotnet tool, then upload the nupkgs.
+8. **pack** - after every gate: `dotnet pack` the library (the only published
+   package), then upload the nupkgs.
 9. **publish** (only on version tags, environment `nuget`) - push the nupkgs to
    nuget.org using the `NUGET_API_KEY` secret.
 
@@ -180,8 +180,8 @@ packages and GitHub Actions, and security updates are enabled repository-wide.
 
 Pushing a version tag (`1.5.0` or `v1.5.0`) does two independent things:
 
-- `ci.yml` packs and publishes `XISOSharp.<version>.nupkg` + `.snupkg` and the
-  `XISOSharp.Tool.<version>.nupkg` dotnet tool to NuGet.
+- `ci.yml` packs and publishes `XISOSharp.<version>.nupkg` + `.snupkg` (the
+  library is the only NuGet package) to NuGet.
 - `release.yml` builds the six framework-dependent bundles
   (`release_<version>_<rid>.zip` for `win-x64`, `win-arm64`, `linux-x64`,
   `linux-arm64`, `MacOsX-x64`, `MacOsX-arm64`) from the same tag, smoke-tests
