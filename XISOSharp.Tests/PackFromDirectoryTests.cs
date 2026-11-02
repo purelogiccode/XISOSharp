@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using XISOSharp.DataStructures;
 
 namespace XISOSharp.Tests;
 
@@ -160,7 +161,7 @@ public class PackFromDirectoryTests : IDisposable
     [Fact]
     public void PackFromDirectory_RestoresCwd_OnSuccess()
     {
-        // The create path hops CWD internally; it must not leak (#22).
+        // Creation uses absolute host paths and must not leak a CWD change (#22).
         string before = Directory.GetCurrentDirectory();
         try
         {
@@ -187,8 +188,7 @@ public class PackFromDirectoryTests : IDisposable
     [Fact]
     public void CreateXiso_RestoresCwd_WhenOutputCollides()
     {
-        // The #55 collision throws *after* chdir into the source; CWD must
-        // still be restored (#22).
+        // The #55 collision throws during validation; CWD must stay untouched (#22).
         string before = Directory.GetCurrentDirectory();
         string src = CreateSourceTree();
         _tempDirs.Add(src);
@@ -216,8 +216,8 @@ public class PackFromDirectoryTests : IDisposable
     [Fact]
     public async Task PackFromDirectory_ConcurrentCalls_AllSucceed()
     {
-        // Creates are serialized process-wide (#22) — parallel packs must
-        // all succeed with intact outputs instead of corrupting shared CWD.
+        // Creates are independent (#22) - parallel packs must all succeed with
+        // intact outputs and must not leak a working-directory change.
         string before = Directory.GetCurrentDirectory();
         List<(string src, string iso)> cases = Enumerable.Range(0, 4).Select(_ =>
         {
@@ -238,5 +238,124 @@ public class PackFromDirectoryTests : IDisposable
         }
 
         Assert.Equal(before, Directory.GetCurrentDirectory());
+    }
+
+    [Fact]
+    public async Task PackFromDirectory_ConcurrentCalls_DoNotSerialize()
+    {
+        // The old process-wide CreateLock made a second create wait for the
+        // first. Block the first create inside its progress callback and prove
+        // a second, independent create finishes while it is still blocked.
+        string srcA = CreateSourceTree();
+        string srcB = CreateSourceTree();
+        _tempDirs.Add(srcA);
+        _tempDirs.Add(srcB);
+        string isoA = Path.Combine(CreateTempDir(), "a.iso");
+        string isoB = Path.Combine(CreateTempDir(), "b.iso");
+
+        using ManualResetEventSlim firstStarted = new(false);
+        using ManualResetEventSlim releaseFirst = new(false);
+        int blocked = 0;
+
+        bool priorQuiet = Logger.Quiet;
+        Logger.Quiet = true;
+        Task<int>? first = null;
+        try
+        {
+            first = Task.Factory.StartNew(() => XisoWriter.PackFromDirectory(srcA, isoA,
+                    progressCallback: (_, _) =>
+                    {
+                        if (Interlocked.Exchange(ref blocked, 1) == 0)
+                        {
+                            firstStarted.Set();
+                            releaseFirst.Wait(TimeSpan.FromSeconds(30));
+                        }
+                    }),
+                CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+
+            Assert.True(firstStarted.Wait(TimeSpan.FromSeconds(10)), "first pack never reported progress");
+
+            Task<int> second = Task.Run(() => XisoWriter.PackFromDirectory(srcB, isoB));
+            Task completed = await Task.WhenAny(second, Task.Delay(TimeSpan.FromSeconds(10)));
+            Assert.Same(second, completed);
+            Assert.Equal(0, await second);
+            Assert.True(File.Exists(isoB));
+        }
+        finally
+        {
+            releaseFirst.Set();
+            if (first != null)
+            {
+                Assert.Equal(0, await first);
+            }
+
+            Logger.Quiet = priorQuiet;
+        }
+
+        Assert.True(File.Exists(isoA));
+        Assert.Equal(HashTree(srcA), HashTree(ExtractToTemp(isoA)));
+    }
+
+    [Fact]
+    public void PackFromDirectory_RelativeSource_ResolvesAgainstCallerCwd()
+    {
+        string root = CreateTempDir();
+        string src = Path.Combine(root, "game");
+        Directory.CreateDirectory(src);
+        File.WriteAllText(Path.Combine(src, "a.txt"), "hello");
+        string isoPath = Path.Combine(CreateTempDir(), "game.iso");
+
+        string cwd = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(root);
+            Assert.Equal(0, XisoWriter.PackFromDirectory("game", isoPath));
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(cwd);
+        }
+
+        Assert.True(File.Exists(isoPath));
+        Assert.Equal("hello", File.ReadAllText(Path.Combine(ExtractToTemp(isoPath), "a.txt")));
+    }
+
+    [Fact]
+    public void CreateXiso_PrebuiltTreeWithoutHostPaths_ResolvesAgainstCwdWithoutChdir()
+    {
+        // Caller-supplied AVL trees without HostPath are the legacy contract:
+        // file names resolve against the caller's working directory. The writer
+        // resolves them up front instead of chdir-ing into each directory.
+        string root = CreateTempDir();
+        string gameDir = Path.Combine(root, "game");
+        string subDir = Path.Combine(gameDir, "sub");
+        Directory.CreateDirectory(subDir);
+        File.WriteAllText(Path.Combine(subDir, "a.txt"), "hello");
+        string outputDir = CreateTempDir();
+
+        AvlNode tree = new()
+        {
+            Filename = "sub",
+            Subdirectory = new AvlNode { Filename = "a.txt", FileSize = 5 }
+        };
+
+        string cwd = Directory.GetCurrentDirectory();
+        string? isoPath;
+        try
+        {
+            Directory.SetCurrentDirectory(root);
+            string canonicalRoot = Directory.GetCurrentDirectory();
+            Assert.Equal(0, XisoWriter.CreateXiso("game", outputDir, tree, null,
+                out isoPath, "game.iso", null));
+            Assert.Equal(canonicalRoot, Directory.GetCurrentDirectory());
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(cwd);
+        }
+
+        Assert.NotNull(isoPath);
+        Assert.True(File.Exists(isoPath));
+        Assert.Equal("hello", File.ReadAllText(Path.Combine(ExtractToTemp(isoPath), "sub", "a.txt")));
     }
 }

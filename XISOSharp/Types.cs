@@ -94,4 +94,10 @@ internal class WriteTreeContext
 
     /// <summary>When <c>true</c>, file data is read from <see cref="DataStructures.AvlNode.HostPath"/> instead of the current directory.</summary>
     internal bool IsRemap;
+
+    /// <summary>Bytes actually written by this operation (per-operation progress state).</summary>
+    internal long BytesWritten;
+
+    /// <summary>Files actually written by this operation (per-operation progress state).</summary>
+    internal int FilesWritten;
 }

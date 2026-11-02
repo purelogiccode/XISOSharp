@@ -4,7 +4,7 @@ XISOSharp aims to be the most complete **XISO/XDVDFS** library, not every
 Xbox container. This page lists deliberate boundaries and current workarounds.
 
 - [Scope](#scope)
-- [Writer concurrency](#writer-concurrency)
+- [Concurrency](#concurrency)
 - [Windows paths and names](#windows-paths-and-names)
 - [Archival metadata](#archival-metadata)
 - [Compression](#compression)
@@ -34,13 +34,18 @@ Deliberately out of scope:
 - direct optical-drive reading (implement `IBlockDevice`)
 - Python bindings / a native ABI
 
-## Writer concurrency
+## Concurrency
 
-`XisoWriter.CreateXiso`/`PackFromDirectory` still use the process working
-directory internally and serialize concurrent creates with a process-wide lock
-(TODO #22). Parallel creation in one process is therefore serialized; separate
-processes are fine. `XisoReader` extraction has an `IFilesystem` path that does
-not change the CWD.
+`XisoWriter.CreateXiso`/`PackFromDirectory` resolve a local source to absolute
+host paths, keep progress counters per operation, and take no process-wide lock.
+Concurrent creates run independently and never change the process working
+directory. A caller-supplied `inRoot` without host paths is resolved once against
+the caller's CWD, so it is CWD-free too.
+
+The legacy `XisoReader.Extract` path still walks the destination with
+`Directory.SetCurrentDirectory` (like the C tool) and restores the original
+directory afterwards. `XisoReader.UnpackImage(..., IFilesystem)` is the
+CWD-free extraction path; `-x`/`--unpack` still use the legacy path.
 
 ## Windows paths and names
 

@@ -44,6 +44,7 @@ Highlights:
 | Skip/prepend sectors | `SkipPrependSectorsTests.cs` |
 | Unpack resume (`UnpackOptions.SkipExisting`, cancel+resume, copy-out) | `UnpackResumeTests.cs` |
 | Parallel unpack (`UnpackOptions.MaxDegreeOfParallelism`, ordered progress, CISO/split sources, CLI `--jobs`) | `ParallelExtractionTests.cs` |
+| Writer concurrency (independent overlapping creates, absolute source paths, CWD-free output, prebuilt-tree resolution) | `PackFromDirectoryTests.cs` |
 | Safe-extract name policy (`ExtractNamePolicy`/`UnpackOptions.NamePolicy`, CLI `--name-policy`, ISO/STFS/ZAR) | `ExtractNamePolicyTests.cs` |
 | Table writer (offsets, encoding, byte-identity with writer output) | `DirectoryEntryTableWriterTests.cs` |
 | Snapshot (`Fixtures/test_fixture.iso` byte-identity; extract/rewrite SHA-256 per file) | `XisoSnapshotTests.cs` |
@@ -79,8 +80,10 @@ Conventions:
 
 - Tests run **sequentially** (assembly-wide
   `[CollectionBehavior(DisableTestParallelization = true)]`, on top of
-  `[Collection("Sequential")]` on the CWD-sensitive classes) because create/extract
-  operations temporarily change the process-wide current directory.
+  `[Collection("Sequential")]` on the CWD-sensitive classes) because the legacy
+  `XisoReader.Extract` path temporarily changes the process-wide current directory.
+  Creation no longer does: `XisoWriter` uses absolute host paths and per-operation
+  state, and `PackFromDirectoryTests` covers concurrent creates.
 - Tests create their own temp directories and clean up afterwards.
 - A snapshot-style round-trip (create → extract → compare SHA-256 of every file) is
   the standard correctness pattern, locked by the checked-in reference

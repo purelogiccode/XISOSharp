@@ -138,10 +138,15 @@ is read-only; STFS writing/rebuilding is out of scope. `ExtractTo` has an
   calculation — see [XISO Format](xiso-format.md).
 - **Synchronous core**: the engine is synchronous and thread-static buffers keep it
   allocation-light; async wrappers offload to the thread pool.
-- **Current-directory based creation**: like the C tool, `XisoWriter.CreateXiso` walks
-  the file system using `Directory.SetCurrentDirectory` internally and restores the
-  original directory afterwards (even on failure). Concurrent creates are safe but
-  serialized process-wide via an internal lock — they run one at a time (TODO #22).
+- **Absolute-path creation**: `XisoWriter.CreateXiso` resolves a local source once and
+  walks it with absolute host paths, so creating from a directory never changes the
+  process working directory. Progress counters are per operation, and concurrent
+  creates run independently without a process-wide lock. A caller-supplied `inRoot`
+  without host paths is resolved once against the caller's CWD.
+- **Legacy extraction path**: `XisoReader.Extract` still walks the destination with
+  `Directory.SetCurrentDirectory` (like the C tool) and restores the original
+  directory afterwards, even on failure. `UnpackImage(..., IFilesystem)` is the
+  CWD-free extraction path.
 
 ## Error handling
 

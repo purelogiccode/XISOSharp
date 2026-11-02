@@ -4,6 +4,12 @@ XISOSharp 1.6.0 is the Phase 10 Tier A release (A1-A5), plus the first slice
 of Tier B: read-only GOD/SVOD sector input and XBLA/XBLIG STFS package
 listing/extraction.
 
+- **Concurrent creation**: `XisoWriter.CreateXiso`/`PackFromDirectory` use
+  absolute source paths and per-operation progress state, so concurrent creates
+  run independently and never change the process working directory. A
+  caller-supplied `inRoot` without host paths is resolved once against the
+  caller's CWD. The legacy `XisoReader.Extract` path still changes the CWD;
+  `UnpackImage(..., IFilesystem)` is the CWD-free extraction path.
 - **Xbox 360 title metadata**: `title-info` and `--xex-info` read the plaintext
   XDBF/XSTR/XSRC resources from `default.xex` and report the title name,
   publisher, developer, genre, description, thumbnail presence and XEX header

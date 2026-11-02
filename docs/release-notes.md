@@ -4,6 +4,13 @@
 
 ### Library
 
+- **Concurrent creation**: `XisoWriter.CreateXiso`/`PackFromDirectory` now resolve
+  the source to absolute host paths, keep byte/file progress in per-operation
+  state and take no process-wide lock. Concurrent creates run independently and
+  never change the process working directory; output is byte-identical. A
+  caller-supplied `inRoot` without `HostPath` is resolved once against the
+  caller's CWD. The legacy `XisoReader.Extract` path still changes the CWD; use
+  `UnpackImage(..., IFilesystem)` for CWD-free extraction.
 - **FATX-safe split default**: `Constants.FatxMaxFileSize` (`0xFF000000`,
   4 GiB − 16 MiB) is now the default maximum part size for plain-ISO splits.
   An explicit `--size` above it is still honoured with a warning. CISO/CCI keep

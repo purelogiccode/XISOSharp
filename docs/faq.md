@@ -145,9 +145,12 @@ self-contained for any platform (see [Building](building.md#publish)).
 **Is the library thread-safe?**
 
 The engine uses thread-static scratch buffers, so independent operations on different
-threads are safe. `CreateXiso` holds a process-wide `CreateLock` (it changes the
-working directory internally), so concurrent creates are safe but run one at a
-time; the working directory is always restored.
+threads are safe. `CreateXiso`/`PackFromDirectory` resolve the source to absolute host
+paths and keep their progress state per call, so concurrent creates run independently
+and never change the process working directory; a caller-supplied `inRoot` is resolved
+once against the caller's CWD. The legacy `XisoReader.Extract` path still changes the
+working directory internally (like the C tool) and restores it; use
+`UnpackImage(..., IFilesystem)` for a CWD-free extraction.
 
 **How do I suppress console output from the library?**
 

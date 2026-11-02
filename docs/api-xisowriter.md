@@ -79,6 +79,11 @@ public static int CreateXiso(
 Returns 0 on success, 1 on error (permission, I/O, or any exception while writing —
 errors are logged and converted to the return code).
 
+Concurrent calls are independent: the source is resolved to absolute host paths,
+progress counters are per operation, and no process-wide lock is taken. Creating
+never changes the process working directory. A caller-supplied `inRoot` without
+`HostPath` is resolved once against the caller's CWD.
+
 Throws: `ArgumentOutOfRangeException` for a negative `prependSectors`;
 `XisoFileTooLargeException` when a source file exceeds ~4 GB;
 `InvalidDataException` when a supplied layout has an overlap, an out-of-range or

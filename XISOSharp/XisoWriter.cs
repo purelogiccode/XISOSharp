@@ -34,19 +34,6 @@ public static class XisoWriter
     }
 
     /// <summary>
-    /// Serializes concurrent create/rewrite operations in the process (TODO #22).
-    /// The create path walks the host file system with
-    /// <c>Directory.SetCurrentDirectory</c> (like the C tool), which is
-    /// process-global: two concurrent creates would corrupt each other's
-    /// working directory. Holding this across the whole operation makes
-    /// concurrent calls safe (they run one at a time), including the
-    /// <c>Logger.TotalBytes/TotalFiles</c> progress counters.
-    /// </summary>
-#pragma warning disable MA0158 // object keeps net8 compat (System.Threading.Lock is net9+)
-    private static readonly object CreateLock = new();
-#pragma warning restore MA0158
-
-    /// <summary>
     /// Creates or rewrites an XISO image. When <paramref name="inRoot"/> is <c>null</c>,
     /// builds an AVL tree from the local file system and creates a new ISO.
     /// Otherwise, rewrites the ISO using the pre-built AVL tree and source stream.
@@ -120,9 +107,10 @@ public static class XisoWriter
     /// </param>
     /// <returns>0 on success, 1 on error.</returns>
     /// <remarks>
-    /// Concurrent calls from multiple threads are safe but run one at a time
-    /// (see <c>CreateLock</c>); the process working directory is always
-    /// restored before returning or throwing.
+    /// Concurrent calls from multiple threads are safe and independent: the
+    /// source and caller-supplied tree paths are resolved to absolute host paths,
+    /// per-operation progress counters are used and no process-wide lock is taken,
+    /// so creating never reads or changes the process working directory.
     /// </remarks>
     public static int CreateXiso(
         string rootDirectory,
@@ -138,37 +126,15 @@ public static class XisoWriter
         IProgress<ProgressInfo>? progress = null,
         ulong? fileTime = null,
         long sourceDiscLseek = 0,
-        XisoLayoutSpec? layout = null)
-    {
-        lock (CreateLock)
-        {
-            string cwd = Directory.GetCurrentDirectory();
-            try
-            {
-                return CreateXisoCore(rootDirectory, outputDirectory, inRoot, sourceStream,
-                    out outIsoPath, inName, progressCallback, cancellationToken, prependSectors,
-                    excludePatterns, progress, fileTime, sourceDiscLseek, layout);
-            }
-            finally
-            {
-                // Safety net for the pre-write throw paths (validation, tree
-                // generation, cancellation): CreateXisoCore only restores the
-                // working directory on its own success/error returns.
-                try
-                {
-                    Directory.SetCurrentDirectory(cwd);
-                }
-                catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
-                {
-                    // Best effort: never mask the original failure.
-                }
-            }
-        }
-    }
+        XisoLayoutSpec? layout = null) =>
+        CreateXisoCore(rootDirectory, outputDirectory, inRoot, sourceStream,
+            out outIsoPath, inName, progressCallback, cancellationToken, prependSectors,
+            excludePatterns, progress, fileTime, sourceDiscLseek, layout);
 
     /// <summary>
-    /// Core <c>CreateXiso</c> implementation. Callers must hold <c>CreateLock</c>
-    /// (use <see cref="CreateXiso"/>).
+    /// Core <c>CreateXiso</c> implementation. Resolves every source path up front
+    /// and uses only per-operation state, so concurrent calls never change the
+    /// working directory and never share counters or a lock.
     /// </summary>
     private static int CreateXisoCore(
         string rootDirectory,
@@ -193,6 +159,13 @@ public static class XisoWriter
         // always read it (Todo #53).
         string? partialOutput = null;
 
+        if (inRoot == null && string.IsNullOrEmpty(rootDirectory))
+        {
+            // The old chdir-based walk rejected an empty source with
+            // ArgumentException; keep that contract now that paths are resolved.
+            throw new ArgumentException("Source directory must not be empty.", nameof(rootDirectory));
+        }
+
         if (prependSectors is < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(prependSectors), prependSectors.Value,
@@ -201,26 +174,31 @@ public static class XisoWriter
 
         long prependOffset = (long)(prependSectors ?? 0) * Constants.SectorSize;
 
+        // Compatibility reset for the static Logger mirror; the writer's own
+        // logic and progress callback use per-operation state below.
         Logger.TotalBytes = Logger.TotalFiles = 0;
 
         string cwd = Directory.GetCurrentDirectory();
 
-        // Capture full source path before chdir for #55 validation (relative paths resolve against original CWD).
+        // Resolve the source once against the caller's CWD. The create path uses
+        // absolute host paths throughout, so it never changes or re-reads the
+        // process working directory (TODO #22).
+        string? sourceRootPath = null;
         string? fullSourceForValidation = null;
         if (inRoot == null)
         {
             try
             {
-                fullSourceForValidation = Path.IsPathRooted(rootDirectory)
+                sourceRootPath = Path.IsPathRooted(rootDirectory)
                     ? Path.GetFullPath(rootDirectory)
                     : Path.GetFullPath(Path.Combine(cwd, rootDirectory));
-                fullSourceForValidation = fullSourceForValidation.TrimEnd(Path.DirectorySeparatorChar,
-                    Path.AltDirectorySeparatorChar);
+                fullSourceForValidation = Path.TrimEndingDirectorySeparator(sourceRootPath);
                 if (fullSourceForValidation.Length == 0)
                     fullSourceForValidation = cwd;
             }
             catch
             {
+                sourceRootPath = null;
                 fullSourceForValidation = null;
             }
         }
@@ -234,8 +212,6 @@ public static class XisoWriter
 
         if (inRoot == null)
         {
-            Directory.SetCurrentDirectory(rootDirectory);
-
             string dir = rootDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
             int slashPos = dir.LastIndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) + 1;
@@ -243,16 +219,16 @@ public static class XisoWriter
             if (isoDir is "." or "..")
             {
                 // A relative source such as `-c .` / `-c ..` has no usable last
-                // component. The write phase chdirs to ".." and then re-enters
-                // the source by name (root.Filename), so using the literal "."
-                // would make it read files from the source's parent directory.
-                isoDir = Path.GetFileName(Directory.GetCurrentDirectory());
+                // component; use the resolved directory's own name and default
+                // the output to its parent.
+                string resolvedSource = Path.TrimEndingDirectorySeparator(sourceRootPath ?? rootDirectory);
+                isoDir = Path.GetFileName(resolvedSource);
                 if (isoDir.Length == 0)
                     isoDir = Constants.PathCharStr;
 
                 try
                 {
-                    defaultOutputDirectory = Path.GetDirectoryName(Directory.GetCurrentDirectory());
+                    defaultOutputDirectory = Path.GetDirectoryName(resolvedSource);
                 }
                 catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
                 {
@@ -282,10 +258,8 @@ public static class XisoWriter
         // drive-relative `C:` that Path.Combine would then mis-resolve.
         outputDirectory = XisoPaths.TrimTrailingSeparators(outputDirectory);
 
-        // #68 — a relative output directory resolves against the caller's CWD,
-        // not against the source directory the write phase chdirs into (the
-        // stream is opened after SetCurrentDirectory(rootDirectory)); the
-        // collision check below already resolves against the original CWD.
+        // A relative output directory resolves against the caller's CWD; the
+        // collision check below uses the same resolved base.
         if (!Path.IsPathRooted(outputDirectory))
         {
             try
@@ -316,40 +290,33 @@ public static class XisoWriter
         // #55 — Cannot generate ISO when output path equals input directory.
         if (inRoot == null && fullSourceForValidation != null)
         {
-            try
-            {
-                string fullOutput = Path.IsPathRooted(xisoPath)
-                    ? Path.GetFullPath(xisoPath)
-                    : Path.GetFullPath(Path.Combine(cwd, xisoPath));
-                ValidateOutputNotColliding(fullSourceForValidation, fullOutput);
-            }
-            catch (ArgumentException)
-            {
-                // Ensure CWD is restored before throwing (cleanup label expects original CWD).
-                try
-                {
-                    Directory.SetCurrentDirectory(cwd);
-                }
-                catch
-                {
-                    // ignored
-                }
-
-                throw;
-            }
+            string fullOutput = Path.IsPathRooted(xisoPath)
+                ? Path.GetFullPath(xisoPath)
+                : Path.GetFullPath(Path.Combine(cwd, xisoPath));
+            ValidateOutputNotColliding(fullSourceForValidation, fullOutput);
         }
 
         Logger.Log($"{(inRoot != null ? "rewriting" : "\ncreating")} {isoName}{(inName != null ? "" : ".iso")}:\n\n");
 
         AvlNode root = new() { Filename = isoDir, StartSector = Constants.RootDirectorySector };
 
-        Logger.TotalBytes = Logger.TotalFiles = 0;
+        // Caller-supplied trees without a source stream are resolved once against
+        // the caller's CWD (the legacy cwd-relative contract), so the write walk
+        // never needs to change the process working directory.
+        if (inRoot != null && sourceStream == null)
+        {
+            AssignHostPaths(inRoot, Path.Combine(cwd, isoDir));
+        }
+
+        long totalBytes = 0;
 
         if (inRoot != null)
         {
             root.Subdirectory = inRoot;
-            AvlTree.AvlTraverseDepthFirst(inRoot, CalculateTotalFilesAndBytes, null,
+            TreeTotals totals = new();
+            AvlTree.AvlTraverseDepthFirst(inRoot, CalculateTotalFilesAndBytes, totals,
                 AvlTraversalMethod.Prefix, 0);
+            totalBytes = totals.Bytes;
         }
         else
         {
@@ -371,7 +338,8 @@ public static class XisoWriter
                 effectivePatterns = patterns;
             }
 
-            err = GenerateAvlTreeLocal(ref root.Subdirectory, ref n, ref filesSkipped, effectivePatterns);
+            err = GenerateAvlTreeLocal(ref root.Subdirectory, ref n, ref filesSkipped,
+                sourceRootPath ?? rootDirectory, ref totalBytes, effectivePatterns);
 
             for (int i = 0; i < n; i++) Logger.Log("\b");
             for (int i = 0; i < n; i++) Logger.Log(" ");
@@ -397,9 +365,8 @@ public static class XisoWriter
             progress.Report(new ProgressInfo(ProgressInfoType.DirCount, Count: dirCount));
         }
 
-        progressCallback?.Invoke(0, Logger.TotalBytes);
-        long finalTotal = Logger.TotalBytes;
-        Logger.TotalBytes = Logger.TotalFiles = 0;
+        progressCallback?.Invoke(0, totalBytes);
+        long finalTotal = totalBytes;
 
         uint startSector = root.StartSector;
 
@@ -493,11 +460,6 @@ public static class XisoWriter
 
             xisoFs.Write(magicBytes, 0, Constants.HeaderDataLength);
 
-            if (inRoot == null)
-            {
-                Directory.SetCurrentDirectory("..");
-            }
-
             root.Filename = isoDir;
 
             xisoFs.Seek(prependOffset + ((long)root.StartSector * Constants.SectorSize), SeekOrigin.Begin);
@@ -517,6 +479,11 @@ public static class XisoWriter
 
             AvlTree.AvlTraverseDepthFirst(root, WriteTreeCallback, wtContext,
                 AvlTraversalMethod.Prefix, 0);
+
+            // Compatibility mirror for the static Logger counters (the writer's
+            // own logic and progress callback use the per-operation values).
+            Logger.TotalFiles = wtContext.FilesWritten;
+            Logger.TotalBytes = wtContext.BytesWritten;
 
             long pos = xisoFs.Seek(0, SeekOrigin.End);
             long pad = ((Constants.FileModulus - (pos % Constants.FileModulus)) % Constants.FileModulus);
@@ -541,7 +508,7 @@ public static class XisoWriter
             if (inRoot == null)
             {
                 Logger.Log(
-                    $"\nsucessfully created {isoName}{(inName != null ? "" : ".iso")} ({Logger.TotalFiles.ToString(CultureInfo.InvariantCulture)} files totalling {Logger.TotalBytes.ToString(CultureInfo.InvariantCulture)} bytes added)\n");
+                    $"\nsucessfully created {isoName}{(inName != null ? "" : ".iso")} ({wtContext.FilesWritten.ToString(CultureInfo.InvariantCulture)} files totalling {wtContext.BytesWritten.ToString(CultureInfo.InvariantCulture)} bytes added)\n");
             }
 
             progress?.Report(new ProgressInfo(ProgressInfoType.FinishedPacking));
@@ -588,8 +555,6 @@ public static class XisoWriter
             outIsoPath = null;
         }
 
-        Directory.SetCurrentDirectory(cwd);
-
         return err;
 
         void DeletePartialOutput()
@@ -634,7 +599,8 @@ public static class XisoWriter
                     ? ctx.Path + avl.Filename + Constants.PathCharStr
                     : Constants.PathCharStr,
                 PrependOffset = ctx.PrependOffset,
-                SourceDiscLseek = ctx.SourceDiscLseek
+                SourceDiscLseek = ctx.SourceDiscLseek,
+                IsRemap = ctx.IsRemap
             };
 
             ctx.StructuredProgress?.Report(new ProgressInfo(
@@ -646,14 +612,6 @@ public static class XisoWriter
 
             if (!ReferenceEquals(avl.Subdirectory, AvlNode.EmptySubdirectory))
             {
-                if (ctx.SourceStream == null && !ctx.IsRemap)
-                {
-                    Directory.SetCurrentDirectory(avl.Filename);
-                }
-
-                // Propagate remap flag to child context
-                subCtx.IsRemap = ctx.IsRemap;
-
                 AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, WriteFileCallback, subCtx,
                     AvlTraversalMethod.Prefix, 0);
 
@@ -674,11 +632,6 @@ public static class XisoWriter
                     Span<byte> padBuf = stackalloc byte[(int)pad];
                     padBuf.Fill(Constants.PadByte);
                     xisoFs.Write(padBuf);
-                }
-
-                if (ctx.SourceStream == null && !ctx.IsRemap)
-                {
-                    Directory.SetCurrentDirectory("..");
                 }
             }
             else
@@ -750,8 +703,10 @@ public static class XisoWriter
         Stream srcStream;
         if (ctx.SourceStream == null)
         {
+            // Local create, caller-supplied and remap trees carry absolute host
+            // paths; the bare-name fallback is only a safety net for a node
+            // that arrived without one.
             string hostPath = avl.HostPath ?? avl.Filename;
-            // For remap, HostPath is absolute; for normal, it's bare filename with CWD already set.
             srcStream = new FileStream(hostPath,
                 new FileStreamOptions
                 {
@@ -845,8 +800,9 @@ public static class XisoWriter
                     $"WARNING: File {avl.Filename} is truncated. Reported size: {originalSize.ToString(CultureInfo.InvariantCulture)} bytes, wrote size: {avl.FileSize.ToString(CultureInfo.InvariantCulture)} bytes!\n");
             }
 
-            Logger.RecordFileWritten(avl.FileSize);
-            ctx.ProgressCallback?.Invoke(Logger.TotalBytes, ctx.FinalBytes);
+            ctx.FilesWritten++;
+            ctx.BytesWritten += avl.FileSize;
+            ctx.ProgressCallback?.Invoke(ctx.BytesWritten, ctx.FinalBytes);
             ctx.StructuredProgress?.Report(new ProgressInfo(
                 ProgressInfoType.FileAdded,
                 Path: ToInternalPath(ctx.Path + avl.Filename),
@@ -856,14 +812,16 @@ public static class XisoWriter
     }
 
     /// <summary>
-    /// Recursively descends into the current working directory, building an AVL tree
-    /// of all files and subdirectories found. Updates the progress display as it goes.
-    /// Inaccessible entries are skipped with a warning rather than aborting.
+    /// Recursively descends into <paramref name="directoryPath"/>, building an AVL
+    /// tree of all files and subdirectories found. Updates the progress display as
+    /// it goes. Inaccessible entries are skipped with a warning rather than aborting.
     /// Entries matching an exclude pattern are skipped silently.
     /// </summary>
     /// <param name="outRoot">Receives the root of the generated AVL tree.</param>
     /// <param name="ioN">Running count of filename characters for progress display.</param>
     /// <param name="filesSkipped">Running count of entries skipped due to access errors.</param>
+    /// <param name="directoryPath">Absolute host directory to enumerate.</param>
+    /// <param name="totalBytes">Receives the summed byte length of all packed files.</param>
     /// <param name="excludePatterns">
     /// Optional glob patterns of files and directories to omit. Paths are matched relative
     /// to the source root with <c>/</c> separators; matching directories are not recursed into.
@@ -874,21 +832,26 @@ public static class XisoWriter
         ref AvlNode? outRoot,
         ref int ioN,
         ref int filesSkipped,
+        string directoryPath,
+        ref long totalBytes,
         IReadOnlyList<string>? excludePatterns = null,
         string relativePath = "")
     {
         GlobMatcher? matcher = excludePatterns is { Count: > 0 } ? new GlobMatcher(excludePatterns) : null;
-        return GenerateAvlTreeLocalCore(ref outRoot, ref ioN, ref filesSkipped, matcher, relativePath);
+        return GenerateAvlTreeLocalCore(ref outRoot, ref ioN, ref filesSkipped, directoryPath,
+            ref totalBytes, matcher, relativePath);
     }
 
     private static int GenerateAvlTreeLocalCore(
         ref AvlNode? outRoot,
         ref int ioN,
         ref int filesSkipped,
+        string directoryPath,
+        ref long totalBytes,
         GlobMatcher? matcher,
         string relativePath)
     {
-        string[] entries = Directory.GetFileSystemEntries(".");
+        string[] entries = Directory.GetFileSystemEntries(directoryPath);
         // Deterministic (TODO #2): filesystem enumeration order is OS-dependent and
         // insertion order shapes the AVL tree (hence the dirtab bytes), so sort
         // ordinally — identical input trees then always produce identical images.
@@ -938,20 +901,8 @@ public static class XisoWriter
                 if ((attr & FileAttributes.Directory) != FileAttributes.None)
                 {
                     emptyDir = false;
-                    string prevDir = Directory.GetCurrentDirectory();
-                    Directory.SetCurrentDirectory(entryName);
-                    try
-                    {
-                        GenerateAvlTreeLocalCore(ref avl.Subdirectory, ref ioN, ref filesSkipped, matcher,
-                            entryRelPath);
-                    }
-                    finally
-                    {
-                        // A per-entry catch below (or a throw) must not leave the
-                        // walker inside the failed subdirectory: the remaining
-                        // siblings resolve relative to the parent (Todo #21).
-                        Directory.SetCurrentDirectory(prevDir);
-                    }
+                    GenerateAvlTreeLocalCore(ref avl.Subdirectory, ref ioN, ref filesSkipped, entryPath,
+                        ref totalBytes, matcher, entryRelPath);
                 }
                 else
                 {
@@ -972,7 +923,10 @@ public static class XisoWriter
                     }
 
                     avl.FileSize = (uint)packedLength;
-                    Logger.RecordFileWritten(avl.FileSize);
+                    // Absolute path so the write phase never depends on the
+                    // process working directory (TODO #22).
+                    avl.HostPath = entryPath;
+                    totalBytes += avl.FileSize;
                 }
 
                 // XISO names are case-insensitive: a host directory holding
@@ -1123,16 +1077,9 @@ public static class XisoWriter
     internal static int CreateFromRemapTree(AvlNode? remapRoot, string outputIsoPath, string? volumeName = null,
         IProgress<ProgressInfo>? progress = null, ProgressCallback? progressCallback = null,
         CancellationToken cancellationToken = default, int? prependSectors = null, ulong? fileTime = null,
-        XisoLayoutSpec? layout = null)
-    {
-        // Serialize with CreateXiso: both mutate the shared Logger totals and
-        // capture/restore the process CWD (Todo #29).
-        lock (CreateLock)
-        {
-            return CreateFromRemapTreeCore(remapRoot, outputIsoPath, volumeName, progress, progressCallback,
-                cancellationToken, prependSectors, fileTime, layout);
-        }
-    }
+        XisoLayoutSpec? layout = null) =>
+        CreateFromRemapTreeCore(remapRoot, outputIsoPath, volumeName, progress, progressCallback,
+            cancellationToken, prependSectors, fileTime, layout);
 
     private static int CreateFromRemapTreeCore(AvlNode? remapRoot, string outputIsoPath, string? volumeName,
         IProgress<ProgressInfo>? progress, ProgressCallback? progressCallback,
@@ -1164,9 +1111,11 @@ public static class XisoWriter
         long totalBytes = 0;
         int totalFiles = 0;
 
+        // Compatibility reset for the static Logger mirror (per-operation state
+        // drives progress below).
+        Logger.TotalBytes = Logger.TotalFiles = 0;
+
         SumFiles(root.Subdirectory);
-        Logger.TotalFiles = totalFiles;
-        Logger.TotalBytes = (uint)Math.Min(totalBytes, uint.MaxValue);
 
         if (progress != null)
         {
@@ -1177,13 +1126,11 @@ public static class XisoWriter
 
         progressCallback?.Invoke(0, totalBytes);
         long finalTotal = totalBytes;
-        Logger.TotalBytes = Logger.TotalFiles = 0;
 
         long prependOffset = (long)(prependSectors ?? 0) * Constants.SectorSize;
         if (prependOffset < 0) throw new ArgumentOutOfRangeException(nameof(prependSectors));
 
         int err = 0;
-        string cwd = Directory.GetCurrentDirectory();
         // A failed/cancelled remap create must not leave a truncated .iso that
         // looks like a finished artifact (Todo #53, remap path).
         string? partialOutput = null;
@@ -1255,6 +1202,11 @@ public static class XisoWriter
 
             AvlTree.AvlTraverseDepthFirst(root, WriteTreeCallback, wtContext, AvlTraversalMethod.Prefix, 0);
 
+            // Compatibility mirror for the static Logger counters (the writer's
+            // own logic and progress callback use the per-operation values).
+            Logger.TotalFiles = wtContext.FilesWritten;
+            Logger.TotalBytes = wtContext.BytesWritten;
+
             long pos = xisoFs.Seek(0, SeekOrigin.End);
             long pad = ((Constants.FileModulus - (pos % Constants.FileModulus)) % Constants.FileModulus);
             if (pad > 0)
@@ -1287,14 +1239,6 @@ public static class XisoWriter
         {
             if (root.Subdirectory != null && !ReferenceEquals(root.Subdirectory, AvlNode.EmptySubdirectory))
                 AvlTree.FreeTree(root.Subdirectory);
-            try
-            {
-                Directory.SetCurrentDirectory(cwd);
-            }
-            catch
-            {
-                // ignored
-            }
         }
 
         if (err != 0)
@@ -1398,23 +1342,53 @@ public static class XisoWriter
     }
 
     /// <summary>
-    /// Traversal callback that accumulates total file count and byte count
-    /// from an AVL tree. Used to compute the final byte count before writing.
+    /// Resolves every file node's <see cref="AvlNode.HostPath"/> against
+    /// <paramref name="directoryPath"/> for a caller-supplied tree that has no
+    /// source stream. Relative paths (and existing relative host paths) keep the
+    /// legacy cwd-relative meaning, but the writer no longer changes the CWD.
+    /// </summary>
+    /// <param name="node">Sibling root of the current directory level.</param>
+    /// <param name="directoryPath">Absolute host directory for this level.</param>
+    private static void AssignHostPaths(AvlNode? node, string directoryPath)
+    {
+        while (node != null)
+        {
+            if (node.Subdirectory == null)
+            {
+                string hostPath = string.IsNullOrEmpty(node.HostPath) ? node.Filename : node.HostPath;
+                node.HostPath = Path.IsPathRooted(hostPath)
+                    ? hostPath
+                    : Path.Combine(directoryPath, hostPath);
+            }
+            else if (!ReferenceEquals(node.Subdirectory, AvlNode.EmptySubdirectory))
+            {
+                AssignHostPaths(node.Subdirectory, Path.Combine(directoryPath, node.Filename));
+            }
+
+            AssignHostPaths(node.Left, directoryPath);
+            node = node.Right;
+        }
+    }
+
+    /// <summary>
+    /// Traversal callback that accumulates the total byte count from an AVL tree.
+    /// Used to compute the final byte count before writing.
     /// </summary>
     /// <param name="avl">Current node being visited.</param>
-    /// <param name="context">Not used.</param>
+    /// <param name="context">A <see cref="TreeTotals"/> accumulator.</param>
     /// <param name="depth">Not used.</param>
     /// <returns>Always 0.</returns>
     private static int CalculateTotalFilesAndBytes(AvlNode avl, object? context, int depth)
     {
+        TreeTotals totals = (TreeTotals)context!;
         if (avl.Subdirectory != null && !ReferenceEquals(avl.Subdirectory, AvlNode.EmptySubdirectory))
         {
-            AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, CalculateTotalFilesAndBytes, null,
+            AvlTree.AvlTraverseDepthFirst(avl.Subdirectory, CalculateTotalFilesAndBytes, totals,
                 AvlTraversalMethod.Prefix, 0);
         }
         else if (avl.Subdirectory == null)
         {
-            Logger.RecordFileWritten(avl.FileSize);
+            totals.Bytes += avl.FileSize;
         }
 
         return 0;
@@ -1711,6 +1685,12 @@ public static class XisoWriter
                 }
             }
         }
+    }
+
+    /// <summary>Per-operation byte accumulator for the pre-write tree walk.</summary>
+    private sealed class TreeTotals
+    {
+        internal long Bytes;
     }
 }
 
