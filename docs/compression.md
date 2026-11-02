@@ -90,7 +90,7 @@ block, with a `(sectors + 1) × u32` random-access index at the end. The
 normative description is
 [`Team-Resurgent/libCCI` `FORMAT.md`](https://github.com/Team-Resurgent/libCCI/blob/main/FORMAT.md).
 
-XISOSharp consumes [CCISharp](https://github.com/purelogiccode/CCISharp) 1.0.0,
+XISOSharp consumes [CCISharp](https://github.com/purelogiccode/CCISharp) 1.0.1,
 an independent MIT implementation (no GPL code). The API surface:
 
 ```csharp
@@ -117,6 +117,9 @@ device.Read(0, sector);
   `game.2.cci` derives `game.cci`.
 - **Encoder**: fast LZ4 block encoder. Output is spec-valid and interoperable
   with libCCI/Repackinator, but not byte-identical to their LZ4-HC output.
+- **Hardened reader**: CCISharp 1.0.1 caps a part's index at 64 MiB and returns
+  `InvalidIndex` for hostile headers instead of allocating an index sized only
+  by the part file length.
 - **In-place guards**: `--repair`, `--copy-in`, and `--set-filetime` refuse CCI
   (compressed bytes are not patch-stable); decompress first.
 - **Reader verbs**: `-l`, `-t`, `-x`, `--unpack`, `-r`, `checksum`,

@@ -1,9 +1,9 @@
 # Plan to Enhance XISOSharp
 
-**Status:** CCISharp 1.0.0 published on NuGet (2026-11-01). XISOSharp 1.6.0 implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input (including `validate`/`--validate-checksums`), Phase 4 pathological-TOC traversal hardening (extract/list/rewrite plus the audit, sector-range, repair, salvage and ZAR follow-up walkers), Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests); follow-ups make CISO compression read split/container sources directly and harden ZAR extraction (depth bound, pre-sized exact copies, partial cleanup).
+**Status:** CCISharp 1.0.1 published on NuGet (2026-11-01; 1.0.0 was the first release, 1.0.1 adds hostile-index hardening). XISOSharp 1.6.0 implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input (including `validate`/`--validate-checksums`), Phase 4 pathological-TOC traversal hardening (extract/list/rewrite plus the audit, sector-range, repair, salvage and ZAR follow-up walkers), Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests); follow-ups make CISO compression read split/container sources directly and harden ZAR extraction (depth bound, pre-sized exact copies, partial cleanup).
 **Baseline:** XISOSharp `1.4.4` (tag), extract-xiso build `202609111233`, xdvdfs `0.8.3`
 **Reference:** CCI spec/implementation copied to `References/libCCI-0.1.0-1b0087e` (commit `1b0087e`, GPL-2.0-or-later; reference only) and verified to build/round-trip.
-**CCISharp repo:** <https://github.com/purelogiccode/CCISharp> — package <https://www.nuget.org/packages/CCISharp/1.0.0>.
+**CCISharp repo:** <https://github.com/purelogiccode/CCISharp> — package <https://www.nuget.org/packages/CCISharp/1.0.1>.
 **Date:** 2026-10-31
 **Scope:** turn XISOSharp into the most complete original-Xbox disc-image library by closing the four format/robustness gaps, adding a dedicated `CCISharp` package, and adding three quality-of-life improvements. This document records the plan and its implementation status.
 
@@ -214,7 +214,7 @@ A full review of the upstream trackers — 56 extract-xiso issues, 54 extract-xi
 
 **Option 1 — standalone `CCISharp` repository at `purelogiccode/CCISharp`.**
 
-- The `CCISharp` package ID is now in use: **1.0.0 is published on NuGet** (nupkg + snupkg). Future versions must use new immutable version numbers.
+- The `CCISharp` package ID is now in use: **1.0.1 is published on NuGet** (nupkg + snupkg; 1.0.0 was the first release). Future versions must use new immutable version numbers.
 - Model the repo on `CSharp_ZArchiveSharp`: `CCISharp/`, `CCISharp.Tests/`, `CCISharp.Benchmarks/`, optional `CCISharp.Cli/`, `docs/`, `Directory.Build.props`, `global.json`, `LICENSE`, `THIRD-PARTY-NOTICES.md`, `.github/workflows/ci.yml`.
 - Target `net8.0;net9.0;net10.0`, MinVer (`v*` tags), `IsTrimmable`/`IsAotCompatible`, XML docs, SourceLink, deterministic builds, symbols (`snupkg`), `EnablePackageValidation`.
 - Zero runtime dependencies (own LZ4 block codec). Do **not** add K4os to the shipped package; use K4os only in tests as an independent oracle.
@@ -531,7 +531,7 @@ CLI `cci validate` maps to this report.
 - A 4 GiB+ split set validates and decodes without materializing the whole image.
 - A `libCCI`-produced fixture (`cci_encode` on a synthetic image) parses correctly; CCISharp-produced CCI parses in `cci_extract`/the independent test decoder.
 - Fuzz suite finds no unhandled exception or OOM.
-- Package `CCISharp` 1.0.0 packs with README, LICENSE, third-party notices, XML docs and symbols; nupkg + snupkg published.
+- Package `CCISharp` 1.0.0/1.0.1 packs with README, LICENSE, third-party notices, XML docs and symbols; nupkg + snupkg published.
 
 ---
 
@@ -858,10 +858,10 @@ existing named error or report/drop gate.
 ### 12.0 Current state (2026-11-01)
 
 - **Reference:** `References/libCCI-0.1.0-1b0087e` built; `cci_encode`/`cci_extract`/`cci_info` verified.
-- **CCISharp 1.0.0:** <https://github.com/purelogiccode/CCISharp> - published to NuGet at <https://www.nuget.org/packages/CCISharp/1.0.0>.
+- **CCISharp 1.0.1:** <https://github.com/purelogiccode/CCISharp> - published to NuGet at <https://www.nuget.org/packages/CCISharp/1.0.1>.
   - `net8.0`/`net9.0`/`net10.0`, zero runtime dependencies, trimmable/AOT.
   - Reader, writer, split sets, seekable stream, ISO extraction, validation.
-  - **39 tests green on all three TFMs**, including `libCCI` -> CCISharp and CCISharp -> `libCCI` interop.
+  - **43 tests green on all three TFMs**, including `libCCI` -> CCISharp and CCISharp -> `libCCI` interop.
   - CI green on Windows/Linux/macOS; tag `v1.0.0` builds/publishes `1.0.0` (nupkg + snupkg).
 - **XISOSharp 1.6.0 (in tree, untagged):**
   - `XisoImageSource` factory (ISO/split ISO/CISO/split CISO/CCI/split CCI/ZAR).
@@ -898,7 +898,7 @@ XISOSharp 1.5.0 (factory + split ISO + CCI + ZAR input + traversal hardening + b
 |---|---|---|---|
 | 0 | Reference copy + oracle build | done | `References/libCCI-0.1.0-1b0087e`; `cci_encode`/`cci_extract`/`cci_info` verified |
 | 1 | CCISharp repo bootstrap, header/index/codec, reader | done | 39 tests green on net8/9/10 |
-| 2 | CCISharp writer + split + tests/bench/docs | 1.0.0 published; benchmarks/docs/fuzz pending | NuGet `1.0.0` |
+| 2 | CCISharp writer + split + tests/bench/docs | 1.0.0 published; 1.0.1 hardened the index path (cap, checked cast, hostile tests) and made libCCI interop a real CI gate; benchmarks/docs/fuzz pending | NuGet `1.0.1` |
 | 3 | XISOSharp Phase 0 factory + split ISO input | done (1.4.5) | `XisoImageSource`, `SplitIsoFile`/`SplitIsoStream`, naming/guards/tests |
 | 4 | XISOSharp CCI integration (library + CLI + GUI) | done (1.4.5) | `CciBlockDevice`, `XisoCci`, `--format cci`, GUI selector |
 | 5 | XISOSharp ZAR input | done (1.4.5) | `ListZar`/`ExtractZar`/`ConvertZarToIso`, `ComputeZarChecksum`, CLI `convert` |
@@ -921,7 +921,7 @@ Effort figures are indicative, not commitments; they exclude review, docs polish
 
 ### 12.4 Suggested version labels
 
-- **CCISharp 1.0.0** — read/write/split/validate.
+- **CCISharp 1.0.1** — read/write/split/validate, with hardened index parsing.
 - **XISOSharp 1.5.0** — factory + split ISO + CCI/ZAR input + batch + JSON + preallocation.
 - **XISOSharp 1.6.0** — explicit sector-layout packing (`--layout`, `XisoLayoutSpec`).
 
@@ -1058,8 +1058,8 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [x] NuGet publish is gated on `pack` and runs only on tags (`ci.yml`).
 - [x] `AGENTS.md` release routine and bundle recipe document the automated path.
 - [x] Merge the tree's 1.5.0/1.6.0 notes into one `## 1.5.0` release section and refresh `WhatsNew.md` for the new features.
-- [x] Publish `1.5.0`: tag, NuGet nupkg/snupkg + `XISOSharp.Tool`, GitHub release with six bundles + SPDX SBOM; verified `api.nuget.org/v3-flatcontainer` and the release assets.
-- [x] Add a `dotnet tool` package (`XISOSharp.Tool`, command `xisosharp`) and a tag-only publish job.
+- [x] Publish `1.5.0`: tag, NuGet nupkg/snupkg + `XISOSharp.Tool` (the tool package was dropped after 1.5.0), GitHub release with six bundles + SPDX SBOM; verified `api.nuget.org/v3-flatcontainer` and the release assets.
+- [x] Add a `dotnet tool` package (`XISOSharp.Tool`, command `xisosharp`) and a tag-only publish job. **Removed for 1.6.0**: the CLI ships only inside the six RID bundles; the NuGet feed carries the library alone.
 - [x] Add SBOM generation (CycloneDX/SPDX) to the release workflow.
 - [x] Add GitHub build-provenance attestations for the six bundles.
 - [ ] Add optional NuGet author-signing and Windows Authenticode/macOS notarization steps gated on repository secrets.
@@ -1119,7 +1119,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [ ] Add a safe-extract policy (reject / sanitize / skip) for hostile names.
 - [x] Fuzz the XBE/XEX parsers and CCI/CISO index decoders.
 - [x] Add memory/entry caps and malformed-index/alignment validation for CISO on hostile inputs.
-- [ ] Add memory/entry caps for CCI indexes on hostile inputs (CCISharp 1.1).
+- [x] Add memory/entry caps for CCI indexes on hostile inputs (CCISharp 1.0.1: 64 MiB cap, checked cast, hostile-header tests).
 - [x] Document a threat model and a “hostile image” test corpus.
 
 ### 15.6 Feature completeness (beyond the references)
@@ -1164,7 +1164,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 
 ### 15.9 Cross-repo work (CCISharp / ZArchiveSharp)
 
-- [ ] CCISharp 1.1: LZ4-HC encoder, multi-digit parts, fuzz harness, benchmarks, format/API/interop docs.
+- [ ] CCISharp 1.1: LZ4-HC encoder, multi-digit parts, own fuzz harness, benchmarks, format/API/interop docs (1.0.1 already shipped index hardening, real libCCI interop in CI, and format/coverage/package-baseline gates).
 - [ ] ZArchiveSharp: fuzz harness and benchmark coverage for ZAR decode.
 - [ ] SimpleXisoDrive/XISOStudio: consume the new `XisoImage` facade (optional, after 1.5.0).
 
@@ -1182,13 +1182,12 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 
 ```powershell
 dotnet build CSharp_XISOSharp.sln -c Release -m:1
-dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release
+dotnet test tests/XISOSharp.Tests/XISOSharp.Tests.csproj -c Release
 dotnet format whitespace CSharp_XISOSharp.sln --verify-no-changes --no-restore
-dotnet pack XISOSharp/XISOSharp.csproj -c Release -o artifacts
-dotnet pack XISOSharp.Tool/XISOSharp.Tool.csproj -c Release -o artifacts
-dotnet publish XISOSharp.AotSmoke/XISOSharp.AotSmoke.csproj -c Release -r linux-x64
-dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
-dotnet run --project XISOSharp.Fuzz -c Release -- --seconds 60
+dotnet pack src/XISOSharp/XISOSharp.csproj -c Release -o artifacts
+dotnet publish tests/XISOSharp.AotSmoke/XISOSharp.AotSmoke.csproj -c Release -r linux-x64
+dotnet run --project tests/XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
+dotnet run --project tests/XISOSharp.Fuzz -c Release -- --seconds 60
 ```
 
 ### 15.12 Progress log
@@ -1198,3 +1197,4 @@ dotnet run --project XISOSharp.Fuzz -c Release -- --seconds 60
 | 2026-11-01 | Phase 9 plan added; 1.5/1.6 notes merged into 1.5.0 | — |
 | 2026-11-01 | Phase 9 implementation: `XisoImage`, full-image hashes, `verify-hashes`, `title-info`, CISO hardening (fuzzer found an `OverflowException`), ZAR caps, reserved names/long paths, `dotnet tool`, AOT smoke, mutation fuzzer, 3-OS CI, format/coverage gates, SBOM/provenance, community files, sample, end-to-end benchmarks, support policy, threat model, public-API snapshot, synthetic battle-interop. Full suite 1979/1 (net8/9), 2043/1 (net10); Linux 2015/24; NativeAOT smoke green. | — |
 | 2026-11-01 | **Released 1.5.0**: tag pushed, CI green on Ubuntu/Windows/macOS + AOT + fuzz + battle-interop + InspectCode, NuGet `XISOSharp` 1.5.0 + `XISOSharp.Tool` 1.5.0 published, GitHub release published with six RID bundles + SPDX SBOM. | `1.5.0` |
+| 2026-11-01 | **CCISharp 1.0.1**: 64 MiB index cap (checked cast; hostile headers return `InvalidIndex` instead of throwing from `ArrayPool.Rent`), overflow-free index length, hostile-input tests, libCCI interop in CI with checked-in oracles, format + 65/55 coverage + package-validation gates, pinned actions. XISOSharp now references 1.0.1. | `v1.0.1` |

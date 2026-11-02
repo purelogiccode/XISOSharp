@@ -78,7 +78,7 @@
     <!-- CCISharp is consumed as a NuGet package (https://www.nuget.org/packages/CCISharp).
              The library lives in the sibling CSharp_CCISharp repo; local changes there are
              consumed here by publishing a new package version. -->
-    <PackageReference Include="CCISharp" Version="1.0.0" />
+    <PackageReference Include="CCISharp" Version="1.0.1" />
   </ItemGroup>
 
   <ItemGroup>
