@@ -557,6 +557,8 @@ exposes this as `--xbe-image <image> <path> --type logo|title|save -o out.png|ou
 public static bool IsGodContainer(string path)
 public static bool TryReadTitle(string path, out GodTitleInfo? info)
 public static GodTitleInfo? ReadTitle(string path)
+public static bool TryReadVolume(string path, out GodVolumeInfo? info)
+public static bool TryReadVolume(string path, FileShare share, out GodVolumeInfo? info)
 ```
 
 Reads the plaintext `XContent` header of a Games-on-Demand (GOD/SVOD)
@@ -567,9 +569,16 @@ number/count (`0x366`/`0x367`) and UTF-16BE title name (`0x411`, 0x80 bytes).
 Names are sanitised for FATX (non-ASCII/control characters removed,
 `\/:*?"<>|` replaced with `_`) and fall back to the 8-digit hex title ID when
 empty. `GodTitleInfo` carries `HeaderPath`, `TitleName`, `TitleId`,
-`TitleIdHex`, `DiscNumber` and `DiscCount`. The CLI exposes this as
-`title-info <header-or-.data-folder> [--json]`; full read-only GOD sector input
-through `StfsSharp` is planned for 1.7.0.
+`TitleIdHex`, `DiscNumber` and `DiscCount`.
+
+`TryReadVolume` additionally parses the SVOD device descriptor (start block,
+data-block count, enhanced-GDF flag) and the `DataNNNN` fragment list, returning
+a `GodVolumeInfo` with the logical image length and fragment paths. The
+`GodBlockDevice` (`XISOSharp.BlockDevice`) exposes that mapping as a read-only
+`IBlockDevice`, and `XisoImageSource` detects a GOD header or its `.data`
+folder and routes every read verb through the decompressed view. The CLI
+exposes this as `title-info <header-or-.data-folder> [--json]`,
+`decompress <header> [out.iso]`, and `convert <header> <out.iso|out.cci|out.cso>`.
 
 ## Single-file STFS package metadata (`StfsHeader`)
 

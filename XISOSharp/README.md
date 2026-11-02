@@ -100,6 +100,7 @@ accepts these sources through `XisoReader.OpenImageStream`:
 | `game.1.iso` … | Split plain ISO, concatenated and seekable; a missing middle part throws. |
 | `.cso`, `.1.cso` | CISO v1/v2, single or split, decompressed on demand (`CisoBlockDevice`). |
 | `.cci`, `.1.cci` | CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), single or split (`CciBlockDevice`). |
+| GOD header or `<header>.data` | GOD/SVOD sector input: `DataNNNN` fragments are mapped to the logical image through `GodBlockDevice` (read-only). |
 | `.zar` | ZArchive name tree: list/extract/checksum/validate/convert (`XisoZarchive`), not a sector image. |
 
 Detection is extension-led with a `CISO`/`CCIM` magic sniff fallback, so renamed
@@ -358,15 +359,25 @@ public static class GodHeader
     public static bool IsGodContainer(string path);
     public static bool TryReadTitle(string path, out GodTitleInfo? info);
     public static GodTitleInfo? ReadTitle(string path);
+    public static bool TryReadVolume(string path, out GodVolumeInfo? info);
+    public static bool TryReadVolume(string path, FileShare share, out GodVolumeInfo? info);
 }
 
 public sealed record GodTitleInfo(
     string HeaderPath, string TitleName, uint TitleId, string TitleIdHex,
     byte DiscNumber, byte DiscCount);
+
+public sealed record GodVolumeInfo(
+    string HeaderPath, string DataDirectory, uint DataFileCount,
+    uint StartingBlock, uint DataBlockCount, bool EnhancedGdf,
+    long Length, IReadOnlyList<string> Parts);
 ```
 
-`path` may be the header file or its `.data` directory. Full read-only GOD
-sector input through `StfsSharp` is planned for 1.7.0.
+`path` may be the header file or its `.data` directory. `TryReadVolume`
+parses the SVOD descriptor and fragment list; `GodBlockDevice` exposes the
+sector mapping as a read-only `IBlockDevice`, so every read verb accepts a GOD
+container. In-place `Repair`, `CopyIntoImage`, `SetFileTime`, rewrite and split
+refuse GOD and ask for `decompress` first.
 
 #### Single-file STFS package metadata (`StfsHeader`)
 

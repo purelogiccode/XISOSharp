@@ -77,11 +77,11 @@ XISOSharp image-spec from -O <out> -m "host:image" ... [specPath]
 XISOSharp compress|cso|cci <sourceDir|image> [output] [--format cso|cci]
     [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
     [--cci-level 0..9] [--cci-split bytes] [--batch <dir>]
-XISOSharp decompress|uncso|decso|uncci <cso|cci> [output.iso] [--batch <dir>]
+XISOSharp decompress|uncso|decso|uncci <cso|cci|god> [output.iso] [--batch <dir>]
 XISOSharp checksum [--silent] <image> [images...]
 XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...] [--batch <dir>]
 XISOSharp join [--output <file>] <first.1.iso> [...]
-XISOSharp convert <src.zar|src.iso> <out.iso|out.zar> [--batch <dir> --format iso|zar]
+XISOSharp convert <src.zar|src.iso|god> <out.iso|out.zar|out.cci|out.cso> [--batch <dir> --format iso|zar]
 ```
 
 Rules: flags must precede positional arguments (the first non-flag token ends option
@@ -122,8 +122,8 @@ printed and the tool exits 1.
 | `--ranges <image>` | System (bone) vs file sector ranges (inclusive spans) |
 | `--is-optimized <image>` | Print whether the image carries the optimized tag (supports `--skip-sectors`) |
 | `--batch <dir>` (+ `--batch-recursive`) | Process all `.iso` in `<dir>` (extract/list/tree/rewrite/audit), or the verb's inputs (`compress`/`decompress`/`convert`/`split`) |
-| `compress` (`cso`, `cci`) / `decompress` (`uncso`, `decso`, `uncci`) | CISO v2 LZ4 (default) / v1 DEFLATE and CCI LZ4 round-trip (`--format`, `--ciso-*`, `--cci-*`, `--batch`) |
-| `convert` | ZArchive to ISO / ISO to ZArchive (`--batch --format iso\|zar` for whole directories) |
+| `compress` (`cso`, `cci`) / `decompress` (`uncso`, `decso`, `uncci`) | CISO v2 LZ4 (default) / v1 DEFLATE, CCI LZ4 and GOD/SVOD round-trip (`--format`, `--ciso-*`, `--cci-*`, `--batch`) |
+| `convert` | ZArchive to ISO / ISO to ZArchive / GOD to ISO, CCI or CISO (`--batch --format iso\|zar` for whole directories) |
 | `build-image` / `image-spec` | xdvdfs-parity ordered packing from globs / TOML spec generation |
 | `--video` / `--random` / `--seed` / `--wipe` / `--trim` / `--petrify` / `--update` / `--zar` | Redump archival verbs (`--jobs`/`--policy` for `--zar`; `--all`/`--best`/`--compress` aliases; `--security-sectors` for rebuild) |
 | `rebuild` | Rebuild a lossless Redump image from components (`-o <redump.iso>`) |
@@ -234,6 +234,9 @@ XISOSharp checksum game.iso
 XISOSharp checksum game.zar
 XISOSharp validate --validate-checksums game.zar game.iso
 XISOSharp convert game.zar game.iso
+XISOSharp -l "4D5307E6"                       # GOD header (or its .data folder)
+XISOSharp decompress "4D5307E6" game.iso      # GOD -> ISO
+XISOSharp convert "4D5307E6" game.cci         # GOD -> CCI
 XISOSharp split --size half --output base game.iso
 XISOSharp join --output rejoined.iso base.1.iso
 

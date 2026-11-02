@@ -259,6 +259,12 @@ public static class XisoSplitter
             throw new ArgumentException("Image path must not be empty.", nameof(isoPath));
         if (!File.Exists(isoPath))
             throw new FileNotFoundException($"Image not found: {isoPath}", isoPath);
+        if (GodHeader.IsGodContainer(isoPath))
+        {
+            throw new NotSupportedException(
+                $"Cannot split GOD container '{isoPath}' directly; decompress it to ISO first.");
+        }
+
         VolumeInfo volume = XisoReader.GetVolumeInfo(isoPath);
         if (!volume.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");

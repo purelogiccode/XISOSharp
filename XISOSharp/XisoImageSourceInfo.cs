@@ -8,7 +8,10 @@ namespace XISOSharp;
 /// <param name="Format">Container format.</param>
 /// <param name="DisplayName">File name used in logs and error messages (the first part for split sets).</param>
 /// <param name="Length">Logical uncompressed image length in bytes.</param>
-/// <param name="Parts">Part paths in image order; a single element for non-split images.</param>
+/// <param name="Parts">
+/// Part paths in image order; a single element for non-split images. A GOD
+/// container lists its header first, followed by the <c>DataNNNN</c> fragments.
+/// </param>
 [SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global",
     Justification = "Public detection payload: consumers read DisplayName, the library itself does not.")]
 public sealed record XisoImageSourceInfo(

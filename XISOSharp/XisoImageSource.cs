@@ -2,20 +2,24 @@ using System.Buffers.Binary;
 using CCISharp;
 using XISOSharp.BlockDevice;
 using XISOSharp.Interfaces;
+using XISOSharp.Models;
 using ZArchiveSharp;
 
 namespace XISOSharp;
 
 /// <summary>
 /// Single entry point for detecting and opening Xbox image sources.
-/// Normalizes plain ISO, CISO/CSO, CCI and their split variants so readers,
-/// checksums, repair guards and output naming share one detection table.
+/// Normalizes plain ISO, CISO/CSO, CCI, GOD/SVOD and their split variants so
+/// readers, checksums, repair guards and output naming share one detection
+/// table.
 /// </summary>
 /// <remarks>
 /// Detection is extension-led with a magic sniff fallback: a renamed CISO or
 /// CCI container (for example a <c>.old</c> rewrite backup) still opens through
-/// the decompressed view. A plain file with an unknown extension is treated as
-/// a raw ISO candidate; <see cref="XisoReader.VerifyXiso(IBlockDevice, string, int?)"/>
+/// the decompressed view. GOD headers are content-hash file names (or a
+/// <c>.data</c> directory), so they are probed by header content rather than
+/// extension. A plain file with an unknown extension is treated as a raw ISO
+/// candidate; <see cref="XisoReader.VerifyXiso(IBlockDevice, string, int?)"/>
 /// performs the authoritative format check.
 /// </remarks>
 public static class XisoImageSource
@@ -35,10 +39,11 @@ public static class XisoImageSource
     /// <summary>
     /// Attempts to classify <paramref name="path"/> and read its logical length.
     /// Returns <c>false</c> when the path is empty, a known container header is
-    /// invalid, or a split part set has no existing parts. Plain files always
-    /// classify as <see cref="XisoImageFormat.Iso"/>.
+    /// invalid, or a split part set has no existing parts. A GOD header (or its
+    /// <c>.data</c> folder) is classified as <see cref="XisoImageFormat.God"/>;
+    /// other plain files classify as <see cref="XisoImageFormat.Iso"/>.
     /// </summary>
-    /// <param name="path">Image path (single file or first split part).</param>
+    /// <param name="path">Image path (single file, GOD header/`.data` folder or first split part).</param>
     /// <param name="info">Detected source metadata, or <c>null</c> on failure.</param>
     public static bool TryDetect(string? path, out XisoImageSourceInfo? info) =>
         TryDetect(path, FileShare.Read, out info);
@@ -47,15 +52,23 @@ public static class XisoImageSource
     /// Attempts to classify <paramref name="path"/> using a caller-chosen share
     /// mode for header probes. Returns <c>false</c> when the path is empty, a
     /// known container header is invalid, or a split part set has no existing
-    /// parts. Plain files always classify as <see cref="XisoImageFormat.Iso"/>.
+    /// parts. A GOD header (or its <c>.data</c> folder) is classified as
+    /// <see cref="XisoImageFormat.God"/>; other plain files classify as
+    /// <see cref="XisoImageFormat.Iso"/>.
     /// </summary>
-    /// <param name="path">Image path (single file or first split part).</param>
+    /// <param name="path">Image path (single file, GOD header/`.data` folder or first split part).</param>
     /// <param name="share">File sharing mode used for header probes.</param>
     /// <param name="info">Detected source metadata, or <c>null</c> on failure.</param>
     public static bool TryDetect(string? path, FileShare share, out XisoImageSourceInfo? info)
     {
         info = null;
         if (string.IsNullOrWhiteSpace(path)) return false;
+
+        // GOD headers have no dedicated extension (they are content-hash file
+        // names beside a .data directory), so probe before the extension-led
+        // paths. The content-type/volume-type check keeps ordinary ISO files
+        // with an unrelated .data sibling from being misclassified.
+        if (TryDetectGod(path, share, out info)) return true;
 
         string extension = Path.GetExtension(path);
 
@@ -129,6 +142,14 @@ public static class XisoImageSource
         TryDetect(path, out XisoImageSourceInfo? info) && info is not null && info.IsCompressed;
 
     /// <summary>
+    /// Returns true when <paramref name="path"/> is a readable GOD/SVOD
+    /// container (a header file or its <c>.data</c> directory).
+    /// </summary>
+    /// <param name="path">GOD header file or matching <c>.data</c> directory.</param>
+    public static bool IsGodImage(string? path) =>
+        !string.IsNullOrWhiteSpace(path) && GodHeader.TryReadVolume(path, out _);
+
+    /// <summary>
     /// Returns true when <paramref name="path"/> has a CISO or CCI extension,
     /// without opening the file. Used by in-place guards that must refuse a
     /// compressed container even when the file is missing or corrupt.
@@ -143,11 +164,11 @@ public static class XisoImageSource
     }
 
     /// <summary>
-    /// Opens an image for reading, decompressing CISO/CCI containers and
-    /// stitching split parts transparently. The caller owns the returned
-    /// stream.
+    /// Opens an image for reading, decompressing CISO/CCI containers, mapping
+    /// GOD/SVOD fragments and stitching split parts transparently. The caller
+    /// owns the returned stream.
     /// </summary>
-    /// <param name="path">Image path (single file or first split part).</param>
+    /// <param name="path">Image path (single file, GOD header/`.data` folder or first split part).</param>
     /// <param name="share">File sharing mode for the underlying file(s).</param>
     /// <exception cref="FileNotFoundException">The image or a split part does not exist.</exception>
     /// <exception cref="InvalidDataException">A container header or index is invalid.</exception>
@@ -174,6 +195,7 @@ public static class XisoImageSource
                 new BlockDeviceStream(new CisoBlockDevice(path, share)),
             XisoImageFormat.Cci or XisoImageFormat.SplitCci =>
                 new BlockDeviceStream(new CciBlockDevice(path, share)),
+            XisoImageFormat.God => new BlockDeviceStream(new GodBlockDevice(path, share)),
             XisoImageFormat.Zar => throw new NotSupportedException(ZarNotSectorImageMessage),
             _ => throw new InvalidDataException($"Unsupported image format for '{path}'."),
         };
@@ -181,10 +203,10 @@ public static class XisoImageSource
 
     /// <summary>
     /// Opens an image as an <see cref="IBlockDevice"/>, decompressing CISO/CCI
-    /// containers and stitching split parts transparently. The caller owns the
-    /// returned device.
+    /// containers, mapping GOD/SVOD fragments and stitching split parts
+    /// transparently. The caller owns the returned device.
     /// </summary>
-    /// <param name="path">Image path (single file or first split part).</param>
+    /// <param name="path">Image path (single file, GOD header/`.data` folder or first split part).</param>
     /// <param name="share">File sharing mode for the underlying file(s).</param>
     /// <exception cref="FileNotFoundException">The image or a split part does not exist.</exception>
     /// <exception cref="InvalidDataException">A container header or index is invalid.</exception>
@@ -200,6 +222,7 @@ public static class XisoImageSource
             XisoImageFormat.SplitIso => new StreamBlockDevice(new SplitIsoStream(info.Parts, share)),
             XisoImageFormat.Ciso or XisoImageFormat.SplitCiso => new CisoBlockDevice(path, share),
             XisoImageFormat.Cci or XisoImageFormat.SplitCci => new CciBlockDevice(path, share),
+            XisoImageFormat.God => new GodBlockDevice(path, share),
             XisoImageFormat.Zar => throw new NotSupportedException(ZarNotSectorImageMessage),
             _ => throw new InvalidDataException($"Unsupported image format for '{path}'."),
         };
@@ -276,6 +299,22 @@ public static class XisoImageSource
         }
 
         throw new InvalidDataException($"Unsupported or invalid Xbox image: {path}");
+    }
+
+    private static bool TryDetectGod(string path, FileShare share, out XisoImageSourceInfo? info)
+    {
+        info = null;
+        if (!GodHeader.TryReadVolume(path, share, out GodVolumeInfo? volume))
+            return false;
+
+        string displayName = GodHeader.ReadTitle(volume.HeaderPath)?.TitleName
+                             ?? Path.GetFileName(volume.HeaderPath);
+        info = new XisoImageSourceInfo(
+            XisoImageFormat.God,
+            displayName,
+            volume.Length,
+            volume.Parts);
+        return true;
     }
 
     private static bool TryDetectSplitIso(string path, out XisoImageSourceInfo? info)

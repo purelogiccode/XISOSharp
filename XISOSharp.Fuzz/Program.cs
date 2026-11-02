@@ -1,5 +1,7 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text;
 using XISOSharp.Models;
 
 namespace XISOSharp.Fuzz;
@@ -32,6 +34,7 @@ internal static class Program
                 new("ciso", CreateCiso(root, baseIso)),
                 new("cci", CreateCci(root, baseIso)),
                 new("zar", CreateZar(root, baseIso)),
+                new("god", CreateGod(root, baseIso)),
             ];
 
             Stopwatch clock = Stopwatch.StartNew();
@@ -42,9 +45,22 @@ internal static class Program
                 iterations++;
                 FuzzTarget target = targets[random.Next(targets.Count)];
                 string mutated = Path.Combine(root, $"mutated_{iterations}{Path.GetExtension(target.Path)}");
+                string? mutatedData = null;
                 try
                 {
                     Mutate(target.Path, mutated, random);
+                    if (string.Equals(target.Format, "god", StringComparison.Ordinal))
+                    {
+                        // GOD needs the header's .data sibling; keep the base
+                        // fragments while mutating the header fields.
+                        mutatedData = mutated + ".data";
+                        Directory.CreateDirectory(mutatedData);
+                        File.Copy(
+                            Path.Combine(target.Path + ".data", "Data0000"),
+                            Path.Combine(mutatedData, "Data0000"),
+                            overwrite: true);
+                    }
+
                     RunChecks(target.Format, mutated, root);
                 }
                 catch (Exception ex) when (IsExpected(ex))
@@ -64,6 +80,7 @@ internal static class Program
                 finally
                 {
                     TryDelete(mutated);
+                    if (mutatedData != null) TryDeleteDirectory(mutatedData);
                 }
             }
 
@@ -137,6 +154,53 @@ internal static class Program
         return path;
     }
 
+    private static string CreateGod(string root, string iso)
+    {
+        string header = Path.Combine(root, "base.god");
+        string dataDirectory = header + ".data";
+        Directory.CreateDirectory(dataDirectory);
+
+        byte[] isoBytes = File.ReadAllBytes(iso);
+        int sectors = isoBytes.Length / Constants.SectorSize;
+        uint dataBlocks = (uint)((sectors + 1) / 2);
+
+        byte[] headerBytes = new byte[GodHeader.MinimumHeaderLength];
+        BinaryPrimitives.WriteUInt32BigEndian(headerBytes.AsSpan(0), 0x4C495645); // LIVE
+        BinaryPrimitives.WriteUInt32BigEndian(headerBytes.AsSpan(0x344), 0x7000); // GOD
+        BinaryPrimitives.WriteUInt32BigEndian(headerBytes.AsSpan(GodHeader.TitleIdOffset), 0x4D5307E6);
+        headerBytes[GodHeader.DiscNumberOffset] = 1;
+        headerBytes[GodHeader.DiscCountOffset] = 1;
+        byte[] title = Encoding.BigEndianUnicode.GetBytes("Fuzz GOD");
+        title.AsSpan(0, Math.Min(title.Length, GodHeader.TitleNameLength))
+            .CopyTo(headerBytes.AsSpan(GodHeader.TitleNameOffset));
+        WriteUInt24LittleEndian(headerBytes, 0x392, dataBlocks);
+        WriteUInt24LittleEndian(headerBytes, 0x395, 0);
+        BinaryPrimitives.WriteUInt32BigEndian(headerBytes.AsSpan(0x39D), 1);
+        BinaryPrimitives.WriteUInt32BigEndian(headerBytes.AsSpan(0x3A9), 1);
+        File.WriteAllBytes(header, headerBytes);
+
+        string dataPath = Path.Combine(dataDirectory, "Data0000");
+        using FileStream data = new(
+            dataPath, FileMode.Create, FileAccess.Write, FileShare.Read,
+            1 << 16, FileOptions.RandomAccess);
+        for (int block = 0; block * 0x198 < sectors; block++)
+        {
+            int startSector = block * 0x198;
+            int count = Math.Min(0x198, sectors - startSector);
+            data.Seek(0x2000 + block * 0xCD000L, SeekOrigin.Begin);
+            data.Write(isoBytes, startSector * Constants.SectorSize, count * Constants.SectorSize);
+        }
+
+        return header;
+    }
+
+    private static void WriteUInt24LittleEndian(Span<byte> buffer, int offset, uint value)
+    {
+        buffer[offset] = (byte)value;
+        buffer[offset + 1] = (byte)(value >> 8);
+        buffer[offset + 2] = (byte)(value >> 16);
+    }
+
     private static void RunChecks(string format, string path, string root)
     {
         if (string.Equals(format, "zar", StringComparison.Ordinal))
@@ -166,7 +230,12 @@ internal static class Program
             _ = image.ReadFile(file.FullPath);
         }
 
-        _ = image.ComputeImageHash();
+        // A mutated GOD header can claim a multi-terabyte logical length;
+        // hashing it would stream the whole range and stall the fuzzer. The
+        // other formats' base images are small and still exercise this path.
+        if (!string.Equals(format, "god", StringComparison.Ordinal))
+            _ = image.ComputeImageHash();
+
         _ = image.Validate();
         _ = image.GetTitleInfo();
         _ = image.GetXbeInfo("/default.xbe");

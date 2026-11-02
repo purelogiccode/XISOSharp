@@ -63,6 +63,7 @@ Highlights:
 | Image splitting (`XisoSplitter` split/halves/join, alignment, guards, CLI verbs) | `XisoSplitTests.cs` |
 | FATX-safe split default and explicit over-cap warning | `XisoSplitTests.cs` |
 | Batch `--delete-source` (success/failure, `-y`/`-n`, split sets, summary) | `CliBatchConvertTests.cs` |
+| GOD read-only sector input (`GodBlockDevice`, detection, extraction, checksum, CLI decompress/convert, guards) | `GodBlockDeviceTests.cs` |
 | GOD header title metadata (`GodHeader`, `title-info` text/JSON) | `GodHeaderTests.cs` |
 | Single-file XBLA/XBLIG STFS header metadata (`StfsHeader`, text/JSON) | `StfsHeaderTests.cs` |
 | Explicit sector-layout packing (`XisoLayoutSpec` JSON/text, fixed extents, first-fit, CLI/build-image) | `LayoutPackingTests.cs` |

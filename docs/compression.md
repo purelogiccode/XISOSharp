@@ -8,6 +8,11 @@ zero dependencies): `XisoCci` compresses/decompresses, `CciBlockDevice` exposes 
 access, and `.cci`/`.1.cci` inputs work through the same reader verbs as CISO. See
 [CCI (CCIM)](#cci-ccim).
 
+GOD/SVOD containers (a header file or its `.data` folder) are accepted as a
+compression source: the decompressed sector view is materialized to a temporary
+ISO before CISO/CCI encoding, so `compress`/`convert` work without a manual
+`decompress` step.
+
 Also covered here: **ZAR/ZArchive block compression** (`ZArchiveSharp`, pure-C# zstd) — see [ZArchive / zstd block compression](#zarchive--zstd-block-compression).
 
 - [Format](#format)

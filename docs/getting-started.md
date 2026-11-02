@@ -209,6 +209,11 @@ XISOSharp image-spec from -O dist/image.iso -m "bin:/" xdvdfs.toml
 XISOSharp compress ./game_dir game.cso --ciso-level 9 --ciso-version 2 --ciso-split 0
 XISOSharp decompress game.cso game.iso   # uncso/decso aliases; split .1.cso input accepted
 
+# GOD/SVOD read-only input (header file or its .data folder)
+XISOSharp -l "4D5307E6"                   # list/extract/checksum/hash/validate
+XISOSharp decompress "4D5307E6" game.iso  # title-named ISO by default
+XISOSharp convert "4D5307E6" game.cci     # or .cso
+
 # Deterministic SHA3-256 image checksum (BTreeMap sorted, xdvdfs compat)
 XISOSharp checksum game.iso
 ```

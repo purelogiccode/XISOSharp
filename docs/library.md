@@ -40,7 +40,7 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | [`XisoImage`](api-utilities.md#xisoimage) / `XisoImageHash` | Open-once disposable facade (list/read/extract/validate/title/hash, async wrappers) + full-image CRC32/MD5/SHA-1/SHA-256/SHA3-256 |
 | [`XisoReader`](api-xisoreader.md) | Verify, extract, list, tree, rewrite, info, `ls`, audit, repair, salvage, hash, copy-out, copy-in, checksum, filetime, split/join, XEX/XBE info, XEX title metadata, BlockDevice overloads |
 | `XbeAssets` | XBE logo / `$$XTIMAGE` / `$$XSIMAGE` extraction with BCL-only PNG and DDS output |
-| `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` | Unified detection and open (`TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`) for ISO, split ISO, CISO, CCI, split variants and ZAR |
+| `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` | Unified detection and open (`TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`) for ISO, split ISO, CISO, CCI, GOD/SVOD, split variants and ZAR |
 | `XisoCci` / `CciBlockDevice` | CCI/CCIM compression, extraction, default names and random access (CCISharp-backed) |
 | `XisoZarchive` (read APIs) | `ListZar`, `ExtractZar`, `ConvertZarToIso` alongside the existing `CreateZar` |
 | [`XisoExplorer`](api-utilities.md#xisoexplorer--xisoattributes) / [`XisoAttributes`](api-utilities.md#xisoexplorer--xisoattributes) | In-place exploration (list/get/copy/hash/XEX/XBE, bounded `OpenReadStream`, keep-open VFS mode) + Windows attribute mapping |
@@ -56,7 +56,7 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | [`XisoRanges`/`XisoSkeleton`/`XgdTables`/`XboxPrng`/`SecuritySectors`](api-utilities.md) | Redump archival: ranges, skeleton/SHA-1, wave tables, PRNG seed, `sectors.txt` |
 | [`XisoRedump`/`XisoOperations`/`XisoZarchive`](api-utilities.md) | Video/filler/wipe/trim/petrify/update/ZAR/rebuild |
 | [`XisoChecksum` / `CisoWriter`/`CisoReader`](api-utilities.md) | SHA3-256 image checksum + CISO compress/decompress |
-| [`BlockDevice/*`](api-utilities.md#blockdevice) | `IBlockDevice` + `File`/`Memory`/`Offset`/`Stream`/`Ciso`/`Cci` devices |
+| [`BlockDevice/*`](api-utilities.md#blockdevice) | `IBlockDevice` + `File`/`Memory`/`Offset`/`Stream`/`Ciso`/`Cci`/`God` devices |
 | [`RemapFilesystem`](api-utilities.md) | Ordered `host→image` remapping, `xdvdfs.toml`, `GenerateSpecText`, `DryRunRemap` |
 | Records/enums | `VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `XexTitleInfo`, `XbeInfo`, `XbeImage`, `TitleInfo`/`TitleKind`, `RemapRule`, `XisoLayoutSpec`, `XisoLayoutEntry`, `ProgressInfo`, `ExtractMode`, … |
 | Exceptions | `XisoFormatException`, `XisoEmptyException`, `XisoFileTooLargeException`, `ExtractErrorException` |
@@ -73,6 +73,7 @@ if (XisoImageSource.TryDetect(path, out XisoImageSourceInfo? info) && info is no
 
 using Stream image = XisoImageSource.OpenRead(@"C:\games\game.1.cci");
 using IBlockDevice dev = XisoImageSource.OpenBlockDevice(@"C:\games\game.1.iso");
+using IBlockDevice god = XisoImageSource.OpenBlockDevice(@"C:\games\4D5307E6"); // or its .data folder
 ```
 
 ## Open-once facade

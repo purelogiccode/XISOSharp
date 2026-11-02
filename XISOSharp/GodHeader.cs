@@ -43,6 +43,30 @@ public static class GodHeader
     /// </summary>
     public const int MinimumHeaderLength = TitleNameOffset + TitleNameLength;
 
+    /// <summary>Offset of the 0x24-byte STFS/SVOD volume descriptor.</summary>
+    internal const int VolumeDescriptorOffset = 0x379;
+
+    /// <summary>Offset of the SVOD device-features byte.</summary>
+    internal const int SvodFeaturesOffset = VolumeDescriptorOffset + 0x18;
+
+    /// <summary>Offset of the 24-bit little-endian SVOD data-block count.</summary>
+    internal const int SvodDataBlockCountOffset = VolumeDescriptorOffset + 0x19;
+
+    /// <summary>Offset of the 24-bit little-endian SVOD start data block.</summary>
+    internal const int SvodStartingBlockOffset = VolumeDescriptorOffset + 0x1C;
+
+    /// <summary>Offset of the big-endian data-file count.</summary>
+    internal const int DataFileCountOffset = 0x39D;
+
+    /// <summary>Offset of the big-endian volume type (STFS = 0, SVOD = 1).</summary>
+    internal const int VolumeTypeOffset = 0x3A9;
+
+    /// <summary>Volume type value for an SVOD/GOD container.</summary>
+    internal const uint VolumeTypeSvod = 1;
+
+    /// <summary>Enhanced-GDF feature bit in the SVOD device descriptor.</summary>
+    internal const byte SvodFeatureEnhancedGdf = 0x40;
+
     /// <summary>
     /// Returns true when <paramref name="path"/> is a GOD header file or its
     /// <c>.data</c> directory: the header exists, the sibling
@@ -50,6 +74,91 @@ public static class GodHeader
     /// recognized XContent signature/content type.
     /// </summary>
     public static bool IsGodContainer(string path) => TryReadTitle(path, out _);
+
+    /// <summary>
+    /// Reads the SVOD sector mapping from a GOD header file or its
+    /// <c>.data</c> directory. Returns <c>false</c> for a single-file STFS
+    /// package, a non-SVOD volume, a missing/truncated fragment file, or an
+    /// unreadable header.
+    /// </summary>
+    /// <param name="path">GOD header file or the matching <c>.data</c> directory.</param>
+    /// <param name="info">Parsed volume mapping when the method returns <c>true</c>.</param>
+    public static bool TryReadVolume(string path, [NotNullWhen(true)] out GodVolumeInfo? info) =>
+        TryReadVolume(path, FileShare.Read, out info);
+
+    /// <summary>
+    /// Reads the SVOD sector mapping with a caller-chosen share mode for the
+    /// header probe.
+    /// </summary>
+    /// <param name="path">GOD header file or the matching <c>.data</c> directory.</param>
+    /// <param name="share">File sharing mode used while reading the header.</param>
+    /// <param name="info">Parsed volume mapping when the method returns <c>true</c>.</param>
+    public static bool TryReadVolume(string path, FileShare share,
+        [NotNullWhen(true)] out GodVolumeInfo? info)
+    {
+        info = null;
+        if (!TryResolveHeaderPath(path, out string headerPath) ||
+            !XContentHeaderReader.TryReadHeader(headerPath, share, out byte[] header))
+        {
+            return false;
+        }
+
+        uint contentType = XContentHeaderReader.ReadContentType(header);
+        if (contentType is not (XContentHeaderReader.ContentTypeGod or XContentHeaderReader.ContentTypeNxe))
+            return false;
+
+        if (BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(VolumeTypeOffset)) != VolumeTypeSvod)
+            return false;
+
+        uint dataFileCount = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(DataFileCountOffset));
+        // Bound the fragment list before allocating: a corrupt header must not
+        // make the reader allocate unbounded paths. 4096 fragments is far
+        // beyond any real GOD title (each fragment is ~170 MiB).
+        if (dataFileCount is 0 or > 4096)
+            return false;
+
+        uint dataBlockCount = ReadUInt24LittleEndian(header, SvodDataBlockCountOffset);
+        uint startingBlock = ReadUInt24LittleEndian(header, SvodStartingBlockOffset);
+        if (dataBlockCount == 0)
+            return false;
+
+        bool enhancedGdf = (header[SvodFeaturesOffset] & SvodFeatureEnhancedGdf) != 0;
+
+        string dataDirectory = headerPath + ".data";
+        List<string> parts = new(checked((int)dataFileCount + 1)) { headerPath };
+        for (uint index = 0; index < dataFileCount; index++)
+        {
+            string fragment = Path.Combine(dataDirectory, $"Data{index:D4}");
+            if (!File.Exists(fragment))
+                return false;
+
+            parts.Add(fragment);
+        }
+
+        long length;
+        try
+        {
+            length = checked(((long)dataBlockCount + startingBlock) * 2 * Constants.SectorSize);
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+
+        if (length <= 0)
+            return false;
+
+        info = new GodVolumeInfo(
+            headerPath,
+            dataDirectory,
+            dataFileCount,
+            startingBlock,
+            dataBlockCount,
+            enhancedGdf,
+            length,
+            parts);
+        return true;
+    }
 
     /// <summary>
     /// Reads title metadata from a GOD header path or its <c>.data</c>
@@ -96,6 +205,9 @@ public static class GodHeader
     /// </summary>
     public static GodTitleInfo? ReadTitle(string path) =>
         TryReadTitle(path, out GodTitleInfo? info) ? info : null;
+
+    private static uint ReadUInt24LittleEndian(ReadOnlySpan<byte> buffer, int offset) =>
+        (uint)(buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16));
 
     private static bool TryResolveHeaderPath(string path, out string headerPath)
     {

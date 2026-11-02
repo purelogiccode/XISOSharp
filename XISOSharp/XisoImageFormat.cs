@@ -25,4 +25,10 @@ public enum XisoImageFormat
 
     /// <summary>A ZArchive (<c>.zar</c>) name-tree container (not a sector image).</summary>
     Zar,
+
+    /// <summary>
+    /// A Games-on-Demand (GOD/SVOD) container: a plaintext <c>XContent</c>
+    /// header beside a <c>&lt;header&gt;.data</c> directory.
+    /// </summary>
+    God,
 }

@@ -44,10 +44,10 @@ public static class CisoWriter
 
     /// <summary>
     /// Compresses an XISO image or a directory (which is first packed into a temp XISO) to CISO/CSO.
-    /// Split ISO, CISO and CCI sources are read through the seekable decompressed view from
+    /// Split ISO, CISO, CCI and GOD sources are read through the seekable decompressed view from
     /// <see cref="XisoImageSource"/> and compressed directly, without a joined temporary ISO.
     /// </summary>
-    /// <param name="sourcePath">Source directory, ISO file, split ISO/CISO/CCI image.</param>
+    /// <param name="sourcePath">Source directory, ISO file, split ISO/CISO/CCI image or GOD container.</param>
     /// <param name="outputCsoPath">Destination CSO path; if null, derived from source (<c>.cso</c>).</param>
     /// <param name="level">Compression level 0..9 (0=store, 1=fastest … 9=smallestSize). Default 6.
     /// For version 2 the level maps inversely to the LZ4 acceleration parameter
@@ -78,19 +78,37 @@ public static class CisoWriter
         if (version != VersionDeflate && version != VersionLz4)
             throw new ArgumentOutOfRangeException(nameof(version), "CISO version must be 1 (DEFLATE) or 2 (LZ4)");
 
-        bool isDir = Directory.Exists(sourcePath);
+        // A GOD `.data` folder is a container, not a directory to pack.
+        XisoImageSource.TryDetect(sourcePath, out XisoImageSourceInfo? sourceInfo);
+        bool isGod = sourceInfo is not null && sourceInfo.Format == XisoImageFormat.God;
+        if (!isGod && GodHeader.IsGodContainer(sourcePath))
+        {
+            throw new InvalidDataException(
+                $"GOD container '{sourcePath}' is incomplete or has no readable data fragments.");
+        }
+
+        bool isDir = Directory.Exists(sourcePath) && !isGod;
         bool isFile = File.Exists(sourcePath);
-        if (!isDir && !isFile)
+        if (!isDir && !isFile && !isGod)
             throw new FileNotFoundException($"Source not found: {sourcePath}");
 
         string output = outputCsoPath ?? DeriveDefaultCsoPath(sourcePath, isDir);
-        if (XisoPaths.AreSamePath(sourcePath, output))
+        if (sourceInfo is not null)
+        {
+            foreach (string part in sourceInfo.Parts)
+            {
+                if (XisoPaths.AreSamePath(part, output))
+                    throw new IOException("Source and destination paths are the same");
+            }
+        }
+        else if (XisoPaths.AreSamePath(sourcePath, output))
+        {
             throw new IOException("Source and destination paths are the same");
+        }
         if (splitBytes.HasValue && !isDir)
         {
-            XisoImageSource.TryDetect(sourcePath, out XisoImageSourceInfo? guardInfo);
-            long sourceLength = guardInfo?.Length ?? new FileInfo(sourcePath).Length;
-            IReadOnlyList<string> sourceParts = guardInfo?.Parts ?? [sourcePath];
+            long sourceLength = sourceInfo?.Length ?? new FileInfo(sourcePath).Length;
+            IReadOnlyList<string> sourceParts = sourceInfo?.Parts ?? [sourcePath];
             GuardSplitParts(output, splitBytes.Value, sourceLength, sourceParts);
         }
 
@@ -110,14 +128,13 @@ public static class CisoWriter
                     throw new IOException($"Failed to pack directory {sourcePath} to temp ISO");
                 sourceFile = tempIso;
             }
-            else if (XisoImageSource.TryDetect(sourcePath, out XisoImageSourceInfo? info) &&
-                     info is not null &&
-                     (info.Format != XisoImageFormat.Iso || info.IsSplit))
+            else if (sourceInfo is not null &&
+                     (sourceInfo.Format != XisoImageFormat.Iso || sourceInfo.IsSplit))
             {
-                // Split ISO and CISO/CCI containers already expose one flat,
-                // seekable decompressed view; compress it directly instead of
-                // materializing a joined temporary ISO (Phase 2).
-                if (info.Format == XisoImageFormat.Zar)
+                // Split ISO and CISO/CCI/GOD containers already expose one
+                // flat, seekable decompressed view; compress it directly
+                // instead of materializing a joined temporary ISO (Phase 2).
+                if (sourceInfo.Format == XisoImageFormat.Zar)
                 {
                     throw new NotSupportedException(
                         "ZArchive (.zar) input is not a sector image; convert it to ISO first.");

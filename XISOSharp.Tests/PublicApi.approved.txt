@@ -8,6 +8,8 @@ C:XISOSharp.BlockDevice.CisoBlockDevice(System.String)
 C:XISOSharp.BlockDevice.CisoBlockDevice(System.String,System.IO.FileShare)
 C:XISOSharp.BlockDevice.FileBlockDevice(System.IO.FileStream,System.Boolean)
 C:XISOSharp.BlockDevice.FileBlockDevice(System.String,System.IO.FileMode,System.IO.FileAccess,System.IO.FileShare,System.Int32)
+C:XISOSharp.BlockDevice.GodBlockDevice(System.String)
+C:XISOSharp.BlockDevice.GodBlockDevice(System.String,System.IO.FileShare)
 C:XISOSharp.BlockDevice.MemoryBlockDevice()
 C:XISOSharp.BlockDevice.MemoryBlockDevice(System.Int64)
 C:XISOSharp.BlockDevice.MemoryBlockDevice(System.ReadOnlySpan<System.Byte>)
@@ -40,6 +42,7 @@ C:XISOSharp.Models.EntryInfo(System.String,System.Boolean,System.UInt32,System.U
 C:XISOSharp.Models.ExplorerNode(System.String,System.String,System.Boolean,System.Int64,System.UInt32,System.Byte)
 C:XISOSharp.Models.FileSectorExtent(System.String,System.Boolean,System.UInt32,System.UInt32,System.UInt32)
 C:XISOSharp.Models.GodTitleInfo(System.String,System.String,System.UInt32,System.String,System.Byte,System.Byte)
+C:XISOSharp.Models.GodVolumeInfo(System.String,System.String,System.UInt32,System.UInt32,System.UInt32,System.Boolean,System.Int64,System.Collections.Generic.IReadOnlyList<System.String>)
 C:XISOSharp.Models.HashVerificationEntry(System.String,System.String,System.String,XISOSharp.Models.HashVerificationStatus)
 C:XISOSharp.Models.HashVerificationResult(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.HashVerificationEntry>)
 C:XISOSharp.Models.ProcessRunResult()
@@ -250,6 +253,7 @@ F:XISOSharp.XisoCci.DefaultSplitBytes:System.Int64
 F:XISOSharp.XisoFileCopier.MaxPooledChunkSize:System.Int32
 F:XISOSharp.XisoImageFormat.Cci:XISOSharp.XisoImageFormat
 F:XISOSharp.XisoImageFormat.Ciso:XISOSharp.XisoImageFormat
+F:XISOSharp.XisoImageFormat.God:XISOSharp.XisoImageFormat
 F:XISOSharp.XisoImageFormat.Iso:XISOSharp.XisoImageFormat
 F:XISOSharp.XisoImageFormat.SplitCci:XISOSharp.XisoImageFormat
 F:XISOSharp.XisoImageFormat.SplitCiso:XISOSharp.XisoImageFormat
@@ -277,6 +281,9 @@ M:XISOSharp.BlockDevice.CisoBlockDevice.Write(System.Int64,System.ReadOnlySpan<S
 M:XISOSharp.BlockDevice.FileBlockDevice.Dispose()->System.Void
 M:XISOSharp.BlockDevice.FileBlockDevice.Read(System.Int64,System.Span<System.Byte>)->System.Int32
 M:XISOSharp.BlockDevice.FileBlockDevice.Write(System.Int64,System.ReadOnlySpan<System.Byte>)->System.Void
+M:XISOSharp.BlockDevice.GodBlockDevice.Dispose()->System.Void
+M:XISOSharp.BlockDevice.GodBlockDevice.Read(System.Int64,System.Span<System.Byte>)->System.Int32
+M:XISOSharp.BlockDevice.GodBlockDevice.Write(System.Int64,System.ReadOnlySpan<System.Byte>)->System.Void
 M:XISOSharp.BlockDevice.MemoryBlockDevice.AsSpan()->System.ReadOnlySpan<System.Byte>
 M:XISOSharp.BlockDevice.MemoryBlockDevice.Dispose()->System.Void
 M:XISOSharp.BlockDevice.MemoryBlockDevice.Read(System.Int64,System.Span<System.Byte>)->System.Int32
@@ -338,6 +345,8 @@ M:XISOSharp.GlobMatcher.TryMatch(System.String,out System.String[])->System.Bool
 M:XISOSharp.GodHeader.IsGodContainer(System.String)->System.Boolean
 M:XISOSharp.GodHeader.ReadTitle(System.String)->XISOSharp.Models.GodTitleInfo
 M:XISOSharp.GodHeader.TryReadTitle(System.String,out XISOSharp.Models.GodTitleInfo)->System.Boolean
+M:XISOSharp.GodHeader.TryReadVolume(System.String,System.IO.FileShare,out XISOSharp.Models.GodVolumeInfo)->System.Boolean
+M:XISOSharp.GodHeader.TryReadVolume(System.String,out XISOSharp.Models.GodVolumeInfo)->System.Boolean
 M:XISOSharp.Interfaces.IBlockDevice.Read(System.Int64,System.Span<System.Byte>)->System.Int32
 M:XISOSharp.Interfaces.IBlockDevice.Write(System.Int64,System.ReadOnlySpan<System.Byte>)->System.Void
 M:XISOSharp.Interfaces.IFilesystem.CreateDirectory(System.String)->System.Void
@@ -400,6 +409,12 @@ M:XISOSharp.Models.GodTitleInfo.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.GodTitleInfo.Equals(XISOSharp.Models.GodTitleInfo)->System.Boolean
 M:XISOSharp.Models.GodTitleInfo.GetHashCode()->System.Int32
 M:XISOSharp.Models.GodTitleInfo.ToString()->System.String
+M:XISOSharp.Models.GodVolumeInfo.<Clone>$()->XISOSharp.Models.GodVolumeInfo
+M:XISOSharp.Models.GodVolumeInfo.Deconstruct(out System.String,out System.String,out System.UInt32,out System.UInt32,out System.UInt32,out System.Boolean,out System.Int64,out System.Collections.Generic.IReadOnlyList<System.String>)->System.Void
+M:XISOSharp.Models.GodVolumeInfo.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.GodVolumeInfo.Equals(XISOSharp.Models.GodVolumeInfo)->System.Boolean
+M:XISOSharp.Models.GodVolumeInfo.GetHashCode()->System.Int32
+M:XISOSharp.Models.GodVolumeInfo.ToString()->System.String
 M:XISOSharp.Models.HashVerificationEntry.<Clone>$()->XISOSharp.Models.HashVerificationEntry
 M:XISOSharp.Models.HashVerificationEntry.Deconstruct(out System.String,out System.String,out System.String,out XISOSharp.Models.HashVerificationStatus)->System.Void
 M:XISOSharp.Models.HashVerificationEntry.Equals(System.Object)->System.Boolean
@@ -631,6 +646,7 @@ M:XISOSharp.XisoImageOptions.ToString()->System.String
 M:XISOSharp.XisoImageSource.HasImageSuffix(System.String)->System.Boolean
 M:XISOSharp.XisoImageSource.IsCompressedContainerPath(System.String)->System.Boolean
 M:XISOSharp.XisoImageSource.IsCompressedImage(System.String)->System.Boolean
+M:XISOSharp.XisoImageSource.IsGodImage(System.String)->System.Boolean
 M:XISOSharp.XisoImageSource.IsSupportedImage(System.String)->System.Boolean
 M:XISOSharp.XisoImageSource.OpenBlockDevice(System.String,System.IO.FileShare)->XISOSharp.Interfaces.IBlockDevice
 M:XISOSharp.XisoImageSource.OpenRead(System.String,System.IO.FileShare)->System.IO.Stream
@@ -765,6 +781,10 @@ P:XISOSharp.BlockDevice.CciBlockDevice.Length:System.Int64:get;
 P:XISOSharp.BlockDevice.CisoBlockDevice.Length:System.Int64:get;
 P:XISOSharp.BlockDevice.FileBlockDevice.BaseStream:System.IO.FileStream:get;
 P:XISOSharp.BlockDevice.FileBlockDevice.Length:System.Int64:get;
+P:XISOSharp.BlockDevice.GodBlockDevice.DataDirectory:System.String:get;
+P:XISOSharp.BlockDevice.GodBlockDevice.HeaderPath:System.String:get;
+P:XISOSharp.BlockDevice.GodBlockDevice.Info:XISOSharp.Models.GodVolumeInfo:get;
+P:XISOSharp.BlockDevice.GodBlockDevice.Length:System.Int64:get;
 P:XISOSharp.BlockDevice.MemoryBlockDevice.Length:System.Int64:get;set;
 P:XISOSharp.BlockDevice.OffsetBlockDevice.Inner:XISOSharp.Interfaces.IBlockDevice:get;
 P:XISOSharp.BlockDevice.OffsetBlockDevice.Length:System.Int64:get;
@@ -838,6 +858,14 @@ P:XISOSharp.Models.GodTitleInfo.HeaderPath:System.String:get;set;
 P:XISOSharp.Models.GodTitleInfo.TitleId:System.UInt32:get;set;
 P:XISOSharp.Models.GodTitleInfo.TitleIdHex:System.String:get;set;
 P:XISOSharp.Models.GodTitleInfo.TitleName:System.String:get;set;
+P:XISOSharp.Models.GodVolumeInfo.DataBlockCount:System.UInt32:get;set;
+P:XISOSharp.Models.GodVolumeInfo.DataDirectory:System.String:get;set;
+P:XISOSharp.Models.GodVolumeInfo.DataFileCount:System.UInt32:get;set;
+P:XISOSharp.Models.GodVolumeInfo.EnhancedGdf:System.Boolean:get;set;
+P:XISOSharp.Models.GodVolumeInfo.HeaderPath:System.String:get;set;
+P:XISOSharp.Models.GodVolumeInfo.Length:System.Int64:get;set;
+P:XISOSharp.Models.GodVolumeInfo.Parts:System.Collections.Generic.IReadOnlyList<System.String>:get;set;
+P:XISOSharp.Models.GodVolumeInfo.StartingBlock:System.UInt32:get;set;
 P:XISOSharp.Models.HashVerificationEntry.ActualSha1:System.String:get;set;
 P:XISOSharp.Models.HashVerificationEntry.ExpectedSha1:System.String:get;set;
 P:XISOSharp.Models.HashVerificationEntry.Path:System.String:get;set;
@@ -1027,6 +1055,7 @@ T:XISOSharp.BlockDevice.BlockDeviceStream
 T:XISOSharp.BlockDevice.CciBlockDevice
 T:XISOSharp.BlockDevice.CisoBlockDevice
 T:XISOSharp.BlockDevice.FileBlockDevice
+T:XISOSharp.BlockDevice.GodBlockDevice
 T:XISOSharp.BlockDevice.MemoryBlockDevice
 T:XISOSharp.BlockDevice.OffsetBlockDevice
 T:XISOSharp.BlockDevice.StreamBlockDevice
@@ -1061,6 +1090,7 @@ T:XISOSharp.Models.ExtractError
 T:XISOSharp.Models.ExtractMode
 T:XISOSharp.Models.FileSectorExtent
 T:XISOSharp.Models.GodTitleInfo
+T:XISOSharp.Models.GodVolumeInfo
 T:XISOSharp.Models.HashVerificationEntry
 T:XISOSharp.Models.HashVerificationResult
 T:XISOSharp.Models.HashVerificationStatus

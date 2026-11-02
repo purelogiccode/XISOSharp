@@ -26,10 +26,11 @@ public static class XisoCci
 
     /// <summary>
     /// Compresses an image into one or more CCI parts.
-    /// Plain ISO input is compressed directly; split ISO, CISO and CCI input is
-    /// first materialized to a temporary ISO through the decompressed view.
+    /// Plain ISO input is compressed directly; split ISO, CISO, CCI and GOD
+    /// input is first materialized to a temporary ISO through the decompressed
+    /// view.
     /// </summary>
-    /// <param name="sourcePath">Source image or directory.</param>
+    /// <param name="sourcePath">Source image, directory or GOD container (header or <c>.data</c> folder).</param>
     /// <param name="outputCciPath">
     /// Output path (<c>game.cci</c> or <c>game</c>). When <c>null</c>, a sibling
     /// path is derived with <see cref="DeriveDefaultCciPath"/>.
@@ -60,8 +61,17 @@ public static class XisoCci
         ArgumentOutOfRangeException.ThrowIfNegative(splitBytes);
         ct.ThrowIfCancellationRequested();
 
-        bool isDirectory = Directory.Exists(sourcePath);
-        if (!isDirectory && !File.Exists(sourcePath))
+        // A GOD `.data` folder is a container, not a directory to pack.
+        XisoImageSource.TryDetect(sourcePath, out XisoImageSourceInfo? sourceInfo);
+        bool isGod = sourceInfo is not null && sourceInfo.Format == XisoImageFormat.God;
+        if (!isGod && GodHeader.IsGodContainer(sourcePath))
+        {
+            throw new InvalidDataException(
+                $"GOD container '{sourcePath}' is incomplete or has no readable data fragments.");
+        }
+
+        bool isDirectory = Directory.Exists(sourcePath) && !isGod;
+        if (!isDirectory && !File.Exists(sourcePath) && !isGod)
         {
             throw new FileNotFoundException($"Source image not found: {sourcePath}", sourcePath);
         }
@@ -70,7 +80,15 @@ public static class XisoCci
         long effectiveSplit = splitBytes;
 
         string probe = ResolveOutputProbe(output, effectiveSplit > 0);
-        if (!isDirectory && XisoPaths.AreSamePath(sourcePath, probe))
+        if (sourceInfo is not null)
+        {
+            foreach (string part in sourceInfo.Parts)
+            {
+                if (XisoPaths.AreSamePath(part, probe))
+                    throw new IOException("Source and destination paths are the same.");
+            }
+        }
+        else if (!isDirectory && XisoPaths.AreSamePath(sourcePath, probe))
         {
             throw new IOException("Source and destination paths are the same.");
         }
@@ -90,11 +108,10 @@ public static class XisoCci
 
                 sourceFile = tempIso;
             }
-            else if (XisoImageSource.TryDetect(sourcePath, out XisoImageSourceInfo? info) &&
-                     info is not null &&
-                     (info.Format != XisoImageFormat.Iso || info.IsSplit))
+            else if (sourceInfo is not null &&
+                     (sourceInfo.Format != XisoImageFormat.Iso || sourceInfo.IsSplit))
             {
-                if (info.Format == XisoImageFormat.Zar)
+                if (sourceInfo.Format == XisoImageFormat.Zar)
                 {
                     throw new NotSupportedException(
                         "ZArchive (.zar) input is not a sector image; convert it to ISO first.");

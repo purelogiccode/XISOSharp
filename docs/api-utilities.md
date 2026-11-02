@@ -102,6 +102,7 @@ Manual `xdvdfs.toml` subset parser — see [xdvdfs Compat — Build-Image](xdvdf
 | `StreamBlockDevice` | Any readable, seekable `Stream` (split ISO, archives, test streams) with serialized reads/writes |
 | `CisoBlockDevice` | CISO random-access, `index[totalBlocks+1]` LE u32 + single-sector cache, DEFLATE v1 + LZ4 v2 on-demand |
 | `CciBlockDevice` | CCI/CCIM random-access over `CCISharp.CciFile`; single or split `.cci` sets |
+| `GodBlockDevice` | GOD/SVOD random-access over a header + `DataNNNN` fragments (SVOD hash-table interleave, fragment roll-over, security sectors) |
 
 Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXiso(IBlockDevice, isoName, requireOptimizedTag)`), `ListDirectory(IBlockDevice, path)`. FileStream overloads delegate thinly.
 
@@ -120,7 +121,7 @@ Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXis
 | `XisoChecksum` | `ComputeImageChecksum` / `ComputeImageChecksumHex` — SHA3-256 `SortedDictionary Ordinal` (`/path` UTF-8 + streamed data, `xdvdfs` compat; BCL `SHA3_256` when supported, else pure-managed fallback); `ComputeZarChecksum`/`ComputeZarChecksumHex` for `.zar` |
 | `CisoWriter` / `CisoReader` | `CompressToCso` (BCL DEFLATE v1 `0x80000000`, `align` 0/1/2, threshold `+12`, `--ciso-split` shim) / `DecompressToIso` (v1 DEFLATE + v2 LZ4) |
 | `XisoCci` | `CompressToCci` / `DecompressToIso` / `DeriveDefaultCciPath` / `DeriveDefaultIsoPath` (CCISharp-backed CCI/CCIM) |
-| `XisoImageSource` | `TryDetect` / `IsSupportedImage` / `IsCompressedImage` / `OpenRead` / `OpenBlockDevice` / `StripImageSuffix` across ISO, split ISO, CISO, CCI and ZAR |
+| `XisoImageSource` | `TryDetect` / `IsSupportedImage` / `IsCompressedImage` / `IsGodImage` / `OpenRead` / `OpenBlockDevice` / `StripImageSuffix` across ISO, split ISO, CISO, CCI, GOD/SVOD and ZAR |
 
 See [Archival](archival.md) and [Compression](compression.md).
 

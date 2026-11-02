@@ -32,7 +32,10 @@ internal static class XContentHeaderReader
     /// Returns <c>false</c> for a missing/short file, an unreadable file, or a
     /// file without a CON/LIVE/PIRS signature.
     /// </summary>
-    internal static bool TryReadHeader(string headerPath, out byte[] header)
+    internal static bool TryReadHeader(string headerPath, out byte[] header) =>
+        TryReadHeader(headerPath, FileShare.Read, out header);
+
+    internal static bool TryReadHeader(string headerPath, FileShare share, out byte[] header)
     {
         header = [];
         if (string.IsNullOrWhiteSpace(headerPath) || !File.Exists(headerPath))
@@ -41,7 +44,7 @@ internal static class XContentHeaderReader
         try
         {
             using FileStream stream = new(
-                headerPath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                headerPath, FileMode.Open, FileAccess.Read, share,
                 bufferSize: 4096, FileOptions.RandomAccess);
             if (stream.Length < MinimumHeaderLength)
                 return false;

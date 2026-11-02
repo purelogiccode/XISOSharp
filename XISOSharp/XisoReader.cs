@@ -1780,6 +1780,12 @@ public static class XisoReader
         bool preserveAttributes = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (mode == ExtractMode.Rewrite && GodHeader.IsGodContainer(xisoPath))
+        {
+            throw new NotSupportedException(
+                $"Cannot rewrite GOD container '{xisoPath}' in place; decompress it to ISO first.");
+        }
+
         using Stream fs = OpenImageStream(xisoPath);
         return DecodeXisoCore(fs, xisoPath, outputPath, mode, out outIsoPath, llCompat,
             cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions,
@@ -1918,9 +1924,19 @@ public static class XisoReader
             return 1;
         }
 
+        // GOD headers are content-hash file names (or a `.data` directory), so
+        // the header's title is a far better output name than the hash.
+        if (XisoImageSource.TryDetect(imageName, out XisoImageSourceInfo? godSource) &&
+            godSource is not null &&
+            godSource.Format == XisoImageFormat.God)
+        {
+            name = godSource.DisplayName;
+            shortName = godSource.DisplayName;
+        }
+
         // Container inputs (plain ISO, CISO, CCI and split parts) name their
         // outputs after the game, not the container.
-        if (XisoImageSource.HasImageSuffix(name))
+        if (shortName is null && XisoImageSource.HasImageSuffix(name))
         {
             shortName = XisoImageSource.StripImageSuffix(name);
         }
@@ -2438,6 +2454,12 @@ public static class XisoReader
         {
             throw new IOException(
                 $"Cannot set the FILETIME of a compressed image: {isoPath}; decompress it first");
+        }
+
+        if (GodHeader.IsGodContainer(isoPath))
+        {
+            throw new IOException(
+                $"Cannot set the FILETIME of a GOD container in place: {isoPath}; decompress it to ISO first");
         }
 
         using FileStream fs = new(

@@ -49,8 +49,8 @@ public static class XisoPatcher
     /// <exception cref="InvalidDataException">
     /// The internal path is malformed, a parent is missing, the target is a
     /// directory, the host path is a directory (only single files can be
-    /// copied in), the image is a compressed container or split set, or the
-    /// data/table does not fit in free space.
+    /// copied in), the image is a compressed container, a GOD container or a
+    /// split set, or the data/table does not fit in free space.
     /// </exception>
     public static void CopyIntoImage(string isoPath, string hostFile, string internalPath,
         bool createBackup = true)
@@ -63,6 +63,12 @@ public static class XisoPatcher
         {
             throw new InvalidDataException(
                 $"Cannot patch compressed container '{isoPath}' in place (compressed bytes are not patch-stable); decompress it first.");
+        }
+
+        if (GodHeader.IsGodContainer(isoPath))
+        {
+            throw new InvalidDataException(
+                $"Cannot patch GOD container '{isoPath}' in place; decompress it to ISO first.");
         }
 
         if (XisoSplitter.IsSplitPath(isoPath) || SplitIsoFile.IsSplitPath(isoPath))

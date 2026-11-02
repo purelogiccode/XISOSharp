@@ -8,6 +8,13 @@
   4 GiB − 16 MiB) is now the default maximum part size for plain-ISO splits.
   An explicit `--size` above it is still honoured with a warning. CISO/CCI keep
   their `0xffbf6000` xdvdfs-compatible compression default.
+- **GOD read-only sector input**: `GodBlockDevice` maps a GOD/SVOD header plus
+  its `DataNNNN` fragments into the decompressed sector view, so every read
+  verb (list, tree, extract, checksum, hash, validate, sector-layout, ranges)
+  accepts a GOD container. `GodHeader.TryReadVolume`/`GodVolumeInfo` expose the
+  SVOD mapping, and `XisoImageSource` detects both a header file and its
+  `.data` folder. In-place repair/copy-in/set-filetime/rewrite refuse GOD and
+  ask for a decompress first.
 - **GOD title metadata**: `GodHeader`/`GodTitleInfo` read the plaintext
   `XContent` header of a GOD/SVOD container (title name, title ID, disc
   number/count) without mounting it. Names are sanitised for FATX and fall back
@@ -29,6 +36,10 @@
 
 ### CLI
 
+- **GOD input**: every read verb accepts a GOD header or its `.data` folder;
+  `decompress` writes a plain ISO (named after the header title) and `convert`
+  accepts GOD → `.iso`/`.cci`/`.cso`. Redump modes and in-place write verbs
+  refuse GOD with a "decompress first" message.
 - **`title-info`** accepts a GOD header or its `.data` folder, a single-file
   XBLA/XBLIG STFS package, or an XISO image's `default.xbe`/`default.xex`/
   `default_mp.xbe` and reports the available title name, title ID, disc and

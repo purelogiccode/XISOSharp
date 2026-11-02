@@ -4145,7 +4145,7 @@ internal static class Program
 
         if (positionals.Count < 1 || positionals.Count > 2)
         {
-            Logger.LogErr("Error: decompress requires <cso|cci> [output.iso]\n");
+            Logger.LogErr("Error: decompress requires <cso|cci|god> [output.iso]\n");
             PrintUsage();
             return 1;
         }
@@ -4162,16 +4162,22 @@ internal static class Program
         string? outIso = positionals.Count == 2 ? positionals[1] : output;
 
         bool isCci = Path.GetExtension(source).Equals(".cci", StringComparison.OrdinalIgnoreCase);
-        if (!isCci && XisoImageSource.TryDetect(source, out XisoImageSourceInfo? info) && info is not null)
+        bool isGod = false;
+        if (XisoImageSource.TryDetect(source, out XisoImageSourceInfo? info) && info is not null)
         {
             isCci = info.Format is XisoImageFormat.Cci or XisoImageFormat.SplitCci;
+            isGod = info.Format == XisoImageFormat.God;
         }
 
         // #15 (xdvdfs #36): refuse before the -y/-n prompt, not after it.
-        string probeIso = outIso ?? (isCci
-            ? XisoCci.DeriveDefaultIsoPath(source)
-            : CisoReader.DeriveDefaultIsoPath(source));
+        string probeIso = outIso ?? (isGod
+            ? DeriveGodIsoPath(source)
+            : isCci
+                ? XisoCci.DeriveDefaultIsoPath(source)
+                : CisoReader.DeriveDefaultIsoPath(source));
         string? decompressRefusal = CliOutputGuard.CheckImageOutput(source, probeIso);
+        if (decompressRefusal == null)
+            decompressRefusal = CheckGodHeaderCollision(source, probeIso);
         if (decompressRefusal != null)
         {
             Logger.LogErr(decompressRefusal);
@@ -4189,15 +4195,101 @@ internal static class Program
         try
         {
             Logger.Log(Constants.Banner);
-            int rc = isCci
-                ? XisoCci.DecompressToIso(source, outIso, overwrite: true)
-                : CisoReader.DecompressToIso(source, outIso);
+            int rc = isGod
+                ? DecompressGodToIso(source, probeIso)
+                : isCci
+                    ? XisoCci.DecompressToIso(source, outIso, overwrite: true)
+                    : CisoReader.DecompressToIso(source, outIso);
             return rc;
         }
         catch (Exception ex)
         {
             Logger.LogErr($"Error decompressing: {ex.Message}\n");
             return 1;
+        }
+    }
+
+    /// <summary>
+    /// Derives the default ISO name for a GOD container: the header title when
+    /// available, otherwise the header file name (or the <c>.data</c> folder
+    /// name without its suffix).
+    /// </summary>
+    private static string DeriveGodIsoPath(string source)
+    {
+        string full = Path.GetFullPath(source).TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string directory = Path.GetDirectoryName(full) ?? string.Empty;
+        string name = GodHeader.ReadTitle(full)?.TitleName ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = Path.GetFileName(full);
+            if (name.EndsWith(".data", StringComparison.OrdinalIgnoreCase))
+                name = name[..^5];
+        }
+
+        return Path.Combine(directory, name + ".iso");
+    }
+
+    /// <summary>
+    /// Refuses an output that would overwrite a GOD header or data fragment
+    /// when the source was passed as its <c>.data</c> folder.
+    /// </summary>
+    private static string? CheckGodHeaderCollision(string source, string output)
+    {
+        if (!GodHeader.TryReadVolume(source, out GodVolumeInfo? volume))
+            return null;
+
+        foreach (string part in volume.Parts)
+        {
+            if (XisoPaths.AreSamePath(part, output))
+            {
+                return $"Error: output {output} is part of the GOD container; " +
+                       "choose another name\n";
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Materializes a GOD/SVOD container as a plain ISO through the seekable
+    /// decompressed view. The output is written to a temporary file and moved
+    /// into place, so a failed copy never leaves a partial ISO.
+    /// </summary>
+    private static int DecompressGodToIso(string source, string output)
+    {
+        using Stream input = XisoImageSource.OpenRead(source);
+        string fullOutput = Path.GetFullPath(output);
+        string? directory = Path.GetDirectoryName(fullOutput);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
+
+        string temp = fullOutput + ".tmp-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            using (FileStream destination = new(
+                       temp, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                       1 << 20, FileOptions.SequentialScan))
+            {
+                destination.SetLength(input.Length);
+                input.CopyTo(destination);
+            }
+
+            File.Move(temp, fullOutput, overwrite: true);
+            return 0;
+        }
+        catch
+        {
+            try
+            {
+                if (File.Exists(temp)) File.Delete(temp);
+            }
+            catch
+            {
+                // Best-effort cleanup; the original error is more useful.
+            }
+
+            throw;
         }
     }
 
@@ -4270,6 +4362,11 @@ internal static class Program
             return $"'{path}' is a ZArchive; convert it to ISO first (XISOSharp convert).";
         }
 
+        if (GodHeader.IsGodContainer(path))
+        {
+            return $"'{path}' is a GOD container; decompress it to ISO first (XISOSharp decompress).";
+        }
+
         if (XisoImageSource.IsCompressedContainerPath(path))
         {
             return $"'{path}' is a compressed CISO/CCI container; decompress it first (XISOSharp decompress).";
@@ -4288,6 +4385,8 @@ internal static class Program
                 $"'{path}' is a CISO container; decompress it first (XISOSharp decompress).",
             XisoImageFormat.Cci or XisoImageFormat.SplitCci =>
                 $"'{path}' is a CCI container; decompress it first (XISOSharp decompress).",
+            XisoImageFormat.God =>
+                $"'{path}' is a GOD container; decompress it to ISO first (XISOSharp decompress).",
             XisoImageFormat.Zar => $"'{path}' is a ZArchive; convert it to ISO first (XISOSharp convert).",
             _ => null,
         };
@@ -5058,7 +5157,8 @@ internal static class Program
 
         if (positionals.Count != 2)
         {
-            Logger.LogErr("Error: convert requires <source.zar|source.iso> <output.iso|output.zar>\n");
+            Logger.LogErr(
+                "Error: convert requires <source.zar|source.iso|god> <output.iso|output.zar|output.cci|output.cso>\n");
             return 1;
         }
 
@@ -5068,6 +5168,42 @@ internal static class Program
 
         try
         {
+            bool sourceGod = XisoImageSource.TryDetect(source, out XisoImageSourceInfo? godInfo) &&
+                             godInfo is not null &&
+                             godInfo.Format == XisoImageFormat.God;
+            if (sourceGod)
+            {
+                string? convertRefusal = CliOutputGuard.CheckImageOutput(source, output);
+                if (convertRefusal == null)
+                    convertRefusal = CheckGodHeaderCollision(source, output);
+                if (convertRefusal != null)
+                {
+                    Logger.LogErr(convertRefusal);
+                    return 1;
+                }
+
+                string outputExtension = Path.GetExtension(output);
+                if (outputExtension.Equals(".iso", StringComparison.OrdinalIgnoreCase))
+                    return DecompressGodToIso(source, output);
+
+                if (outputExtension.Equals(".cci", StringComparison.OrdinalIgnoreCase))
+                {
+                    // The explicit output path is the artifact: do not turn it
+                    // into a .1.cci set just because the default split point is
+                    // set.
+                    return XisoCci.CompressToCci(
+                        source, output, splitBytes: 0, overwrite: true) == 0 ? 0 : 1;
+                }
+
+                if (outputExtension.Equals(".cso", StringComparison.OrdinalIgnoreCase))
+                    return CisoWriter.CompressToCso(source, output) == 0 ? 0 : 1;
+
+                Logger.LogErr(
+                    "Error: a GOD container can be converted to .iso, .cci or .cso; " +
+                    "convert it to ISO first for other targets\n");
+                return 1;
+            }
+
             bool sourceZar = IsZarPath(source);
             bool outputZar = IsZarPath(output);
             if (sourceZar && !outputZar)
@@ -5086,7 +5222,8 @@ internal static class Program
                 return XisoZarchive.CreateZar(source, output) ? 0 : 1;
             }
 
-            Logger.LogErr("Error: convert supports .zar -> .iso and .iso -> .zar\n");
+            Logger.LogErr(
+                "Error: convert supports .zar -> .iso, .iso -> .zar, and GOD -> .iso/.cci/.cso\n");
             return 1;
         }
         catch (Exception ex)
@@ -6480,6 +6617,9 @@ internal static class Program
                                                     XISOSharp [options] [-[lrx]] <file1.xiso> [file2.xiso] ...
                                                     XISOSharp [options] -c <dir> [name] [-c <dir> [name]] ...
 
+                                                   Read inputs: ISO/XISO, split .1.iso, CISO, CCI, GOD
+                                                   (header or .data folder) and ZAR (name-tree verbs).
+
                                                    Mutually exclusive modes:
 
                                                      -c <dir> [name]     Create xiso from file(s) starting in <dir>.
@@ -6592,8 +6732,10 @@ internal static class Program
                                                                             CCI output is split at 0xffbf6000 into .1.cci/.2.cci …
                                                                             parts; --cci-split 0 writes a single .cci.
                                                                             Aliases: cso (CISO), cci (CCI).
-                                                      decompress <cso|cci> [output.iso] [--batch <dir>]    Decompress CISO/CSO or CCI to ISO (DEFLATE v1,
-                                                                            LZ4 v2 and CCI LZ4; single files and split parts).
+                                                      decompress <cso|cci|god> [output.iso] [--batch <dir>]    Decompress CISO/CSO, CCI or a GOD/SVOD
+                                                                            container to ISO (DEFLATE v1, LZ4 v2 and CCI LZ4;
+                                                                            single files and split parts). GOD output is named
+                                                                            after the header title when available.
                                                                             Aliases: uncso, decso, uncci.
                                                        checksum <image> [images...] [--silent]  Compute SHA3-256 image checksum (xdvdfs-compatible:
                                                                              SHA3-256 over sorted path bytes + file data). Output: hex tab path.
@@ -6604,8 +6746,8 @@ internal static class Program
                                                        split <image> [images...] [--size <bytes|half>] [--output <base>] [--batch <dir>]  Split ISO into sector-aligned
                                                                              .1.iso/.2.iso… parts (default 0xFF000000 = 4 GiB − 16 MiB FATX cap; 'half' splits in two).
                                                        join <first.1.iso> [...] [--output <file>]  Reassemble split parts (output validated as XISO).
-                                                       convert <src.zar|src.iso> <out.iso|out.zar>  Convert ZArchive to ISO (extract + repack)
-                                                                             or ISO to ZArchive. Existing outputs follow -y/-n.
+                                                       convert <src.zar|src.iso|god> <out.iso|out.zar|out.cci|out.cso>  Convert ZArchive to ISO (extract + repack),
+                                                                             ISO to ZArchive, or a GOD container to ISO/CCI/CISO. Existing outputs follow -y/-n.
                                                                              --batch <dir> --format iso|zar converts a whole
                                                                              directory (default format: zar).
                                                        Batch container verbs (compress/decompress/convert/split):
