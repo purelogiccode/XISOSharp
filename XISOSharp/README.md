@@ -400,8 +400,39 @@ public sealed record StfsTitleInfo(
     string TitleIdHex, byte DiscNumber, byte DiscCount, uint ContentType);
 ```
 
-Supported content types are XBLA `0x000D0000` and XBLIG `0x00000002`. Full
-package listing/extraction remains future `StfsSharp` work.
+Supported content types are XBLA `0x000D0000` and XBLIG `0x00000002`
+(Community Game `0x02000000` is treated as XBLIG).
+
+#### STFS package contents (`StfsPackage`)
+
+`StfsPackage` reads the file table and file data behind the STFS hash tables,
+so an XBLA/XBLIG package can be listed and extracted without converting it to
+an ISO:
+
+```csharp
+public sealed class StfsPackage : IDisposable
+{
+    public StfsPackageInfo Info { get; }
+    public IReadOnlyList<StfsEntry> Entries { get; }
+
+    public static bool IsStfsPackage(string? path);
+    public static StfsPackage Open(string path, FileShare share = FileShare.Read);
+    public static bool TryOpen(string path, out StfsPackage? package);
+
+    public StfsEntry? Find(string? path);
+    public byte[] ReadAllBytes(StfsEntry entry);
+    public void CopyTo(StfsEntry entry, Stream destination);
+    public int ExtractTo(string outputDirectory, bool skipExisting = false,
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default);
+}
+```
+
+`StfsPackageInfo` reports the XContent title fields and the volume layout;
+`StfsEntry` carries the path, size, block range, contiguity flag and FAT
+timestamps. The reader handles contiguous files, hash-chain block lists and
+writable-format packages with primary/secondary hash tables. STFS writing and
+rebuilding remain out of scope. `XisoChecksum.ComputeStfsChecksum` hashes the
+same sorted-path tree as ISO and ZAR, so equivalent trees compare equal.
 
 #### `VerifyXiso`
 

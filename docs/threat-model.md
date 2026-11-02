@@ -12,7 +12,7 @@ boundaries, the main threats and the controls that mitigate them.
 
 ## Trust boundaries
 
-1. **Container headers/indexes** — CISO, CCI and ZAR headers and per-sector indexes
+1. **Container headers/indexes** — CISO, CCI, STFS and ZAR headers and per-sector indexes
    are attacker-controlled.
 2. **XDVDFS directory tables** — child offsets, entry counts, names and sizes.
 3. **Archive name trees** — paths, nesting depth and entry sizes.
@@ -30,6 +30,7 @@ boundaries, the main threats and the controls that mitigate them.
 | Case collisions on case-insensitive hosts | duplicate-name rejection at table parse/write; first-wins remap rules documented. |
 | Decompression bombs | CISO/CCI sector-sized blocks; ZAR `maxEntries`/`maxTotalBytes` caps; CISO compressed-span cap; bounded allocations. |
 | Malformed CISO/CCI indexes | alignment/version/block-size validation, monotonic positions, file-bounds checks, sane span caps (the mutation fuzzer found an `OverflowException` here in 1.5.0). |
+| Hostile STFS file tables/hash chains | entry-count cap, parent-index ordering, name validation, block-range checks, per-block bounds checks, cycle-free parent walk, `MaxTocDepth` nesting bound; malformed input is `InvalidDataException`. |
 | Hostile XBE/XEX headers | magic/length gates and bounded header reads; parsers return `null` instead of throwing for non-executables. |
 | In-place write corruption | input==output guards, `<file>.old` backups, temp-file + move, partial-output cleanup. |
 | Concurrent writers | process-wide create lock and per-operation state; extraction resumes with `--skip-existing`. |

@@ -43,6 +43,7 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` | Unified detection and open (`TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`) for ISO, split ISO, CISO, CCI, GOD/SVOD, split variants and ZAR |
 | `XisoCci` / `CciBlockDevice` | CCI/CCIM compression, extraction, default names and random access (CCISharp-backed) |
 | `XisoZarchive` (read APIs) | `ListZar`, `ExtractZar`, `ConvertZarToIso` alongside the existing `CreateZar` |
+| `StfsPackage` / `StfsEntry` / `StfsPackageInfo` | Read-only XBLA/XBLIG single-file STFS package: file table, hash-chain block lists, `Find`, `ReadAllBytes`, `CopyTo`, `ExtractTo` and volume/title metadata |
 | [`XisoExplorer`](api-utilities.md#xisoexplorer--xisoattributes) / [`XisoAttributes`](api-utilities.md#xisoexplorer--xisoattributes) | In-place exploration (list/get/copy/hash/XEX/XBE, bounded `OpenReadStream`, keep-open VFS mode) + Windows attribute mapping |
 | [`XisoWriter`](api-xisowriter.md) | Create and rewrite images + `build-image` remap (`CreateFromRemapTree`) |
 | [`XisoPatcher`](api-xisoreader.md#copyin) / [`DirectoryEntryTableWriter`](api-xisowriter.md#directoryentrytablewriter) | In-place file patching (`CopyIntoImage`) + single-table build/serialize primitive |
@@ -104,6 +105,28 @@ AuditResult audit = image.Validate();
 
 `OpenRead`/`OpenBlockDevice` throw `FileNotFoundException`, `InvalidDataException`
 or `NotSupportedException` (ZAR) rather than returning a partially valid view.
+
+## XBLA/XBLIG STFS packages
+
+A single-file XBLA or XBLIG package is an STFS file system, not an XISO sector
+image, so it has its own reader instead of `XisoImageSource`:
+
+```csharp
+using StfsPackage package = StfsPackage.Open(@"C:\games\4D5307E6");
+Console.WriteLine($"{package.Info.TitleName} ({package.Info.Kind})");
+
+foreach (StfsEntry entry in package.Entries)
+    Console.WriteLine($"{entry.Path} {entry.Size}");
+
+byte[] defaultXex = package.ReadAllBytes(package.Find("default.xex")!);
+package.ExtractTo(@"C:\games\4D5307E6-extracted", skipExisting: true);
+```
+
+`StfsPackage` follows the STFS volume descriptor and the level-0/level-1/level-2
+hash-table interleave, including writable-format packages with primary and
+secondary tables. `XisoChecksum.ComputeStfsChecksum` uses the same sorted-path
+SHA3-256 tree hash as ISO and ZAR, so equivalent trees compare equal. The reader
+is read-only; STFS writing/rebuilding is out of scope.
 
 ## Design notes
 

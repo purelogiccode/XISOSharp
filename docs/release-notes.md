@@ -22,6 +22,13 @@
 - **XBLA/XBLIG header metadata**: `StfsHeader`/`StfsTitleInfo` read the same
   XContent fields from single-file Xbox 360 STFS packages (XBLA `0x000D0000`,
   XBLIG `0x00000002`), which have no `.data` directory.
+- **XBLA/XBLIG package listing and extraction**: `StfsPackage` reads the STFS
+  file table, follows contiguous and hash-chain block lists through the
+  level-0/level-1/level-2 hash interleave, and exposes `Entries`, `Find`,
+  `ReadAllBytes`, `CopyTo` and `ExtractTo`. `StfsPackageInfo` reports the
+  `XContent` title fields and the volume layout. `XisoChecksum.ComputeStfsChecksum`
+  uses the same sorted-path SHA3-256 tree hash as ISO and ZAR, so equivalent
+  trees compare equal. Read-only: STFS writing/rebuilding stays out of scope.
 - **Xbox 360 title metadata**: `XexDbdf` reads the plaintext XDBF/XSTR/XSRC
   resources from the XEX header-section table. `XexTitleInfo` carries title
   name, publisher, developer, genre, description and optional thumbnail;
@@ -40,6 +47,11 @@
   `decompress` writes a plain ISO (named after the header title) and `convert`
   accepts GOD → `.iso`/`.cci`/`.cso`. Redump modes and in-place write verbs
   refuse GOD with a "decompress first" message.
+- **XBLA/XBLIG STFS packages**: `-l`, `-t`, `-x`, `--unpack`, `checksum` and
+  `-l/--json` accept a single-file XBLA/XBLIG STFS package and read its file
+  table directly. Extraction honours `-d` and `--skip-existing`; `checksum`
+  uses the ISO/ZAR-compatible tree hash. `compress`, `decompress`, `convert`,
+  rewrite and the raw redump modes refuse STFS with an "extract first" message.
 - **`title-info`** accepts a GOD header or its `.data` folder, a single-file
   XBLA/XBLIG STFS package, or an XISO image's `default.xbe`/`default.xex`/
   `default_mp.xbe` and reports the available title name, title ID, disc and

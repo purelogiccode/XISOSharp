@@ -14,7 +14,8 @@ namespace XISOSharp;
 /// </summary>
 /// <remarks>
 /// Supported content types: XBLA <c>0x000D0000</c> and XBLIG
-/// <c>0x00000002</c>. GOD/NXE containers are handled by <see cref="GodHeader"/>.
+/// <c>0x00000002</c> (Community Game <c>0x02000000</c> is accepted as XBLIG).
+/// GOD/NXE containers are handled by <see cref="GodHeader"/>.
 /// The title name is at <c>0x411</c> (UTF-16BE, 0x80 bytes), title ID at
 /// <c>0x360</c>, and disc number/count at <c>0x366</c>/<c>0x367</c>.
 /// </remarks>
@@ -29,8 +30,13 @@ public static class StfsHeader
         if (!XContentHeaderReader.TryReadHeader(path, out byte[] header))
             return false;
 
+        if (!HasStfsVolumeType(header))
+            return false;
+
         uint contentType = XContentHeaderReader.ReadContentType(header);
-        return contentType is XContentHeaderReader.ContentTypeXbla or XContentHeaderReader.ContentTypeXblig;
+        return contentType is XContentHeaderReader.ContentTypeXbla or
+            XContentHeaderReader.ContentTypeXblig or
+            XContentHeaderReader.ContentTypeCommunityGame;
     }
 
     /// <summary>
@@ -46,13 +52,17 @@ public static class StfsHeader
         if (!XContentHeaderReader.TryReadHeader(path, out byte[] header))
             return false;
 
+        if (!HasStfsVolumeType(header))
+            return false;
+
         uint contentType = XContentHeaderReader.ReadContentType(header);
         StfsPackageKind kind;
         if (contentType == XContentHeaderReader.ContentTypeXbla)
         {
             kind = StfsPackageKind.Xbla;
         }
-        else if (contentType == XContentHeaderReader.ContentTypeXblig)
+        else if (contentType is XContentHeaderReader.ContentTypeXblig or
+                 XContentHeaderReader.ContentTypeCommunityGame)
         {
             kind = StfsPackageKind.Xblig;
         }
@@ -90,4 +100,8 @@ public static class StfsHeader
     /// </summary>
     public static StfsTitleInfo? ReadTitle(string path) =>
         TryReadTitle(path, out StfsTitleInfo? info) ? info : null;
+
+    private static bool HasStfsVolumeType(ReadOnlySpan<byte> header) =>
+        BinaryPrimitives.ReadUInt32BigEndian(header[GodHeader.VolumeTypeOffset..]) ==
+        GodHeader.VolumeTypeStfs;
 }

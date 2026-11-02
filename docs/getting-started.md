@@ -214,6 +214,11 @@ XISOSharp -l "4D5307E6"                   # list/extract/checksum/hash/validate
 XISOSharp decompress "4D5307E6" game.iso  # title-named ISO by default
 XISOSharp convert "4D5307E6" game.cci     # or .cso
 
+# XBLA/XBLIG STFS package (single-file; read-only)
+XISOSharp -l game.stfs                    # list the STFS file table
+XISOSharp -x -d game game.stfs            # extract every package file
+XISOSharp checksum game.stfs              # same tree hash as an equivalent ISO/ZAR
+
 # Deterministic SHA3-256 image checksum (BTreeMap sorted, xdvdfs compat)
 XISOSharp checksum game.iso
 ```

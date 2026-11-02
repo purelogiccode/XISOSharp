@@ -589,12 +589,37 @@ public static StfsTitleInfo? ReadTitle(string path)
 ```
 
 Reads the same XContent header from a single-file Xbox 360 STFS package:
-XBLA (content type `0x000D0000`) or XBLIG (`0x00000002`). These packages have
+XBLA (content type `0x000D0000`) or XBLIG (`0x00000002`; Community Game
+`0x02000000` is accepted as XBLIG). These packages have
 no `<header>.data` directory, so the package file itself is passed. The parser
 returns `StfsTitleInfo` with `PackagePath`, `Kind` (`Xbla`/`Xblig`),
 `TitleName`, `TitleId`, `TitleIdHex`, `DiscNumber`, `DiscCount` and the raw
-`ContentType`. GOD/NXE containers are handled by `GodHeader`; full package
-listing/extraction remains future `StfsSharp` work.
+`ContentType`. GOD/NXE containers are handled by `GodHeader`.
+
+## Single-file STFS package contents (`StfsPackage`)
+
+```csharp
+public static bool IsStfsPackage(string? path)
+public static StfsPackage Open(string path, FileShare share = FileShare.Read)
+public static bool TryOpen(string path, out StfsPackage? package)
+
+public StfsPackageInfo Info { get; }
+public IReadOnlyList<StfsEntry> Entries { get; }
+public StfsEntry? Find(string? path)
+public byte[] ReadAllBytes(StfsEntry entry)
+public void CopyTo(StfsEntry entry, Stream destination)
+public int ExtractTo(string outputDirectory, bool skipExisting = false,
+    IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
+```
+
+`StfsPackage` reads the STFS file table, follows contiguous and hash-chain
+block lists through the level-0/level-1/level-2 hash-table interleave (including
+writable-format primary/secondary tables) and exposes the package as a
+read-only tree. `StfsPackageInfo` reports the XContent title fields plus the
+volume layout; `StfsEntry` carries the path, size, block range, contiguity flag
+and FAT timestamps. `XisoChecksum.ComputeStfsChecksum` hashes the same
+sorted-path tree as ISO/ZAR, so equivalent trees compare equal. STFS writing and
+rebuilding remain out of scope.
 
 ## Checksum (SHA3-256)
 

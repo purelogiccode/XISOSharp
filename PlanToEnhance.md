@@ -1,6 +1,6 @@
 # Plan to Enhance XISOSharp
 
-**Status:** CCISharp 1.0.1 published on NuGet (2026-11-01; 1.0.0 was the first release, 1.0.1 adds hostile-index hardening). XISOSharp **1.5.0** (published 2026-11-01) implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input (including `validate`/`--validate-checksums`), Phase 4 pathological-TOC traversal hardening (extract/list/rewrite plus the audit, sector-range, repair, salvage and ZAR follow-up walkers), Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests); follow-ups make CISO compression read split/container sources directly and harden ZAR extraction (depth bound, pre-sized exact copies, partial cleanup). **Phase 10 Tier A is the 1.6.0 work:** A1 (Xbox 360 XDBF/XSRC title metadata), A2 (XBE logo/title/save image assets), A3 (FATX cap), A4 (`--delete-source`) and A5 (GOD title naming, extended to single-file XBLA/XBLIG STFS package headers) are implemented. **Tier B (1.7.0) is in progress:** B1's read-only GOD/SVOD sector input is implemented in-repo (`GodBlockDevice`, `GodHeader.TryReadVolume`, `XisoImageSource` detection, CLI `decompress`/`convert`); extracting the reader into the standalone `StfsSharp` package and full XBLA/XBLIG package listing/extraction remain.
+**Status:** CCISharp 1.0.1 published on NuGet (2026-11-01; 1.0.0 was the first release, 1.0.1 adds hostile-index hardening). XISOSharp **1.5.0** (published 2026-11-01) implements the Phase 0 image-source factory, Phase 1 CCI integration, Phase 2 split-ISO input, Phase 3 ZAR input (including `validate`/`--validate-checksums`), Phase 4 pathological-TOC traversal hardening (extract/list/rewrite plus the audit, sector-range, repair, salvage and ZAR follow-up walkers), Phase 5 batch conversion/naming, Phase 6 `--json` output, Phase 7 preallocation/sequential I/O, and Phase 8 explicit sector-layout packing (library + CLI + tests); follow-ups make CISO compression read split/container sources directly and harden ZAR extraction (depth bound, pre-sized exact copies, partial cleanup). **Phase 10 Tier A is the 1.6.0 work:** A1 (Xbox 360 XDBF/XSRC title metadata), A2 (XBE logo/title/save image assets), A3 (FATX cap), A4 (`--delete-source`) and A5 (GOD title naming, extended to single-file XBLA/XBLIG STFS package headers) are implemented. **Tier B (1.7.0) is in progress:** B1's read-only GOD/SVOD sector input is implemented in-repo (`GodBlockDevice`, `GodHeader.TryReadVolume`, `XisoImageSource` detection, CLI `decompress`/`convert`), and full XBLA/XBLIG single-file STFS package listing/extraction is implemented in-repo (`StfsPackage`, `StfsEntry`, `StfsPackageInfo`, `XisoChecksum.ComputeStfsChecksum`, CLI `-l`/`-t`/`-x`/`--unpack`/`checksum`); extracting the readers into the standalone `StfsSharp` package remains.
 **Baseline:** XISOSharp `1.4.4` (tag), extract-xiso build `202609111233`, xdvdfs `0.8.3`
 **Reference:** CCI spec/implementation copied to `References/libCCI-0.1.0-1b0087e` (commit `1b0087e`, GPL-2.0-or-later; reference only) and verified to build/round-trip.
 **CCISharp repo:** <https://github.com/purelogiccode/CCISharp> — package <https://www.nuget.org/packages/CCISharp/1.0.1>.
@@ -64,7 +64,7 @@ A full review of the upstream trackers — 56 extract-xiso issues, 54 extract-xi
 - `XISOSharp/XisoZarchive.cs` — `CreateZar`, `ListZar`, `ExtractZar` and `ConvertZarToIso`.
 - `XISOSharp/XisoPatcher.cs`, `SectorAllocator.cs`, `XisoValidator.cs`, `XisoChecksum.cs` — sector layout, copy-in, audit and SHA3-256 checksum already exist.
 - `XISOSharp.Cli/Program.cs` — `--batch` covers extract/list/tree/rewrite/audit and the container verbs (`compress`/`decompress`/`convert`/`split`); JSON only via `--validate-report` (Phase 6).
-- `XISOSharp.Tests` - current suite: 2032 passed / 1 opt-in skip on net8.0/net9.0; 2096 passed / 1 opt-in skip on net10.0.
+- `XISOSharp.Tests` - current suite: 2043 passed / 1 opt-in skip on net8.0/net9.0; 2107 passed / 1 opt-in skip on net10.0.
 
 ---
 
@@ -889,7 +889,7 @@ existing named error or report/drop gate.
   - **A5:** `GodHeader`/`GodTitleInfo` read the plaintext GOD/SVOD `XContent` header (title name, title ID, disc number/count); `title-info` accepts a GOD header or its `.data` folder in text and `--json` form, with FATX-safe name sanitisation and a hex-title-ID fallback. **Extension:** `StfsHeader`/`StfsTitleInfo` read the same XContent fields from single-file XBLA (`0x000D0000`) and XBLIG (`0x00000002`) STFS packages, which have no `.data` folder.
   - **A1:** `XexDbdf` reads the plaintext XDBF/XSTR/XSRC resources from the XEX header-section table; `XexTitleInfo` carries title name, publisher, developer, genre, description and optional thumbnail. `TitleInfo` gains `Kind` (`Xbe`/`Xex`) and `Xex` init properties without changing the positional record; `GetTitleInfo` resolves `default.xbe` → `default.xex` → `default_mp.xbe`; `title-info`/`--xex-info` print and serialize the 360 fields.
   - **A2:** `XbeAssets` reads the logo bitmap and `$$XTIMAGE`/`$$XSIMAGE` sections; `DxtDecoder`/`PngWriter` decode DXT1/3/5, BGR24/BGRA32 and XPR0 payloads to PNG, and DDS is passed through or generated. `XbeInfo` gains `HasLogoBitmap`/`HasTitleImage`/`HasSaveImage`; `--xbe-image` extracts logo/title/save as PNG or DDS.
-- **Remaining roadmap:** Tier B B1's read-only GOD/SVOD sector input is implemented in-repo (`GodBlockDevice`, `GodHeader.TryReadVolume`, CLI `decompress`/`convert`); extracting it into the standalone `StfsSharp` package remains for `1.7.0`, as do full XBLA/XBLIG STFS package listing/extraction (future; 1.6.0 has header metadata only) and the unchecked §15 quality items. CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work.
+- **Remaining roadmap:** Tier B B1's read-only GOD/SVOD sector input is implemented in-repo (`GodBlockDevice`, `GodHeader.TryReadVolume`, CLI `decompress`/`convert`), and XBLA/XBLIG STFS package listing/extraction is implemented in-repo (`StfsPackage`, `StfsEntry`, `StfsPackageInfo`, `ComputeStfsChecksum`, CLI read verbs); extracting both readers into the standalone `StfsSharp` package remains for `1.7.0`, as do the unchecked §15 quality items. CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work.
 
 ### 12.1 Dependency graph
 
@@ -1146,6 +1146,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [x] Split ISO input.
 - [x] ZAR input for list/extract/checksum/validate/convert.
 - [x] GOD/SVOD read-only sector input (`GodBlockDevice`, `GodHeader.TryReadVolume`, all read verbs, CLI decompress/convert); standalone `StfsSharp` package extraction remains.
+- [x] XBLA/XBLIG single-file STFS package listing/extraction (`StfsPackage`, `StfsEntry`, `StfsPackageInfo`, `XisoChecksum.ComputeStfsChecksum`, CLI `-l`/`-t`/`-x`/`--unpack`/`checksum`).
 - [x] Add `verify-hashes <image> <hash-file>` to verify a rebuilt image against the `.hash` sidecar emitted by `--petrify` (works for ISO/CISO/CCI/ZAR).
 - [x] Add `hash <image>` with streaming CRC32/MD5/SHA1/SHA256/SHA3-256, `--json`, and per-file/full-image modes.
 - [x] Add `--title-info`/`GetTitleInfo` that finds `default.xbe`, parses the certificate and reports title name/ID/region/disc.
@@ -1153,7 +1154,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [ ] Add CCI LZ4-HC level 12 encoding in CCISharp for byte-parity with libCCI/Repackinator (keep the fast encoder as default).
 - [ ] Add optional multi-digit CCI part discovery (`game.10.cci`) while keeping reference-compatible single-digit output.
 - [-] XRD Redump metadata generation — deferred: XboxKit 0.7's implementation is itself a stub (zeroed hashes, TODO certificates). Implement only with a complete XRD spec and a verified oracle, not by porting the stub.
-- [-] GOD/STFS/CON containers — non-goal for the XISO library; belongs in a separate Xbox 360 container package. **Amended 2026-11-01:** read-only GOD input is planned for `1.7.0` via `StfsSharp` (Phase 10, §16.3); STFS writing/rebuild stays out. **A5 (2026-11-02):** header-only GOD title metadata and single-file XBLA/XBLIG STFS package header metadata are implemented in `1.6.0` (`GodHeader`/`GodTitleInfo`, `StfsHeader`/`StfsTitleInfo`, `title-info`).
+- [-] GOD/STFS/CON containers — non-goal for the XISO library; belongs in a separate Xbox 360 container package. **Amended 2026-11-01:** read-only GOD input is planned for `1.7.0` via `StfsSharp` (Phase 10, §16.3); STFS writing/rebuild stays out. **A5 (2026-11-02):** header-only GOD title metadata and single-file XBLA/XBLIG STFS package header metadata are implemented in `1.6.0` (`GodHeader`/`GodTitleInfo`, `StfsHeader`/`StfsTitleInfo`, `title-info`). **2026-11-02:** full XBLA/XBLIG package listing/extraction is implemented in-repo (`StfsPackage`, CLI read verbs); STFS writing/rebuild remains a non-goal.
 
 ### 15.7 Documentation, samples, community
 
@@ -1196,7 +1197,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [-] Bit-exact CCI output until CCISharp ships LZ4-HC.
 - [-] STFS/CON/LIVE/PIRS **writing**, package rebuild and re-signing; XRD (see 15.6).
 - [~] GOD **read-only** input — **B1 partial done:** `GodBlockDevice`/`GodHeader.TryReadVolume`/`XisoImageSource` detect and read GOD/SVOD in-repo, and the CLI `decompress`/`convert` verbs are wired. Extracting the reader into the standalone `StfsSharp` package is pending; GOD writing stays a non-goal. **A5 done in `1.6.0`:** header-only title metadata (`title-info`) for GOD and XBLA/XBLIG packages.
-- [ ] Full XBLA/XBLIG single-file STFS package listing/extraction (file table, hash tree, data blocks); `StfsHeader` reads only the XContent header.
+- [x] Full XBLA/XBLIG single-file STFS package listing/extraction (file table, hash tree, data blocks) through `StfsPackage`; `StfsHeader` remains the header-only metadata shortcut.
 
 ### 15.11 Verification commands for this phase
 
@@ -1369,10 +1370,11 @@ the name is empty. Implemented as the first slice of B1 so it ships on its own.
 **Acceptance.** A synthetic GOD header reports the expected name/disc; a non-GOD
 file produces the existing clean error.
 
-**Scope note (2026-11-02).** A5 is **header metadata only**. It does not list or
-extract XBLA/XBLIG package contents. Full single-file STFS package reading (file
-table, hash tree and data blocks) remains future work — a natural extension of
-`StfsSharp`/B1, not part of the 1.6.0 A5 acceptance.
+**Scope note (2026-11-02).** A5 itself is **header metadata only** and does not
+list or extract package contents. Full single-file STFS package reading (file
+table, hash tree and data blocks) is now implemented separately in
+`StfsPackage`/CLI read verbs; extracting it into `StfsSharp` remains future
+work.
 
 ### 16.3 Tier B — `1.7.0`
 
@@ -1383,8 +1385,10 @@ implemented in-repo: `GodBlockDevice` (SVOD hash-table interleave, fragment
 roll-over, security-sector mapping), `GodHeader.TryReadVolume`/`GodVolumeInfo`,
 `XisoImageFormat.God`, `XisoImageSource` detection for a header file or its
 `.data` folder, and CLI `decompress`/`convert`. Every read verb works; in-place
-write verbs and redump modes refuse GOD. The standalone `StfsSharp` package
-extraction and full XBLA/XBLIG single-file package listing/extraction remain.
+write verbs and redump modes refuse GOD. XBLA/XBLIG single-file STFS package
+listing/extraction is also implemented in-repo (`StfsPackage`, `StfsEntry`,
+`StfsPackageInfo`, `XisoChecksum.ComputeStfsChecksum`, CLI read verbs); the
+standalone `StfsSharp` package extraction remains.
 
 **Problem.** `XisoImageSource` covers ISO, split ISO, CISO, split CISO, CCI, split
 CCI and ZAR — **not GOD**, the dominant 360 digital format. GOD is a sector image
@@ -1420,9 +1424,11 @@ remain non-goals."*
 validates and reads without materialising the image; corrupt hash tables fail
 with a named error, not an exception.
 
-**Scope note (2026-11-02).** B1 covers GOD/SVOD sector input. Full
-XBLA/XBLIG package listing/extraction remains future work; the 1.6.0
-`StfsHeader` only reads header metadata.
+**Scope note (2026-11-02).** B1 covers GOD/SVOD sector input and XBLA/XBLIG
+single-file STFS package listing/extraction. The 1.6.0 `StfsHeader` remains the
+header-only metadata shortcut; the full `StfsPackage` reader adds the file
+table, hash-chain block lists and file data. Extracting both readers into the
+standalone `StfsSharp` package remains future work.
 
 ### 16.4 File-by-file change map
 
@@ -1447,13 +1453,17 @@ XBLA/XBLIG package listing/extraction remains future work; the 1.6.0
 | `XISOSharp/BlockDevice/GodBlockDevice.cs` (new) | read-only `IBlockDevice` over GOD/SVOD fragments (B1 partial) |
 | `XISOSharp/StfsHeader.cs` (new) | single-file XBLA/XBLIG `XContent` title parser (A5 extension) |
 | `XISOSharp/Models/StfsTitleInfo.cs` (new) | XBLA/XBLIG title metadata record + kind enum (A5 extension) |
+| `XISOSharp/StfsPackage.cs` (new) | read-only STFS file table, hash-chain block lists, `ReadAllBytes`/`CopyTo`/`ExtractTo` |
+| `XISOSharp/Models/StfsEntry.cs` / `StfsPackageInfo.cs` (new) | package entry and volume/title metadata records |
+| `XISOSharp/XisoChecksum.cs` | `ComputeStfsChecksum`/`ComputeStfsChecksumHex` (ISO/ZAR-compatible tree hash) |
+| `XISOSharp/XisoRepairer.cs` / `XisoPatcher.cs` / `XisoSplitter.cs` / `XisoReader.cs` | STFS extract-first guards for in-place writes and split/rewrite |
 | `XISOSharp/XisoImageFormat.cs` / `XisoImageSource.cs` | `God` + detection (header and `.data` folder) (B1) |
 | `XISOSharp/BlockDevice/GodBlockDevice.cs` (new) | `IBlockDevice` over `StfsFile` (B1) |
-| `XISOSharp.Cli/Program.cs` | `--delete-source` (A4), GOD + XBLA/XBLIG `title-info` (A5), 360 `title-info`/`--xex-info` (A1), `--xbe-image` (A2), GOD `decompress`/`convert` and redump/in-place guards (B1 partial) |
+| `XISOSharp.Cli/Program.cs` | `--delete-source` (A4), GOD + XBLA/XBLIG `title-info` (A5), 360 `title-info`/`--xex-info` (A1), `--xbe-image` (A2), GOD `decompress`/`convert` and redump/in-place guards (B1 partial), STFS `-l`/`-t`/`-x`/`--unpack`/`checksum`/`--json` and container/redump/rewrite guards |
 | `XISOSharp.Cli/JsonOutput.cs` | `JsonGodTitleInfo` + `JsonStfsTitleInfo` (A5), 360 `title-info`/`--xex-info` fields (A1), `xbe-info` presence flags (A2) |
-| `XISOSharp.Gui/**` | 360 title panel, XBE image preview, GOD filter/drop routing (future; A1/A2 are library + CLI) |
-| `XISOSharp.Tests/*` | XDBF, XBE assets, DXT/PNG, FATX cut, delete-source, GOD + XBLA/XBLIG header metadata |
-| `XISOSharp.TestDataGenerator/*` | synthetic XDBF, XBE-with-images, GOD set |
+| `XISOSharp.Gui/**` | 360 title panel, XBE image preview, GOD/STFS filter/drop routing (future; A1/A2 and STFS are library + CLI) |
+| `XISOSharp.Tests/*` | XDBF, XBE assets, DXT/PNG, FATX cut, delete-source, GOD + XBLA/XBLIG header metadata, STFS package listing/extraction (`StfsPackageTests`) |
+| `XISOSharp.TestDataGenerator/*` | synthetic XDBF, XBE-with-images, GOD set, STFS package (`SyntheticStfsPackage`) |
 | `docs/*`, `WhatsNew.md`, `docs/release-notes.md`, READMEs | feature + limitation docs |
 
 ### 16.5 Test plan and quality gates
@@ -1465,6 +1475,7 @@ XBLA/XBLIG package listing/extraction remains future work; the 1.6.0
   reflection-free).
 - Public API additive only; `PackageValidationBaselineVersion` stays green.
 - New JSON fields covered by `GodHeaderTests` (GOD), `StfsHeaderTests` (XBLA/XBLIG) and `CliJsonTests` (existing payloads).
+- STFS package fixtures are synthetic (`SyntheticStfsPackage`); `StfsPackageTests` covers the file table, contiguous/hash-chain blocks, writable primary/secondary tables and the level-1 boundary, and the fuzzer mutates a base package through `StfsPackage.Open`/`ReadAllBytes`/`ExtractTo`/`ComputeStfsChecksum`.
 - Fuzzer seeds: XDBF, XBE section table, DXT block, GOD `XContent`/block map (XDBF/XBE/DXT have synthetic coverage; the GOD header + fragment mapping is now in `XISOSharp.Fuzz`).
 
 ### 16.6 Companion repositories
@@ -1512,7 +1523,7 @@ viewers. Cross-repo work is tracked in §15.9.
 | 4 | A2 XBE image assets | `1.6.0` | 1–2 d |
 | 5 | B1 `StfsSharp` + read-only GOD | `1.7.0` | 1–2 wk |
 | 6 | Companion upgrades (SimpleXisoDrive, XISOStudio) | after `1.7.0` | cross-repo |
-| 7 | Full XBLA/XBLIG STFS package listing/extraction (file table, hash tree, data blocks) | future | header metadata only in 1.6.0 (`StfsHeader`) |
+| 7 | Full XBLA/XBLIG STFS package listing/extraction (file table, hash tree, data blocks) | done in-repo (`StfsPackage`) | full reader + CLI read verbs in this tree; `StfsSharp` extraction remains |
 
 ### 16.9 Progress log
 
@@ -1522,3 +1533,4 @@ viewers. Cross-repo work is tracked in §15.9.
 | 2026-11-02 | Phase 10 Tier A partial: A3 FATX cap (`Constants.FatxMaxFileSize`), A4 `--delete-source`, A5 GOD header title naming (`GodHeader`/`GodTitleInfo`, `title-info` text/JSON) extended to single-file XBLA/XBLIG STFS headers (`StfsHeader`/`StfsTitleInfo`); plan/document drift corrected (1.5.0 release state, counts, benchmark scope, coverage floor) | — |
 | 2026-11-02 | Phase 10 Tier A complete: A1 XEX header-section table + XDBF/XSTR/XSRC parser (`XexDbdf`, `XexTitleInfo`, `GetXexTitleInfo`, `TitleInfo.Kind`/`Xex`, `default.xbe`→`default.xex`→`default_mp.xbe`, 360 `title-info`/`--xex-info` text+JSON); A2 XBE logo/`$$XTIMAGE`/`$$XSIMAGE` extraction (`XbeAssets`, `XbeImage`, DXT1/3/5 + BGR24/BGRA32 + XPR0 decode, BCL PNG writer, DDS passthrough/generation, `XbeInfo` presence flags, `--xbe-image`); synthetic XDBF/XBE fixtures and CLI tests | — |
 | 2026-11-02 | Phase 10 Tier B partial: read-only GOD/SVOD sector input (`GodBlockDevice`, `GodHeader.TryReadVolume`, `GodVolumeInfo`, `XisoImageFormat.God`, `XisoImageSource` header/`.data` detection, CLI `decompress`/`convert`, in-place guards); `GodBlockDeviceTests` (11); GOD header/fragment target added to `XISOSharp.Fuzz`; docs/release notes updated. Standalone `StfsSharp` extraction and full XBLA/XBLIG package listing remain. | — |
+| 2026-11-02 | XBLA/XBLIG STFS package listing/extraction: `StfsPackage`/`StfsEntry`/`StfsPackageInfo` read the STFS file table and hash-chain block lists (read-only and writable primary/secondary tables, level-1 boundary), `XisoChecksum.ComputeStfsChecksum` adds the ISO/ZAR-compatible tree hash, CLI `-l`/`-t`/`-x`/`--unpack`/`checksum`/`--json` accept packages, container/redump/rewrite verbs refuse them, `SyntheticStfsPackage` fixtures, `StfsPackageTests` (11), fuzzer target; docs/plan/release notes updated. | — |

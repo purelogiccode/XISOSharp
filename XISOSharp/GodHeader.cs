@@ -64,6 +64,9 @@ public static class GodHeader
     /// <summary>Volume type value for an SVOD/GOD container.</summary>
     internal const uint VolumeTypeSvod = 1;
 
+    /// <summary>Volume type value for a single-file STFS package.</summary>
+    internal const uint VolumeTypeStfs = 0;
+
     /// <summary>Enhanced-GDF feature bit in the SVOD device descriptor.</summary>
     internal const byte SvodFeatureEnhancedGdf = 0x40;
 

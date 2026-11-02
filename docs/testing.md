@@ -66,6 +66,7 @@ Highlights:
 | GOD read-only sector input (`GodBlockDevice`, detection, extraction, checksum, CLI decompress/convert, guards) | `GodBlockDeviceTests.cs` |
 | GOD header title metadata (`GodHeader`, `title-info` text/JSON) | `GodHeaderTests.cs` |
 | Single-file XBLA/XBLIG STFS header metadata (`StfsHeader`, text/JSON) | `StfsHeaderTests.cs` |
+| XBLA/XBLIG STFS package listing/extraction (file table, contiguous and hash-chain blocks, writable secondary tables, level-1 boundary, checksum vs ZAR, CLI verbs, corrupt/unsafe inputs) | `StfsPackageTests.cs` |
 | Explicit sector-layout packing (`XisoLayoutSpec` JSON/text, fixed extents, first-fit, CLI/build-image) | `LayoutPackingTests.cs` |
 | CISO compress/decompress, split parts, `.cso` auto-detect | `CisoTests.cs`, `CisoAutoDetectTests.cs` |
 | Golden interop vs reference `xdvdfs-cli 0.8.3` (both directions, split layout) | `CisoSplitInteropTests.cs` |

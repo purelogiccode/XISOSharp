@@ -71,6 +71,12 @@ public static class XisoPatcher
                 $"Cannot patch GOD container '{isoPath}' in place; decompress it to ISO first.");
         }
 
+        if (StfsPackage.IsStfsPackage(isoPath))
+        {
+            throw new InvalidDataException(
+                $"Cannot patch STFS package '{isoPath}' in place; extract it first.");
+        }
+
         if (XisoSplitter.IsSplitPath(isoPath) || SplitIsoFile.IsSplitPath(isoPath))
         {
             throw new InvalidDataException(

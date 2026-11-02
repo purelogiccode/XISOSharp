@@ -98,9 +98,9 @@ printed and the tool exits 1.
 | `-c <dir> [name]` | Create an ISO from `<dir>` (optional `name` overrides output, may include a path; repeatable) |
 | `--pack <input> [name]` | Pack a directory into an ISO, or repack an existing ISO in place (rewrite) |
 | `-x` | Extract xiso(s) (explicit; the default mode) |
-| `--unpack <file> [dest]` | Unpack the whole image (auto-named `./<game>/` when dest omitted) |
-| `-l` | List top-level entries (non-recursive) |
-| `-t` | Tree — recursive listing with full paths, sizes, totals |
+| `--unpack <file> [dest]` | Unpack the whole image (auto-named `./<game>/` when dest omitted). XBLA/XBLIG STFS packages unpack through their file table |
+| `-l` | List top-level entries (non-recursive); also `.zar` and XBLA/XBLIG STFS packages |
+| `-t` | Tree — recursive listing with full paths, sizes, totals (ISO, `.zar`, STFS) |
 | `-i <file> [path]` | Volume info + directory entry metadata (sector, size, attributes) |
 | `--ls <file> [path]` | Flat directory listing, names only (mirrors `ls`) |
 | `--md5 <file> [path]` / `--sha256 <file> [path]` | Hash files inside the image (whole image / directory / single file) |
@@ -114,7 +114,7 @@ printed and the tool exits 1.
 | `--salvage <file>` | Rebuild reachable entries from a corrupt image (`--repair-out` overrides output) |
 | `-r` | Rewrite as optimized ISO (byte-identical to `extract-xiso -r`) |
 | `validate <src> <out>` | Validate conversion between two images (+ `--validate*` flags; mismatch exits 2). Both sides accept ISO, CISO/CCI (single or split), split ISO sets and `.zar` |
-| `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum (`--silent` → hex only) |
+| `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum (`--silent` → hex only); ISO/ZAR/STFS tree hashes compare equal |
 | `title-info <image> [--json]` | Root `default.xbe`, `default.xex` or `default_mp.xbe` title metadata (name, ID, region, disc, version); Xbox 360 XDBF adds publisher/developer/genre/description/thumbnail presence. A GOD header or its `.data` folder, or a single-file XBLA/XBLIG STFS package, reports `XContent` name/ID/disc metadata |
 | `split` / `join` (`joinsplit`) | Split into `<base>.1.iso`… parts / reassemble (`--size`, `--output`, `--batch`; default size `0xFF000000`, 4 GiB − 16 MiB) |
 | `--filetime <image>` / `--set-filetime <image> <value>` | Show / set the FILETIME volume field |
@@ -232,8 +232,11 @@ XISOSharp compress --format cci game.iso game.cci --cci-split 0
 XISOSharp decompress game.1.cci game.iso
 XISOSharp checksum game.iso
 XISOSharp checksum game.zar
+XISOSharp checksum game.stfs
 XISOSharp validate --validate-checksums game.zar game.iso
 XISOSharp convert game.zar game.iso
+XISOSharp -l game.stfs                        # XBLA/XBLIG STFS package
+XISOSharp -x -d game game.stfs                # extract the package file table
 XISOSharp -l "4D5307E6"                       # GOD header (or its .data folder)
 XISOSharp decompress "4D5307E6" game.iso      # GOD -> ISO
 XISOSharp convert "4D5307E6" game.cci         # GOD -> CCI

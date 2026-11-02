@@ -92,6 +92,8 @@ Output: `hex tab path` (silent → hex only). Exit `0` on all, deterministic hex
 `XisoImageSource.OpenBlockDevice`, so the digest is identical to the source ISO;
 `ComputeZarChecksum` hashes the ZAR name tree with the same sorted `/path` +
 file-data rule, so equivalent trees hash equally across ISO and ZAR.
+`ComputeStfsChecksum` applies the same rule to an XBLA/XBLIG STFS package, so
+equivalent ISO/ZAR/STFS trees compare equal.
 
 **Also:** `--checksum` as CLI flag `Program.cs:533` + `checksumFlagMode` supports `checksum a.iso b.iso` and `--silent`.
 

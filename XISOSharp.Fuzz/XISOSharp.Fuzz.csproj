@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(RepoRoot)XISOSharp\XISOSharp.csproj" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp.TestDataGenerator\XISOSharp.TestDataGenerator.csproj" />
   </ItemGroup>
 
   <ItemGroup>

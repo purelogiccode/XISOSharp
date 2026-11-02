@@ -1786,6 +1786,12 @@ public static class XisoReader
                 $"Cannot rewrite GOD container '{xisoPath}' in place; decompress it to ISO first.");
         }
 
+        if (mode == ExtractMode.Rewrite && StfsPackage.IsStfsPackage(xisoPath))
+        {
+            throw new NotSupportedException(
+                $"Cannot rewrite STFS package '{xisoPath}' in place; extract it first.");
+        }
+
         using Stream fs = OpenImageStream(xisoPath);
         return DecodeXisoCore(fs, xisoPath, outputPath, mode, out outIsoPath, llCompat,
             cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions,
@@ -2460,6 +2466,12 @@ public static class XisoReader
         {
             throw new IOException(
                 $"Cannot set the FILETIME of a GOD container in place: {isoPath}; decompress it to ISO first");
+        }
+
+        if (StfsPackage.IsStfsPackage(isoPath))
+        {
+            throw new IOException(
+                $"Cannot set the FILETIME of an STFS package in place: {isoPath}; extract it first");
         }
 
         using FileStream fs = new(

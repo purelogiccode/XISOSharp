@@ -128,7 +128,7 @@ sit at the repository root with no grouping folders.
 | `XISOSharp.Tests` | xUnit test suite |
 | `XISOSharp.Benchmarks` | BenchmarkDotNet benchmarks (AVL tree, Boyer–Moore, sector math) |
 | `XISOSharp.BattleTests` | CLI-vs-reference oracle harness (`extract-xiso` / `xdvdfs` / `xboxkit`) |
-| `XISOSharp.Fuzz` | Mutation fuzzer (TOC, CISO, CCI, ZAR, XBE/XEX) |
+| `XISOSharp.Fuzz` | Mutation fuzzer (TOC, CISO, CCI, ZAR, STFS, XBE/XEX) |
 | `XISOSharp.AotSmoke` | NativeAOT publish/run smoke check |
 | `XISOSharp.TestDataGenerator` | Deterministic `TestData/` fixture generator |
 | `XISOSharp.Sample` | Library walkthrough console app |

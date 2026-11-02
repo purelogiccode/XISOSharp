@@ -265,6 +265,12 @@ public static class XisoSplitter
                 $"Cannot split GOD container '{isoPath}' directly; decompress it to ISO first.");
         }
 
+        if (StfsPackage.IsStfsPackage(isoPath))
+        {
+            throw new NotSupportedException(
+                $"Cannot split STFS package '{isoPath}' directly; extract it first.");
+        }
+
         VolumeInfo volume = XisoReader.GetVolumeInfo(isoPath);
         if (!volume.IsValid)
             throw new XisoFormatException($"Not a valid XISO: {isoPath}");

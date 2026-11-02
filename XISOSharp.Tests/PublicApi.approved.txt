@@ -52,6 +52,8 @@ C:XISOSharp.Models.RepairResult(System.Collections.Generic.IReadOnlyList<System.
 C:XISOSharp.Models.SalvageResult(System.Collections.Generic.IReadOnlyList<System.String>,System.Collections.Generic.IReadOnlyList<System.String>,System.String,System.Collections.Generic.IReadOnlyList<System.String>)
 C:XISOSharp.Models.SectorLayout(XISOSharp.Models.VolumeInfo,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.FileSectorExtent>,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.SectorRange>,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.SectorRange>,System.Int64)
 C:XISOSharp.Models.SectorRange(System.UInt32,System.UInt32)
+C:XISOSharp.Models.StfsEntry(System.String,System.String,System.Boolean,System.Int64,System.UInt32,System.UInt32,System.Boolean,System.Nullable<System.DateTimeOffset>,System.Nullable<System.DateTimeOffset>)
+C:XISOSharp.Models.StfsPackageInfo(System.String,XISOSharp.Models.StfsPackageKind,System.String,System.UInt32,System.String,System.Byte,System.Byte,System.UInt32,System.Int64,System.UInt32,System.Int64,System.UInt32,System.UInt32,System.UInt16,System.UInt32,System.Boolean,System.Int32,System.Int32,System.Int64)
 C:XISOSharp.Models.StfsTitleInfo(System.String,XISOSharp.Models.StfsPackageKind,System.String,System.UInt32,System.String,System.Byte,System.Byte,System.UInt32)
 C:XISOSharp.Models.TitleInfo(System.String,System.String,System.UInt32,System.String,System.UInt32,System.String,System.UInt32,System.UInt32,XISOSharp.Models.XbeInfo)
 C:XISOSharp.Models.UnpackOptions()
@@ -457,6 +459,18 @@ M:XISOSharp.Models.SectorRange.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.SectorRange.Equals(XISOSharp.Models.SectorRange)->System.Boolean
 M:XISOSharp.Models.SectorRange.GetHashCode()->System.Int32
 M:XISOSharp.Models.SectorRange.ToString()->System.String
+M:XISOSharp.Models.StfsEntry.<Clone>$()->XISOSharp.Models.StfsEntry
+M:XISOSharp.Models.StfsEntry.Deconstruct(out System.String,out System.String,out System.Boolean,out System.Int64,out System.UInt32,out System.UInt32,out System.Boolean,out System.Nullable<System.DateTimeOffset>,out System.Nullable<System.DateTimeOffset>)->System.Void
+M:XISOSharp.Models.StfsEntry.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.StfsEntry.Equals(XISOSharp.Models.StfsEntry)->System.Boolean
+M:XISOSharp.Models.StfsEntry.GetHashCode()->System.Int32
+M:XISOSharp.Models.StfsEntry.ToString()->System.String
+M:XISOSharp.Models.StfsPackageInfo.<Clone>$()->XISOSharp.Models.StfsPackageInfo
+M:XISOSharp.Models.StfsPackageInfo.Deconstruct(out System.String,out XISOSharp.Models.StfsPackageKind,out System.String,out System.UInt32,out System.String,out System.Byte,out System.Byte,out System.UInt32,out System.Int64,out System.UInt32,out System.Int64,out System.UInt32,out System.UInt32,out System.UInt16,out System.UInt32,out System.Boolean,out System.Int32,out System.Int32,out System.Int64)->System.Void
+M:XISOSharp.Models.StfsPackageInfo.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.StfsPackageInfo.Equals(XISOSharp.Models.StfsPackageInfo)->System.Boolean
+M:XISOSharp.Models.StfsPackageInfo.GetHashCode()->System.Int32
+M:XISOSharp.Models.StfsPackageInfo.ToString()->System.String
 M:XISOSharp.Models.StfsTitleInfo.<Clone>$()->XISOSharp.Models.StfsTitleInfo
 M:XISOSharp.Models.StfsTitleInfo.Deconstruct(out System.String,out XISOSharp.Models.StfsPackageKind,out System.String,out System.UInt32,out System.String,out System.Byte,out System.Byte,out System.UInt32)->System.Void
 M:XISOSharp.Models.StfsTitleInfo.Equals(System.Object)->System.Boolean
@@ -555,6 +569,14 @@ M:XISOSharp.SecuritySectors.ParseLines(System.Collections.Generic.IEnumerable<Sy
 M:XISOSharp.StfsHeader.IsStfsPackage(System.String)->System.Boolean
 M:XISOSharp.StfsHeader.ReadTitle(System.String)->XISOSharp.Models.StfsTitleInfo
 M:XISOSharp.StfsHeader.TryReadTitle(System.String,out XISOSharp.Models.StfsTitleInfo)->System.Boolean
+M:XISOSharp.StfsPackage.CopyTo(XISOSharp.Models.StfsEntry,System.IO.Stream)->System.Void
+M:XISOSharp.StfsPackage.Dispose()->System.Void
+M:XISOSharp.StfsPackage.ExtractTo(System.String,System.Boolean,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Int32
+M:XISOSharp.StfsPackage.Find(System.String)->XISOSharp.Models.StfsEntry
+M:XISOSharp.StfsPackage.IsStfsPackage(System.String)->System.Boolean
+M:XISOSharp.StfsPackage.Open(System.String,System.IO.FileShare)->XISOSharp.StfsPackage
+M:XISOSharp.StfsPackage.ReadAllBytes(XISOSharp.Models.StfsEntry)->System.Byte[]
+M:XISOSharp.StfsPackage.TryOpen(System.String,out XISOSharp.StfsPackage)->System.Boolean
 M:XISOSharp.ToolLocator.FindOnPath(System.String)->System.String
 M:XISOSharp.ToolLocator.GetFileName(System.String)->System.String
 M:XISOSharp.ToolLocator.ProbeVersionAsync(System.String,System.Nullable<System.TimeSpan>,System.Threading.CancellationToken)->System.Threading.Tasks.Task<System.String>
@@ -596,6 +618,8 @@ M:XISOSharp.XisoChecksum.ComputeImageChecksum(System.IO.FileStream,System.String
 M:XISOSharp.XisoChecksum.ComputeImageChecksum(System.String,System.Nullable<System.Int32>,System.Threading.CancellationToken)->System.Byte[]
 M:XISOSharp.XisoChecksum.ComputeImageChecksum(XISOSharp.Interfaces.IBlockDevice,System.String,System.Nullable<System.Int32>,System.Threading.CancellationToken)->System.Byte[]
 M:XISOSharp.XisoChecksum.ComputeImageChecksumHex(System.String,System.Nullable<System.Int32>,System.Threading.CancellationToken)->System.String
+M:XISOSharp.XisoChecksum.ComputeStfsChecksum(System.String,System.Threading.CancellationToken)->System.Byte[]
+M:XISOSharp.XisoChecksum.ComputeStfsChecksumHex(System.String,System.Threading.CancellationToken)->System.String
 M:XISOSharp.XisoChecksum.ComputeZarChecksum(System.String,System.Threading.CancellationToken)->System.Byte[]
 M:XISOSharp.XisoChecksum.ComputeZarChecksumHex(System.String,System.Threading.CancellationToken)->System.String
 M:XISOSharp.XisoExplorer.Combine(System.String,System.String)->System.String
@@ -905,6 +929,34 @@ P:XISOSharp.Models.SectorLayout.UsedRanges:System.Collections.Generic.IReadOnlyL
 P:XISOSharp.Models.SectorLayout.Volume:XISOSharp.Models.VolumeInfo:get;set;
 P:XISOSharp.Models.SectorRange.SectorCount:System.UInt32:get;set;
 P:XISOSharp.Models.SectorRange.StartSector:System.UInt32:get;set;
+P:XISOSharp.Models.StfsEntry.BlockCount:System.UInt32:get;set;
+P:XISOSharp.Models.StfsEntry.Created:System.Nullable<System.DateTimeOffset>:get;set;
+P:XISOSharp.Models.StfsEntry.IsContiguous:System.Boolean:get;set;
+P:XISOSharp.Models.StfsEntry.IsDirectory:System.Boolean:get;set;
+P:XISOSharp.Models.StfsEntry.Modified:System.Nullable<System.DateTimeOffset>:get;set;
+P:XISOSharp.Models.StfsEntry.Name:System.String:get;set;
+P:XISOSharp.Models.StfsEntry.Path:System.String:get;set;
+P:XISOSharp.Models.StfsEntry.Size:System.Int64:get;set;
+P:XISOSharp.Models.StfsEntry.StartBlock:System.UInt32:get;set;
+P:XISOSharp.Models.StfsPackageInfo.ContentType:System.UInt32:get;set;
+P:XISOSharp.Models.StfsPackageInfo.DirectoryCount:System.Int32:get;set;
+P:XISOSharp.Models.StfsPackageInfo.DiscCount:System.Byte:get;set;
+P:XISOSharp.Models.StfsPackageInfo.DiscNumber:System.Byte:get;set;
+P:XISOSharp.Models.StfsPackageInfo.FileCount:System.Int32:get;set;
+P:XISOSharp.Models.StfsPackageInfo.FileTableBlockCount:System.UInt16:get;set;
+P:XISOSharp.Models.StfsPackageInfo.FileTableBlockNumber:System.UInt32:get;set;
+P:XISOSharp.Models.StfsPackageInfo.FirstBlockOffset:System.Int64:get;set;
+P:XISOSharp.Models.StfsPackageInfo.FreeBlockCount:System.UInt32:get;set;
+P:XISOSharp.Models.StfsPackageInfo.HeaderSize:System.UInt32:get;set;
+P:XISOSharp.Models.StfsPackageInfo.IsReadOnlyFormat:System.Boolean:get;set;
+P:XISOSharp.Models.StfsPackageInfo.Kind:XISOSharp.Models.StfsPackageKind:get;set;
+P:XISOSharp.Models.StfsPackageInfo.PackageLength:System.Int64:get;set;
+P:XISOSharp.Models.StfsPackageInfo.PackagePath:System.String:get;set;
+P:XISOSharp.Models.StfsPackageInfo.TitleId:System.UInt32:get;set;
+P:XISOSharp.Models.StfsPackageInfo.TitleIdHex:System.String:get;set;
+P:XISOSharp.Models.StfsPackageInfo.TitleName:System.String:get;set;
+P:XISOSharp.Models.StfsPackageInfo.TotalBlockCount:System.UInt32:get;set;
+P:XISOSharp.Models.StfsPackageInfo.TotalFileSize:System.Int64:get;set;
 P:XISOSharp.Models.StfsTitleInfo.ContentType:System.UInt32:get;set;
 P:XISOSharp.Models.StfsTitleInfo.DiscCount:System.Byte:get;set;
 P:XISOSharp.Models.StfsTitleInfo.DiscNumber:System.Byte:get;set;
@@ -1021,6 +1073,8 @@ P:XISOSharp.SectorAllocator.FreeRanges:System.Collections.Generic.IReadOnlyList<
 P:XISOSharp.SectorAllocator.NextFree:System.UInt32:get;
 P:XISOSharp.SectorAllocator.TotalSectors:System.Nullable<System.Int64>:get;
 P:XISOSharp.SectorAllocator.UsedRanges:System.Collections.Generic.IReadOnlyList<XISOSharp.Models.SectorRange>:get;
+P:XISOSharp.StfsPackage.Entries:System.Collections.Generic.IReadOnlyList<XISOSharp.Models.StfsEntry>:get;
+P:XISOSharp.StfsPackage.Info:XISOSharp.Models.StfsPackageInfo:get;
 P:XISOSharp.TruncatedCopyException.CopiedBytes:System.Int64:get;
 P:XISOSharp.TruncatedCopyException.ExpectedBytes:System.Int64:get;
 P:XISOSharp.WaxGlob.Pattern:System.String:get;
@@ -1102,6 +1156,8 @@ T:XISOSharp.Models.RepairResult
 T:XISOSharp.Models.SalvageResult
 T:XISOSharp.Models.SectorLayout
 T:XISOSharp.Models.SectorRange
+T:XISOSharp.Models.StfsEntry
+T:XISOSharp.Models.StfsPackageInfo
 T:XISOSharp.Models.StfsPackageKind
 T:XISOSharp.Models.StfsTitleInfo
 T:XISOSharp.Models.TitleInfo
@@ -1126,6 +1182,7 @@ T:XISOSharp.RemapFilesystem
 T:XISOSharp.SectorAllocator
 T:XISOSharp.SecuritySectors
 T:XISOSharp.StfsHeader
+T:XISOSharp.StfsPackage
 T:XISOSharp.ToolLocator
 T:XISOSharp.TraversalCallback
 T:XISOSharp.TruncatedCopyException

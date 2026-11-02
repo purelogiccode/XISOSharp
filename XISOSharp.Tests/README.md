@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-2086-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2107-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![Test SDK](https://img.shields.io/badge/test--sdk-18.10.1-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
@@ -45,6 +45,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Container input** - `XisoImageSource` detection table (ISO/XISO/IMG/CISO/split CISO/CCI/split CCI/split ISO/ZAR), magic sniffing, `CciBlockDevice`, split-ISO seeks, and CCI/split-ISO/ZAR reader-verb parity with plain ISO
 - **CCI** - `XisoCci` single/split round-trips, default-path helpers, CLI `--format cci`, `--cci-level`/`--cci-split`, `cci`/`uncci` aliases, and in-place refusal guards; `CisoTests` covers recompressing a CISO through the direct decompressed view
 - **ZAR input** - `XisoZarchive.ListZar`/`ExtractZar`/`ConvertZarToIso`, unsafe-name rejection, depth-bound rejection, pre-sized exact extraction, `ComputeZarChecksum` parity with `ComputeImageChecksum`, per-entry `ComputeFileHash`, ZAR↔ISO/CCI validation (tree + checksums), and CLI `-l`/`-x`/`checksum`/`validate`/`convert`
+- **STFS packages** - synthetic XBLA/XBLIG packages: file table and directory paths, contiguous and hash-chain block lists, writable primary/secondary tables, level-1 hash boundary, `StfsPackage`/`StfsEntry`/`StfsPackageInfo`, `ComputeStfsChecksum` parity with the equivalent ZAR tree, extraction/skip-existing, unsafe-name and corrupt-header rejection, CLI `-l`/`-t`/`-x`/`--unpack`/`checksum`/`--json`, and container/redump/rewrite refusals
 - **Pathological TOC traversal** - 4,096-entry left-skewed/right-skewed/alternating/balanced tables: list/tree/extract/rewrite parity, rewrite-checksum equality with the balanced form, audit/sector-range/repair/salvage/ZAR parity on the left spine, left self-cycle refusal, and continue-on-error subtree skipping
 - **Batch conversion** - `compress`/`decompress`/`convert`/`split` `--batch`/`--batch-recursive`, naming templates (`{name}`/`{ext}`/`{format}`), `--skip-existing` resume, `--continue-on-error` partial-output cleanup, duplicate-output refusal, and `--jobs` parallelism
 - **Redump input guard** - every redump mode (`--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`) refuses `.cci`/`.cso`, split-ISO and `.zar` inputs with a decompress/convert/join message while a plain ISO still runs; `MainViewModelTests` covers the bidirectional ZAR tab, `CliCommandsTests.Convert`/the GUI self-test cover the convert argv, and `NoBugReport`-tagged overwrite refusals are asserted too

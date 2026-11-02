@@ -1,7 +1,8 @@
 # What's New in 1.6.0 (unreleased)
 
 XISOSharp 1.6.0 is the Phase 10 Tier A release (A1-A5), plus the first slice
-of Tier B: read-only GOD/SVOD sector input.
+of Tier B: read-only GOD/SVOD sector input and XBLA/XBLIG STFS package
+listing/extraction.
 
 - **Xbox 360 title metadata**: `title-info` and `--xex-info` read the plaintext
   XDBF/XSTR/XSRC resources from `default.xex` and report the title name,
@@ -25,6 +26,11 @@ of Tier B: read-only GOD/SVOD sector input.
 - **XBLA/XBLIG header metadata**: `StfsHeader`/`StfsTitleInfo` read the same
   fields from single-file XBLA/XBLIG STFS packages, which have no `.data`
   folder.
+- **XBLA/XBLIG package contents**: `StfsPackage` reads the STFS file table and
+  file data behind the hash tables, so `-l`, `-t`, `-x`, `--unpack`, `checksum`
+  and `-l/--json` accept an XBLA/XBLIG package directly. `XisoChecksum.ComputeStfsChecksum`
+  uses the same sorted-path SHA3-256 tree hash as ISO and ZAR. STFS writing
+  stays out of scope.
 - **FATX-safe split default**: plain-ISO splits now default to
   `Constants.FatxMaxFileSize` (`0xFF000000`, 4 GiB − 16 MiB); an explicit
   larger `--size` warns.

@@ -2646,6 +2646,64 @@ internal static class Program
                 continue;
             }
 
+            if (StfsPackage.IsStfsPackage(xisoPath))
+            {
+                try
+                {
+                    using StfsPackage package = StfsPackage.Open(xisoPath);
+                    if (rewrite)
+                    {
+                        Logger.LogErr($"Error: cannot rewrite STFS package '{xisoPath}'; extract it first\n");
+                        err = 1;
+                    }
+                    else if (skipSectors is not null)
+                    {
+                        Logger.LogErr("Error: --skip-sectors is not supported for STFS packages\n");
+                        err = 1;
+                    }
+                    else if (extract && unpackOptions?.ContinueOnError == true)
+                    {
+                        Logger.LogErr("Error: --continue-on-error is not supported for STFS packages\n");
+                        err = 1;
+                    }
+                    else if (extract)
+                    {
+                        string destination = path ?? DeriveStfsExtractDirectory(xisoPath);
+                        Logger.Log($"extracting {Path.GetFileName(xisoPath)}:\n\n");
+                        package.ExtractTo(destination, skipExisting: unpackOptions?.SkipExisting ?? false);
+                        Logger.TotalFiles = package.Info.FileCount;
+                        Logger.TotalBytes = package.Info.TotalFileSize;
+                        Logger.Log(
+                            $"\n{package.Info.FileCount} files in {xisoPath} total {package.Info.TotalFileSize} bytes\n");
+                    }
+                    else if (jsonListings != null)
+                    {
+                        List<JsonEntry> entries = package.Entries
+                            .Select(static entry => new JsonEntry(
+                                "/" + entry.Path,
+                                entry.Name,
+                                entry.IsDirectory,
+                                0,
+                                entry.Size,
+                                0))
+                            .ToList();
+                        jsonListings.Add(new JsonImageListing(
+                            xisoPath, package.Info.FileCount, package.Info.TotalFileSize, entries));
+                    }
+                    else
+                    {
+                        PrintStfsEntries(package, xisoPath, tree);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException)
+                {
+                    Logger.LogErr($"Error processing STFS package {xisoPath}: {ex.Message}\n");
+                    err = 1;
+                }
+
+                continue;
+            }
+
             bool optimized;
 
             try
@@ -3072,6 +3130,25 @@ internal static class Program
             {
                 XisoZarchive.ExtractZar(xisoPath, destPath ?? DeriveZarExtractDirectory(xisoPath),
                     skipExisting);
+                return 0;
+            }
+
+            if (StfsPackage.IsStfsPackage(xisoPath))
+            {
+                if (skipSectors is not null)
+                {
+                    Logger.LogErr("Error: --skip-sectors is not supported for STFS packages\n");
+                    return 1;
+                }
+
+                if (continueOnError)
+                {
+                    Logger.LogErr("Error: --continue-on-error is not supported for STFS packages\n");
+                    return 1;
+                }
+
+                using StfsPackage package = StfsPackage.Open(xisoPath);
+                package.ExtractTo(destPath ?? DeriveStfsExtractDirectory(xisoPath), skipExisting);
                 return 0;
             }
 
@@ -3930,6 +4007,13 @@ internal static class Program
         string? outPath = positionals.Count == 2 ? positionals[1] : output;
         long? effectiveSplit = cci ? cciSplitBytes : cisoSplitBytes;
 
+        if (StfsPackage.IsStfsPackage(source))
+        {
+            Logger.LogErr(
+                "Error: STFS packages are not sector images; extract them first (XISOSharp -x).\n");
+            return 1;
+        }
+
         // #15 (xdvdfs #36): refuse before the -y/-n prompt, not after it.
         string probeBase = outPath ?? (cci
             ? XisoCci.DeriveDefaultCciPath(source, Directory.Exists(source))
@@ -4161,6 +4245,13 @@ internal static class Program
         string source = positionals[0];
         string? outIso = positionals.Count == 2 ? positionals[1] : output;
 
+        if (StfsPackage.IsStfsPackage(source))
+        {
+            Logger.LogErr(
+                "Error: STFS packages are not sector images; extract them first (XISOSharp -x).\n");
+            return 1;
+        }
+
         bool isCci = Path.GetExtension(source).Equals(".cci", StringComparison.OrdinalIgnoreCase);
         bool isGod = false;
         if (XisoImageSource.TryDetect(source, out XisoImageSourceInfo? info) && info is not null)
@@ -4362,6 +4453,11 @@ internal static class Program
             return $"'{path}' is a ZArchive; convert it to ISO first (XISOSharp convert).";
         }
 
+        if (StfsPackage.IsStfsPackage(path))
+        {
+            return $"'{path}' is an STFS package; extract it first (XISOSharp -x).";
+        }
+
         if (GodHeader.IsGodContainer(path))
         {
             return $"'{path}' is a GOD container; decompress it to ISO first (XISOSharp decompress).";
@@ -4397,6 +4493,41 @@ internal static class Program
         string directory = Path.GetDirectoryName(zarPath) ?? string.Empty;
         string name = Path.GetFileNameWithoutExtension(zarPath);
         return Path.Combine(directory, name);
+    }
+
+    private static string DeriveStfsExtractDirectory(string packagePath)
+    {
+        string directory = Path.GetDirectoryName(packagePath) ?? string.Empty;
+        string name = Path.GetFileNameWithoutExtension(packagePath);
+        if (name.Length == 0)
+        {
+            name = Path.GetFileName(packagePath);
+        }
+
+        return Path.Combine(directory, name);
+    }
+
+    private static void PrintStfsEntries(StfsPackage package, string packagePath, bool tree)
+    {
+        string name = Path.GetFileName(packagePath);
+        Logger.Log($"{(tree ? "tree" : "listing")} {name}:\n\n");
+        foreach (StfsEntry entry in package.Entries)
+        {
+            if (tree)
+            {
+                int depth = entry.Path.Count(static c => c == '/');
+                Logger.Log(
+                    $"{new string(' ', depth * 2)}{entry.Name}{(entry.IsDirectory ? "\\" : "")} ({entry.Size} bytes)\n");
+            }
+            else
+            {
+                Logger.Log($"{entry.Path.Replace('/', '\\')} ({entry.Size} bytes)\n");
+            }
+        }
+
+        Logger.TotalFiles = package.Info.FileCount;
+        Logger.TotalBytes = package.Info.TotalFileSize;
+        Logger.Log($"\n{package.Info.FileCount} files in {name} total {package.Info.TotalFileSize} bytes\n");
     }
 
     private static void PrintZarEntries(string zarPath, bool tree)
@@ -4495,7 +4626,9 @@ internal static class Program
             {
                 byte[] hash = IsZarPath(iso)
                     ? XisoChecksum.ComputeZarChecksum(iso)
-                    : XisoChecksum.ComputeImageChecksum(iso);
+                    : StfsPackage.IsStfsPackage(iso)
+                        ? XisoChecksum.ComputeStfsChecksum(iso)
+                        : XisoChecksum.ComputeImageChecksum(iso);
                 string hex = Convert.ToHexString(hash).ToLowerInvariant();
                 if (silent)
                     Logger.Log($"{hex}\n");
@@ -5164,6 +5297,14 @@ internal static class Program
 
         string source = positionals[0];
         string output = positionals[1];
+
+        if (StfsPackage.IsStfsPackage(source))
+        {
+            Logger.LogErr(
+                "Error: STFS packages are not sector images; extract them first (XISOSharp -x).\n");
+            return 1;
+        }
+
         if (!OverwritePrompt.ConfirmOverwrite(output, assumeYes, assumeNo)) return 1;
 
         try
@@ -5427,6 +5568,13 @@ internal static class Program
         {
             try
             {
+                if (StfsPackage.IsStfsPackage(iso))
+                {
+                    Logger.LogErr($"Error: cannot split STFS package '{iso}'; extract it first\n");
+                    exit = 1;
+                    continue;
+                }
+
                 string splitBase = outputBase
                                    ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(iso)) ?? "",
                                        Path.GetFileNameWithoutExtension(iso));
@@ -6676,7 +6824,8 @@ internal static class Program
                                                      --unpack <file> [dest]  Unpack the whole image to <dest>, or to a
                                                                            directory named after the ISO when omitted.
                                                                            -l/-t/-x/--unpack/checksum accept .zar
-                                                                           archives directly (ZArchive name tree).
+                                                                           archives directly (ZArchive name tree) and
+                                                                           XBLA/XBLIG STFS packages (STFS file table).
                                                      -X <glob_pattern>   In create mode (-c), exclude files/directories
                                                                            matching the glob pattern from the image.
                                                                            Repeatable. Examples: "*.tmp", "**/node_modules/**",

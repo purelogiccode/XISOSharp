@@ -26,6 +26,7 @@ internal static class XContentHeaderReader
     internal const uint ContentTypeGod = 0x7000;
     internal const uint ContentTypeXbla = 0x000D0000;
     internal const uint ContentTypeXblig = 0x00000002;
+    internal const uint ContentTypeCommunityGame = 0x02000000;
 
     /// <summary>
     /// Reads the fixed-size header prefix from <paramref name="headerPath"/>.

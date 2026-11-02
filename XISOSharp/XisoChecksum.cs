@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using XISOSharp.BlockDevice;
 using XISOSharp.Interfaces;
+using XISOSharp.Models;
 using ZArchiveSharp;
 
 namespace XISOSharp;
@@ -201,6 +202,76 @@ public static class XisoChecksum
     /// <param name="ct">Cancellation token.</param>
     public static string ComputeZarChecksumHex(string zarPath, CancellationToken ct = default) =>
         Convert.ToHexString(ComputeZarChecksum(zarPath, ct)).ToLowerInvariant();
+
+    /// <summary>
+    /// Computes the same deterministic SHA3-256 tree checksum for an XBLA/XBLIG
+    /// STFS package that <see cref="ComputeImageChecksum(string,int?,CancellationToken)"/>
+    /// computes for an ISO: sorted <c>/path</c> bytes plus file data. Equivalent
+    /// trees therefore hash equally across ISO, ZAR and STFS.
+    /// </summary>
+    /// <param name="packagePath">Path to the single-file STFS package.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>32-byte SHA3-256 digest.</returns>
+    /// <exception cref="ArgumentException"><paramref name="packagePath"/> is null or empty.</exception>
+    /// <exception cref="FileNotFoundException">The package does not exist.</exception>
+    /// <exception cref="InvalidDataException">The package is malformed or not an XBLA/XBLIG STFS package.</exception>
+    public static byte[] ComputeStfsChecksum(string packagePath, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(packagePath);
+        ct.ThrowIfCancellationRequested();
+
+        using StfsPackage package = StfsPackage.Open(packagePath);
+        SortedDictionary<string, StfsEntry> map = new(StringComparer.Ordinal);
+        foreach (StfsEntry entry in package.Entries)
+        {
+            map["/" + entry.Path] = entry;
+        }
+
+        using IncrementalHash? nativeHasher = SHA3_256.IsSupported
+            ? IncrementalHash.CreateHash(HashAlgorithmName.SHA3_256)
+            : null;
+        using Sha3256? managedHasher = nativeHasher == null ? new Sha3256() : null;
+
+        foreach (KeyValuePair<string, StfsEntry> kv in map)
+        {
+            ct.ThrowIfCancellationRequested();
+            byte[] pathBytes = Encoding.UTF8.GetBytes(kv.Key);
+            if (nativeHasher != null)
+            {
+                nativeHasher.AppendData(pathBytes);
+            }
+            else
+            {
+                managedHasher!.AppendData(pathBytes);
+            }
+
+            StfsEntry entry = kv.Value;
+            if (entry.IsDirectory || entry.Size == 0)
+            {
+                continue;
+            }
+
+            package.ReadFileChunks(entry, (buffer, offset, count) =>
+            {
+                if (nativeHasher != null)
+                {
+                    nativeHasher.AppendData(buffer, offset, count);
+                }
+                else
+                {
+                    managedHasher!.AppendData(buffer, offset, count);
+                }
+            });
+        }
+
+        return nativeHasher != null ? nativeHasher.GetHashAndReset() : managedHasher!.GetHashAndReset();
+    }
+
+    /// <summary>Returns the lowercase hex representation of <see cref="ComputeStfsChecksum"/>.</summary>
+    /// <param name="packagePath">Path to the single-file STFS package.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public static string ComputeStfsChecksumHex(string packagePath, CancellationToken ct = default) =>
+        Convert.ToHexString(ComputeStfsChecksum(packagePath, ct)).ToLowerInvariant();
 
     // -----------------------------------------------------------------------
     // File-tree collection — mirrors xdvdfs read.rs file_tree + walk_dirent_tree

@@ -15,15 +15,19 @@ Xbox container. This page lists deliberate boundaries and current workarounds.
 
 XISO/XDVDFS, Redump full-disc images, split ISO, CISO/CSO, CCI/CCIM, ZAR,
 read-only GOD/SVOD sector input, GOD and single-file XBLA/XBLIG header title
-metadata, Xbox 360 XDBF/XSRC title metadata, XBE logo/title/save image
-extraction, and XBE/XEX **read-only** metadata are in scope.
+metadata, XBLA/XBLIG STFS package listing/extraction, Xbox 360 XDBF/XSRC title
+metadata, XBE logo/title/save image extraction, and XBE/XEX **read-only**
+metadata are in scope.
 
 Deliberately out of scope:
 
 - STFS/CON/LIVE/PIRS **writing**, package rebuild and re-signing. Read-only
-  GOD/SVOD input is supported through `GodBlockDevice`; full XBLA/XBLIG
-  single-file package listing/extraction (file table, hash tree, data blocks)
-  remains future work.
+  GOD/SVOD input is supported through `GodBlockDevice`, and single-file
+  XBLA/XBLIG package listing/extraction is supported through `StfsPackage`;
+  STFS writes stay out of scope. `StfsPackage` follows the hash tables for block
+  chains but does not verify per-block SHA-1 hashes or package signatures, and
+  it accepts XBLA/XBLIG/Community Game content types (not saves, profiles or
+  DLC packages).
 - CHD containers
 - XEX decryption or XBE editing
 - FUSE/Dokan mounting (see SimpleXisoDrive)
@@ -63,7 +67,8 @@ device names (`CON`, `NUL`, `COM1`…). The OS must still have long paths enable
 - CISO v2 is byte-identical to modern `xdvdfs compress`; CISO v1 (DEFLATE) is
   supported for reading and writing but is legacy.
 - In-place `--repair`, `--copy-in`, `--set-filetime`, `-r` (rewrite) and `split`
-  refuse compressed, GOD and split containers; decompress/join first.
+  refuse compressed, GOD, STFS and split containers; decompress/join/extract
+  first.
 
 ## Platforms and support
 

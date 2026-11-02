@@ -69,6 +69,12 @@ public static class XisoRepairer
                 $"Cannot repair GOD container '{isoPath}' in place; decompress it to ISO first.");
         }
 
+        if (StfsPackage.IsStfsPackage(isoPath))
+        {
+            throw new InvalidDataException(
+                $"Cannot repair STFS package '{isoPath}' in place; extract it first.");
+        }
+
         if (XisoSplitter.IsSplitPath(isoPath))
         {
             throw new InvalidDataException(

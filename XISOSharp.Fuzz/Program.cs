@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using XISOSharp.Models;
+using XISOSharp.TestDataGenerator;
 
 namespace XISOSharp.Fuzz;
 
@@ -35,6 +36,7 @@ internal static class Program
                 new("cci", CreateCci(root, baseIso)),
                 new("zar", CreateZar(root, baseIso)),
                 new("god", CreateGod(root, baseIso)),
+                new("stfs", CreateStfs(root)),
             ];
 
             Stopwatch clock = Stopwatch.StartNew();
@@ -154,6 +156,17 @@ internal static class Program
         return path;
     }
 
+    private static string CreateStfs(string root)
+    {
+        string path = Path.Combine(root, "base.stfs");
+        SyntheticStfsPackage.Create(path, [
+            new SyntheticStfsFile("default.xex", Encoding.ASCII.GetBytes("XEX2fuzz")),
+            new SyntheticStfsFile("data/payload.bin", RandomNumberGenerator.GetBytes(9000)),
+            new SyntheticStfsFile("data/empty.bin", []),
+        ], extraDirectories: ["empty-dir"]);
+        return path;
+    }
+
     private static string CreateGod(string root, string iso)
     {
         string header = Path.Combine(root, "base.god");
@@ -211,6 +224,31 @@ internal static class Program
             try
             {
                 XisoZarchive.ExtractZar(path, extract, maxEntries: 4096, maxTotalBytes: 64L * 1024 * 1024);
+            }
+            finally
+            {
+                TryDeleteDirectory(extract);
+            }
+
+            return;
+        }
+
+        if (string.Equals(format, "stfs", StringComparison.Ordinal))
+        {
+            using StfsPackage package = StfsPackage.Open(path);
+            foreach (StfsEntry entry in package.Entries)
+            {
+                if (!entry.IsDirectory && entry.Size <= 1_000_000)
+                {
+                    _ = package.ReadAllBytes(entry);
+                }
+            }
+
+            _ = XisoChecksum.ComputeStfsChecksum(path);
+            string extract = Path.Combine(root, "stfs_extract");
+            try
+            {
+                package.ExtractTo(extract);
             }
             finally
             {
