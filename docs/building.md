@@ -31,42 +31,42 @@ dotnet build CSharp_XISOSharp.sln
 dotnet build CSharp_XISOSharp.sln -c Release
 
 # Build just the CLI or the library
-dotnet build XISOSharp.Cli -c Release
-dotnet build XISOSharp -c Release
+dotnet build apps/XISOSharp.Cli -c Release
+dotnet build src/XISOSharp -c Release
 ```
 
 The solution contains:
 
 | Project | Target(s) | Output |
 |---|---|---|
-| `XISOSharp` | net8.0, net9.0, net10.0 | `XISOSharp.dll` + NuGet package |
-| `XISOSharp.Cli` | net8.0, net9.0, net10.0 (ships: net10.0) | `XISOSharp` executable |
-| `XISOSharp.Gui` | net10.0 | Avalonia GUI (shippable, shells out to the CLI) |
-| `XISOSharp.Tests` | net8.0, net9.0, net10.0 | xUnit test assembly (engine + CLI) |
+| `src/XISOSharp` | net8.0, net9.0, net10.0 | `XISOSharp.dll` + NuGet package |
+| `apps/XISOSharp.Cli` | net8.0, net9.0, net10.0 (ships: net10.0) | `XISOSharp` executable |
+| `apps/XISOSharp.Gui` | net10.0 | Avalonia GUI (shippable, shells out to the CLI) |
+| `tests/XISOSharp.Tests` | net8.0, net9.0, net10.0 | xUnit test assembly (engine + CLI) |
 | `ZArchiveSharp` (`ZArchiveSharp.Tests` / `ZArchiveSharp.Benchmarks` / `ZArchiveSharp.Cli`) | — | Lives in the sibling `../CSharp_ZArchiveSharp` repo (own solution); consumed here as NuGet package `ZArchiveSharp` 1.4.0 (`ZArchiveSharp.Cli` is a `dotnet tool`, not a library reference) |
-| `XISOSharp.Benchmarks` | net10.0 | BenchmarkDotNet harness |
-| `XISOSharpTester` | net10.0-windows | WPF regression-test rig (Windows-only, runs from build output) |
+| `tests/XISOSharp.Benchmarks` | net10.0 | BenchmarkDotNet harness |
+| `apps/XISOSharpTester` | net10.0-windows | WPF regression-test rig (Windows-only, runs from build output) |
 
 > [!NOTE]
 > Two GUI stacks, different jobs: `XISOSharp.Gui` (Avalonia, cross-platform) is
 > the shippable GUI — it shells out to the CLI and publishes per-RID via
 > `publish-gui.ps1`. `XISOSharpTester` (WPF, Windows-only) is the in-process
 > regression rig for engine + reference-tool interop (see [Testing](testing.md#the-gui-regression-tester));
-> it runs from its build output (`dotnet run --project XISOSharpTester`) and is
+> it runs from its build output (`dotnet run --project apps/XISOSharpTester`) and is
 > intentionally not published single-file. Both (plus the battle harness) share
 > the single `XISOSharp.ProcessRunner` + `XISOSharp.ToolLocator`
 > (override → sibling → `PATH` + `-v` probe) in the core library — no per-app runners.
 
 > [!NOTE]
 > The Core project packs a NuGet package only via an explicit
-> `dotnet pack XISOSharp -c Release -o ./artifacts` (CI `pack` job, releases) —
+> `dotnet pack src/XISOSharp -c Release -o ./artifacts` (CI `pack` job, releases) —
 > plain `dotnet build` stays clean (`GeneratePackageOnBuild` is off).
 
 ## Test
 
 ```bash
-dotnet test XISOSharp.Tests
-dotnet test XISOSharp.Tests -c Release
+dotnet test tests/XISOSharp.Tests
+dotnet test tests/XISOSharp.Tests -c Release
 ```
 
 The suite is xUnit-based and runs sequentially (the engine changes the current
@@ -74,7 +74,7 @@ directory during create/extract, so tests are in a `Sequential` collection). Wit
 coverage:
 
 ```bash
-dotnet test XISOSharp.Tests --collect:"XPlat Code Coverage"
+dotnet test tests/XISOSharp.Tests --collect:"XPlat Code Coverage"
 ```
 
 See [Testing](testing.md) for the full picture, including cross-checking against the
@@ -87,14 +87,14 @@ runtime required on the target machine:
 
 ```bash
 # Windows x64
-dotnet publish XISOSharp.Cli -c Release -f net10.0 -r win-x64 --self-contained
+dotnet publish apps/XISOSharp.Cli -c Release -f net10.0 -r win-x64 --self-contained
 
 # Linux x64
-dotnet publish XISOSharp.Cli -c Release -f net10.0 -r linux-x64 --self-contained
+dotnet publish apps/XISOSharp.Cli -c Release -f net10.0 -r linux-x64 --self-contained
 
 # macOS (Intel / Apple Silicon)
-dotnet publish XISOSharp.Cli -c Release -f net10.0 -r osx-x64 --self-contained
-dotnet publish XISOSharp.Cli -c Release -f net10.0 -r osx-arm64 --self-contained
+dotnet publish apps/XISOSharp.Cli -c Release -f net10.0 -r osx-x64 --self-contained
+dotnet publish apps/XISOSharp.Cli -c Release -f net10.0 -r osx-arm64 --self-contained
 ```
 
 (`-f net10.0` is required: the CLI multi-targets net8/9/10, but only net10.0
@@ -107,7 +107,7 @@ Supported runtime identifiers (single source of truth: `XISOSharp.Cli.csproj` /
 CLI (XboxKit parity, incl. the 32-bit `win-x86`); the GUI ships the six 64-bit
 RIDs only.
 
-Output lands in `XISOSharp.Cli/bin/Release/net10.0/<rid>/publish/` as a single
+Output lands in `apps/XISOSharp.Cli/bin/Release/net10.0/<rid>/publish/` as a single
 `XISOSharp` (or `XISOSharp.exe`) binary (renamed from the `XISOSharp.Cli`
 assembly name by the csproj `RenamePublishedExeToXisoSharp` target).
 
@@ -128,7 +128,7 @@ The library package (`XISOSharp`) is configured in `XISOSharp.csproj`:
 Pack manually:
 
 ```bash
-dotnet pack XISOSharp -c Release -o ./artifacts
+dotnet pack src/XISOSharp -c Release -o ./artifacts
 ```
 
 ## CI pipeline
@@ -138,7 +138,7 @@ tags (`v*` or bare `[0-9]*`, both accepted by MinVer and the publish gate):
 
 1. **build-and-test** - matrix over `ubuntu-latest`, `windows-latest`,
    `macos-latest`: restore → format verification (Windows) → build (Release) →
-   test the `XISOSharp.Tests` project with XPlat code coverage. The merged
+   test the `tests/XISOSharp.Tests` project with XPlat code coverage. The merged
    line/branch coverage lands in the job summary (fails below **70% line / 60%
    branch**), and the trx + coverage reports are uploaded as artifacts.
 2. **gui-smoke** - Windows: `XISOSharp -v`, `XISOSharp.Gui --probe-cli` and
@@ -148,7 +148,7 @@ tags (`v*` or bare `[0-9]*`, both accepted by MinVer and the publish gate):
    to **Security → Code scanning**.
 4. **dependency-audit** - `dotnet list package --vulnerable --include-transitive`
    fails on any known-vulnerable direct or transitive package.
-5. **aot-smoke** - publishes `XISOSharp.AotSmoke` with NativeAOT on Linux and
+5. **aot-smoke** - publishes `tests/XISOSharp.AotSmoke` with NativeAOT on Linux and
    runs it, proving the library (and transitive ZAR/CCI packages) stay
    trim/AOT-compatible.
 6. **fuzz-smoke** - two minutes of deterministic mutation fuzzing over ISO,

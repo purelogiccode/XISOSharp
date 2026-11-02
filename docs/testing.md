@@ -18,7 +18,7 @@ The xUnit suite lives in `XISOSharp.Tests` (engine + CLI, targets: net8.0/net9.0
 `../CSharp_ZArchiveSharp` repo with its own solution and CI. Run the local suite with:
 
 ```bash
-dotnet test XISOSharp.Tests
+dotnet test tests/XISOSharp.Tests
 ```
 
 (Plain `dotnet test` on the solution runs it.)
@@ -75,7 +75,7 @@ Conventions:
 - Tests create their own temp directories and clean up afterwards.
 - A snapshot-style round-trip (create → extract → compare SHA-256 of every file) is
   the standard correctness pattern, locked by the checked-in reference
-  `XISOSharp.Tests/Fixtures/test_fixture.iso` (built deterministically with
+  `tests/XISOSharp.Tests/Fixtures/test_fixture.iso` (built deterministically with
   `fileTime: 0`; validate with `XISO_UPDATE_FIXTURE=1 dotnet test --filter
   FullyQualifiedName~ValidateFixtureIso_WhenRequested`, then regenerate the
   binary out of band after a legitimate writer change and commit it).
@@ -100,12 +100,12 @@ create round-trip.
 There are no standalone PowerShell helper scripts in the repository; comparison
 against the original C tool is built into the test suite and the battle harness:
 
-- `XISOSharp.Tests/XisoLegacyInteropTests.cs` creates legacy-layout images with
+- `tests/XISOSharp.Tests/XisoLegacyInteropTests.cs` creates legacy-layout images with
   the reference `extract-xiso.exe` (gitignored `References/` drop, dated build
   `202609111233`) and round-trips them through the `llCompat` reader paths. The
   tests early-return when the oracle is absent, so clean checkouts and non-Windows
   CI stay green.
-- `XISOSharp.Tests/CisoSplitInteropTests.cs` checks split-CISO golden vectors
+- `tests/XISOSharp.Tests/CisoSplitInteropTests.cs` checks split-CISO golden vectors
   against the reference `xdvdfs-cli` 0.8.3.
 - `XISOSharp.BattleTests` ([below](#the-cli-battle-harness)) compares
   list/extract/rewrite against a real `extract-xiso.exe` and the xdvdfs/xboxkit
@@ -117,7 +117,7 @@ the oracle discovery path (`SkipConditions.OraclePath`).
 
 ## Reference-binary interop tests
 
-`XISOSharp.Tests/CisoSplitInteropTests.cs` (split-CSO golden vectors vs the
+`tests/XISOSharp.Tests/CisoSplitInteropTests.cs` (split-CSO golden vectors vs the
 reference `xdvdfs-cli 0.8.3`) and (in the sibling `../CSharp_ZArchiveSharp` repo)
 `ZArchiveSharp.Tests/ZArchiveSharpTests.cs` (`zarchive.exe` both-directions interop) shell out to reference binaries that live
 in the gitignored `References/` folder (`References/xdvdfs-0.8.3/xdvdfs.exe`;
@@ -164,7 +164,7 @@ at three levels:
 The CI collects coverage with XPlat code coverage:
 
 ```bash
-dotnet test XISOSharp.Tests --collect:"XPlat Code Coverage"
+dotnet test tests/XISOSharp.Tests --collect:"XPlat Code Coverage"
 ```
 
 The report (`coverage.cobertura.xml`) is uploaded as a CI artifact, and the
@@ -192,7 +192,7 @@ shapes neither writer emits.
 | `XisoEndToEndBenchmarks` | Pack, open/list, full-image hash, CISO compress/decompress |
 
 ```bash
-dotnet run --project XISOSharp.Benchmarks -c Release
+dotnet run --project tests/XISOSharp.Benchmarks -c Release
 ```
 
 `ZArchiveSharp.Benchmarks` (zstd L1/L6/L19 compress + decode, `.zar` pack/extract
@@ -299,7 +299,7 @@ instead of collapsing to `U+FFFD`:
   directory (per-op `cliSeconds`/`oracleSeconds` and per-tool totals in the JSON).
 
 ```bash
-dotnet run --project XISOSharp.BattleTests -c Release -- --seed 2026
+dotnet run --project tests/XISOSharp.BattleTests -c Release -- --seed 2026
 XISOSharp.BattleTests --ops list,extract,rewrite --count 3 --dir "H:\XBOXTest"
 XISOSharp.BattleTests --ops checksum,md5,unpack,pack,cso      # xdvdfs-parity features
 XISOSharp.BattleTests --ops petrify,video,random,seed,trim,wipe,zar,rebuild  # XboxKit archival

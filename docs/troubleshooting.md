@@ -238,8 +238,8 @@ oracle-gated tests, or run the battle harness. Both skip cleanly when the binary
 is absent:
 
 ```bash
-dotnet test XISOSharp.Tests -c Release --filter "FullyQualifiedName~Interop"
-dotnet run --project XISOSharp.BattleTests -c Release
+dotnet test tests/XISOSharp.Tests -c Release --filter "FullyQualifiedName~Interop"
+dotnet run --project tests/XISOSharp.BattleTests -c Release
 ```
 
 **The WPF tester does not build on Linux/macOS.**

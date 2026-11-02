@@ -21,7 +21,7 @@
        copied beside the harness by this reference) and extract-xiso.exe. The
        XISOSharp library is pulled in transitively; no in-process API use. -->
   <ItemGroup>
-    <ProjectReference Include="..\XISOSharp.Cli\XISOSharp.Cli.csproj" />
+    <ProjectReference Include="$(RepoRoot)apps\XISOSharp.Cli\XISOSharp.Cli.csproj" />
   </ItemGroup>
 
   <ItemGroup>

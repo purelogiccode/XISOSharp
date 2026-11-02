@@ -1,6 +1,11 @@
 <Project>
 
   <PropertyGroup>
+    <!-- Repository root, absolute, with a trailing separator. Cross-project paths
+         (linked Compile items, staged CLI outputs, the strong-name key) go through
+         $(RepoRoot) so moving a project folder only touches the .sln and the
+         reference in here, not every consumer's relative "..\" chain. -->
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Deterministic>true</Deterministic>

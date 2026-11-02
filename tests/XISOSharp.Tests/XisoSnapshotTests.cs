@@ -8,7 +8,7 @@ using TestDataGenerator;
 /// Snapshot tests for TODO #1 (full test suite, xdvdfs #107/#137): a fixed,
 /// deterministic source tree is packed with <c>fileTime: 0</c>, and the
 /// resulting image bytes must equal the checked-in
-/// <c>XISOSharp.Tests/Fixtures/test_fixture.iso</c> reference exactly.
+/// <c>tests/XISOSharp.Tests/Fixtures/test_fixture.iso</c> reference exactly.
 /// Extraction (and rewrite + extraction) must reproduce every source file
 /// byte-for-byte (SHA-256 per file), including empty files/directories,
 /// nested structure, non-ASCII names, and the <c>.xbe</c> media patch.

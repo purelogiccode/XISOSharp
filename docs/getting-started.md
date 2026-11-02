@@ -27,16 +27,16 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 
 # Framework-dependent build (requires the .NET 10 SDK)
-dotnet build XISOSharp.Cli -c Release
+dotnet build apps/XISOSharp.Cli -c Release
 
 # Or a self-contained single-file binary for your platform (no runtime needed)
-dotnet publish XISOSharp.Cli -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+dotnet publish apps/XISOSharp.Cli -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
 # Supported RIDs: win-x86, win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64
 # Or publish all seven at once: ./publish-cli.ps1  (binaries land in publish/<rid>/)
 ```
 
 A framework-dependent `dotnet build` produces `XISOSharp.Cli(.exe)` in
-`XISOSharp.Cli/bin/Release/net10.0/`; a self-contained `dotnet publish` (or
+`apps/XISOSharp.Cli/bin/Release/net10.0/`; a self-contained `dotnet publish` (or
 `./publish-cli.ps1`, whose output lands in `publish/<rid>/`) ships the same tool
 renamed to **`XISOSharp`** (Windows: `XISOSharp.exe`).
 

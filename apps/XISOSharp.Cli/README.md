@@ -27,8 +27,8 @@ Reader probing also accepts rebuilt "sector-0" XISOs (volume descriptor at absol
 
 ```bash
 # Framework-dependent build (requires the .NET 10 SDK, pinned in global.json)
-dotnet build XISOSharp.Cli -c Release
-# bin: XISOSharp.Cli/bin/Release/net10.0/XISOSharp.Cli(.exe)
+dotnet build apps/XISOSharp.Cli -c Release
+# bin: apps/XISOSharp.Cli/bin/Release/net10.0/XISOSharp.Cli(.exe)
 
 # Self-contained trimmed single-file (no runtime needed), renamed to XISOSharp(.exe)
 ./publish-cli.ps1
@@ -36,7 +36,7 @@ dotnet build XISOSharp.Cli -c Release
 # RIDs: win-x86, win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64
 
 # ... or one RID manually (single-file + trimmed come from the csproj defaults)
-dotnet publish XISOSharp.Cli -c Release -f net10.0 -r win-x64 --self-contained
+dotnet publish apps/XISOSharp.Cli -c Release -f net10.0 -r win-x64 --self-contained
 ```
 
 > [!TIP]
@@ -250,10 +250,10 @@ XISOSharp -v --json
 ## Full reference
 
 Every mode, option matrix, restriction table, and deep-dive lives in the
-[CLI Reference](../docs/cli.md). New additions beyond `extract-xiso` (audit,
+[CLI Reference](../../docs/cli.md). New additions beyond `extract-xiso` (audit,
 repair/salvage, unpack/batch/pack, copy-in/out, hashes, XEX/XBE parsing,
 Redump archival, xdvdfs parity) are listed there and in the
-[main README](../README.md#using-the-cli).
+[main README](../../README.md#using-the-cli).
 
 ## License
 

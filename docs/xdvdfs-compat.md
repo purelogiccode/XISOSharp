@@ -24,7 +24,7 @@ XISOSharp build-image --dry-run -m "bin:/" -m "assets/**:/assets/{1}" ./src
 
 **What it does:** ordered first-wins remapping of host filesystem → image filesystem. Rules evaluated in order; first match wins, `!` prefix negates (exclusion), unmapped → skip, duplicate image path → deterministic first-wins. Supports `*`/`**`/`?`/`[]`/`{a,b}` + whole-match `{0}` and per-group `{1..n}` captures + suffix re-add.
 
-**Files:** `XISOSharp.Core/WaxGlob.cs` (capture engine), `XISOSharp.Core/RemapFilesystem.cs` (`RemapRule` + `DryRunRemap`/`BuildImage` → `XisoWriter.CreateFromRemapTree` with `IsRemap` flag skipping CWD), `XISOSharp.Cli/Program.cs:RunBuildImage`.
+**Files:** `src/XISOSharp/WaxGlob.cs` (capture engine), `src/XISOSharp/RemapFilesystem.cs` (`RemapRule` + `DryRunRemap`/`BuildImage` → `XisoWriter.CreateFromRemapTree` with `IsRemap` flag skipping CWD), `apps/XISOSharp.Cli/Program.cs:RunBuildImage`.
 
 **`xdvdfs.toml`:**
 

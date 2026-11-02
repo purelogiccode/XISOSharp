@@ -3,11 +3,33 @@
 Project instructions for AI agents working in this repository. Read this before
 building, cleaning, or releasing anything.
 
+## Repository layout
+
+Project folders are grouped by role, and the solution file mirrors the disk
+(always keep the two in sync — a project's path in `CSharp_XISOSharp.sln` must
+match its real folder):
+
+| Folder | Contents |
+|---|---|
+| `src/` | Shipped libraries: `XISOSharp` (the NuGet package) |
+| `apps/` | Shipped executables (`XISOSharp.Cli`, `XISOSharp.Gui`) plus the Windows-only `XISOSharpTester` regression rig |
+| `tests/` | Everything that verifies: `XISOSharp.Tests`, `BattleTests`, `Fuzz`, `AotSmoke`, `Benchmarks`, `TestDataGenerator` |
+| `samples/` | `XISOSharp.Sample` walkthrough app |
+| `docs/`, `References/`, `TestData/` | Docs, vendored upstream sources, gitignored fixtures — stay at the repo root |
+
+- `Directory.Build.props` defines `$(RepoRoot)`; cross-project paths (linked
+  `Compile` items, `ProjectReference`, the strong-name key, staged CLI outputs)
+  use it instead of `..\..\` chains. Add new cross-folder references that way.
+- `TestDataLocator` finds the repo root by walking up to `CSharp_XISOSharp.sln`,
+  so keep the solution file at the root. `TestData/` stays there too.
+- `References/**` is never part of the solution; it holds oracle binaries and
+  third-party sources for parity work.
+
 ## Hard rule: never delete files in Release output paths
 
 Release output trees are artifact stores, not disposable caches. They hold
 previously shipped bundles (e.g.
-`XISOSharp.Gui/bin/Release/release_1.0.1_win-x64.zip`) that may not be
+`apps/XISOSharp.Gui/bin/Release/release_1.0.1_win-x64.zip`) that may not be
 reproducible or re-downloadable. Never delete them.
 
 - Never delete or remove files under a project's Release output paths:
@@ -56,7 +78,7 @@ reproducible or re-downloadable. Never delete them.
 - The three TFM test hosts run in parallel and share one `TestData/` tree; the
   fixture stamps `TestData/output/fixture.stamp` so only the first host rebuilds
   the ISO (`TestDataWriter`). Do not make the ISO rebuild unconditional again.
-- `XISOSharp.Tests` is strong-named with `XISOSharp/XISOSharp.snk` because the
+- `XISOSharp.Tests` is strong-named with `src/XISOSharp/XISOSharp.snk` because the
   library grants it `InternalsVisibleTo` with the matching public key embedded
   in `XISOSharp.csproj`; keep the key file, the test `SignAssembly` settings,
   and the embedded public key in sync when touching signing.
@@ -81,15 +103,15 @@ reproducible or re-downloadable. Never delete them.
 ### Steps
 
 1. Finalize documentation first — the package bakes it in:
-   - `XISOSharp/README.md` is packed into the nupkg (`PackageReadmeFile`), and
-     `XISOSharp/XISOSharp.csproj` holds the nuget.org `Description`.
+   - `src/XISOSharp/README.md` is packed into the nupkg (`PackageReadmeFile`), and
+     `src/XISOSharp/XISOSharp.csproj` holds the nuget.org `Description`.
    - Add the release section to `docs/release-notes.md`, refresh `WhatsNew.md`,
      and update the READMEs (root, library, CLI, Tests, Tester) plus any docs
      the change touched.
    - Upstream parity references use the dated build (`extract-xiso` build
      `202609111233`), not `v2.7.1`. Never change the on-disk optimized tag
      `in!xiso!2.7.1 (01.11.14)` or `Constants.ExisoVersion`.
-2. Run the full suite: `dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release`
+2. Run the full suite: `dotnet test tests/XISOSharp.Tests/XISOSharp.Tests.csproj -c Release`
    (currently 1979 passed / 1 skipped on net8.0/net9.0 and 2043 passed / 1 skipped on
    net10.0 — net10.0 adds the GUI-helper tests).
 3. Commit + push `master` (only when the user asks), then tag and push:
@@ -102,7 +124,7 @@ reproducible or re-downloadable. Never delete them.
 5. Manual fallback (CI unavailable or local verification):
 
    ```powershell
-   dotnet pack XISOSharp/XISOSharp.csproj -c Release -o artifacts\<version>
+   dotnet pack src/XISOSharp/XISOSharp.csproj -c Release -o artifacts\<version>
    dotnet nuget push "artifacts\<version>\XISOSharp.<version>.nupkg" --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
    dotnet nuget push "artifacts\<version>\XISOSharp.<version>.snupkg" --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
    ```
@@ -137,12 +159,12 @@ To rehearse without tagging, dispatch the workflow with `dry_run: true`.
 3. Upload all six bundles:
 
    ```bash
-   gh release upload <version> XISOSharp.Gui/bin/Release/release_<version>_win-x64.zip \
-     XISOSharp.Gui/bin/Release/release_<version>_win-arm64.zip \
-     XISOSharp.Gui/bin/Release/release_<version>_linux-x64.zip \
-     XISOSharp.Gui/bin/Release/release_<version>_linux-arm64.zip \
-     XISOSharp.Gui/bin/Release/release_<version>_MacOsX-x64.zip \
-     XISOSharp.Gui/bin/Release/release_<version>_MacOsX-arm64.zip
+   gh release upload <version> apps/XISOSharp.Gui/bin/Release/release_<version>_win-x64.zip \
+     apps/XISOSharp.Gui/bin/Release/release_<version>_win-arm64.zip \
+     apps/XISOSharp.Gui/bin/Release/release_<version>_linux-x64.zip \
+     apps/XISOSharp.Gui/bin/Release/release_<version>_linux-arm64.zip \
+     apps/XISOSharp.Gui/bin/Release/release_<version>_MacOsX-x64.zip \
+     apps/XISOSharp.Gui/bin/Release/release_<version>_MacOsX-arm64.zip
    ```
 
 4. Verify:
@@ -156,18 +178,18 @@ To rehearse without tagging, dispatch the workflow with `dry_run: true`.
 
 Outputs need the .NET 10 runtime (Desktop Runtime for the GUI). For each RID,
 stage into `%TEMP%` (safe to wipe) and produce the zip under
-`XISOSharp.Gui/bin/Release/`:
+`apps/XISOSharp.Gui/bin/Release/`:
 
 ```powershell
 $stage = "$env:TEMP\xiso_bundle\<rid>"
 # create/clear ONLY the temp stage
-dotnet publish XISOSharp.Gui/XISOSharp.Gui.csproj -c Release -r <rid> --no-self-contained -o $stage
-dotnet publish XISOSharp.Cli/XISOSharp.Cli.csproj -c Release -f net10.0 -r <rid> --no-self-contained -p:PublishTrimmed=false -o $stage
+dotnet publish apps/XISOSharp.Gui/XISOSharp.Gui.csproj -c Release -r <rid> --no-self-contained -o $stage
+dotnet publish apps/XISOSharp.Cli/XISOSharp.Cli.csproj -c Release -f net10.0 -r <rid> --no-self-contained -p:PublishTrimmed=false -o $stage
 Get-ChildItem $stage -Include *.pdb,*.xml -Recurse | Remove-Item -Force
 Copy-Item README.md $stage
 Copy-Item LICENSE $stage
 Copy-Item WhatsNew.md $stage
-Compress-Archive "$stage\*" "XISOSharp.Gui\bin\Release\release_<version>_<rid>.zip" -Force
+Compress-Archive "$stage\*" "apps\XISOSharp.Gui\bin\Release\release_<version>_<rid>.zip" -Force
 ```
 
 Each zip must contain exactly the GUI app, `XISOSharp(.exe)`, `README.md`,

@@ -115,16 +115,26 @@ See [Getting Started](getting-started.md) for details.
 
 ## Project layout
 
+Projects are grouped by role: shipped code in `src/` (library) and `apps/`
+(executables plus the internal WPF rig), every verification harness in `tests/`,
+runnable examples in `samples/`.
+
 | Project | Description |
 |---|---|
-| `XISOSharp` | Class library (NuGet package `XISOSharp`) — complete read/write engine |
-| `XISOSharp.Cli` | Command-line tool `XISOSharp` (extract-xiso-compatible flags) |
-| `XISOSharp.Tests` | xUnit test suite |
-| `XISOSharp.Benchmarks` | BenchmarkDotNet benchmarks (AVL tree, Boyer–Moore, sector math) |
-| `XISOSharpTester` | WPF GUI for batch regression testing against the reference C tool |
+| `src/XISOSharp` | Class library (NuGet package `XISOSharp`) — complete read/write engine |
+| `apps/XISOSharp.Cli` | Command-line tool `XISOSharp` (extract-xiso-compatible flags); packs as `XISOSharp.Tool` |
+| `apps/XISOSharp.Gui` | Avalonia desktop app (dark-only, shells out to the CLI) |
+| `apps/XISOSharpTester` | WPF GUI for batch regression testing against the reference C tool (Windows-only) |
+| `tests/XISOSharp.Tests` | xUnit test suite |
+| `tests/XISOSharp.Benchmarks` | BenchmarkDotNet benchmarks (AVL tree, Boyer–Moore, sector math) |
+| `tests/XISOSharp.BattleTests` | CLI-vs-reference oracle harness (`extract-xiso` / `xdvdfs` / `xboxkit`) |
+| `tests/XISOSharp.Fuzz` | Mutation fuzzer (TOC, CISO, CCI, ZAR, XBE/XEX) |
+| `tests/XISOSharp.AotSmoke` | NativeAOT publish/run smoke check |
+| `tests/XISOSharp.TestDataGenerator` | Deterministic `TestData/` fixture generator |
+| `samples/XISOSharp.Sample` | Library walkthrough console app |
 | `References/` | Reference sources: `extract-xiso` build `202609111233` (`extract-xiso.c`, same internal version 2.7.1, empty-dir rewrite fix), xdvdfs 0.8.3, XboxKit 0.7 |
 | `TestData/` | Fixtures used by tests and the output-comparison scripts |
-| `XISOSharp.Tests/Fixtures/` | Checked-in `test_fixture.iso` snapshot reference (see [Testing](testing.md#test-suite)) |
+| `tests/XISOSharp.Tests/Fixtures/` | Checked-in `test_fixture.iso` snapshot reference (see [Testing](testing.md#test-suite)) |
 
 ## License
 

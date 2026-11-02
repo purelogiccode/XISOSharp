@@ -39,7 +39,7 @@ foreach ($r in $Rid) {
         Remove-Item -LiteralPath $stage -Recurse -Force
     }
     New-Item -ItemType Directory -Path $stage -Force | Out-Null
-    & dotnet publish (Join-Path $PSScriptRoot 'XISOSharp.Gui/XISOSharp.Gui.csproj') `
+    & dotnet publish (Join-Path $PSScriptRoot 'apps/XISOSharp.Gui/XISOSharp.Gui.csproj') `
         -c $Configuration -r $r --self-contained -o $stage
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet publish failed for RID $r (exit $LASTEXITCODE)."

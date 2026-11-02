@@ -27,8 +27,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\XISOSharp\XISOSharp.csproj" />
-    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <ProjectReference Include="$(RepoRoot)src\XISOSharp\XISOSharp.csproj" />
+    <None Include="$(RepoRoot)README.md" Pack="true" PackagePath="\" />
     <PackageReference Include="Serilog" Version="4.4.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
