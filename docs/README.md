@@ -115,26 +115,26 @@ See [Getting Started](getting-started.md) for details.
 
 ## Project layout
 
-Projects are grouped by role: shipped code in `src/` (library) and `apps/`
-(executables plus the internal WPF rig), every verification harness in `tests/`,
-runnable examples in `samples/`.
+Every project lives in its own top-level folder next to the solution file — the
+library, the shipped executables, the verification harnesses and the sample all
+sit at the repository root with no grouping folders.
 
 | Project | Description |
 |---|---|
-| `src/XISOSharp` | Class library (NuGet package `XISOSharp`) — complete read/write engine |
-| `apps/XISOSharp.Cli` | Command-line tool `XISOSharp` (extract-xiso-compatible flags) |
-| `apps/XISOSharp.Gui` | Avalonia desktop app (dark-only, shells out to the CLI) |
-| `apps/XISOSharpTester` | WPF GUI for batch regression testing against the reference C tool (Windows-only) |
-| `tests/XISOSharp.Tests` | xUnit test suite |
-| `tests/XISOSharp.Benchmarks` | BenchmarkDotNet benchmarks (AVL tree, Boyer–Moore, sector math) |
-| `tests/XISOSharp.BattleTests` | CLI-vs-reference oracle harness (`extract-xiso` / `xdvdfs` / `xboxkit`) |
-| `tests/XISOSharp.Fuzz` | Mutation fuzzer (TOC, CISO, CCI, ZAR, XBE/XEX) |
-| `tests/XISOSharp.AotSmoke` | NativeAOT publish/run smoke check |
-| `tests/XISOSharp.TestDataGenerator` | Deterministic `TestData/` fixture generator |
-| `samples/XISOSharp.Sample` | Library walkthrough console app |
+| `XISOSharp` | Class library (NuGet package `XISOSharp`) — complete read/write engine |
+| `XISOSharp.Cli` | Command-line tool `XISOSharp` (extract-xiso-compatible flags) |
+| `XISOSharp.Gui` | Avalonia desktop app (dark-only, shells out to the CLI) |
+| `XISOSharpTester` | WPF GUI for batch regression testing against the reference C tool (Windows-only) |
+| `XISOSharp.Tests` | xUnit test suite |
+| `XISOSharp.Benchmarks` | BenchmarkDotNet benchmarks (AVL tree, Boyer–Moore, sector math) |
+| `XISOSharp.BattleTests` | CLI-vs-reference oracle harness (`extract-xiso` / `xdvdfs` / `xboxkit`) |
+| `XISOSharp.Fuzz` | Mutation fuzzer (TOC, CISO, CCI, ZAR, XBE/XEX) |
+| `XISOSharp.AotSmoke` | NativeAOT publish/run smoke check |
+| `XISOSharp.TestDataGenerator` | Deterministic `TestData/` fixture generator |
+| `XISOSharp.Sample` | Library walkthrough console app |
 | `References/` | Reference sources: `extract-xiso` build `202609111233` (`extract-xiso.c`, same internal version 2.7.1, empty-dir rewrite fix), xdvdfs 0.8.3, XboxKit 0.7 |
 | `TestData/` | Fixtures used by tests and the output-comparison scripts |
-| `tests/XISOSharp.Tests/Fixtures/` | Checked-in `test_fixture.iso` snapshot reference (see [Testing](testing.md#test-suite)) |
+| `XISOSharp.Tests/Fixtures/` | Checked-in `test_fixture.iso` snapshot reference (see [Testing](testing.md#test-suite)) |
 
 ## License
 

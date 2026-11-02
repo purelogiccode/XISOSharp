@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -21,7 +21,7 @@
        copied beside the harness by this reference) and extract-xiso.exe. The
        XISOSharp library is pulled in transitively; no in-process API use. -->
   <ItemGroup>
-    <ProjectReference Include="$(RepoRoot)apps\XISOSharp.Cli\XISOSharp.Cli.csproj" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp.Cli\XISOSharp.Cli.csproj" />
   </ItemGroup>
 
   <ItemGroup>

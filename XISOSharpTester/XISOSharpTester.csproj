@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -23,7 +23,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoRoot)src\XISOSharp\XISOSharp.csproj" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp\XISOSharp.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -65,7 +65,7 @@
     <Resource Include="Images\exit.png" />
   </ItemGroup>
 
-  <!-- BUG-X-001: single source of truth for logging lives in apps/XISOSharp.Cli/Logging
+  <!-- BUG-X-001: single source of truth for logging lives in XISOSharp.Cli/Logging
          (trim-safe source-gen payload kept intact). These linked items compile the same
          sources into the Tester under the Tester namespace (LOGGING_NS_TESTER); do not copy them. -->
   <PropertyGroup>
@@ -86,12 +86,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="$(RepoRoot)apps\XISOSharp.Cli\Logging\ApiKeyStore.cs" Link="Logging\ApiKeyStore.cs" />
-    <Compile Include="$(RepoRoot)apps\XISOSharp.Cli\Logging\AppLogging.cs" Link="Logging\AppLogging.cs" />
-    <Compile Include="$(RepoRoot)apps\XISOSharp.Cli\Logging\ApplicationStats.cs" Link="Logging\ApplicationStats.cs" />
-    <Compile Include="$(RepoRoot)apps\XISOSharp.Cli\Logging\BugReporter.cs" Link="Logging\BugReporter.cs" />
-    <Compile Include="$(RepoRoot)apps\XISOSharp.Cli\Logging\BugReportSink.cs" Link="Logging\BugReportSink.cs" />
-    <Compile Include="$(RepoRoot)apps\XISOSharp.Cli\Logging\EnvironmentInfo.cs" Link="Logging\EnvironmentInfo.cs" />
+    <Compile Include="$(RepoRoot)XISOSharp.Cli\Logging\ApiKeyStore.cs" Link="Logging\ApiKeyStore.cs" />
+    <Compile Include="$(RepoRoot)XISOSharp.Cli\Logging\AppLogging.cs" Link="Logging\AppLogging.cs" />
+    <Compile Include="$(RepoRoot)XISOSharp.Cli\Logging\ApplicationStats.cs" Link="Logging\ApplicationStats.cs" />
+    <Compile Include="$(RepoRoot)XISOSharp.Cli\Logging\BugReporter.cs" Link="Logging\BugReporter.cs" />
+    <Compile Include="$(RepoRoot)XISOSharp.Cli\Logging\BugReportSink.cs" Link="Logging\BugReportSink.cs" />
+    <Compile Include="$(RepoRoot)XISOSharp.Cli\Logging\EnvironmentInfo.cs" Link="Logging\EnvironmentInfo.cs" />
   </ItemGroup>
 
 </Project>

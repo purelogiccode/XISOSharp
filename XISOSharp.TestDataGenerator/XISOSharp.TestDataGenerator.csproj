@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -15,7 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoRoot)src\XISOSharp\XISOSharp.csproj" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp\XISOSharp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

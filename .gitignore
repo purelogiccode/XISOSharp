@@ -8,7 +8,8 @@ riderModule.iml
 /_ReSharper.Caches/
 /TestData/
 # Battle harness run artifacts (reports + console logs)
-/tests/XISOSharp.BattleTests/BattleReports/
-/tests/XISOSharp.BattleTests/battle_*.log
+/XISOSharp.BattleTests/BattleReports/
+/XISOSharp.BattleTests/battle_*.log
+/XISOSharp.BattleTests/battle_*.pid
 
 /BattleReports/

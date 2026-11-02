@@ -10,7 +10,7 @@ Quick version:
 2. Build and test:
    ```bash
    dotnet build CSharp_XISOSharp.sln -c Release -m:1
-   dotnet test tests/XISOSharp.Tests/XISOSharp.Tests.csproj -c Release
+   dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release
    dotnet format whitespace CSharp_XISOSharp.sln --verify-no-changes --no-restore
    ```
 3. Keep output byte-identical to the reference tools for existing behavior.

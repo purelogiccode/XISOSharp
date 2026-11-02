@@ -535,7 +535,7 @@ public static AuditResult AuditXiso(IBlockDevice dev, string isoName, bool requi
 public static IReadOnlyList<EntryInfo> ListDirectory(IBlockDevice dev, string internalPath = "/");
 ```
 
-`IBlockDevice` stack under `XISOSharp.Core/BlockDevice/` (`FileBlockDevice`/`MemoryBlockDevice`/`OffsetBlockDevice`/`StreamBlockDevice`/`CisoBlockDevice`/`CciBlockDevice`). Mirror `xdvdfs-core/src/blockdev.rs` - enables in-memory golden fixtures + CISO/CCI random-access via single-sector caches without `no_std` target. All `FileStream` overloads delegate to these.
+`IBlockDevice` stack under `XISOSharp/BlockDevice/` (`FileBlockDevice`/`MemoryBlockDevice`/`OffsetBlockDevice`/`StreamBlockDevice`/`CisoBlockDevice`/`CciBlockDevice`). Mirror `xdvdfs-core/src/blockdev.rs` - enables in-memory golden fixtures + CISO/CCI random-access via single-sector caches without `no_std` target. All `FileStream` overloads delegate to these.
 
 ## AuditXiso
 

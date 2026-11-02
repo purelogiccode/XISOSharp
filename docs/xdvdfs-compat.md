@@ -24,7 +24,7 @@ XISOSharp build-image --dry-run -m "bin:/" -m "assets/**:/assets/{1}" ./src
 
 **What it does:** ordered first-wins remapping of host filesystem → image filesystem. Rules evaluated in order; first match wins, `!` prefix negates (exclusion), unmapped → skip, duplicate image path → deterministic first-wins. Supports `*`/`**`/`?`/`[]`/`{a,b}` + whole-match `{0}` and per-group `{1..n}` captures + suffix re-add.
 
-**Files:** `src/XISOSharp/WaxGlob.cs` (capture engine), `src/XISOSharp/RemapFilesystem.cs` (`RemapRule` + `DryRunRemap`/`BuildImage` → `XisoWriter.CreateFromRemapTree` with `IsRemap` flag skipping CWD), `apps/XISOSharp.Cli/Program.cs:RunBuildImage`.
+**Files:** `XISOSharp/WaxGlob.cs` (capture engine), `XISOSharp/RemapFilesystem.cs` (`RemapRule` + `DryRunRemap`/`BuildImage` → `XisoWriter.CreateFromRemapTree` with `IsRemap` flag skipping CWD), `XISOSharp.Cli/Program.cs:RunBuildImage`.
 
 **`xdvdfs.toml`:**
 
@@ -86,7 +86,7 @@ Output: `hex tab path` (silent → hex only). Exit `0` on all, deterministic hex
 
 **Gap it closes:** XISOSharp previously only had per-file `MD5`/`SHA-256` (`ComputeFileHash` + `--md5`/`--sha256`) and `XisoValidator.ValidateConversion` (`--validate-checksums` `SHA-256`). No deterministic image-level checksum.
 
-**Implementation:** `XISOSharp.Core/XisoChecksum.cs` `ComputeImageChecksum` / `ComputeImageChecksumHex` (streaming) over `SortedDictionary<string,Node> StringComparer.Ordinal` (`/`-prefixed paths e.g. `/DIR/FILE` UTF-8 Latin1/`WINDOWS_1252` path bytes + streamed file data via `ReadData`). No `SHA3.Net`/`NSec` dep — BCL `SHA3_256` when `SHA3_256.IsSupported`, otherwise the pure-managed FIPS 202 fallback (`XISOSharp/Sha3.cs`); digests are identical either way (OSes without a SHA3 provider — Windows 10 CNG, OpenSSL 1.x — threw `PlatformNotSupportedException` before the fallback). Documented `NOT SHA256 of full image` parity warning.
+**Implementation:** `XISOSharp/XisoChecksum.cs` `ComputeImageChecksum` / `ComputeImageChecksumHex` (streaming) over `SortedDictionary<string,Node> StringComparer.Ordinal` (`/`-prefixed paths e.g. `/DIR/FILE` UTF-8 Latin1/`WINDOWS_1252` path bytes + streamed file data via `ReadData`). No `SHA3.Net`/`NSec` dep — BCL `SHA3_256` when `SHA3_256.IsSupported`, otherwise the pure-managed FIPS 202 fallback (`XISOSharp/Sha3.cs`); digests are identical either way (OSes without a SHA3 provider — Windows 10 CNG, OpenSSL 1.x — threw `PlatformNotSupportedException` before the fallback). Documented `NOT SHA256 of full image` parity warning.
 
 **Container input:** `ComputeImageChecksum` opens CISO/CCI/split ISO through
 `XisoImageSource.OpenBlockDevice`, so the digest is identical to the source ISO;
@@ -101,7 +101,7 @@ file-data rule, so equivalent trees hash equally across ISO and ZAR.
 
 **xdvdfs ref:** `xdvdfs-core/src/blockdev.rs` traits `read(offset,&mut buf)` / `write(offset,buf)` / `len()` + `OffsetWrapper` for CISO.
 
-**XISOSharp:** `XISOSharp.Core/BlockDevice/`:
+**XISOSharp:** `XISOSharp/BlockDevice/`:
 
 | Type | Role |
 |---|---|

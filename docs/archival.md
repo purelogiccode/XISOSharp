@@ -19,7 +19,7 @@ XboxKit's value is **lossless** round-trip: Redump full-disc images ↔ trimmed 
 
 ## Concepts
 
-A Redump dump is `L0` video head + `l0Padding` zeroes + **game partition** (XDVDFS, what XISOSharp extracts) + `l1Padding` + `L1` video tail (optionally `l1Trimmed + updateFS + lastSector` for XGD3). Tables live in `XISOSharp.Core/XgdTables.cs` (verbatim `XISO_OFFSET`/`REDUMP_ISO_LENGTH[9]`/`VIDEO_L*_LENGTH[19]`/`WAVE_PVD[24]` + PVD at `0x832D` via `GetVideoType`/`GetRedumpIsoTypeBySize`). Ranges live in `XISOSharp.Core/XisoRanges.cs` (`GetXisoRanges`/`GetValidSectors`/`MergeRanges`), seeded gaps in `XboxPrng.cs`, skeleton in `XisoSkeleton.cs`, `SecuritySectors.cs` parses `sectors.txt`.
+A Redump dump is `L0` video head + `l0Padding` zeroes + **game partition** (XDVDFS, what XISOSharp extracts) + `l1Padding` + `L1` video tail (optionally `l1Trimmed + updateFS + lastSector` for XGD3). Tables live in `XISOSharp/XgdTables.cs` (verbatim `XISO_OFFSET`/`REDUMP_ISO_LENGTH[9]`/`VIDEO_L*_LENGTH[19]`/`WAVE_PVD[24]` + PVD at `0x832D` via `GetVideoType`/`GetRedumpIsoTypeBySize`). Ranges live in `XISOSharp/XisoRanges.cs` (`GetXisoRanges`/`GetValidSectors`/`MergeRanges`), seeded gaps in `XboxPrng.cs`, skeleton in `XisoSkeleton.cs`, `SecuritySectors.cs` parses `sectors.txt`.
 
 ```
 Redump: [ L0 (VIDEO_L0_LENGTH[wave]) | l0Padding | game partition (fileRanges + gaps) | l1Padding | L1 (VIDEO_L1_LENGTH[wave]) ]

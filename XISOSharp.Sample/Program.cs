@@ -3,8 +3,8 @@ using XISOSharp.Models;
 namespace XISOSharp.Sample;
 
 // Usage:
-//   dotnet run --project samples/XISOSharp.Sample -- <image.iso>
-//   dotnet run --project samples/XISOSharp.Sample -- --pack <sourceDir> <out.iso>
+//   dotnet run --project XISOSharp.Sample -- <image.iso>
+//   dotnet run --project XISOSharp.Sample -- --pack <sourceDir> <out.iso>
 internal static class Program
 {
     private static int Main(string[] args)

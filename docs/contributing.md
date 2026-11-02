@@ -17,7 +17,7 @@ Thanks for considering a contribution! This project is a byte-faithful port of
 4. Build and test before starting:
    ```bash
    dotnet build
-   dotnet test tests/XISOSharp.Tests
+   dotnet test XISOSharp.Tests
    ```
 5. Make your change **with tests** (see below).
 6. Push and open a pull request against `master` (the repo's branch; CI also
@@ -44,7 +44,7 @@ Thanks for considering a contribution! This project is a byte-faithful port of
 - Verify the full suite passes and the solution builds with 0 warnings:
   ```bash
   dotnet build CSharp_XISOSharp.sln -c Release
-  dotnet test tests/XISOSharp.Tests -c Release
+  dotnet test XISOSharp.Tests -c Release
   ```
 - For behavior-affecting changes, run the reference comparison (the oracle-gated
   interop tests plus the battle harness, see

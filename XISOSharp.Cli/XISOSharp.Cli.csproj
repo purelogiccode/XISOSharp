@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <!-- Ships only as a release-bundle executable (GitHub releases) and as the
          self-contained publish output; there is no NuGet package for the CLI.
-         The library (src/XISOSharp) is the only published package. -->
+         The library (XISOSharp/) is the only published package. -->
     <IsPackable>false</IsPackable>
     <Description>XISOSharp command-line tool: create, extract, list, rewrite, compress and archive Xbox XISO/XDVDFS images. Reads ISO, split ISO, CISO, CCI and ZAR; writes XISO, CISO, CCI and ZAR; includes Redump/XboxKit archival modes.</Description>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
@@ -23,7 +23,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoRoot)src\XISOSharp\XISOSharp.csproj" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp\XISOSharp.csproj" />
     <PackageReference Include="Serilog" Version="4.4.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />

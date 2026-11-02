@@ -7,7 +7,7 @@
     <RootNamespace>XISOSharp.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
     <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>$(RepoRoot)src\XISOSharp\XISOSharp.snk</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>$(RepoRoot)XISOSharp\XISOSharp.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -47,13 +47,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoRoot)src\XISOSharp\XISOSharp.csproj" />
-    <ProjectReference Include="$(RepoRoot)apps\XISOSharp.Cli\XISOSharp.Cli.csproj" />
-    <ProjectReference Include="$(RepoRoot)apps\XISOSharp.Gui\XISOSharp.Gui.csproj" Condition="'$(TargetFramework)' == 'net10.0'" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp\XISOSharp.csproj" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp.Cli\XISOSharp.Cli.csproj" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp.Gui\XISOSharp.Gui.csproj" Condition="'$(TargetFramework)' == 'net10.0'" />
     <!-- TestDataWriter lives in the Generator project (single owner); Tests
              references the project instead of linked-compiling the file, so new
              Generator sources always propagate. -->
-    <ProjectReference Include="$(RepoRoot)tests\XISOSharp.TestDataGenerator\XISOSharp.TestDataGenerator.csproj" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp.TestDataGenerator\XISOSharp.TestDataGenerator.csproj" />
     <!-- ZArchiveSharp resolves transitively via XISOSharp lib (ProjectReference when
              sibling checkout exists, NuGet fallback otherwise). No direct
              out-of-repo reference here. -->

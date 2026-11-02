@@ -176,10 +176,10 @@ This "media-enable" patch lets homebrew executables run from writable media.
 
 ## References
 
-- `XISOSharp.Core/Constants.cs` — all constants used above
-- `XISOSharp.Core/XisoReader.cs` — header verification, tree traversal, extraction
-- `XISOSharp.Core/XisoWriter.cs` — layout calculation and writing
-- `XISOSharp.Core/AvlTree.cs` — AVL insert/rotate/traverse
+- `XISOSharp/Constants.cs` — all constants used above
+- `XISOSharp/XisoReader.cs` — header verification, tree traversal, extraction
+- `XISOSharp/XisoWriter.cs` — layout calculation and writing
+- `XISOSharp/AvlTree.cs` — AVL insert/rotate/traverse
 - `References/xdvdfs-0.8.3` — independent Rust implementation used for cross-checking
 - `References/XboxKit-0.7` — C# reference implementation used for cross-checking (`XgdTables`, `XisoRanges`, `XboxPrng`, `ZArchive` ported)
 - `References/xdvdfs-0.8.3/tests/img.py::BuildImage` — `build-image` wax capture vectors verified

@@ -1,20 +1,18 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <!-- CI publishes this app with PublishAot=true and runs it, proving the
-         library surface (and the transitive ZAR/CCI packages) stay trim/AOT
-         compatible. It is not packed or shipped. -->
-    <PublishAot>true</PublishAot>
-    <InvariantGlobalization>true</InvariantGlobalization>
     <IsPackable>false</IsPackable>
-    <AssemblyName>XISOSharp.AotSmoke</AssemblyName>
-    <RootNamespace>XISOSharp.AotSmoke</RootNamespace>
+    <AssemblyName>XISOSharp.Fuzz</AssemblyName>
+    <RootNamespace>XISOSharp.Fuzz</RootNamespace>
+    <!-- A deterministic mutation fuzzer, not a library consumer; keep it out of
+         trimming/AOT claims. -->
+    <PublishAot>false</PublishAot>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoRoot)src\XISOSharp\XISOSharp.csproj" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp\XISOSharp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

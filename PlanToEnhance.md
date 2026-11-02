@@ -6,6 +6,7 @@
 **CCISharp repo:** <https://github.com/purelogiccode/CCISharp> — package <https://www.nuget.org/packages/CCISharp/1.0.1>.
 **Date:** 2026-10-31
 **Scope:** turn XISOSharp into the most complete original-Xbox disc-image library by closing the four format/robustness gaps, adding a dedicated `CCISharp` package, and adding three quality-of-life improvements. This document records the plan and its implementation status.
+**Phase 10 (2026-11-01):** cross-reference harvest from the four new reference projects (`Xbox360Convert`, `XboxToolkit`, `XDVDFS-TR`, `XeCrypt`) — Tier A for `1.6.0`, Tier B for `1.7.0`; see §16.
 
 ---
 
@@ -931,10 +932,12 @@ Effort figures are indicative, not commitments; they exclude review, docs polish
 
 - Replacing XISOSharp's CISO implementation with `CSOSharp` (CSOSharp is read-only).
 - Adding CCI to `CSOSharp`.
-- CHD/GOD/STFS containers in XISOSharp core (keep them in SimpleXisoDrive/XISOStudio/VideoGameFileSystemParser).
-- Python bindings (`no_std`, `bincode`, NFS/FUSE daemons, Tauri/web UI, CMake fixes).
+- CHD, and STFS/CON/LIVE/PIRS **writing or rebuilding**, in XISOSharp core (CHD stays in SimpleXisoDrive/XISOStudio; STFS write belongs in a future container package). **Read-only GOD input is the one exception:** it arrives in `1.7.0` through the `StfsSharp` package (Phase 10, §16.3) so every existing read verb works on GOD without new format code in XISOSharp.
+- Web/WASM builds, browser samples and a Tauri/web UI — owner decision 2026-11-01: XISOSharp ships no web surface (`xdvdfs-web` parity is not a goal).
+- Python bindings, a native ABI (C/C++/Rust/Python export layer), `no_std`, `bincode`, NFS/FUSE daemons and CMake fixes — owner decision 2026-11-01: XISOSharp stays a managed .NET library and ships no binding layer.
 - Xbox 360 XEX decryption or full XBE editing (out of scope; `GetXexInfo`/`GetXbeInfo` stay read-only).
-- Direct optical-drive reading (users can implement `IBlockDevice`).
+- Executable signature verification (XBE certificate RSA signature, XEX hash tree) — owner decision 2026-11-01: `--validate` stays structural, with no authenticity or tamper reporting.
+- Direct optical-drive reading — DVD/BD drive access, SCSI/IOCTL passthrough, raw ripping and drive-speed control — owner decision 2026-11-01: **permanent non-goal**. Users who need it implement `IBlockDevice` over their own drive reader.
 - Byte-identical output vs Repackinator's CCI encoder (interoperability is the goal).
 
 ---
@@ -959,7 +962,7 @@ Effort figures are indicative, not commitments; they exclude review, docs polish
 | extract-xiso #28 Xbox 360 | covered (XGD offsets, XEX info) | keep |
 | extract-xiso #32/#33 Redump offset | covered | keep |
 | extract-xiso #60/#61 bulk | covered | `--batch` extended to convert verbs (Phase 5) |
-| extract-xiso #63 DVD drive | not planned | `IBlockDevice` extension point |
+| extract-xiso #63 DVD drive | excluded | permanent non-goal — users implement `IBlockDevice` (§13) |
 | extract-xiso #66 audit | covered | keep |
 | extract-xiso #67 rewrite name | covered | keep |
 | extract-xiso #68 media patch | covered (pattern patch) | optional XBE editor later |
@@ -975,7 +978,7 @@ Effort figures are indicative, not commitments; they exclude review, docs polish
 | xdvdfs #37/#155 filetime | covered | keep |
 | xdvdfs #49 layout | dump + copy-in covered; pack-to-layout not | Phase 8 |
 | xdvdfs #60/#117/#129 mount | not planned | SimpleXisoDrive |
-| xdvdfs #88 Python bindings | not planned | native ABI later |
+| xdvdfs #88 Python bindings | excluded | permanent non-goal (§13) |
 | xdvdfs #93/#114 batch | covered | batch conversion (Phase 5) |
 | xdvdfs #97 split | covered (Phase 2) | keep |
 | xdvdfs #101 deterministic | covered | keep |
@@ -1137,15 +1140,15 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [ ] Add CCI LZ4-HC level 12 encoding in CCISharp for byte-parity with libCCI/Repackinator (keep the fast encoder as default).
 - [ ] Add optional multi-digit CCI part discovery (`game.10.cci`) while keeping reference-compatible single-digit output.
 - [-] XRD Redump metadata generation — deferred: XboxKit 0.7's implementation is itself a stub (zeroed hashes, TODO certificates). Implement only with a complete XRD spec and a verified oracle, not by porting the stub.
-- [-] GOD/STFS/CON containers — non-goal for the XISO library; belongs in a separate Xbox 360 container package.
+- [-] GOD/STFS/CON containers — non-goal for the XISO library; belongs in a separate Xbox 360 container package. **Amended 2026-11-01:** read-only GOD input is planned for `1.7.0` via `StfsSharp` (Phase 10, §16.3); STFS writing/rebuild stays out.
 
 ### 15.7 Documentation, samples, community
 
 - [x] Docsify site + GitHub Wiki mirror.
 - [x] `docs/library.md`, API pages, CLI reference, archival, compression, format, testing, troubleshooting.
 - [ ] DocFX API reference published to Pages.
-- [x] `samples/XISOSharp.Sample` console app (open/list/read/extract/create/validate/verify).
-- [ ] `samples/XISOSharp.WasmSample` after the CWD/`IFilesystem` refactor.
+- [x] `XISOSharp.Sample` console app (open/list/read/extract/create/validate/verify).
+- [-] `samples/XISOSharp.WasmSample` — excluded 2026-11-01 by owner decision: XISOSharp ships no web/WASM surface (see §13 and §16.7).
 - [x] Root `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `CODEOWNERS`, `SUPPORT.md`, PR template.
 - [ ] Public synthetic/homebrew fixture corpus and a regeneration script.
 - [x] “Known limitations” page (long paths, GOD/STFS, XRD, net9 EOL, unsigned bundles).
@@ -1172,22 +1175,25 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 
 - [-] CHD containers.
 - [-] Xbox 360 XEX decryption or XBE editing.
+- [-] Executable signature verification (XBE certificate / XEX hash tree) — **permanent non-goal** (owner decision 2026-11-01).
 - [-] FUSE/Dokan mounting in the core library (SimpleXisoDrive owns it).
-- [-] Python bindings / native ABI in this release.
-- [-] Direct optical-drive reading (users implement `IBlockDevice`).
+- [-] Web/WASM builds, browser samples and a Tauri/web UI — **permanent non-goal** (owner decision 2026-11-01).
+- [-] Python bindings / native ABI — **permanent non-goal** (owner decision 2026-11-01); XISOSharp remains a managed .NET library.
+- [-] Direct optical-drive reading — **permanent non-goal** (owner decision 2026-11-01); users implement `IBlockDevice` over their own drive reader.
 - [-] Bit-exact CCI output until CCISharp ships LZ4-HC.
-- [-] GOD/STFS/CON and XRD (see 15.6).
+- [-] STFS/CON/LIVE/PIRS **writing**, package rebuild and re-signing; XRD (see 15.6).
+- [ ] GOD **read-only** input through `StfsSharp` — planned for `1.7.0` (Phase 10, §16.3); GOD writing stays a non-goal.
 
 ### 15.11 Verification commands for this phase
 
 ```powershell
 dotnet build CSharp_XISOSharp.sln -c Release -m:1
-dotnet test tests/XISOSharp.Tests/XISOSharp.Tests.csproj -c Release
+dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release
 dotnet format whitespace CSharp_XISOSharp.sln --verify-no-changes --no-restore
-dotnet pack src/XISOSharp/XISOSharp.csproj -c Release -o artifacts
-dotnet publish tests/XISOSharp.AotSmoke/XISOSharp.AotSmoke.csproj -c Release -r linux-x64
-dotnet run --project tests/XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
-dotnet run --project tests/XISOSharp.Fuzz -c Release -- --seconds 60
+dotnet pack XISOSharp/XISOSharp.csproj -c Release -o artifacts
+dotnet publish XISOSharp.AotSmoke/XISOSharp.AotSmoke.csproj -c Release -r linux-x64
+dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
+dotnet run --project XISOSharp.Fuzz -c Release -- --seconds 60
 ```
 
 ### 15.12 Progress log
@@ -1198,3 +1204,267 @@ dotnet run --project tests/XISOSharp.Fuzz -c Release -- --seconds 60
 | 2026-11-01 | Phase 9 implementation: `XisoImage`, full-image hashes, `verify-hashes`, `title-info`, CISO hardening (fuzzer found an `OverflowException`), ZAR caps, reserved names/long paths, `dotnet tool`, AOT smoke, mutation fuzzer, 3-OS CI, format/coverage gates, SBOM/provenance, community files, sample, end-to-end benchmarks, support policy, threat model, public-API snapshot, synthetic battle-interop. Full suite 1979/1 (net8/9), 2043/1 (net10); Linux 2015/24; NativeAOT smoke green. | — |
 | 2026-11-01 | **Released 1.5.0**: tag pushed, CI green on Ubuntu/Windows/macOS + AOT + fuzz + battle-interop + InspectCode, NuGet `XISOSharp` 1.5.0 + `XISOSharp.Tool` 1.5.0 published, GitHub release published with six RID bundles + SPDX SBOM. | `1.5.0` |
 | 2026-11-01 | **CCISharp 1.0.1**: 64 MiB index cap (checked cast; hostile headers return `InvalidIndex` instead of throwing from `ArrayPool.Rent`), overflow-free index length, hostile-input tests, libCCI interop in CI with checked-in oracles, format + 65/55 coverage + package-validation gates, pinned actions. XISOSharp now references 1.0.1. | `v1.0.1` |
+
+---
+
+## 16. Phase 10 — cross-reference harvest (Xbox360Convert / XboxToolkit / XDVDFS-TR / XeCrypt)
+
+**Status:** proposed 2026-11-01. Tier A ships in **`1.6.0`** (next release after the published `1.5.0` tag); Tier B ships in **`1.7.0`**. Scope is deliberately narrow: only items judged *worthy and useful* are included, and every rejected candidate is recorded in §16.7 with a reason so it is not re-litigated.
+
+**References reviewed:** `References/Xbox360Convert-1.0.1`, `References/XboxToolkit-main`, `References/XDVDFS-TR-0.8.4-TR`, `References/XeCrypt-main`, re-checked against `extract-xiso-build-202609111233`, `libCCI-0.1.0-1b0087e`, `XboxKit-0.7` and `xdvdfs-0.8.3`.
+
+### 16.1 Review outcome — why the scope is small
+
+| Reference | License | New capability vs the 1.5.0 tree | Taken |
+|---|---|---|---|
+| `extract-xiso-build-202609111233` | BSD-style | none — parity baseline and oracle | no |
+| `libCCI-0.1.0-1b0087e` | GPL-2.0-or-later | none — CCISharp 1.0.1 implements `FORMAT.md` | no |
+| `Xbox360Convert-1.0.1` | GPL-3.0 (no own license file; links XboxToolkit) | GOD input, FATX split point, delete-after-convert, GOD title naming | **4 small items** |
+| `XboxKit-0.7` | permissive | none — full CLI/redump parity already shipped | no |
+| `XboxToolkit-main` | GPL-3.0-only | GOD/STFS read, XEX XDBF metadata, XBE image assets | **3 items** |
+| `xdvdfs-0.8.3` | MIT | none — parity baseline | no |
+| `XDVDFS-TR-0.8.4-TR` | MIT | none functional (see note) | no |
+| `XeCrypt-main` | MIT | XBE certificate signature format, STFS hash trees | no — signature verification excluded (§16.7) |
+
+**XDVDFS-TR note.** It was diffed file by file against `xdvdfs-0.8.3`. The only
+additions are `xdvdfs-cci` (already covered by CCISharp), `xdvdfs-fsd` (FUSE + NFS
+daemon), `xdvdfs-web` (WASM) and internal refactors (`layout/*` split into
+modules, `FilesystemCopier`/`RWCopier`, `progress_info`, error enums).
+`xdvdfs-core/src/checksum.rs` is algorithmically identical, so checksum parity is
+unaffected. Two notes for other repositories, not this one: `xdvdfs-fsd` proves an
+NFS mount path for SimpleXisoDrive, and `xdvdfs-web` shows an upstream WASM build
+exists — **excluded here by owner decision** (§16.7).
+
+**Licensing rule for this phase.** `XboxToolkit` is GPL-3.0-only and
+`Xbox360Convert` has no license file and links it, so both are *behaviour
+oracles* only: no code, no transliteration, no linked binaries. Every item below
+is implemented from on-disk format facts and verified against synthetic fixtures.
+`XeCrypt` is MIT and was reviewed for the XBE certificate signature layout, but
+**no item in this phase uses it** — signature verification was dropped (§16.7).
+
+### 16.2 Tier A — `1.6.0`
+
+#### A1. Xbox 360 title metadata (`title-info` on 360 discs)
+
+**Problem.** `XisoReader.GetTitleInfo` resolves only `/default.xbe`, so on a 360
+XISO it returns `null` and the CLI prints *"no root default.xbe with an XBEH
+certificate"*. `GetXexInfo` parses the fixed header, security info (image size,
+load address, region, allowed media), execution info (media ID, version, title
+ID, platform, disc number/count) and file-format info — and stops there: no
+header section table, no XDBF/XSRC strings.
+
+**Change.**
+- Parse the XEX header section table (count at `0x14`, 8-byte entries at `0x18`)
+  and read the XDBF/XSRC resource: title name, publisher, developer, genre,
+  description, optional thumbnail. XDBF sits in a **plaintext** header section —
+  no decryption, no keys.
+- New `XexTitleInfo` record. `TitleInfo` gains `Kind` (`Xbe`/`Xex`) and
+  `XexTitleInfo? Xex` as **non-positional init properties**, so the positional
+  record signature and the 1.4.4 `PackageValidationBaselineVersion` stay intact.
+- `GetTitleInfo` resolution order: `/default.xbe` → `/default.xex` →
+  `/default_mp.xbe` → `null`.
+- CLI `title-info` auto-detects both kinds; `--json` gains additive nullable
+  fields (nulls omitted) and keeps `schemaVersion: 1`.
+- `--xex-info` prints the resolved title name/publisher when XDBF is present.
+
+**Acceptance.** `title-info` on a 360 XISO reports name, title ID, region, disc
+and version; output for OG XISOs is byte-identical to today; `CliJsonTests`
+snapshots updated; a synthetic XDBF fixture round-trips.
+
+#### A2. XBE image assets (`--xbe-image`)
+
+**Problem.** `--xbe-info` reports the certificate only; the artwork is unreachable.
+
+**Format facts** (confirmed in the reference, reimplemented from the layout):
+- title image = `$$XTIMAGE` section: a 54-byte **DDS** header followed by a
+  128×128 image (49,152 bytes for BGR24; DXT1/3/5 variants exist);
+- save image = `$$XSIMAGE` section, same shape;
+- logo = the raw 100×17 32-bpp buffer addressed by the header's
+  `LogoBitmapAddress`/`LogoBitmapSize`.
+
+**Change.**
+- New `XbeAssets` API: read logo / `$$XTIMAGE` / `$$XSIMAGE` from an image path
+  or `Stream`, section-walk bounded like the existing XBE reader.
+- DXT1/DXT3/DXT5 + BGR24 decode and a minimal BCL-only PNG writer
+  (`System.IO.Compression`); DDS passthrough for lossless archival.
+- `XbeInfo` gains `HasLogoBitmap` / `HasTitleImage` / `HasSaveImage`
+  (additive init properties).
+- CLI: `--xbe-image <image> <path> --type logo|title|save -o out.(png|dds)`.
+- **No new package dependency** — `SixLabors.ImageSharp` is not added.
+
+**Acceptance.** Title, save and logo extract from a synthetic XBE to valid PNG
+and DDS; `--json` reports the presence flags; a missing section is a clean error,
+not an exception.
+
+#### A3. One FATX file-size constant
+
+**Problem.** `XisoSplitter.DefaultPartSizeBytes` is `4294967296` — exactly 4 GiB.
+FATX cannot represent a 4 GiB file, and a part can be exactly that size, so a
+"FATX-safe" split can currently produce an unwritable part. `CisoWriter` uses
+`0xffbf6000` and Xbox360Convert uses `0xFF000000` (4 GiB − 16 MiB); three
+different values for one limit (§14 Q4 already raised this for CCI).
+
+**Change.**
+- `Constants.FatxMaxFileSize = 0xFF000000` (4,278,190,080 = 4 GiB − 16 MiB)
+  becomes the plain-ISO split default.
+- CISO/CCI keep `0xffbf6000` for `xdvdfs` byte-parity, asserted to be below the
+  cap and documented as the compression default rather than the FATX limit.
+- An explicit `--size` above the cap is still honoured, with a warning.
+
+**Acceptance.** A 4 GiB sparse image splits into parts strictly below 4 GiB;
+split/join round-trips are unchanged; existing split tests updated for the new
+default.
+
+#### A4. `--delete-source` for batch conversion
+
+**Problem.** Xbox360Convert has `-d`; XISOSharp's batch verbs have no equivalent,
+so library cleanup needs a second pass.
+
+**Change.** `--delete-source` on batch `compress`, `decompress`, `convert` and
+`split`:
+- requires `-y` (refused with `-n` or an interactive prompt);
+- deletes only after a fully successful conversion;
+- never deletes an input that is another input's output;
+- a split set deletes every part.
+
+**Acceptance.** Success deletes, failure keeps, `-n` refuses, and the batch
+summary reports deleted counts.
+
+#### A5. GOD title naming (header only, no mount)
+
+**Problem.** A GOD container is a header file named by content hash next to a
+`<name>.data/` directory. Its title name (`0x411`, UTF-16, `0x80` bytes), title ID
+(`0x360`) and disc number/count (`0x366`/`0x367`) are readable without decoding a
+single sector.
+
+**Change.** `title-info` accepts either the header path or its `.data` folder and
+reports title name, title ID, disc number and disc count from the `XContent`
+header, with FATX-safe name sanitisation and a fallback to the hex title ID when
+the name is empty. Implemented as the first slice of B1 so it ships on its own.
+
+**Acceptance.** A synthetic GOD header reports the expected name/disc; a non-GOD
+file produces the existing clean error.
+
+### 16.3 Tier B — `1.7.0`
+
+#### B1. `StfsSharp` package + read-only GOD source
+
+**Problem.** `XisoImageSource` covers ISO, split ISO, CISO, split CISO, CCI, split
+CCI and ZAR — **not GOD**, the dominant 360 digital format. GOD is a sector image
+(SVOD), so it fits `IBlockDevice` naturally and every existing verb would work
+unchanged.
+
+**Change.**
+- New MIT package/repo `purelogiccode/StfsSharp`, shaped exactly like `CCISharp`
+  (`net8.0`/`net9.0`/`net10.0`, MinVer, `IsTrimmable`/`IsAotCompatible`, zero
+  runtime dependencies, XML docs, nupkg + snupkg, 3-OS CI):
+  `XContent` header, STFS block chains and hash tables, SVOD `.data` mapping,
+  `StfsFile`/`StfsStream`, `StfsValidationReport`. **Read-only** — no block
+  hashing, no signing, no rebuild.
+- Mapping facts to implement (from the on-disk layout, not the GPL code):
+  `0x14388` sectors per data file, `0x198` sectors per data block, one
+  `0x1000`-byte hash block per data block, base address `0x12000`
+  (`0x2000` for enhanced GDF), and sectors `0x20`/`0x21` living in `Data0000`.
+- XISOSharp: `XisoImageFormat.God`, `GodBlockDevice : IBlockDevice`, detection of
+  a header path **and** a `.data` folder path, naming through
+  `StripImageSuffix`.
+- CLI: every read verb (`-l`, `-t`, `-x`, `checksum`, `hash`, `validate`,
+  `--sector-layout`, `--ranges`, `title-info`) accepts GOD with no per-verb
+  changes; `decompress`/`convert` gain `god → iso` and `god → cci`; write paths
+  (`--repair`, `--set-filetime`, redump modes) refuse with the existing
+  "decompress first" message.
+
+**Scope reversal.** §13, §15.6 and §15.10 are amended to *"GOD/STFS **read-only**
+via StfsSharp; STFS write/rebuild, CON/LIVE/PIRS re-signing and XEX decryption
+remain non-goals."*
+
+**Acceptance.** `checksum game.god` == `checksum game.iso` for the same tree;
+`-x game.god` is byte-identical to `-x game.iso`; a synthetic multi-`Data` set
+validates and reads without materialising the image; corrupt hash tables fail
+with a named error, not an exception.
+
+### 16.4 File-by-file change map
+
+| File | Change |
+|---|---|
+| `XISOSharp/Models/TitleInfo.cs` | additive `Kind`, `Xex` properties |
+| `XISOSharp/Models/XexTitleInfo.cs` (new) | XDBF-derived 360 metadata |
+| `XISOSharp/XexDbdf.cs` (new) | XEX header-section table + XDBF/XSRC parser |
+| `XISOSharp/XisoReader.cs` | `GetTitleInfo` xbe→xex resolution; `GetXexInfo` enrichment |
+| `XISOSharp/Models/XbeInfo.cs` | additive image-presence properties |
+| `XISOSharp/XbeAssets.cs` (new) | logo / `$$XTIMAGE` / `$$XSIMAGE` extraction |
+| `XISOSharp/DxtDecoder.cs` (new) | DXT1/3/5 + BGR24 decode |
+| `XISOSharp/PngWriter.cs` (new) | BCL-only PNG encode |
+| `XISOSharp/Constants.cs` | `FatxMaxFileSize` |
+| `XISOSharp/XisoSplitter.cs` / `CisoWriter.cs` / `XisoCci.cs` | use the shared cap |
+| `XISOSharp/XisoImageFormat.cs` / `XisoImageSource.cs` | `God` + detection (header and `.data` folder) |
+| `XISOSharp/BlockDevice/GodBlockDevice.cs` (new) | `IBlockDevice` over `StfsFile` |
+| `XISOSharp.Cli/Program.cs` | `--xbe-image`, `--delete-source`, GOD verbs |
+| `XISOSharp.Cli/JsonOutput.cs` | additive title/xbe fields |
+| `XISOSharp.Gui/**` | 360 title panel, XBE image preview, GOD filter/drop routing |
+| `XISOSharp.Tests/*` | XDBF, XBE assets, DXT/PNG, FATX cut, delete-source, GOD |
+| `XISOSharp.TestDataGenerator/*` | synthetic XDBF, XBE-with-images, GOD set |
+| `docs/*`, `WhatsNew.md`, `docs/release-notes.md`, READMEs | feature + limitation docs |
+
+### 16.5 Test plan and quality gates
+
+- Synthetic fixtures only; no copyrighted game data and no GPL binaries.
+- `dotnet test` green on `net8.0`/`net9.0`/`net10.0`; InspectCode 0 warnings;
+  `dotnet format whitespace --verify-no-changes`.
+- Trim/AOT analyzers clean (XDBF, DXT and PNG code are pure managed,
+  reflection-free).
+- Public API additive only; `PackageValidationBaselineVersion` stays green.
+- New JSON fields covered by `CliJsonTests` golden snapshots.
+- Fuzzer seeds: XDBF, XBE section table, DXT block, GOD `XContent`/block map.
+
+### 16.6 Companion repositories
+
+`CSharp_SimpleXisoDrive` (mount) and `CSharp_XISOStudio` (GUI) are first-class
+consumers of this phase. Both currently pin **XISOSharp 1.4.4** and drive
+everything through the static `XisoReader.*` APIs plus `IBlockDevice`, so the
+items above are designed to reach them without new format code:
+
+| Repo | Consumption today | Work |
+|---|---|---|
+| `CSharp_SimpleXisoDrive` | `XisoReader.GetVolumeInfo`/`ListDirectory`/`GetEntryInfo`/`OpenImageStream`, `IRawImageSource`, ZArchiveSharp, CHDSharp, Dokan + LibFuseSharp | upgrade to 1.6/1.7, adopt `XisoImage`; **GOD mount arrives free** through `XisoImageSource.OpenRead` |
+| `CSharp_XISOStudio` | `XisoReader.*`, `IBlockDevice` (`ChdBlockDevice`), `XisoZarchive.CreateZar`, `XisoImageExplorer`, SharpCompress | upgrade; add GOD to the open dialog, a 360 title panel and an XBE image preview; keep CHD and ZIP in the app |
+
+Explicitly **not** in XISOSharp (companion responsibilities): Dokan/FUSE/NFS
+mounting, CHD, ZIP input (XISOStudio already ships SharpCompress), texture
+viewers. Cross-repo work is tracked in §15.9.
+
+### 16.7 Evaluated and rejected (recorded so it is not re-litigated)
+
+| Item | Source | Why not |
+|---|---|---|
+| WASM / web sample, Tauri or browser UI | `xdvdfs-web` | **Excluded by owner decision (2026-11-01).** §13 and §15.7 updated. |
+| Python bindings / native ABI (C/C++/Rust export layer) | `xdvdfs` Python bindings | **Excluded by owner decision (2026-11-01)** — permanent, not "later". §13, §15.10 and Appendix A updated. |
+| XPR / DDS / DXT **texture conversion** | XboxToolkit | Not a disc-image concern and needs ImageSharp; DXT is decoded only for XBE title images (A2). |
+| BIOS boot-logo encode/decode | XboxToolkit | Belongs to a BIOS toolkit, not an XISO library. |
+| Marketplace metadata fetch | XboxToolkit | Network + XML, not archival. |
+| STFS write / package rebuild | XboxToolkit, Xbox360Convert | Block hashing + signing + private keys; B1 is read-only by design. |
+| XexTool re-sign / unrestrict | Xbox360Convert | External binary, private keys, legally sensitive. |
+| XEX decryption / decompression | XboxToolkit (native `libXexUnpack`) | Non-goal, and the native binary cannot be shipped. |
+| XGD-shaped image synthesis from a folder | XboxToolkit `ISOFormat.Xbox360` | Cannot produce a bootable disc (no video partition, no security sectors); `--prepend-sectors` + `rebuild` already cover the real workflows. |
+| `ContainerBuilder` / XGD header writer | XboxToolkit | Weaker than `LayoutPlanner` + `SectorAllocator` (single XGD3 default, no layout support). |
+| FUSE/NFS daemon | `xdvdfs-fsd` | SimpleXisoDrive owns mounting. |
+| ZIP input | Xbox360Convert | New dependency; XISOStudio already has SharpCompress. |
+| Direct optical-drive reading (DVD/BD, SCSI/IOCTL, ripping) | `extract-xiso` #63 | **Excluded by owner decision (2026-11-01)** — permanent. §13, §15.10 and Appendix A updated. |
+| XBE/XEX executable signature verification | XboxToolkit, `XeCrypt` | **Excluded by owner decision (2026-11-01)** — not doing signature verification; `--validate` stays structural. §13 and §15.10 updated. |
+
+### 16.8 Sequencing
+
+| Step | Deliverable | Version | Est. |
+|---|---|---|---|
+| 1 | A3 FATX cap + A4 `--delete-source` | `1.6.0` | 0.5 d |
+| 2 | A5 GOD title naming | `1.6.0` | 0.5 d |
+| 3 | A1 360 title metadata | `1.6.0` | 1–2 d |
+| 4 | A2 XBE image assets | `1.6.0` | 1–2 d |
+| 5 | B1 `StfsSharp` + read-only GOD | `1.7.0` | 1–2 wk |
+| 6 | Companion upgrades (SimpleXisoDrive, XISOStudio) | after `1.7.0` | cross-repo |
+
+### 16.9 Progress log
+
+| Date | Change | Commit |
+|---|---|---|
+| 2026-11-01 | Phase 10 scope agreed from the reference review: 5 items accepted, GOD read-only proposed; owner exclusions recorded (WASM/web, Python bindings/native ABI, direct optical-drive reading, executable signature verification); §13/§15.6/§15.7/§15.10 and Appendix A amended | — |

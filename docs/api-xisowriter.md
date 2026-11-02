@@ -357,7 +357,7 @@ sources are pinned:
 ## CISO
 
 ```csharp
-// XISOSharp.Core/CisoWriter.cs + CisoReader.cs
+// XISOSharp/CisoWriter.cs + CisoReader.cs
 public static int CompressToCso(string sourcePath, string outputCsoPath, int level = 9, long? splitBytes = null, IProgress<ProgressInfo>? progress = null, CancellationToken ct = default);
 public static int DecompressToIso(string csoPath, string outputIsoPath, IProgress<ProgressInfo>? progress = null, CancellationToken ct = default);
 ```

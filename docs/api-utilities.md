@@ -91,7 +91,7 @@ Manual `xdvdfs.toml` subset parser — see [xdvdfs Compat — Build-Image](xdvdf
 
 ## BlockDevice
 
-`XISOSharp.Core/BlockDevice/` — `xdvdfs-core/src/blockdev.rs` parity (`read(offset,buf)`/`write`/`len()` + `OffsetWrapper`):
+`XISOSharp/BlockDevice/` — `xdvdfs-core/src/blockdev.rs` parity (`read(offset,buf)`/`write`/`len()` + `OffsetWrapper`):
 
 | Type | Description |
 |---|---|
