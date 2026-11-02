@@ -259,6 +259,117 @@ public class CisoTests : IDisposable
     }
 
     [Fact]
+    public void CompressToCso_WithJobs_IsByteIdenticalToSequential()
+    {
+        string isoPath = CreateTempIso();
+        string dir = CreateTempDir();
+        string sequential = Path.Combine(dir, "sequential.cso");
+        string parallel = Path.Combine(dir, "parallel.cso");
+
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, sequential, level: 9));
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, parallel, level: 9,
+            splitBytes: null, version: CisoWriter.VersionLz4, jobs: 4));
+
+        Assert.Equal(File.ReadAllBytes(sequential), File.ReadAllBytes(parallel));
+        Assert.True(CisoReader.IsCso(parallel));
+
+        string decoded = Path.Combine(dir, "parallel.iso");
+        Assert.Equal(0, CisoReader.DecompressToIso(parallel, decoded));
+        Assert.Equal(ComputeSha256(isoPath), ComputeSha256(decoded));
+    }
+
+    [Fact]
+    public void CompressToCso_WithJobs_V1Deflate_IsByteIdenticalToSequential()
+    {
+        string isoPath = CreateTempIso();
+        string dir = CreateTempDir();
+        string sequential = Path.Combine(dir, "sequential-v1.cso");
+        string parallel = Path.Combine(dir, "parallel-v1.cso");
+
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, sequential, level: 6,
+            version: CisoWriter.VersionDeflate));
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, parallel, level: 6,
+            splitBytes: null, version: CisoWriter.VersionDeflate, jobs: 3));
+
+        Assert.Equal(File.ReadAllBytes(sequential), File.ReadAllBytes(parallel));
+        Assert.True(CisoReader.IsCso(parallel));
+    }
+
+    [Fact]
+    public void CompressToCso_WithJobs_SplitOutput_IsByteIdenticalToSequential()
+    {
+        string isoPath = CreateTempIso();
+        string dir = CreateTempDir();
+        const long split = 1024 * 1024;
+
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, Path.Combine(dir, "seq.cso"), level: 9,
+            splitBytes: split));
+        Assert.Equal(0, CisoWriter.CompressToCso(isoPath, Path.Combine(dir, "par.cso"), level: 9,
+            splitBytes: split, version: CisoWriter.VersionLz4, jobs: 3));
+
+        string[] seqParts = Directory.GetFiles(dir, "seq.*.cso").OrderBy(p => p, StringComparer.Ordinal)
+            .ToArray();
+        string[] parParts = Directory.GetFiles(dir, "par.*.cso").OrderBy(p => p, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(seqParts);
+        Assert.Equal(seqParts.Length, parParts.Length);
+        for (int i = 0; i < seqParts.Length; i++)
+        {
+            Assert.Equal(File.ReadAllBytes(seqParts[i]), File.ReadAllBytes(parParts[i]));
+        }
+    }
+
+    [Fact]
+    public void CompressStream_WithJobs_IsByteIdenticalToSequential_AndProgressIsOrdered()
+    {
+        string isoPath = CreateTempIso();
+        byte[] isoBytes = File.ReadAllBytes(isoPath);
+
+        using MemoryStream source = new(isoBytes, writable: false);
+        using MemoryStream sequential = new();
+        CisoWriter.CompressStream(source, sequential, level: 9);
+
+        source.Seek(0, SeekOrigin.Begin);
+        using MemoryStream parallel = new();
+        SectorProgress progress = new();
+        CisoWriter.CompressStream(source, parallel, level: 9, version: CisoWriter.VersionLz4, jobs: 4,
+            progress: progress);
+
+        Assert.Equal(sequential.ToArray(), parallel.ToArray());
+        Assert.Equal(Enumerable.Range(0, (isoBytes.Length + 2047) / 2048).Select(i => $"/sector/{i}"),
+            progress.Paths, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void CompressToCso_JobsOutOfRange_Throws()
+    {
+        string isoPath = CreateTempIso();
+        string dir = CreateTempDir();
+        string output = Path.Combine(dir, "bad.cso");
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CisoWriter.CompressToCso(isoPath, output, level: 6, splitBytes: null,
+                version: CisoWriter.VersionLz4, jobs: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CisoWriter.CompressToCso(isoPath, output, level: 6, splitBytes: null,
+                version: CisoWriter.VersionLz4, jobs: CisoWriter.MaxParallelism + 1));
+        Assert.False(File.Exists(output));
+    }
+
+    /// <summary>Collects CISO per-sector progress paths synchronously, in report order.</summary>
+    private sealed class SectorProgress : IProgress<ProgressInfo>
+    {
+        internal List<string> Paths { get; } = [];
+
+        public void Report(ProgressInfo value)
+        {
+            if (value.Type == ProgressInfoType.FileAdded && value.Path != null)
+                Paths.Add(value.Path);
+        }
+    }
+
+    [Fact]
     public async Task CompressToCsoAsync_And_DecompressToIsoAsync_RoundTrip()
     {
         string isoPath = CreateTempIso();

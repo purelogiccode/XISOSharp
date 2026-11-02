@@ -34,6 +34,12 @@ listing/extraction.
 - **FATX-safe split default**: plain-ISO splits now default to
   `Constants.FatxMaxFileSize` (`0xFF000000`, 4 GiB − 16 MiB); an explicit
   larger `--size` warns.
+- **Parallel CISO compression**: `compress`/`cso --jobs 1..64` (and
+  `CisoWriter.CompressToCso(..., jobs: n)` / `CompressStream(..., jobs: n)`)
+  compresses sectors on a bounded worker pool. Batches are compressed in
+  parallel and written in sector order, so the output is byte-identical to the
+  sequential writer and progress stays ordered. CCI compression remains
+  single-threaded (CCISharp 1.1 work).
 - **`--delete-source`**: batch `compress`/`decompress`/`convert`/`split` can
   delete each source after a successful conversion (requires `-y`; split sets
   delete every part; the summary reports the count).

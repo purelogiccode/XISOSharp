@@ -134,7 +134,12 @@ internal static class BatchConversion
     /// Validates batch-only flags after parsing. Returns the error line, or
     /// <c>null</c> when the combination is valid.
     /// </summary>
-    internal static string? Validate(BatchOptions options)
+    /// <param name="options">Parsed batch flags.</param>
+    /// <param name="allowJobsWithoutBatch">
+    /// <c>true</c> for <c>compress</c>, where <c>--jobs</c> also selects the
+    /// per-sector CISO compression worker count in single-file mode.
+    /// </param>
+    internal static string? Validate(BatchOptions options, bool allowJobsWithoutBatch = false)
     {
         bool batch = options.Directory != null;
 
@@ -148,7 +153,7 @@ internal static class BatchConversion
                 return "--continue-on-error requires --batch <directory>";
             if (options.DeleteSource)
                 return "--delete-source requires --batch <directory>";
-            if (options.JobsSpecified)
+            if (options.JobsSpecified && !allowJobsWithoutBatch)
                 return "--jobs requires --batch <directory>";
             if (options.OutputName != null)
                 return "--output-name requires --batch <directory>";

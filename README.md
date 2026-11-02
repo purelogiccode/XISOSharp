@@ -29,7 +29,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) fo
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) - full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) - extract-xiso-compatible flags + 35+ extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (2107 tests on net10.0; 2043 on net8.0/net9.0) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + XDBF/XSRC 360 title metadata + XBE logo/title/save images + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + CCI/libCCI interop + split-ISO input + ZAR input + GOD/SVOD read-only input + XBLA/XBLIG STFS package listing/extraction + pathological TOC chains (list/tree/extract/rewrite/audit/ranges/repair/salvage/ZAR) + batch container conversion + JSON output/preallocation + explicit sector-layout packing + GOD and XBLA/XBLIG header title metadata + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (2115 tests on net10.0; 2051 on net8.0/net9.0) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + XDBF/XSRC 360 title metadata + XBE logo/title/save images + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + CCI/libCCI interop + split-ISO input + ZAR input + GOD/SVOD read-only input + XBLA/XBLIG STFS package listing/extraction + pathological TOC chains (list/tree/extract/rewrite/audit/ranges/repair/salvage/ZAR) + batch container conversion + JSON output/preallocation + explicit sector-layout packing + GOD and XBLA/XBLIG header title metadata + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command coverage |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 1 of `H:\XBOXTest`, seeded): `extract-xiso.exe` (reference build `202609111233`; `list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
@@ -279,7 +279,7 @@ XISOSharp image-spec from -O dist/image.iso -m "bin:/" -m "assets:/{0}" xdvdfs.t
 
 # CISO (v2 LZ4 default, byte-identical to modern xdvdfs compress; v1 DEFLATE via --ciso-version 1)
 XISOSharp compress ./game_dir game.cso --ciso-level 9       # 0=store; 1..9 = LZ4 acceleration 10-level
-XISOSharp cso game.iso game.cso --ciso-split 0              # single .cso (default splits at ~4 GiB)
+XISOSharp cso game.iso game.cso --ciso-split 0 --jobs 8     # single .cso, 8 compression workers
 XISOSharp decompress game.1.cso game.iso                    # also reads split .1.cso/.2.cso parts
 XISOSharp uncso game.cso                                    # decso alias
 
@@ -511,6 +511,8 @@ var loaded = RemapFilesystem.ParseSpecFile("xdvdfs.toml"); // preserve-order [ma
 
 // CISO (pure-managed: v2 LZ4 default byte-identical to xdvdfs (lz4_flex port), v1 DEFLATE, threshold +12)
 int cso = CisoWriter.CompressToCso("game.iso", "game.cso", level: 9, splitBytes: CisoWriter.DefaultSplitPoint);
+int csoFast = CisoWriter.CompressToCso("game.iso", "game-fast.cso", 9, null,
+    CisoWriter.VersionLz4, jobs: 8); // bounded-parallel sectors; byte-identical output
 int iso = CisoReader.DecompressToIso("game.1.cso", "rebuilt.iso"); // split .N.cso input supported
 bool isCso = CisoReader.IsCso("game.cso"); // magic CISO + blockSize 2048 + ver 1/2
 
@@ -681,7 +683,7 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (same outputs; no implicit pack)
-dotnet test -c Release                       # 2107 tests on net10.0 (2043 on net8/9; `XISOSharp.Tests`; ZArchiveSharp/CCISharp come from NuGet)
+dotnet test -c Release                       # 2115 tests on net10.0 (2051 on net8/9; `XISOSharp.Tests`; ZArchiveSharp/CCISharp come from NuGet)
 ```
 
 Layout: every project lives in its own top-level folder beside the solution — `XISOSharp` (library), `XISOSharp.Cli`, `XISOSharp.Gui`, `XISOSharpTester`, the verification harnesses (`XISOSharp.Tests`, `XISOSharp.BattleTests`, `XISOSharp.Benchmarks`, `XISOSharp.Fuzz`, `XISOSharp.AotSmoke`, `XISOSharp.TestDataGenerator`) and the `XISOSharp.Sample` walkthrough. There are no `src`/`apps`/`tests`/`samples` grouping folders.

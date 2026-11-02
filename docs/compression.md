@@ -62,6 +62,10 @@ encoder keeps `IsTrimmable`/`IsAotCompatible` true.
   level 9 = acceleration 1 = the exact `lz4_flex`/xdvdfs output. Higher acceleration grows the search
   step sooner (faster, larger output, still spec-valid LZ4).
 - `--ciso-version 1` → classic DEFLATE payload with the dynamic align and `0x80000000` = plain bit.
+- `--jobs 1..64` (API: `CompressToCso(..., jobs: n)` / `CompressStream(..., jobs: n)`) compresses
+  sectors on a bounded worker pool. Sectors are read in batches, compressed in parallel, then
+  written in sector order, so the output is **byte-identical** to the sequential writer (level `0`
+  and `jobs = 1` keep the sequential loop). Progress events stay in sector order.
 
 `Lz4.Compress`/`Lz4.Decompress` are public: compress with `acceleration = 1` reproduces `lz4_flex`
 byte for byte; `Decompress` implements the LZ4 block specification and decodes any conforming block.
@@ -140,7 +144,7 @@ device.Read(0, sector);
 ```
 XISOSharp compress <sourceDir|image> [output] [--format cso|cci]
     [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
-    [--cci-level 0..9] [--cci-split bytes] [--batch <dir>]
+    [--cci-level 0..9] [--cci-split bytes] [--batch <dir>] [--jobs <n>]
 XISOSharp cso <sourceDir|image> [output.cso]              # CISO alias
 XISOSharp cci <sourceDir|image> [output.cci]              # CCI alias
 XISOSharp decompress <cso|cci> [output.iso] [--batch <dir>]
@@ -156,6 +160,7 @@ XISOSharp uncci <cci|.1.cci> [output.iso]                 # CCI alias
 | `--format cso\|cci` | Output container. Default `cso`; `cci` selects the CCISharp writer. |
 | `--cci-level 0..9` | CCI level: `0` stores every sector raw; `1..9` map to the fast LZ4 block encoder's acceleration (`10 - level`, level 9 = smallest). |
 | `--cci-split <bytes>` | CCI split point. Default `0xffbf6000` (~4 GiB) into `.1.cci`/`.2.cci` …; `0` = single `.cci`. |
+| `--jobs <n>` | CISO sector compression workers, `1..64` (default `1`). Output is byte-identical to the sequential writer and progress stays in sector order. With `--batch`, `<n>` runs `<n>` conversions in parallel instead; CCI single-file compression is single-threaded. |
 
 Examples:
 
@@ -212,9 +217,15 @@ Multi-file handling: `compress` accepts `sourceDir` or `image.iso`; when given a
 public static int CompressToCso(string sourcePath, string? outputCsoPath = null, int level = 6,
     long? splitBytes = null, byte version = VersionLz4,
     IProgress<ProgressInfo>? progress = null, CancellationToken ct = default);
+public static int CompressToCso(string sourcePath, string? outputCsoPath, int level,
+    long? splitBytes, byte version, int jobs,
+    IProgress<ProgressInfo>? progress = null, CancellationToken ct = default); // jobs 1..64
 public static void CompressStream(Stream source, Stream dest, int level = 6, byte version = VersionLz4,
     IProgress<ProgressInfo>? progress = null, CancellationToken ct = default);
+public static void CompressStream(Stream source, Stream dest, int level, byte version, int jobs,
+    IProgress<ProgressInfo>? progress = null, CancellationToken ct = default);
 public const long DefaultSplitPoint = 0xffbf6000; // ciso::split FILE_SPLIT_POINT
+public const int MaxParallelism = 64;
 
 // XISOSharp/Lz4.cs
 public static int Compress(ReadOnlySpan<byte> input, Span<byte> destination, int acceleration = 1);

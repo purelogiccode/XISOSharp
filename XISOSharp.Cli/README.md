@@ -76,7 +76,7 @@ XISOSharp build-image [sourceDir] [output.iso] -m "host:image" [-f <toml>] [-O o
 XISOSharp image-spec from -O <out> -m "host:image" ... [specPath]
 XISOSharp compress|cso|cci <sourceDir|image> [output] [--format cso|cci]
     [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
-    [--cci-level 0..9] [--cci-split bytes] [--batch <dir>]
+    [--cci-level 0..9] [--cci-split bytes] [--batch <dir>] [--jobs <n>]
 XISOSharp decompress|uncso|decso|uncci <cso|cci|god> [output.iso] [--batch <dir>]
 XISOSharp checksum [--silent] <image> [images...]
 XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...] [--batch <dir>]
@@ -159,7 +159,7 @@ printed and the tool exits 1.
 | `--validate` / `--validate-checksums` / `--validate-strict` / `--validate-report <file>` | Post-rewrite/conversion validation (require `-r` or `validate`) |
 | `--ciso-level 0..9` / `--ciso-version 1\|2\|auto` / `--ciso-split <bytes>` | CISO codec options (compress only) |
 | `--format cso\|cci` / `--cci-level 0..9` / `--cci-split <bytes>` | CCI output and codec options (compress only) |
-| `--jobs <n>` / `--policy <skip\|overwrite\|auto-rename>` | Parallel + overwrite handling for `--zar`; batch verbs accept `--jobs 1..64` |
+| `--jobs <n>` / `--policy <skip\|overwrite\|auto-rename>` | Parallel + overwrite handling for `--zar`; batch verbs accept `--jobs 1..64`; single-file CISO `compress` accepts `--jobs 1..64` for sector compression (byte-identical output) |
 | `--security-sectors <file>` (`--sectors`) | Rebuild-only security-sector range override |
 | `-f <toml>` / `-m "host:image"` (`--map`) / `-O <out>` (`--output`) | `build-image`/`image-spec` inputs |
 | `--json` | Machine-readable output for read-only verbs (`-i`, `-l`, `-t`, `checksum`, `--sector-layout`, `--ranges`, `--filetime`, `--xex-info`, `--xbe-info`, `validate`, `-v`). JSON on stdout, human logs on stderr |

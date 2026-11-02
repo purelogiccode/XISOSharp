@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.Compression;
 using XISOSharp.Models;
@@ -24,6 +25,13 @@ public static class CisoWriter
 
     /// <summary>CISO header size in bytes (24).</summary>
     public const uint HeaderSize = 24;
+
+    /// <summary>
+    /// Maximum accepted <c>jobs</c>/<c>--jobs</c> value for parallel sector
+    /// compression. Matches the CLI batch ceiling so one documented limit
+    /// covers both forms of parallelism.
+    /// </summary>
+    public const int MaxParallelism = 64;
 
     /// <summary>CISO version 1 — classic DEFLATE payload where high bit means plain.</summary>
     public const byte VersionDeflate = 1; // classic CISO with DEFLATE
@@ -65,12 +73,45 @@ public static class CisoWriter
     /// <returns>0 on success, 1 on error.</returns>
     public static int CompressToCso(string sourcePath, string? outputCsoPath = null, int level = 6,
         long? splitBytes = null, byte version = VersionLz4,
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default) =>
+        CompressToCso(sourcePath, outputCsoPath, level, splitBytes, version, 1, progress, ct);
+
+    /// <summary>
+    /// Bounded-parallel variant of
+    /// <see cref="CompressToCso(string, string?, int, long?, byte, IProgress{ProgressInfo}?, CancellationToken)"/>:
+    /// sectors are compressed by up to <paramref name="jobs"/> workers and
+    /// written back in sector order, so the output is byte-identical to the
+    /// single-threaded path. Only CISO v2/v1 compression benefits; level
+    /// <c>0</c> (store) and <c>jobs</c> = 1 keep the sequential writer.
+    /// </summary>
+    /// <param name="sourcePath">Source directory, ISO file, split ISO/CISO/CCI image or GOD container.</param>
+    /// <param name="outputCsoPath">Destination CSO path; if null, derived from source (<c>.cso</c>).</param>
+    /// <param name="level">Compression level 0..9 (0=store, 1=fastest … 9=smallestSize).</param>
+    /// <param name="splitBytes">Optional split threshold; see the sequential overload.</param>
+    /// <param name="version">CISO version: <see cref="VersionLz4"/> (default) or <see cref="VersionDeflate"/>.</param>
+    /// <param name="jobs">
+    /// Worker count for per-sector compression, <c>1..<see cref="MaxParallelism"/></c>.
+    /// <c>1</c> keeps the sequential writer.
+    /// </param>
+    /// <param name="progress">Optional progress channel (reported in sector order).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>0 on success, 1 on error.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="level"/> is outside 0..9, <paramref name="jobs"/> is
+    /// outside 1..<see cref="MaxParallelism"/>, or <paramref name="splitBytes"/> is not positive.
+    /// </exception>
+    public static int CompressToCso(string sourcePath, string? outputCsoPath, int level,
+        long? splitBytes, byte version, int jobs,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
         if (level < 0 || level > 9)
             throw new ArgumentOutOfRangeException(nameof(level), "CISO level must be 0..9");
+
+        if (jobs < 1 || jobs > MaxParallelism)
+            throw new ArgumentOutOfRangeException(nameof(jobs),
+                $"CISO jobs must be 1..{MaxParallelism}");
 
         if (splitBytes is <= 0)
             throw new ArgumentOutOfRangeException(nameof(splitBytes));
@@ -151,7 +192,7 @@ public static class CisoWriter
                 bool completed = false;
                 try
                 {
-                    CompressStream(src, split, level, version, progress, ct);
+                    CompressStream(src, split, level, version, jobs, progress, ct);
                     completed = true;
                 }
                 finally
@@ -178,7 +219,7 @@ public static class CisoWriter
                 {
                     using FileStream dst = new(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
                     created = true;
-                    CompressStream(src, dst, level, version, progress, ct);
+                    CompressStream(src, dst, level, version, jobs, progress, ct);
                 }
                 catch
                 {
@@ -241,11 +282,19 @@ public static class CisoWriter
         }
     }
 
-    /// <summary>Asynchronous variant of <see cref="CompressToCso"/>.</summary>
+    /// <summary>Asynchronous variant of <see cref="CompressToCso(string, string?, int, long?, byte, IProgress{ProgressInfo}?, CancellationToken)"/>.</summary>
     public static async Task<int> CompressToCsoAsync(string sourcePath, string? outputCsoPath = null, int level = 6,
         long? splitBytes = null, byte version = VersionLz4,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default) =>
         await Task.Run(() => CompressToCso(sourcePath, outputCsoPath, level, splitBytes, version, progress, ct),
+                ct)
+            .ConfigureAwait(false);
+
+    /// <summary>Asynchronous variant of the bounded-parallel <see cref="CompressToCso(string, string?, int, long?, byte, int, IProgress{ProgressInfo}?, CancellationToken)"/>.</summary>
+    public static async Task<int> CompressToCsoAsync(string sourcePath, string? outputCsoPath, int level,
+        long? splitBytes, byte version, int jobs,
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default) =>
+        await Task.Run(() => CompressToCso(sourcePath, outputCsoPath, level, splitBytes, version, jobs, progress, ct),
                 ct)
             .ConfigureAwait(false);
 
@@ -257,6 +306,28 @@ public static class CisoWriter
     /// the destination is a <see cref="CisoSplitOutput"/>.
     /// </summary>
     public static void CompressStream(Stream source, Stream dest, int level = 6, byte version = VersionLz4,
+        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default) =>
+        CompressStream(source, dest, level, version, 1, progress, ct);
+
+    /// <summary>
+    /// Bounded-parallel <see cref="CompressStream(Stream, Stream, int, byte, IProgress{ProgressInfo}?, CancellationToken)"/>:
+    /// up to <paramref name="jobs"/> workers compress sectors in batches and
+    /// the payloads are written in sector order, so the resulting CISO is
+    /// byte-identical to the single-threaded writer. Progress events keep
+    /// sector order.
+    /// </summary>
+    /// <param name="source">Seekable source stream (plain ISO view).</param>
+    /// <param name="dest">Seekable destination stream (CISO, including <see cref="CisoSplitOutput"/>).</param>
+    /// <param name="level">Compression level 0..9 (0 = store).</param>
+    /// <param name="version"><see cref="VersionLz4"/> or <see cref="VersionDeflate"/>.</param>
+    /// <param name="jobs">Worker count 1..<see cref="MaxParallelism"/>; <c>1</c> is sequential.</param>
+    /// <param name="progress">Optional progress channel.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="level"/> is outside 0..9, <paramref name="jobs"/> is
+    /// outside 1..<see cref="MaxParallelism"/>, or the version is unknown.
+    /// </exception>
+    public static void CompressStream(Stream source, Stream dest, int level, byte version, int jobs,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -264,6 +335,9 @@ public static class CisoWriter
             throw new ArgumentOutOfRangeException(nameof(level), "CISO level must be 0..9");
         if (version != VersionDeflate && version != VersionLz4)
             throw new ArgumentOutOfRangeException(nameof(version), "CISO version must be 1 (DEFLATE) or 2 (LZ4)");
+        if (jobs < 1 || jobs > MaxParallelism)
+            throw new ArgumentOutOfRangeException(nameof(jobs),
+                $"CISO jobs must be 1..{MaxParallelism}");
         if (!source.CanSeek) throw new ArgumentException("Source must be seekable", nameof(source));
         if (!dest.CanSeek) throw new ArgumentException("Destination must be seekable", nameof(dest));
 
@@ -306,125 +380,133 @@ public static class CisoWriter
 
         uint[] indexEntries = new uint[indexLen];
 
-        byte[] blockBuf = new byte[BlockSize];
         // For progress
         progress?.Report(new ProgressInfo(ProgressInfoType.FileCount, Count: totalBlocks));
 
-        CompressionLevel compLevel = MapLevel(level);
-
-        // Scratch for the v2 payload: [u32 LE block info][LZ4 block data] — the LZ4 frame with
-        // its 7-byte header and 4-byte end mark stripped (ciso write.rs).
-        byte[]? lz4Scratch = null;
-        if (version == VersionLz4 && level > 0)
-            lz4Scratch = new byte[4 + Lz4.MaxCompressedOutputSize(BlockSize)];
-
         // --ciso-level maps inversely to LZ4 acceleration (level 9 = acceleration 1 = lz4_flex parity).
         int acceleration = Math.Max(1, 10 - level);
+        CompressionLevel compLevel = MapLevel(level);
 
-        for (int sector = 0; sector < totalBlocks; sector++)
+        if (jobs > 1 && level > 0 && totalBlocks > 0)
         {
-            ct.ThrowIfCancellationRequested();
+            CompressParallelSectors(source, dest, level, version, totalBlocks, align, indexEntries,
+                ref position, progress, ct, jobs);
+        }
+        else
+        {
+            byte[] blockBuf = new byte[BlockSize];
 
-            // Align position before this block
-            if (align != 0)
+            // Scratch for the v2 payload: [u32 LE block info][LZ4 block data] — the LZ4 frame with
+            // its 7-byte header and 4-byte end mark stripped (ciso write.rs).
+            byte[]? lz4Scratch = null;
+            if (version == VersionLz4 && level > 0)
+                lz4Scratch = new byte[4 + Lz4.MaxCompressedOutputSize(BlockSize)];
+
+            for (int sector = 0; sector < totalBlocks; sector++)
             {
-                long alignBytes = 1L << align;
-                long mis = position & (alignBytes - 1);
-                if (mis != 0)
+                ct.ThrowIfCancellationRequested();
+
+                // Align position before this block
+                if (align != 0)
                 {
-                    long pad = alignBytes - mis;
-                    byte[] padBuf = new byte[pad];
-                    dest.Seek(position, SeekOrigin.Begin);
-                    dest.Write(padBuf, 0, padBuf.Length);
-                    position += pad;
+                    long alignBytes = 1L << align;
+                    long mis = position & (alignBytes - 1);
+                    if (mis != 0)
+                    {
+                        long pad = alignBytes - mis;
+                        byte[] padBuf = new byte[pad];
+                        dest.Seek(position, SeekOrigin.Begin);
+                        dest.Write(padBuf, 0, padBuf.Length);
+                        position += pad;
+                    }
                 }
-            }
 
-            // Read one block (pad last block with zeros if file not multiple of BlockSize)
-            int read = 0;
-            while (read < BlockSize)
-            {
-                int n = source.Read(blockBuf, read, BlockSize - read);
-                if (n == 0) break;
-                read += n;
-            }
-
-            if (read < BlockSize)
-                Array.Clear(blockBuf, read, BlockSize - read);
-
-            ReadOnlySpan<byte> dataToWrite;
-            uint flagBit;
-
-            if (version == VersionLz4)
-            {
-                // v2: index high bit set = compressed, clear = plain.
-                if (level == 0)
+                // Read one block (pad last block with zeros if file not multiple of BlockSize)
+                int read = 0;
+                while (read < BlockSize)
                 {
-                    dataToWrite = blockBuf;
-                    flagBit = 0;
+                    int n = source.Read(blockBuf, read, BlockSize - read);
+                    if (n == 0) break;
+                    read += n;
                 }
-                else
-                {
-                    int blockLen = Lz4.Compress(blockBuf, lz4Scratch.AsSpan(4), acceleration);
-                    // When the block does not compress, the frame stores it raw
-                    // (block info carries the 0x80000000 uncompressed bit, as in lz4_flex).
-                    uint sizeField = blockLen < BlockSize ? (uint)blockLen : 0x80000000u | BlockSize;
-                    BinaryPrimitives.WriteUInt32LittleEndian(lz4Scratch, sizeField);
-                    int payloadLen = 4 + Math.Min(blockLen, BlockSize);
 
-                    if (payloadLen + CompressionSavingThreshold >= BlockSize)
+                if (read < BlockSize)
+                    Array.Clear(blockBuf, read, BlockSize - read);
+
+                ReadOnlySpan<byte> dataToWrite;
+                uint flagBit;
+
+                if (version == VersionLz4)
+                {
+                    // v2: index high bit set = compressed, clear = plain.
+                    if (level == 0)
                     {
                         dataToWrite = blockBuf;
                         flagBit = 0;
                     }
                     else
                     {
-                        dataToWrite = lz4Scratch.AsSpan(0, payloadLen);
-                        flagBit = 0x80000000u;
+                        int blockLen = Lz4.Compress(blockBuf, lz4Scratch.AsSpan(4), acceleration);
+                        // When the block does not compress, the frame stores it raw
+                        // (block info carries the 0x80000000 uncompressed bit, as in lz4_flex).
+                        uint sizeField = blockLen < BlockSize ? (uint)blockLen : 0x80000000u | BlockSize;
+                        BinaryPrimitives.WriteUInt32LittleEndian(lz4Scratch, sizeField);
+                        int payloadLen = 4 + Math.Min(blockLen, BlockSize);
+
+                        if (payloadLen + CompressionSavingThreshold >= BlockSize)
+                        {
+                            dataToWrite = blockBuf;
+                            flagBit = 0;
+                        }
+                        else
+                        {
+                            dataToWrite = lz4Scratch.AsSpan(0, payloadLen);
+                            flagBit = 0x80000000u;
+                        }
                     }
                 }
-            }
-            else
-            {
-                // v1 classic DEFLATE: index high bit set = plain.
-                byte[] compressed;
-                if (level == 0)
-                {
-                    compressed = Array.Empty<byte>();
-                }
                 else
                 {
-                    compressed = DeflateCompress(blockBuf, compLevel);
+                    // v1 classic DEFLATE: index high bit set = plain.
+                    byte[] compressed;
+                    if (level == 0)
+                    {
+                        compressed = Array.Empty<byte>();
+                    }
+                    else
+                    {
+                        compressed = DeflateCompress(blockBuf, compLevel);
+                    }
+
+                    bool usePlain = level == 0 || compressed.Length == 0 ||
+                                    compressed.Length + CompressionSavingThreshold >= BlockSize;
+                    if (usePlain)
+                    {
+                        dataToWrite = blockBuf;
+                        flagBit = 0x80000000u;
+                    }
+                    else
+                    {
+                        dataToWrite = compressed;
+                        flagBit = 0;
+                    }
                 }
 
-                bool usePlain = level == 0 || compressed.Length == 0 ||
-                                compressed.Length + CompressionSavingThreshold >= BlockSize;
-                if (usePlain)
-                {
-                    dataToWrite = blockBuf;
-                    flagBit = 0x80000000u;
-                }
-                else
-                {
-                    dataToWrite = compressed;
-                    flagBit = 0;
-                }
+                long posShifted = position >> align;
+                if (posShifted > 0x7FFFFFFFL)
+                    throw new IOException("CISO index overflow: image too large for the CISO format");
+
+                uint entry = (uint)posShifted | flagBit;
+                indexEntries[sector] = entry;
+
+                dest.Seek(position, SeekOrigin.Begin);
+                dest.Write(dataToWrite);
+                position += dataToWrite.Length;
+
+                // Progress: report file added? Use Sector
+                progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded, Path: $"/sector/{sector}",
+                    Sector: sector, Size: dataToWrite.Length));
             }
-
-            long posShifted = position >> align;
-            if (posShifted > 0x7FFFFFFFL)
-                throw new IOException("CISO index overflow: image too large for the CISO format");
-
-            uint entry = (uint)posShifted | flagBit;
-            indexEntries[sector] = entry;
-
-            dest.Seek(position, SeekOrigin.Begin);
-            dest.Write(dataToWrite);
-            position += dataToWrite.Length;
-
-            // Progress: report file added? Use Sector
-            progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded, Path: $"/sector/{sector}", Sector: sector,
-                Size: dataToWrite.Length));
         }
 
         // Final index entry (end of file) — never flagged
@@ -448,6 +530,166 @@ public static class CisoWriter
         // Seek to end
         dest.Seek(position, SeekOrigin.Begin);
         progress?.Report(new ProgressInfo(ProgressInfoType.FinishedPacking));
+    }
+
+    /// <summary>
+    /// Bounded-parallel sector compression used by
+    /// <see cref="CompressStream(Stream, Stream, int, byte, int, IProgress{ProgressInfo}?, CancellationToken)"/>.
+    /// Sectors are read and compressed in batches; the payloads are then
+    /// written in sector order with the same alignment and index encoding as
+    /// the sequential writer, so the output is byte-identical.
+    /// </summary>
+    private static void CompressParallelSectors(
+        Stream source,
+        Stream dest,
+        int level,
+        byte version,
+        int totalBlocks,
+        byte align,
+        uint[] indexEntries,
+        ref long position,
+        IProgress<ProgressInfo>? progress,
+        CancellationToken ct,
+        int jobs)
+    {
+        int workers = Math.Min(jobs, MaxParallelism);
+        // Enough sectors per batch to amortise Parallel.For, capped so a large
+        // --jobs never buffers more than a few MiB.
+        int batchSectors = Math.Clamp(workers * 16, 64, 1024);
+        batchSectors = Math.Min(batchSectors, totalBlocks);
+
+        int lz4Stride = version == VersionLz4 ? 4 + Lz4.MaxCompressedOutputSize(BlockSize) : 0;
+        byte[] input = ArrayPool<byte>.Shared.Rent(batchSectors * BlockSize);
+        byte[]? lz4Scratch = lz4Stride > 0 ? ArrayPool<byte>.Shared.Rent(batchSectors * lz4Stride) : null;
+        // Non-null alias for the worker loop: the LZ4 branch is unreachable when
+        // lz4Stride is 0, so the empty fallback is never dereferenced.
+        byte[] lz4Buffer = lz4Scratch ?? [];
+        byte[]?[] deflatePayloads = new byte[]?[batchSectors];
+        int[] lz4Lengths = new int[batchSectors];
+        int acceleration = Math.Max(1, 10 - level);
+        CompressionLevel compLevel = MapLevel(level);
+        byte[] zeroPad = new byte[1 << (align == 0 ? 0 : align)];
+
+        try
+        {
+            for (int start = 0; start < totalBlocks; start += batchSectors)
+            {
+                ct.ThrowIfCancellationRequested();
+                int count = Math.Min(batchSectors, totalBlocks - start);
+                int batchBytes = count * BlockSize;
+
+                int read = 0;
+                while (read < batchBytes)
+                {
+                    int n = source.Read(input, read, batchBytes - read);
+                    if (n == 0) break;
+                    read += n;
+                }
+
+                if (read < batchBytes)
+                {
+                    Array.Clear(input, read, batchBytes - read);
+                }
+
+                Parallel.For(0, count,
+                    new ParallelOptions { MaxDegreeOfParallelism = workers, CancellationToken = ct },
+                    i =>
+                    {
+                        int offset = i * BlockSize;
+                        if (version == VersionLz4)
+                        {
+                            int scratchOffset = i * lz4Stride;
+                            int blockLen = Lz4.Compress(input.AsSpan(offset, BlockSize),
+                                lz4Buffer.AsSpan(scratchOffset + 4), acceleration);
+                            // When the block does not compress, the frame stores it raw
+                            // (block info carries the 0x80000000 uncompressed bit, as in lz4_flex).
+                            uint sizeField = blockLen < BlockSize ? (uint)blockLen : 0x80000000u | BlockSize;
+                            BinaryPrimitives.WriteUInt32LittleEndian(lz4Buffer.AsSpan(scratchOffset), sizeField);
+                            int payloadLen = 4 + Math.Min(blockLen, BlockSize);
+                            lz4Lengths[i] = payloadLen + CompressionSavingThreshold >= BlockSize ? 0 : payloadLen;
+                        }
+                        else
+                        {
+                            byte[] compressed =
+                                DeflateCompress(input.AsSpan(offset, BlockSize).ToArray(), compLevel);
+                            deflatePayloads[i] =
+                                compressed.Length == 0 || compressed.Length + CompressionSavingThreshold >= BlockSize
+                                    ? null
+                                    : compressed;
+                        }
+                    });
+
+                for (int i = 0; i < count; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    int sector = start + i;
+
+                    // Align position before this block
+                    if (align != 0)
+                    {
+                        long alignBytes = 1L << align;
+                        long mis = position & (alignBytes - 1);
+                        if (mis != 0)
+                        {
+                            long pad = alignBytes - mis;
+                            dest.Seek(position, SeekOrigin.Begin);
+                            dest.Write(zeroPad, 0, (int)pad);
+                            position += pad;
+                        }
+                    }
+
+                    ReadOnlySpan<byte> dataToWrite;
+                    uint flagBit;
+                    if (version == VersionLz4)
+                    {
+                        if (lz4Lengths[i] == 0)
+                        {
+                            dataToWrite = input.AsSpan(i * BlockSize, BlockSize);
+                            flagBit = 0;
+                        }
+                        else
+                        {
+                            dataToWrite = lz4Buffer.AsSpan(i * lz4Stride, lz4Lengths[i]);
+                            flagBit = 0x80000000u;
+                        }
+                    }
+                    else
+                    {
+                        if (deflatePayloads[i] is null)
+                        {
+                            dataToWrite = input.AsSpan(i * BlockSize, BlockSize);
+                            flagBit = 0x80000000u;
+                        }
+                        else
+                        {
+                            dataToWrite = deflatePayloads[i];
+                            flagBit = 0;
+                        }
+                    }
+
+                    long posShifted = position >> align;
+                    if (posShifted > 0x7FFFFFFFL)
+                        throw new IOException("CISO index overflow: image too large for the CISO format");
+
+                    indexEntries[sector] = (uint)posShifted | flagBit;
+
+                    dest.Seek(position, SeekOrigin.Begin);
+                    dest.Write(dataToWrite);
+                    position += dataToWrite.Length;
+
+                    progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded,
+                        Path: $"/sector/{sector}", Sector: sector, Size: dataToWrite.Length));
+                }
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(input);
+            if (lz4Scratch is not null)
+            {
+                ArrayPool<byte>.Shared.Return(lz4Scratch);
+            }
+        }
     }
 
     private static byte[] DeflateCompress(byte[] data, CompressionLevel level)
@@ -474,7 +716,7 @@ public static class CisoWriter
 
     /// <summary>
     /// Derives the default <c>.cso</c> output path for <paramref name="sourcePath"/>
-    /// (same rule <see cref="CompressToCso"/> uses when no explicit output is given):
+    /// (same rule <see cref="CompressToCso(string, string?, int, long?, byte, IProgress{ProgressInfo}?, CancellationToken)"/> uses when no explicit output is given):
     /// a directory maps to <c>&lt;parent&gt;/&lt;name&gt;.cso</c>, a file maps to its
     /// sibling with the image suffix (including a <c>.1</c> split marker) replaced by <c>.cso</c>.
     /// </summary>
@@ -518,7 +760,7 @@ public static class CisoWriter
     // Internal helper to avoid recursion with public CompressToCso calling PackFromDirectory which might call Compress again
     /// <summary>
     /// Internal packing helper for the CISO pipeline; packs a directory to an exact ISO path
-    /// without re-entering <see cref="CompressToCso"/>.
+    /// without re-entering <see cref="CompressToCso(string, string?, int, long?, byte, IProgress{ProgressInfo}?, CancellationToken)"/>.
     /// </summary>
     private static class XisoWriterInternal
     {

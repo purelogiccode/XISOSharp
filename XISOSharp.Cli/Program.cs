@@ -3938,6 +3938,14 @@ internal static class Program
         }
 
         bool cci = string.Equals(format, "cci", StringComparison.OrdinalIgnoreCase);
+        int jobs = batch.JobsSpecified ? batch.Jobs : 1;
+        if (cci && batch.JobsSpecified && batch.Directory == null)
+        {
+            Logger.LogErr(
+                "Error: --jobs is only supported for CISO output; CCI compression is single-threaded\n");
+            return 1;
+        }
+
         if (cci && cisoLevelSpecified)
         {
             Logger.LogErr("Error: --ciso-level is only valid for CISO output; use --cci-level\n");
@@ -3968,7 +3976,7 @@ internal static class Program
             return 1;
         }
 
-        string? batchError = BatchConversion.Validate(batch);
+        string? batchError = BatchConversion.Validate(batch, allowJobsWithoutBatch: true);
         if (batchError != null)
         {
             Logger.LogErr($"Error: {batchError}\n");
@@ -4063,7 +4071,7 @@ internal static class Program
                 return XisoCci.CompressToCci(source, outPath, level, cciSplitBytes ?? 0, overwrite: true);
             }
 
-            return CisoWriter.CompressToCso(source, outPath, level, cisoSplitBytes, version);
+            return CisoWriter.CompressToCso(source, outPath, level, cisoSplitBytes, version, jobs);
         }
         catch (Exception ex)
         {
@@ -6867,6 +6875,7 @@ internal static class Program
                                                       compress <sourceDir|image> [output] [--format cso|cci]
                                                                [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
                                                                [--cci-level 0..9] [--cci-split bytes] [--batch <dir>]
+                                                               [--jobs <n>]
                                                                             Pack and compress to CISO/CSO (default) or CCI.
                                                                             Source may be a directory (packed then compressed),
                                                                             an ISO, or a split ISO/CISO/CCI image (decompressed
@@ -6875,6 +6884,9 @@ internal static class Program
                                                                             CISO version 2 (default) writes LZ4 sectors with fixed
                                                                             align 2 — byte-compatible with modern `xdvdfs compress`;
                                                                             version 1 writes classic DEFLATE sectors.
+                                                                            --jobs 1..64 compresses CISO sectors in parallel
+                                                                            (default 1; output is byte-identical). CCI
+                                                                            compression is single-threaded.
                                                                             Like xdvdfs, CISO output is split at 0xffbf6000
                                                                             (~4 GiB) into .1.cso/.2.cso parts; --ciso-split bytes
                                                                             overrides the point, --ciso-split 0 writes a single .cso.
@@ -6906,7 +6918,9 @@ internal static class Program
                                                        --delete-source      With --batch and -y, delete each source after a
                                                                             successful conversion (split sets: every part).
                                                        --jobs <n>           With --batch, run up to <n> conversions in
-                                                                            parallel (1..64; default 1).
+                                                                            parallel (1..64; default 1). On a single-file
+                                                                            CISO compress, compress sectors with <n> workers
+                                                                            (output is byte-identical).
                                                        --output-name <t>    With --batch, name outputs from a template:
                                                                             {name} (source stem, split marker stripped),
                                                                             {ext} (source extension), {format} (output format).

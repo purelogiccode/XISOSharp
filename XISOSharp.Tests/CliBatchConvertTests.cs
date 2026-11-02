@@ -680,6 +680,60 @@ public sealed class CliBatchConvertTests : IDisposable
         Assert.Contains("--jobs requires --batch", capture2.Output, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void CompressSingleFile_WithJobs_IsByteIdenticalToSequential()
+    {
+        string work = CreateTempDir("xiso_cli_batch");
+        string isoDir = Path.Combine(work, "iso");
+        string iso = CreateIso(work, isoDir, "game");
+        string sequential = Path.Combine(work, "sequential.cso");
+        string parallel = Path.Combine(work, "parallel.cso");
+
+        using (LogCapture capture = new())
+        {
+            Assert.Equal(0, Program.Main(["compress", iso, sequential, "--ciso-split", "0", "-y"]));
+            Assert.True(File.Exists(sequential), capture.Output);
+        }
+
+        using (LogCapture capture = new())
+        {
+            Assert.Equal(0, Program.Main(
+                ["compress", iso, parallel, "--ciso-split", "0", "--jobs", "4", "-y"]));
+            Assert.True(File.Exists(parallel), capture.Output);
+        }
+
+        Assert.Equal(File.ReadAllBytes(sequential), File.ReadAllBytes(parallel));
+    }
+
+    [Fact]
+    public void CompressCci_WithJobs_IsRejected()
+    {
+        string work = CreateTempDir("xiso_cli_batch");
+        string isoDir = Path.Combine(work, "iso");
+        string iso = CreateIso(work, isoDir, "game");
+        string output = Path.Combine(work, "game.cci");
+
+        using LogCapture capture = new();
+        int rc = Program.Main(
+            ["compress", iso, output, "--format", "cci", "--jobs", "2", "-y"]);
+
+        Assert.Equal(1, rc);
+        Assert.Contains("--jobs is only supported for CISO output", capture.Output, StringComparison.Ordinal);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public void CompressSingleFile_JobsOutOfRange_IsRejected()
+    {
+        string work = CreateTempDir("xiso_cli_batch");
+        string isoDir = Path.Combine(work, "iso");
+        string iso = CreateIso(work, isoDir, "game");
+
+        using LogCapture capture = new();
+        Assert.Equal(1, Program.Main(["compress", iso, Path.Combine(work, "x.cso"), "--jobs", "0"]));
+        Assert.Contains("--jobs requires an integer 1..64", capture.Output, StringComparison.Ordinal);
+    }
+
     private string CreateTempDir(string prefix)
     {
         string dir = Path.Combine(Path.GetTempPath(), $"{prefix}_{Guid.NewGuid():N}");

@@ -8,6 +8,11 @@
   4 GiB − 16 MiB) is now the default maximum part size for plain-ISO splits.
   An explicit `--size` above it is still honoured with a warning. CISO/CCI keep
   their `0xffbf6000` xdvdfs-compatible compression default.
+- **Parallel CISO compression**: `CisoWriter.CompressToCso`/`CompressStream`
+  gain `jobs` overloads (`1..64`) that compress sector batches on a bounded
+  worker pool and write payloads in sector order, so output is byte-identical
+  to the sequential writer and progress stays ordered. `MaxParallelism` is the
+  shared ceiling; CCI remains single-threaded until CCISharp 1.1.
 - **GOD read-only sector input**: `GodBlockDevice` maps a GOD/SVOD header plus
   its `DataNNNN` fragments into the decompressed sector view, so every read
   verb (list, tree, extract, checksum, hash, validate, sector-layout, ranges)
@@ -65,6 +70,10 @@
   `split`: deletes each source only after a successful conversion, requires
   `-y`/`--yes` (refused with `-n`/`--no`), removes every part of a split set,
   and reports the deleted count in the batch summary.
+- **`--jobs` on CISO compression**: `compress`/`cso --jobs 1..64` compresses
+  sectors on a bounded worker pool (default `1`); output is byte-identical to
+  the sequential writer. With `--batch`, `--jobs` still selects concurrent
+  conversions; single-file CCI compression is single-threaded.
 - `split` warns when an explicit `--size` exceeds the conservative FATX cap.
 
 ### Dependencies

@@ -100,6 +100,7 @@ F:XISOSharp.CisoWriter.BlockSize:System.Int32
 F:XISOSharp.CisoWriter.DefaultSplitPoint:System.Int64
 F:XISOSharp.CisoWriter.HeaderSize:System.UInt32
 F:XISOSharp.CisoWriter.Magic:System.UInt32
+F:XISOSharp.CisoWriter.MaxParallelism:System.Int32
 F:XISOSharp.CisoWriter.VersionDeflate:System.Byte
 F:XISOSharp.CisoWriter.VersionLz4:System.Byte
 F:XISOSharp.Constants.AttributeArc:System.Byte
@@ -310,8 +311,11 @@ M:XISOSharp.CisoReader.IsCso(System.String)->System.Boolean
 M:XISOSharp.CisoReader.ReadFromCso(System.IO.FileStream,System.Int64,System.Span<System.Byte>)->System.Void
 M:XISOSharp.CisoReader.ReadFromCso(System.String,System.Int64,System.Span<System.Byte>)->System.Void
 M:XISOSharp.CisoWriter.CompressStream(System.IO.Stream,System.IO.Stream,System.Int32,System.Byte,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Void
+M:XISOSharp.CisoWriter.CompressStream(System.IO.Stream,System.IO.Stream,System.Int32,System.Byte,System.Int32,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Void
 M:XISOSharp.CisoWriter.CompressToCso(System.String,System.String,System.Int32,System.Nullable<System.Int64>,System.Byte,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Int32
+M:XISOSharp.CisoWriter.CompressToCso(System.String,System.String,System.Int32,System.Nullable<System.Int64>,System.Byte,System.Int32,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Int32
 M:XISOSharp.CisoWriter.CompressToCsoAsync(System.String,System.String,System.Int32,System.Nullable<System.Int64>,System.Byte,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Threading.Tasks.Task<System.Int32>
+M:XISOSharp.CisoWriter.CompressToCsoAsync(System.String,System.String,System.Int32,System.Nullable<System.Int64>,System.Byte,System.Int32,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Threading.Tasks.Task<System.Int32>
 M:XISOSharp.CisoWriter.DeriveDefaultCsoPath(System.String,System.Boolean)->System.String
 M:XISOSharp.Constants.IsEmptyDirectoryHeader(System.ReadOnlySpan<System.Byte>)->System.Boolean
 M:XISOSharp.Constants.IsEmptyDirectorySentinel(System.UInt16)->System.Boolean

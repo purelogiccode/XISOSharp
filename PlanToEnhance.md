@@ -64,7 +64,7 @@ A full review of the upstream trackers — 56 extract-xiso issues, 54 extract-xi
 - `XISOSharp/XisoZarchive.cs` — `CreateZar`, `ListZar`, `ExtractZar` and `ConvertZarToIso`.
 - `XISOSharp/XisoPatcher.cs`, `SectorAllocator.cs`, `XisoValidator.cs`, `XisoChecksum.cs` — sector layout, copy-in, audit and SHA3-256 checksum already exist.
 - `XISOSharp.Cli/Program.cs` — `--batch` covers extract/list/tree/rewrite/audit and the container verbs (`compress`/`decompress`/`convert`/`split`); JSON only via `--validate-report` (Phase 6).
-- `XISOSharp.Tests` - current suite: 2043 passed / 1 opt-in skip on net8.0/net9.0; 2107 passed / 1 opt-in skip on net10.0.
+- `XISOSharp.Tests` - current suite: 2051 passed / 1 opt-in skip on net8.0/net9.0; 2115 passed / 1 opt-in skip on net10.0.
 
 ---
 
@@ -889,6 +889,7 @@ existing named error or report/drop gate.
   - **A5:** `GodHeader`/`GodTitleInfo` read the plaintext GOD/SVOD `XContent` header (title name, title ID, disc number/count); `title-info` accepts a GOD header or its `.data` folder in text and `--json` form, with FATX-safe name sanitisation and a hex-title-ID fallback. **Extension:** `StfsHeader`/`StfsTitleInfo` read the same XContent fields from single-file XBLA (`0x000D0000`) and XBLIG (`0x00000002`) STFS packages, which have no `.data` folder.
   - **A1:** `XexDbdf` reads the plaintext XDBF/XSTR/XSRC resources from the XEX header-section table; `XexTitleInfo` carries title name, publisher, developer, genre, description and optional thumbnail. `TitleInfo` gains `Kind` (`Xbe`/`Xex`) and `Xex` init properties without changing the positional record; `GetTitleInfo` resolves `default.xbe` → `default.xex` → `default_mp.xbe`; `title-info`/`--xex-info` print and serialize the 360 fields.
   - **A2:** `XbeAssets` reads the logo bitmap and `$$XTIMAGE`/`$$XSIMAGE` sections; `DxtDecoder`/`PngWriter` decode DXT1/3/5, BGR24/BGRA32 and XPR0 payloads to PNG, and DDS is passed through or generated. `XbeInfo` gains `HasLogoBitmap`/`HasTitleImage`/`HasSaveImage`; `--xbe-image` extracts logo/title/save as PNG or DDS.
+  - **Parallel CISO compression:** `CisoWriter.CompressToCso`/`CompressStream` gain a `jobs` overload (1..64) that compresses sector batches on a bounded worker pool and writes payloads in sector order, so output stays byte-identical; `compress`/`cso --jobs <n>` exposes it (single-file mode). CCI stays single-threaded until CCISharp 1.1.
 - **Remaining roadmap:** Tier B B1's read-only GOD/SVOD sector input is implemented in-repo (`GodBlockDevice`, `GodHeader.TryReadVolume`, CLI `decompress`/`convert`), and XBLA/XBLIG STFS package listing/extraction is implemented in-repo (`StfsPackage`, `StfsEntry`, `StfsPackageInfo`, `ComputeStfsChecksum`, CLI read verbs); extracting both readers into the standalone `StfsSharp` package remains for `1.7.0`, as do the unchecked §15 quality items. CCISharp benchmarks/docs/fuzz and optional cross-repo consumers remain separate work.
 
 ### 12.1 Dependency graph
@@ -1116,8 +1117,8 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [x] Pre-sized extraction/copy-out and `SequentialScan` hints.
 - [x] Writer layout pre-sizing.
 - [ ] Add end-to-end BenchmarkDotNet suites: create, extract, checksum, CISO compress/decompress, CCI compress/decompress, large-image I/O. **Partial:** `XisoEndToEndBenchmarks` covers pack, open/list, hash and CISO compress/decompress; extract, CCI and large-image I/O remain.
-- [ ] Add bounded parallel CISO sector compression and a `--jobs` option on `compress`/`cso`.
-- [ ] Add parallel CCI sector compression (CCISharp 1.1) and a `--jobs` option.
+- [x] Add bounded parallel CISO sector compression and a `--jobs` option on `compress`/`cso`. **Done:** `CisoWriter.CompressToCso(..., jobs: n)` / `CompressStream(..., jobs: n)` compress batches of sectors on a bounded pool and write payloads in sector order, so output is byte-identical to the sequential writer; CLI `compress`/`cso --jobs 1..64` (single-file mode), `CisoTests` and `CliBatchConvertTests` cover byte identity, v1/v2, split output, ordered progress and flag rejection.
+- [ ] Add parallel CCI sector compression (CCISharp 1.1) and a `--jobs` option. **Partial:** `--jobs` is accepted for CCI only in `--batch` mode (concurrent conversions); single-file CCI compression stays single-threaded until CCISharp ships a parallel encoder.
 - [ ] Add bounded parallel extraction (independent files) with ordered progress.
 - [ ] Add a sparse/large-file output strategy (avoid zero-filling 8 GB images where the OS supports sparse files).
 - [ ] Publish a benchmark comparison against extract-xiso, xdvdfs and XboxKit with methodology and hardware.
@@ -1150,7 +1151,7 @@ XISOSharp --checksum game.zar   # must equal the ISO checksum
 - [x] Add `verify-hashes <image> <hash-file>` to verify a rebuilt image against the `.hash` sidecar emitted by `--petrify` (works for ISO/CISO/CCI/ZAR).
 - [x] Add `hash <image>` with streaming CRC32/MD5/SHA1/SHA256/SHA3-256, `--json`, and per-file/full-image modes.
 - [x] Add `--title-info`/`GetTitleInfo` that finds `default.xbe`, parses the certificate and reports title name/ID/region/disc.
-- [ ] Add `--jobs` to extraction (`-x`, `--unpack`) and CISO/CCI compression.
+- [~] Add `--jobs` to extraction (`-x`, `--unpack`) and CISO/CCI compression. **CISO done:** `compress`/`cso --jobs 1..64` compresses sectors on a bounded pool with byte-identical output. Extraction and single-file CCI remain pending (CCI parallelism is CCISharp 1.1 work).
 - [ ] Add CCI LZ4-HC level 12 encoding in CCISharp for byte-parity with libCCI/Repackinator (keep the fast encoder as default).
 - [ ] Add optional multi-digit CCI part discovery (`game.10.cci`) while keeping reference-compatible single-digit output.
 - [-] XRD Redump metadata generation — deferred: XboxKit 0.7's implementation is itself a stub (zeroed hashes, TODO certificates). Implement only with a complete XRD spec and a verified oracle, not by porting the stub.
@@ -1219,6 +1220,7 @@ dotnet run --project XISOSharp.Fuzz -c Release -- --seconds 60
 | 2026-11-01 | Phase 9 implementation: `XisoImage`, full-image hashes, `verify-hashes`, `title-info`, CISO hardening (fuzzer found an `OverflowException`), ZAR caps, reserved names/long paths, `dotnet tool`, AOT smoke, mutation fuzzer, 3-OS CI, format/coverage gates, SBOM/provenance, community files, sample, end-to-end benchmarks, support policy, threat model, public-API snapshot, synthetic battle-interop. Full suite 1979/1 (net8/9), 2043/1 (net10); Linux 2015/24; NativeAOT smoke green. | — |
 | 2026-11-01 | **Released 1.5.0**: tag pushed, CI green on Ubuntu/Windows/macOS + AOT + fuzz + battle-interop + InspectCode, NuGet `XISOSharp` 1.5.0 + `XISOSharp.Tool` 1.5.0 published, GitHub release published with six RID bundles + SPDX SBOM. | `1.5.0` |
 | 2026-11-01 | **CCISharp 1.0.1**: 64 MiB index cap (checked cast; hostile headers return `InvalidIndex` instead of throwing from `ArrayPool.Rent`), overflow-free index length, hostile-input tests, libCCI interop in CI with checked-in oracles, format + 65/55 coverage + package-validation gates, pinned actions. XISOSharp now references 1.0.1. | `v1.0.1` |
+| 2026-11-02 | **Parallel CISO compression** (§15.4): `CisoWriter.CompressToCso`/`CompressStream` gained `jobs` overloads (1..64) that compress sector batches on a bounded worker pool and write payloads in sector order, so output is byte-identical; `compress`/`cso --jobs <n>` wired in single-file mode, CCI `--jobs` rejected with a single-threaded message, help/docs/tests updated. | — |
 
 ---
 
