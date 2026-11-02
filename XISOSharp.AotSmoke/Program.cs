@@ -60,8 +60,11 @@ internal static class Program
                 return 1;
             }
 
-            int extracted = image.Extract(extract);
-            if (extracted != 0 || !File.Exists(Path.Combine(extract, "readme.txt")))
+            int extracted = image.Extract(extract,
+                new UnpackOptions { MaxDegreeOfParallelism = 2 });
+            if (extracted != 0 ||
+                !File.Exists(Path.Combine(extract, "readme.txt")) ||
+                !File.Exists(Path.Combine(extract, "sub", "payload.bin")))
             {
                 Console.Error.WriteLine("extract failed");
                 return 1;

@@ -267,8 +267,10 @@ already-masked `ExplorerNode.Attributes` / `EntryInfo.Attributes`.
 
 | Member | Description |
 |---|---|
+| `const int MaxParallelism` | Ceiling for `MaxDegreeOfParallelism` (`64`) |
 | `bool SkipExisting { get; set; }` | Skip destinations already holding a same-size file (`skip: <path>`) |
 | `bool ContinueOnError { get; set; }` | Record per-file failures and continue; the run ends with the `ErrExtractFailed` summary |
+| `int MaxDegreeOfParallelism { get; set; }` | Copy independent files with 1..64 workers (`1` = sequential); output and `FileAdded` order are unchanged |
 | `bool ShouldSkip(string destPath, long fileSize)` | The size-match predicate (never skips unresolvable paths) |
 | `bool ShouldSkip(string destPath, long fileSize, IFilesystem filesystem)` | Same predicate against any destination filesystem (disk, memory, custom) |
 

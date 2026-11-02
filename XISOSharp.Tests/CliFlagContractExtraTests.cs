@@ -196,7 +196,8 @@ public class CliFlagContractExtraTests : IDisposable
         int rc = Program.Main(["--jobs", "4", "-l", "no-such-flag-test.iso"]);
 
         Assert.Equal(1, rc);
-        Assert.Contains("--jobs/--policy are only used with --zar", AllError(), StringComparison.Ordinal);
+        Assert.Contains("--jobs is only used with --zar, extract (-x) or --unpack", AllError(),
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -205,7 +206,7 @@ public class CliFlagContractExtraTests : IDisposable
         int rc = Program.Main(["--policy", "skip", "-x", "no-such-flag-test.iso"]);
 
         Assert.Equal(1, rc);
-        Assert.Contains("--jobs/--policy are only used with --zar", AllError(), StringComparison.Ordinal);
+        Assert.Contains("--policy is only used with --zar", AllError(), StringComparison.Ordinal);
     }
 
     [Fact]

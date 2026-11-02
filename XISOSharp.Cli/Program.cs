@@ -871,7 +871,8 @@ internal static class Program
                         break;
                     case "--jobs":
                         if (i + 1 >= args.Length || !int.TryParse(args[i + 1],
-                                NumberStyles.Integer, CultureInfo.InvariantCulture, out jobs) || jobs < 1)
+                                NumberStyles.Integer, CultureInfo.InvariantCulture, out jobs) ||
+                            jobs < 1 || jobs > UnpackOptions.MaxParallelism)
                         {
                             PrintUsage();
                             return 1;
@@ -1104,10 +1105,18 @@ internal static class Program
         }
 
         // Item #37: --jobs/--policy are only consumed by the parallel ZAR path
-        // (--compress expands to --zar later, so accept it here too).
-        if (!zarMode && !compressAlias && (jobs != 1 || zarPolicy != null))
+        // (--compress expands to --zar later, so accept it here too) and, for
+        // --jobs, by the parallel extract/--unpack path.
+        bool parallelExtract = (extract && !rewrite && createList.Count == 0) || unpackMode;
+        if (!zarMode && !compressAlias && !parallelExtract && jobs != 1)
         {
-            Logger.LogErr("Error: --jobs/--policy are only used with --zar\n");
+            Logger.LogErr("Error: --jobs is only used with --zar, extract (-x) or --unpack\n");
+            return 1;
+        }
+
+        if (!zarMode && !compressAlias && zarPolicy != null)
+        {
+            Logger.LogErr("Error: --policy is only used with --zar\n");
             return 1;
         }
 
@@ -1297,15 +1306,17 @@ internal static class Program
         }
 
         // Item 37 follow-up: --jobs only takes effect for a lone --zar over
-        // several inputs (the parallel branch). --compress/multi-mode used to
-        // accept it and silently run serially.
+        // several inputs (the parallel branch) or for extract/--unpack.
+        // --compress/multi-mode used to accept it and silently run serially.
         int redumpModeCount = new[]
         {
             videoMode, randomMode, seedMode, wipeMode, trimMode, petrifyMode, updateMode, zarMode
         }.Count(b => b);
-        if (jobs != 1 && !(zarMode && redumpModeCount == 1))
+        bool parallelExtractMode = redumpModeCount == 0 &&
+                                   ((extract && !rewrite && createList.Count == 0) || unpackMode);
+        if (jobs != 1 && !(zarMode && redumpModeCount == 1) && !parallelExtractMode)
         {
-            Logger.LogErr("Error: --jobs is only used with a lone --zar over several inputs\n");
+            Logger.LogErr("Error: --jobs is only used with a lone --zar over several inputs, extract (-x) or --unpack\n");
             return 1;
         }
 
@@ -2249,8 +2260,14 @@ internal static class Program
         // run resumes instead of redoing completed files.
         // #9 (xdvdfs #187): with --continue-on-error, per-file failures are logged
         // and skipped instead of aborting the run; the summary still fails the exit code.
-        UnpackOptions? unpackOptions = skipExisting || continueOnError
-            ? new UnpackOptions { SkipExisting = skipExisting, ContinueOnError = continueOnError }
+        // --jobs > 1 queues independent files and copies them on a bounded pool.
+        UnpackOptions? unpackOptions = skipExisting || continueOnError || jobs > 1
+            ? new UnpackOptions
+            {
+                SkipExisting = skipExisting,
+                ContinueOnError = continueOnError,
+                MaxDegreeOfParallelism = jobs
+            }
             : null;
 
         if (unpackMode)
@@ -2259,7 +2276,7 @@ internal static class Program
             if (RejectIgnoredOutputFlags("--unpack"))
                 return 1;
 
-            return RunUnpackMode(args, optind, path, skipSectors, skipExisting, continueOnError);
+            return RunUnpackMode(args, optind, path, skipSectors, skipExisting, continueOnError, jobs);
         }
 
         if (hashMode)
@@ -2603,6 +2620,11 @@ internal static class Program
                         Logger.LogErr($"Error: cannot rewrite ZArchive '{xisoPath}'; convert it to ISO first\n");
                         err = 1;
                     }
+                    else if (extract && jobs > 1)
+                    {
+                        Logger.LogErr("Error: --jobs is not supported for ZArchive extraction\n");
+                        err = 1;
+                    }
                     else if (extract)
                     {
                         string destination = path ?? DeriveZarExtractDirectory(xisoPath);
@@ -2664,6 +2686,11 @@ internal static class Program
                     else if (extract && unpackOptions?.ContinueOnError == true)
                     {
                         Logger.LogErr("Error: --continue-on-error is not supported for STFS packages\n");
+                        err = 1;
+                    }
+                    else if (extract && jobs > 1)
+                    {
+                        Logger.LogErr("Error: --jobs is not supported for STFS packages\n");
                         err = 1;
                     }
                     else if (extract)
@@ -3100,7 +3127,7 @@ internal static class Program
     /// (defaulting to the ISO name). Returns the process exit code.
     /// </summary>
     private static int RunUnpackMode(string[] args, int optind, string? path, int? skipSectors, bool skipExisting,
-        bool continueOnError)
+        bool continueOnError, int jobs)
     {
         if (optind >= args.Length)
         {
@@ -3128,6 +3155,12 @@ internal static class Program
         {
             if (IsZarPath(xisoPath))
             {
+                if (jobs > 1)
+                {
+                    Logger.LogErr("Error: --jobs is not supported for ZArchive extraction\n");
+                    return 1;
+                }
+
                 XisoZarchive.ExtractZar(xisoPath, destPath ?? DeriveZarExtractDirectory(xisoPath),
                     skipExisting);
                 return 0;
@@ -3147,13 +3180,24 @@ internal static class Program
                     return 1;
                 }
 
+                if (jobs > 1)
+                {
+                    Logger.LogErr("Error: --jobs is not supported for STFS packages\n");
+                    return 1;
+                }
+
                 using StfsPackage package = StfsPackage.Open(xisoPath);
                 package.ExtractTo(destPath ?? DeriveStfsExtractDirectory(xisoPath), skipExisting);
                 return 0;
             }
 
-            UnpackOptions? unpackOptions = skipExisting || continueOnError
-                ? new UnpackOptions { SkipExisting = skipExisting, ContinueOnError = continueOnError }
+            UnpackOptions? unpackOptions = skipExisting || continueOnError || jobs > 1
+                ? new UnpackOptions
+                {
+                    SkipExisting = skipExisting,
+                    ContinueOnError = continueOnError,
+                    MaxDegreeOfParallelism = jobs
+                }
                 : null;
             int result = XisoReader.UnpackImage(xisoPath, destPath, skipSectors: skipSectors,
                 options: unpackOptions);
@@ -6831,6 +6875,8 @@ internal static class Program
                                                      -x                  Extract xiso(s) (the default mode if none is given).
                                                      --unpack <file> [dest]  Unpack the whole image to <dest>, or to a
                                                                            directory named after the ISO when omitted.
+                                                                           --jobs 1..64 copies independent files
+                                                                           in parallel (output is byte-identical).
                                                                            -l/-t/-x/--unpack/checksum accept .zar
                                                                            archives directly (ZArchive name tree) and
                                                                            XBLA/XBLIG STFS packages (STFS file table).
@@ -7002,6 +7048,10 @@ internal static class Program
                                                                           directory skips its subtree. The run still
                                                                           ends with a "Failed to unpack image"
                                                                           summary and a non-zero exit code.
+                                                     --jobs <n>           In extract (-x) and --unpack modes, copy
+                                                                          independent files with up to <n> workers
+                                                                          (1..64, default 1; output is byte-identical
+                                                                          and FileAdded progress stays in entry order).
                                                     -q                  Run quiet (suppress all non-error output).
                                                     -Q                  Run silent (suppress all output).
                                                     -s                  Skip $SystemUpdate folder.

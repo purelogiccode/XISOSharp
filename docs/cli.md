@@ -61,7 +61,7 @@ Image inputs accept `.cso`/`.1.cso`, `.cci`/`.1.cci` and GOD header/`.data` sour
 | `-c <dir> [name]` | **Create** an ISO from the contents of `<dir>`. Optional `name` overrides the output filename (may include a path). Default output is `<dir leaf>.iso` in the current directory; a current-directory source (`-c .` / `-c ..`) defaults to the source's parent instead (mirroring `-c <leaf>` from there). Repeatable for batch creation. Excludes `-X` patterns; with `-s`, `$SystemUpdate` is skipped automatically. |
 | `--pack <input> [name]` | **Pack** a directory into an ISO (1:1 mapping; `name` defaults to the directory name and may include a path), or **repack** an existing ISO in place (rewrite mode, source renamed to `.old`). Translates internally to create or rewrite mode. Already-optimized images are skipped. |
 | `-x` | **Extract** (explicit; the default mode). |
-| `--unpack <file> [dest]` | **Unpack** the whole image to `dest`, or to a directory named after the ISO (minus `.iso`) in the current directory when omitted. Detects the optimized layout automatically; supports `--skip-sectors` and `--skip-existing` (resume). A single-file XBLA/XBLIG STFS package is unpacked through its file table. |
+| `--unpack <file> [dest]` | **Unpack** the whole image to `dest`, or to a directory named after the ISO (minus `.iso`) in the current directory when omitted. Detects the optimized layout automatically; supports `--skip-sectors`, `--skip-existing` (resume) and `--jobs 1..64` (copy independent files in parallel; output is byte-identical). A single-file XBLA/XBLIG STFS package is unpacked through its file table. |
 | `-l` | **List** the top-level entries of each ISO (non-recursive). A `.zar` or an XBLA/XBLIG STFS package lists its archive/package tree instead. |
 | `-t` | **Tree** — recursive listing with full paths, sizes, and totals. `.zar` and XBLA/XBLIG STFS packages are supported. |
 | `-i <file> [path]` | **Info** — volume descriptor metadata (incl. detected disc format: `RAW` / `GLOBAL (XGD2)` / `XGD3` / `XGD2 Hybrid` / `XGD1`) plus per-entry details (sector, size, attributes, left/right child offsets). `path` defaults to `/`. |
@@ -92,7 +92,7 @@ Image inputs accept `.cso`/`.1.cso`, `.cci`/`.1.cci` and GOD header/`.data` sour
 | `--petrify` | **Redump:** skeleton — XISO with file extents zeroed + SHA-1 per file (`XisoSkeleton.Petrify`, `CollectFileEntries` sorted); writes skeleton + `*.hash`. See [Archival](archival.md#petrify). |
 | `--update` | **Redump:** extract system update `su20076000_00000000` from XGD3 video `L1` tail (`XisoRedump.TryExtractUpdate`, `FindUpdateOffset` `ABCDABCD`); warns on XGD1/2. See [Archival](archival.md#update). |
 | `--zar` | Create ZArchive/zstd (`XisoZarchive.CreateZar` → `ZArchiveSharp.ZArchiveWriter`, L6 blocks + raw fallback; standalone `--zar -o <out.zar> <iso>` or Redump-batch zar of the XISO component). Load the result directly in Xenia canary. See [Archival](archival.md#zar). |
-| `--jobs <n>` | With a lone `--zar` over several inputs, pack up to `<n>` archives in parallel (default `1`). On a batch container verb (`compress`, `decompress`, `convert`, `split`), run up to `<n>` conversions in parallel (`1..64`, default `1`). On a single-file CISO `compress`, compress sectors with `<n>` workers (`1..64`, default `1`; output is byte-identical to `--jobs 1`). CCI single-file compression is single-threaded. |
+| `--jobs <n>` | With a lone `--zar` over several inputs, pack up to `<n>` archives in parallel (default `1`). On a batch container verb (`compress`, `decompress`, `convert`, `split`), run up to `<n>` conversions in parallel (`1..64`, default `1`). On a single-file CISO `compress`, compress sectors with `<n>` workers (`1..64`, default `1`; output is byte-identical to `--jobs 1`). In extract (`-x`) and `--unpack` modes, copy independent files with up to `<n>` workers (`1..64`, default `1`; output is byte-identical and per-file `FileAdded` progress stays in traversal order). CCI single-file compression is single-threaded. |
 | `--policy <p>` | `--zar` overwrite handling without prompting: `skip` \| `overwrite` \| `auto-rename`. |
 | `--all` | Alias: `--random --seed --trim --update --video --wipe` (→ `--xiso` as batch). Mirrors XboxKit `-a`. |
 | `--best` | Alias: `--trim --wipe` (XISO). Mirrors XboxKit `-b`. |
@@ -205,6 +205,33 @@ Notes:
 - Cancellation is honored per entry, so Ctrl+C stops promptly; the working directory
   is always restored.
 - `--skip-existing` is rejected outside extract / `--unpack` / `--copy-out` (exit 1).
+
+### Parallel extraction
+
+`--jobs <n>` (`1..64`, default `1`) on extract (`-x`) and `--unpack` copies
+independent files with up to `<n>` workers. The directory tree is still walked
+and created on one thread; once the walk finishes, the queued files are copied
+concurrently. Per-file `FileAdded` progress and the `extracting`/`skip:` log
+lines are emitted in traversal order, matching a sequential run (parallel mode
+logs one completion line per file instead of per-chunk percentage updates).
+Output is byte-identical to `--jobs 1`.
+
+```bash
+XISOSharp -x --jobs 4 -d ./out game.iso
+XISOSharp --unpack --jobs 8 game.iso ./out
+```
+
+Plain ISO images are read positionally (no shared seek position). CISO/CCI,
+GOD, split ISO and in-memory sources serialize their reads behind a lock, so
+they are safe but see less speed-up; destination filesystem calls are
+serialized as well, which keeps non-thread-safe stores (for example
+`MemoryFilesystem`) correct. Byte-level `FileProgress` events may interleave
+between files, while per-file `FileAdded` events stay ordered. A failure still
+surfaces as the named `ExtractFileException` (or the `--continue-on-error`
+summary), and `--jobs` is rejected for ZAR/STFS unpacking and outside
+extract/`--unpack`. Without `--continue-on-error`, the first failure is thrown
+after the queued copies finish, so a parallel run may leave files extracted
+that a sequential run would not have reached.
 
 ### Extraction robustness
 

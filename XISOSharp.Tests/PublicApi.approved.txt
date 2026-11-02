@@ -236,6 +236,7 @@ F:XISOSharp.Models.StfsPackageKind.value__:System.Int32
 F:XISOSharp.Models.TitleKind.Xbe:XISOSharp.Models.TitleKind
 F:XISOSharp.Models.TitleKind.Xex:XISOSharp.Models.TitleKind
 F:XISOSharp.Models.TitleKind.value__:System.Int32
+F:XISOSharp.Models.UnpackOptions.MaxParallelism:System.Int32
 F:XISOSharp.Models.ValidationIssueType.ChecksumMismatch:XISOSharp.Models.ValidationIssueType
 F:XISOSharp.Models.ValidationIssueType.ExtraInOutput:XISOSharp.Models.ValidationIssueType
 F:XISOSharp.Models.ValidationIssueType.MissingInOutput:XISOSharp.Models.ValidationIssueType
@@ -981,6 +982,7 @@ P:XISOSharp.Models.TitleInfo.Xbe:XISOSharp.Models.XbeInfo:get;set;
 P:XISOSharp.Models.TitleInfo.XbePath:System.String:get;set;
 P:XISOSharp.Models.TitleInfo.Xex:XISOSharp.Models.XexTitleInfo:get;set;
 P:XISOSharp.Models.UnpackOptions.ContinueOnError:System.Boolean:get;set;
+P:XISOSharp.Models.UnpackOptions.MaxDegreeOfParallelism:System.Int32:get;set;
 P:XISOSharp.Models.UnpackOptions.SkipExisting:System.Boolean:get;set;
 P:XISOSharp.Models.ValidationIssue.OutputHash:System.Byte[]:get;set;
 P:XISOSharp.Models.ValidationIssue.OutputSize:System.Int64:get;set;

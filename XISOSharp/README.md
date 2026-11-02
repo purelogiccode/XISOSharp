@@ -237,6 +237,12 @@ destination-root-relative, `/`-separated, case-insensitive; `FileLength` returns
 cancelled copy deletes its partial destination through `DeleteFile` (default
 no-op, so custom stores keep their partial content if they cannot delete).
 
+`UnpackOptions.MaxDegreeOfParallelism` (`1..64`, default `1`) copies independent
+files on a bounded worker pool after the sequential tree walk. Output is
+byte-identical to a sequential unpack, `FileAdded` progress stays in traversal
+order, and destination filesystem calls are serialized, so a non-thread-safe
+store such as `MemoryFilesystem` remains correct.
+
 Built-in implementations:
 
 | Type | Behavior |

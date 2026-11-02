@@ -13,6 +13,15 @@
   worker pool and write payloads in sector order, so output is byte-identical
   to the sequential writer and progress stays ordered. `MaxParallelism` is the
   shared ceiling; CCI remains single-threaded until CCISharp 1.1.
+- **Parallel extraction**: `UnpackOptions.MaxDegreeOfParallelism` (`1..64`,
+  default `1`) queues independent files during the sequential tree walk and
+  copies them on a bounded pool. Output is byte-identical to a sequential run;
+  per-file `FileAdded` progress and completion logs stay in traversal order,
+  and `SkipExisting`/`ContinueOnError` keep their semantics. Plain ISO sources
+  are read positionally through `RandomAccess`; CISO/CCI/GOD/split and
+  in-memory sources serialize reads, and destination filesystem calls are
+  serialized so `MemoryFilesystem` and other non-thread-safe stores stay safe.
+  `UnpackOptions.MaxParallelism` is the shared `64` ceiling.
 - **GOD read-only sector input**: `GodBlockDevice` maps a GOD/SVOD header plus
   its `DataNNNN` fragments into the decompressed sector view, so every read
   verb (list, tree, extract, checksum, hash, validate, sector-layout, ranges)
@@ -74,6 +83,11 @@
   sectors on a bounded worker pool (default `1`); output is byte-identical to
   the sequential writer. With `--batch`, `--jobs` still selects concurrent
   conversions; single-file CCI compression is single-threaded.
+- **`--jobs` on extraction**: `-x` and `--unpack` accept `--jobs 1..64` (default
+  `1`) to copy independent files in parallel. Output is byte-identical, per-file
+  `FileAdded` progress stays in traversal order, and `--skip-existing`/
+  `--continue-on-error` work unchanged. ZAR/STFS unpacking and non-extract modes
+  reject the flag with a clear message.
 - `split` warns when an explicit `--size` exceeds the conservative FATX cap.
 
 ### Dependencies

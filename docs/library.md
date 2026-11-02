@@ -187,6 +187,10 @@ int result = XisoReader.Extract("game.iso", "./out", llCompat: false);
 int resumed = XisoReader.UnpackImage("game.iso", "./out",
     options: new UnpackOptions { SkipExisting = true });
 
+// Copy independent files with four workers (output is byte-identical)
+int fast = XisoReader.UnpackImage("game.iso", "./out",
+    options: new UnpackOptions { MaxDegreeOfParallelism = 4 });
+
 // Keep going past bad files; the run still throws a summary at the end
 try
 {

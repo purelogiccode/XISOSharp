@@ -3,11 +3,60 @@ namespace XISOSharp.Models;
 /// <summary>
 /// Options controlling unpack/extract/copy-out behavior (TODO #13, xdvdfs #190;
 /// TODO #9, xdvdfs #187): an unpack cancelled mid-run restarts by skipping files
-/// already on disk instead of rewriting them, and a run over a damaged image or
-/// a hostile destination can log per-file failures and finish the rest.
+/// already on disk instead of rewriting them, a run over a damaged image or
+/// a hostile destination can log per-file failures and finish the rest, and
+/// independent files can be written by several workers at once.
 /// </summary>
 public sealed class UnpackOptions
 {
+    /// <summary>
+    /// Maximum accepted <see cref="MaxDegreeOfParallelism"/> value for the
+    /// parallel unpack path (the same 64-worker ceiling the CISO writer and the
+    /// CLI's <c>--jobs</c> use).
+    /// </summary>
+    public const int MaxParallelism = 64;
+
+    private int _maxDegreeOfParallelism = 1;
+
+    /// <summary>
+    /// Number of independent files an unpack writes concurrently
+    /// (<c>1..<see cref="MaxParallelism"/></c>; default <c>1</c>, the sequential
+    /// walk). The directory tree is still walked and created on one thread;
+    /// once the walk completes, up to this many workers copy file data from the
+    /// image into their destinations. Per-file <c>FileAdded</c> progress is
+    /// reported in traversal order, matching a sequential run; byte-level
+    /// <c>FileProgress</c> events may interleave between files.
+    /// </summary>
+    /// <remarks>
+    /// Parallel extraction reads the image positionally: a plain <see cref="System.IO.FileStream"/>
+    /// is read through <see cref="System.IO.RandomAccess"/> (no shared seek
+    /// position), and other sources (CISO/CCI/GOD/split streams) serialize
+    /// their reads behind a lock. Destination filesystem calls are serialized
+    /// as well, so an <see cref="Interfaces.IFilesystem"/> that is not itself
+    /// thread-safe (for example <see cref="MemoryFilesystem"/>) is still safe.
+    /// A destination store whose file streams must not be written concurrently
+    /// should keep the default of <c>1</c>. Without <see cref="ContinueOnError"/>,
+    /// the first failure is reported after the queued copies finish, so later
+    /// files may still be extracted (unlike the sequential walk).
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when the value is outside <c>1..<see cref="MaxParallelism"/></c>.
+    /// </exception>
+    public int MaxDegreeOfParallelism
+    {
+        get => _maxDegreeOfParallelism;
+        set
+        {
+            if (value < 1 || value > MaxParallelism)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value,
+                    $"Unpack parallelism must be 1..{MaxParallelism}.");
+            }
+
+            _maxDegreeOfParallelism = value;
+        }
+    }
+
     /// <summary>
     /// When <c>true</c>, a file already present on disk with the same byte size
     /// is left untouched (logged as <c>skip: &lt;path&gt;</c>) instead of being

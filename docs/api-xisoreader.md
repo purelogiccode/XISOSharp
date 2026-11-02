@@ -120,7 +120,7 @@ public static int Rewrite(
 | `prependSectors` | Rewrite only: reserve zero-filled sectors before the filesystem |
 | `preserveAttributes` | Rewrite only: re-encode the source dirent attribute bits (RO/HID/SYS/NOR). Default `false` — extract-xiso byte parity (entries re-encoded with DIR/ARC defaults, `dir=0x10`/`file=0x20`) |
 | `progress` | Rewrite: structured progress channel (`IProgress<ProgressInfo>`) — see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo). Extract: a `FileAdded` event per file actually written (skipped/excluded files are silent), plus a per-chunk `FileProgress` event (`Size` = bytes copied so far, `Count` = total file bytes) while each file copies |
-| `options` | Extract/unpack only: resume options — see [Resume interrupted unpacks](#resume-interrupted-unpacks) |
+| `options` | Extract/unpack only: resume and parallelism options — see [Resume interrupted unpacks](#resume-interrupted-unpacks) |
 
 `UnpackImage` is the convenience form of `Extract`: it probes the optimized-tag marker
 to pick `llCompat` automatically and defaults the output directory to the ISO name
@@ -183,8 +183,10 @@ byte[] defaultXbe = memory.ReadAllBytes("default.xbe"); // never touched the dis
 ```csharp
 public sealed class UnpackOptions
 {
+    public const int MaxParallelism = 64;
     public bool SkipExisting { get; set; }
     public bool ContinueOnError { get; set; }
+    public int MaxDegreeOfParallelism { get; set; } // 1..64, default 1
     public bool ShouldSkip(string destPath, long fileSize);
     public bool ShouldSkip(string destPath, long fileSize, IFilesystem filesystem);
 }
@@ -205,6 +207,16 @@ an uncreatable directory skips its subtree. The run still throws at the end —
 an `ExtractErrorException` with code `ErrExtractFailed` listing every failure
 (the xdvdfs `Failed to unpack image` wrapper) — so the failure is visible to
 callers. Structural table corruption still aborts immediately (TODO #16).
+
+When `MaxDegreeOfParallelism` is greater than `1`, `Extract` / `UnpackImage`
+walk the directory tree and create directories on one thread, queue the file
+entries, then copy independent files with that many workers. Output is
+byte-identical to a sequential run, `FileAdded` progress and completion log
+lines stay in traversal order, and `SkipExisting` / `ContinueOnError` keep their
+semantics. Plain ISO sources are read positionally; CISO/CCI/GOD/split and
+in-memory sources serialize reads behind a lock. Destination filesystem calls
+are serialized, so non-thread-safe stores such as `MemoryFilesystem` remain
+correct. `CopyOut` ignores the option (it copies one file).
 
 The directory walk itself is iterative within a table: an explicit in-order stack
 bounds intra-table AVL depth by `Constants.MaxTocEntriesPerTable` and

@@ -129,6 +129,10 @@ if (result == 0)
 // Resume an interrupted run: skip files already on disk with matching sizes
 int resumed = XisoReader.UnpackImage("game.iso", "output_directory",
     options: new UnpackOptions { SkipExisting = true });
+
+// Copy independent files with four workers (output is byte-identical)
+int parallel = XisoReader.UnpackImage("game.iso", "output_directory",
+    options: new UnpackOptions { MaxDegreeOfParallelism = 4 });
 ```
 
 ### Create

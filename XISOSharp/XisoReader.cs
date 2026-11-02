@@ -1,7 +1,9 @@
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 using XISOSharp.BlockDevice;
 using XISOSharp.DataStructures;
 using XISOSharp.Interfaces;
@@ -452,6 +454,12 @@ public static class XisoReader
     /// defaults, matching extract-xiso byte-for-byte; when <c>true</c>, source
     /// RO/HID/SYS/NOR bits are re-encoded into the rewritten image.
     /// </param>
+    /// <param name="pendingFiles">
+    /// Optional parallel-extraction collector. When set in extract mode, file
+    /// entries are recorded here instead of being written during the walk;
+    /// directories are still created on this thread, and the caller copies the
+    /// collected files after the walk with <see cref="ExtractFilesParallel"/>.
+    /// </param>
     /// <exception cref="XisoFormatException">
     /// Thrown naming the offending path and offset when the table is
     /// structurally corrupt. Under <c>UnpackOptions.ContinueOnError</c> in
@@ -472,7 +480,8 @@ public static class XisoReader
         long tableSize = long.MaxValue,
         int depth = 0,
         IFilesystem? filesystem = null,
-        bool preserveAttributes = false)
+        bool preserveAttributes = false,
+        List<ExtractJob>? pendingFiles = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (depth > Constants.MaxTocDepth)
@@ -554,7 +563,7 @@ public static class XisoReader
                 try
                 {
                     ProcessTocEntry(fs, node, path, mode, discLseek, unpackOptions, cancellationToken,
-                        progress, filesystem, depth, llCompat);
+                        progress, filesystem, depth, llCompat, pendingFiles);
                 }
                 catch (Exception ex) when (IsTocCatchable(ex, mode, unpackOptions))
                 {
@@ -820,7 +829,8 @@ public static class XisoReader
         IProgress<ProgressInfo>? progress,
         IFilesystem? filesystem,
         int depth,
-        bool llCompat)
+        bool llCompat,
+        List<ExtractJob>? pendingFiles = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -917,7 +927,8 @@ public static class XisoReader
                                     fs, subStart, subPath, mode,
                                     ref entry.Avl!.Subdirectory,
                                     llCompat, discLseek, unpackOptions, cancellationToken, progress,
-                                    tableSize: entry.FileSize, depth: depth + 1, filesystem: filesystem);
+                                    tableSize: entry.FileSize, depth: depth + 1, filesystem: filesystem,
+                                    pendingFiles: pendingFiles);
                             }
                             else
                             {
@@ -926,7 +937,8 @@ public static class XisoReader
                                     fs, subStart, subPath, mode,
                                     ref unusedAvl,
                                     llCompat, discLseek, unpackOptions, cancellationToken, progress,
-                                    tableSize: entry.FileSize, depth: depth + 1, filesystem: filesystem);
+                                    tableSize: entry.FileSize, depth: depth + 1, filesystem: filesystem,
+                                    pendingFiles: pendingFiles);
                             }
                         }
                         catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
@@ -961,48 +973,65 @@ public static class XisoReader
         {
             if (!Logger.RemoveSystemUpdate || !(path?.Contains("$SystemUpdate", StringComparison.Ordinal) ?? false))
             {
-                // A failed file still advances the sibling chain: every entry
-                // seeks explicitly (ExtractFile seeks to its sector, siblings
-                // seek from the saved position), so recording and carrying on
-                // is position-safe. Failed files are excluded from the totals.
-                bool fileOk = true;
-                if (mode == ExtractMode.Extract)
+                if (mode == ExtractMode.Extract && pendingFiles != null)
                 {
-                    bool written;
-                    try
-                    {
-                        written = ExtractFile(fs, filename, entry.StartSector, entry.FileSize, path, discLseek,
-                            unpackOptions, cancellationToken, progress, filesystem);
-                    }
-                    catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
-                                               ex is not OperationCanceledException)
-                    {
-                        ExtractFileException failure = ex as ExtractFileException
-                                                       ?? ExtractFileException.ForWrite(
-                                                           string.Concat(path, filename), filename,
-                                                           entry.StartSector, entry.FileSize, -1, ex);
-                        unpackOptions.RecordFailure(failure);
-                        Logger.LogErr($"Error: {failure.Message}\n");
-                        written = false;
-                        fileOk = false;
-                    }
-
-                    if (written)
-                    {
-                        progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded,
-                            Path: string.Concat(path, filename).Replace('\\', '/'),
-                            Sector: entry.StartSector, Size: entry.FileSize));
-                    }
+                    // Parallel unpack: the tree walk only creates directories and
+                    // records file work; ExtractFilesParallel copies the data
+                    // after the walk, when every destination directory exists.
+                    string internalPath = string.Concat(path, filename);
+                    pendingFiles.Add(new ExtractJob(
+                        Filename: filename,
+                        InternalPath: internalPath,
+                        ProgressPath: internalPath.Replace('\\', '/'),
+                        Destination: filesystem != null ? internalPath : Path.GetFullPath(filename),
+                        StartSector: entry.StartSector,
+                        FileSize: entry.FileSize));
                 }
                 else
                 {
-                    Logger.Log($"{path!}{filename} ({entry.FileSize} bytes)\n");
-                    Logger.Flush();
-                }
+                    // A failed file still advances the sibling chain: every entry
+                    // seeks explicitly (ExtractFile seeks to its sector, siblings
+                    // seek from the saved position), so recording and carrying on
+                    // is position-safe. Failed files are excluded from the totals.
+                    bool fileOk = true;
+                    if (mode == ExtractMode.Extract)
+                    {
+                        bool written;
+                        try
+                        {
+                            written = ExtractFile(fs, filename, entry.StartSector, entry.FileSize, path, discLseek,
+                                unpackOptions, cancellationToken, progress, filesystem);
+                        }
+                        catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
+                                                   ex is not OperationCanceledException)
+                        {
+                            ExtractFileException failure = ex as ExtractFileException
+                                                           ?? ExtractFileException.ForWrite(
+                                                               string.Concat(path, filename), filename,
+                                                               entry.StartSector, entry.FileSize, -1, ex);
+                            unpackOptions.RecordFailure(failure);
+                            Logger.LogErr($"Error: {failure.Message}\n");
+                            written = false;
+                            fileOk = false;
+                        }
 
-                if (fileOk)
-                {
-                    Logger.RecordIsoFileWritten(entry.FileSize);
+                        if (written)
+                        {
+                            progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded,
+                                Path: string.Concat(path, filename).Replace('\\', '/'),
+                                Sector: entry.StartSector, Size: entry.FileSize));
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log($"{path!}{filename} ({entry.FileSize} bytes)\n");
+                        Logger.Flush();
+                    }
+
+                    if (fileOk)
+                    {
+                        Logger.RecordIsoFileWritten(entry.FileSize);
+                    }
                 }
             }
         }
@@ -1094,10 +1123,314 @@ public static class XisoReader
         // legacy path keeps the cwd-relative bare name.
         string dest = filesystem != null ? internalPath : filename;
 
-        if (unpackOptions?.ShouldSkip(dest, fileSize, filesystem ?? LocalFilesystem.Instance) == true)
+        return ExtractFileCore(
+            new ImageReader(fs),
+            ((long)startSector * Constants.SectorSize) + discLseek,
+            filename,
+            internalPath,
+            internalPath.Replace('\\', '/'),
+            dest,
+            startSector,
+            fileSize,
+            unpackOptions,
+            cancellationToken,
+            progress,
+            filesystem,
+            logProgress: true,
+            sync: null);
+    }
+
+    /// <summary>One queued file for the parallel unpack pass.</summary>
+    /// <param name="Filename">Bare entry name (for error messages).</param>
+    /// <param name="InternalPath">Image path with the host separator (for log lines).</param>
+    /// <param name="ProgressPath">Image path with <c>/</c> separators (for progress events).</param>
+    /// <param name="Destination">
+    /// Destination path: the absolute host path for legacy disk extraction, or the
+    /// destination-root-relative path for an <see cref="IFilesystem"/>.
+    /// </param>
+    /// <param name="StartSector">Partition-relative start sector.</param>
+    /// <param name="FileSize">Declared byte size.</param>
+    private sealed record ExtractJob(
+        string Filename,
+        string InternalPath,
+        string ProgressPath,
+        string Destination,
+        uint StartSector,
+        uint FileSize);
+
+    /// <summary>
+    /// Positional, thread-safe image reader for parallel extraction. A plain
+    /// <see cref="FileStream"/> is read through <see cref="RandomAccess"/> so
+    /// workers never share a seek position; every other stream (CISO/CCI/GOD
+    /// block-device views, split streams, in-memory images) is serialized
+    /// behind a lock.
+    /// </summary>
+    private sealed class ImageReader
+    {
+        private readonly Stream _stream;
+        private readonly SafeFileHandle? _handle;
+#pragma warning disable MA0158 // object keeps net8 compat (System.Threading.Lock is net9+)
+        private readonly object _gate = new();
+#pragma warning restore MA0158
+
+        internal ImageReader(Stream stream)
         {
-            Logger.Log($"skip: {path}{filename} ({fileSize} bytes)\n");
-            Logger.Flush();
+            _stream = stream;
+            if (stream is FileStream { CanSeek: true } fileStream)
+            {
+                try
+                {
+                    _handle = fileStream.SafeFileHandle;
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Fall back to the locked path; the read reports the natural error.
+                }
+            }
+        }
+
+        internal long Length
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _stream.Length;
+                }
+            }
+        }
+
+        /// <summary>Reads up to <paramref name="buffer"/>.Length bytes at an absolute offset.</summary>
+        internal int Read(long offset, Span<byte> buffer)
+        {
+            if (_handle is not null)
+            {
+                int total = 0;
+                while (total < buffer.Length)
+                {
+                    int read = RandomAccess.Read(_handle, buffer[total..], offset + total);
+                    if (read <= 0) break;
+                    total += read;
+                }
+
+                return total;
+            }
+
+            lock (_gate)
+            {
+                _stream.Seek(offset, SeekOrigin.Begin);
+                int total = 0;
+                while (total < buffer.Length)
+                {
+                    int read = _stream.Read(buffer[total..]);
+                    if (read <= 0) break;
+                    total += read;
+                }
+
+                return total;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Read-only stream over a fixed byte range of an <see cref="ImageReader"/>,
+    /// so <see cref="XisoFileCopier.CopyExact"/> can copy one file without
+    /// touching the shared image stream position.
+    /// </summary>
+    private sealed class PositionalReadStream(ImageReader reader, long start, long length) : Stream
+    {
+        private long _position;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => length;
+        public override long Position
+        {
+            get => _position;
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            Read(buffer.AsSpan(offset, count));
+
+        public override int Read(Span<byte> buffer)
+        {
+            long remaining = length - _position;
+            if (remaining <= 0 || buffer.Length == 0) return 0;
+
+            int toRead = (int)Math.Min(buffer.Length, remaining);
+            int read = reader.Read(start + _position, buffer[..toRead]);
+            _position += read;
+            return read;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    /// <summary>
+    /// Copies the queued files with up to <paramref name="maxParallel"/> workers
+    /// and reports progress in traversal order. Directory creation already
+    /// happened during the sequential walk, so every destination parent exists.
+    /// </summary>
+    private static void ExtractFilesParallel(
+        Stream fs,
+        List<ExtractJob> jobs,
+        long discLseek,
+        UnpackOptions? unpackOptions,
+        CancellationToken cancellationToken,
+        IProgress<ProgressInfo>? progress,
+        IFilesystem? filesystem,
+        int maxParallel)
+    {
+        int count = jobs.Count;
+        byte[] states = new byte[count]; // 0 pending, 1 written, 2 skipped, 3 failed
+        ExtractFileException?[] failures = new ExtractFileException?[count];
+#pragma warning disable MA0158 // object keeps net8 compat (System.Threading.Lock is net9+)
+        object stateGate = new();
+        object ioGate = new();
+#pragma warning restore MA0158
+        int nextToReport = 0;
+        ExtractFileException? firstFailure = null;
+        ImageReader reader = new(fs);
+
+        Parallel.For(0, count,
+            new ParallelOptions { MaxDegreeOfParallelism = maxParallel, CancellationToken = cancellationToken },
+            index =>
+            {
+                ExtractJob job = jobs[index];
+                byte state;
+                ExtractFileException? failure = null;
+                try
+                {
+                    bool written = ExtractFileCore(
+                        reader,
+                        ((long)job.StartSector * Constants.SectorSize) + discLseek,
+                        job.Filename,
+                        job.InternalPath,
+                        job.ProgressPath,
+                        job.Destination,
+                        job.StartSector,
+                        job.FileSize,
+                        unpackOptions,
+                        cancellationToken,
+                        progress,
+                        filesystem,
+                        logProgress: false,
+                        sync: ioGate);
+                    state = written ? (byte)1 : (byte)2;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    failure = ex as ExtractFileException
+                              ?? ExtractFileException.ForWrite(job.InternalPath, job.Filename,
+                                  job.StartSector, job.FileSize, -1, ex);
+                    state = 3;
+                }
+
+                lock (stateGate)
+                {
+                    states[index] = state;
+                    failures[index] = failure;
+
+                    // Emit completion in entry order so FileAdded events and log
+                    // lines match a sequential run even when a later file wins
+                    // the race.
+                    while (nextToReport < count && states[nextToReport] != 0)
+                    {
+                        int doneIndex = nextToReport++;
+                        ExtractJob done = jobs[doneIndex];
+                        switch (states[doneIndex])
+                        {
+                            case 1:
+                                Logger.Log($"extracting {done.InternalPath} ({done.FileSize} bytes) [100%]\n");
+                                Logger.Flush();
+                                Logger.RecordIsoFileWritten(done.FileSize);
+                                progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded,
+                                    Path: done.ProgressPath, Sector: done.StartSector, Size: done.FileSize));
+                                break;
+                            case 2:
+                                Logger.Log($"skip: {done.InternalPath} ({done.FileSize} bytes)\n");
+                                Logger.Flush();
+                                break;
+                            case 3:
+                                firstFailure ??= failures[doneIndex];
+                                if (unpackOptions?.ContinueOnError == true)
+                                {
+                                    unpackOptions.RecordFailure(failures[doneIndex]!);
+                                    Logger.LogErr($"Error: {failures[doneIndex]!.Message}\n");
+                                }
+
+                                break;
+                        }
+                    }
+                }
+            });
+
+        // Fail-fast parity: a sequential unpack stops at the first bad file.
+        // Parallel workers already finished their in-flight copies, but the
+        // caller still sees the original named exception.
+        if (firstFailure is not null && unpackOptions?.ContinueOnError != true)
+        {
+            ExceptionDispatchInfo.Capture(firstFailure).Throw();
+        }
+    }
+
+    /// <summary>
+    /// Shared extraction core for the sequential and parallel paths: skip check,
+    /// bounds pre-check, destination creation, exact copy, post-write size check
+    /// and partial-file cleanup. When <paramref name="logProgress"/> is false the
+    /// caller owns the completion log line (the parallel pass emits it in order).
+    /// </summary>
+    private static bool ExtractFileCore(
+        ImageReader reader,
+        long dataOffset,
+        string filename,
+        string internalPath,
+        string progressPath,
+        string dest,
+        uint startSector,
+        uint fileSize,
+        UnpackOptions? unpackOptions,
+        CancellationToken cancellationToken,
+        IProgress<ProgressInfo>? progress,
+        IFilesystem? filesystem,
+        bool logProgress,
+        object? sync)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        bool skip;
+        if (sync is null)
+        {
+            skip = unpackOptions?.ShouldSkip(dest, fileSize, filesystem ?? LocalFilesystem.Instance) == true;
+        }
+        else
+        {
+            lock (sync)
+            {
+                skip = unpackOptions?.ShouldSkip(dest, fileSize, filesystem ?? LocalFilesystem.Instance) == true;
+            }
+        }
+
+        if (skip)
+        {
+            if (logProgress)
+            {
+                Logger.Log($"skip: {internalPath} ({fileSize} bytes)\n");
+                Logger.Flush();
+            }
+
             return false;
         }
 
@@ -1105,16 +1438,16 @@ public static class XisoReader
         // Catches torn images and entries pointing past the end before an empty
         // destination file is created for them. A length that cannot be resolved
         // (write-only view) skips the pre-check; the copy loop still validates.
-        if (fileSize > 0 && fs.CanSeek)
+        if (fileSize > 0)
         {
             try
             {
-                long imageLength = fs.Length;
-                long dataEnd = ((long)startSector * Constants.SectorSize) + discLseek + fileSize;
+                long imageLength = reader.Length;
+                long dataEnd = dataOffset + fileSize;
                 if (dataEnd > imageLength)
                 {
                     throw ExtractFileException.ForTruncated(internalPath, filename, startSector, fileSize,
-                        Math.Max(0, imageLength - (((long)startSector * Constants.SectorSize) + discLseek)));
+                        Math.Max(0, imageLength - dataOffset));
                 }
             }
             catch (ExtractFileException)
@@ -1132,12 +1465,14 @@ public static class XisoReader
         {
             if (filesystem != null)
             {
-                outFile = filesystem.CreateFile(dest, fileSize);
+                outFile = sync is null
+                    ? filesystem.CreateFile(dest, fileSize)
+                    : Locked(sync, () => filesystem.CreateFile(dest, fileSize));
             }
             else
             {
                 FileStream direct = new(
-                    filename,
+                    dest,
                     new FileStreamOptions
                     {
                         Mode = FileMode.Create,
@@ -1174,15 +1509,16 @@ public static class XisoReader
         bool succeeded = false;
         try
         {
-            using (outFile)
+            try
             {
-                fs.Seek(((long)startSector * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
-
                 if (fileSize == 0)
                 {
-                    Logger.Log(
-                        $"extracting {path}{filename} (0 bytes) [100%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
-                    Logger.Flush();
+                    if (logProgress)
+                    {
+                        Logger.Log(
+                            $"extracting {internalPath} (0 bytes) [100%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
+                        Logger.Flush();
+                    }
                 }
                 else
                 {
@@ -1190,30 +1526,44 @@ public static class XisoReader
                     // large files stream per chunk with byte-level progress. The
                     // rented pooled buffer keeps chunking (and therefore
                     // the percent log sequence) identical to the old inline loop.
-                    string progressPath = string.Concat(path, filename).Replace('\\', '/');
                     byte[] copyBuffer = RentCopyBuffer();
                     try
                     {
                         XisoFileCopier.CopyExact(
-                            fs,
+                            new PositionalReadStream(reader, dataOffset, fileSize),
                             fileSize,
                             // ReSharper disable once AccessToDisposedClosure — sink runs synchronously inside CopyExact.
-                            (buffer, count) =>
+                            (buffer, chunkCount) =>
                             {
                                 // Write-then-count matches the old inline loop, so
                                 // ForWrite/ForTruncated carry identical byte counts.
-                                outFile.Write(buffer, 0, count);
-                                totalSize += (uint)count;
+                                outFile.Write(buffer, 0, chunkCount);
+                                totalSize += (uint)chunkCount;
                             },
                             copyBuffer,
                             copied =>
                             {
-                                uint percent = (uint)(copied * 100.0 / fileSize);
-                                Logger.Log(
-                                    $"extracting {path}{filename} ({fileSize} bytes) [{percent}%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
-                                Logger.Flush();
-                                progress?.Report(new ProgressInfo(ProgressInfoType.FileProgress,
-                                    Count: fileSize, Path: progressPath, Sector: startSector, Size: copied));
+                                if (logProgress)
+                                {
+                                    uint percent = (uint)(copied * 100.0 / fileSize);
+                                    Logger.Log(
+                                        $"extracting {internalPath} ({fileSize} bytes) [{percent}%]{(Logger.Out == Console.Out && Console.IsOutputRedirected ? "\n" : "\r")}");
+                                    Logger.Flush();
+                                }
+
+                                ProgressInfo info = new(ProgressInfoType.FileProgress,
+                                    Count: fileSize, Path: progressPath, Sector: startSector, Size: copied);
+                                if (sync is null)
+                                {
+                                    progress?.Report(info);
+                                }
+                                else
+                                {
+                                    lock (sync)
+                                    {
+                                        progress?.Report(info);
+                                    }
+                                }
                             },
                             cancellationToken);
                     }
@@ -1228,10 +1578,35 @@ public static class XisoReader
                     }
                 }
             }
+            finally
+            {
+                // Custom stores may publish bytes on dispose (MemoryFilesystem);
+                // serializing it keeps non-thread-safe stores correct.
+                if (sync is null)
+                {
+                    outFile.Dispose();
+                }
+                else
+                {
+                    lock (sync)
+                    {
+                        outFile.Dispose();
+                    }
+                }
+            }
 
             // Post-write integrity: the bytes written must equal the reported size.
             // Catches torn writes and anything that truncated the file behind us.
-            long writtenLength = filesystem?.FileLength(dest) ?? new FileInfo(filename).Length;
+            long writtenLength;
+            if (filesystem != null)
+            {
+                writtenLength = sync is null ? filesystem.FileLength(dest) : Locked(sync, () => filesystem.FileLength(dest));
+            }
+            else
+            {
+                writtenLength = new FileInfo(dest).Length;
+            }
+
             if (writtenLength != fileSize)
                 throw ExtractFileException.ForTruncated(internalPath, dest, startSector, fileSize, totalSize);
 
@@ -1250,12 +1625,22 @@ public static class XisoReader
             // A failed or canceled copy must not leave a partial destination behind:
             // callers cannot distinguish it from a complete file. Custom stores get
             // the same chance through IFilesystem.DeleteFile.
-            if (!succeeded) TryDeletePartialFile(filesystem, dest);
+            if (!succeeded) TryDeletePartialFile(filesystem, dest, sync);
         }
 
-        Logger.Log("\n");
+        if (logProgress) Logger.Log("\n");
         return true;
     }
+
+    /// <summary>Runs a filesystem call under the parallel pass's shared I/O lock.</summary>
+    private static T Locked<T>(object sync, Func<T> action)
+    {
+        lock (sync)
+        {
+            return action();
+        }
+    }
+
 
     /// <summary>
     /// Removes a partially written destination after a failed extraction. Best-effort:
@@ -1263,13 +1648,24 @@ public static class XisoReader
     /// </summary>
     /// <param name="filesystem">Destination filesystem, or <c>null</c> for the local disk.</param>
     /// <param name="path">Destination path (host path for the legacy disk path).</param>
-    private static void TryDeletePartialFile(IFilesystem? filesystem, string path)
+    /// <param name="sync">Optional parallel-pass lock serializing filesystem calls.</param>
+    private static void TryDeletePartialFile(IFilesystem? filesystem, string path, object? sync = null)
     {
         try
         {
             if (filesystem != null)
             {
-                filesystem.DeleteFile(path);
+                if (sync is null)
+                {
+                    filesystem.DeleteFile(path);
+                }
+                else
+                {
+                    lock (sync)
+                    {
+                        filesystem.DeleteFile(path);
+                    }
+                }
             }
             else
             {
@@ -1347,6 +1743,8 @@ public static class XisoReader
     /// <param name="options">
     /// Optional resume options; when <see cref="UnpackOptions.SkipExisting"/> is set,
     /// files already on disk with the same size are skipped (TODO #13, xdvdfs #190).
+    /// Set <see cref="UnpackOptions.MaxDegreeOfParallelism"/> above 1 to copy
+    /// independent files concurrently.
     /// </param>
     /// <param name="progress">
     /// Optional structured progress channel; receives a <see cref="ProgressInfoType.FileAdded"/>
@@ -1408,7 +1806,9 @@ public static class XisoReader
     /// <param name="options">
     /// Optional resume options; when <see cref="UnpackOptions.SkipExisting"/> is set,
     /// files already on disk with the same size are skipped, so an interrupted unpack
-    /// resumes instead of redoing completed files (TODO #13, xdvdfs #190).
+    /// resumes instead of redoing completed files (TODO #13, xdvdfs #190). Set
+    /// <see cref="UnpackOptions.MaxDegreeOfParallelism"/> above 1 to copy independent
+    /// files concurrently (output and <c>FileAdded</c> order are unchanged).
     /// </param>
     /// <param name="progress">
     /// Optional structured progress channel; receives a <see cref="ProgressInfoType.FileAdded"/>
@@ -1493,6 +1893,9 @@ public static class XisoReader
     /// Optional resume options; when <see cref="UnpackOptions.SkipExisting"/> is set,
     /// files already present in <paramref name="filesystem"/> with the same size are
     /// skipped, so an interrupted unpack resumes instead of redoing completed files.
+    /// Set <see cref="UnpackOptions.MaxDegreeOfParallelism"/> above 1 to copy
+    /// independent files concurrently; filesystem calls are serialized so a
+    /// non-thread-safe store stays correct.
     /// </param>
     /// <param name="progress">
     /// Optional structured progress channel; receives a <see cref="ProgressInfoType.FileAdded"/>
@@ -2059,12 +2462,14 @@ public static class XisoReader
                 {
                     fs.Seek(((long)rootDirSect * Constants.SectorSize) + discLseek, SeekOrigin.Begin);
                     AvlNode? avlRoot = null;
+                    int maxParallel = unpackOptions?.MaxDegreeOfParallelism ?? 1;
+                    List<ExtractJob>? pendingFiles = mode == ExtractMode.Extract && maxParallel > 1 ? [] : null;
                     try
                     {
                         TraverseXiso(fs, ((long)rootDirSect * Constants.SectorSize) + discLseek,
                             filesystem != null ? "/" : buf, mode, ref avlRoot, llCompat, discLseek,
                             unpackOptions, cancellationToken, progress,
-                            tableSize: rootDirSize, filesystem: filesystem);
+                            tableSize: rootDirSize, filesystem: filesystem, pendingFiles: pendingFiles);
                     }
                     catch (Exception ex) when (unpackOptions?.ContinueOnError == true &&
                                                mode == ExtractMode.Extract &&
@@ -2079,6 +2484,14 @@ public static class XisoReader
                                                            rootDirSize, ex);
                         unpackOptions.RecordFailure(failure);
                         Logger.LogErr($"Error: {failure.Message}\n");
+                    }
+
+                    // The walk only created directories and queued file work;
+                    // copy the queued files now that every parent exists.
+                    if (pendingFiles is { Count: > 0 })
+                    {
+                        ExtractFilesParallel(fs, pendingFiles, discLseek, unpackOptions, cancellationToken,
+                            progress, filesystem, maxParallel);
                     }
 
                     // A continued run that hit per-file failures still fails the

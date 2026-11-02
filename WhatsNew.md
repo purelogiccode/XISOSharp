@@ -40,6 +40,14 @@ listing/extraction.
   parallel and written in sector order, so the output is byte-identical to the
   sequential writer and progress stays ordered. CCI compression remains
   single-threaded (CCISharp 1.1 work).
+- **Parallel extraction**: `-x`/`--unpack --jobs 1..64` (and
+  `UnpackOptions.MaxDegreeOfParallelism`) queues independent files during the
+  tree walk and copies them on a bounded pool. Output is byte-identical,
+  `FileAdded` progress and completion logs stay in traversal order, and
+  `--skip-existing`/`--continue-on-error` keep working. Plain ISOs are read
+  positionally; CISO/CCI/GOD/split and in-memory sources serialize reads, and
+  destination filesystem calls are serialized so non-thread-safe stores stay
+  correct.
 - **`--delete-source`**: batch `compress`/`decompress`/`convert`/`split` can
   delete each source after a successful conversion (requires `-y`; split sets
   delete every part; the summary reports the count).
