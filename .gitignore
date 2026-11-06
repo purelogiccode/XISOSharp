@@ -1,6 +1,10 @@
 bin/
 obj/
 BenchmarkDotNet.Artifacts/
+# DocFX generated output and Pages staging
+_site/
+docs/api/
+docs/docfx/api-src/
 /packages/
 /artifacts/
 /publish/

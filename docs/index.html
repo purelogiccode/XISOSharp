@@ -1,15 +1,49 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8"/>
     <title>XISOSharp — Documentation</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="color-scheme" content="dark"/>
+    <meta name="theme-color" content="#0b0f14"/>
     <meta name="description" content="XISOSharp — pure C# extract-xiso port (reference build 202609111233; XISO/XDVDFS) with Redump archival & xdvdfs parity"/>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/dark.css"/>
     <style>
+    :root {
+      --theme-color: #42b983;
+      --xiso-bg: #0b0f14;
+      --xiso-panel: #11161d;
+      --xiso-border: #26303a;
+      --xiso-text: #d6dee6;
+      --xiso-muted: #8b98a5;
+    }
+    html, body { background: var(--xiso-bg); color: var(--xiso-text); }
+    body { color-scheme: dark; }
     /* left sidebar fixed, highlight active */
-    .sidebar { width: 280px; }
-    .sidebar-nav li.active > a { font-weight: 700; border-left: 3px solid #42b983; padding-left: 8px; }
+    .sidebar {
+      width: 280px;
+      background: var(--xiso-panel);
+      border-right: 1px solid var(--xiso-border);
+    }
+    .sidebar ul li a { color: var(--xiso-text); }
+    .sidebar ul li.active > a {
+      color: var(--theme-color);
+      font-weight: 700;
+      border-left: 3px solid var(--theme-color);
+      padding-left: 8px;
+    }
+    .markdown-section h1, .markdown-section h2, .markdown-section h3,
+    .markdown-section h4, .markdown-section h5, .markdown-section strong {
+      color: #f0f6fc;
+    }
+    .markdown-section a { color: var(--theme-color); }
+    .markdown-section code { background: #161b22; color: #c9d1d9; }
+    .markdown-section pre { background: #161b22; }
+    .markdown-section pre > code { background: #161b22; color: #c9d1d9; }
+    .markdown-section table td, .markdown-section table th { border-color: var(--xiso-border); }
+    .markdown-section tr:nth-child(2n) { background-color: var(--xiso-panel); }
+    .markdown-section blockquote { color: var(--xiso-muted); }
+    .github-corner svg { color: var(--xiso-bg); fill: var(--theme-color); }
     /* narrow screens: keep toggle */
     @media (max-width: 768px) { .sidebar { width: 260px; } }
   </style>

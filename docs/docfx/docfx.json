@@ -1,0 +1,50 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "../../XISOSharp",
+          "files": [
+            "XISOSharp.csproj"
+          ]
+        }
+      ],
+      "dest": "api-src",
+      "properties": {
+        "TargetFramework": "net10.0"
+      }
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "src": "api-src",
+        "files": [
+          "**.yml"
+        ],
+        "dest": "."
+      },
+      {
+        "files": [
+          "index.md"
+        ],
+        "dest": "."
+      }
+    ],
+    "dest": "../api",
+    "template": [
+      "default",
+      "modern",
+      "template"
+    ],
+    "globalMetadata": {
+      "_appTitle": "XISOSharp API Reference",
+      "_appName": "XISOSharp",
+      "_appFooter": "XISOSharp API reference · generated with DocFX",
+      "_enableSearch": true,
+      "_disableContribution": true,
+      "_appLogoPath": "logo.svg",
+      "_appFaviconPath": "favicon.ico"
+    }
+  }
+}

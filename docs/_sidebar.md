@@ -15,6 +15,7 @@
   - [FAQ](faq.md)
 
 - **Library API**
+  - [DocFX API Reference ↗](https://purelogiccode.github.io/XISOSharp/api/)
   - [Overview](library.md)
   - [XisoReader](api-xisoreader.md)
   - [XisoWriter](api-xisowriter.md)

@@ -21,13 +21,16 @@ This documentation set is published twice from the same sources and covers the C
 library API, the XISO on-disk format, Xbox disc formats (XGD1/XGD2/XGD3/Hybrid, Redump images),
 archival workflows, and `xdvdfs` parity:
 
-- **GitHub Pages** — rendered with **Docsify**; the fixed **left sidebar** comes from
-  `_sidebar.md`, served by `index.html` (`pages.yml` deploys `docs/`).
+- **GitHub Pages** — rendered with **Docsify** in a dark theme; the fixed **left sidebar**
+  comes from `_sidebar.md`, served by `index.html` (`pages.yml` deploys `docs/`).
+  The **DocFX API reference** is generated into `/api/` from the library XML docs and
+  included in the same Pages deployment.
 - **GitHub Wiki** — `wiki.yml` runs `sync-wiki.ps1`, which copies every page, generates
   `Home.md` from this index, and builds the wiki **side menu** `_Sidebar.md` from the same
   `_sidebar.md`, so both targets always share one navigation.
 
 Both side menus list the same pages; relative page links work in either renderer.
+The DocFX API link is absolute because the generated reference is published on Pages.
 
 ---
 
@@ -55,6 +58,7 @@ Both side menus list the same pages; relative page links work in either renderer
 
 | Page | What it covers |
 |---|---|
+| [DocFX API Reference](https://purelogiccode.github.io/XISOSharp/api/) | Generated API reference for every public type, member and overload |
 | [Library Overview](library.md) | Architecture, packages, error handling, quick samples |
 | [XisoReader](api-xisoreader.md) | Read/extract/list/audit/hash/checksum APIs (+ `IBlockDevice` overloads) |
 | [XisoWriter](api-xisowriter.md) | Create/rewrite + remap (`build-image`) APIs |
