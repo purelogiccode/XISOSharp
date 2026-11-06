@@ -43,9 +43,6 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
-      - name: Restore library
-        run: dotnet restore XISOSharp/XISOSharp.csproj
-
       - name: Build DocFX metadata
         run: dotnet docfx metadata docs/docfx/docfx.json
 
