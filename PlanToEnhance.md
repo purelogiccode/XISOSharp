@@ -1,10 +1,10 @@
 # XISOSharp — Remaining Work Plan
 
 - **Updated:** 2026-11-06
-- **Baseline:** XISOSharp **1.5.0** (published 2026-11-01)
-- **Working tree:** 1.6.0 scope implemented, **not yet tagged** (`1.5.0` + 17 commits)
-- **Next releases:** 1.6.0 (release gate) → 1.7.0 (`StfsSharp`) → CCISharp 1.1 (parallel track)
-- **Packages:** CCISharp `1.0.1`, ZArchiveSharp `1.4.0`
+- **Latest release:** XISOSharp **1.6.0** (2026-11-06)
+- **Working tree:** 1.6.0 released, tagged `1.6.0` (`350f629`)
+- **Next releases:** 1.7.0 (`StfsSharp`) → CCISharp 1.1 (parallel track)
+- **Packages:** XISOSharp `1.6.0`, CCISharp `1.0.1`, ZArchiveSharp `1.4.0`
 - **Scope of this file:** only work that is still open. Implemented features are listed once in [§9](#9-implemented-baseline-do-not-re-implement) so they are not re-implemented.
 
 > **How to use this file:** change `- [ ]` to `- [x]` when an item meets its **Done when** line. Add the version/date to the progress log in [§14](#14-progress-log).
@@ -21,9 +21,9 @@
 
 | Field | Value |
 |---|---|
-| Published library | **XISOSharp 1.5.0** (2026-11-01) |
-| Current tree | **1.6.0 code-complete**, untagged (`1.5.0-17-gd791d0f`) |
-| Next release gate | 1.6.0 tag → NuGet nupkg/snupkg → GitHub release (six RID bundles) |
+| Published library | **XISOSharp 1.6.0** (2026-11-06) |
+| Current tree | **1.6.0 released**, tag `1.6.0` at `350f629` |
+| Next release gate | 1.7.0 — `StfsSharp` extraction |
 | Next feature release | **1.7.0** — `StfsSharp` extraction |
 | Compression track | **CCISharp 1.1** — HC encoder, parallel writer, multi-digit parts |
 | Tests (last recorded) | 2098 passed / 1 skipped on `net8.0`/`net9.0`; 2162 passed / 1 skipped on `net10.0` |
@@ -52,25 +52,24 @@
 
 | Priority | Workstream | Target | Open items |
 |---|---|---|---:|
-| **P0** | Ship 1.6.0 | 1.6.0 | 2 |
+| **P0** | Ship 1.6.0 | ✅ released 2026-11-06 | 0 |
 | **P1** | Extract `StfsSharp` | 1.7.0 | 8 |
 | **P1** | CCISharp 1.1 | CCISharp 1.1 | 7 |
 | **P2** | Library hardening | 1.7.x / 2.0.0 | 8 |
 | **P2** | Docs, fixtures and GUI | 1.7.x | 8 |
 | **P3** | Distribution and supply chain | later | 5 |
 | **P3** | Cross-repo consumers | after 1.7.0 | 4 |
-| | **Total** | | **42 open** (3 optional) + 2 done |
+| | **Total** | | **40 open** (3 optional) + 4 done |
 
 **Recommended order**
 
 | Order | Work | Why |
 |---:|---|---|
-| 1 | `REL-03` … `REL-04` | Tag/publish 1.6.0; `REL-01`/`REL-02` are done. |
-| 2 | `STF-01` … `STF-08` | Biggest structural change; makes GOD/STFS readers reusable. |
-| 3 | `CCI-01` … `CCI-06` | Independent track; unblocks CCI HC and `--jobs`. |
-| 4 | `LIB-01` … `LIB-08` | Harden the API after the release branches settle. |
-| 5 | `DOC-*`, `GUI-*` | User-facing polish; depends on the library work. |
-| 6 | `DST-*`, `XRP-*` | Distribution and companion repositories. |
+| 1 | `STF-01` … `STF-08` | Biggest structural change; makes GOD/STFS readers reusable. |
+| 2 | `CCI-01` … `CCI-06` | Independent track; unblocks CCI HC and `--jobs`. |
+| 3 | `LIB-01` … `LIB-08` | Harden the API after the release branches settle. |
+| 4 | `DOC-*`, `GUI-*` | User-facing polish; depends on the library work. |
+| 5 | `DST-*`, `XRP-*` | Distribution and companion repositories. |
 
 ---
 
@@ -88,13 +87,15 @@
   - **Done when:** every gate passes on the exact release commit.
   - **Done 2026-11-06:** Release build 0 warnings/0 errors; tests 2098/1 on net8/net9 and 2162/1 on net10; format clean; InspectCode 0 warnings; pack succeeded (pre-release version until the tag); AOT smoke passed; fuzz 4,113 iterations/0 failures; synthetic battle 8 passed/0 failed/8 skipped.
 
-- [ ] **REL-03 · Tag and publish 1.6.0**
+- [x] **REL-03 · Tag and publish 1.6.0**
   - Tag `1.6.0`, push, approve the `nuget` environment, verify `XISOSharp.1.6.0.nupkg` + `.snupkg` and the GitHub release with six RID bundles.
   - **Done when:** `api.nuget.org/v3-flatcontainer/xisosharp/index.json` lists 1.6.0 and `gh release view 1.6.0 --json assets` lists the six `release_1.6.0_<rid>.zip` assets (SBOM/provenance assets may accompany them).
+  - **Done 2026-11-06:** tag `1.6.0` at `350f629`; NuGet `1.6.0` indexed; GitHub release has six RID zips + SPDX asset.
 
-- [ ] **REL-04 · Post-release smoke test**
+- [x] **REL-04 · Post-release smoke test**
   - Extract `win-x64`, `linux-x64` and `MacOsX-arm64` bundles; run `XISOSharp -v`, `XISOSharp.Gui --probe-cli` and `XISOSharp.Gui --self-test <cli>`.
   - **Done when:** all three report 1.6.0 and `SELF-TEST: all passed`.
+  - **Done 2026-11-06:** release workflow smoke-tested `win-x64`, `linux-x64` and `MacOsX-arm64`; downloaded `win-x64` reports `XISOSharp v1.6.0`, `--probe-cli` reports 1.6.0, and `--self-test` prints `SELF-TEST: all passed`.
 
 ---
 
@@ -390,4 +391,6 @@ dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
 | 2026-11-06 | `REL-02` verification complete | 1.6.0 | Build 0/0; tests 2098/1 + 2162/1; format clean; InspectCode 0; pack OK; AOT, fuzz and synthetic battle passed |
 | 2026-11-06 | InspectCode/NU1903 cleanup | — | 44 InspectCode warnings fixed; ILCompiler pack pinned to 10.0.14 |
 | 2026-11-06 | macOS CWD test fix | 1.6.0 | Compare actual CWD before/after; avoids `/var` vs `/private/var` symlink mismatch |
+| 2026-11-06 | `REL-03` tagged and published | 1.6.0 | Tag `1.6.0` at `350f629`; NuGet indexed; GitHub release 6 zips + SPDX |
+| 2026-11-06 | `REL-04` post-release smoke | 1.6.0 | win/linux/macOS bundles passed; downloaded win-x64 CLI/GUI smoke passed |
 | | | | |
