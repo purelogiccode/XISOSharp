@@ -78,12 +78,12 @@ public sealed class GodBlockDevice : IBlockDevice
         }
 
         Info = info;
-        _fragments = new FileStream[info.Parts.Count - 1];
+        List<FileStream> fragments = new(info.Parts.Count - 1);
         try
         {
-            for (int index = 0; index < _fragments.Length; index++)
+            for (int index = 0; index < info.Parts.Count - 1; index++)
             {
-                _fragments[index] = new FileStream(
+                fragments.Add(new FileStream(
                     info.Parts[index + 1],
                     new FileStreamOptions
                     {
@@ -92,18 +92,20 @@ public sealed class GodBlockDevice : IBlockDevice
                         Share = share,
                         BufferSize = 1 << 16,
                         Options = FileOptions.RandomAccess,
-                    });
+                    }));
             }
         }
         catch
         {
-            foreach (FileStream? fragment in _fragments)
+            foreach (FileStream fragment in fragments)
             {
-                fragment?.Dispose();
+                fragment.Dispose();
             }
 
             throw;
         }
+
+        _fragments = fragments.ToArray();
     }
 
     /// <summary>Parsed header and fragment metadata.</summary>

@@ -253,8 +253,8 @@ public class PackFromDirectoryTests : IDisposable
         string isoA = Path.Combine(CreateTempDir(), "a.iso");
         string isoB = Path.Combine(CreateTempDir(), "b.iso");
 
-        using ManualResetEventSlim firstStarted = new(false);
-        using ManualResetEventSlim releaseFirst = new(false);
+        TaskCompletionSource<bool> firstStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> releaseFirst = new(TaskCreationOptions.RunContinuationsAsynchronously);
         int blocked = 0;
 
         bool priorQuiet = Logger.Quiet;
@@ -267,13 +267,14 @@ public class PackFromDirectoryTests : IDisposable
                     {
                         if (Interlocked.Exchange(ref blocked, 1) == 0)
                         {
-                            firstStarted.Set();
-                            releaseFirst.Wait(TimeSpan.FromSeconds(30));
+                            firstStarted.TrySetResult(true);
+                            releaseFirst.Task.Wait(TimeSpan.FromSeconds(30));
                         }
                     }),
                 CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
-            Assert.True(firstStarted.Wait(TimeSpan.FromSeconds(10)), "first pack never reported progress");
+            Task firstSignal = await Task.WhenAny(firstStarted.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+            Assert.True(ReferenceEquals(firstSignal, firstStarted.Task), "first pack never reported progress");
 
             Task<int> second = Task.Run(() => XisoWriter.PackFromDirectory(srcB, isoB));
             Task completed = await Task.WhenAny(second, Task.Delay(TimeSpan.FromSeconds(10)));
@@ -283,7 +284,7 @@ public class PackFromDirectoryTests : IDisposable
         }
         finally
         {
-            releaseFirst.Set();
+            releaseFirst.TrySetResult(true);
             if (first != null)
             {
                 Assert.Equal(0, await first);

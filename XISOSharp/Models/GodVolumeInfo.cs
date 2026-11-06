@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace XISOSharp.Models;
 
 /// <summary>
@@ -17,6 +19,8 @@ namespace XISOSharp.Models;
 /// Header path followed by the fragment files in image order. The first element
 /// is the header, not a sector-bearing part.
 /// </param>
+[SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global",
+    Justification = "Public SVOD mapping: fragment/block counts are diagnostic metadata for callers.")]
 public sealed record GodVolumeInfo(
     string HeaderPath,
     string DataDirectory,

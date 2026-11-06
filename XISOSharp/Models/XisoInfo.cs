@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace XISOSharp.Models;
 
 #pragma warning disable MA0048 // File name must match type name — related types are grouped intentionally
@@ -72,6 +74,8 @@ public record VolumeInfo(
 /// <param name="Attributes">Raw attribute byte (see <see cref="Constants"/> for flag definitions).</param>
 /// <param name="LeftChildOffset">Left child offset in the directory tree (0 if none).</param>
 /// <param name="RightChildOffset">Right child offset in the directory tree (0 if none).</param>
+[SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global",
+    Justification = "Public tree metadata: consumers may inspect child offsets; the library does not.")]
 public record EntryInfo(
     string Name,
     bool IsDirectory,

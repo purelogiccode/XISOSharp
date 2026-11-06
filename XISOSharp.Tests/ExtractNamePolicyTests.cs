@@ -324,8 +324,6 @@ public sealed class ExtractNamePolicyTests : IDisposable
             Logger.RealQuiet = false;
         }
 
-        internal string Output => _out.ToString();
-
         internal string Error => _error.ToString();
 
         public void Dispose()

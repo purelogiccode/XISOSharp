@@ -163,7 +163,7 @@ internal static class CliOutputGuard
     /// <summary>
     /// Compress/decompress output (explicit or derived default) must not be the
     /// source file itself. Split-part collisions beyond the base name are caught
-    /// by the library backstop (<see cref="CisoWriter.CompressToCso"/>).
+    /// by the library backstop (<c>CisoWriter.CompressToCso</c>).
     /// </summary>
     internal static string? CheckImageOutput(string source, string output)
     {

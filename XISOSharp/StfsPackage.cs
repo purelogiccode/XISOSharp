@@ -35,7 +35,6 @@ public sealed class StfsPackage : IDisposable
     private const int BlockSize = 0x1000;
     private const int HeaderReadSize = 0x971A;
     private const int HeaderSizeOffset = 0x340;
-    private const int ContentTypeOffset = XContentHeaderReader.ContentTypeOffset;
     private const int TitleIdOffset = XContentHeaderReader.TitleIdOffset;
     private const int DiscNumberOffset = XContentHeaderReader.DiscNumberOffset;
     private const int DiscCountOffset = XContentHeaderReader.DiscCountOffset;
@@ -64,10 +63,10 @@ public sealed class StfsPackage : IDisposable
     private const int MaxEntries = Constants.MaxTocEntriesPerTable;
 
     private readonly FileStream _stream;
+    private readonly long _streamLength;
     private readonly string _packagePath;
     private readonly long _firstBlockOffset;
     private readonly uint _totalBlockCount;
-    private readonly uint _freeBlockCount;
     private readonly ushort _fileTableBlockCount;
     private readonly uint _fileTableBlockNumber;
     private readonly bool _readOnlyFormat;
@@ -88,12 +87,13 @@ public sealed class StfsPackage : IDisposable
     private StfsPackage(FileStream stream, string packagePath)
     {
         _stream = stream;
+        _streamLength = stream.Length;
         _packagePath = Path.GetFullPath(packagePath);
 
-        if (stream.Length < HeaderReadSize)
+        if (_streamLength < HeaderReadSize)
         {
             throw new InvalidDataException(
-                $"STFS package '{packagePath}' is too small ({stream.Length} bytes).");
+                $"STFS package '{packagePath}' is too small ({_streamLength} bytes).");
         }
 
         byte[] header = new byte[HeaderReadSize];
@@ -127,7 +127,7 @@ public sealed class StfsPackage : IDisposable
         _blockStep1 = (uint)(BlocksPerHashLevel1 + ((EntriesPerHashTable + 1) * _blocksPerHashTable));
 
         _totalBlockCount = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(TotalBlockCountOffset));
-        _freeBlockCount = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(FreeBlockCountOffset));
+        uint freeBlockCount = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(FreeBlockCountOffset));
         _fileTableBlockCount = BinaryPrimitives.ReadUInt16LittleEndian(
             header.AsSpan(FileTableBlockCountOffset));
         _fileTableBlockNumber = ReadUInt24LittleEndian(header, FileTableBlockNumberOffset);
@@ -207,11 +207,11 @@ public sealed class StfsPackage : IDisposable
             header[DiscNumberOffset],
             header[DiscCountOffset],
             contentType,
-            stream.Length,
+            _streamLength,
             headerSize,
             _firstBlockOffset,
             _totalBlockCount,
-            _freeBlockCount,
+            freeBlockCount,
             _fileTableBlockCount,
             _fileTableBlockNumber,
             _readOnlyFormat,
@@ -386,7 +386,8 @@ public sealed class StfsPackage : IDisposable
         lock (_sync)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            ReadFileChunksCore(resolved, (buffer, offset, count) => destination.Write(buffer, offset, count));
+            ReadFileChunksCore(resolved, destination,
+                static (state, buffer, offset, count) => state.Write(buffer, offset, count));
         }
     }
 
@@ -596,7 +597,7 @@ public sealed class StfsPackage : IDisposable
             // A hostile header can claim far more blocks than the file can
             // hold; cap the walk at the physical block count so validation
             // cannot spin on a small, malformed package.
-            long availableBlocks = Math.Max(0, (_stream.Length - _firstBlockOffset) / BlockSize);
+            long availableBlocks = Math.Max(0, (_streamLength - _firstBlockOffset) / BlockSize);
             long blocksToCheck = Math.Min(_totalBlockCount, availableBlocks);
             if (_totalBlockCount > availableBlocks)
             {
@@ -825,7 +826,8 @@ public sealed class StfsPackage : IDisposable
     /// Streams one file's bytes to an internal sink. Used by the checksum
     /// walker so large files are never buffered in full.
     /// </summary>
-    internal void ReadFileChunks(StfsEntry entry, Action<byte[], int, int> sink)
+    internal void ReadFileChunks<TState>(StfsEntry entry, TState state,
+        Action<TState, byte[], int, int> sink)
     {
         ArgumentNullException.ThrowIfNull(sink);
         StfsEntry resolved = ResolveEntry(entry);
@@ -837,11 +839,12 @@ public sealed class StfsPackage : IDisposable
         lock (_sync)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            ReadFileChunksCore(resolved, sink);
+            ReadFileChunksCore(resolved, state, sink);
         }
     }
 
-    private void ReadFileChunksCore(StfsEntry entry, Action<byte[], int, int> sink)
+    private void ReadFileChunksCore<TState>(StfsEntry entry, TState state,
+        Action<TState, byte[], int, int> sink)
     {
         long remaining = entry.Size;
         if (remaining == 0)
@@ -862,7 +865,7 @@ public sealed class StfsPackage : IDisposable
 
             int toRead = (int)Math.Min(BlockSize, remaining);
             ReadBlockBytes(block, buffer.AsSpan(0, toRead));
-            sink(buffer, 0, toRead);
+            sink(state, buffer, 0, toRead);
             remaining -= toRead;
 
             if (index + 1 < blockCount)
@@ -1079,7 +1082,7 @@ public sealed class StfsPackage : IDisposable
         }
 
         long offset = _firstBlockOffset + checked((long)mapped * BlockSize);
-        if (offset < 0 || offset > _stream.Length - BlockSize)
+        if (offset < 0 || offset > _streamLength - BlockSize)
         {
             throw new InvalidDataException($"STFS block {block} points outside the package.");
         }
@@ -1105,7 +1108,7 @@ public sealed class StfsPackage : IDisposable
     {
         uint blockNumber = HashTableBlockNumber(block, level);
         long baseOffset = _firstBlockOffset + ((long)blockNumber * BlockSize);
-        if (baseOffset < 0 || baseOffset > _stream.Length - BlockSize)
+        if (baseOffset < 0 || baseOffset > _streamLength - BlockSize)
         {
             throw new InvalidDataException(
                 $"STFS hash table for block {block} (level {level}) points outside the package.");
@@ -1130,7 +1133,7 @@ public sealed class StfsPackage : IDisposable
             offset = baseOffset + ((parentInfo & 0x40000000) != 0 ? BlockSize : 0);
         }
 
-        if (offset > _stream.Length - BlockSize)
+        if (offset > _streamLength - BlockSize)
         {
             throw new InvalidDataException(
                 $"STFS hash table for block {block} (level {level}) points outside the package.");
@@ -1178,8 +1181,12 @@ public sealed class StfsPackage : IDisposable
     {
         try
         {
-            _stream.Position = BlockToOffset(block);
-            _stream.ReadExactly(destination);
+            lock (_sync)
+            {
+                _stream.Position = BlockToOffset(block);
+                _stream.ReadExactly(destination);
+            }
+
             error = null;
             return true;
         }
@@ -1255,8 +1262,11 @@ public sealed class StfsPackage : IDisposable
 
     private void ReadStreamBytes(int offset, Span<byte> destination)
     {
-        _stream.Position = offset;
-        _stream.ReadExactly(destination);
+        lock (_sync)
+        {
+            _stream.Position = offset;
+            _stream.ReadExactly(destination);
+        }
     }
 
     private byte[] GetHashTable(long offset)
@@ -1279,15 +1289,23 @@ public sealed class StfsPackage : IDisposable
     private byte[] ReadBlockBytes(long offset)
     {
         byte[] buffer = new byte[BlockSize];
-        _stream.Position = offset;
-        _stream.ReadExactly(buffer);
+        lock (_sync)
+        {
+            _stream.Position = offset;
+            _stream.ReadExactly(buffer);
+        }
+
         return buffer;
     }
 
     private void ReadBlockBytes(uint block, Span<byte> destination)
     {
-        _stream.Position = BlockToOffset(block);
-        _stream.ReadExactly(destination);
+        long offset = BlockToOffset(block);
+        lock (_sync)
+        {
+            _stream.Position = offset;
+            _stream.ReadExactly(destination);
+        }
     }
 
     private static uint ReadUInt24LittleEndian(ReadOnlySpan<byte> buffer, int offset) =>

@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace XISOSharp.Models;
 
 /// <summary>
@@ -23,6 +25,8 @@ namespace XISOSharp.Models;
 /// <param name="FileCount">Number of file entries in the file table.</param>
 /// <param name="DirectoryCount">Number of directory entries in the file table.</param>
 /// <param name="TotalFileSize">Sum of every file's declared size.</param>
+[SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global",
+    Justification = "Public package summary: every field is diagnostic metadata for callers and JSON output.")]
 public sealed record StfsPackageInfo(
     string PackagePath,
     StfsPackageKind Kind,

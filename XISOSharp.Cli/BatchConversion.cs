@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace XISOSharp.Cli;
@@ -6,6 +7,8 @@ namespace XISOSharp.Cli;
 /// Parsed <c>--batch</c> flags shared by the container verbs
 /// (<c>compress</c>, <c>decompress</c>, <c>convert</c> and <c>split</c>).
 /// </summary>
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global",
+    Justification = "AssumeYes/AssumeNo are set by the CLI parsers and read by BatchConversion.")]
 internal sealed class BatchOptions
 {
     /// <summary>Directory scanned for sources; <c>null</c> means single-source mode.</summary>

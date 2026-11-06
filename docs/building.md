@@ -178,7 +178,7 @@ packages and GitHub Actions, and security updates are enabled repository-wide.
 
 ## Releases
 
-Pushing a version tag (`1.5.0` or `v1.5.0`) does two independent things:
+Pushing a version tag (`1.6.0` or `v1.6.0`) does two independent things:
 
 - `ci.yml` packs and publishes `XISOSharp.<version>.nupkg` + `.snupkg` (the
   library is the only NuGet package) to NuGet.

@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace XISOSharp.Models;
 
 /// <summary>
@@ -20,6 +22,8 @@ namespace XISOSharp.Models;
 /// The payload is usually a PNG or JPEG image.
 /// </param>
 /// <param name="Info">Full XEX2 header metadata.</param>
+[SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global",
+    Justification = "Public title payload: XexPath is used by callers and JSON output, not by the parser core.")]
 public sealed record XexTitleInfo(
     string XexPath,
     string TitleName,

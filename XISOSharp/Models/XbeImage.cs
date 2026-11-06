@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace XISOSharp.Models;
 
 /// <summary>Identifies an image carried by an original-Xbox XBE executable.</summary>
@@ -26,6 +28,8 @@ public enum XbeImageKind
 /// <param name="Raw">Raw on-disk payload.</param>
 /// <param name="Png">PNG encoding of the decoded image, or <c>null</c> when unsupported.</param>
 /// <param name="Dds">DDS encoding of the image (passthrough or generated), or <c>null</c> when unsupported.</param>
+[SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global",
+    Justification = "Public image payload: Raw is consumed by the CLI/writer, not by the extraction core.")]
 public sealed record XbeImage(
     XbeImageKind Kind,
     string SectionName,

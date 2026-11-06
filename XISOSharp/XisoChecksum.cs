@@ -227,23 +227,12 @@ public static class XisoChecksum
             map["/" + entry.Path] = entry;
         }
 
-        using IncrementalHash? nativeHasher = SHA3_256.IsSupported
-            ? IncrementalHash.CreateHash(HashAlgorithmName.SHA3_256)
-            : null;
-        using Sha3256? managedHasher = nativeHasher == null ? new Sha3256() : null;
+        using StfsHashAccumulator hasher = new();
 
         foreach (KeyValuePair<string, StfsEntry> kv in map)
         {
             ct.ThrowIfCancellationRequested();
-            byte[] pathBytes = Encoding.UTF8.GetBytes(kv.Key);
-            if (nativeHasher != null)
-            {
-                nativeHasher.AppendData(pathBytes);
-            }
-            else
-            {
-                managedHasher!.AppendData(pathBytes);
-            }
+            hasher.Append(Encoding.UTF8.GetBytes(kv.Key));
 
             StfsEntry entry = kv.Value;
             if (entry.IsDirectory || entry.Size == 0)
@@ -251,20 +240,11 @@ public static class XisoChecksum
                 continue;
             }
 
-            package.ReadFileChunks(entry, (buffer, offset, count) =>
-            {
-                if (nativeHasher != null)
-                {
-                    nativeHasher.AppendData(buffer, offset, count);
-                }
-                else
-                {
-                    managedHasher!.AppendData(buffer, offset, count);
-                }
-            });
+            package.ReadFileChunks(entry, hasher,
+                static (state, buffer, offset, count) => state.Append(buffer, offset, count));
         }
 
-        return nativeHasher != null ? nativeHasher.GetHashAndReset() : managedHasher!.GetHashAndReset();
+        return hasher.GetHashAndReset();
     }
 
     /// <summary>Returns the lowercase hex representation of <see cref="ComputeStfsChecksum"/>.</summary>
@@ -486,5 +466,57 @@ public static class XisoChecksum
             Attributes = attrs,
             Name = name
         };
+    }
+
+    /// <summary>
+    /// SHA3-256 accumulator shared by the STFS checksum walk. Keeping the
+    /// hashers in one disposable object lets the chunk callback stay static, so
+    /// the streaming read never captures a disposed <c>using</c> variable.
+    /// </summary>
+    private sealed class StfsHashAccumulator : IDisposable
+    {
+        private readonly IncrementalHash? _native;
+        private readonly Sha3256? _managed;
+
+        internal StfsHashAccumulator()
+        {
+            _native = SHA3_256.IsSupported
+                ? IncrementalHash.CreateHash(HashAlgorithmName.SHA3_256)
+                : null;
+            _managed = _native == null ? new Sha3256() : null;
+        }
+
+        internal void Append(ReadOnlySpan<byte> data)
+        {
+            if (_native != null)
+            {
+                _native.AppendData(data);
+            }
+            else
+            {
+                _managed!.AppendData(data);
+            }
+        }
+
+        internal void Append(byte[] buffer, int offset, int count)
+        {
+            if (_native != null)
+            {
+                _native.AppendData(buffer, offset, count);
+            }
+            else
+            {
+                _managed!.AppendData(buffer, offset, count);
+            }
+        }
+
+        internal byte[] GetHashAndReset() =>
+            _native != null ? _native.GetHashAndReset() : _managed!.GetHashAndReset();
+
+        public void Dispose()
+        {
+            _native?.Dispose();
+            _managed?.Dispose();
+        }
     }
 }

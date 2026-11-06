@@ -1,6 +1,20 @@
 # Release Notes
 
-## Unreleased
+## 1.6.0
+
+**Release date:** 2026-11-06
+
+**Phase 10 Tier A + read-only Tier B slice.** This release adds Xbox 360
+XDBF/XSRC title metadata, XBE logo/title/save image extraction, the FATX split
+cap, batch `--delete-source`, GOD/STFS title naming, read-only GOD/SVOD sector
+input, XBLA/XBLIG STFS package listing/extraction and SHA-1 hash-tree
+validation, parallel CISO compression/extraction, the safe-extract name policy,
+and CWD-free writer/reader concurrency. The standalone `StfsSharp` package
+extraction is planned for 1.7.0; CCISharp 1.1 (LZ4-HC and parallel CCI
+compression) remains a separate track.
+
+Full suite green on all three targets: **2098 passed / 1 opt-in skip (2099) on
+net8.0/net9.0** and **2162 passed / 1 opt-in skip (2163) on net10.0**.
 
 ### Library
 
@@ -135,8 +149,8 @@
 
 ## 1.5.0
 
-**World-class library release.** This merges everything from the unreleased
-1.5.0/1.6.0 tree (CCI, split ISO, ZAR input, traversal hardening, batch
+**World-class library release.** This merges the 1.5.0 development work
+(CCI, split ISO, ZAR input, traversal hardening, batch
 conversion, JSON, preallocation and explicit layout packing) with the Phase 9
 productization work: an open-once `XisoImage` facade, full-image
 CRC32/MD5/SHA-1/SHA-256/SHA3-256, `.hash` verification, title metadata,

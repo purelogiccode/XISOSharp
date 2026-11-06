@@ -138,18 +138,7 @@ public static class GodHeader
             parts.Add(fragment);
         }
 
-        long length;
-        try
-        {
-            length = checked(((long)dataBlockCount + startingBlock) * 2 * Constants.SectorSize);
-        }
-        catch (OverflowException)
-        {
-            return false;
-        }
-
-        if (length <= 0)
-            return false;
+        long length = checked(((long)dataBlockCount + startingBlock) * 2 * Constants.SectorSize);
 
         info = new GodVolumeInfo(
             headerPath,

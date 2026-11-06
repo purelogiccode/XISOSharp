@@ -18,7 +18,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.320">
+    <!-- Pin the AOT compiler above the SDK's bundled 10.0.9 (GHSA-p3jp-9v83-76w9).
+         Updating the implicit pack avoids the "explicit PackageReference"
+         versioning warning from the ILCompiler targets. -->
+    <KnownILCompilerPack Update="Microsoft.DotNet.ILCompiler" ILCompilerPackVersion="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.321">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

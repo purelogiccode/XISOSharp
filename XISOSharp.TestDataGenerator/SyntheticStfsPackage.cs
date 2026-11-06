@@ -24,7 +24,6 @@ public static class SyntheticStfsPackage
     private const int BlockSize = 0x1000;
     private const int HeaderSize = 0xB000;
     private const int DirectoryEntrySize = 0x40;
-    private const int EntriesPerBlock = BlockSize / DirectoryEntrySize;
     private const int MaxDataBlocks = 170 * 170;
     private const uint ContentTypeXbla = 0x000D0000;
     private const uint ContentTypeXblig = 0x00000002;

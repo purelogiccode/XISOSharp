@@ -28,7 +28,9 @@ Deliberately out of scope:
   STFS writes stay out of scope. `StfsPackage.Validate` verifies the per-block
   SHA-1 hash tree (level-0/1/2 tables, top hash and header hash), but package
   signatures are not verified and the reader accepts XBLA/XBLIG/Community Game
-  content types (not saves, profiles or DLC packages).
+  content types (not saves, profiles or DLC packages). The readers currently
+  live in XISOSharp; extracting them into the standalone `StfsSharp` package is
+  planned for 1.7.0, with compatibility facades kept in XISOSharp.
 - CHD containers
 - XEX decryption or XBE editing
 - FUSE/Dokan mounting (see SimpleXisoDrive)

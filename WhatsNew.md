@@ -1,8 +1,11 @@
-# What's New in 1.6.0 (unreleased)
+# What's New in 1.6.0
+
+_Release date: 2026-11-06._
 
 XISOSharp 1.6.0 is the Phase 10 Tier A release (A1-A5), plus the first slice
 of Tier B: read-only GOD/SVOD sector input and XBLA/XBLIG STFS package
-listing/extraction.
+listing/extraction. Full suite green: **2098 passed / 1 opt-in skip on
+net8.0/net9.0** and **2162 passed / 1 opt-in skip on net10.0**.
 
 - **Concurrent creation and extraction**: `XisoWriter.CreateXiso`/`PackFromDirectory`
   use absolute source paths and per-operation progress state, so concurrent
@@ -74,7 +77,7 @@ listing/extraction.
 # What's New in 1.5.0
 
 XISOSharp 1.5.0 is the first public release since 1.4.4 and merges the
-unreleased 1.5/1.6 work (CCI, split ISO, ZAR input, traversal hardening, batch
+1.5.0 development work (CCI, split ISO, ZAR input, traversal hardening, batch
 conversion, JSON, preallocation and explicit layout packing) with the Phase 9
 "world-class library" work.
 

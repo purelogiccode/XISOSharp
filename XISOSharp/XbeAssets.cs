@@ -365,8 +365,8 @@ public static class XbeAssets
 
     private static XbeImage DecodeLogo(byte[] raw)
     {
-        byte[]? rgba = null;
-        string format = "Unknown";
+        byte[]? rgba;
+        string format;
         if (raw.Length == LogoWidth * LogoHeight * 4)
         {
             rgba = DxtDecoder.DecodeBgra32(raw, LogoWidth, LogoHeight);

@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace XISOSharp.Models;
 
 /// <summary>Outcome of one entry in a <c>.hash</c> verification run.</summary>
@@ -21,6 +23,8 @@ public enum HashVerificationStatus
 /// <param name="ExpectedSha1">SHA-1 from the hash file, or <c>null</c> for an extra image file.</param>
 /// <param name="ActualSha1">SHA-1 computed from the image, or <c>null</c> when the file is missing.</param>
 /// <param name="Status">Comparison outcome.</param>
+[SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global",
+    Justification = "Public verification payload: consumers render every field; the library only builds it.")]
 public sealed record HashVerificationEntry(
     string Path,
     string? ExpectedSha1,
@@ -34,6 +38,8 @@ public sealed record HashVerificationEntry(
 /// <param name="Missing">Entries absent from the image.</param>
 /// <param name="Extra">Image files not named by the hash file.</param>
 /// <param name="Entries">Per-file results, sorted by path.</param>
+[SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global",
+    Justification = "Public verification payload: consumers render the per-file entries; the library only builds it.")]
 public sealed record HashVerificationResult(
     int Checked,
     int Matched,

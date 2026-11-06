@@ -75,7 +75,7 @@ public class XbeAssetsTests : IDisposable
         WriteU32(span, cert + 0xA8, 1);
         WriteU32(span, cert + 0xAC, 0x00010000);
 
-        WriteU32(span, 0x50C, (uint)rawOffset);
+        WriteU32(span, 0x50C, rawOffset);
         WriteU32(span, 0x510, (uint)raw.Length);
         WriteU32(span, 0x514, 0x00010700);
         Encoding.ASCII.GetBytes(sectionName).CopyTo(span[0x700..]);

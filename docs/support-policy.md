@@ -6,7 +6,7 @@
 |---|---|---|
 | `net10.0` | **LTS** | Primary target; ships in the release bundles. |
 | `net9.0` | EOL (12 May 2026) | Still built/tested for source compatibility; no new features depend on it. |
-| `net8.0` | Supported until 10 Nov 2026 | Kept through the 1.5.x line; will be dropped in the next major after EOL. |
+| `net8.0` | Supported until 10 Nov 2026 | Kept through the 1.6.x line; will be dropped in the next major after EOL. |
 
 `netstandard2.0`/`net6.0` are **not** targets: the library uses
 `Span<T>`/`FileStreamOptions`/`SHA3_256` and modern BCL APIs. Consumers on older
@@ -21,8 +21,8 @@ frameworks can use the 1.4.x package line.
 - **Patch**: fixes only, no new public surface.
 
 The package validates against `PackageValidationBaselineVersion` (currently
-1.4.4) with a reviewed `CompatibilitySuppressions.xml` for the 1.5.0
-optional-parameter additions. Do not add suppressions without a written reason.
+1.4.4) with a reviewed `CompatibilitySuppressions.xml` for the 1.5.0/1.6.0
+additive API changes. Do not add suppressions without a written reason.
 
 ## Platform support
 

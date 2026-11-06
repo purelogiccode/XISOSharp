@@ -123,7 +123,7 @@ public sealed class GodBlockDeviceTests : IDisposable
     public void GodBlockDevice_ZeroFillsPrefixBeforeGameData()
     {
         string work = CreateTempDir("xiso_god_device");
-        (string header, _) = CreateGodHeader(work, "prefix-game", startingBlock: 4, dataBlockCount: 1);
+        string header = CreateGodHeader(work, "prefix-game", startingBlock: 4, dataBlockCount: 1);
         string dataDir = header + ".data";
         Directory.CreateDirectory(dataDir);
         File.WriteAllBytes(Path.Combine(dataDir, "Data0000"), []);
@@ -140,7 +140,7 @@ public sealed class GodBlockDeviceTests : IDisposable
     public void GodBlockDevice_EnhancedGdfUsesTheSecuritySectorArea()
     {
         string work = CreateTempDir("xiso_god_device");
-        (string header, _) = CreateGodHeader(
+        string header = CreateGodHeader(
             work, "enhanced", startingBlock: 0, dataBlockCount: 0x22, enhancedGdf: true);
 
         string dataDir = header + ".data";
@@ -171,7 +171,7 @@ public sealed class GodBlockDeviceTests : IDisposable
     {
         string work = CreateTempDir("xiso_god_device");
         const uint blocksPerFragment = 0xA1C4;
-        (string header, _) = CreateGodHeader(
+        string header = CreateGodHeader(
             work, "two-fragment", startingBlock: 0, dataBlockCount: blocksPerFragment + 1,
             dataFileCount: 2);
 
@@ -200,11 +200,11 @@ public sealed class GodBlockDeviceTests : IDisposable
     {
         string work = CreateTempDir("xiso_god_device");
 
-        (string noVolume, _) = CreateGodHeader(work, "stfs-volume", volumeType: 0);
+        string noVolume = CreateGodHeader(work, "stfs-volume", volumeType: 0);
         Directory.CreateDirectory(noVolume + ".data");
         Assert.False(GodHeader.TryReadVolume(noVolume, out _));
 
-        (string missing, _) = CreateGodHeader(work, "missing-fragment", dataFileCount: 2);
+        string missing = CreateGodHeader(work, "missing-fragment", dataFileCount: 2);
         Directory.CreateDirectory(missing + ".data");
         File.WriteAllBytes(Path.Combine(missing + ".data", "Data0000"), []);
         Assert.False(GodHeader.TryReadVolume(missing, out _));
@@ -213,7 +213,7 @@ public sealed class GodBlockDeviceTests : IDisposable
         Assert.True(GodHeader.IsGodContainer(missing));
         Assert.False(XisoImageSource.IsGodImage(missing));
 
-        (string zeroBlocks, _) = CreateGodHeader(work, "zero-blocks", dataBlockCount: 0);
+        string zeroBlocks = CreateGodHeader(work, "zero-blocks", dataBlockCount: 0);
         Directory.CreateDirectory(zeroBlocks + ".data");
         File.WriteAllBytes(Path.Combine(zeroBlocks + ".data", "Data0000"), []);
         Assert.False(GodHeader.TryReadVolume(zeroBlocks, out _));
@@ -361,7 +361,7 @@ public sealed class GodBlockDeviceTests : IDisposable
         int sectors = isoBytes.Length / Constants.SectorSize;
         uint dataBlocks = (uint)((sectors + 1) / 2);
 
-        (string header, _) = CreateGodHeader(
+        string header = CreateGodHeader(
             work, name, title, startingBlock, dataBlocks,
             dataFileCount: 1, enhancedGdf: enhancedGdf);
 
@@ -382,7 +382,7 @@ public sealed class GodBlockDeviceTests : IDisposable
         return (header, iso);
     }
 
-    private static (string Header, string DataDirectory) CreateGodHeader(
+    private static string CreateGodHeader(
         string work,
         string name,
         string title = "GOD Test",
@@ -411,7 +411,7 @@ public sealed class GodBlockDeviceTests : IDisposable
         BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(0x3A9), volumeType);
 
         File.WriteAllBytes(headerPath, header);
-        return (headerPath, headerPath + ".data");
+        return headerPath;
     }
 
     private static void WriteUInt24LittleEndian(Span<byte> buffer, int offset, uint value)
