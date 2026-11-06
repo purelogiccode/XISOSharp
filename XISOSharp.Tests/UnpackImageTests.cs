@@ -258,11 +258,12 @@ public class UnpackImageTests : IDisposable
         try
         {
             Directory.SetCurrentDirectory(workDir);
+            string expectedCwd = Directory.GetCurrentDirectory();
 
             int result = XisoReader.Extract(isoPath, dest, llCompat: false);
 
             Assert.Equal(0, result);
-            Assert.Equal(Path.GetFullPath(workDir), Directory.GetCurrentDirectory());
+            Assert.Equal(expectedCwd, Directory.GetCurrentDirectory());
             Assert.Equal(HashTree(src), HashTree(dest));
         }
         finally
@@ -282,11 +283,12 @@ public class UnpackImageTests : IDisposable
         try
         {
             Directory.SetCurrentDirectory(workDir);
+            string expectedCwd = Directory.GetCurrentDirectory();
 
             int result = XisoReader.Extract(isoPath, null, llCompat: false);
 
             Assert.Equal(0, result);
-            Assert.Equal(Path.GetFullPath(workDir), Directory.GetCurrentDirectory());
+            Assert.Equal(expectedCwd, Directory.GetCurrentDirectory());
             Assert.Equal(HashTree(src), HashTree(Path.Combine(workDir, "game")));
         }
         finally
@@ -311,6 +313,7 @@ public class UnpackImageTests : IDisposable
         try
         {
             Directory.SetCurrentDirectory(workDir);
+            string expectedCwd = Directory.GetCurrentDirectory();
             Logger.Quiet = true;
 
             int[] results = new int[2];
@@ -319,7 +322,7 @@ public class UnpackImageTests : IDisposable
                 () => results[1] = XisoReader.Extract(isoPath, second, llCompat: false));
 
             Assert.All(results, result => Assert.Equal(0, result));
-            Assert.Equal(Path.GetFullPath(workDir), Directory.GetCurrentDirectory());
+            Assert.Equal(expectedCwd, Directory.GetCurrentDirectory());
             Assert.Equal(HashTree(src), HashTree(first));
             Assert.Equal(HashTree(src), HashTree(second));
         }
