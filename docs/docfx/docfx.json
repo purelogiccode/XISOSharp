@@ -40,7 +40,7 @@
     "globalMetadata": {
       "_appTitle": "XISOSharp API Reference",
       "_appName": "XISOSharp",
-      "_appFooter": "XISOSharp API reference · generated with DocFX",
+      "_appFooter": "<style>#logo{width:32px;height:32px;margin-right:.55rem;flex:0 0 32px;object-fit:contain}@media(max-width:576px){#logo{width:28px;height:28px;flex-basis:28px}}</style>XISOSharp API reference · generated with DocFX",
       "_enableSearch": true,
       "_disableContribution": true,
       "_appLogoPath": "logo.svg",
