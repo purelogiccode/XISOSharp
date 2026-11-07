@@ -30,4 +30,5 @@
   - [Support Policy](support-policy.md)
   - [Threat Model](threat-model.md)
   - [Troubleshooting](troubleshooting.md)
+  - [Benchmarks](benchmarks.md)
   - [Release Notes](release-notes.md)

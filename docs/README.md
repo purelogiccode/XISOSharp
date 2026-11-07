@@ -70,7 +70,8 @@ The DocFX API link is absolute because the generated reference is published on P
 | Page | What it covers |
 |---|---|
 | [Building](building.md) | SDK requirements, build/publish, CI pipeline |
-| [Testing](testing.md) | Test suite, TestData, reference-tool comparison, benchmarks, BattleTests |
+| [Testing](testing.md) | Test suite, TestData, public corpus, reference-tool comparison, BattleTests |
+| [Benchmarks](benchmarks.md) | In-process BenchmarkDotNet baseline and reproducible extract-xiso/xdvdfs comparison |
 | [Contributing](contributing.md) | Contribution workflow, code style, PR guidelines |
 | [Troubleshooting](troubleshooting.md) | Common errors and how to resolve them |
 | [Release Notes](release-notes.md) | What changed in each release |
@@ -130,11 +131,11 @@ sit at the repository root with no grouping folders.
 | `XISOSharp.Gui` | Avalonia desktop app (dark-only, shells out to the CLI) |
 | `XISOSharpTester` | WPF GUI for batch regression testing against the reference C tool (Windows-only) |
 | `XISOSharp.Tests` | xUnit test suite |
-| `XISOSharp.Benchmarks` | BenchmarkDotNet benchmarks (AVL tree, Boyer–Moore, sector math) |
+| `XISOSharp.Benchmarks` | BenchmarkDotNet benchmarks (AVL tree, Boyer-Moore, sector math + end-to-end pack/list/extract/hash/CISO/CCI/large-image I/O) |
 | `XISOSharp.BattleTests` | CLI-vs-reference oracle harness (`extract-xiso` / `xdvdfs` / `xboxkit`) |
 | `XISOSharp.Fuzz` | Mutation fuzzer (TOC, CISO, CCI, ZAR, STFS, XBE/XEX) |
 | `XISOSharp.AotSmoke` | NativeAOT publish/run smoke check |
-| `XISOSharp.TestDataGenerator` | Deterministic `TestData/` fixture generator |
+| `XISOSharp.TestDataGenerator` | Deterministic `TestData/` fixture and public synthetic corpus generator |
 | `XISOSharp.Sample` | Library walkthrough console app |
 | `References/` | Reference sources: `extract-xiso` build `202609111233` (`extract-xiso.c`, same internal version 2.7.1, empty-dir rewrite fix), xdvdfs 0.8.3, XboxKit 0.7 |
 | `TestData/` | Fixtures used by tests and the output-comparison scripts |

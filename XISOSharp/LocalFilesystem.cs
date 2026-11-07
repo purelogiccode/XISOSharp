@@ -91,7 +91,9 @@ public sealed class LocalFilesystem(string? root = null) : IFilesystem
         {
             try
             {
-                stream.SetLength(expectedLength.Value);
+                // LIB-03: mark sparse before sizing, so a multi-GB destination's
+                // unwritten ranges stay holes instead of being zero-filled.
+                SparseFile.Prepare(stream, expectedLength.Value);
             }
             catch
             {

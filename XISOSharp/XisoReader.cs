@@ -7,6 +7,7 @@ using Microsoft.Win32.SafeHandles;
 using XISOSharp.BlockDevice;
 using XISOSharp.DataStructures;
 using XISOSharp.Interfaces;
+using XISOSharp.Logging;
 using XISOSharp.Models;
 
 namespace XISOSharp;
@@ -1512,7 +1513,7 @@ public static class XisoReader
                 {
                     if (fileSize > 0)
                     {
-                        direct.SetLength(fileSize);
+                        SparseFile.Prepare(direct, fileSize);
                     }
                 }
                 catch
@@ -2329,6 +2330,7 @@ public static class XisoReader
         IFilesystem? filesystem = null,
         bool preserveAttributes = false)
     {
+        using IDisposable logScope = XisoLogScope.Begin(unpackOptions?.Log);
         outIsoPath = null;
 
         // Batch scripts can pass an empty -d (`-d "%UNSET_VAR%"`): fail fast
@@ -4256,7 +4258,7 @@ public static class XisoReader
             {
                 if (entry.FileSize > 0)
                 {
-                    direct.SetLength(entry.FileSize);
+                    SparseFile.Prepare(direct, entry.FileSize);
                 }
             }
             catch

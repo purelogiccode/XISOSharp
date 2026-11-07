@@ -60,7 +60,8 @@ public partial class MainWindow : Window
     private const int RewriteTab = 2;
     private const int RebuildTab = 3;
     private const int DecompressTab = 6;
-    private const int BatchTab = 8;
+    private const int XboxTab = 7;
+    private const int BatchTab = 9;
 
     /// <summary>
     /// Initializes the window and subscribes drag-over/drop handlers.
@@ -374,6 +375,15 @@ public partial class MainWindow : Window
                 return;
             }
 
+            // GOD/SVOD containers and STFS packages have no image extension;
+            // route them to the Xbox 360 tab before the generic image/folder
+            // handlers can mistake them for pack sources.
+            if (paths.Count == 1 && IsXboxContainer(paths[0]))
+            {
+                RouteXbox(paths[0]);
+                return;
+            }
+
             List<string> images = paths.Where(p => File.Exists(p) && IsImage(p)).ToList();
             List<string> dirs = paths.Where(Directory.Exists).ToList();
             foreach (string skipped in paths.Except(images, StringComparer.OrdinalIgnoreCase)
@@ -435,7 +445,11 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (IsZar(image))
+            if (IsXboxContainer(image))
+            {
+                RouteXbox(image);
+            }
+            else if (IsZar(image))
             {
                 Vm.ExImage = image;
                 OpTabs.SelectedIndex = ExtractTab;
@@ -465,6 +479,12 @@ public partial class MainWindow : Window
     {
         try
         {
+            if (IsXboxContainer(dir))
+            {
+                RouteXbox(dir);
+                return;
+            }
+
             // A folder full of .iso images reads as a batch library; anything
             // else (including .cso/.zar/.img-only folders, which CLI --batch
             // would reject with "no .iso files found") reads as files to pack.
@@ -516,6 +536,47 @@ public partial class MainWindow : Window
             {
                 // ignored
             }
+        }
+    }
+
+    private void RouteXbox(string path)
+    {
+        Vm.XbSource = path;
+        OpTabs.SelectedIndex = XboxTab;
+        Vm.LogMessage($"[GUI] Drop: GOD/STFS input routed to the Xbox 360 tab: {path}");
+    }
+
+    /// <summary>
+    /// Detects a GOD/SVOD container (header file or <c>.data</c> folder) or a
+    /// single-file STFS package. A parent folder containing a GOD header is also
+    /// accepted so dropping the game folder works.
+    /// </summary>
+    private static bool IsXboxContainer(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                return GodHeader.IsGodContainer(path) || StfsPackage.IsStfsPackage(path);
+            }
+
+            if (!Directory.Exists(path))
+            {
+                return false;
+            }
+
+            if (GodHeader.IsGodContainer(path))
+            {
+                return true;
+            }
+
+            return Directory.EnumerateFiles(path).Any(static file =>
+                GodHeader.IsGodContainer(file) || StfsPackage.IsStfsPackage(file));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or ArgumentException or NotSupportedException)
+        {
+            return false;
         }
     }
 
@@ -1144,6 +1205,84 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse batch destination failed");
+            try
+            {
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+    }
+
+    private async void BrowseXbSourceFile_ClickAsync(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            MainViewModel vm = Vm;
+            string? picked = await PickSingleFileAsync([ImageFilter], "Select Xbox 360 image or package")
+                .ConfigureAwait(false);
+            if (picked is not null)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => vm.XbSource = picked);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Browse Xbox 360 source file failed");
+            try
+            {
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+    }
+
+    private async void BrowseXbSourceFolder_ClickAsync(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            MainViewModel vm = Vm;
+            string? picked = await PickFolderAsync("Select GOD/SVOD header or .data folder")
+                .ConfigureAwait(false);
+            if (picked is not null)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => vm.XbSource = picked);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Browse Xbox 360 source folder failed");
+            try
+            {
+                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+    }
+
+    private async void BrowseXbDest_ClickAsync(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            MainViewModel vm = Vm;
+            string? picked = await PickFolderAsync("Select Xbox 360 destination")
+                .ConfigureAwait(false);
+            if (picked is not null)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => vm.XbDest = picked);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Browse Xbox 360 destination failed");
             try
             {
                 VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");

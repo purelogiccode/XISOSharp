@@ -30,6 +30,10 @@ internal static class SelfTest
                 ["-d", "out", "-x", "-n", "a.iso"]);
             Check("extract-nodest", CliCommands.Extract(["a.iso", "b.cso"], null, overwrite: true),
                 ["-x", "-y", "a.iso", "b.cso"]);
+            Check("extract-jobs", CliCommands.Extract(["a.iso"], null, overwrite: false, jobs: 4),
+                ["--jobs", "4", "-x", "-n", "a.iso"]);
+            Check("unpack-jobs", CliCommands.Unpack("a.iso", "out", jobs: 3),
+                ["--jobs", "3", "--unpack", "a.iso", "out"]);
             Check("list", CliCommands.List(["a.iso"]), ["-l", "a.iso"]);
             Check("tree", CliCommands.Tree(["a.iso"]), ["-t", "a.iso"]);
             Check("info", CliCommands.Info("a.iso", "/default.xbe"), ["-i", "a.iso", "/default.xbe"]);
@@ -59,6 +63,16 @@ internal static class SelfTest
                 [
                     "compress", "--format", "cci", "--cci-level", "9", "--cci-split", "0", "a.iso", "a.cci", "-n"
                 ]);
+            Check("compress-jobs", CliCommands.Compress("a.iso", null, 12, 2, "0", overwrite: false, "cci",
+                jobs: 8),
+                [
+                    "compress", "--format", "cci", "--cci-level", "12", "--cci-split", "0", "--jobs", "8",
+                    "a.iso", "-n"
+                ]);
+            Check("title-info", CliCommands.TitleInfo("game", json: true), ["title-info", "game", "--json"]);
+            Check("audit", CliCommands.Audit("game"), ["-V", "game"]);
+            Check("xbe-image", CliCommands.XbeImage("a.iso", "/default.xbe", "logo", "out.png"),
+                ["--xbe-image", "a.iso", "/default.xbe", "--type", "logo", "-o", "out.png"]);
             Check("zar", CliCommands.Zar("a.iso", "a.zar", "skip"),
                 ["--zar", "--policy", "skip", "-o", "a.zar", "a.iso"]);
             Check("zar-derived", CliCommands.Zar("a.iso", null, null), ["--zar", "a.iso"]);

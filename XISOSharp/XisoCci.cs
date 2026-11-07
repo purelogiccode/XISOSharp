@@ -225,18 +225,63 @@ public static class XisoCci
 
         using (file)
         {
-            CciExtractOptions options = new()
+            string temp = output + ".tmp";
+            try
             {
-                Overwrite = overwrite,
-                Progress = progress is null ? null : new ProgressAdapter(progress),
-                CancellationToken = ct,
-            };
+                if (File.Exists(output) && !overwrite)
+                {
+                    throw new IOException($"Output already exists: {output}");
+                }
 
-            error = file!.ExtractToIso(output, options);
-            ThrowForError(error, output, ct);
+                TryDelete(temp);
+                long length = file!.Length;
+                using (FileStream destination = new(temp, FileMode.CreateNew, FileAccess.Write,
+                           FileShare.None, 1 << 20, FileOptions.SequentialScan))
+                {
+                    using Stream source = file.OpenStream();
+                    CopyCciToSparse(source, destination, length, output, progress, ct);
+                }
+
+                File.Move(temp, output, overwrite);
+            }
+            catch
+            {
+                TryDelete(temp);
+                throw;
+            }
         }
 
+        progress?.Report(new ProgressInfo(ProgressInfoType.FileAdded, Path: output));
+        progress?.Report(new ProgressInfo(ProgressInfoType.FinishedPacking));
         return 0;
+    }
+
+    /// <summary>
+    /// Copies a decoded CCI stream into a pre-sized sparse file. Kept separate
+    /// so the destination is disposed by its owner after the copy completes.
+    /// </summary>
+    private static void CopyCciToSparse(Stream source, FileStream destination, long length,
+        string output, IProgress<ProgressInfo>? progress, CancellationToken ct)
+    {
+        // LIB-03: mark and pre-size before copying so zero sectors and any
+        // unwritten tail occupy no physical space where supported.
+        bool sparse = SparseFile.TryEnable(destination);
+        SparseFile.Prepare(destination, length);
+
+        XisoFileCopier.CopyExact(
+            source,
+            length,
+            (buffer, count) =>
+                SparseFile.WriteOrSeekZeros(destination, buffer.AsSpan(0, count), sparse),
+            buffer: null,
+            copied => progress?.Report(new ProgressInfo(
+                ProgressInfoType.FileProgress,
+                Count: length,
+                Path: output,
+                Size: copied)),
+            ct);
+
+        destination.SetLength(length);
     }
 
     /// <summary>

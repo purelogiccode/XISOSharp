@@ -465,7 +465,7 @@ public static class XisoZarchive
 
     /// <summary>
     /// Converts a ZArchive to a plain ISO by extracting to a temporary
-    /// directory and packing it with <see cref="XisoWriter.PackFromDirectory"/>.
+    /// directory and packing it with <c>XisoWriter.PackFromDirectory</c>.
     /// </summary>
     /// <param name="zarPath">Path to the <c>.zar</c> archive.</param>
     /// <param name="isoPath">Destination ISO path; defaults to the archive name with <c>.iso</c>.</param>
@@ -666,8 +666,9 @@ public static class XisoZarchive
                 // destination before the first write and copy exactly that many
                 // bytes (a truncated archive now fails instead of silently
                 // producing a short file).
-                target.SetLength(expectedLength);
-                CopyZarFile(source, target, destination, expectedLength, progress, ct, state);
+                bool sparse = SparseFile.TryEnable(target);
+                SparseFile.Prepare(target, expectedLength);
+                CopyZarFile(source, target, destination, expectedLength, sparse, progress, ct, state);
                 state.TotalBytes += expectedLength;
             }
             catch
@@ -683,12 +684,12 @@ public static class XisoZarchive
     }
 
     private static void CopyZarFile(Stream source, Stream destination, string destinationPath, long size,
-        IProgress<ProgressInfo>? progress, CancellationToken ct, ZarExtractState state)
+        bool sparse, IProgress<ProgressInfo>? progress, CancellationToken ct, ZarExtractState state)
     {
         XisoFileCopier.CopyExact(
             source,
             size,
-            (buffer, count) => destination.Write(buffer, 0, count),
+            (buffer, count) => SparseFile.WriteOrSeekZeros(destination, buffer.AsSpan(0, count), sparse),
             buffer: null,
             copied => progress?.Report(new ProgressInfo(
                 ProgressInfoType.FileProgress,

@@ -19,7 +19,7 @@
 |---|---|
 | Package ID | `XISOSharp` |
 | Target frameworks | `net8.0`, `net9.0`, `net10.0` |
-| Dependencies | `ZArchiveSharp` (ZAR), `CCISharp` (CCI/CCIM) |
+| Dependencies | `ZArchiveSharp` (ZAR), `CCISharp` (CCI/CCIM), `StfsSharp` (GOD/SVOD and XBLA/XBLIG STFS) |
 | Signing | strong-named assembly |
 | Trimming / AOT | `IsTrimmable`, `IsAotCompatible` |
 | Versioning | MinVer from git tags (format `v1.0.2` / `1.0.2`) |
@@ -48,6 +48,8 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | [`XisoWriter`](api-xisowriter.md) | Create and rewrite images + `build-image` remap (`CreateFromRemapTree`) |
 | [`XisoPatcher`](api-xisoreader.md#copyin) / [`DirectoryEntryTableWriter`](api-xisowriter.md#directoryentrytablewriter) | In-place file patching (`CopyIntoImage`) + single-table build/serialize primitive |
 | [`Logger`](api-utilities.md#logger) | Configurable text output with quiet/silent modes |
+| `ISourceFilesystem` / `SourceEntry` | Read-side source store for packing without host paths (1.8) |
+| `IXisoLogger` / `XisoLogOptions` / `XisoLogScope` | Per-call log sinks for concurrent operations (1.8) |
 | [`GlobMatcher`/`WaxGlob`](api-utilities.md#globmatcher) | Glob matching for `-X` + ordered `wax` captures `{0}`/`{n}` for `build-image` |
 | [`AvlTree`](api-utilities.md#avltree) | AVL tree operations on directory entries |
 | [`BoyerMoore`](api-utilities.md#boyermoore) | Pattern search used for `.xbe` media patching |
@@ -182,6 +184,61 @@ operations — through the optional `ProgressCallback` (`long currentBytes, long
 totalBytes`) and the structured `IProgress<ProgressInfo>` channel (`FileCount`,
 `DirCount`, `DirAdded`, `FileAdded`, `FinishedPacking` events, plus per-chunk
 `FileProgress` while extracting — see [`ProgressInfo`](api-utilities.md#records)).
+
+### Per-call logging (1.8)
+
+`Logger` stays the compatibility path. For concurrent operations, route one
+operation to an isolated sink instead:
+
+```csharp
+using XISOSharp.Logging;
+
+sealed class MySink : IXisoLogger
+{
+    public void Log(string message) => Console.WriteLine(message);
+    public void LogWarning(string message) => Console.Error.WriteLine(message);
+    public void LogError(string message) => Console.Error.WriteLine(message);
+    public void LogDebug(string message) { }
+}
+
+using (XisoLogScope.Begin(new XisoLogOptions { Sink = new MySink() }))
+{
+    XisoWriter.PackFromDirectory("src", "game.iso");
+}
+```
+
+Scopes use `AsyncLocal`, so two tasks can log to separate sinks. Static
+`Logger.Out`/`Error` writes are suppressed while a sink scope is active (set
+`SuppressStaticOutput = false` to keep both). `UnpackOptions.Log` applies a sink
+to extraction, and the new `ISourceFilesystem` writer overloads accept a
+`XisoLogOptions` argument.
+
+### Packing from a source filesystem (1.8)
+
+`ISourceFilesystem` is the read-side counterpart to `IFilesystem`:
+
+```csharp
+MemoryFilesystem source = new();
+using (Stream stream = source.CreateFile("src/readme.txt"))
+    stream.Write("hello"u8);
+
+// MemoryFilesystem implements both IFilesystem (destination) and
+// ISourceFilesystem (source); the image is byte-identical to a host pack.
+XisoWriter.PackFromDirectory(source, "src", "game.iso", fileTime: 0);
+```
+
+`DirectoryExists`, `EnumerateEntries`, and `OpenRead` are the only required
+members; entries are root-relative with `/` separators. The writer sorts them
+ordinally and reads sequentially, so custom stores do not need to be
+thread-safe.
+
+### Sparse outputs (1.8)
+
+Writer output, `LocalFilesystem.CreateFile(path, expectedLength)`, XISO
+extraction, CISO/CCI decompression and ZAR extraction mark pre-sized files
+sparse where the OS supports it (NTFS `FSCTL_SET_SPARSE`; Unix holes are
+implicit) and skip all-zero chunks. The same call sites keep a dense fallback
+when marking fails, so behavior is unchanged on unsupported file systems.
 
 ## Quick samples
 

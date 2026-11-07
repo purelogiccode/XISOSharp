@@ -9,7 +9,7 @@ namespace XISOSharp;
 /// (<see cref="Constants.MaxTocDepth"/>, per-table entry cap, cycle tracking)
 /// copies every entry reachable without tripping a truncation or structural
 /// gate into a staging directory, then repacks it through the
-/// <see cref="XisoWriter.CreateXiso"/> pipeline into a fresh plain
+/// <c>XisoWriter.CreateXiso</c> pipeline into a fresh plain
 /// <c>.iso</c>. The source image is only ever read — never written, so no
 /// backup is needed and CISO/CCI input is allowed (reads go through the
 /// decompressed view).

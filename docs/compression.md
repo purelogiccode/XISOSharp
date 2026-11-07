@@ -102,7 +102,9 @@ normative description is
 [`Team-Resurgent/libCCI` `FORMAT.md`](https://github.com/Team-Resurgent/libCCI/blob/main/FORMAT.md).
 
 XISOSharp consumes [CCISharp](https://github.com/purelogiccode/CCISharp) 1.1.0,
-an independent MIT implementation (no GPL code). The API surface:
+an independent MIT implementation (no GPL code). CCI extraction pre-sizes the
+output, marks it sparse where supported and skips all-zero chunks (1.8.0); the
+bytes and final ISO length are unchanged. The API surface:
 
 ```csharp
 // Compress any supported source (ISO, split ISO, CISO, CCI or a directory).

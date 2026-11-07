@@ -1,4 +1,14 @@
-# What's New in 1.8.0 (unreleased)
+# What's New in 1.8.0
+
+_Release date: 2026-11-07._
+
+XISOSharp 1.8.0 is the hardening release: custom source filesystems, per-call
+logging, sparse pre-sized outputs, deterministic property coverage, benchmark
+comparisons, a public synthetic corpus and a new Xbox 360 GUI tab. No read/write
+behavior changed and no public API was removed; the package validates against
+1.7.0.
+
+## CCISharp 1.1
 
 XISOSharp now integrates **CCISharp 1.1**:
 
@@ -10,6 +20,49 @@ XISOSharp now integrates **CCISharp 1.1**:
   starts at `game.1.cci`; the writer keeps the `.1.cci` … `.9.cci` layout.
 - `XisoCci.CompressToCci` gains a `jobs` overload. Existing code and read verbs
   are unchanged.
+
+## Library
+
+- **Pack from any source store.** `ISourceFilesystem` is the read-side
+  counterpart to `IFilesystem`; `MemoryFilesystem` implements both. New
+  `XisoWriter.CreateXiso`/`PackFromDirectory` overloads pack a custom store
+  without host source paths and produce a byte-identical image.
+- **Per-call logging.** `IXisoLogger`, `XisoLogOptions` and `XisoLogScope` route
+  one operation's output to an isolated sink (also via `UnpackOptions.Log`).
+  Concurrent operations no longer have to share the static `Logger` writers.
+- **Sparse outputs.** Pre-sized writer/extraction outputs use sparse files on
+  NTFS and Unix; CISO/CCI decompression and ZAR extraction skip all-zero
+  chunks. Dense behavior remains the fallback.
+- **Property-style tests.** Seeded round-trip coverage for pack/extract,
+  split/join, CISO, CCI and ISO/ZAR at boundary sizes (empty, one byte, sector,
+  sector+1, compression threshold).
+- **Benchmarks.** Extract, CCI compress/decompress and a 64 MiB random-read case
+  join the end-to-end suite; [Benchmarks](docs/benchmarks.md) records the
+  in-process and CLI-comparison numbers with a reproducible script.
+- **Support policy.** `net10.0` is the primary target; `net8.0`/`net9.0` are
+  compatibility-only through 1.x and will be removed in 2.0.0.
+
+## Xbox 360 GUI
+
+- New **Xbox 360** tab: open GOD/SVOD headers or `.data` folders,
+  XBLA/XBLIG STFS packages and images; list, tree, extract, unpack and audit
+  (`-V`) with the same CLI verbs as the command line.
+- **Title panel** parses `title-info --json` for XBE/XEX/GOD/STFS.
+- **XBE preview** renders the logo, `$$XTIMAGE` title and `$$XSIMAGE` save
+  asset, with a clean message when an asset is absent or unsupported.
+- Drag/drop routes GOD/STFS inputs to the new tab.
+- Extraction and CISO/CCI compression expose `--jobs 1..64`; CCI levels
+  `10..12` (LZ4-HC) are selectable.
+
+## Docs and test infrastructure
+
+- The DocFX API reference is live and CI now fails on broken local documentation
+  links.
+- `XISOSharp.TestDataGenerator --corpus` generates the public synthetic corpus
+  (XISO, split ISO, CISO, CCI, ZAR, GOD/SVOD, XBLA/XBLIG STFS, XBE/XEX and corrupt
+  variants) with a SHA-256 manifest; tests and BattleTests consume it.
+- Package validation baseline moved to 1.7.0; the 1.4.4-era suppressions were
+  retired.
 
 # What's New in 1.7.0
 

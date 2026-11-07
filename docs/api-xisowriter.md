@@ -42,6 +42,42 @@ into an ISO with a 1:1 mapping: it takes a single output ISO path (creating the
 output directory as needed) instead of separate directory/name arguments. Repacking an
 existing ISO is `XisoReader.Rewrite` (the CLI's `--pack <iso>` maps to it).
 
+### Source filesystem overloads (1.8)
+
+```csharp
+public static int PackFromDirectory(
+    ISourceFilesystem sourceFilesystem,
+    string sourceRoot,
+    string outputIsoPath,
+    IReadOnlyList<string>? excludePatterns = null,
+    ProgressCallback? progressCallback = null,
+    CancellationToken cancellationToken = default,
+    IProgress<ProgressInfo>? progress = null,
+    ulong? fileTime = null,
+    XisoLayoutSpec? layout = null,
+    XisoLogOptions? log = null)
+
+public static int CreateXiso(
+    ISourceFilesystem sourceFilesystem,
+    string sourceRoot,
+    string? outputDirectory,
+    out string? outIsoPath,
+    string? inName,
+    ProgressCallback? progressCallback = null,
+    CancellationToken cancellationToken = default,
+    IReadOnlyList<string>? excludePatterns = null,
+    IProgress<ProgressInfo>? progress = null,
+    ulong? fileTime = null,
+    XisoLayoutSpec? layout = null,
+    XisoLogOptions? log = null)
+```
+
+`sourceRoot` is root-relative (`""` for the store root); entries are enumerated
+with `EnumerateEntries` and read with `OpenRead`, so no host source path is
+required. `MemoryFilesystem` implements `ISourceFilesystem` directly. Async
+variants (`PackFromDirectoryAsync`) accept the same arguments. Outputs are
+byte-identical to packing an equivalent host directory.
+
 ```csharp
 public static int CreateXiso(
     string rootDirectory,

@@ -237,6 +237,34 @@ public class CliCommandsTests
         Assert.ThrowsAny<ArgumentException>(() => CliCommands.Batch("dir", false, string.Empty, null, false));
     }
 
+    /// <summary>Verifies extract/unpack/compress only add --jobs when parallel.</summary>
+    [Fact]
+    public void Jobs_AreEmittedOnlyAboveOne()
+    {
+        Assert.Equal(["-x", "-n", "a.iso"], CliCommands.Extract(["a.iso"], null, false));
+        Assert.Equal(["--jobs", "4", "-x", "-n", "a.iso"],
+            CliCommands.Extract(["a.iso"], null, false, jobs: 4));
+        Assert.Equal(["--unpack", "a.iso"],
+            CliCommands.Unpack("a.iso", null));
+        Assert.Equal(["--jobs", "3", "--unpack", "a.iso", "out"],
+            CliCommands.Unpack("a.iso", "out", jobs: 3));
+        Assert.Equal(["--unpack", "a.iso", "out"], CliCommands.Unpack("a.iso", "out"));
+        Assert.Equal(["compress", "--ciso-level", "9", "--ciso-version", "2", "--jobs", "8",
+                "game.iso", "-n"],
+            CliCommands.Compress("game.iso", null, 9, 2, null, overwrite: false, jobs: 8));
+    }
+
+    /// <summary>Verifies the Xbox 360 tab builders put flags before positionals.</summary>
+    [Fact]
+    public void Xbox360_Builders_Exact()
+    {
+        Assert.Equal(["title-info", "game", "--json"], CliCommands.TitleInfo("game", json: true));
+        Assert.Equal(["title-info", "game"], CliCommands.TitleInfo("game", json: false));
+        Assert.Equal(["-V", "game"], CliCommands.Audit("game"));
+        Assert.Equal(["--xbe-image", "game.iso", "/default.xbe", "--type", "title", "-o", "out.png"],
+            CliCommands.XbeImage("game.iso", "/default.xbe", "title", "out.png"));
+    }
+
     /// <summary>Verifies extract and rewrite keep every flag ahead of the image positionals.</summary>
     [Fact]
     public void ExtractAndRewrite_FlagsPrecedeImages()

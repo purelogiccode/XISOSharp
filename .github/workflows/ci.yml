@@ -157,6 +157,45 @@ jobs:
           path: TestResults/**/coverage.cobertura.xml
           if-no-files-found: warn
 
+  docs-links:
+    name: docs-links (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.Build.props
+            global.json
+            dotnet-tools.json
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Build DocFX metadata
+        run: dotnet docfx metadata docs/docfx/docfx.json
+
+      - name: Stage Docsify site
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp -R docs/. _site/
+          rm -rf _site/docfx _site/api
+
+      - name: Build DocFX API reference
+        run: dotnet docfx build docs/docfx/docfx.json --output _site/api
+
+      - name: Check local documentation links
+        run: python3 scripts/check_docs_links.py _site
+
   aot-smoke:
     name: aot-smoke (linux)
     runs-on: ubuntu-latest

@@ -39,7 +39,7 @@ public sealed record XisoLayoutEntry(
 /// Phase 8, xdvdfs #49). Load one from the JSON emitted by
 /// <c>--sector-layout --json</c>/<see cref="XisoReader.GetSectorLayout(string)"/>
 /// or from a compact <c>path=sector</c> text file, then pass it to
-/// <see cref="XisoWriter.CreateXiso"/> or <see cref="XisoWriter.PackFromDirectory"/>.
+/// <c>XisoWriter.CreateXiso</c> or <c>XisoWriter.PackFromDirectory</c>.
 /// </summary>
 /// <remarks>
 /// Every entry is a fixed extent: the packer writes the matching file or

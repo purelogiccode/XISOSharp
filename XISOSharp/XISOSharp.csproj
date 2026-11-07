@@ -59,9 +59,10 @@
     <!-- API compatibility validation across target frameworks -->
     <EnablePackageValidation>true</EnablePackageValidation>
     <EnableStrictModeForPackageValidation>true</EnableStrictModeForPackageValidation>
-    <!-- Compare against the last published package; additive 1.5.0 APIs are
-         allowed, accidental removals/renames fail the pack. -->
-    <PackageValidationBaselineVersion>1.4.4</PackageValidationBaselineVersion>
+    <!-- Compare against the last published package; additive APIs are allowed,
+         accidental removals/renames fail the pack. Updated with each stable
+         release (1.8.0 validates against 1.7.0). -->
+    <PackageValidationBaselineVersion>1.7.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>

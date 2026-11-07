@@ -4,18 +4,19 @@ using XISOSharp.Interfaces;
 namespace XISOSharp;
 
 /// <summary>
-/// <see cref="IFilesystem"/> backed by process memory: extraction without
-/// touching the disk (xdvdfs #166, TODO #7 — the web/wasm unpacker's
-/// destination, and the library/GUI route for previewing or piping files).
+/// <see cref="IFilesystem"/> and <see cref="ISourceFilesystem"/> backed by
+/// process memory: extraction or packing without touching the disk (xdvdfs
+/// #166, TODO #7 - the web/wasm unpacker's destination, and the library/GUI
+/// route for previewing or piping files).
 /// Files are committed byte snapshots: each <see cref="CreateFile(string)"/> stream
 /// buffers in memory and publishes its bytes on dispose, so completed files
 /// are visible to <see cref="FileExists"/>, <see cref="FileLength"/>,
 /// <see cref="ReadAllBytes"/>, and <see cref="FileNames"/> immediately after the
 /// unpack writes them. Re-creating a file replaces it (truncates). Parent
 /// directories of a created file are materialized automatically. Not
-/// thread-safe; unpacking writes sequentially.
+/// thread-safe; unpacking writes and packing reads sequentially.
 /// </summary>
-public sealed class MemoryFilesystem : IFilesystem
+public sealed class MemoryFilesystem : IFilesystem, ISourceFilesystem
 {
     private readonly Dictionary<string, byte[]> _files = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _directories = new(StringComparer.OrdinalIgnoreCase);
@@ -97,6 +98,81 @@ public sealed class MemoryFilesystem : IFilesystem
 
     /// <inheritdoc/>
     public void DeleteFile(string path) => _files.Remove(Normalize(path));
+
+    /// <inheritdoc/>
+    public bool DirectoryExists(string path)
+    {
+        string key = Normalize(path);
+        return key.Length == 0 || _directories.Contains(key);
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<SourceEntry> EnumerateEntries(string path)
+    {
+        string key = Normalize(path);
+        if (!DirectoryExists(key))
+        {
+            throw new DirectoryNotFoundException($"Source directory not found: {path}");
+        }
+
+        Dictionary<string, SourceEntry> entries = new(StringComparer.OrdinalIgnoreCase);
+        foreach ((string filePath, byte[] bytes) in _files)
+        {
+            SplitEntry(filePath, key, out string parent, out string name);
+            if (name.Length > 0 && string.Equals(parent, key, StringComparison.OrdinalIgnoreCase))
+            {
+                entries[name] = new SourceEntry(name, IsDirectory: false, bytes.LongLength);
+            }
+        }
+
+        foreach (string directory in _directories)
+        {
+            SplitEntry(directory, key, out string parent, out string name);
+            if (name.Length > 0 && string.Equals(parent, key, StringComparison.OrdinalIgnoreCase))
+            {
+                // A directory wins over a same-named file; the writer rejects
+                // case-insensitive collisions on its own.
+                entries[name] = new SourceEntry(name, IsDirectory: true, Length: 0);
+            }
+        }
+
+        return [.. entries.Values];
+    }
+
+    /// <inheritdoc/>
+    public Stream OpenRead(string path)
+    {
+        string key = Normalize(path);
+        if (!_files.TryGetValue(key, out byte[]? bytes))
+        {
+            throw new FileNotFoundException($"Source file not found: {path}", path);
+        }
+
+        // The committed array is replaced (not mutated) when the path is
+        // re-created, so this read-only view is a stable snapshot.
+        return new MemoryStream(bytes, 0, bytes.Length, writable: false, publiclyVisible: false);
+    }
+
+    /// <summary>
+    /// Splits a root-relative entry path into its parent and leaf relative to
+    /// <paramref name="current"/> (which is empty for the root).
+    /// </summary>
+    private static void SplitEntry(string entry, string current, out string parent, out string name)
+    {
+        string normalized = Normalize(entry);
+        string prefix = current.Length == 0 ? string.Empty : current + "/";
+        if (!normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            parent = string.Empty;
+            name = string.Empty;
+            return;
+        }
+
+        string remainder = normalized[prefix.Length..];
+        int slash = remainder.IndexOf('/', StringComparison.Ordinal);
+        parent = current;
+        name = slash < 0 ? remainder : remainder[..slash];
+    }
 
     /// <summary>
     /// Returns a snapshot of the bytes stored at <paramref name="path"/>

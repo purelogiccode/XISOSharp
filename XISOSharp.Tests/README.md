@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-2165-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2217-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![Test SDK](https://img.shields.io/badge/test--sdk-18.10.1-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
@@ -74,7 +74,13 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Follow-up regressions** — `-c .` default output next to the source, colon names through list/tree/rewrite (extract refuses on Windows), audit root-size/extraction parity, header-only sector-layout reservations, `build-image` cancellation cleanup, child-offset `0xFFFF` sentinel guard
 - **Sequential execution** — assembly-wide `[CollectionBehavior(DisableTestParallelization = true)]` because many tests set the process CWD themselves (creation and extraction no longer do)
 - **GUI command builders** (net10.0) — `CliCommands` argv for every verb, flags-before-positionals invariant, `CliLocator` version metadata fallbacks
-- **GUI services** (net10.0) — screenshot file naming/folder resolution/collision suffixes and update-check version comparison/release-URL fallback
+- **GUI services** (net10.0) - screenshot file naming/folder resolution/collision suffixes and update-check version comparison/release-URL fallback
+- **GUI Xbox 360 tab** (net10.0) - GOD/STFS extraction argv parity with the direct CLI, title-info JSON formatting, and asset-builder contracts
+- **Source filesystem packing** - `ISourceFilesystem`/`MemoryFilesystem` source parity with host packs, empty roots, exclude patterns, oversized/duplicate rejection, and concurrent CWD-free creates
+- **Per-call logging** - isolated concurrent sinks, nested scopes, static fallback, `UnpackOptions.Log`, and throwing-sink resilience
+- **Sparse outputs** - NTFS allocation checks plus CISO/CCI/ZAR round-trips with all-zero content
+- **Property round-trips** - seeded pack/extract, split/join, CISO, CCI and ISO/ZAR at boundary sizes
+- **Public corpus** - every generated container opens/lists, title metadata and XBE images decode, and corrupt fixtures fail cleanly
 
 ## Running Tests
 

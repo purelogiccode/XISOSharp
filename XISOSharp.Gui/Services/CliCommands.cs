@@ -29,14 +29,21 @@ internal static class CliCommands
     /// <param name="images">Image paths to extract.</param>
     /// <param name="destDir">Optional destination directory (<c>-d</c>).</param>
     /// <param name="overwrite">Whether to pass <c>-y</c> instead of <c>-n</c>.</param>
+    /// <param name="jobs">Extraction workers (1..64); values above 1 pass <c>--jobs</c>.</param>
     /// <returns>The extract argument list.</returns>
-    internal static string[] Extract(IReadOnlyList<string> images, string? destDir, bool overwrite)
+    internal static string[] Extract(IReadOnlyList<string> images, string? destDir, bool overwrite, int jobs = 1)
     {
         List<string> args = new();
         if (!string.IsNullOrWhiteSpace(destDir))
         {
             args.Add("-d");
             args.Add(destDir);
+        }
+
+        if (jobs > 1)
+        {
+            args.Add("--jobs");
+            args.Add(jobs.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
         args.Add("-x");
@@ -81,10 +88,19 @@ internal static class CliCommands
     /// </summary>
     /// <param name="image">Image path.</param>
     /// <param name="destDir">Optional destination directory.</param>
+    /// <param name="jobs">Extraction workers (1..64); values above 1 pass <c>--jobs</c>.</param>
     /// <returns>The unpack argument list.</returns>
-    internal static string[] Unpack(string image, string? destDir)
+    internal static string[] Unpack(string image, string? destDir, int jobs = 1)
     {
-        List<string> args = new() { "--unpack", image };
+        List<string> args = new();
+        if (jobs > 1)
+        {
+            args.Add("--jobs");
+            args.Add(jobs.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        args.Add("--unpack");
+        args.Add(image);
         if (!string.IsNullOrWhiteSpace(destDir))
         {
             args.Add(destDir);
@@ -311,6 +327,7 @@ internal static class CliCommands
     /// <param name="splitBytes">Optional split value (bytes).</param>
     /// <param name="overwrite">Whether to pass <c>-y</c> instead of <c>-n</c>.</param>
     /// <param name="format">Output format: <c>cso</c> (default) or <c>cci</c>.</param>
+    /// <param name="jobs">Sector-compression workers (1..64); values above 1 pass <c>--jobs</c>.</param>
     /// <returns>The compress argument list.</returns>
     internal static string[] Compress(
         string source,
@@ -319,7 +336,8 @@ internal static class CliCommands
         int version,
         string? splitBytes,
         bool overwrite,
-        string format = "cso")
+        string format = "cso",
+        int jobs = 1)
     {
         bool cci = string.Equals(format, "cci", StringComparison.OrdinalIgnoreCase);
         List<string> args = new() { "compress" };
@@ -347,6 +365,12 @@ internal static class CliCommands
                 args.Add("--ciso-split");
                 args.Add(splitBytes);
             }
+        }
+
+        if (jobs > 1)
+        {
+            args.Add("--jobs");
+            args.Add(jobs.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
         args.Add(source);
@@ -493,5 +517,45 @@ internal static class CliCommands
         args.Add(modeFlag);
         args.Add(OverwriteFlag(overwrite));
         return [.. args];
+    }
+
+    /// <summary>
+    /// Builds the <c>title-info</c> argv for a XISO, CISO/CCI, GOD or STFS input.
+    /// </summary>
+    /// <param name="image">Image or package path.</param>
+    /// <param name="json">Whether to request machine-readable JSON.</param>
+    /// <returns>The title-info argument list.</returns>
+    internal static string[] TitleInfo(string image, bool json)
+    {
+        List<string> args = ["title-info", image];
+        if (json)
+        {
+            args.Add("--json");
+        }
+
+        return [.. args];
+    }
+
+    /// <summary>
+    /// Builds the deep-audit argv (<c>-V</c>) used for STFS/GOD and image
+    /// validation in the Xbox 360 tab.
+    /// </summary>
+    /// <param name="image">Image or package path.</param>
+    /// <returns>The audit argument list.</returns>
+    internal static string[] Audit(string image) => ["-V", image];
+
+    /// <summary>
+    /// Builds the XBE asset extraction argv (<c>--xbe-image</c> plus
+    /// <c>--type</c> and <c>-o</c>).
+    /// </summary>
+    /// <param name="image">Image path.</param>
+    /// <param name="internalPath">Path of the XBE inside the image.</param>
+    /// <param name="kind">Asset kind: <c>logo</c>, <c>title</c> or <c>save</c>.</param>
+    /// <param name="output">Output PNG/DDS path.</param>
+    /// <returns>The XBE image argument list.</returns>
+    internal static string[] XbeImage(string image, string internalPath, string kind, string output)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        return ["--xbe-image", image, internalPath, "--type", kind, "-o", output];
     }
 }

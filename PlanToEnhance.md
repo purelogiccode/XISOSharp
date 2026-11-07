@@ -1,10 +1,10 @@
 # XISOSharp — Remaining Work Plan
 
 - **Updated:** 2026-11-07
-- **Latest release:** XISOSharp **1.7.0** (2026-11-07)
-- **Working tree:** 1.8.0 development; CCISharp 1.1 integrated
-- **Next release:** 1.8.0 hardening
-- **Packages:** XISOSharp `1.7.0`, StfsSharp `1.0.0`, CCISharp `1.1.0`, ZArchiveSharp `1.4.0`
+- **Latest release:** XISOSharp **1.8.0** (2026-11-07)
+- **Working tree:** 1.8.0 hardened; P2 tracks complete
+- **Next release:** 2.0.0 (facade removal / TFM drop) or a future P3 track
+- **Packages:** XISOSharp `1.8.0`, StfsSharp `1.0.0`, CCISharp `1.1.0`, ZArchiveSharp `1.4.0`
 - **Scope of this file:** only work that is still open. Implemented features are listed once in [§9](#9-implemented-baseline-do-not-re-implement) so they are not re-implemented.
 
 > **How to use this file:** change `- [ ]` to `- [x]` when an item meets its **Done when** line. Add the version/date to the progress log in [§14](#14-progress-log).
@@ -13,7 +13,7 @@
 > 1. **Ship 1.6.0** — ✅ done (tag `350f629`, NuGet and GitHub release verified).
 > 2. **Ship 1.7.0** — ✅ done: `StfsSharp 1.0.0` extracted and published; XISOSharp 1.7.0 tagged/released with six bundles.
 > 3. **Ship CCISharp 1.1** — ✅ done: LZ4-HC, parallel CCI compression, multi-digit parts; `CCISharp 1.1.0` published and integrated.
-> 4. **Harden** — source `IFilesystem`, per-call logging, sparse output, property tests and benchmarks.
+> 4. **Harden and ship 1.8.0** — ✅ done: LIB-01…08, DOC-01…03 and GUI-01…05 implemented. P3 distribution/cross-repo items remain deliberately deferred.
 
 ---
 
@@ -21,13 +21,13 @@
 
 | Field | Value |
 |---|---|
-| Published library | **XISOSharp 1.7.0** (2026-11-07) |
+| Published library | **XISOSharp 1.8.0** (2026-11-07) |
 | Published readers | **StfsSharp 1.0.0** (2026-11-07), **CCISharp 1.1.0** (2026-11-07, NuGet) |
-| Current tree | **1.8.0 development**, CCISharp 1.1 integrated |
-| Next release gate | **1.8.0** — hardening track (`LIB-*`, `DOC-*`, `GUI-*`) |
-| Next feature release | **1.8.0** — hardening track (`LIB-*`, `DOC-*`, `GUI-*`) |
+| Current tree | **1.8.0**, P2 tracks complete |
+| Next release gate | **2.0.0** — facade removal and `net8.0`/`net9.0` drop |
+| Next feature release | **2.0.0** or a future P3 distribution/cross-repo track |
 | Compression track | **CCISharp 1.1** — ✅ HC encoder, parallel writer, multi-digit parts |
-| Tests (last recorded) | XISOSharp 2106 passed / 1 skipped on `net8.0`/`net9.0`; 2170 passed / 1 skipped on `net10.0`; CCISharp 78/78 on all TFMs; StfsSharp 37/37 on all TFMs |
+| Tests (last recorded) | XISOSharp 2144 passed / 1 skipped on `net8.0`/`net9.0`; 2217 passed / 1 skipped on `net10.0`; CCISharp 78/78 on all TFMs; StfsSharp 37/37 on all TFMs |
 | CI gates | 3-OS build/test, `dotnet format`, InspectCode, AOT smoke, fuzz, battle-interop, coverage floors |
 | Reference set | 8 local copies under `References/` — see [§10](#10-reference-map) |
 
@@ -56,11 +56,11 @@
 | **P0** | Ship 1.6.0 | ✅ released 2026-11-06 | 0 |
 | **P1** | Extract `StfsSharp` | ✅ released 2026-11-07 | 0 |
 | **P1** | CCISharp 1.1 | ✅ released 2026-11-07 | 0 |
-| **P2** | Library hardening | 1.7.x / 2.0.0 | 8 |
-| **P2** | Docs, fixtures and GUI | 1.7.x | 8 |
+| **P2** | Library hardening | 1.8.0 | 0 |
+| **P2** | Docs, fixtures and GUI | 1.8.0 | 0 |
 | **P3** | Distribution and supply chain | later | 5 |
-| **P3** | Cross-repo consumers | after 1.7.0 | 4 |
-| | **Total** | | **25 open** (2 optional) + 19 done |
+| **P3** | Cross-repo consumers | after 1.8.0 | 4 |
+| | **Total** | | **9 open** (2 optional) + 35 done |
 
 **Recommended order**
 
@@ -68,9 +68,9 @@
 |---:|---|---|
 | 1 | `STF-01` … `STF-08` | ✅ done; `StfsSharp 1.0.0` and XISOSharp 1.7.0 are published. |
 | 2 | `CCI-01` … `CCI-06` | ✅ done; `CCISharp 1.1.0` is published and integrated. |
-| 3 | `LIB-01` … `LIB-08` | Harden the API after the release branches settle. |
-| 4 | `DOC-*`, `GUI-*` | User-facing polish; depends on the library work. |
-| 5 | `DST-*`, `XRP-*` | Distribution and companion repositories. |
+| 3 | `LIB-01` … `LIB-08` | ✅ done in 1.8.0. |
+| 4 | `DOC-*`, `GUI-*` | ✅ done in 1.8.0. |
+| 5 | `DST-*`, `XRP-*` | Deferred; separate distribution and companion-repository tracks. |
 
 ---
 
@@ -191,35 +191,37 @@
 
 ## 5. P2 — Library hardening
 
-- [ ] **LIB-01 · Walk local create sources through `IFilesystem`**
+> ✅ Completed 2026-11-07 in 1.8.0; see the progress log in [§14](#14-progress-log).
+
+- [x] **LIB-01 · Walk local create sources through `IFilesystem`**
   - Add a source-filesystem abstraction to `XisoWriter.CreateXiso`/`PackFromDirectory` so a custom store can be packed without host paths; keep the current overloads additive.
   - **Done when:** a `MemoryFilesystem` source packs a byte-identical image and concurrent creates remain CWD-free.
 
-- [ ] **LIB-02 · Make logging per-call**
+- [x] **LIB-02 · Make logging per-call**
   - Add an `XisoOptions`/`ILogger`-style sink to the read/write entry points; keep the static `Logger` as a compatibility facade.
   - **Done when:** two concurrent operations can log to separate sinks and existing static logging still works.
 
-- [ ] **LIB-03 · Add a sparse/large-file output strategy**
+- [x] **LIB-03 · Add a sparse/large-file output strategy**
   - Use OS sparse-file support for pre-sized multi-GB images, with a safe fallback. Cover the writer, CISO/CCI decompression and extraction.
   - **Done when:** a multi-GB sparse image writes without zero-filling on Windows/Linux and extracts byte-identically.
 
-- [ ] **LIB-04 · Add property-based round-trip tests**
+- [x] **LIB-04 · Add property-based round-trip tests**
   - Add generators for pack/extract, split/join, CISO/CCI compress/decompress and ISO↔ZAR; use deterministic seeds.
   - **Done when:** the property suite runs in CI within budget and covers 0/1 sector, padding and compression-threshold edge sizes.
 
-- [ ] **LIB-05 · Complete the end-to-end benchmark suite**
+- [x] **LIB-05 · Complete the end-to-end benchmark suite**
   - Add extract, CCI compress/decompress and large-image I/O to `XISOSharp.Benchmarks`; keep the current pack/list/hash/CISO cases.
   - **Done when:** `--filter "*EndToEnd*"` covers every major path and results are documented.
 
-- [ ] **LIB-06 · Publish a benchmark comparison**
+- [x] **LIB-06 · Publish a benchmark comparison**
   - Compare against extract-xiso, xdvdfs and XboxKit with methodology, hardware and a reproducible script.
   - **Done when:** `docs/benchmarks.md` contains the numbers and commands.
 
-- [ ] **LIB-07 · Resolve the post-EOL target-framework plan**
+- [x] **LIB-07 · Resolve the post-EOL target-framework plan**
   - `net9.0` is EOL (2026-05-12) and `net8.0` reaches EOL on 2026-11-10. Decide before 1.7.0 whether 1.7.x keeps them compatibility-only and drops them in 2.0.0, or drops them sooner; update the csproj files, CI, `docs/support-policy.md` and READMEs.
   - **Done when:** the support policy and build matrix agree and CI remains green.
 
-- [ ] **LIB-08 · Refresh the package-validation baseline**
+- [x] **LIB-08 · Refresh the package-validation baseline**
   - Move `PackageValidationBaselineVersion` from `1.4.4` to the latest published stable (`1.5.0`/`1.6.0` as appropriate), review `CompatibilitySuppressions.xml`, and refresh `PublicApi.approved.txt`.
   - **Done when:** `dotnet pack` passes with the new baseline and no unreviewed suppressions remain.
 
@@ -227,35 +229,37 @@
 
 ## 6. P2 — Docs, fixtures and GUI
 
-- [ ] **DOC-01 · Generate and publish the DocFX API reference**
+> ✅ Completed 2026-11-07 in 1.8.0; see the progress log in [§14](#14-progress-log).
+
+- [x] **DOC-01 · Generate and publish the DocFX API reference**
   - Build the API site from the XML docs, publish it to GitHub Pages and add a link check.
   - **Done when:** the API pages are live and CI fails on broken links.
 
-- [ ] **DOC-02 · Add a public synthetic fixture corpus**
+- [x] **DOC-02 · Add a public synthetic fixture corpus**
   - Add a deterministic generator/regeneration script with no copyrighted game data. Cover XISO, split ISO, CISO, CCI, ZAR, GOD, STFS, XBE/XEX and corrupt cases.
   - **Done when:** the corpus is checked in or generated in CI, and BattleTests consume it.
 
-- [ ] **DOC-03 · Refresh user docs after 1.7.0**
+- [x] **DOC-03 · Refresh user docs after 1.7.0**
   - Update the feature matrix, `docs/known-limitations.md`, `docs/compression.md`, `docs/cli.md`, `docs/library.md`, READMEs and release notes for `StfsSharp` and CCISharp 1.1; fold in any 1.6.0 deltas missed by `REL-01`.
   - **Done when:** the docs match the shipped packages and no stale "future" claims remain.
 
-- [ ] **GUI-01 · Add GOD/SVOD input to the GUI**
+- [x] **GUI-01 · Add GOD/SVOD input to the GUI**
   - Open-dialog filters, drop routing, list/tree/extract, `decompress`/`convert`, and title metadata.
   - **Done when:** the GUI opens a synthetic GOD set and extracts it byte-identically to the CLI.
 
-- [ ] **GUI-02 · Add STFS package input to the GUI**
+- [x] **GUI-02 · Add STFS package input to the GUI**
   - Open/list/extract/validate XBLA/XBLIG packages and route `-V` validation.
   - **Done when:** the GUI lists and extracts a synthetic package and reports validation status.
 
-- [ ] **GUI-03 · Add the Xbox 360 title panel**
+- [x] **GUI-03 · Add the Xbox 360 title panel**
   - Show `title-info` fields for XBE/XEX/GOD/STFS, including XDBF/XSRC metadata.
   - **Done when:** the panel matches CLI `title-info --json` on synthetic fixtures.
 
-- [ ] **GUI-04 · Add the XBE image preview**
+- [x] **GUI-04 · Add the XBE image preview**
   - Preview the logo, title image and save image (PNG/DDS) from `XbeAssets`.
   - **Done when:** all three asset types render and a missing asset is a clean message.
 
-- [ ] **GUI-05 · (P2, optional) Expose parallel jobs controls**
+- [x] **GUI-05 · (P2, optional) Expose parallel jobs controls**
   - Add `--jobs` controls for extraction and compression where supported; keep CCI disabled until CCISharp 1.1 lands.
   - **Done when:** the GUI command builders and self-test cover the new flags.
 
@@ -423,4 +427,15 @@ dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
 | 2026-11-07 | `CCI-04`/`CCI-07` fuzz, benchmarks, CLI | CCISharp 1.1.0 | Fuzz + benchmark projects; `CCISharp.Cli` pack/unpack/info/validate; CI `fuzz-smoke` + `cli-smoke` green |
 | 2026-11-07 | `CCI-05` CCISharp 1.1.0 published | CCISharp 1.1.0 | Tag `v1.1.0`; CI green; NuGet 1.1.0 indexed; XISOSharp ref bumped; pack validation green |
 | 2026-11-07 | CCISharp 1.1 integration verification | 1.8.0-dev | XISOSharp suite 2106/1 (net8/net9) + 2170/1 (net10); build 0 warnings; format clean; full restore from nuget.org |
+| 2026-11-07 | `LIB-01` source filesystem packing | 1.8.0 | `ISourceFilesystem` + `MemoryFilesystem` source; `CreateXiso`/`PackFromDirectory` overloads; host-parity and concurrent CWD tests |
+| 2026-11-07 | `LIB-02` per-call logging | 1.8.0 | `IXisoLogger`/`XisoLogOptions`/`XisoLogScope`; `UnpackOptions.Log`; isolated concurrent sinks and static fallback tests |
+| 2026-11-07 | `LIB-03` sparse output | 1.8.0 | NTFS sparse marking + zero-skip CISO/CCI/ZAR; NTFS allocation and round-trip tests |
+| 2026-11-07 | `LIB-04` property round-trips | 1.8.0 | Seeded boundary-size pack/extract, split/join, CISO, CCI and ZAR cases |
+| 2026-11-07 | `LIB-05`/`LIB-06` benchmarks | 1.8.0 | End-to-end extract/CCI/large-read cases; `docs/benchmarks.md` + `scripts/bench-compare.ps1`; BDN and 1 GiB CLI comparison captured |
+| 2026-11-07 | `LIB-07`/`LIB-08` support + validation baseline | 1.8.0 | `net8`/`net9` compatibility-only through 1.x; validation baseline moved to 1.7.0 and old suppressions retired; pack green |
+| 2026-11-07 | `DOC-01` DocFX link gate | 1.8.0 | Live API site retained; `docs-links` CI job + `scripts/check_docs_links.py` (2428 local links checked) |
+| 2026-11-07 | `DOC-02` public corpus | 1.8.0 | `TestDataGenerator --corpus` covers XISO/split/CISO/CCI/ZAR/GOD/STFS/XBE/XEX/corrupt + manifest; `PublicCorpusTests` and BattleTests consume it |
+| 2026-11-07 | `DOC-03` docs refresh | 1.8.0 | READMEs, feature/limitations/compression/library/CLI/testing docs, release notes and support policy updated |
+| 2026-11-07 | `GUI-01`–`GUI-05` Xbox 360 GUI | 1.8.0 | GOD/STFS open/list/tree/extract/unpack/audit, title panel, XBE preview, drop routing, `--jobs` controls; self-test and GUI parity tests |
+| 2026-11-07 | 1.8.0 verification | 1.8.0 | Suite 2144/1 (net8/net9) + 2217/1 (net10); format clean; InspectCode 0; pack 1.7.0 baseline; AOT, fuzz 6,605 iterations, battle 40/40, GUI self-test and docs links green |
 | | | | |

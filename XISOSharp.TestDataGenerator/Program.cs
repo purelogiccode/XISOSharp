@@ -15,12 +15,17 @@ internal static class Program
     {
         string? root = null;
         bool force = false;
+        bool corpus = false;
 
         foreach (string arg in args)
         {
             if (arg is "--force" or "-f")
             {
                 force = true;
+            }
+            else if (arg is "--corpus")
+            {
+                corpus = true;
             }
             else if (arg is "--help" or "-h")
             {
@@ -33,16 +38,21 @@ internal static class Program
             }
         }
 
-        root ??= TestDataLocator.GetTestDataRoot(AppContext.BaseDirectory);
+        root ??= corpus
+            ? Path.Combine(TestDataLocator.GetTestDataRoot(AppContext.BaseDirectory), "corpus")
+            : TestDataLocator.GetTestDataRoot(AppContext.BaseDirectory);
 
         try
         {
-            foreach (string action in TestDataWriter.EnsureTestData(root, force))
+            IReadOnlyList<string> actions = corpus
+                ? PublicCorpusWriter.EnsureCorpus(root, force)
+                : TestDataWriter.EnsureTestData(root, force);
+            foreach (string action in actions)
             {
                 Console.WriteLine(action);
             }
 
-            Console.WriteLine($"TestData ready at '{root}'");
+            Console.WriteLine($"{(corpus ? "Corpus" : "TestData")} ready at '{root}'");
             return 0;
         }
         catch (Exception ex)
@@ -57,15 +67,21 @@ internal static class Program
     /// </summary>
     private static void PrintUsage() =>
         Console.WriteLine("""
-                          Usage: XISOSharp.TestDataGenerator [path] [--force]
+                          Usage: XISOSharp.TestDataGenerator [path] [--corpus] [--force]
 
                           Restores the TestData fixture used by the XISOSharp test suite:
                             source\file1.txt, source\file2.txt, source\binary.bin, source\test.xbe,
                             source\subdir\subfile.txt, source\subdir\nested\deep.txt
                             output\source.iso (rebuilt from source on every run)
 
-                            path     Target TestData root directory
-                                     (default: <repo root>\TestData)
-                            --force  Rewrite existing source files with the canonical content
+                          With --corpus, generates the public synthetic corpus instead:
+                            xiso, split ISO, CISO, CCI, ZAR, GOD/SVOD, XBLA/XBLIG STFS,
+                            XBE/XEX fixtures and corrupt variants, plus corpus-manifest.json.
+                            All content is generated; no game data is included.
+
+                            path     Target root directory
+                                     (TestData default: <repo root>\TestData;
+                                      corpus default: <repo root>\TestData\corpus)
+                            --force  Regenerate the fixture/corpus even when current
                           """);
 }

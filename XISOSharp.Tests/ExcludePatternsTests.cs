@@ -2,7 +2,7 @@ namespace XISOSharp.Tests;
 
 /// <summary>
 /// Integration tests for excluding files and directories during XISO creation
-/// via <see cref="XisoWriter.CreateXiso"/> exclude patterns (extract-xiso issue #19).
+/// via <c>XisoWriter.CreateXiso</c> exclude patterns (extract-xiso issue #19).
 /// </summary>
 [Collection("Sequential")]
 public class ExcludePatternsTests : IDisposable

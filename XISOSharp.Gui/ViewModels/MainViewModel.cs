@@ -1,4 +1,6 @@
 using System.Text;
+using System.Text.Json;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -58,6 +60,14 @@ internal sealed partial class MainViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(RunValidateCommand))]
     [NotifyCanExecuteChangedFor(nameof(RunChecksumCommand))]
     [NotifyCanExecuteChangedFor(nameof(RunBatchCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxListCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxTreeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxExtractCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxUnpackCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxAuditCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxTitleCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxDecompressCommand))]
+    [NotifyCanExecuteChangedFor(nameof(LoadXbePreviewCommand))]
     [NotifyCanExecuteChangedFor(nameof(CancelRunCommand))]
     public partial bool IsRunning { get; set; }
 
@@ -100,6 +110,69 @@ internal sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RunCopyOutCommand))]
     public partial string ExCopyDest { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets extraction workers for the Extract tab (1..64).</summary>
+    [ObservableProperty]
+    public partial int ExJobs { get; set; } = 1;
+
+    // Xbox 360 tab
+    /// <summary>Gets or sets the GOD/SVOD, STFS, XISO or compressed image path.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxListCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxTreeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxExtractCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxUnpackCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxAuditCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxTitleCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunXboxDecompressCommand))]
+    [NotifyCanExecuteChangedFor(nameof(LoadXbePreviewCommand))]
+    [NotifyPropertyChangedFor(nameof(XbCanDecompress))]
+    public partial string XbSource { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the Xbox 360 extraction destination directory.</summary>
+    [ObservableProperty]
+    public partial string XbDest { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets extraction workers for the Xbox 360 tab (1..64).</summary>
+    [ObservableProperty]
+    public partial int XbJobs { get; set; } = 1;
+
+    /// <summary>Gets or sets the in-image XBE path used by the preview panel.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(LoadXbePreviewCommand))]
+    public partial string XbAssetPath { get; set; } = "/default.xbe";
+
+    /// <summary>Gets or sets the XBE asset kind shown in the preview panel.</summary>
+    [ObservableProperty]
+    public partial string XbAssetKind { get; set; } = "Title";
+
+    /// <summary>Gets or sets the formatted <c>title-info --json</c> summary.</summary>
+    [ObservableProperty]
+    public partial string XbTitleInfo { get; set; } = "No title inspected yet.";
+
+    /// <summary>Gets or sets the decoded XBE preview, or <c>null</c> when none is loaded.</summary>
+    [ObservableProperty]
+    public partial Bitmap? XbPreviewImage { get; set; }
+
+    /// <summary>Gets or sets the preview status or clean missing-asset message.</summary>
+    [ObservableProperty]
+    public partial string XbPreviewStatus { get; set; } = "Choose an image and load a preview.";
+
+    /// <summary>Gets a value indicating whether the source is a compressed image that can be decompressed.</summary>
+    public bool XbCanDecompress
+    {
+        get
+        {
+            string source = XbSource.Trim();
+            return source.EndsWith(".cso", StringComparison.OrdinalIgnoreCase)
+                   || source.EndsWith(".cci", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>Gets the XBE asset kinds offered in the preview panel.</summary>
+    internal IReadOnlyList<string> XbeAssetKinds { get; } = ["Logo", "Title", "Save"];
+
+    private Stream? _previewStream;
 
     // Create tab
     /// <summary>Gets or sets the source directory to pack into a new image.</summary>
@@ -211,6 +284,10 @@ internal sealed partial class MainViewModel : ObservableObject
     /// <summary>Gets or sets the optional <c>--ciso-split</c> value.</summary>
     [ObservableProperty]
     public partial string CpSplit { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets sector-compression workers for CISO/CCI (1..64).</summary>
+    [ObservableProperty]
+    public partial int CpJobs { get; set; } = 1;
 
     // ZAR tab
     /// <summary>
@@ -470,10 +547,18 @@ internal sealed partial class MainViewModel : ObservableObject
 
     private bool CanRunBatch() => !IsRunning && !string.IsNullOrWhiteSpace(BaDir);
 
+    private bool CanRunXbox() => !IsRunning && !string.IsNullOrWhiteSpace(XbSource);
+
+    private bool CanRunXboxPreview() =>
+        !IsRunning && !string.IsNullOrWhiteSpace(XbSource) && !string.IsNullOrWhiteSpace(XbAssetPath);
+
+    private bool CanRunXboxDecompress() => CanRunXbox() && XbCanDecompress;
+
     [RelayCommand(CanExecute = nameof(CanRunExtract))]
     private Task RunExtractAsync() =>
         GuardedAsync(() => RunSingleImageAsync("extract", ExImage,
-            CliCommands.Extract(RequireOne(ExImage, "image"), NullIfEmpty(ExDest), OverwriteExisting)));
+            CliCommands.Extract(RequireOne(ExImage, "image"), NullIfEmpty(ExDest), OverwriteExisting,
+                ExJobs)));
 
     [RelayCommand(CanExecute = nameof(CanRunList))]
     private Task RunListAsync() =>
@@ -493,7 +578,7 @@ internal sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRunUnpack))]
     private Task RunUnpackAsync() =>
         GuardedAsync(() => RunSingleImageAsync("unpack", ExImage,
-            CliCommands.Unpack(RequireValue(ExImage, "image"), NullIfEmpty(ExDest))));
+            CliCommands.Unpack(RequireValue(ExImage, "image"), NullIfEmpty(ExDest), ExJobs)));
 
     [RelayCommand(CanExecute = nameof(CanRunCopyOut))]
     private Task RunCopyOutAsync() =>
@@ -562,8 +647,9 @@ internal sealed partial class MainViewModel : ObservableObject
             bool cci = string.Equals(CpFormat, "CCI", StringComparison.OrdinalIgnoreCase);
             ThrowIfCompressCollision(source, NullIfEmpty(CpOutput), NullIfEmpty(CpSplit), cci);
             return RunJobAsync("compress", CliCommands.Compress(source, NullIfEmpty(CpOutput),
-                Math.Clamp(CpLevel, 0, 9), string.Equals(CpVersion, "1", StringComparison.Ordinal) ? 1 : 2,
-                NullIfEmpty(CpSplit), OverwriteExisting, cci ? "cci" : "cso"));
+                Math.Clamp(CpLevel, 0, cci ? 12 : 9),
+                string.Equals(CpVersion, "1", StringComparison.Ordinal) ? 1 : 2,
+                NullIfEmpty(CpSplit), OverwriteExisting, cci ? "cci" : "cso", CpJobs));
         });
 
     [RelayCommand(CanExecute = nameof(CanRunZar))]
@@ -643,6 +729,240 @@ internal sealed partial class MainViewModel : ObservableObject
             return RunJobAsync("batch",
                 CliCommands.Batch(dir, BaRecursive, modeFlag, NullIfEmpty(BaDest), OverwriteExisting));
         });
+
+    [RelayCommand(CanExecute = nameof(CanRunXbox))]
+    private Task RunXboxListAsync() =>
+        GuardedAsync(() => RunJobAsync("xbox-list",
+            CliCommands.List(RequireOne(XbSource, "Xbox 360 image or package"))));
+
+    [RelayCommand(CanExecute = nameof(CanRunXbox))]
+    private Task RunXboxTreeAsync() =>
+        GuardedAsync(() => RunJobAsync("xbox-tree",
+            CliCommands.Tree(RequireOne(XbSource, "Xbox 360 image or package"))));
+
+    [RelayCommand(CanExecute = nameof(CanRunXbox))]
+    private Task RunXboxExtractAsync() =>
+        GuardedAsync(() => RunJobAsync("xbox-extract",
+            CliCommands.Extract(RequireOne(XbSource, "Xbox 360 image or package"),
+                NullIfEmpty(XbDest), OverwriteExisting, XbJobs)));
+
+    [RelayCommand(CanExecute = nameof(CanRunXbox))]
+    private Task RunXboxUnpackAsync() =>
+        GuardedAsync(() => RunJobAsync("xbox-unpack",
+            CliCommands.Unpack(RequireValue(XbSource, "Xbox 360 image or package"),
+                NullIfEmpty(XbDest), XbJobs)));
+
+    [RelayCommand(CanExecute = nameof(CanRunXbox))]
+    private Task RunXboxAuditAsync() =>
+        GuardedAsync(() => RunJobAsync("xbox-audit",
+            CliCommands.Audit(RequireValue(XbSource, "Xbox 360 image or package"))));
+
+    [RelayCommand(CanExecute = nameof(CanRunXbox))]
+    private Task RunXboxTitleAsync() =>
+        GuardedAsync(async () =>
+        {
+            string source = RequireValue(XbSource, "Xbox 360 image or package");
+            StringBuilder json = new();
+            int exit = await RunJobAsync("title-info", CliCommands.TitleInfo(source, json: true),
+                line => json.AppendLine(line)).ConfigureAwait(false);
+            string summary = exit == 0
+                ? FormatTitleInfo(json.ToString())
+                : $"title-info failed with exit code {exit}; see the log.";
+            SetOnUi(() => XbTitleInfo = summary);
+
+            if (exit == 0)
+            {
+                string? assetPath = TryGetTitleAssetPath(json.ToString());
+                if (!string.IsNullOrWhiteSpace(assetPath))
+                {
+                    SetOnUi(() => XbAssetPath = assetPath);
+                }
+            }
+        });
+
+    [RelayCommand(CanExecute = nameof(CanRunXboxDecompress))]
+    private Task RunXboxDecompressAsync() =>
+        GuardedAsync(() =>
+        {
+            string source = RequireValue(XbSource, "compressed image");
+            if (!XbCanDecompress)
+            {
+                throw new InvalidOperationException(
+                    "Decompress is available for .cso/.cci sources; use Extract/Unpack for GOD and STFS packages.");
+            }
+
+            return RunJobAsync("xbox-decompress",
+                CliCommands.Decompress(source, null, OverwriteExisting));
+        });
+
+    [RelayCommand(CanExecute = nameof(CanRunXboxPreview))]
+    private Task LoadXbePreviewAsync() =>
+        GuardedAsync(async () =>
+        {
+            string source = RequireValue(XbSource, "Xbox 360 image");
+            string internalPath = RequireValue(XbAssetPath, "XBE path");
+            string kind = XbAssetKind.Trim().ToLowerInvariant();
+            if (kind is not ("logo" or "title" or "save"))
+            {
+                throw new InvalidOperationException($"Unknown XBE asset kind '{XbAssetKind}'.");
+            }
+
+            string temp = Path.Combine(Path.GetTempPath(), $"xiso_preview_{Guid.NewGuid():N}.png");
+            try
+            {
+                int exit = await RunJobAsync("xbe-image",
+                    CliCommands.XbeImage(source, internalPath, kind, temp)).ConfigureAwait(false);
+                if (exit != 0 || !File.Exists(temp))
+                {
+                    SetOnUi(() =>
+                    {
+                        XbPreviewImage?.Dispose();
+                        XbPreviewImage = null;
+                        XbPreviewStatus =
+                            $"No {XbAssetKind.ToLowerInvariant()} preview: " +
+                            "the asset is missing or not decodable (see the log).";
+                    });
+                    return;
+                }
+
+                byte[] bytes = await File.ReadAllBytesAsync(temp).ConfigureAwait(false);
+                MemoryStream stream = new(bytes, writable: false);
+                Bitmap bitmap;
+                try
+                {
+                    bitmap = new Bitmap(stream);
+                }
+                catch
+                {
+                    stream.Dispose();
+                    throw;
+                }
+
+                SetOnUi(() =>
+                {
+                    XbPreviewImage?.Dispose();
+                    _previewStream?.Dispose();
+                    _previewStream = stream;
+                    XbPreviewImage = bitmap;
+                    XbPreviewStatus = $"{XbAssetKind} asset {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}";
+                });
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(temp)) File.Delete(temp);
+                }
+                catch
+                {
+                    // Best effort temp cleanup.
+                }
+            }
+        });
+
+    /// <summary>
+    /// Formats <c>title-info --json</c> into the compact panel text. Returns the
+    /// raw payload when it cannot be parsed, so the user still sees the CLI
+    /// output instead of an empty panel.
+    /// </summary>
+    internal static string FormatTitleInfo(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return "(no title metadata)";
+        }
+
+        string text = json.Trim();
+        int start = text.IndexOf('{', StringComparison.Ordinal);
+        int end = text.LastIndexOf('}');
+        if (start < 0 || end <= start)
+        {
+            return text;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(text[start..(end + 1)]);
+            JsonElement root = document.RootElement;
+            List<string> lines = [];
+            AddTitleLine(lines, root, "kind", "Kind");
+            AddTitleLine(lines, root, "titleName", "Title");
+            AddTitleLine(lines, root, "titleIdHex", "Title ID");
+            AddTitleLine(lines, root, "gameRegionName", "Region");
+            AddTitleLine(lines, root, "discNumber", "Disc number");
+            AddTitleLine(lines, root, "diskNumber", "Disc number");
+            AddTitleLine(lines, root, "discCount", "Disc count");
+            AddTitleLine(lines, root, "version", "Version");
+            AddTitleLine(lines, root, "xbePath", "XBE");
+            AddTitleLine(lines, root, "xexPath", "XEX");
+            AddTitleLine(lines, root, "headerPath", "GOD header");
+            AddTitleLine(lines, root, "packagePath", "Package");
+            AddTitleLine(lines, root, "publisher", "Publisher");
+            AddTitleLine(lines, root, "developer", "Developer");
+            AddTitleLine(lines, root, "genre", "Genre");
+            AddTitleLine(lines, root, "description", "Description");
+            AddTitleLine(lines, root, "contentType", "Content type");
+            AddTitleLine(lines, root, "hasThumbnail", "Thumbnail");
+            return lines.Count == 0 ? text : string.Join(Environment.NewLine, lines);
+        }
+        catch (JsonException)
+        {
+            return text;
+        }
+    }
+
+    /// <summary>Reads the executable path from a <c>title-info --json</c> payload.</summary>
+    internal static string? TryGetTitleAssetPath(string json)
+    {
+        try
+        {
+            string text = json.Trim();
+            int start = text.IndexOf('{', StringComparison.Ordinal);
+            int end = text.LastIndexOf('}');
+            if (start < 0 || end <= start)
+            {
+                return null;
+            }
+
+            using JsonDocument document = JsonDocument.Parse(text[start..(end + 1)]);
+            return GetString(document.RootElement, "xbePath") ?? GetString(document.RootElement, "xexPath");
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static void AddTitleLine(List<string> lines, JsonElement root, string property, string label)
+    {
+        if (!root.TryGetProperty(property, out JsonElement value))
+        {
+            return;
+        }
+
+        string? text = value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString(),
+            JsonValueKind.Number => value.ToString(),
+            JsonValueKind.True => "yes",
+            JsonValueKind.False => "no",
+            _ => null,
+        };
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            // "discNumber" and "diskNumber" are aliases; keep one line.
+            string line = $"{label}: {text}";
+            if (!lines.Contains(line, StringComparer.Ordinal))
+            {
+                lines.Add(line);
+            }
+        }
+    }
+
+    private static string? GetString(JsonElement root, string property) =>
+        root.TryGetProperty(property, out JsonElement value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
 
     private async Task GuardedAsync(Func<Task> run)
     {
@@ -880,11 +1200,11 @@ internal sealed partial class MainViewModel : ObservableObject
         await RunJobAsync(title, args).ConfigureAwait(false);
     }
 
-    private async Task RunJobAsync(string title, string[] args)
+    private async Task<int> RunJobAsync(string title, string[] args, Action<string>? onLine = null)
     {
         if (IsRunning)
         {
-            return;
+            return -1;
         }
 
         string? cli;
@@ -896,7 +1216,7 @@ internal sealed partial class MainViewModel : ObservableObject
         {
             Log.Error(ex, "CLI resolve failed for job {Title}", title);
             AppendLog($"[GUI] CLI resolve failed: {ex.Message}");
-            return;
+            return -1;
         }
 
         if (cli is null)
@@ -905,7 +1225,7 @@ internal sealed partial class MainViewModel : ObservableObject
                 .Warning("Run {Title} refused: CLI {CliFile} not found", title, CliLocator.CliFileName);
             AppendLog(
                 $"[GUI] XISOSharp CLI ({CliLocator.CliFileName}) not found — set the CLI path on the Settings tab.");
-            return;
+            return -1;
         }
 
         IsRunning = true;
@@ -916,11 +1236,18 @@ internal sealed partial class MainViewModel : ObservableObject
             _runningCts = cts;
         }
 
+        int exit = -1;
         try
         {
             AppendLog($"$ XISOSharp {Quote(args)}");
             Log.Information("Starting {Title}: XISOSharp {Args}", title, Quote(args));
-            int exit = await CliRunner.RunAsync(cli, args, AppendLog, cts.Token).ConfigureAwait(false);
+            exit = await CliRunner.RunAsync(cli, args,
+                    line =>
+                    {
+                        AppendLog(line);
+                        onLine?.Invoke(line);
+                    }, cts.Token)
+                .ConfigureAwait(false);
             string exitText = $"Exit code: {exit}";
             SetOnUi(() => LastExit = exitText);
             AppendLog($"[GUI] {title} finished with exit code {exit}.");
@@ -952,6 +1279,8 @@ internal sealed partial class MainViewModel : ObservableObject
             cts.Dispose();
             SetOnUi(() => IsRunning = false);
         }
+
+        return exit;
     }
 
     private void AppendLog(string line)

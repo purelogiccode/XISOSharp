@@ -22,6 +22,7 @@
        XISOSharp library is pulled in transitively; no in-process API use. -->
   <ItemGroup>
     <ProjectReference Include="$(RepoRoot)XISOSharp.Cli\XISOSharp.Cli.csproj" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp.TestDataGenerator\XISOSharp.TestDataGenerator.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,7 +1,7 @@
 namespace XISOSharp.Models;
 
 /// <summary>
-/// A structured progress event emitted during <see cref="XisoWriter.CreateXiso"/>
+/// A structured progress event emitted during <c>XisoWriter.CreateXiso</c>
 /// operations. Delivered through <see cref="IProgress{T}"/> so consumers can drive
 /// progress bars, tree views, and logging from a single channel.
 /// </summary>

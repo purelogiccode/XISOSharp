@@ -4,7 +4,7 @@ using XISOSharp.DataStructures;
 namespace XISOSharp.Tests;
 
 /// <summary>
-/// Tests for <see cref="XisoWriter.PackFromDirectory"/> — directory-to-ISO packing
+/// Tests for <c>XisoWriter.PackFromDirectory</c> - directory-to-ISO packing
 /// with a 1:1 mapping (the library behind the CLI's --pack flag).
 /// </summary>
 [Collection("Sequential")]

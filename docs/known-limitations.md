@@ -52,6 +52,12 @@ the output directory, and concurrent extracts into different destinations stay
 independent. `XisoReader.UnpackImage(..., IFilesystem)` remains the way to target
 a custom store.
 
+Create sources can also be virtual: `ISourceFilesystem` (and the
+`MemoryFilesystem` source overloads) packs a custom store without host paths.
+Implementations need not be thread-safe; enumeration and reads are sequential.
+Per-call log sinks (`XisoLogScope`) are `AsyncLocal`-based, so they isolate
+concurrent operations without changing the static `Logger` facade.
+
 ## Windows paths and names
 
 The CLI and GUI manifests opt into `longPathAware`, and extraction rejects or
@@ -88,13 +94,17 @@ skipping for a recovery run. The OS must still have long paths enabled
 ## Platforms and support
 
 - The library targets `net8.0`, `net9.0` and `net10.0`. .NET 9 is EOL (May
-  2026) and .NET 8 reaches EOL in November 2026; `net10.0` is the LTS target
-  going forward.
+  2026) and .NET 8 is EOL (10 November 2026); both remain compatibility-only
+  through 1.x and are removed in 2.0.0. `net10.0` is the LTS target going
+  forward.
 - The test suite runs on Windows, Linux and macOS. The WPF `XISOSharpTester`
   harness only runs on Windows (it builds everywhere).
 - The per-file size field is 32-bit, so a single file cannot exceed ~4 GiB.
-  Plain-ISO `split` defaults to `0xFF000000` (4 GiB − 16 MiB) so parts fit FATX;
+  Plain-ISO `split` defaults to `0xFF000000` (4 GiB - 16 MiB) so parts fit FATX;
   CISO/CCI keep `0xffbf6000` as their xdvdfs-compatible compression default.
+- Sparse output is best-effort: NTFS/Unix mark pre-sized files sparse and skip
+  zero chunks, but FAT/exFAT and file systems without sparse support fall back
+  to dense allocation. The written bytes and image length are unchanged.
 
 ## Distribution
 

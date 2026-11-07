@@ -2,6 +2,8 @@ using System.Buffers.Binary;
 using System.Globalization;
 using System.Text;
 using XISOSharp.DataStructures;
+using XISOSharp.Interfaces;
+using XISOSharp.Logging;
 using XISOSharp.Models;
 
 namespace XISOSharp;
@@ -132,6 +134,55 @@ public static class XisoWriter
             excludePatterns, progress, fileTime, sourceDiscLseek, layout);
 
     /// <summary>
+    /// Creates an XISO image from a caller-supplied source filesystem instead of
+    /// a local directory. The tree is enumerated through
+    /// <see cref="ISourceFilesystem"/> and file data is read through
+    /// <see cref="ISourceFilesystem.OpenRead(string)"/>, so no host source path
+    /// is required (PlanToEnhance LIB-01). Output remains a local host path.
+    /// </summary>
+    /// <param name="sourceFilesystem">Source store to pack.</param>
+    /// <param name="sourceRoot">
+    /// Root-relative directory to start from (empty or <c>"/"</c> for the whole
+    /// store). Its leaf name becomes the volume name, matching a host directory.
+    /// </param>
+    /// <param name="outputDirectory">Host directory receiving the image, or <c>null</c> for the caller's CWD.</param>
+    /// <param name="outIsoPath">Receives the written image path.</param>
+    /// <param name="inName">Output file name (including extension); when <c>null</c>, derived from the source root plus <c>.iso</c>.</param>
+    /// <param name="progressCallback">Optional byte-progress callback.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="excludePatterns">Optional glob patterns matched against source-root-relative paths.</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <param name="fileTime">Optional fixed FILETIME for deterministic output.</param>
+    /// <param name="layout">Optional explicit sector layout.</param>
+    /// <param name="log">Optional per-call log sink (LIB-02).</param>
+    /// <returns>0 on success, 1 on error.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="sourceFilesystem"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="sourceRoot"/> is <c>null</c>.</exception>
+    /// <exception cref="DirectoryNotFoundException">The source root does not exist.</exception>
+    public static int CreateXiso(
+        ISourceFilesystem sourceFilesystem,
+        string sourceRoot,
+        string? outputDirectory,
+        out string? outIsoPath,
+        string? inName,
+        ProgressCallback? progressCallback = null,
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<string>? excludePatterns = null,
+        IProgress<ProgressInfo>? progress = null,
+        ulong? fileTime = null,
+        XisoLayoutSpec? layout = null,
+        XisoLogOptions? log = null)
+    {
+        ArgumentNullException.ThrowIfNull(sourceFilesystem);
+        ArgumentNullException.ThrowIfNull(sourceRoot);
+        using IDisposable logScope = XisoLogScope.Begin(log);
+        return CreateXisoCore(sourceRoot, outputDirectory, null, null,
+            out outIsoPath, inName, progressCallback, cancellationToken,
+            excludePatterns: excludePatterns, progress: progress, fileTime: fileTime,
+            layout: layout, sourceFilesystem: sourceFilesystem);
+    }
+
+    /// <summary>
     /// Core <c>CreateXiso</c> implementation. Resolves every source path up front
     /// and uses only per-operation state, so concurrent calls never change the
     /// working directory and never share counters or a lock.
@@ -150,7 +201,8 @@ public static class XisoWriter
         IProgress<ProgressInfo>? progress = null,
         ulong? fileTime = null,
         long sourceDiscLseek = 0,
-        XisoLayoutSpec? layout = null)
+        XisoLayoutSpec? layout = null,
+        ISourceFilesystem? sourceFilesystem = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
@@ -159,7 +211,7 @@ public static class XisoWriter
         // always read it (Todo #53).
         string? partialOutput = null;
 
-        if (inRoot == null && string.IsNullOrEmpty(rootDirectory))
+        if (inRoot == null && sourceFilesystem == null && string.IsNullOrEmpty(rootDirectory))
         {
             // The old chdir-based walk rejected an empty source with
             // ArgumentException; keep that contract now that paths are resolved.
@@ -185,7 +237,19 @@ public static class XisoWriter
         // process working directory (TODO #22).
         string? sourceRootPath = null;
         string? fullSourceForValidation = null;
-        if (inRoot == null)
+        string virtualSourceRoot = string.Empty;
+        if (sourceFilesystem != null)
+        {
+            // Virtual stores use root-relative paths, never host paths. Validate
+            // the root up front so a missing path fails before any output exists.
+            virtualSourceRoot = rootDirectory.Replace('\\', '/').Trim('/');
+            if (!sourceFilesystem.DirectoryExists(virtualSourceRoot))
+            {
+                throw new DirectoryNotFoundException(
+                    $"Source directory not found in the source filesystem: '{rootDirectory}'.");
+            }
+        }
+        else if (inRoot == null)
         {
             try
             {
@@ -210,7 +274,18 @@ public static class XisoWriter
         // the source itself would trip the #55 same-leaf collision guard below.
         string? defaultOutputDirectory = null;
 
-        if (inRoot == null)
+        if (sourceFilesystem != null)
+        {
+            int slashPos = virtualSourceRoot.LastIndexOf('/') + 1;
+            isoDir = virtualSourceRoot[slashPos..];
+            if (isoDir.Length == 0 || isoDir is "." or "..")
+            {
+                isoDir = "root";
+            }
+
+            isoName = inName ?? isoDir;
+        }
+        else if (inRoot == null)
         {
             string dir = rootDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
@@ -338,8 +413,11 @@ public static class XisoWriter
                 effectivePatterns = patterns;
             }
 
-            err = GenerateAvlTreeLocal(ref root.Subdirectory, ref n, ref filesSkipped,
-                sourceRootPath ?? rootDirectory, ref totalBytes, effectivePatterns);
+            err = sourceFilesystem != null
+                ? GenerateAvlTreeSource(ref root.Subdirectory, ref n, ref filesSkipped,
+                    sourceFilesystem, virtualSourceRoot, ref totalBytes, effectivePatterns)
+                : GenerateAvlTreeLocal(ref root.Subdirectory, ref n, ref filesSkipped,
+                    sourceRootPath ?? rootDirectory, ref totalBytes, effectivePatterns);
 
             for (int i = 0; i < n; i++) Logger.Log("\b");
             for (int i = 0; i < n; i++) Logger.Log(" ");
@@ -403,7 +481,7 @@ public static class XisoWriter
             outIsoPath = xisoPath;
             partialOutput = xisoPath;
 
-            xisoFs.SetLength(preallocatedLength);
+            SparseFile.Prepare(xisoFs, preallocatedLength);
 
             if (prependOffset > 0)
             {
@@ -469,6 +547,7 @@ public static class XisoWriter
                 XisoStream = xisoFs,
                 Path = null,
                 SourceStream = sourceStream,
+                SourceFilesystem = sourceFilesystem,
                 ProgressCallback = progressCallback,
                 StructuredProgress = progress,
                 FinalBytes = finalTotal,
@@ -591,6 +670,7 @@ public static class XisoWriter
             {
                 XisoStream = ctx.XisoStream,
                 SourceStream = ctx.SourceStream,
+                SourceFilesystem = ctx.SourceFilesystem,
                 ProgressCallback = ctx.ProgressCallback,
                 StructuredProgress = ctx.StructuredProgress,
                 FinalBytes = ctx.FinalBytes,
@@ -701,7 +781,20 @@ public static class XisoWriter
         byte[] buf = new byte[bufSize + 1];
 
         Stream srcStream;
-        if (ctx.SourceStream == null)
+        if (ctx.SourceStream != null)
+        {
+            srcStream = ctx.SourceStream;
+            srcStream.Seek(((long)avl.OldStartSector * Constants.SectorSize) + ctx.SourceDiscLseek,
+                SeekOrigin.Begin);
+        }
+        else if (ctx.SourceFilesystem != null)
+        {
+            // Virtual create: HostPath carries the root-relative key, not a host
+            // path (LIB-01). The stream is owned by this method and disposed
+            // below, exactly like the host FileStream branch.
+            srcStream = ctx.SourceFilesystem.OpenRead(avl.HostPath ?? avl.Filename);
+        }
+        else
         {
             // Local create, caller-supplied and remap trees carry absolute host
             // paths; the bare-name fallback is only a safety net for a node
@@ -715,12 +808,6 @@ public static class XisoWriter
                     Share = FileShare.Read,
                     BufferSize = 65536
                 });
-        }
-        else
-        {
-            srcStream = ctx.SourceStream;
-            srcStream.Seek(((long)avl.OldStartSector * Constants.SectorSize) + ctx.SourceDiscLseek,
-                SeekOrigin.Begin);
         }
 
         using (ctx.SourceStream == null ? srcStream : null)
@@ -978,8 +1065,140 @@ public static class XisoWriter
     }
 
     /// <summary>
+    /// Builds an AVL tree from an <see cref="ISourceFilesystem"/> (LIB-01).
+    /// </summary>
+    private static int GenerateAvlTreeSource(
+        ref AvlNode? outRoot,
+        ref int ioN,
+        ref int filesSkipped,
+        ISourceFilesystem sourceFilesystem,
+        string directoryPath,
+        ref long totalBytes,
+        IReadOnlyList<string>? excludePatterns)
+    {
+        GlobMatcher? matcher = excludePatterns is { Count: > 0 } ? new GlobMatcher(excludePatterns) : null;
+        return GenerateAvlTreeSourceCore(ref outRoot, ref ioN, ref filesSkipped, sourceFilesystem,
+            directoryPath, ref totalBytes, matcher, relativePath: "");
+    }
+
+    private static int GenerateAvlTreeSourceCore(
+        ref AvlNode? outRoot,
+        ref int ioN,
+        ref int filesSkipped,
+        ISourceFilesystem sourceFilesystem,
+        string directoryPath,
+        ref long totalBytes,
+        GlobMatcher? matcher,
+        string relativePath)
+    {
+        IReadOnlyList<SourceEntry> entries;
+        try
+        {
+            entries = sourceFilesystem.EnumerateEntries(directoryPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.LogErr($"warning: cannot read source directory '{directoryPath}': {ex.Message}, skipping.\n");
+            filesSkipped++;
+            return 0;
+        }
+
+        // Deterministic output: the store may enumerate in any order, while
+        // insertion order shapes the AVL tree and therefore the directory bytes.
+        SourceEntry[] ordered = [.. entries];
+        Array.Sort(ordered, static (a, b) => StringComparer.Ordinal.Compare(a.Name, b.Name));
+        bool emptyDir = true;
+
+        foreach (SourceEntry entry in ordered)
+        {
+            string entryName = entry.Name;
+            if (string.IsNullOrEmpty(entryName) || entryName is "." or ".." ||
+                entryName.Contains('/') || entryName.Contains('\\'))
+            {
+                throw new InvalidDataException(
+                    $"Source filesystem returned an invalid entry name '{entryName}' under '{directoryPath}'.");
+            }
+
+            string entryRelPath = relativePath.Length == 0 ? entryName : relativePath + "/" + entryName;
+            if (matcher?.IsMatch(entryRelPath) == true)
+            {
+                continue;
+            }
+
+            try
+            {
+                for (int i = ioN; i > 0; i--) Logger.Log("\b");
+                Logger.Log(entryName);
+                int nameLen = entryName.Length;
+                for (int j = nameLen; j < ioN; j++) Logger.Log(" ");
+                for (int j = nameLen; j < ioN; j++) Logger.Log("\b");
+                ioN = nameLen;
+                Logger.Flush();
+
+                AvlNode avl = new() { Filename = entryName };
+                emptyDir = false;
+
+                if (entry.IsDirectory)
+                {
+                    string childDirectory = directoryPath.Length == 0
+                        ? entryName
+                        : directoryPath + "/" + entryName;
+                    GenerateAvlTreeSourceCore(ref avl.Subdirectory, ref ioN, ref filesSkipped,
+                        sourceFilesystem, childDirectory, ref totalBytes, matcher, entryRelPath);
+                }
+                else
+                {
+                    if (entry.Length < 0)
+                    {
+                        throw new InvalidDataException(
+                            $"Source filesystem reported a negative length for '{entryRelPath}'.");
+                    }
+
+                    if (entry.Length > uint.MaxValue)
+                    {
+                        throw new XisoFileTooLargeException(entryName, entry.Length);
+                    }
+
+                    avl.FileSize = (uint)entry.Length;
+                    // Store-relative key consumed by WriteFileData through OpenRead.
+                    avl.HostPath = directoryPath.Length == 0
+                        ? entryName
+                        : directoryPath + "/" + entryName;
+                    totalBytes += entry.Length;
+                }
+
+                if (AvlTree.AvlInsert(ref outRoot, avl) == AvlResult.AvlError)
+                {
+                    throw new InvalidDataException(
+                        $"Cannot pack '{entryRelPath}': a case-insensitive duplicate of '{avl.Filename}' is already in the image.");
+                }
+            }
+            catch (XisoFileTooLargeException)
+            {
+                throw;
+            }
+            catch (InvalidDataException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Logger.LogErr($"warning: I/O error on {entryName}: {ex.Message}, skipping.\n");
+                filesSkipped++;
+            }
+        }
+
+        if (emptyDir)
+        {
+            outRoot = AvlNode.EmptySubdirectory;
+        }
+
+        return 0;
+    }
+
+    /// <summary>
     /// Packs a local directory into an XISO image with a 1:1 mapping of all entries.
-    /// Convenience wrapper around <see cref="CreateXiso"/> that takes a single output
+    /// Convenience wrapper around <c>CreateXiso</c> that takes a single output
     /// ISO path instead of separate directory/name arguments.
     /// </summary>
     /// <param name="sourceDirectory">Source directory whose contents are packed.</param>
@@ -1031,6 +1250,81 @@ public static class XisoWriter
             progressCallback, cancellationToken, excludePatterns: excludePatterns, progress: progress,
             fileTime: fileTime, layout: layout);
     }
+
+    /// <summary>
+    /// Packs a caller-supplied source filesystem into an XISO image with a 1:1
+    /// mapping (LIB-01). The output remains a local host path; no host source
+    /// path is required.
+    /// </summary>
+    /// <param name="sourceFilesystem">Source store to pack.</param>
+    /// <param name="sourceRoot">Root-relative source directory (empty for the store root).</param>
+    /// <param name="outputIsoPath">Full host path of the ISO to create.</param>
+    /// <param name="excludePatterns">Optional glob patterns of files/directories to omit.</param>
+    /// <param name="progressCallback">Optional byte-progress callback.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <param name="fileTime">Optional fixed FILETIME for deterministic output.</param>
+    /// <param name="layout">Optional explicit sector layout.</param>
+    /// <param name="log">Optional per-call log sink (LIB-02).</param>
+    /// <returns>0 on success, 1 on error.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="sourceFilesystem"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="outputIsoPath"/> is empty.</exception>
+    /// <exception cref="DirectoryNotFoundException">The source root does not exist in the store.</exception>
+    public static int PackFromDirectory(
+        ISourceFilesystem sourceFilesystem,
+        string sourceRoot,
+        string outputIsoPath,
+        IReadOnlyList<string>? excludePatterns = null,
+        ProgressCallback? progressCallback = null,
+        CancellationToken cancellationToken = default,
+        IProgress<ProgressInfo>? progress = null,
+        ulong? fileTime = null,
+        XisoLayoutSpec? layout = null,
+        XisoLogOptions? log = null)
+    {
+        ArgumentNullException.ThrowIfNull(sourceFilesystem);
+        ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
+
+        string fullOutput = Path.GetFullPath(outputIsoPath);
+        string outputDirectory = Path.GetDirectoryName(fullOutput) ?? Directory.GetCurrentDirectory();
+        string inName = Path.GetFileName(fullOutput);
+        Directory.CreateDirectory(outputDirectory);
+
+        return CreateXiso(sourceFilesystem, sourceRoot, outputDirectory, out _, inName,
+            progressCallback, cancellationToken, excludePatterns: excludePatterns, progress: progress,
+            fileTime: fileTime, layout: layout, log: log);
+    }
+
+    /// <summary>
+    /// Asynchronously packs a caller-supplied source filesystem into an XISO
+    /// image (LIB-01).
+    /// </summary>
+    /// <param name="sourceFilesystem">Source store to pack.</param>
+    /// <param name="sourceRoot">Root-relative source directory (empty for the store root).</param>
+    /// <param name="outputIsoPath">Full host path of the ISO to create.</param>
+    /// <param name="excludePatterns">Optional glob patterns of files/directories to omit.</param>
+    /// <param name="progressCallback">Optional byte-progress callback.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <param name="fileTime">Optional fixed FILETIME for deterministic output.</param>
+    /// <param name="layout">Optional explicit sector layout.</param>
+    /// <param name="log">Optional per-call log sink (LIB-02).</param>
+    /// <returns>A task that completes with 0 on success, 1 on error.</returns>
+    public static async Task<int> PackFromDirectoryAsync(
+        ISourceFilesystem sourceFilesystem,
+        string sourceRoot,
+        string outputIsoPath,
+        IReadOnlyList<string>? excludePatterns = null,
+        ProgressCallback? progressCallback = null,
+        CancellationToken cancellationToken = default,
+        IProgress<ProgressInfo>? progress = null,
+        ulong? fileTime = null,
+        XisoLayoutSpec? layout = null,
+        XisoLogOptions? log = null) =>
+        await Task.Run(() => PackFromDirectory(
+                sourceFilesystem, sourceRoot, outputIsoPath, excludePatterns, progressCallback,
+                cancellationToken, progress, fileTime, layout, log),
+            cancellationToken).ConfigureAwait(false);
 
     /// <summary>
     /// Asynchronously packs a local directory into an XISO image with a 1:1 mapping.
@@ -1159,7 +1453,7 @@ public static class XisoWriter
                     Options = FileOptions.SequentialScan
                 });
             partialOutput = xisoPath;
-            xisoFs.SetLength(preallocatedLength);
+            SparseFile.Prepare(xisoFs, preallocatedLength);
             if (prependOffset > 0)
             {
                 xisoFs.Seek(prependOffset, SeekOrigin.Begin);
@@ -1616,7 +1910,7 @@ public static class XisoWriter
     /// </param>
     /// <param name="progress">
     /// Optional structured progress channel; receives <see cref="ProgressInfo"/> events
-    /// (counts, per-entry additions, completion) — see <see cref="CreateXiso"/>.
+    /// (counts, per-entry additions, completion) - see <c>CreateXiso</c>.
     /// </param>
     /// <param name="fileTime">
     /// Optional fixed FILETIME for the volume descriptor (deterministic output, TODO #2).

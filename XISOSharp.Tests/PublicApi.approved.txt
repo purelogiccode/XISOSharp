@@ -34,7 +34,9 @@ C:XISOSharp.ExtractFileException(XISOSharp.Models.ExtractError,System.String,Sys
 C:XISOSharp.ExtractFileException(XISOSharp.Models.ExtractError,System.String,System.String,System.UInt32,System.Int64,System.String,System.Int64,System.Exception)
 C:XISOSharp.GlobMatcher(System.Collections.Generic.IEnumerable<System.String>)
 C:XISOSharp.GlobMatcher+GlobMatchResult(System.Boolean,System.String[])
+C:XISOSharp.Interfaces.SourceEntry(System.String,System.Boolean,System.Int64)
 C:XISOSharp.LocalFilesystem(System.String)
+C:XISOSharp.Logging.XisoLogOptions()
 C:XISOSharp.MemoryFilesystem()
 C:XISOSharp.Models.AuditResult(System.Boolean,System.Int32,System.Int32,System.Collections.Generic.IReadOnlyList<System.String>)
 C:XISOSharp.Models.CreateList()
@@ -368,6 +370,14 @@ M:XISOSharp.Interfaces.IFilesystem.CreateFile(System.String,System.Nullable<Syst
 M:XISOSharp.Interfaces.IFilesystem.DeleteFile(System.String)->System.Void
 M:XISOSharp.Interfaces.IFilesystem.FileExists(System.String)->System.Boolean
 M:XISOSharp.Interfaces.IFilesystem.FileLength(System.String)->System.Int64
+M:XISOSharp.Interfaces.ISourceFilesystem.DirectoryExists(System.String)->System.Boolean
+M:XISOSharp.Interfaces.ISourceFilesystem.EnumerateEntries(System.String)->System.Collections.Generic.IReadOnlyList<XISOSharp.Interfaces.SourceEntry>
+M:XISOSharp.Interfaces.ISourceFilesystem.OpenRead(System.String)->System.IO.Stream
+M:XISOSharp.Interfaces.SourceEntry.Deconstruct(out System.String,out System.Boolean,out System.Int64)->System.Void
+M:XISOSharp.Interfaces.SourceEntry.Equals(System.Object)->System.Boolean
+M:XISOSharp.Interfaces.SourceEntry.Equals(XISOSharp.Interfaces.SourceEntry)->System.Boolean
+M:XISOSharp.Interfaces.SourceEntry.GetHashCode()->System.Int32
+M:XISOSharp.Interfaces.SourceEntry.ToString()->System.String
 M:XISOSharp.LocalFilesystem.CreateDirectory(System.String)->System.Void
 M:XISOSharp.LocalFilesystem.CreateFile(System.String)->System.IO.Stream
 M:XISOSharp.LocalFilesystem.CreateFile(System.String,System.Nullable<System.Int64>)->System.IO.Stream
@@ -382,6 +392,18 @@ M:XISOSharp.Logger.LogLine(System.String)->System.Void
 M:XISOSharp.Logger.LogWarn(System.String)->System.Void
 M:XISOSharp.Logger.RecordFileWritten(System.Int64)->System.Void
 M:XISOSharp.Logger.RecordIsoFileWritten(System.Int64)->System.Void
+M:XISOSharp.Logging.IXisoLogger.Flush()->System.Void
+M:XISOSharp.Logging.IXisoLogger.Log(System.String)->System.Void
+M:XISOSharp.Logging.IXisoLogger.LogDebug(System.String)->System.Void
+M:XISOSharp.Logging.IXisoLogger.LogError(System.String)->System.Void
+M:XISOSharp.Logging.IXisoLogger.LogWarning(System.String)->System.Void
+M:XISOSharp.Logging.XisoLogOptions.<Clone>$()->XISOSharp.Logging.XisoLogOptions
+M:XISOSharp.Logging.XisoLogOptions.Equals(System.Object)->System.Boolean
+M:XISOSharp.Logging.XisoLogOptions.Equals(XISOSharp.Logging.XisoLogOptions)->System.Boolean
+M:XISOSharp.Logging.XisoLogOptions.GetHashCode()->System.Int32
+M:XISOSharp.Logging.XisoLogOptions.ToString()->System.String
+M:XISOSharp.Logging.XisoLogScope.Begin(XISOSharp.Logging.XisoLogOptions)->System.IDisposable
+M:XISOSharp.Logging.XisoLogScope.Run(XISOSharp.Logging.XisoLogOptions,System.Func<T>)->T
 M:XISOSharp.Lz4.Compress(System.ReadOnlySpan<System.Byte>,System.Span<System.Byte>,System.Int32)->System.Int32
 M:XISOSharp.Lz4.Decompress(System.ReadOnlySpan<System.Byte>,System.Span<System.Byte>)->System.Int32
 M:XISOSharp.Lz4.MaxCompressedOutputSize(System.Int32)->System.Int32
@@ -389,8 +411,11 @@ M:XISOSharp.MemoryFilesystem.CreateDirectory(System.String)->System.Void
 M:XISOSharp.MemoryFilesystem.CreateFile(System.String)->System.IO.Stream
 M:XISOSharp.MemoryFilesystem.CreateFile(System.String,System.Nullable<System.Int64>)->System.IO.Stream
 M:XISOSharp.MemoryFilesystem.DeleteFile(System.String)->System.Void
+M:XISOSharp.MemoryFilesystem.DirectoryExists(System.String)->System.Boolean
+M:XISOSharp.MemoryFilesystem.EnumerateEntries(System.String)->System.Collections.Generic.IReadOnlyList<XISOSharp.Interfaces.SourceEntry>
 M:XISOSharp.MemoryFilesystem.FileExists(System.String)->System.Boolean
 M:XISOSharp.MemoryFilesystem.FileLength(System.String)->System.Int64
+M:XISOSharp.MemoryFilesystem.OpenRead(System.String)->System.IO.Stream
 M:XISOSharp.MemoryFilesystem.ReadAllBytes(System.String)->System.Byte[]
 M:XISOSharp.Models.AuditResult.<Clone>$()->XISOSharp.Models.AuditResult
 M:XISOSharp.Models.AuditResult.Deconstruct(out System.Boolean,out System.Int32,out System.Int32,out System.Collections.Generic.IReadOnlyList<System.String>)->System.Void
@@ -812,9 +837,12 @@ M:XISOSharp.XisoValidator.LogResult(XISOSharp.Models.ValidationResult,System.Str
 M:XISOSharp.XisoValidator.ValidateConversion(System.String,System.String,System.Boolean)->XISOSharp.Models.ValidationResult
 M:XISOSharp.XisoValidator.WriteReport(XISOSharp.Models.ValidationResult,System.String,System.String,System.String)->System.Void
 M:XISOSharp.XisoWriter.CreateXiso(System.String,System.String,XISOSharp.DataStructures.AvlNode,System.IO.Stream,out System.String,System.String,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.Nullable<System.Int32>,System.Collections.Generic.IReadOnlyList<System.String>,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,System.Int64,XISOSharp.Models.XisoLayoutSpec)->System.Int32
+M:XISOSharp.XisoWriter.CreateXiso(XISOSharp.Interfaces.ISourceFilesystem,System.String,System.String,out System.String,System.String,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.Collections.Generic.IReadOnlyList<System.String>,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec,XISOSharp.Logging.XisoLogOptions)->System.Int32
 M:XISOSharp.XisoWriter.CreateXisoAsync(System.String,System.String,XISOSharp.DataStructures.AvlNode,System.IO.Stream,System.String,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.Nullable<System.Int32>,System.Collections.Generic.IReadOnlyList<System.String>,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec)->System.Threading.Tasks.Task<System.ValueTuple<System.Int32,System.String>>
 M:XISOSharp.XisoWriter.PackFromDirectory(System.String,System.String,System.Collections.Generic.IReadOnlyList<System.String>,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec)->System.Int32
+M:XISOSharp.XisoWriter.PackFromDirectory(XISOSharp.Interfaces.ISourceFilesystem,System.String,System.String,System.Collections.Generic.IReadOnlyList<System.String>,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec,XISOSharp.Logging.XisoLogOptions)->System.Int32
 M:XISOSharp.XisoWriter.PackFromDirectoryAsync(System.String,System.String,System.Collections.Generic.IReadOnlyList<System.String>,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec)->System.Threading.Tasks.Task<System.Int32>
+M:XISOSharp.XisoWriter.PackFromDirectoryAsync(XISOSharp.Interfaces.ISourceFilesystem,System.String,System.String,System.Collections.Generic.IReadOnlyList<System.String>,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec,XISOSharp.Logging.XisoLogOptions)->System.Threading.Tasks.Task<System.Int32>
 M:XISOSharp.XisoZarchive.ComputeFileHash(System.String,System.String,System.Security.Cryptography.HashAlgorithmName)->System.Byte[]
 M:XISOSharp.XisoZarchive.ConvertZarToIso(System.String,System.String,System.Boolean,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Int32
 M:XISOSharp.XisoZarchive.CreateZar(System.IO.FileStream,System.Int64,System.String,System.Boolean,System.Boolean,System.Threading.CancellationToken,ZArchiveSharp.IZarBlockCompressor,System.IProgress<ZArchiveSharp.Pipeline.ZarProgress>)->System.Boolean
@@ -856,6 +884,9 @@ P:XISOSharp.ExtractFileException.StartSector:System.UInt32:get;
 P:XISOSharp.GlobMatcher+GlobMatchResult.Groups:System.String[]:get;set;
 P:XISOSharp.GlobMatcher+GlobMatchResult.IsMatch:System.Boolean:get;set;
 P:XISOSharp.Interfaces.IBlockDevice.Length:System.Int64:get;
+P:XISOSharp.Interfaces.SourceEntry.IsDirectory:System.Boolean:get;set;
+P:XISOSharp.Interfaces.SourceEntry.Length:System.Int64:get;set;
+P:XISOSharp.Interfaces.SourceEntry.Name:System.String:get;set;
 P:XISOSharp.LocalFilesystem.Instance:XISOSharp.LocalFilesystem:get;
 P:XISOSharp.LocalFilesystem.Root:System.String:get;
 P:XISOSharp.Logger.Error:System.IO.TextWriter:get;set;
@@ -875,6 +906,8 @@ P:XISOSharp.Logger.TotalFiles:System.Int32:get;set;
 P:XISOSharp.Logger.TotalFilesAllIsos:System.Int32:get;set;
 P:XISOSharp.Logger.Warned:System.Boolean:get;set;
 P:XISOSharp.Logger.XboxDiscLseek:System.Int64:get;set;
+P:XISOSharp.Logging.XisoLogOptions.Sink:XISOSharp.Logging.IXisoLogger:get;set;
+P:XISOSharp.Logging.XisoLogOptions.SuppressStaticOutput:System.Boolean:get;set;
 P:XISOSharp.MemoryFilesystem.DirectoryNames:System.Collections.ObjectModel.ReadOnlyCollection<System.String>:get;
 P:XISOSharp.MemoryFilesystem.FileNames:System.Collections.ObjectModel.ReadOnlyCollection<System.String>:get;
 P:XISOSharp.Models.AuditResult.DirsChecked:System.Int32:get;set;
@@ -1012,6 +1045,7 @@ P:XISOSharp.Models.TitleInfo.Xbe:XISOSharp.Models.XbeInfo:get;set;
 P:XISOSharp.Models.TitleInfo.XbePath:System.String:get;set;
 P:XISOSharp.Models.TitleInfo.Xex:XISOSharp.Models.XexTitleInfo:get;set;
 P:XISOSharp.Models.UnpackOptions.ContinueOnError:System.Boolean:get;set;
+P:XISOSharp.Models.UnpackOptions.Log:XISOSharp.Logging.XisoLogOptions:get;set;
 P:XISOSharp.Models.UnpackOptions.MaxDegreeOfParallelism:System.Int32:get;set;
 P:XISOSharp.Models.UnpackOptions.NamePolicy:XISOSharp.Models.ExtractNamePolicy:get;set;
 P:XISOSharp.Models.UnpackOptions.SkipExisting:System.Boolean:get;set;
@@ -1166,8 +1200,13 @@ T:XISOSharp.GlobMatcher+GlobMatchResult
 T:XISOSharp.GodHeader
 T:XISOSharp.Interfaces.IBlockDevice
 T:XISOSharp.Interfaces.IFilesystem
+T:XISOSharp.Interfaces.ISourceFilesystem
+T:XISOSharp.Interfaces.SourceEntry
 T:XISOSharp.LocalFilesystem
 T:XISOSharp.Logger
+T:XISOSharp.Logging.IXisoLogger
+T:XISOSharp.Logging.XisoLogOptions
+T:XISOSharp.Logging.XisoLogScope
 T:XISOSharp.Lz4
 T:XISOSharp.MemoryFilesystem
 T:XISOSharp.Models.AuditResult

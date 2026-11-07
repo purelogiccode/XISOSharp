@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using XISOSharp.Logging;
 
 namespace XISOSharp;
 
@@ -190,6 +192,16 @@ public static class Logger
     /// <param name="args">Format arguments.</param>
     public static void Log(string message, params object?[] args)
     {
+        XisoLogScope.ScopeState? scope = XisoLogScope.Current;
+        if (scope is not null)
+        {
+            WriteScoped(scope.Sink.Log, message, args);
+            if (scope.SuppressStaticOutput)
+            {
+                return;
+            }
+        }
+
         if (!Quiet && !RealQuiet)
         {
             // Call sites pass pre-interpolated text (file names, tool output) that may
@@ -211,6 +223,16 @@ public static class Logger
     /// <param name="message">The line of text to write (no format arguments).</param>
     public static void LogLine(string message)
     {
+        XisoLogScope.ScopeState? scope = XisoLogScope.Current;
+        if (scope is not null)
+        {
+            WriteScoped(scope.Sink.Log, message, Array.Empty<object?>());
+            if (scope.SuppressStaticOutput)
+            {
+                return;
+            }
+        }
+
         if (!Quiet && !RealQuiet) InfoWriter.WriteLine(message);
         Forward(ForwardInfo, message, Array.Empty<object?>());
     }
@@ -221,14 +243,34 @@ public static class Logger
     /// swallowed errors stay observable in the host log.
     /// </summary>
     /// <param name="message">The diagnostic message.</param>
-    public static void LogDebug(string message) => Forward(ForwardDebug, message, Array.Empty<object?>());
+    public static void LogDebug(string message)
+    {
+        XisoLogScope.ScopeState? scope = XisoLogScope.Current;
+        if (scope is not null)
+        {
+            WriteScoped(scope.Sink.LogDebug, message, Array.Empty<object?>());
+            if (scope.SuppressStaticOutput) return;
+        }
+
+        Forward(ForwardDebug, message, Array.Empty<object?>());
+    }
 
     /// <summary>
     /// Reports a library warning through <see cref="ForwardWarning"/> without
     /// writing to <see cref="Error"/>. See <see cref="LogDebug"/>.
     /// </summary>
     /// <param name="message">The warning message.</param>
-    public static void LogWarn(string message) => Forward(ForwardWarning, message, Array.Empty<object?>());
+    public static void LogWarn(string message)
+    {
+        XisoLogScope.ScopeState? scope = XisoLogScope.Current;
+        if (scope is not null)
+        {
+            WriteScoped(scope.Sink.LogWarning, message, Array.Empty<object?>());
+            if (scope.SuppressStaticOutput) return;
+        }
+
+        Forward(ForwardWarning, message, Array.Empty<object?>());
+    }
 
     /// <summary>
     /// Flushes <see cref="Out"/> unless <see cref="Quiet"/> or
@@ -236,6 +278,21 @@ public static class Logger
     /// </summary>
     public static void Flush()
     {
+        XisoLogScope.ScopeState? scope = XisoLogScope.Current;
+        if (scope is not null)
+        {
+            try
+            {
+                scope.Sink.Flush();
+            }
+            catch
+            {
+                // Per-call sinks must not break library output.
+            }
+
+            if (scope.SuppressStaticOutput) return;
+        }
+
         if (!Quiet && !RealQuiet) InfoWriter.Flush();
     }
 
@@ -247,6 +304,13 @@ public static class Logger
     /// <param name="args">Format arguments.</param>
     public static void LogErr(string message, params object?[] args)
     {
+        XisoLogScope.ScopeState? scope = XisoLogScope.Current;
+        if (scope is not null)
+        {
+            WriteScoped(scope.Sink.LogError, message, args);
+            if (scope.SuppressStaticOutput) return;
+        }
+
         if (!RealQuiet)
         {
             // See Log: never composite-format caller-interpolated text without args.
@@ -257,6 +321,25 @@ public static class Logger
         }
 
         Forward(ForwardError, message, args);
+    }
+
+    /// <summary>Formats and writes one message to a per-call sink without throwing.</summary>
+    private static void WriteScoped(Action<string> write, string message, object?[] args)
+    {
+        try
+        {
+            string text = args.Length == 0
+                ? message
+                : string.Format(CultureInfo.CurrentCulture, message, args);
+            if (!string.IsNullOrEmpty(text))
+            {
+                write(text);
+            }
+        }
+        catch
+        {
+            // The per-call sink must never break library output.
+        }
     }
 
     private static void Forward(Action<string>? target, string message, object?[] args)

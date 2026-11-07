@@ -1603,6 +1603,44 @@ XisoReader.DecodeXiso("game.iso", "output", ExtractMode.Extract, out _);
 logWriter.Flush();
 ```
 
+For concurrent operations, use a per-call sink instead of the process-wide
+writers:
+
+```csharp
+using XISOSharp.Logging;
+
+using (XisoLogScope.Begin(new XisoLogOptions { Sink = mySink }))
+{
+    XisoWriter.PackFromDirectory("src", "game.iso");
+}
+```
+
+`XisoLogScope` is `AsyncLocal`-based, so two tasks can log independently.
+`UnpackOptions.Log` applies the same sink to extraction, and static `Logger`
+output remains the fallback when no scope is active.
+
+### Packing from a Source Filesystem
+
+`ISourceFilesystem` lets a custom store be packed without host paths
+(`MemoryFilesystem` implements both the source and destination interfaces):
+
+```csharp
+MemoryFilesystem source = new();
+// ... populate source files ...
+XisoWriter.PackFromDirectory(source, "src", "game.iso", fileTime: 0);
+```
+
+The output is byte-identical to packing an equivalent directory. Entries are
+enumerated through `DirectoryExists`/`EnumerateEntries` and read through
+`OpenRead`; the writer sorts them ordinally.
+
+### Sparse Outputs
+
+Pre-sized writer and extraction outputs are marked sparse where supported
+(NTFS and Unix), and CISO/CCI decompression/ZAR extraction skip all-zero
+chunks. Unsupported file systems fall back to dense allocation with identical
+bytes and lengths.
+
 ### Graphical Progress (WPF / Blazor)
 
 The `ProgressCallback` delegate integrates naturally into GUI frameworks:
@@ -1685,7 +1723,13 @@ The core processing engine is **not thread-safe** for concurrent operations on t
 | .NET 9 | `net9.0` |
 | .NET 10 | `net10.0` |
 
-The library targets `net8.0`, `net9.0`, and `net10.0`. Its runtime dependencies beyond the .NET runtime are [ZArchiveSharp](https://www.nuget.org/packages/ZArchiveSharp) (ZAR archive support) and [CCISharp](https://www.nuget.org/packages/CCISharp) (CCI/CCIM containers); everything else is BCL-only.
+The library targets `net8.0`, `net9.0`, and `net10.0`. `net10.0` is the primary
+target; `net8.0`/`net9.0` are compatibility-only through 1.x and are removed in
+2.0.0 (see [Support Policy](https://github.com/purelogiccode/XISOSharp/blob/master/docs/support-policy.md)).
+Its runtime dependencies beyond the .NET runtime are [ZArchiveSharp](https://www.nuget.org/packages/ZArchiveSharp)
+(ZAR archive support), [CCISharp](https://www.nuget.org/packages/CCISharp)
+(CCI/CCIM containers) and [StfsSharp](https://www.nuget.org/packages/StfsSharp)
+(GOD/SVOD and XBLA/XBLIG STFS readers); everything else is BCL-only.
 
 ---
 

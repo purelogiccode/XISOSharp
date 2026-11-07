@@ -76,6 +76,12 @@ Highlights:
 | CISO parallel compression (`jobs` 1..64, byte-identical v1/v2/split, ordered progress) | `CisoTests.cs`, `CliBatchConvertTests.cs` |
 | Golden interop vs reference `xdvdfs-cli 0.8.3` (both directions, split layout) | `CisoSplitInteropTests.cs` |
 | Logging, constants, types, exceptions | `LoggerTests.cs`, `ConstantsTests.cs`, `TypesTests.cs`, `XisoExceptionTests.cs`, … |
+| Source filesystem packing (`ISourceFilesystem`, `MemoryFilesystem` source, byte-identical host parity, CWD-free concurrency) | `SourceFilesystemPackingTests.cs` |
+| Per-call logging (`IXisoLogger`, `XisoLogOptions`, `XisoLogScope`, concurrent sinks, `UnpackOptions.Log`) | `PerCallLoggingTests.cs` |
+| Sparse pre-sized outputs (`FSCTL_SET_SPARSE`, zero-skipping CISO/CCI/ZAR) | `SparseOutputTests.cs` |
+| Seeded property round-trips (pack/extract, split/join, CISO, CCI, ZAR boundary sizes) | `PropertyRoundTripTests.cs` |
+| Public synthetic corpus (all containers, title metadata/images, corrupt fixtures, manifest) | `PublicCorpusTests.cs` |
+| GUI Xbox 360 tab (GOD/STFS argv parity, title panel formatting, asset builder) | `GuiXbox360Tests.cs`, `MainViewModelTests.cs`, `CliCommandsTests.cs` |
 
 Conventions:
 
@@ -97,6 +103,26 @@ Conventions:
   `XisoLegacyInteropTests.cs`) silently pass when the binary under `References/`
   is absent, so CI and clean checkouts stay green.
 
+## Public synthetic corpus
+
+`XISOSharp.TestDataGenerator --corpus [root] --force` writes the DOC-02 corpus
+used by `PublicCorpusTests`, the GUI Xbox 360 tests and BattleTests:
+
+| Path | Fixture |
+|---|---|
+| `xiso/` | basic, names, sizes, XBE-assets and XEX-title XISOs |
+| `split/` | FATX-style `.1.iso` … parts |
+| `ciso/`, `cci/`, `zar/` | compressed/archival variants of the basic image |
+| `god/` | synthetic SVOD header + `.data` fragments |
+| `stfs/` | XBLA and XBLIG single-file packages |
+| `xbe/`, `xex/` | raw synthetic executables with images/XDBF metadata |
+| `corrupt/` | truncated ISO, bad-magic ISO, truncated CISO/CCI and STFS |
+| `corpus-manifest.json` | revision, size and SHA-256 for every generated file |
+
+The generator only uses synthetic, copyright-free content. The default root is
+`TestData/corpus` (gitignored); CI regenerates it on demand and the tests also
+generate isolated copies under the temp directory.
+
 ## TestData fixtures
 
 `TestData/` holds stable fixtures:
@@ -109,10 +135,19 @@ Conventions:
 The presence of `test.xbe` ensures the media-enable patch path is exercised on every
 create round-trip.
 
+## Benchmarks
+
+- In-process: `dotnet run --project XISOSharp.Benchmarks -c Release -- --filter
+  "*XisoEndToEnd*"` covers pack, open/list, hash, extract, CISO, CCI and random
+  reads.
+- End-to-end CLI comparison: `pwsh -File scripts/bench-compare.ps1 -Iterations 2
+  -SizeMiB 1024` compares create/extract against `extract-xiso` and `xdvdfs`.
+- Numbers, hardware and caveats are recorded in [Benchmarks](benchmarks.md).
+
 ## Reference cross-checking
 
-There are no standalone PowerShell helper scripts in the repository; comparison
-against the original C tool is built into the test suite and the battle harness:
+Comparison against the original C tool is built into the test suite and the
+battle harness (plus the benchmark comparison script):
 
 - `XISOSharp.Tests/XisoLegacyInteropTests.cs` creates legacy-layout images with
   the reference `extract-xiso.exe` (gitignored `References/` drop, dated build

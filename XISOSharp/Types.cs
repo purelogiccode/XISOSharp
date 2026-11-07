@@ -70,6 +70,13 @@ internal class WriteTreeContext
     /// </summary>
     internal Stream? SourceStream;
 
+    /// <summary>
+    /// Source filesystem for create mode when the caller supplied a virtual
+    /// store (<see cref="XISOSharp.Interfaces.ISourceFilesystem"/>); <c>null</c>
+    /// for host-directory create, rewrite and remap modes.
+    /// </summary>
+    internal Interfaces.ISourceFilesystem? SourceFilesystem;
+
     /// <summary>Optional byte-progress callback invoked during file writes.</summary>
     internal ProgressCallback? ProgressCallback;
 

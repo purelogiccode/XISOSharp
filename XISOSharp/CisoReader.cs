@@ -150,6 +150,9 @@ public static class CisoReader
 
         progress?.Report(new ProgressInfo(ProgressInfoType.FileCount, Count: totalBlocks));
 
+        // LIB-03: a marked sparse destination lets all-zero sectors become holes.
+        bool sparseOutput = dest is FileStream sparseStream && SparseFile.TryEnable(sparseStream);
+
         for (long sector = 0; sector < totalBlocks; sector++)
         {
             ct.ThrowIfCancellationRequested();
@@ -243,7 +246,7 @@ public static class CisoReader
                 int expected = (int)Math.Min(BlockSize, (long)uncompressedSize - written);
                 byte[] sectorData = DecompressSector(version, align, compBuf, expected);
 
-                dest.Write(sectorData, 0, expected);
+                SparseFile.WriteOrSeekZeros(dest, sectorData.AsSpan(0, expected), sparseOutput);
                 written += expected;
             }
 

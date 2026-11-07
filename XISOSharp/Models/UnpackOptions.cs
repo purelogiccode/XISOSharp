@@ -1,3 +1,5 @@
+using XISOSharp.Logging;
+
 namespace XISOSharp.Models;
 
 /// <summary>
@@ -9,6 +11,13 @@ namespace XISOSharp.Models;
 /// </summary>
 public sealed class UnpackOptions
 {
+    /// <summary>
+    /// Optional per-call log sink (LIB-02). When set, extraction log output is
+    /// routed to <see cref="XisoLogOptions.Sink"/> for the duration of the
+    /// operation instead of the process-wide static <see cref="XISOSharp.Logger"/>.
+    /// </summary>
+    public XisoLogOptions? Log { get; set; }
+
     /// <summary>
     /// Maximum accepted <see cref="MaxDegreeOfParallelism"/> value for the
     /// parallel unpack path (the same 64-worker ceiling the CISO writer and the

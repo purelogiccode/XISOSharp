@@ -1,8 +1,44 @@
 # Release Notes
 
-## Unreleased
+## 1.8.0
 
-**CCISharp 1.1 integration.** XISOSharp now references CCISharp 1.1.0:
+**Release date:** 2026-11-07.
+
+**Hardening and Xbox 360 GUI release.** No existing public API is removed and
+all read/write behavior is unchanged; the package validates against `1.7.0`.
+
+### Library
+
+- **Source-filesystem packing (LIB-01):** `ISourceFilesystem` is the read-side
+  counterpart to `IFilesystem`. `MemoryFilesystem` implements both, and
+  `XisoWriter.CreateXiso`/`PackFromDirectory` (sync and async) gain overloads
+  that pack a custom store without host source paths. The output is
+  byte-identical to the host-directory path and remains CWD-free under
+  concurrent creates.
+- **Per-call logging (LIB-02):** `IXisoLogger`, `XisoLogOptions` and
+  `XisoLogScope` route one operation's log output to an isolated sink.
+  `UnpackOptions.Log` applies the same to extraction. Scopes are
+  `AsyncLocal`-based, so concurrent operations can log to separate sinks; the
+  static `Logger` facade is unchanged when no scope is active.
+- **Sparse outputs (LIB-03):** pre-sized writer and extraction outputs are
+  marked sparse on NTFS (`FSCTL_SET_SPARSE`) and rely on file-system holes on
+  Unix. CISO/CCI decompression and ZAR extraction skip all-zero chunks; every
+  path keeps the dense fallback when sparse files are unavailable.
+- **Property-style round-trips (LIB-04):** deterministic seeded coverage for
+  pack/extract, split/join, CISO, CCI and ISO/ZAR at empty, one-byte,
+  sector-boundary and compression-threshold sizes.
+- **Benchmarks (LIB-05/LIB-06):** the end-to-end suite adds extract, CCI
+  compress/decompress and 64 MiB random-read cases; `docs/benchmarks.md`
+  records the methodology and an extract-xiso/xdvdfs/XboxKit comparison with a
+  reproducible script.
+- **Support policy (LIB-07):** `net8.0`/`net9.0` stay compatibility-only
+  through 1.x and are removed in 2.0.0; `net10.0` is the primary target.
+- **Package validation (LIB-08):** the baseline moved from `1.4.4` to `1.7.0`;
+  the 1.4.4-era suppressions were retired.
+
+### CCISharp 1.1 integration
+
+XISOSharp now references CCISharp 1.1.0:
 
 - CCI compression levels `10..12` select the managed LZ4-HC encoder (level 12
   is the highest effort); levels `0..9` keep the existing fast encoder and byte
@@ -15,6 +51,37 @@
   unchanged and defaults to sequential compression.
 - Documentation, CLI help and the public-API baseline are updated. Existing
   level `0..9` CCI output and all read verbs are unchanged.
+
+### Docs and fixtures
+
+- **DocFX link gate (DOC-01):** the Pages site and API reference already
+  publish from the library XML docs; a CI `docs-links` job now fails on broken
+  local Markdown/HTML links.
+- **Public synthetic corpus (DOC-02):** `XISOSharp.TestDataGenerator --corpus`
+  deterministically generates XISO, split ISO, CISO, CCI, ZAR, GOD/SVOD,
+  XBLA/XBLIG STFS, XBE/XEX and corrupt fixtures plus a SHA-256 manifest. No
+  game data is included, and `PublicCorpusTests`/BattleTests consume it.
+- **Docs refresh (DOC-03):** feature matrices, known limitations, library/CLI
+  docs and READMEs updated for the hardening APIs and the Xbox 360 GUI.
+
+### GUI
+
+- **Xbox 360 tab (GUI-01/GUI-02):** open GOD/SVOD headers or `.data` folders,
+  XBLA/XBLIG STFS packages and images; list/tree/extract/unpack/audit, with the
+  same CLI verbs and byte-identical output as the command line. Drag/drop
+  routes GOD/STFS inputs to the tab.
+- **Title panel (GUI-03):** parses `title-info --json` for XBE/XEX/GOD/STFS and
+  shows title name, ID, region, disc and publisher/developer/genre fields.
+- **XBE preview (GUI-04):** renders logo, `$$XTIMAGE` title and `$$XSIMAGE` save
+  assets through the same `XbeAssets` decoder as `--xbe-image`; missing or
+  unsupported assets produce a clean message.
+- **Parallel controls (GUI-05):** extraction and CISO/CCI compression expose
+  `--jobs 1..64`, and CCI levels `10..12` are selectable.
+
+Full suite green on all three targets: **2144 passed / 1 opt-in skip on
+net8.0/net9.0** and **2217 passed / 1 opt-in skip on net10.0**. Package
+validation against 1.7.0, `dotnet format`, InspectCode, AOT, fuzz and
+battle-interop are green on the release commit.
 
 ## 1.7.0
 
