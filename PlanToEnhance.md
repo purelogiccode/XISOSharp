@@ -2,9 +2,9 @@
 
 - **Updated:** 2026-11-07
 - **Latest release:** XISOSharp **1.7.0** (2026-11-07)
-- **Working tree:** 1.7.0 released, tagged `1.7.0` (`84d12d9`)
-- **Next releases:** CCISharp 1.1 (parallel track) → 1.8.0 hardening
-- **Packages:** XISOSharp `1.7.0`, StfsSharp `1.0.0`, CCISharp `1.0.1`, ZArchiveSharp `1.4.0`
+- **Working tree:** 1.8.0 development; CCISharp 1.1 integrated
+- **Next release:** 1.8.0 hardening
+- **Packages:** XISOSharp `1.7.0`, StfsSharp `1.0.0`, CCISharp `1.1.0`, ZArchiveSharp `1.4.0`
 - **Scope of this file:** only work that is still open. Implemented features are listed once in [§9](#9-implemented-baseline-do-not-re-implement) so they are not re-implemented.
 
 > **How to use this file:** change `- [ ]` to `- [x]` when an item meets its **Done when** line. Add the version/date to the progress log in [§14](#14-progress-log).
@@ -12,7 +12,7 @@
 > **TL;DR**
 > 1. **Ship 1.6.0** — ✅ done (tag `350f629`, NuGet and GitHub release verified).
 > 2. **Ship 1.7.0** — ✅ done: `StfsSharp 1.0.0` extracted and published; XISOSharp 1.7.0 tagged/released with six bundles.
-> 3. **Ship CCISharp 1.1** — LZ4-HC, parallel CCI compression and multi-digit parts; then remove the CCI `--jobs` restriction.
+> 3. **Ship CCISharp 1.1** — ✅ done: LZ4-HC, parallel CCI compression, multi-digit parts; `CCISharp 1.1.0` published and integrated.
 > 4. **Harden** — source `IFilesystem`, per-call logging, sparse output, property tests and benchmarks.
 
 ---
@@ -22,12 +22,12 @@
 | Field | Value |
 |---|---|
 | Published library | **XISOSharp 1.7.0** (2026-11-07) |
-| Published readers | **StfsSharp 1.0.0** (2026-11-07, NuGet) |
-| Current tree | **1.7.0 released**, tag `1.7.0` at `84d12d9` |
-| Next release gate | CCISharp 1.1 (separate package/repository) |
+| Published readers | **StfsSharp 1.0.0** (2026-11-07), **CCISharp 1.1.0** (2026-11-07, NuGet) |
+| Current tree | **1.8.0 development**, CCISharp 1.1 integrated |
+| Next release gate | **1.8.0** — hardening track (`LIB-*`, `DOC-*`, `GUI-*`) |
 | Next feature release | **1.8.0** — hardening track (`LIB-*`, `DOC-*`, `GUI-*`) |
-| Compression track | **CCISharp 1.1** — HC encoder, parallel writer, multi-digit parts |
-| Tests (last recorded) | 2101 passed / 1 skipped on `net8.0`/`net9.0`; 2165 passed / 1 skipped on `net10.0`; StfsSharp 37/37 on all TFMs |
+| Compression track | **CCISharp 1.1** — ✅ HC encoder, parallel writer, multi-digit parts |
+| Tests (last recorded) | XISOSharp 2106 passed / 1 skipped on `net8.0`/`net9.0`; 2170 passed / 1 skipped on `net10.0`; CCISharp 78/78 on all TFMs; StfsSharp 37/37 on all TFMs |
 | CI gates | 3-OS build/test, `dotnet format`, InspectCode, AOT smoke, fuzz, battle-interop, coverage floors |
 | Reference set | 8 local copies under `References/` — see [§10](#10-reference-map) |
 
@@ -55,19 +55,19 @@
 |---|---|---|---:|
 | **P0** | Ship 1.6.0 | ✅ released 2026-11-06 | 0 |
 | **P1** | Extract `StfsSharp` | ✅ released 2026-11-07 | 0 |
-| **P1** | CCISharp 1.1 | CCISharp 1.1 | 7 |
+| **P1** | CCISharp 1.1 | ✅ released 2026-11-07 | 0 |
 | **P2** | Library hardening | 1.7.x / 2.0.0 | 8 |
 | **P2** | Docs, fixtures and GUI | 1.7.x | 8 |
 | **P3** | Distribution and supply chain | later | 5 |
 | **P3** | Cross-repo consumers | after 1.7.0 | 4 |
-| | **Total** | | **32 open** (3 optional) + 12 done |
+| | **Total** | | **25 open** (2 optional) + 19 done |
 
 **Recommended order**
 
 | Order | Work | Why |
 |---:|---|---|
 | 1 | `STF-01` … `STF-08` | ✅ done; `StfsSharp 1.0.0` and XISOSharp 1.7.0 are published. |
-| 2 | `CCI-01` … `CCI-06` | Independent track; unblocks CCI HC and `--jobs`. |
+| 2 | `CCI-01` … `CCI-06` | ✅ done; `CCISharp 1.1.0` is published and integrated. |
 | 3 | `LIB-01` … `LIB-08` | Harden the API after the release branches settle. |
 | 4 | `DOC-*`, `GUI-*` | User-facing polish; depends on the library work. |
 | 5 | `DST-*`, `XRP-*` | Distribution and companion repositories. |
@@ -149,36 +149,43 @@
 
 ## 4. P1 — CCISharp 1.1
 
-> Separate package/repository. XISOSharp already consumes CCISharp 1.0.1; these items close the compression-quality, parallelism and interop gaps.
+> ✅ Done. Separate package/repository (`purelogiccode/CCISharp`); `CCISharp 1.1.0` is on NuGet and XISOSharp consumes it.
 
-- [ ] **CCI-01 · Add the LZ4-HC level-12 encoder**
+- [x] **CCI-01 · Add the LZ4-HC level-12 encoder**
   - Add a managed LZ4-HC encoder (or an optional opt-in adapter) compatible with libCCI's `LZ4HC_CLEVEL_MAX`; keep the fast encoder as the default and keep the default package dependency-free. Expose it as `--cci-level 12` or `--hc`.
   - Do **not** reuse the global `--best` name: in XISOSharp it is already the Redump `--trim --wipe` alias.
   - **Done when:** HC output decodes in libCCI, is equal-or-smaller than the fast encoder on the synthetic corpus, and byte-level differences are documented.
+  - **Done 2026-11-07:** `Lz4Hc.Compress` and `CciWriteOptions.Level` 10..12 (12 = max effort); fast encoder stays the default. libCCI `cci_extract` decodes every HC test file; HC is equal-or-smaller than level 9 on the synthetic corpora (strictly smaller on the repetitive fixture). Byte-level notes are in CCISharp `docs/interop.md`.
 
-- [ ] **CCI-02 · Add parallel CCI sector compression**
+- [x] **CCI-02 · Add parallel CCI sector compression**
   - Add a bounded worker-pool compressor in CCISharp that writes sector payloads in order, so output is byte-identical to the sequential writer. Then wire single-file `compress --format cci --jobs 1..64` in XISOSharp and remove the "CCI is single-threaded" rejection.
   - **Done when:** `--jobs N` produces the same bytes as `--jobs 1`, and CLI contract tests cover the new path.
+  - **Done 2026-11-07:** `CciWriteOptions.Jobs` 1..64 drives an ordered batch pipeline; tests cover levels 0/1/9/12 and split/single output. XISOSharp passes `--jobs` to the new `XisoCci.CompressToCci(... jobs ...)` overload; `CliCciTests` asserts byte parity and round-trip, and the single-threaded rejection is gone.
 
-- [ ] **CCI-03 · Add optional multi-digit CCI part discovery**
+- [x] **CCI-03 · Add optional multi-digit CCI part discovery**
   - Accept `game.10.cci` when no single-digit interpretation applies; keep writer output at `game.1.cci` … `game.9.cci` for reference compatibility.
   - **Done when:** the reader discovers contiguous parts `1..N`, the writer still emits single-digit parts, and the compatibility rule is documented.
+  - **Done 2026-11-07:** `CciFile` parses any numeric suffix, discovers contiguous `1..N`, and falls back to a standalone image when the requested number is outside the set. XISOSharp's `CciNaming`/`StripImageSuffix` follow the same rule. Writer output stays `.1.cci` … `.9.cci`; the rule is in CCISharp `docs/format.md` and `docs/api.md`.
 
-- [ ] **CCI-04 · Add CCISharp fuzz and benchmarks**
+- [x] **CCI-04 · Add CCISharp fuzz and benchmarks**
   - Fuzz header/index/blob/split parsing; benchmark compress/decompress, random sector reads, split overhead and allocations.
   - **Done when:** the fuzzer finds no unhandled exception or OOM and benchmark results are documented.
+  - **Done 2026-11-07:** `CCISharp.Fuzz` covers header/index/blob mutations and split-set mutations (multi-digit rename, gaps, truncation, case changes); 60-second CI fuzz smoke has zero failures. `CCISharp.Benchmarks` covers fast/HC/parallel/split compression, extraction and random reads with `MemoryDiagnoser`; results are in `docs/benchmarks.md`.
 
-- [ ] **CCI-05 · Publish CCISharp 1.1 and bump XISOSharp**
+- [x] **CCI-05 · Publish CCISharp 1.1 and bump XISOSharp**
   - Add `docs/format.md`, `docs/api.md`, `docs/interop.md`, README and release notes; tag/publish CCISharp 1.1.0; update `XISOSharp.csproj` `PackageReference` and package validation.
   - **Done when:** CCISharp 1.1.0 is on NuGet and XISOSharp builds/tests against it.
+  - **Done 2026-11-07:** docs + README + release notes written; tag `v1.1.0` pushed, CI green (including `publish to NuGet`), flat-container index lists `1.1.0`. `XISOSharp.csproj` references `CCISharp 1.1.0`; `dotnet pack` package validation passes.
 
-- [ ] **CCI-06 · Verify interop against libCCI**
+- [x] **CCI-06 · Verify interop against libCCI**
   - Use `cci_encode`/`cci_extract`/`cci_info` from `References/libCCI-0.1.0-1b0087e` as an oracle on synthetic images; optionally cross-check a Repackinator-produced fixture if one is available. Document any byte-level differences.
   - **Done when:** both directions round-trip and the interop report is in `docs/interop.md`.
+  - **Done 2026-11-07:** fast, HC and parallel CCISharp output all extract byte-identically through `cci_extract`; level-12 libCCI output opens, validates and decodes through CCISharp. Report and synthetic-corpus results are in CCISharp `docs/interop.md`; the Windows CI interop tests run on every push.
 
-- [ ] **CCI-07 · (P2, optional) Ship `CCISharp.Cli`**
+- [x] **CCI-07 · (P2, optional) Ship `CCISharp.Cli`**
   - Add `pack`, `unpack`, `info` and `validate` for interop and CI smoke tests.
   - **Done when:** the CLI packs/unpacks a synthetic image in CI.
+  - **Done 2026-11-07:** `CCISharp.Cli` implements all four verbs; the `cli-smoke` CI job packs with level 12/`--jobs 4`, runs `info` + deep `validate`, unpacks and compares the ISO byte-for-byte.
 
 ---
 
@@ -308,6 +315,7 @@
 | **CLI** | extract/list/tree/checksum/hash/verify-hashes/validate/title-info/xbe-image, compress/decompress/convert/split, batch, JSON, `--layout`, `--jobs` (CISO/extraction; CCI pending), `--name-policy`, `--delete-source` |
 | **1.6.0 scope** | A1 XDBF, A2 XBE assets, A3 FATX cap, A4 `--delete-source`, A5 GOD/STFS title naming, read-only GOD input, STFS package listing/extraction/validation, parallel CISO compression, parallel extraction, safe-extract policy, CWD-free writer/reader |
 | **1.7.0 scope** | `StfsSharp` extraction: standalone GOD/SVOD + STFS readers, NuGet 1.0.0, XISOSharp facades with an unchanged public API, moved tests/fixtures/fuzzer/benchmarks |
+| **CCISharp 1.1 scope** | LZ4-HC levels 10..12, parallel sector compression (`Jobs` 1..64, byte-identical), multi-digit split discovery, `CCISharp.Cli`, fuzz + benchmarks, `CCISharp 1.1.0` on NuGet |
 | **Quality** | 3-OS CI, format gate, InspectCode, AOT smoke, mutation fuzz, battle-interop, coverage floors, SBOM and build provenance |
 
 ---
@@ -319,7 +327,7 @@ All paths are under `References/`. These are **behaviour/format oracles** unless
 | Reference | License | Used for | Remaining work |
 |---|---|---|---|
 | `extract-xiso-build-202609111233` | BSD-style | Core XISO/CLI parity and oracle | None |
-| `libCCI-0.1.0-1b0087e` | GPL-2.0-or-later | Normative CCI `FORMAT.md` and `cci_*` oracle | CCISharp 1.1 HC/multi-digit work (`CCI-*`) |
+| `libCCI-0.1.0-1b0087e` | GPL-2.0-or-later | Normative CCI `FORMAT.md` and `cci_*` oracle | None — CCISharp 1.1 HC/parallel/multi-digit work verified |
 | `Xbox360Convert-1.0.1` | GPL-3.0 (no own license file; links XboxToolkit) | GOD input, FATX split point, delete-source, GOD title naming | None — A3/A4/A5 implemented in 1.6.0; reference only |
 | `XboxKit-0.7` | Permissive (upstream) | Redump/ZAR parity baseline | None — XRD is deferred |
 | `XboxToolkit-main` | GPL-3.0-only | GOD/STFS read, XEX XDBF metadata, XBE image assets | GUI surfaces (`GUI-*`); `StfsSharp` extraction done in 1.7.0 |
@@ -410,4 +418,9 @@ dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
 | 2026-11-07 | `STF-07` tests/fixtures/fuzz | StfsSharp 1.0.0 | Tests and fixture moved, fuzzer added; XISOSharp suite 2101/2165 |
 | 2026-11-07 | Real-corpus verification | StfsSharp 1.0.0 | Aegis Wing XBLA (validate PASS), 1on1 Soccer XBLIG, GOD mapping; CLI smoke passed |
 | 2026-11-07 | `STF-08` XISOSharp 1.7.0 released | 1.7.0 | Tag `1.7.0` at `84d12d9`; CI green + NuGet publish; GitHub release 6 zips + SPDX; win-x64 bundle/`--self-test` passed |
+| 2026-11-07 | `CCI-01`/`CCI-06` LZ4-HC + interop | CCISharp 1.1.0 | Managed HC levels 10..12; libCCI decodes fast/HC/parallel output; HC equal-or-smaller on synthetic corpora; interop report written |
+| 2026-11-07 | `CCI-02`/`CCI-03` parallel + multi-digit | CCISharp 1.1.0 | `Jobs` 1..64 byte-identical; XISOSharp `--jobs` wired; multi-digit reader discovery with single-digit writer output |
+| 2026-11-07 | `CCI-04`/`CCI-07` fuzz, benchmarks, CLI | CCISharp 1.1.0 | Fuzz + benchmark projects; `CCISharp.Cli` pack/unpack/info/validate; CI `fuzz-smoke` + `cli-smoke` green |
+| 2026-11-07 | `CCI-05` CCISharp 1.1.0 published | CCISharp 1.1.0 | Tag `v1.1.0`; CI green; NuGet 1.1.0 indexed; XISOSharp ref bumped; pack validation green |
+| 2026-11-07 | CCISharp 1.1 integration verification | 1.8.0-dev | XISOSharp suite 2106/1 (net8/net9) + 2170/1 (net10); build 0 warnings; format clean; full restore from nuget.org |
 | | | | |

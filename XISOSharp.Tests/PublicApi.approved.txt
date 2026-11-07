@@ -636,6 +636,7 @@ M:XISOSharp.XgdTables.GetXisoTypeBySize(System.Int64)->System.Int32
 M:XISOSharp.XgdTables.GetXisoTypeFromVideo(System.Int32)->System.Int32
 M:XISOSharp.XisoAttributes.ToWindowsFileAttributes(System.Byte)->System.IO.FileAttributes
 M:XISOSharp.XisoCci.CompressToCci(System.String,System.String,System.Int32,System.Int64,System.Boolean,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Int32
+M:XISOSharp.XisoCci.CompressToCci(System.String,System.String,System.Int32,System.Int64,System.Boolean,System.Int32,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Int32
 M:XISOSharp.XisoCci.DecompressToIso(System.String,System.String,System.Boolean,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Int32
 M:XISOSharp.XisoCci.DeriveDefaultCciPath(System.String,System.Boolean)->System.String
 M:XISOSharp.XisoCci.DeriveDefaultIsoPath(System.String)->System.String

@@ -1,5 +1,21 @@
 # Release Notes
 
+## Unreleased
+
+**CCISharp 1.1 integration.** XISOSharp now references CCISharp 1.1.0:
+
+- CCI compression levels `10..12` select the managed LZ4-HC encoder (level 12
+  is the highest effort); levels `0..9` keep the existing fast encoder and byte
+  output.
+- Single-file `compress --format cci --jobs 1..64` compresses sectors on a
+  bounded worker pool. Output is byte-identical to `--jobs 1`.
+- CCI readers accept multi-digit parts such as `game.10.cci` when the contiguous
+  set starts at `game.1.cci`; the writer still emits `.1.cci` … `.9.cci`.
+- `XisoCci.CompressToCci` gains a `jobs` overload; the existing overload is
+  unchanged and defaults to sequential compression.
+- Documentation, CLI help and the public-API baseline are updated. Existing
+  level `0..9` CCI output and all read verbs are unchanged.
+
 ## 1.7.0
 
 **Release date:** 2026-11-07.

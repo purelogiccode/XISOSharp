@@ -9,10 +9,12 @@ namespace XISOSharp;
 /// do not need to reference CCISharp types directly.
 /// </summary>
 /// <remarks>
-/// The CCI encoder in CCISharp is a fast LZ4 block encoder: output is fully
-/// interoperable with libCCI/Repackinator, but not byte-identical to their
-/// LZ4-HC output. Levels <c>0..9</c> follow CCISharp's scale (<c>0</c> stores
-/// every sector raw; <c>9</c> is the smallest fast-encoder output).
+/// CCISharp levels <c>0..9</c> use the fast LZ4 block encoder; levels
+/// <c>10..12</c> use the managed LZ4-HC encoder (12 is the highest effort and
+/// corresponds to the reference encoder's HC preset). Output is fully
+/// interoperable with libCCI/Repackinator, but HC byte parity is best-effort,
+/// not a guarantee. Parallel compression with <c>jobs</c> &gt; 1 is
+/// byte-identical to sequential output.
 /// </remarks>
 public static class XisoCci
 {
@@ -35,7 +37,7 @@ public static class XisoCci
     /// Output path (<c>game.cci</c> or <c>game</c>). When <c>null</c>, a sibling
     /// path is derived with <see cref="DeriveDefaultCciPath"/>.
     /// </param>
-    /// <param name="level">Compression level <c>0..9</c> (default <c>9</c>).</param>
+    /// <param name="level">Compression level <c>0..12</c> (default <c>9</c>; <c>10..12</c> select LZ4-HC).</param>
     /// <param name="splitBytes">
     /// Split target in bytes; <c>0</c> writes a single part. Defaults to
     /// <see cref="DefaultSplitBytes"/>.
@@ -46,19 +48,47 @@ public static class XisoCci
     /// <returns><c>0</c> on success.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="sourcePath"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException"><paramref name="sourcePath"/> is empty.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="level"/> is outside <c>0..9</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="level"/> is outside <c>0..12</c>.</exception>
     /// <exception cref="FileNotFoundException">The source does not exist.</exception>
     /// <exception cref="NotSupportedException">The source is a ZArchive (convert it to ISO first).</exception>
     /// <exception cref="IOException">The output exists and <paramref name="overwrite"/> is <c>false</c>, or an I/O error occurred.</exception>
     /// <exception cref="OperationCanceledException">The operation was cancelled.</exception>
     public static int CompressToCci(string sourcePath, string? outputCciPath = null, int level = 9,
         long splitBytes = DefaultSplitBytes, bool overwrite = false, IProgress<ProgressInfo>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default) =>
+        CompressToCciCore(sourcePath, outputCciPath, level, splitBytes, overwrite, jobs: 1, progress, ct);
+
+    /// <summary>
+    /// Compresses an image into one or more CCI parts with a bounded number of
+    /// sector-compression workers. Output is byte-identical to the
+    /// single-threaded overload for the same level and split settings.
+    /// </summary>
+    /// <param name="sourcePath">Source image, directory or GOD container (header or <c>.data</c> folder).</param>
+    /// <param name="outputCciPath">
+    /// Output path (<c>game.cci</c> or <c>game</c>). When <c>null</c>, a sibling
+    /// path is derived with <see cref="DeriveDefaultCciPath"/>.
+    /// </param>
+    /// <param name="level">Compression level <c>0..12</c> (<c>10..12</c> select LZ4-HC).</param>
+    /// <param name="splitBytes">Split target in bytes; <c>0</c> writes a single part.</param>
+    /// <param name="overwrite">Overwrite existing output files.</param>
+    /// <param name="jobs">Sector-compression workers, <c>1..64</c>. <c>1</c> is sequential.</param>
+    /// <param name="progress">Optional progress channel.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns><c>0</c> on success.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="level"/> is outside <c>0..12</c> or <paramref name="jobs"/> is outside <c>1..64</c>.</exception>
+    public static int CompressToCci(string sourcePath, string? outputCciPath, int level, long splitBytes,
+        bool overwrite, int jobs, IProgress<ProgressInfo>? progress = null, CancellationToken ct = default) =>
+        CompressToCciCore(sourcePath, outputCciPath, level, splitBytes, overwrite, jobs, progress, ct);
+
+    private static int CompressToCciCore(string sourcePath, string? outputCciPath, int level, long splitBytes,
+        bool overwrite, int jobs, IProgress<ProgressInfo>? progress, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrEmpty(sourcePath);
         ArgumentOutOfRangeException.ThrowIfLessThan(level, 0);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(level, 9);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(level, 12);
         ArgumentOutOfRangeException.ThrowIfNegative(splitBytes);
+        ArgumentOutOfRangeException.ThrowIfLessThan(jobs, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(jobs, CciWriteOptions.MaxJobs);
         ct.ThrowIfCancellationRequested();
 
         // A GOD `.data` folder is a container, not a directory to pack.
@@ -133,6 +163,7 @@ public static class XisoCci
             CciWriteOptions options = new()
             {
                 Level = level,
+                Jobs = jobs,
                 SplitBytes = effectiveSplit,
                 Overwrite = overwrite,
                 CancellationToken = ct,
@@ -250,9 +281,7 @@ public static class XisoCci
         string stem;
         if (file.EndsWith(CciFormat.Extension, StringComparison.OrdinalIgnoreCase))
         {
-            stem = CciNaming.IsSplitPath(file)
-                ? file[..^(CciFormat.Extension.Length + 2)]
-                : file[..^CciFormat.Extension.Length];
+            stem = Path.GetFileNameWithoutExtension(CciNaming.StripPartSuffix(file));
         }
         else
         {

@@ -287,8 +287,8 @@ XISOSharp cso game.iso game.cso --ciso-split 0 --jobs 8     # single .cso, 8 com
 XISOSharp decompress game.1.cso game.iso                    # also reads split .1.cso/.2.cso parts
 XISOSharp uncso game.cso                                    # decso alias
 
-# CCI/CCIM (CCISharp; fast LZ4 sector blocks)
-XISOSharp compress --format cci game.iso game.cci --cci-level 9 --cci-split 0
+# CCI/CCIM (CCISharp; fast LZ4 or LZ4-HC sector blocks)
+XISOSharp compress --format cci game.iso game.cci --cci-level 12 --jobs 4 --cci-split 0
 XISOSharp cci game.iso game.cci --cci-split 0               # cso-style alias
 XISOSharp decompress game.1.cci game.iso                    # single or split .N.cci
 XISOSharp uncci game.cci game.iso
@@ -525,7 +525,7 @@ int csoFast = CisoWriter.CompressToCso("game.iso", "game-fast.cso", 9, null,
 int iso = CisoReader.DecompressToIso("game.1.cso", "rebuilt.iso"); // split .N.cso input supported
 bool isCso = CisoReader.IsCso("game.cso"); // magic CISO + blockSize 2048 + ver 1/2
 
-// CCI/CCIM (CCISharp-backed: fast LZ4 sector blocks; 0 = single file)
+// CCI/CCIM (CCISharp-backed: fast LZ4 or LZ4-HC sector blocks; 0 = single file)
 int cci = XisoCci.CompressToCci("game.iso", "game.cci", level: 9, splitBytes: 0);
 int fromCci = XisoCci.DecompressToIso("game.1.cci", "rebuilt.iso"); // split .N.cci input supported
 

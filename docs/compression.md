@@ -101,7 +101,7 @@ block, with a `(sectors + 1) × u32` random-access index at the end. The
 normative description is
 [`Team-Resurgent/libCCI` `FORMAT.md`](https://github.com/Team-Resurgent/libCCI/blob/main/FORMAT.md).
 
-XISOSharp consumes [CCISharp](https://github.com/purelogiccode/CCISharp) 1.0.1,
+XISOSharp consumes [CCISharp](https://github.com/purelogiccode/CCISharp) 1.1.0,
 an independent MIT implementation (no GPL code). The API surface:
 
 ```csharp
@@ -109,9 +109,10 @@ an independent MIT implementation (no GPL code). The API surface:
 int rc = XisoCci.CompressToCci(
     @"C:\games\game.iso",
     @"C:\games\game.cci",
-    level: 9,                       // 0 = store, 1..9 = fast-LZ4 presets
+    level: 12,                      // 0 = store, 1..9 = fast, 10..12 = LZ4-HC
     splitBytes: XisoCci.DefaultSplitBytes, // ~4 GiB; 0 = single file
-    overwrite: false);
+    overwrite: false,
+    jobs: 4);                       // byte-identical to jobs: 1
 
 // Extract (split sets are stitched transparently).
 int rc2 = XisoCci.DecompressToIso(@"C:\games\game.1.cci", @"C:\games\game.iso");
@@ -123,12 +124,19 @@ device.Read(0, sector);
 ```
 
 - **Split sets**: `game.1.cci` … `game.9.cci`; open any numbered part and the
-  reader discovers the set from `.1`. Outputs are named after the game, not the
-  part: extraction creates `game/`, rewrite writes `game.iso`, and recompressing
-  `game.2.cci` derives `game.cci`.
-- **Encoder**: fast LZ4 block encoder. Output is spec-valid and interoperable
-  with libCCI/Repackinator, but not byte-identical to their LZ4-HC output.
-- **Hardened reader**: CCISharp 1.0.1 caps a part's index at 64 MiB and returns
+  reader discovers the set from `.1`. Multi-digit reader parts such as
+  `game.10.cci` are accepted when the contiguous set starts at `.1`; the writer
+  still emits the reference-compatible single-digit layout. Outputs are named
+  after the game, not the part: extraction creates `game/`, rewrite writes
+  `game.iso`, and recompressing `game.2.cci`/`game.10.cci` derives `game.cci`.
+- **Encoder**: levels `1..9` use the fast LZ4 block encoder; levels `10..12`
+  use CCISharp's managed LZ4-HC encoder (12 = highest effort). Output is
+  spec-valid and interoperable with libCCI/Repackinator. HC byte parity is
+  best-effort, not a guarantee; see CCISharp's `docs/interop.md`.
+- **Parallel compression**: single-file `--jobs 1..64` (and the `jobs` overload
+  of `XisoCci.CompressToCci`) encodes sectors on a bounded worker pool and
+  writes in sector order, so output is byte-identical to `--jobs 1`.
+- **Hardened reader**: CCISharp 1.1 caps a part's index at 64 MiB and returns
   `InvalidIndex` for hostile headers instead of allocating an index sized only
   by the part file length.
 - **In-place guards**: `--repair`, `--copy-in`, and `--set-filetime` refuse CCI
@@ -144,7 +152,7 @@ device.Read(0, sector);
 ```
 XISOSharp compress <sourceDir|image> [output] [--format cso|cci]
     [--ciso-level 0..9] [--ciso-version 1|2|auto] [--ciso-split bytes]
-    [--cci-level 0..9] [--cci-split bytes] [--batch <dir>] [--jobs <n>]
+    [--cci-level 0..12] [--cci-split bytes] [--batch <dir>] [--jobs <n>]
 XISOSharp cso <sourceDir|image> [output.cso]              # CISO alias
 XISOSharp cci <sourceDir|image> [output.cci]              # CCI alias
 XISOSharp decompress <cso|cci> [output.iso] [--batch <dir>]
@@ -158,9 +166,9 @@ XISOSharp uncci <cci|.1.cci> [output.iso]                 # CCI alias
 | `--ciso-version 1\|2\|auto` | Payload codec. `2` (default, `auto` = `2`): LZ4, fixed `align 2`, byte-compatible with modern `xdvdfs compress`. `1`: classic DEFLATE. |
 | `--ciso-split <bytes>` | Split point override. Default: `0xffbf6000` (~4 GiB) - xdvdfs `SplitOutput` behavior. `0` = single-file output. |
 | `--format cso\|cci` | Output container. Default `cso`; `cci` selects the CCISharp writer. |
-| `--cci-level 0..9` | CCI level: `0` stores every sector raw; `1..9` map to the fast LZ4 block encoder's acceleration (`10 - level`, level 9 = smallest). |
+| `--cci-level 0..12` | CCI level: `0` stores every sector raw; `1..9` map to the fast LZ4 block encoder's acceleration (`10 - level`, level 9 = smallest fast output); `10..12` select the managed LZ4-HC encoder (12 = highest effort). |
 | `--cci-split <bytes>` | CCI split point. Default `0xffbf6000` (~4 GiB) into `.1.cci`/`.2.cci` …; `0` = single `.cci`. |
-| `--jobs <n>` | CISO sector compression workers, `1..64` (default `1`). Output is byte-identical to the sequential writer and progress stays in sector order. With `--batch`, `<n>` runs `<n>` conversions in parallel instead; CCI single-file compression is single-threaded. |
+| `--jobs <n>` | CISO/CCI sector compression workers, `1..64` (default `1`). Output is byte-identical to the sequential writer and progress stays in sector order. With `--batch`, `<n>` runs `<n>` conversions in parallel instead. |
 
 Examples:
 
@@ -182,6 +190,7 @@ XISOSharp uncso game.cso
 # CCI: single-file and split output
 XISOSharp cci game.iso game.cci --cci-split 0
 XISOSharp cci game.iso game.cci --cci-level 9
+XISOSharp cci game.iso game.cci --cci-level 12 --jobs 4 --cci-split 0  # LZ4-HC, parallel
 #   → game.1.cci (+ game.2.cci … for images > ~4 GiB)
 
 # Any compressed/split source can be recompressed

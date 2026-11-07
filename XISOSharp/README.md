@@ -99,14 +99,14 @@ accepts these sources through `XisoReader.OpenImageStream`:
 | `.iso`, `.xiso`, `.img` | Opened directly. |
 | `game.1.iso` … | Split plain ISO, concatenated and seekable; a missing middle part throws. |
 | `.cso`, `.1.cso` | CISO v1/v2, single or split, decompressed on demand (`CisoBlockDevice`). |
-| `.cci`, `.1.cci` | CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), single or split (`CciBlockDevice`). |
+| `.cci`, `.N.cci` | CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), single or split (`CciBlockDevice`); reader discovery accepts multi-digit parts such as `.10.cci`. |
 | GOD header or `<header>.data` | GOD/SVOD sector input: `DataNNNN` fragments are mapped to the logical image through `GodBlockDevice` (read-only, StfsSharp-backed). |
 | `.zar` | ZArchive name tree: list/extract/checksum/validate/convert (`XisoZarchive`), not a sector image. |
 
 Detection is extension-led with a `CISO`/`CCIM` magic sniff fallback, so renamed
 containers (including the CLI rewrite backup `game.cso.old`) still resolve.
 Compressed and split inputs are read through the decompressed view; output names
-strip the container suffix and `.1` part marker (`game.1.cci` → `game`).
+strip the container suffix and `.N` part marker (`game.1.cci` → `game`).
 In-place operations (`Repair`, `CopyIntoImage`, `SetFileTime`) refuse compressed
 containers and require decompressing first.
 

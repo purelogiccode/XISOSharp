@@ -250,10 +250,10 @@ public static class XisoImageSource
     /// <summary>
     /// Strips a recognized image suffix and a trailing split-part marker for
     /// output naming: <c>game.iso</c> → <c>game</c>, <c>game.1.cso</c> →
-    /// <c>game</c>, <c>game.1.cci</c> → <c>game</c>. CCI accepts any
-    /// single-digit part as an entry point (CCISharp resolves the whole set
-    /// from <c>.1</c>), so <c>game.2.cci</c> → <c>game</c> as well. Plain ISO
-    /// and CISO sets only expose <c>.1</c>, and ZArchive names such as
+    /// <c>game</c>, <c>game.1.cci</c> → <c>game</c>. CCI accepts any numbered
+    /// part as an entry point (CCISharp resolves the whole set from <c>.1</c>),
+    /// so <c>game.2.cci</c> and <c>game.10.cci</c> → <c>game</c> as well. Plain
+    /// ISO and CISO sets only expose <c>.1</c>, and ZArchive names such as
     /// <c>archive.1.zar</c> keep their number. Names without a recognized
     /// suffix are returned unchanged.
     /// </summary>
@@ -265,16 +265,19 @@ public static class XisoImageSource
 
         string extension = Path.GetExtension(name);
         string stem = name[..^extension.Length];
+
+        if (extension.Equals(CciFormat.Extension, StringComparison.OrdinalIgnoreCase))
+        {
+            string stripped = CciNaming.StripPartSuffix(name);
+            return stripped[..^extension.Length];
+        }
+
         if (stem.Length < 2 || stem[^2] != '.') return stem;
 
         char part = stem[^1];
         bool isPart;
-        if (extension.Equals(CciFormat.Extension, StringComparison.OrdinalIgnoreCase))
-        {
-            isPart = part is >= '1' and <= '9';
-        }
-        else if (extension.Equals(".iso", StringComparison.OrdinalIgnoreCase) ||
-                 extension.Equals(".cso", StringComparison.OrdinalIgnoreCase))
+        if (extension.Equals(".iso", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".cso", StringComparison.OrdinalIgnoreCase))
         {
             isPart = part == '1';
         }

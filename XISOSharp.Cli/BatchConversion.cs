@@ -140,7 +140,7 @@ internal static class BatchConversion
     /// <param name="options">Parsed batch flags.</param>
     /// <param name="allowJobsWithoutBatch">
     /// <c>true</c> for <c>compress</c>, where <c>--jobs</c> also selects the
-    /// per-sector CISO compression worker count in single-file mode.
+    /// per-sector CISO/CCI compression worker count in single-file mode.
     /// </param>
     internal static string? Validate(BatchOptions options, bool allowJobsWithoutBatch = false)
     {

@@ -706,7 +706,7 @@ public sealed class CliBatchConvertTests : IDisposable
     }
 
     [Fact]
-    public void CompressCci_WithJobs_IsRejected()
+    public void CompressCci_WithJobs_IsAccepted()
     {
         string work = CreateTempDir("xiso_cli_batch");
         string isoDir = Path.Combine(work, "iso");
@@ -715,11 +715,10 @@ public sealed class CliBatchConvertTests : IDisposable
 
         using LogCapture capture = new();
         int rc = Program.Main(
-            ["compress", iso, output, "--format", "cci", "--jobs", "2", "-y"]);
+            ["compress", iso, output, "--format", "cci", "--cci-split", "0", "--jobs", "2", "-y"]);
 
-        Assert.Equal(1, rc);
-        Assert.Contains("--jobs is only supported for CISO output", capture.Output, StringComparison.Ordinal);
-        Assert.False(File.Exists(output));
+        Assert.Equal(0, rc);
+        Assert.True(File.Exists(output), capture.Output);
     }
 
     [Fact]

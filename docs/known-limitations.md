@@ -73,9 +73,12 @@ skipping for a recovery run. The OS must still have long paths enabled
 
 ## Compression
 
-- CCI uses the fast LZ4 block encoder by default. Output is spec-valid and
-  interoperable, but not byte-identical to libCCI/Repackinator's LZ4-HC level 12
-  output. CCISharp 1.1 will add an HC encoder.
+- CCI levels `0..9` use the fast LZ4 block encoder; levels `10..12` use
+  CCISharp's managed LZ4-HC encoder (12 = highest effort). Output is spec-valid
+  and interoperable; HC byte parity with libCCI/Repackinator is best-effort,
+  not a guarantee.
+- Single-file CCI `--jobs 1..64` compresses sectors in parallel with
+  byte-identical output; batch `--jobs` still runs conversions in parallel.
 - CISO v2 is byte-identical to modern `xdvdfs compress`; CISO v1 (DEFLATE) is
   supported for reading and writing but is legacy.
 - In-place `--repair`, `--copy-in`, `--set-filetime`, `-r` (rewrite) and `split`
