@@ -1,17 +1,17 @@
 # XISOSharp — Remaining Work Plan
 
 - **Updated:** 2026-11-07
-- **Latest release:** XISOSharp **1.6.0** (2026-11-06)
-- **Working tree:** StfsSharp extraction complete; XISOSharp 1.7.0 release gate pending
-- **Next releases:** 1.7.0 (`StfsSharp`, code-complete) → CCISharp 1.1 (parallel track)
-- **Packages:** XISOSharp `1.6.0`, StfsSharp `1.0.0`, CCISharp `1.0.1`, ZArchiveSharp `1.4.0`
+- **Latest release:** XISOSharp **1.7.0** (2026-11-07)
+- **Working tree:** 1.7.0 released, tagged `1.7.0` (`84d12d9`)
+- **Next releases:** CCISharp 1.1 (parallel track) → 1.8.0 hardening
+- **Packages:** XISOSharp `1.7.0`, StfsSharp `1.0.0`, CCISharp `1.0.1`, ZArchiveSharp `1.4.0`
 - **Scope of this file:** only work that is still open. Implemented features are listed once in [§9](#9-implemented-baseline-do-not-re-implement) so they are not re-implemented.
 
 > **How to use this file:** change `- [ ]` to `- [x]` when an item meets its **Done when** line. Add the version/date to the progress log in [§14](#14-progress-log).
 
 > **TL;DR**
 > 1. **Ship 1.6.0** — ✅ done (tag `350f629`, NuGet and GitHub release verified).
-> 2. **Ship 1.7.0** — `StfsSharp` is extracted and published; only the XISOSharp 1.7.0 tag/release remains.
+> 2. **Ship 1.7.0** — ✅ done: `StfsSharp 1.0.0` extracted and published; XISOSharp 1.7.0 tagged/released with six bundles.
 > 3. **Ship CCISharp 1.1** — LZ4-HC, parallel CCI compression and multi-digit parts; then remove the CCI `--jobs` restriction.
 > 4. **Harden** — source `IFilesystem`, per-call logging, sparse output, property tests and benchmarks.
 
@@ -21,11 +21,11 @@
 
 | Field | Value |
 |---|---|
-| Published library | **XISOSharp 1.6.0** (2026-11-06) |
+| Published library | **XISOSharp 1.7.0** (2026-11-07) |
 | Published readers | **StfsSharp 1.0.0** (2026-11-07, NuGet) |
-| Current tree | StfsSharp extraction complete; XISOSharp 1.7.0 release gate pending |
-| Next release gate | 1.7.0 — tag/publish XISOSharp with the StfsSharp dependency |
-| Next feature release | **1.7.0** — `StfsSharp` extraction (code/docs/tests done) |
+| Current tree | **1.7.0 released**, tag `1.7.0` at `84d12d9` |
+| Next release gate | CCISharp 1.1 (separate package/repository) |
+| Next feature release | **1.8.0** — hardening track (`LIB-*`, `DOC-*`, `GUI-*`) |
 | Compression track | **CCISharp 1.1** — HC encoder, parallel writer, multi-digit parts |
 | Tests (last recorded) | 2101 passed / 1 skipped on `net8.0`/`net9.0`; 2165 passed / 1 skipped on `net10.0`; StfsSharp 37/37 on all TFMs |
 | CI gates | 3-OS build/test, `dotnet format`, InspectCode, AOT smoke, fuzz, battle-interop, coverage floors |
@@ -54,19 +54,19 @@
 | Priority | Workstream | Target | Open items |
 |---|---|---|---:|
 | **P0** | Ship 1.6.0 | ✅ released 2026-11-06 | 0 |
-| **P1** | Extract `StfsSharp` | 1.7.0 | 1 (XISOSharp tag/release) |
+| **P1** | Extract `StfsSharp` | ✅ released 2026-11-07 | 0 |
 | **P1** | CCISharp 1.1 | CCISharp 1.1 | 7 |
 | **P2** | Library hardening | 1.7.x / 2.0.0 | 8 |
 | **P2** | Docs, fixtures and GUI | 1.7.x | 8 |
 | **P3** | Distribution and supply chain | later | 5 |
 | **P3** | Cross-repo consumers | after 1.7.0 | 4 |
-| | **Total** | | **33 open** (3 optional) + 11 done |
+| | **Total** | | **32 open** (3 optional) + 12 done |
 
 **Recommended order**
 
 | Order | Work | Why |
 |---:|---|---|
-| 1 | `STF-01` … `STF-08` | ✅ extraction complete; only the XISOSharp 1.7.0 tag/release remains. |
+| 1 | `STF-01` … `STF-08` | ✅ done; `StfsSharp 1.0.0` and XISOSharp 1.7.0 are published. |
 | 2 | `CCI-01` … `CCI-06` | Independent track; unblocks CCI HC and `--jobs`. |
 | 3 | `LIB-01` … `LIB-08` | Harden the API after the release branches settle. |
 | 4 | `DOC-*`, `GUI-*` | User-facing polish; depends on the library work. |
@@ -140,10 +140,10 @@
   - **Done when:** both repositories have green suites and the fuzzer covers the moved readers.
   - **Done 2026-11-07:** fixture and reader tests moved (37 tests on each TFM); a deterministic mutation fuzzer covers STFS and GOD `Open`/`Validate`/`ReadAllBytes`/`ExtractTo`; XISOSharp keeps integration/facade parity tests and its own fuzz target; 60-second CI fuzz-smoke green.
 
-- [ ] **STF-08 · Publish `StfsSharp` and cut 1.7.0**
+- [x] **STF-08 · Publish `StfsSharp` and cut 1.7.0**
   - Write `docs/format.md`, `docs/api.md`, `docs/interop.md` and README; add `THIRD-PARTY-NOTICES.md`; tag/publish `StfsSharp`; bump the XISOSharp reference; tag and publish **XISOSharp 1.7.0** with release notes and six bundles.
   - **Done when:** `StfsSharp` is on NuGet, XISOSharp 1.7.0 is published, and the docs state that GOD/STFS readers are `StfsSharp`-backed.
-  - **Status 2026-11-07:** `StfsSharp 1.0.0` is on NuGet and GitHub (`v1.0.0` tag + release), docs are written (README, `format.md`, `api.md`, `interop.md`), and XISOSharp docs/release notes are updated. Remaining: tag/publish XISOSharp 1.7.0 and build the six bundles.
+  - **Done 2026-11-07:** `StfsSharp 1.0.0` is on NuGet and GitHub (`v1.0.0` tag + release); docs written. XISOSharp tag `1.7.0` at `84d12d9`; CI green (including NuGet publish); GitHub release has six RID zips + SPDX; win-x64 bundle reports `XISOSharp v1.7.0`, `--probe-cli` 1.7.0 and `SELF-TEST: all passed`.
 
 ---
 
@@ -409,4 +409,5 @@ dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
 | 2026-11-07 | `STF-06` XISOSharp integration | 1.7.0-prep | NuGet dependency + facades; public API unchanged; pack validation green |
 | 2026-11-07 | `STF-07` tests/fixtures/fuzz | StfsSharp 1.0.0 | Tests and fixture moved, fuzzer added; XISOSharp suite 2101/2165 |
 | 2026-11-07 | Real-corpus verification | StfsSharp 1.0.0 | Aegis Wing XBLA (validate PASS), 1on1 Soccer XBLIG, GOD mapping; CLI smoke passed |
+| 2026-11-07 | `STF-08` XISOSharp 1.7.0 released | 1.7.0 | Tag `1.7.0` at `84d12d9`; CI green + NuGet publish; GitHub release 6 zips + SPDX; win-x64 bundle/`--self-test` passed |
 | | | | |
