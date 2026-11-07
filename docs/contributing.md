@@ -50,8 +50,39 @@ Thanks for considering a contribution! This project is a byte-faithful port of
   interop tests plus the battle harness, see
   [Testing](testing.md#reference-cross-checking)).
 - Update documentation when user-facing behavior changes (CLI flags, public API,
-  format handling) — this wiki lives in `docs/`.
+  format handling) - this wiki lives in `docs/`.
 - Contributions are licensed under the MIT license of the project.
+
+## Definition of done
+
+For every item that changes code:
+
+- Library API implemented; CLI and GUI wired where applicable.
+- Unit + integration + parity/interop + CLI contract tests added.
+- Synthetic fixtures only; no copyrighted game data and no GPL binaries.
+- Docs, READMEs and release notes updated in the same change.
+- Full suite green on the supported TFM matrix (`net8.0`/`net9.0`/`net10.0`);
+  `dotnet format` clean; InspectCode 0 warnings; trim/AOT analyzers clean.
+- `dotnet pack` succeeds with package validation.
+- No deletion of files under `bin/Release`, `publish*` or release zips (see
+  [`AGENTS.md`](https://github.com/purelogiccode/XISOSharp/blob/master/AGENTS.md)).
+
+```powershell
+# Full build + tests
+dotnet build CSharp_XISOSharp.sln -c Release -m:1
+dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release
+
+# Formatting and packaging
+dotnet format whitespace CSharp_XISOSharp.sln --verify-no-changes --no-restore
+dotnet pack XISOSharp/XISOSharp.csproj -c Release -o artifacts
+
+# AOT, fuzz and benchmarks
+dotnet publish XISOSharp.AotSmoke/XISOSharp.AotSmoke.csproj -c Release -r linux-x64
+dotnet run --project XISOSharp.Fuzz -c Release -- --seconds 60
+dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
+```
+
+Distribution verification commands are in [Building](building.md#distribution-artifacts).
 
 ## Compatibility discipline
 
@@ -69,14 +100,14 @@ tool. Preserve that spirit:
 
 ## Areas to contribute
 
-Good starting points (the open research epics are tracked below):
+Good starting points:
 
-- Open research epics only (repair/salvage are DONE): GOD/STFS/CON
-  (Xbox 360 Games-on-Demand containers) read/write and XRD Redump metadata
-  generation.
-- `docs/` improvements — accuracy passes, examples, screenshots.
+- The current missing-feature list lives in
+  [PlanToEnhance.md](https://github.com/purelogiccode/XISOSharp/blob/master/PlanToEnhance.md);
+  completed work and history are in [Project History](project-history.md).
+- `docs/` improvements - accuracy passes, examples, screenshots.
 - Test coverage: sustain >85% line coverage on `XisoReader.cs`,
-  `XisoWriter.cs`, `AvlTree.cs` (currently 94.2% / 89.6% / 100% — see
+  `XisoWriter.cs`, `AvlTree.cs` (currently 94.2% / 89.6% / 100% - see
   [Testing](testing.md#coverage)); new code paths need tests, and new
   corruption shapes belong in `XisoCorruptionResilienceTests.cs`.
 - Batch-script edge cases for `-d` on Windows.

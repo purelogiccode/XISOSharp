@@ -303,7 +303,7 @@ for resume.
 | Member | Description |
 |---|---|
 | `Stream CreateFile(string path)` | Create/truncate the file for writing; the stream's final length must match the image's reported size |
-| `Stream CreateFile(string path, long? expectedLength)` | Optional overload (default calls the single-argument member): pre-size the destination when the size is known (PlanToEnhance Phase 7) |
+| `Stream CreateFile(string path, long? expectedLength)` | Optional overload (default calls the single-argument member): pre-size the destination when the size is known |
 | `void CreateDirectory(string path)` | Create the directory and all parents; root is a no-op |
 | `bool FileExists(string path)` | `true` when a file (not a directory) exists — resume probe |
 | `long FileLength(string path)` | Byte length, or `-1` when unresolvable (never skipped, reports as truncated) |

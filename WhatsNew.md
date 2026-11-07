@@ -195,7 +195,7 @@ conversion, JSON, preallocation and explicit layout packing) with the Phase 9
 
 ## Layout packing (Phase 8)
 
-XISOSharp can now **pack to an explicit sector layout** (PlanToEnhance Phase 8).
+XISOSharp can now **pack to an explicit sector layout**.
 Take the JSON from `--sector-layout --json` (or write a compact `path=sector`
 text spec), and `-c`, `--pack <dir>` or `build-image` will place matching files
 and directory tables at exactly those sectors while allocating the rest

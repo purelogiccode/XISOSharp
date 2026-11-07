@@ -355,7 +355,7 @@ SectorLayout layout = XisoReader.GetSectorLayout("game.iso");
 var allocator = SectorAllocator.FromLayout(layout);
 uint sector = allocator.AllocateForBytes(1_000_000); // first-fit free run, no overlaps
 
-// Pack to a fixed layout (PlanToEnhance Phase 8; CLI: --layout)
+// Pack to a fixed layout (CLI: --layout)
 XisoLayoutSpec spec = XisoLayoutSpec.FromSectorLayout(layout);
 XisoWriter.PackFromDirectory("game_dir", "repacked.iso", layout: spec);
 

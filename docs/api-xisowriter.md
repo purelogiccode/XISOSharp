@@ -155,7 +155,7 @@ Async wrapper returning the result code and the output path.
 
 ## Explicit sector-layout packing
 
-PlanToEnhance Phase 8 (xdvdfs #49). `XisoLayoutSpec` (in `XISOSharp.Models`) describes
+Explicit layout packing for xdvdfs #49. `XisoLayoutSpec` (in `XISOSharp.Models`) describes
 fixed sector extents. Build one from an existing image's layout, from the JSON emitted
 by `--sector-layout --json`, or from a compact `path=sector` text file:
 

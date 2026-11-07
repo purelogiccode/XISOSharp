@@ -37,6 +37,13 @@ Deliberately out of scope:
 - FUSE/Dokan mounting (see SimpleXisoDrive)
 - direct optical-drive reading (implement `IBlockDevice`)
 - Python bindings / a native ABI
+- executable signature verification (owner decision 2026-11-01; `--validate`
+  stays structural)
+- ZIP input (XISO Studio already ships SharpCompress)
+- XGD-shaped synthesis from a folder / an XGD header writer (cannot produce a
+  bootable disc; `--prepend-sectors` + `rebuild` cover real workflows)
+- a `dotnet tool` package (removed after 1.5.0; the CLI ships only in the six
+  RID bundles)
 
 ## Concurrency
 

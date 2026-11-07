@@ -73,7 +73,9 @@ The DocFX API link is absolute because the generated reference is published on P
 | [Building](building.md) | SDK requirements, build/publish, CI pipeline |
 | [Testing](testing.md) | Test suite, TestData, public corpus, reference-tool comparison, BattleTests |
 | [Benchmarks](benchmarks.md) | In-process BenchmarkDotNet baseline and reproducible extract-xiso/xdvdfs comparison |
-| [Contributing](contributing.md) | Contribution workflow, code style, PR guidelines |
+| [Contributing](contributing.md) | Contribution workflow, code style, definition of done, PR guidelines |
+| [Project History](project-history.md) | Completed releases, implemented baseline, reference oracles, upstream scan and progress log |
+| [Missing Features](https://github.com/purelogiccode/XISOSharp/blob/master/PlanToEnhance.md) | Current unimplemented feature list |
 | [Troubleshooting](troubleshooting.md) | Common errors and how to resolve them |
 | [Release Notes](release-notes.md) | What changed in each release |
 

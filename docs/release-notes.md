@@ -323,7 +323,7 @@ net8.0/net9.0** and **2043 passed / 1 opt-in skip (2044) on net10.0**.
 
 ### Layout packing (Phase 8)
 
-Sector-layout packing release (PlanToEnhance Phase 8), plus the Phase 4 TOC
+Sector-layout packing release, plus the TOC
 hardening follow-up. Images can now be repacked at
 an explicit layout: `XisoLayoutSpec` accepts the JSON emitted by
 `--sector-layout --json` (or a compact `path=sector` text spec), fixes the sectors of
@@ -482,7 +482,7 @@ net8.0/net9.0** and **1922 passed / 1 opt-in skip (1923) on net10.0**.
 
 ### Library
 
-- **Preallocation / sequential I/O** (PlanToEnhance Phase 7): new additive
+- **Preallocation / sequential I/O:** new additive
   `IFilesystem.CreateFile(string path, long? expectedLength)` default member.
   `LocalFilesystem` opens with `FileOptions.SequentialScan` and applies
   `SetLength` before the first write; `MemoryFilesystem` preallocates its

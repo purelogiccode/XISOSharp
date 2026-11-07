@@ -63,6 +63,8 @@ Full docs live in [`docs/`](docs/README.md) — served as a **Docsify site with 
 - [Library Overview](docs/library.md) · [XisoReader](docs/api-xisoreader.md) · [XisoWriter](docs/api-xisowriter.md) · [Utilities](docs/api-utilities.md)
 - [Benchmarks](docs/benchmarks.md) — in-process baseline and reproducible extract-xiso/xdvdfs comparison
 - [Release Notes](docs/release-notes.md) · [What's New](WhatsNew.md) — what changed in each release
+- [Project History](docs/project-history.md) — completed releases, implemented baseline, reference oracles and progress log
+- [Missing Features](PlanToEnhance.md) — current unimplemented feature list
 
 > **Left menu:** open `docs/index.html` locally or via Pages — [`docs/_sidebar.md`](docs/_sidebar.md) is the sidebar. The GitHub Wiki uses the generated `_Sidebar.md` from the same file.
 
