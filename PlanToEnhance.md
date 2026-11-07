@@ -2,7 +2,7 @@
 
 - **Updated:** 2026-11-07
 - **Latest release:** XISOSharp **1.8.0** (2026-11-07)
-- **Working tree:** 1.8.0 + DST-03/04/05 distribution track; DST-01/02 signing is implemented behind repository secrets
+- **Working tree:** 1.8.0 + DST-03/04/05 distribution track + XRP-01/02/03 cross-repo upgrades; DST-01/02 signing is implemented behind repository secrets
 - **Next release:** 2.0.0 (facade removal / TFM drop) or a future P3 track
 - **Packages:** XISOSharp `1.8.0`, StfsSharp `1.0.0`, CCISharp `1.1.0`, ZArchiveSharp `1.4.0`
 - **Scope of this file:** only work that is still open. Implemented features are listed once in [§9](#9-implemented-baseline-do-not-re-implement) so they are not re-implemented.
@@ -24,11 +24,11 @@
 |---|---|
 | Published library | **XISOSharp 1.8.0** (2026-11-07) |
 | Published readers | **StfsSharp 1.0.0** (2026-11-07), **CCISharp 1.1.0** (2026-11-07, NuGet) |
-| Current tree | **1.8.0 + DST-03/04/05**; signing scaffolding for DST-01/02 |
+| Current tree | **1.8.0 + DST-03/04/05 + XRP-01/02/03**; signing scaffolding for DST-01/02 |
 | Next release gate | **2.0.0** — facade removal and `net8.0`/`net9.0` drop |
 | Next feature release | **2.0.0** or a future P3 distribution/cross-repo track |
 | Compression track | **CCISharp 1.1** — ✅ HC encoder, parallel writer, multi-digit parts |
-| Tests (last recorded) | XISOSharp 2144 passed / 1 skipped on `net8.0`/`net9.0`; 2217 passed / 1 skipped on `net10.0`; CCISharp 78/78 on all TFMs; StfsSharp 37/37 on all TFMs |
+| Tests (last recorded) | XISOSharp 2144 passed / 1 skipped on `net8.0`/`net9.0`; 2217 passed / 1 skipped on `net10.0`; CCISharp 78/78 on all TFMs; StfsSharp 37/37 on all TFMs; SimpleXisoDrive 436 (402+34); XISOStudio 1561; ZArchiveSharp 4293 × 3 TFMs + 43 CLI |
 | CI gates | 3-OS build/test, `dotnet format`, InspectCode, AOT smoke, fuzz, battle-interop, packaging (completions/man/winget/Scoop/Homebrew), Docker smoke, coverage floors |
 | Reference set | 8 local copies under `References/` — see [§10](#10-reference-map) |
 
@@ -60,8 +60,8 @@
 | **P2** | Library hardening | 1.8.0 | 0 |
 | **P2** | Docs, fixtures and GUI | 1.8.0 | 0 |
 | **P3** | Distribution and supply chain | later | 2 (DST-01/02 await signing certs) |
-| **P3** | Cross-repo consumers | after 1.8.0 | 4 |
-| | **Total** | | **6 open** (2 optional) + 38 done |
+| **P3** | Cross-repo consumers | after 1.8.0 | 1 (XRP-04 optional; XRP-01/02/03 done) |
+| | **Total** | | **3 open** (2 optional) + 41 done |
 
 **Recommended order**
 
@@ -73,7 +73,8 @@
 | 4 | `DOC-*`, `GUI-*` | ✅ done in 1.8.0. |
 | 5 | `DST-03` … `DST-05` | ✅ implemented: manifests, completions/man page and container image. |
 | 6 | `DST-01`, `DST-02` | Implemented behind repository signing secrets; close when a signed package/release is verified. |
-| 7 | `XRP-*` | Deferred; separate companion-repository tracks. |
+| 7 | `XRP-01` … `XRP-03` | ✅ done (SimpleXisoDrive, XISOStudio, ZArchiveSharp). |
+| 8 | `XRP-04` | Optional; another consumer repository. |
 
 ---
 
@@ -303,17 +304,20 @@
 > `CSharp_XISOStudio`, `CSharp_ZArchiveSharp`, `CSharp_VideoGameFileSystemParser`),
 > not in this tree. They stay open here as a cross-repo reminder.
 
-- [ ] **XRP-01 · Upgrade `SimpleXisoDrive`**
+- [x] **XRP-01 · Upgrade `SimpleXisoDrive`**
   - Move to XISOSharp 1.7/`StfsSharp`, adopt `XisoImage`, and verify GOD mount through `XisoImageSource.OpenRead`.
   - **Done when:** a GOD set mounts and lists through the new facade.
+  - **Done 2026-11-07:** XISOSharp 1.8.0 + StfsSharp 1.0.0; `XisoVfsVolume` uses `XisoImage`; `ImagePathResolver` resolves `.data`/parent GOD paths; `--image-iso` uses `XisoImageSource.OpenRead`; renamed sector images keep a content fallback. Synthetic GOD tests (402+34) plus a real Bobble Head GOD set mounted with 13 root entries and `default.xex` XEX2 reads. Docs/WhatsNew updated.
 
-- [ ] **XRP-02 · Upgrade `XISOStudio`**
+- [x] **XRP-02 · Upgrade `XISOStudio`**
   - Move to XISOSharp 1.7, adopt `XisoImage`, add GOD to the open dialog, the 360 title panel and the XBE image preview; keep CHD/ZIP support in the app.
   - **Done when:** the new inputs open and preview without app-specific format-parsing code.
+  - **Done 2026-11-07:** XISOSharp 1.8.0; `XisoImageExplorer` uses `XisoImage`; factory resolves GOD headers/`.data`/parent folders; explorer has Browse/Folder pickers; new details panel shows title metadata and renders XBE logo/title/save PNGs via `XbeAssets`; CHD/ZAR explorers implement metadata/unavailable states. 1,561 tests green; real GOD metadata (`Bobble Head`, 0x58480813) verified. Docs/WhatsNew updated.
 
-- [ ] **XRP-03 · Add ZArchiveSharp fuzz and benchmarks**
+- [x] **XRP-03 · Add ZArchiveSharp fuzz and benchmarks**
   - Add a ZAR decode fuzz harness and benchmark coverage.
   - **Done when:** the fuzzer runs in CI and the benchmark baseline is documented.
+  - **Done 2026-11-07:** `ZArchiveSharp.Fuzz` (mixed/long-name/dictionary archives, byte+structural mutations, open-contract checks, tree walk, reads/streams/extraction) with a CI `fuzz-smoke` gate; 16,385 seeded iterations/0 failures. Added `ZarReaderBenchmarks` (open/enumerate/random/cross-block/cold-cache/stream/extract) and recorded the baseline in `docs/benchmarks.md`. The fuzzer found a NUL-name extraction `ArgumentException`; entry-name validation and `EnsureWithinRoot` now reject it as a documented `InvalidOperationException` (4,293 tests × 3 TFMs + 43 CLI).
 
 - [ ] **XRP-04 · (P3, optional) Other consumers**
   - Let `VideoGameFileSystemParser` and other apps consume `CCISharp`/`StfsSharp`; document the package usage.
@@ -334,6 +338,7 @@
 | **CCISharp 1.1 scope** | LZ4-HC levels 10..12, parallel sector compression (`Jobs` 1..64, byte-identical), multi-digit split discovery, `CCISharp.Cli`, fuzz + benchmarks, `CCISharp 1.1.0` on NuGet |
 | **Quality** | 3-OS CI, format gate, InspectCode, AOT smoke, mutation fuzz, battle-interop, coverage floors, SBOM and build provenance |
 | **Distribution (1.8.x)** | winget/Scoop/Homebrew manifests + generator, PowerShell/bash/zsh/fish completions, `xisosharp(1)`, CLI container image (GHCR), optional NuGet/Authenticode/macOS signing pipelines |
+| **Cross-repo (XRP)** | SimpleXisoDrive GOD mounts via `XisoImage` + real-corpus verification; XISOStudio GOD explorer + title panel + XBE preview; ZArchiveSharp mutation fuzzer + reader benchmarks + NUL-name hardening |
 
 ---
 
@@ -465,70 +470,46 @@ docker run --rm xisosharp -v
 | 2026-11-07 | Distribution verification | 1.8.x | Full suite 2144/1 + 2217/1; build 0 warnings; format clean; pack green; docs links 263 OK; real `XBOXReady` ISOs audit/checksum/title-info PASS; winget asset hash + layout verified |
 | 2026-11-07 | Work paused | 1.8.x | Distribution track implemented and locally validated; CI/install-smoke and real signing certs remain. Resume notes in [§15](#15-resume-notes--handoff) |
 | 2026-11-07 | First distribution CI run | 1.8.x | Docker + packaging-windows green; man-page `grep -q` SIGPIPE, winget uninstall cleanup and Homebrew local-cask restriction fixed; follow-up run pending |
+| 2026-11-07 | Distribution CI green | 1.8.x | Scoop `bucket add` local-path failure fixed by installing the checked-in manifest; CI run `42396783434` fully green (build/test 3 OS, package installs, Docker, packaging, docs, AOT, fuzz) |
+| 2026-11-07 | `XRP-01` SimpleXisoDrive | — | XISOSharp 1.8.0 + StfsSharp; `XisoImage` adoption; GOD header/`.data`/parent resolution; real Bobble Head GOD mount verified; 436 tests; format + InspectCode clean |
+| 2026-11-07 | `XRP-02` XISOStudio | — | XISOSharp 1.8.0; GOD input (file/folder pickers); title metadata panel; XBE logo/title/save preview; 1,561 tests; build/InspectCode clean; real GOD metadata verified |
+| 2026-11-07 | `XRP-03` ZArchiveSharp | — | `ZArchiveSharp.Fuzz` + CI fuzz-smoke (16,385 iterations/0 failures); `ZarReaderBenchmarks` + documented baseline; fuzzer found and fixed NUL-name extraction exception; 4,293 tests × 3 TFMs + 43 CLI |
 
 ---
 
 ## 15. Resume notes / handoff
 
-**State at pause (2026-11-07):** the distribution track is implemented in the
-working tree but **not committed or pushed**. No source files under
-`XISOSharp/` or `XISOSharp.Cli/` changed; this is docs + CI + packaging only.
+**State at pause (2026-11-07):** the distribution track is green in CI, and the
+cross-repo XRP-01/02/03 upgrades are implemented and locally verified but **not
+committed or pushed** in their repositories. The XISOSharp repository itself has
+no product-source changes from this session beyond the plan/CI fix.
 
 ### Completed locally
 
-- `dotnet build CSharp_XISOSharp.sln -c Release -m:1` — 0 warnings / 0 errors.
-- `dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release --no-build` —
-  2144/1 (`net8.0`), 2144/1 (`net9.0`), 2217/1 (`net10.0`).
-- `dotnet format whitespace ... --verify-no-changes` — clean.
-- `dotnet pack XISOSharp/XISOSharp.csproj -c Release` — 1.8.1-alpha package +
-  snupkg, package validation green.
-- `python scripts/check_cli_completions.py` — 96 flags present in all four
-  completion files; `bash -n` and PowerShell AST/TabExpansion2 exercised.
-- `winget validate` — clean; the published win-x64 asset hash and nested
-  `XISOSharp.exe` / `XISOSharp.Gui.exe` layout match the manifest.
-- Docs link checker — 263 local links OK.
-- Real `D:\Samples\XBOXReady` ISOs: `-l`, `-V` (PASS), `checksum`,
-  `title-info --json` all pass.
-- Docker publish arguments exercised locally (no container runtime installed);
-  version `0.0.0-dockertest` banner verified.
-
-### First CI run (push `6c2eee2`, run `42389621215`)
-
-- `Docker` — passed (image build + `-v` + create/list/extract smoke).
-- `packaging-windows` — passed (`winget validate` + Scoop consistency).
-- `packaging-smoke` — failed only in the man-page step: `groff | grep -q` closed
-  the pipe early and `grotty` reported a spurious output error. Fixed by using a
-  plain `grep > /dev/null`.
-- `package-install (windows)` — winget install and `xisosharp -v` passed; the
-  cleanup `winget uninstall` did not find the portable package and failed the
-  job. Made best-effort on the ephemeral runner.
-- `package-install (macos)` — `ruby -c` passed; Homebrew rejects cask files
-  outside a tap. Fixed by creating a throwaway tap in CI.
-- Core build/test jobs were still running when the session paused; no source
-  failures were reported.
-
-The three CI fixes are committed after the first run; the follow-up CI run still
-needs to be watched.
+- XISOSharp: CI run `42396783434` fully green (3-OS build/test, package installs,
+  packaging, Docker, docs, AOT, fuzz, InspectCode).
+- SimpleXisoDrive: XISOSharp 1.8.0 + StfsSharp 1.0.0, `XisoImage` adoption, GOD
+  mounts; build 0/0, format clean, InspectCode clean, **436** tests (402 core +
+  34 Unix).
+- XISOStudio: XISOSharp 1.8.0, GOD input, title metadata panel, XBE preview;
+  build 0/0, InspectCode 0 warnings, **1,561** tests.
+- ZArchiveSharp: `ZArchiveSharp.Fuzz` (16,385 seeded iterations / 0 failures),
+  `ZarReaderBenchmarks` baseline, NUL-name extraction hardening; build 0/0,
+  **4,293** tests on each of `net8.0`/`net9.0`/`net10.0` + 43 CLI tests.
+- Real-corpus verification: Bobble Head GOD set mounts in SimpleXisoDrive (13
+  root entries, XEX2 reads, `image.iso`) and opens in XISOStudio with
+  `Title=Bobble Head`, `0x58480813`, `default.xex`.
 
 ### First actions on resume
 
-1. `git status` — confirm the new files are visible. The local
-   `.git/info/exclude` had a stale `/Scripts/` rule (Windows treats it as
-   `scripts/`); it was removed so `scripts/check_cli_completions.py` and
-   `scripts/update-packaging.ps1` can be committed. Do not lose them.
-2. Commit and push the distribution track (user approval required per
-   `AGENTS.md`; do not delete anything under `bin/Release`, `publish*` or the
-   release zips).
-3. Wait for the new CI jobs and fix the expected CI-only issues:
-   - `packaging-smoke` — zsh/fish/groff/mandoc are first exercised there.
-   - `packaging-windows` — `winget validate` + Scoop/winget consistency.
-   - `package-install-smoke` — winget needs `LocalManifestFiles` (admin),
-     Scoop uses `-RunAsAdmin` on hosted runners, Homebrew uses
-     `--skip-cask-deps`; confirm the portable alias/shim paths.
-   - `docker` workflow — first real container build/smoke.
-4. After green CI, update the progress log/`§1` counts if any install-smoke
-   adjustment was needed. DST-03/04/05 are already marked done; DST-01/02 stay
-   open until real certificates verify.
+1. Commit and push the three companion repositories (SimpleXisoDrive,
+   XISOStudio, ZArchiveSharp) and watch their CI. Do not delete anything under
+   `bin/Release`, `publish*` or the release zips.
+2. Watch the ZArchiveSharp `fuzz-smoke` job (120 s fixed seed `20261107`); it
+   should repeat the local 0-failure run.
+3. If XISOStudio CI flags pre-existing whitespace drift, fix only the touched
+   files (`MainWindow.XIsoExplorerLogic.cs` is now clean for the changed lines).
+4. XRP-04/2.0.0 remain optional; see below.
 
 ### DST-01/DST-02 signing checklist
 
@@ -545,10 +526,10 @@ the published nupkg/snupkg, `signtool verify /pa` on both Windows bundles, and
 
 ### Pending after this track
 
-- `XRP-01` … `XRP-04` live in the companion repositories and were explicitly
-  out of scope for this working directory.
+- `XRP-01`/`XRP-02`/`XRP-03` are done; `XRP-04` (other consumers, optional) is
+  the only open cross-repo item.
 - The next product release remains **2.0.0** (facade removal and
-  `net8.0`/`net9.0` drop); this distribution work can ship earlier as 1.9.0 if
+  `net8.0`/`net9.0` drop); the distribution work can ship earlier as 1.9.0 if
   desired.
 - After every release run
   `./scripts/update-packaging.ps1 -Version <version>` and commit the refreshed
