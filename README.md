@@ -23,6 +23,14 @@
 
 A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) for Xbox ISO (XISO / XDVDFS) images — **byte-identical** output, no native dependencies, no P/Invoke, just .NET. Beyond the C baseline it merges the archival power of [XboxKit](https://github.com/Deterous/XboxKit) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) into one trimmable, AOT-compatible library + CLI.
 
+## Downstream consumers
+
+- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** mounts ISO/CISO/CHD/ZAR and GOD/SVOD sources through `XisoImage`/`XisoImageSource` (read-only Dokan/FUSE).
+- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** converts and explores Xbox images, including GOD/SVOD input, the title metadata panel and XBE logo/title/save previews.
+
+Both consume the `XisoImage` facade and `XbeAssets` in-process; `StfsSharp`, `CCISharp` and
+`ZArchiveSharp` remain standalone packages for their own readers.
+
 ## Projects
 
 | Project | Description |

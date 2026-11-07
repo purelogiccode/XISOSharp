@@ -474,6 +474,7 @@ docker run --rm xisosharp -v
 | 2026-11-07 | `XRP-01` SimpleXisoDrive | — | XISOSharp 1.8.0 + StfsSharp; `XisoImage` adoption; GOD header/`.data`/parent resolution; real Bobble Head GOD mount verified; 436 tests; format + InspectCode clean; CI run `42405304528` green |
 | 2026-11-07 | `XRP-02` XISOStudio | — | XISOSharp 1.8.0; GOD input (file/folder pickers); title metadata panel; XBE logo/title/save preview; 1,561 tests; real GOD metadata verified. First CI flagged four solution-wide InspectCode suggestions; fixed in `0c43f02`; follow-up CI run `42405778091` green including InspectCode and all six publishes |
 | 2026-11-07 | `XRP-03` ZArchiveSharp | — | `ZArchiveSharp.Fuzz` + CI fuzz-smoke (16,385 iterations/0 failures); `ZarReaderBenchmarks` + documented baseline; fuzzer found and fixed NUL-name extraction exception; 4,293 tests × 3 TFMs + 43 CLI; CI run `42405322199` green including fuzz-smoke and pack |
+| 2026-11-07 | Documentation refresh | 1.8.x | XISOSharp README/library now list SimpleXisoDrive and XISO Studio as downstream `XisoImage` consumers; SimpleXisoDrive Architecture, Virtual File System and Contributing now describe `XisoImage` instead of the old `XisoExplorer`; plan/handoff finalized; XISOSharp CI (`f900517` follow-up) green |
 
 ---
 
@@ -500,6 +501,9 @@ product-source changes from this session beyond the plan/CI fix.
 - Real-corpus verification: Bobble Head GOD set mounts in SimpleXisoDrive (13
   root entries, XEX2 reads, `image.iso`) and opens in XISOStudio with
   `Title=Bobble Head`, `0x58480813`, `default.xex`.
+- Documentation refresh: XISOSharp README/library list the downstream consumers;
+  SimpleXisoDrive Architecture/Virtual File System/Contributing describe the
+  `XisoImage` path; all companion docs/WhatsNew entries are current.
 
 ### First actions on resume
 

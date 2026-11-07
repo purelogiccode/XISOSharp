@@ -4,6 +4,7 @@
 **`XISOSharp`** and contains the complete XISO read/write engine plus CCI
 (`CCISharp`) and ZAR (`ZArchiveSharp`) container support.
 
+- [Downstream consumers](#downstream-consumers)
 - [Packaging & compatibility](#packaging--compatibility)
 - [Namespaces and types](#namespaces-and-types)
 - [Container input](#container-input)
@@ -12,6 +13,19 @@
 - [Logging](#logging)
 - [Quick samples](#quick-samples)
 - [Async and cancellation](#async-and-cancellation)
+
+## Downstream consumers
+
+The companion applications use the same library surface:
+
+- **SimpleXisoDrive** mounts ISO/CISO/CHD/ZAR and GOD/SVOD sources read-only through
+  `XisoImage`/`XisoImageSource` (Dokan on Windows, FUSE 3 on Linux/macOS).
+- **XISO Studio** converts and explores Xbox images, including GOD/SVOD input, a title metadata
+  panel and XBE logo/title/save previews through `XbeAssets`.
+
+The `StfsSharp`, `CCISharp` and `ZArchiveSharp` packages remain usable on their own; XISOSharp
+consumes them for GOD/SVOD, CCI and ZAR support and keeps compatibility facades for its existing
+public types.
 
 ## Packaging & compatibility
 
