@@ -480,9 +480,10 @@ docker run --rm xisosharp -v
 ## 15. Resume notes / handoff
 
 **State at pause (2026-11-07):** the distribution track is green in CI, and the
-cross-repo XRP-01/02/03 upgrades are implemented and locally verified but **not
-committed or pushed** in their repositories. The XISOSharp repository itself has
-no product-source changes from this session beyond the plan/CI fix.
+cross-repo XRP-01/02/03 upgrades are implemented, committed and pushed. Their
+CI is green (SimpleXisoDrive `42405304528`, XISOStudio `42405778091`,
+ZArchiveSharp `42405322199`). The XISOSharp repository itself has no
+product-source changes from this session beyond the plan/CI fix.
 
 ### Completed locally
 
@@ -502,14 +503,14 @@ no product-source changes from this session beyond the plan/CI fix.
 
 ### First actions on resume
 
-1. Commit and push the three companion repositories (SimpleXisoDrive,
-   XISOStudio, ZArchiveSharp) and watch their CI. Do not delete anything under
-   `bin/Release`, `publish*` or the release zips.
-2. Watch the ZArchiveSharp `fuzz-smoke` job (120 s fixed seed `20261107`); it
-   should repeat the local 0-failure run.
-3. If XISOStudio CI flags pre-existing whitespace drift, fix only the touched
-   files (`MainWindow.XIsoExplorerLogic.cs` is now clean for the changed lines).
-4. XRP-04/2.0.0 remain optional; see below.
+1. The three companion repositories are committed and pushed; their CI is green
+   (including ZArchiveSharp's 120-second `fuzz-smoke` and XISOStudio's
+   solution-wide InspectCode).
+2. The only open plan items are **XRP-04** (optional; another consumer
+   repository) and **DST-01/DST-02** (awaits real signing certificates). The
+   next product release remains **2.0.0** (facade removal and
+   `net8.0`/`net9.0` drop).
+3. Do not delete anything under `bin/Release`, `publish*` or the release zips.
 
 ### DST-01/DST-02 signing checklist
 
