@@ -28,7 +28,7 @@
 | Next release gate | **2.0.0** — facade removal and `net8.0`/`net9.0` drop |
 | Next feature release | **2.0.0** or a future P3 distribution/cross-repo track |
 | Compression track | **CCISharp 1.1** — ✅ HC encoder, parallel writer, multi-digit parts |
-| Tests (last recorded) | XISOSharp 2144 passed / 1 skipped on `net8.0`/`net9.0`; 2217 passed / 1 skipped on `net10.0`; CCISharp 78/78 on all TFMs; StfsSharp 37/37 on all TFMs; SimpleXisoDrive 436 (402+34); XISOStudio 1561; ZArchiveSharp 4293 × 3 TFMs + 43 CLI |
+| Tests (last recorded) | XISOSharp 2144 passed / 1 skipped on `net8.0`/`net9.0`; 2217 passed / 1 skipped on `net10.0`; CCISharp 78/78 on all TFMs; StfsSharp 37/37 on all TFMs; SimpleXisoDrive 436 (402+34); XISOStudio 1561; ZArchiveSharp 4293 × 3 TFMs + 43 CLI (after the fuzzer-found NUL-name hardening) |
 | CI gates | 3-OS build/test, `dotnet format`, InspectCode, AOT smoke, fuzz, battle-interop, packaging (completions/man/winget/Scoop/Homebrew), Docker smoke, coverage floors |
 | Reference set | 8 local copies under `References/` — see [§10](#10-reference-map) |
 
