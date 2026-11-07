@@ -471,9 +471,9 @@ docker run --rm xisosharp -v
 | 2026-11-07 | Work paused | 1.8.x | Distribution track implemented and locally validated; CI/install-smoke and real signing certs remain. Resume notes in [§15](#15-resume-notes--handoff) |
 | 2026-11-07 | First distribution CI run | 1.8.x | Docker + packaging-windows green; man-page `grep -q` SIGPIPE, winget uninstall cleanup and Homebrew local-cask restriction fixed; follow-up run pending |
 | 2026-11-07 | Distribution CI green | 1.8.x | Scoop `bucket add` local-path failure fixed by installing the checked-in manifest; CI run `42396783434` fully green (build/test 3 OS, package installs, Docker, packaging, docs, AOT, fuzz) |
-| 2026-11-07 | `XRP-01` SimpleXisoDrive | — | XISOSharp 1.8.0 + StfsSharp; `XisoImage` adoption; GOD header/`.data`/parent resolution; real Bobble Head GOD mount verified; 436 tests; format + InspectCode clean |
-| 2026-11-07 | `XRP-02` XISOStudio | — | XISOSharp 1.8.0; GOD input (file/folder pickers); title metadata panel; XBE logo/title/save preview; 1,561 tests; build/InspectCode clean; real GOD metadata verified |
-| 2026-11-07 | `XRP-03` ZArchiveSharp | — | `ZArchiveSharp.Fuzz` + CI fuzz-smoke (16,385 iterations/0 failures); `ZarReaderBenchmarks` + documented baseline; fuzzer found and fixed NUL-name extraction exception; 4,293 tests × 3 TFMs + 43 CLI |
+| 2026-11-07 | `XRP-01` SimpleXisoDrive | — | XISOSharp 1.8.0 + StfsSharp; `XisoImage` adoption; GOD header/`.data`/parent resolution; real Bobble Head GOD mount verified; 436 tests; format + InspectCode clean; CI run `42405304528` green |
+| 2026-11-07 | `XRP-02` XISOStudio | — | XISOSharp 1.8.0; GOD input (file/folder pickers); title metadata panel; XBE logo/title/save preview; 1,561 tests; real GOD metadata verified. First CI flagged four solution-wide InspectCode suggestions; fixed in `0c43f02`; follow-up CI run `42405778091` green including InspectCode and all six publishes |
+| 2026-11-07 | `XRP-03` ZArchiveSharp | — | `ZArchiveSharp.Fuzz` + CI fuzz-smoke (16,385 iterations/0 failures); `ZarReaderBenchmarks` + documented baseline; fuzzer found and fixed NUL-name extraction exception; 4,293 tests × 3 TFMs + 43 CLI; CI run `42405322199` green including fuzz-smoke and pack |
 
 ---
 
