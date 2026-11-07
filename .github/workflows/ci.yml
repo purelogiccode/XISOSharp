@@ -340,8 +340,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Scoop install script exited $LASTEXITCODE" }
           $env:PATH = "$(Join-Path $env:SCOOP 'shims');$env:PATH"
           if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { throw 'scoop was not found after installation.' }
-          scoop bucket add xisosharp $env:GITHUB_WORKSPACE
-          scoop install xisosharp/xisosharp
+          # Install straight from the checked-in manifest; Scoop only accepts
+          # git URLs for `bucket add` and the .NET SDK is already on the runner.
+          scoop install --independent .\bucket\xisosharp.json
           if ($LASTEXITCODE -ne 0) { throw "scoop install exited $LASTEXITCODE" }
           $shim = Join-Path $env:SCOOP 'shims\xisosharp.exe'
           $scoopBanner = & $shim -v
