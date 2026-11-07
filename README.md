@@ -25,7 +25,7 @@ A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) fo
 
 ## Downstream consumers
 
-- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** mounts ISO/CISO/CHD/ZAR and GOD/SVOD sources through `XisoImage`/`XisoImageSource` (read-only Dokan/FUSE).
+- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** mounts ISO/CISO and GOD/SVOD sources through `XisoImage`/`XisoImageSource`, plus CHD and ZAR through their dedicated readers (read-only Dokan/FUSE).
 - **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** converts and explores Xbox images, including GOD/SVOD input, the title metadata panel and XBE logo/title/save previews.
 
 Both consume the `XisoImage` facade and `XbeAssets` in-process; `StfsSharp`, `CCISharp` and

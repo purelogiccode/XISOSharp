@@ -18,8 +18,9 @@
 
 The companion applications use the same library surface:
 
-- **SimpleXisoDrive** mounts ISO/CISO/CHD/ZAR and GOD/SVOD sources read-only through
-  `XisoImage`/`XisoImageSource` (Dokan on Windows, FUSE 3 on Linux/macOS).
+- **SimpleXisoDrive** mounts ISO/CISO and GOD/SVOD sources read-only through
+  `XisoImage`/`XisoImageSource`, and CHD/ZAR through their dedicated readers (Dokan on Windows,
+  FUSE 3 on Linux/macOS).
 - **XISO Studio** converts and explores Xbox images, including GOD/SVOD input, a title metadata
   panel and XBE logo/title/save previews through `XbeAssets`.
 
