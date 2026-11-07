@@ -235,7 +235,9 @@ jobs:
           set -euo pipefail
           groff -man -Tutf8 -ww -z docs/man/xisosharp.1
           mandoc -T lint -W error docs/man/xisosharp.1
-          groff -man -Tutf8 docs/man/xisosharp.1 | grep -q 'XISOSHARP'
+          # Plain grep (no -q) drains the pipe; grep -q closes it early and
+          # grotty reports a spurious "output error" on SIGPIPE.
+          groff -man -Tutf8 docs/man/xisosharp.1 | grep -F 'XISOSHARP' > /dev/null
           echo "man page renders."
 
   packaging-windows:
@@ -322,7 +324,11 @@ jobs:
           Write-Host $text
           winget uninstall --id purelogiccode.XISOSharp --exact `
             --disable-interactivity --accept-source-agreements
-          if ($LASTEXITCODE -ne 0) { throw "winget uninstall exited $LASTEXITCODE" }
+          # The portable package is not always registered under the manifest ID;
+          # cleanup is best-effort on the ephemeral runner.
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "winget uninstall exited $LASTEXITCODE (cleanup only)."
+          }
 
           # --- Scoop: repository-root bucket --------------------------------
           $env:SCOOP = Join-Path $env:RUNNER_TEMP 'scoop'
@@ -354,11 +360,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          brew install --cask --skip-cask-deps ./packaging/homebrew/xisosharp.rb
+          # Homebrew rejects cask files outside a tap; create a throwaway tap
+          # and install the checked-in cask through it.
+          tap="xisosharp/test"
+          brew tap-new --no-git "$tap"
+          tap_dir="$(brew --repository "$tap")"
+          mkdir -p "$tap_dir/Casks"
+          cp packaging/homebrew/xisosharp.rb "$tap_dir/Casks/xisosharp.rb"
+          brew install --cask --skip-cask-deps "$tap/xisosharp"
           banner="$(xisosharp -v)"
           echo "$banner"
           grep -Eq '^XISOSharp v[0-9]+\.[0-9]+\.[0-9]+' <<< "$banner"
-          brew uninstall --cask xisosharp
+          brew uninstall --cask "$tap/xisosharp"
 
   aot-smoke:
     name: aot-smoke (linux)

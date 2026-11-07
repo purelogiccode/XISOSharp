@@ -464,6 +464,7 @@ docker run --rm xisosharp -v
 | 2026-11-07 | `DST-01`/`DST-02` signing pipelines | 1.8.x | NuGet sign/verify and Windows/macOS sign jobs gated on repository secrets; local self-signed sign/verify passed; open until real certs verify |
 | 2026-11-07 | Distribution verification | 1.8.x | Full suite 2144/1 + 2217/1; build 0 warnings; format clean; pack green; docs links 263 OK; real `XBOXReady` ISOs audit/checksum/title-info PASS; winget asset hash + layout verified |
 | 2026-11-07 | Work paused | 1.8.x | Distribution track implemented and locally validated; CI/install-smoke and real signing certs remain. Resume notes in [§15](#15-resume-notes--handoff) |
+| 2026-11-07 | First distribution CI run | 1.8.x | Docker + packaging-windows green; man-page `grep -q` SIGPIPE, winget uninstall cleanup and Homebrew local-cask restriction fixed; follow-up run pending |
 
 ---
 
@@ -490,6 +491,24 @@ working tree but **not committed or pushed**. No source files under
   `title-info --json` all pass.
 - Docker publish arguments exercised locally (no container runtime installed);
   version `0.0.0-dockertest` banner verified.
+
+### First CI run (push `6c2eee2`, run `42389621215`)
+
+- `Docker` — passed (image build + `-v` + create/list/extract smoke).
+- `packaging-windows` — passed (`winget validate` + Scoop consistency).
+- `packaging-smoke` — failed only in the man-page step: `groff | grep -q` closed
+  the pipe early and `grotty` reported a spurious output error. Fixed by using a
+  plain `grep > /dev/null`.
+- `package-install (windows)` — winget install and `xisosharp -v` passed; the
+  cleanup `winget uninstall` did not find the portable package and failed the
+  job. Made best-effort on the ephemeral runner.
+- `package-install (macos)` — `ruby -c` passed; Homebrew rejects cask files
+  outside a tap. Fixed by creating a throwaway tap in CI.
+- Core build/test jobs were still running when the session paused; no source
+  failures were reported.
+
+The three CI fixes are committed after the first run; the follow-up CI run still
+needs to be watched.
 
 ### First actions on resume
 
