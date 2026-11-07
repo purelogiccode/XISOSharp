@@ -2,8 +2,9 @@
 
 - **Updated:** 2026-11-07
 - **Latest release:** XISOSharp **1.8.0** (2026-11-07)
-- **Working tree:** 1.8.0 + DST-03/04/05 distribution track + XRP-01/02/03 cross-repo upgrades; DST-01/02 signing is implemented behind repository secrets
-- **Next release:** 2.0.0 (facade removal / TFM drop) or a future P3 track
+- **Working tree:** 1.8.0 + DST-03/04/05 distribution track + XRP-01/02/03 cross-repo upgrades; DST-01/02 signing is implemented behind repository secrets; the 2.0.0 and 2.1.0 tracks are planned but **not started**
+- **Next release:** **2.0.0** — remove the `StfsSharp` compatibility facades, **keeping `net8.0`/`net9.0`/`net10.0`** (owner decision 2026-11-07)
+- **Next feature release:** **2.1.0** — beyond-reference features (`BRF-01`…`BRF-15`)
 - **Packages:** XISOSharp `1.8.0`, StfsSharp `1.0.0`, CCISharp `1.1.0`, ZArchiveSharp `1.4.0`
 - **Scope of this file:** only work that is still open. Implemented features are listed once in [§9](#9-implemented-baseline-do-not-re-implement) so they are not re-implemented.
 
@@ -14,7 +15,9 @@
 > 2. **Ship 1.7.0** — ✅ done: `StfsSharp 1.0.0` extracted and published; XISOSharp 1.7.0 tagged/released with six bundles.
 > 3. **Ship CCISharp 1.1** — ✅ done: LZ4-HC, parallel CCI compression, multi-digit parts; `CCISharp 1.1.0` published and integrated.
 > 4. **Harden and ship 1.8.0** — ✅ done: LIB-01…08, DOC-01…03 and GUI-01…05 implemented. P3 distribution/cross-repo items remain deliberately deferred.
-> 5. **P3 distribution track** — DST-03/04/05 implemented (winget/Scoop/Homebrew manifests, shell completions + man page, container image). DST-01/02 are implemented behind repository signing secrets and stay open until a signed package/release is verified. XRP-01…04 stay cross-repo.
+> 5. **P3 distribution track** — DST-03/04/05 implemented (winget/Scoop/Homebrew manifests, shell completions + man page, container image). DST-01/02 are implemented behind repository signing secrets and stay open until a signed package/release is verified. XRP-01…03 are done; XRP-04 is the remaining optional cross-repo item.
+> 6. **2.0.0 facade removal** — planned, not started. Removes the `StfsSharp` compatibility facades; the `net8.0`/`net9.0`/`net10.0` matrix stays (owner decision 2026-11-07).
+> 7. **2.1.0 beyond-reference track** — planned, not started. Adds disc-layout inspection, skeleton overlay, embedded 360 title metadata, XEX thumbnails, per-file hash sidecars, parallel collection verbs, image compare, ZAR tuning, loose-file metadata, optional Redump DAT verification, plus the improvements found in the extract-xiso/xdvdfs issue scan (`BRF-01`…`BRF-15`, see [§8C](#8c-p2--upstream-issuepr-scan-2026-11-07)).
 
 ---
 
@@ -24,9 +27,9 @@
 |---|---|
 | Published library | **XISOSharp 1.8.0** (2026-11-07) |
 | Published readers | **StfsSharp 1.0.0** (2026-11-07), **CCISharp 1.1.0** (2026-11-07, NuGet) |
-| Current tree | **1.8.0 + DST-03/04/05 + XRP-01/02/03**; signing scaffolding for DST-01/02 |
-| Next release gate | **2.0.0** — facade removal and `net8.0`/`net9.0` drop |
-| Next feature release | **2.0.0** or a future P3 distribution/cross-repo track |
+| Current tree | **1.8.0 + DST-03/04/05 + XRP-01/02/03**; signing scaffolding for DST-01/02; 2.0.0/2.1.0 planned (not started) |
+| Next release gate | **2.0.0** — `StfsSharp` facade removal; the `net8.0`/`net9.0`/`net10.0` matrix is retained |
+| Next feature release | **2.1.0** — beyond-reference features (`BRF-01`…`BRF-15`) |
 | Compression track | **CCISharp 1.1** — ✅ HC encoder, parallel writer, multi-digit parts |
 | Tests (last recorded) | XISOSharp 2144 passed / 1 skipped on `net8.0`/`net9.0`; 2217 passed / 1 skipped on `net10.0`; CCISharp 78/78 on all TFMs; StfsSharp 37/37 on all TFMs; SimpleXisoDrive 436 (402+34); XISOStudio 1561; ZArchiveSharp 4293 × 3 TFMs + 43 CLI (after the fuzzer-found NUL-name hardening) |
 | CI gates | 3-OS build/test, `dotnet format`, InspectCode, AOT smoke, fuzz, battle-interop, packaging (completions/man/winget/Scoop/Homebrew), Docker smoke, coverage floors |
@@ -59,9 +62,11 @@
 | **P1** | CCISharp 1.1 | ✅ released 2026-11-07 | 0 |
 | **P2** | Library hardening | 1.8.0 | 0 |
 | **P2** | Docs, fixtures and GUI | 1.8.0 | 0 |
+| **P1** | 2.0.0 facade removal | 2.0.0 | 2 (`FAC-01`/`FAC-02`) |
+| **P1** | Beyond-reference features | 2.1.0 | 15 (`BRF-01`…`BRF-15`) |
 | **P3** | Distribution and supply chain | later | 2 (DST-01/02 await signing certs) |
 | **P3** | Cross-repo consumers | after 1.8.0 | 1 (XRP-04 optional; XRP-01/02/03 done) |
-| | **Total** | | **3 open** (2 optional) + 41 done |
+| | **Total** | | **20 open** (17 planned; DST-01/02 await certificates; XRP-04 optional) + 42 done |
 
 **Recommended order**
 
@@ -71,10 +76,12 @@
 | 2 | `CCI-01` … `CCI-06` | ✅ done; `CCISharp 1.1.0` is published and integrated. |
 | 3 | `LIB-01` … `LIB-08` | ✅ done in 1.8.0. |
 | 4 | `DOC-*`, `GUI-*` | ✅ done in 1.8.0. |
-| 5 | `DST-03` … `DST-05` | ✅ implemented: manifests, completions/man page and container image. |
-| 6 | `DST-01`, `DST-02` | Implemented behind repository signing secrets; close when a signed package/release is verified. |
-| 7 | `XRP-01` … `XRP-03` | ✅ done (SimpleXisoDrive, XISOStudio, ZArchiveSharp). |
-| 8 | `XRP-04` | Optional; another consumer repository. |
+| 5 | `FAC-01`, `FAC-02` | 2.0.0 breaking cleanup: remove the `StfsSharp` facades and keep all three TFMs. |
+| 6 | `BRF-01` … `BRF-15` | 2.1.0 beyond-reference track (disc info, skeleton overlay, embedded 360 metadata, XEX images, file hashes, parallel collection verbs, compare, ZAR tuning, loose files, optional DAT, plus upstream issue-scan items). |
+| 7 | `DST-03` … `DST-05` | ✅ implemented: manifests, completions/man page and container image. |
+| 8 | `DST-01`, `DST-02` | Implemented behind repository signing secrets; close when a signed package/release is verified. |
+| 9 | `XRP-01` … `XRP-03` | ✅ done (SimpleXisoDrive, XISOStudio, ZArchiveSharp). |
+| 10 | `XRP-04` | Optional; another consumer repository. |
 
 ---
 
@@ -224,6 +231,7 @@
 - [x] **LIB-07 · Resolve the post-EOL target-framework plan**
   - `net9.0` is EOL (2026-05-12) and `net8.0` reaches EOL on 2026-11-10. Decide before 1.7.0 whether 1.7.x keeps them compatibility-only and drops them in 2.0.0, or drops them sooner; update the csproj files, CI, `docs/support-policy.md` and READMEs.
   - **Done when:** the support policy and build matrix agree and CI remains green.
+  - **Owner update 2026-11-07:** the 2.0.0 drop is cancelled. `FAC-02` keeps `net8.0`/`net9.0`/`net10.0` and updates the docs/support policy accordingly.
 
 - [x] **LIB-08 · Refresh the package-validation baseline**
   - Move `PackageValidationBaselineVersion` from `1.4.4` to the latest published stable (`1.5.0`/`1.6.0` as appropriate), review `CompatibilitySuppressions.xml`, and refresh `PublicApi.approved.txt`.
@@ -266,6 +274,11 @@
 - [x] **GUI-05 · (P2, optional) Expose parallel jobs controls**
   - Add `--jobs` controls for extraction and compression where supported; keep CCI disabled until CCISharp 1.1 lands.
   - **Done when:** the GUI command builders and self-test cover the new flags.
+
+- [x] **DOC-04 · Cross-link the companion projects in the READMEs**
+  - Add a "Companion projects" section to the root, library and CLI READMEs and `docs/library.md`, listing `SimpleXisoDrive`, `XISO Studio`, `StfsSharp`, `CCISharp` and `ZArchiveSharp`.
+  - **Done when:** every README links the two desktop companions and the three library packages, and the library README (packed into the nupkg) carries the links.
+  - **Done 2026-11-07:** root `README.md`, `XISOSharp/README.md` (NuGet readme), `XISOSharp.Cli/README.md` and `docs/library.md` link SimpleXisoDrive and XISO Studio plus the three sibling NuGet packages.
 
 ---
 
@@ -325,6 +338,196 @@
 
 ---
 
+## 8A. P1 — 2.0.0: remove the `StfsSharp` facades (keep all TFMs)
+
+> Owner decision 2026-11-07: **do not drop `net8.0`/`net9.0`**. The 2.0.0
+> release is a public-API cleanup only; the build/test matrix stays
+> `net8.0`/`net9.0`/`net10.0`. The facades were introduced in 1.7.0/1.8.0 and
+> were always documented as temporary ("removed in 2.0.0").
+
+- [ ] **FAC-01 · Remove the compatibility facades**
+  - Delete `XISOSharp.GodHeader`, `XISOSharp.StfsHeader`, `XISOSharp.StfsPackage`, `XISOSharp.BlockDevice.GodBlockDevice` and the matching `XISOSharp.Models` types: `GodTitleInfo`, `GodVolumeInfo`, `StfsEntry`, `StfsPackageInfo`, `StfsPackageKind`, `StfsTitleInfo`, `StfsValidationIssue`, `StfsValidationReport`.
+  - Migrate library internals, CLI, GUI, fuzz and fixtures to `StfsSharp` types directly. Keep an internal `GodVolumeBlockDevice` adapter for `XisoImageSource.OpenRead`/`OpenBlockDevice`; it is not public surface.
+  - Keep `XisoChecksum.ComputeStfsChecksum`/`ComputeStfsChecksumHex` as direct `StfsSharp`-backed helpers (they expose no facade types) so the `checksum` verb and existing consumers keep working.
+  - Refresh `XISOSharp.Tests/PublicApi.approved.txt`, add reviewed API-compat suppressions for the intentional removals, and move `PackageValidationBaselineVersion` to `1.8.0`.
+  - **Done when:** every read verb still works for GOD/SVOD and XBLA/XBLIG inputs, the public-API snapshot contains no facade type, `dotnet pack` passes with the reviewed suppressions, and the suite is green on all three TFMs.
+
+- [ ] **FAC-02 · Keep and document the TFM matrix**
+  - Keep `net8.0`/`net9.0`/`net10.0` in `XISOSharp`, `XISOSharp.Cli`, `XISOSharp.TestDataGenerator` and `XISOSharp.Tests`; do not add TFM conditionals beyond the existing `NET9_0_OR_GREATER` guards.
+  - Update `docs/support-policy.md`, `docs/known-limitations.md`, the READMEs and release notes so 2.0.0 no longer says the older TFMs are removed; describe all three as supported compatibility targets.
+  - **Done when:** the support policy and build matrix agree, all three TFMs build/test, and no document claims a 2.0.0 TFM drop.
+
+---
+
+## 8B. P1 — 2.1.0: beyond-reference features
+
+> These are **not parity gaps**: XISOSharp already covers the working feature
+> set of `extract-xiso` build `202609111233`, `xdvdfs 0.8.3` and `XboxKit 0.7`
+> (see [§9](#9-implemented-baseline-do-not-re-implement); XRD remains
+> deliberately deferred). This track adds capabilities none of those tools
+> expose, plus the small number of real improvements found in the upstream
+> issue/PR scan ([§8C](#8c-p2--upstream-issuepr-scan-2026-11-07)).
+> Status: **planned, not started** (owner request 2026-11-07).
+
+### Track summary
+
+| Item | Priority | Release | Value |
+|---|---|---|---|
+| `BRF-01` Redump/XGD disc-layout inspector | P1 | 2.1.0 | Archival layout validation |
+| `BRF-02` Skeleton overlay (inverse of petrify) | P1 | 2.1.0 | Completes loose-files → XISO → Redump |
+| `BRF-03` Embedded `default.xex` title metadata for GOD/STFS | P1 | 2.1.0 | 360 title-panel completeness |
+| `BRF-04` XEX/XDBF thumbnail export | P2 | 2.1.0 | Completes the image-preview family |
+| `BRF-05` Per-file hash sidecar for any container | P2 | 2.1.0 | `verify-hashes` without petrify |
+| `BRF-06` Parallel collection verbs | P2 | 2.1.0 | Large-library throughput |
+| `BRF-07` `compare` two images | P2 | 2.1.0 | Conversion QA across containers |
+| `BRF-08` ZAR compression-level flag | P2 | 2.1.0 | Archive-size control |
+| `BRF-09` Loose `.xbe`/`.xex` inputs | P2 | 2.1.0 | Developer workflow |
+| `BRF-10` Redump DAT verification | P3 | 2.2.0 (optional) | Collection validation |
+| `BRF-11` Xbox 42-character filename validation | P2 | 2.1.0 | Hardware-compatible names |
+| `BRF-12` Deterministic-pack alias + regression test | P3 | 2.1.0 | Reproducible builds |
+| `BRF-13` Media-enable patch audit | P2 | 2.1.0 | `-m` parity verified |
+| `BRF-14` Create-time symlink policy | P3 | 2.1.0 | Explicit link handling |
+| `BRF-15` Actionable host-I/O diagnostics | P3 | 2.1.0 | Better errors |
+
+- [ ] **BRF-01 · Add a Redump/XGD disc-layout inspector**
+  - Add `XisoDiscInfo.Read(path)` and CLI `--disc-info <image> [--json]`: report XGD type/subtype and wave, video/game partition byte+sector ranges, PFI presence/layerbreak, security-sector ranges (embedded security sector when present, else `sectors.txt`), known-Redump-size match, and consistency warnings.
+  - Parse only observed on-disk fields. `XgdTables` is the existing format baseline; `References/XboxToolkit-main` remains a **behaviour oracle only** (GPL guardrail) and `References/XboxKit-0.7/LibXGD/XGD.cs` is the permissively licensed table reference.
+  - Work for plain ISO and `--skip-sectors`/auto-detected Redump offsets; containers report the game-partition view and clearly mark video fields unavailable.
+  - **Done when:** synthetic XGD1/XGD2/XGD3/hybrid fixtures report the expected layout, a truncated/wrong-size image reports a clear issue, and `--json` is covered by snapshot tests.
+
+- [ ] **BRF-02 · Add skeleton overlay (`--apply-skeleton`)**
+  - Add `XisoSkeleton.Apply(skeletonPath, sourceDirectory, outputPath, hashPath = null)` and CLI `--apply-skeleton <skeleton.xiso> <source-dir> -o <out.iso> [--hash <file>]`: read the skeleton's entry table/extents, place source file data at the recorded positions, preserve the skeleton's directory/system sectors, and verify the optional SHA-1 `.hash` while writing.
+  - This is the one-step inverse of `--petrify`; it reuses the existing `--sector-layout`/`XisoWriter` extent machinery rather than duplicating the allocator. Missing/extra files and hash mismatches are named errors by default.
+  - **Done when:** `Petrify` → `Apply` on the same files reproduces a byte-identical XISO on synthetic fixtures, the `.hash` verifies, and missing/extra/hash-mismatch cases fail with clear messages.
+
+- [ ] **BRF-03 · Read embedded `default.xex` metadata for GOD/STFS**
+  - Extend `title-info`/`XisoReader.GetTitleInfo` so a GOD container or XBLA/XBLIG package with `default.xex` also reports the XEX2/XDBF/XSRC publisher, developer, genre, description and `hasThumbnail`, merged into the existing XContent result; add the fields to the JSON model and the GUI title panel.
+  - Use the GOD logical stream for GOD and `StfsSharp.StfsPackage.ReadAllBytes` for STFS; reuse `XexDbdf`/`GetXexTitleInfo` parsing. Fall back cleanly to header-only metadata when `default.xex` is absent or unreadable.
+  - **Done when:** a synthetic GOD set and STFS package report the same XEX fields as reading `default.xex` from an equivalent extracted ISO, and the GUI panel matches `title-info --json`.
+
+- [ ] **BRF-04 · Export the XEX/XDBF thumbnail**
+  - Add `--xex-image <image> <internal-path> --type thumbnail -o <out.png>` (and the loose-file form once `BRF-09` lands); the XDBF `0x8000` entry is already captured in `XexTitleInfo.Thumbnail` (PNG payload in the synthetic fixtures).
+  - Validate/pass through the PNG payload, add a clean error for an absent or unsupported thumbnail, and render the preview in the GUI title panel.
+  - **Done when:** a synthetic XEX with a thumbnail exports a readable PNG, a missing thumbnail is a clean message, and the GUI preview matches the CLI export.
+
+- [ ] **BRF-05 · Generate per-file hash sidecars for any container**
+  - Add `XisoReader.ComputeFileHashSidecar(...)` and CLI `--file-hashes <image> [-o <file>] [--algorithm sha1|sha256|md5] [--json]`; the default output is the `<image stem>.hash` SHA-1 format consumed by `verify-hashes`.
+  - Support ISO, split ISO, CISO, CCI, GOD, STFS and ZAR through the existing container view. Keep `--petrify` behavior unchanged. Extend `verify-hashes` to detect SHA-1/SHA-256/MD5 line lengths so non-default sidecars verify too.
+  - **Done when:** the generated sidecar round-trips through `verify-hashes`, matches petrify's `.hash` for the same image, and container inputs produce identical hashes.
+
+- [ ] **BRF-06 · Parallelize collection verbs**
+  - Extend `--jobs 1..64` to multi-image `checksum`, `hash`, `-V`/audit and `--batch` extract/list/tree/rewrite; keep output ordering deterministic (including JSON arrays) and print the existing summaries at the end. Single-image semantics stay unchanged.
+  - **Done when:** `--jobs N` output is byte-identical to `--jobs 1`, cancellation stops new work, and multi-image batch tests cover success, failure and mixed results.
+
+- [ ] **BRF-07 · Add `compare` for two images**
+  - Add `XisoComparator.Compare(a, b)` and CLI `compare <a> <b> [--json] [--algorithm sha256]`: compare logical trees across ISO/split/CISO/CCI/GOD/ZAR, reporting only-in-A, only-in-B, size mismatches and per-file hash mismatches. Exit `0` identical, `2` different, `1` error (matching the `validate` convention).
+  - **Done when:** identical images compare equal across container formats, a single changed byte/path reports the exact file, and JSON output is snapshot-tested.
+
+- [ ] **BRF-08 · Expose the ZAR compression level**
+  - Add `--zar-level <1..22>` to `--zar` and `convert --format zar`, wired to `ZstdCompressionOptions.FromLevel`/`IZarBlockCompressor`; keep level `6` and the fixed 64 KiB ZAR block size as defaults (the block size is format-defined).
+  - **Done when:** levels `1`, `6` and `22` round-trip through ZArchiveSharp, the reference ZArchive reader opens the output, and default output stays byte-identical to today.
+
+- [ ] **BRF-09 · Accept loose `.xbe`/`.xex` inputs**
+  - Let `--xex-info`, `--xbe-info` and `--xbe-image` detect a standalone `.xex`/`.xbe` file and parse it directly, in addition to the current `<image> <internal-path>` form; the same parsers and JSON shape are used.
+  - **Done when:** a loose executable reports exactly the same fields as the same file read from an ISO, and the existing image-plus-path form is unchanged.
+
+- [ ] **BRF-10 · (P3, optional) Redump DAT verification**
+  - Add `verify-dat <dat> <image>... [--json]`: parse a Redump XML DAT (`game/rom` size + MD5/SHA-1), match each image by hashes, and report verified/missing/ambiguous entries. Reuse the full-image digest path (`hash`).
+  - This is a collection-management feature rather than an XISO operation; keep it opt-in and document that `docs/known-limitations.md` currently records DAT matching as not built in.
+  - **Done when:** a synthetic DAT verifies matching images, reports mismatches, and JSON output is covered; no dependency on a specific DAT source is added.
+
+- [ ] **BRF-11 · Enforce/report the Xbox 42-character filename limit**
+  - XDVDFS stores a one-byte name length, but Xbox and Xbox 360 tooling expects each path component to stay within the classic 42-character limit; over-long names currently surface as upstream `Invalid argument` errors (extract-xiso #74). Validate components during create, `--copy-in`, `build-image`, `--petrify` output and `Apply`; warn by default with the offending path and add `--strict-names` to fail before writing.
+  - Keep the Latin-1/Windows-1252 encoding contract, and turn non-encodable names, `+`/special characters and over-long components into actionable errors (extract-xiso #74/#81).
+  - **Done when:** a >42-character component warns and `--strict-names` fails before writing; names with `+`, `!`, spaces and Windows-1252 characters round-trip; the error names the file and the limit.
+
+- [ ] **BRF-12 · Lock deterministic packing**
+  - XISOSharp already sorts source entries (`XisoWriter` uses `StringComparer.Ordinal`) and accepts `--file-time 0`; add a `--deterministic` alias that implies `--file-time 0`, document exactly which inputs affect the bytes, and add repeated-pack regression tests for directory, `build-image`, `--layout` and memory-source packing (xdvdfs #101).
+  - **Done when:** packing the same source twice produces byte-identical output with `--deterministic`, repacking an image is stable, and the docs describe the guarantee.
+
+- [ ] **BRF-13 · Audit media-enable patching (`-m`)**
+  - Add a synthetic `.xbe` fixture containing the `E8 CA FD FF FF 85 C0 7D` signature; assert create and rewrite change the patch byte to `EB`, that `-m` leaves it untouched, and that the log/JSON reports the patched-file count.
+  - Keep the Boyer-Moore overlap-7 behavior; this verifies the upstream report that the reference patch can silently no-op (extract-xiso #68).
+  - **Done when:** create and rewrite tests cover patched/unpatched signatures, `-m` is honored in both modes, and the count is surfaced.
+
+- [ ] **BRF-14 · Add a create-time symlink policy**
+  - Add `--symlink-mode follow|skip|reject` (default: follow file symlinks and skip directory reparse points as today) for `-c`, `--pack`, `build-image` and `Apply`; `reject` fails with the link path and `skip` logs it.
+  - **Done when:** cyclic directory links terminate, each mode is tested, and the default output is unchanged (extract-xiso PR #83).
+
+- [ ] **BRF-15 · Improve host-I/O diagnostics**
+  - Map permission-denied, long-path, read-only destination, illegal-byte and name-collision failures to actionable messages naming the path, operation and likely fix; include the same detail in `--json` errors where applicable.
+  - **Done when:** tests cover permission, long-path and >42-character names on Windows/Linux, and no raw `Invalid argument`/`Permission denied` reaches the user without context (extract-xiso #69/#74/#81).
+
+### Suggested release split
+
+| Release | Items |
+|---|---|
+| **2.1.0** | `BRF-01`…`BRF-09`, `BRF-11`…`BRF-15` |
+| **2.2.0** (optional) | `BRF-10` |
+
+---
+
+## 8C. P2 — Upstream issue/PR scan (2026-11-07)
+
+> Reviewed the open and closed issue/PR lists of `XboxDev/extract-xiso` and
+> `antangelo/xdvdfs` on 2026-11-07. Conclusion: **there is no large missing
+> feature**. Nearly every feature request is already implemented in XISOSharp;
+> the remainder are platform/build questions, web/daemon/mounting work that
+> belongs to companion projects, or explicit non-goals. The actionable items
+> became `BRF-11`…`BRF-15`; the rest are recorded here so the scan is not
+> repeated.
+
+### Already implemented (no new work)
+
+| Upstream request | XISOSharp equivalent |
+|---|---|
+| extract-xiso #66 audit an XISO | `-V` deep audit |
+| extract-xiso #67 custom rewrite filename | `-r -o <name>` |
+| extract-xiso #33 `-o[ffset]` skip video partition | `--skip-sectors` |
+| extract-xiso #92 empty directories become files | empty-directory `0xFF` sentinel |
+| extract-xiso #26 preallocate output files | pre-sized/sparse extraction and writer |
+| extract-xiso #85 multiple ISO arguments | multi-image + `--batch` |
+| extract-xiso #95 large file / AVL failure | `XisoFileTooLargeException` + typed errors |
+| extract-xiso #25 OOM on invalid TOC | pathological-TOC guards |
+| xdvdfs #49 explicit sector layout | `--sector-layout` + `--layout` |
+| xdvdfs #54 unpack a single file | `--copy-out` |
+| xdvdfs #165 copy files into an image | `--copy-in` |
+| xdvdfs #62/#185 CCI support | CCISharp 1.1 integration |
+| xdvdfs #97 split XISO | `split`/`join` |
+| xdvdfs #93 batch convert + naming | `--batch` + `--output-name` |
+| xdvdfs #37/#155 image timestamps | `--file-time` / `--set-filetime` |
+| xdvdfs #121 show XGD offset in info | `-i` reports the disc format; full offset/layout in `BRF-01` |
+| xdvdfs #101 predictable pack output | sorted entries + `--file-time 0`; regression/alias in `BRF-12` |
+| xdvdfs #17 / extract-xiso #68 media patching | implemented in create/rewrite; audit in `BRF-13` |
+| extract-xiso #74/#81 long or special names | new `BRF-11` |
+| extract-xiso PR #83 symlinks | current follow-files/skip-directories policy; explicit modes in `BRF-14` |
+| extract-xiso #69 permission/long-path errors | new `BRF-15` |
+
+### Out of scope or not applicable
+
+| Upstream item | Why no XISOSharp action |
+|---|---|
+| extract-xiso #63 direct DVD-drive reading | permanent non-goal; implement `IBlockDevice` |
+| extract-xiso build/CI/readme/C++ modernization items | C-project maintenance, not library behavior |
+| xdvdfs #88 Python bindings | non-goal (managed .NET only) |
+| xdvdfs #100/#106/#116/#117/#119/#129/#131 desktop/FUSE/NFS/fsd | SimpleXisoDrive owns mounting; NFS/daemon work is out of scope |
+| xdvdfs #167/#120/#102/#114/#46/#36/#190 web UI items | `xdvdfs-web` is a separate Rust/browser app |
+| xdvdfs #187 web FileSystem permission errors | browser File System Access API limitation |
+| xdvdfs #192 `std` via `bincode` | Rust dependency detail |
+| xdvdfs #191 Steel Battalion Recomp | filed in the wrong repository (closed) |
+
+### New items created from the scan
+
+| Item | Upstream source | Summary |
+|---|---|---|
+| `BRF-11` | extract-xiso #74/#81 | Validate the 42-character Xbox name limit and improve name encoding errors |
+| `BRF-12` | xdvdfs #101 | Make determinism explicit (`--deterministic`) and regression-test repeated packing |
+| `BRF-13` | extract-xiso #68 / xdvdfs #17 | Prove `-m` and the media-enable patch actually change the expected bytes |
+| `BRF-14` | extract-xiso PR #83 | Add an explicit create-time symlink policy |
+| `BRF-15` | extract-xiso #69/#74/#81 | Turn host permission/long-path/encoding failures into actionable diagnostics |
+
+---
+
 ## 9. Implemented baseline (do not re-implement)
 
 | Area | Already implemented |
@@ -332,7 +535,7 @@
 | **Core XISO** | `XisoImage` facade, create, list, tree, extract, rewrite, validate, repair, salvage, checksum/hash, sector layout, explicit layout packing, pathological-TOC traversal, pre-sized extraction/writer I/O |
 | **Containers** | one detection layer for ISO, split ISO, CISO v1/v2, split CISO, CCI/CCIM, split CCI, ZAR, read-only GOD/SVOD, read-only XBLA/XBLIG STFS |
 | **Metadata** | XBE/XEX headers, XDBF/XSRC 360 metadata, GOD/STFS XContent title metadata, XBE logo/title/save images |
-| **CLI** | extract/list/tree/checksum/hash/verify-hashes/validate/title-info/xbe-image, compress/decompress/convert/split, batch, JSON, `--layout`, `--jobs` (CISO/extraction; CCI pending), `--name-policy`, `--delete-source` |
+| **CLI** | extract/list/tree/checksum/hash/verify-hashes/validate/title-info/xbe-image, compress/decompress/convert/split, batch, JSON, `--layout`, `--jobs` (CISO/CCI/extraction), `--name-policy`, `--delete-source` |
 | **1.6.0 scope** | A1 XDBF, A2 XBE assets, A3 FATX cap, A4 `--delete-source`, A5 GOD/STFS title naming, read-only GOD input, STFS package listing/extraction/validation, parallel CISO compression, parallel extraction, safe-extract policy, CWD-free writer/reader |
 | **1.7.0 scope** | `StfsSharp` extraction: standalone GOD/SVOD + STFS readers, NuGet 1.0.0, XISOSharp facades with an unchanged public API, moved tests/fixtures/fuzzer/benchmarks |
 | **CCISharp 1.1 scope** | LZ4-HC levels 10..12, parallel sector compression (`Jobs` 1..64, byte-identical), multi-digit split discovery, `CCISharp.Cli`, fuzz + benchmarks, `CCISharp 1.1.0` on NuGet |
@@ -352,7 +555,7 @@ All paths are under `References/`. These are **behaviour/format oracles** unless
 | `libCCI-0.1.0-1b0087e` | GPL-2.0-or-later | Normative CCI `FORMAT.md` and `cci_*` oracle | None — CCISharp 1.1 HC/parallel/multi-digit work verified |
 | `Xbox360Convert-1.0.1` | GPL-3.0 (no own license file; links XboxToolkit) | GOD input, FATX split point, delete-source, GOD title naming | None — A3/A4/A5 implemented in 1.6.0; reference only |
 | `XboxKit-0.7` | Permissive (upstream) | Redump/ZAR parity baseline | None — XRD is deferred |
-| `XboxToolkit-main` | GPL-3.0-only | GOD/STFS read, XEX XDBF metadata, XBE image assets | GUI surfaces (`GUI-*`); `StfsSharp` extraction done in 1.7.0 |
+| `XboxToolkit-main` | GPL-3.0-only | GOD/STFS read, XEX XDBF metadata, XBE image assets | GUI surfaces (`GUI-*`); planned `BRF-03`/`BRF-04` use it as a behaviour oracle; `StfsSharp` extraction done in 1.7.0 |
 | `xdvdfs-0.8.3` | MIT | CISO/split/checksum/CLI parity baseline | None |
 | `XDVDFS-TR-0.8.4-TR` | MIT | `xdvdfs-cci` (covered by CCISharp); `xdvdfs-fsd`/`xdvdfs-web` reviewed | None in XISOSharp — NFS/WASM are out of scope |
 | `XeCrypt-main` | MIT | XBE certificate/STFS hash-tree reference | None — signature verification is excluded; STFS hash tree is already implemented independently |
@@ -365,6 +568,7 @@ All paths are under `References/`. These are **behaviour/format oracles** unless
 - CISO/checksum: `xdvdfs 0.8.3` is the byte-parity baseline.
 - Core XISO/CLI: `extract-xiso` build `202609111233` is the parity/oracle baseline.
 - GOD/STFS: `XboxToolkit`/`Xbox360Convert` are behaviour references only.
+- Upstream issue/PR scan: `extract-xiso` and `xdvdfs` were reviewed on 2026-11-07; no missing feature beyond `BRF-11`…`BRF-15` (see [§8C](#8c-p2--upstream-issuepr-scan-2026-11-07)).
 
 ---
 
@@ -397,7 +601,7 @@ For every item that changes code:
 - Unit + integration + parity/interop + CLI contract tests added.
 - Synthetic fixtures only; no copyrighted game data and no GPL binaries.
 - Docs, READMEs and release notes updated in the same change.
-- Full suite green on the supported TFM matrix (currently `net8.0`/`net9.0`/`net10.0`; see `LIB-07`); `dotnet format` clean; InspectCode 0 warnings; trim/AOT analyzers clean.
+- Full suite green on the supported TFM matrix (currently `net8.0`/`net9.0`/`net10.0`; retained by `FAC-02`); `dotnet format` clean; InspectCode 0 warnings; trim/AOT analyzers clean.
 - `dotnet pack` succeeds with package validation.
 - No deletion of files under `bin/Release`, `publish*` or release zips (see `AGENTS.md`).
 
@@ -475,6 +679,9 @@ docker run --rm xisosharp -v
 | 2026-11-07 | `XRP-02` XISOStudio | — | XISOSharp 1.8.0; GOD input (file/folder pickers); title metadata panel; XBE logo/title/save preview; 1,561 tests; real GOD metadata verified. First CI flagged four solution-wide InspectCode suggestions; fixed in `0c43f02`; follow-up CI run `42405778091` green including InspectCode and all six publishes |
 | 2026-11-07 | `XRP-03` ZArchiveSharp | — | `ZArchiveSharp.Fuzz` + CI fuzz-smoke (16,385 iterations/0 failures); `ZarReaderBenchmarks` + documented baseline; fuzzer found and fixed NUL-name extraction exception; 4,293 tests × 3 TFMs + 43 CLI; CI run `42405322199` green including fuzz-smoke and pack |
 | 2026-11-07 | Documentation refresh | 1.8.x | XISOSharp README/library now list SimpleXisoDrive and XISO Studio as downstream `XisoImage` consumers; SimpleXisoDrive Architecture, Virtual File System and Contributing now describe `XisoImage` instead of the old `XisoExplorer`; plan/handoff finalized; XISOSharp code CI green (`f3c8a98`) and the docs-only follow-up is committed |
+| 2026-11-07 | Plan extended with 2.0.0 + 2.1.0 tracks | — | Owner decision: keep `net8.0`/`net9.0`/`net10.0`; added `FAC-01`/`FAC-02` (facade removal only) and `BRF-01`…`BRF-10` (beyond-reference features, later extended to `BRF-15` by the upstream scan). Planned, not started. |
+| 2026-11-07 | Upstream issue/PR scan | — | Reviewed the `extract-xiso` and `xdvdfs` issue/PR lists; most requests are already covered; added `BRF-11`…`BRF-15` and [§8C](#8c-p2--upstream-issuepr-scan-2026-11-07). No product code changed. |
+| 2026-11-07 | `DOC-04` companion README links | 1.8.x | Root, library (NuGet readme), CLI and `docs/library.md` now link SimpleXisoDrive, XISO Studio, StfsSharp, CCISharp and ZArchiveSharp. |
 
 ---
 
@@ -484,7 +691,9 @@ docker run --rm xisosharp -v
 cross-repo XRP-01/02/03 upgrades are implemented, committed and pushed. Their
 CI is green (SimpleXisoDrive `42405304528`, XISOStudio `42405778091`,
 ZArchiveSharp `42405322199`). The XISOSharp repository itself has no
-product-source changes from this session beyond the plan/CI fix.
+product-source changes from this session beyond the plan/CI fix. The plan was
+extended the same day with the 2.0.0 facade-removal track and the 2.1.0
+beyond-reference track; neither is started.
 
 ### Completed locally
 
@@ -510,10 +719,10 @@ product-source changes from this session beyond the plan/CI fix.
 1. The three companion repositories are committed and pushed; their CI is green
    (including ZArchiveSharp's 120-second `fuzz-smoke` and XISOStudio's
    solution-wide InspectCode).
-2. The only open plan items are **XRP-04** (optional; another consumer
-   repository) and **DST-01/DST-02** (awaits real signing certificates). The
-   next product release remains **2.0.0** (facade removal and
-   `net8.0`/`net9.0` drop).
+2. The next product work is **2.0.0** (`FAC-01`/`FAC-02`): remove the
+   `StfsSharp` facades but **keep `net8.0`/`net9.0`/`net10.0`**. After that,
+   start **2.1.0** (`BRF-01`…`BRF-15`). **XRP-04** (another consumer repository)
+   is optional and **DST-01/DST-02** await real signing certificates.
 3. Do not delete anything under `bin/Release`, `publish*` or the release zips.
 
 ### DST-01/DST-02 signing checklist
@@ -533,9 +742,9 @@ the published nupkg/snupkg, `signtool verify /pa` on both Windows bundles, and
 
 - `XRP-01`/`XRP-02`/`XRP-03` are done; `XRP-04` (other consumers, optional) is
   the only open cross-repo item.
-- The next product release remains **2.0.0** (facade removal and
-  `net8.0`/`net9.0` drop); the distribution work can ship earlier as 1.9.0 if
-  desired.
+- The next product release is **2.0.0** (`FAC-01`/`FAC-02`: remove the
+  `StfsSharp` facades, keep `net8.0`/`net9.0`/`net10.0`), followed by **2.1.0**
+  (`BRF-01`…`BRF-09`, `BRF-11`…`BRF-15`) and optional **2.2.0** (`BRF-10`).
 - After every release run
   `./scripts/update-packaging.ps1 -Version <version>` and commit the refreshed
   winget/Scoop/Homebrew files.

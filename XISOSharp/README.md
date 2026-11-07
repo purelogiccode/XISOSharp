@@ -19,12 +19,26 @@
 
 A pure C# class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. A direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool from C to C# - byte-identical output, no native dependencies - extended with the archival power of [XboxKit](https://github.com/Deterous/XboxKit) (Redump video/filler/seed/wipe/trim/petrify/update/rebuild, ZAR) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) (build-image remapping, CISO compress/decompress, checksums). Container input is unified through `XisoImageSource`: plain ISO, split `.1.iso` sets, CISO/CSO (v1/v2, single or split), CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), read-only GOD/SVOD sectors, and ZAR for listing/extraction/conversion; single-file XBLA/XBLIG STFS packages are read directly through the `StfsPackage` facade over [StfsSharp](https://github.com/purelogiccode/STFSSharp). All logic - including the AVL tree, Boyer-Moore search, XISO header verification, directory traversal, format rewriting, and media-enable patching - is ported directly from the reference C implementation.
 
+## Companion projects
+
+XISOSharp is part of a small Xbox image toolchain:
+
+- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** — read-only Dokan/FUSE drive that mounts ISO/CISO and GOD/SVOD sources through `XisoImage`/`XisoImageSource`, plus CHD and ZAR through their dedicated readers.
+- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** — desktop converter/explorer with GOD/SVOD input, the title metadata panel and XBE logo/title/save previews.
+- **[StfsSharp](https://github.com/purelogiccode/STFSSharp)** — standalone read-only GOD/SVOD and XBLA/XBLIG STFS reader consumed by this package.
+- **[CCISharp](https://github.com/purelogiccode/CCISharp)** — CCI/CCIM reader/writer consumed by this package.
+- **[ZArchiveSharp](https://github.com/purelogiccode/ZArchiveSharp)** — ZArchive/zstd reader/writer consumed by this package.
+
+SimpleXisoDrive and XISO Studio consume the `XisoImage` facade and `XbeAssets` in-process;
+the three library packages remain standalone NuGet dependencies for their own readers.
+
 Full documentation (getting started, CLI reference, archival workflows, library API) lives in the [docs folder on GitHub](https://github.com/purelogiccode/XISOSharp/tree/master/docs).
 
 ---
 
 ## Table of Contents
 
+- [Companion Projects](#companion-projects)
 - [Installation](#installation)
 - [Supported Disc Formats](#supported-disc-formats)
 - [Quick Start](#quick-start)

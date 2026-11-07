@@ -23,6 +23,12 @@ This project is a direct conversion of the [extract-xiso](https://github.com/Xbo
 
 Reader probing also accepts rebuilt "sector-0" XISOs (volume descriptor at absolute offset 0, `DescriptorSector = 0`): extract/list/tree/info, `--filetime`, `--sector-layout`, `--ranges`, `--copy-in`, and ZAR packing all work on them. `rebuild` rejects them with a clear error — repack to the standard sector-32 layout first.
 
+## Companion projects
+
+- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** — read-only Dokan/FUSE drive that mounts ISO/CISO and GOD/SVOD sources through `XisoImage`/`XisoImageSource`, plus CHD and ZAR through their dedicated readers.
+- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** — desktop converter/explorer with GOD/SVOD input, the title metadata panel and XBE logo/title/save previews.
+- **[StfsSharp](https://github.com/purelogiccode/STFSSharp)**, **[CCISharp](https://github.com/purelogiccode/CCISharp)** and **[ZArchiveSharp](https://github.com/purelogiccode/ZArchiveSharp)** — the standalone reader/writer packages consumed by the CLI.
+
 ## Install
 
 ```bash

@@ -23,13 +23,18 @@
 
 A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) for Xbox ISO (XISO / XDVDFS) images — **byte-identical** output, no native dependencies, no P/Invoke, just .NET. Beyond the C baseline it merges the archival power of [XboxKit](https://github.com/Deterous/XboxKit) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) into one trimmable, AOT-compatible library + CLI.
 
-## Downstream consumers
+## Companion projects
 
-- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** mounts ISO/CISO and GOD/SVOD sources through `XisoImage`/`XisoImageSource`, plus CHD and ZAR through their dedicated readers (read-only Dokan/FUSE).
-- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** converts and explores Xbox images, including GOD/SVOD input, the title metadata panel and XBE logo/title/save previews.
+XISOSharp is one part of a small Xbox image toolchain:
 
-Both consume the `XisoImage` facade and `XbeAssets` in-process; `StfsSharp`, `CCISharp` and
-`ZArchiveSharp` remain standalone packages for their own readers.
+- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** — read-only Dokan/FUSE drive that mounts ISO/CISO and GOD/SVOD sources through `XisoImage`/`XisoImageSource`, plus CHD and ZAR through their dedicated readers.
+- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** — desktop converter/explorer with GOD/SVOD input, the title metadata panel and XBE logo/title/save previews.
+- **[StfsSharp](https://github.com/purelogiccode/STFSSharp)** — standalone read-only GOD/SVOD and XBLA/XBLIG STFS reader used by XISOSharp.
+- **[CCISharp](https://github.com/purelogiccode/CCISharp)** — CCI/CCIM reader/writer used by XISOSharp.
+- **[ZArchiveSharp](https://github.com/purelogiccode/ZArchiveSharp)** — ZArchive/zstd reader/writer used by XISOSharp.
+
+SimpleXisoDrive and XISO Studio consume the `XisoImage` facade and `XbeAssets` in-process;
+the three library packages remain standalone dependencies for their own readers.
 
 ## Projects
 

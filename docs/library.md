@@ -4,7 +4,7 @@
 **`XISOSharp`** and contains the complete XISO read/write engine plus CCI
 (`CCISharp`) and ZAR (`ZArchiveSharp`) container support.
 
-- [Downstream consumers](#downstream-consumers)
+- [Companion projects](#companion-projects)
 - [Packaging & compatibility](#packaging--compatibility)
 - [Namespaces and types](#namespaces-and-types)
 - [Container input](#container-input)
@@ -14,17 +14,17 @@
 - [Quick samples](#quick-samples)
 - [Async and cancellation](#async-and-cancellation)
 
-## Downstream consumers
+## Companion projects
 
 The companion applications use the same library surface:
 
-- **SimpleXisoDrive** mounts ISO/CISO and GOD/SVOD sources read-only through
+- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** mounts ISO/CISO and GOD/SVOD sources read-only through
   `XisoImage`/`XisoImageSource`, and CHD/ZAR through their dedicated readers (Dokan on Windows,
   FUSE 3 on Linux/macOS).
-- **XISO Studio** converts and explores Xbox images, including GOD/SVOD input, a title metadata
+- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** converts and explores Xbox images, including GOD/SVOD input, a title metadata
   panel and XBE logo/title/save previews through `XbeAssets`.
 
-The `StfsSharp`, `CCISharp` and `ZArchiveSharp` packages remain usable on their own; XISOSharp
+The [StfsSharp](https://github.com/purelogiccode/STFSSharp), [CCISharp](https://github.com/purelogiccode/CCISharp) and [ZArchiveSharp](https://github.com/purelogiccode/ZArchiveSharp) packages remain usable on their own; XISOSharp
 consumes them for GOD/SVOD, CCI and ZAR support and keeps compatibility facades for its existing
 public types.
 
