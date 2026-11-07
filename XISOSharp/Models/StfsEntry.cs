@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace XISOSharp.Models;
 
 /// <summary>
@@ -13,6 +15,8 @@ namespace XISOSharp.Models;
 /// <param name="IsContiguous">Whether the allocated blocks are consecutive.</param>
 /// <param name="Created">Creation time decoded from the FAT timestamp, or <c>null</c> when absent/invalid.</param>
 /// <param name="Modified">Last-write time decoded from the FAT timestamp, or <c>null</c> when absent/invalid.</param>
+[SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global",
+    Justification = "Public API compatibility: every field is consumer-facing metadata.")]
 public sealed record StfsEntry(
     string Path,
     string Name,

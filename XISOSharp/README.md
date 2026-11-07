@@ -17,7 +17,7 @@
 [![Release date](https://img.shields.io/github/release-date/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/releases/latest)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://purelogiccode.github.io/XISOSharp/)
 
-A pure C# class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. A direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool from C to C# - byte-identical output, no native dependencies - extended with the archival power of [XboxKit](https://github.com/Deterous/XboxKit) (Redump video/filler/seed/wipe/trim/petrify/update/rebuild, ZAR) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) (build-image remapping, CISO compress/decompress, checksums). Container input is unified through `XisoImageSource`: plain ISO, split `.1.iso` sets, CISO/CSO (v1/v2, single or split), CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), read-only GOD/SVOD sectors, and ZAR for listing/extraction/conversion; single-file XBLA/XBLIG STFS packages are read directly through `StfsPackage`. All logic - including the AVL tree, Boyer-Moore search, XISO header verification, directory traversal, format rewriting, and media-enable patching - is ported directly from the reference C implementation.
+A pure C# class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. A direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool from C to C# - byte-identical output, no native dependencies - extended with the archival power of [XboxKit](https://github.com/Deterous/XboxKit) (Redump video/filler/seed/wipe/trim/petrify/update/rebuild, ZAR) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) (build-image remapping, CISO compress/decompress, checksums). Container input is unified through `XisoImageSource`: plain ISO, split `.1.iso` sets, CISO/CSO (v1/v2, single or split), CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), read-only GOD/SVOD sectors, and ZAR for listing/extraction/conversion; single-file XBLA/XBLIG STFS packages are read directly through the `StfsPackage` facade over [StfsSharp](https://github.com/purelogiccode/STFSSharp). All logic - including the AVL tree, Boyer-Moore search, XISO header verification, directory traversal, format rewriting, and media-enable patching - is ported directly from the reference C implementation.
 
 Full documentation (getting started, CLI reference, archival workflows, library API) lives in the [docs folder on GitHub](https://github.com/purelogiccode/XISOSharp/tree/master/docs).
 
@@ -100,7 +100,7 @@ accepts these sources through `XisoReader.OpenImageStream`:
 | `game.1.iso` … | Split plain ISO, concatenated and seekable; a missing middle part throws. |
 | `.cso`, `.1.cso` | CISO v1/v2, single or split, decompressed on demand (`CisoBlockDevice`). |
 | `.cci`, `.1.cci` | CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), single or split (`CciBlockDevice`). |
-| GOD header or `<header>.data` | GOD/SVOD sector input: `DataNNNN` fragments are mapped to the logical image through `GodBlockDevice` (read-only). |
+| GOD header or `<header>.data` | GOD/SVOD sector input: `DataNNNN` fragments are mapped to the logical image through `GodBlockDevice` (read-only, StfsSharp-backed). |
 | `.zar` | ZArchive name tree: list/extract/checksum/validate/convert (`XisoZarchive`), not a sector image. |
 
 Detection is extension-led with a `CISO`/`CCIM` magic sniff fallback, so renamed
@@ -388,7 +388,8 @@ public sealed record GodVolumeInfo(
 `path` may be the header file or its `.data` directory. `TryReadVolume`
 parses the SVOD descriptor and fragment list; `GodBlockDevice` exposes the
 sector mapping as a read-only `IBlockDevice`, so every read verb accepts a GOD
-container. In-place `Repair`, `CopyIntoImage`, `SetFileTime`, rewrite and split
+container. `GodBlockDevice` and `GodHeader` are compatibility facades over the
+standalone StfsSharp package (`GodVolume`/`GodHeader`). In-place `Repair`, `CopyIntoImage`, `SetFileTime`, rewrite and split
 refuse GOD and ask for `decompress` first.
 
 #### Single-file STFS package metadata (`StfsHeader`)
@@ -419,7 +420,9 @@ Supported content types are XBLA `0x000D0000` and XBLIG `0x00000002`
 
 `StfsPackage` reads the file table and file data behind the STFS hash tables,
 so an XBLA/XBLIG package can be listed and extracted without converting it to
-an ISO:
+an ISO. The type is a compatibility facade over the standalone
+[StfsSharp](https://github.com/purelogiccode/STFSSharp) package; the public
+XISOSharp model types are preserved until 2.0.0.
 
 ```csharp
 public sealed class StfsPackage : IDisposable

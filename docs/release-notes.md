@@ -1,5 +1,33 @@
 # Release Notes
 
+## 1.7.0
+
+**Release date:** 2026-11-07.
+
+**StfsSharp extraction.** The GOD/SVOD and single-file XBLA/XBLIG STFS
+readers now live in the standalone MIT package
+[`StfsSharp`](https://www.nuget.org/packages/StfsSharp) 1.0.0. XISOSharp
+consumes it as a NuGet dependency and keeps its historical public types as
+thin facades, so no read verb changes behavior:
+
+- `GodHeader`, `StfsHeader` and `StfsPackage` map the StfsSharp models to the
+  existing XISOSharp records.
+- `GodBlockDevice` is an `IBlockDevice` adapter over `StfsSharp.GodVolume`.
+- `XisoChecksum.ComputeStfsChecksum` and the CLI/GUI paths are unchanged.
+- The facades are scheduled for removal in XISOSharp 2.0.0; consumers can move
+  to `StfsSharp` directly.
+
+`StfsSharp` adds a standalone public surface for the moved readers:
+`GodVolume`/`GodVolumeStream`, `StfsPackage.Open`/`ReadFileChunks`, extraction
+progress (`StfsProgress`), safe-name policies, and deep hash-tree validation.
+Its suite covers synthetic packages, a deterministic mutation fuzzer,
+BenchmarkDotNet cases and optional real-corpus checks (XBLA, XBLIG and
+GOD/SVOD). No on-disk format behavior changed.
+
+Full suite green on all three targets: **2101 passed / 1 opt-in skip (2102) on
+net8.0/net9.0** and **2165 passed / 1 opt-in skip (2166) on net10.0**;
+InspectCode 0 warnings, `dotnet format` clean, package validation passes.
+
 ## 1.6.0
 
 **Release date:** 2026-11-06

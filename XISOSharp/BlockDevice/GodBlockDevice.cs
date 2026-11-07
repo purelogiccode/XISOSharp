@@ -1,5 +1,6 @@
 using XISOSharp.Interfaces;
 using XISOSharp.Models;
+using SharpGodVolume = StfsSharp.GodVolume;
 
 namespace XISOSharp.BlockDevice;
 
@@ -18,28 +19,16 @@ namespace XISOSharp.BlockDevice;
 /// device exposes only the sector data, not the hash tables.
 /// </para>
 /// <para>
-/// Reads are serialized on an internal lock, so one instance can be shared by
-/// concurrent readers. The device is read-only; <see cref="Write"/> throws
-/// <see cref="NotSupportedException"/>.
+/// This is a compatibility adapter over the standalone
+/// <see href="https://www.nuget.org/packages/StfsSharp">StfsSharp</see>
+/// <c>GodVolume</c> reader. Reads are serialized by the volume, so one
+/// instance can be shared by concurrent readers. The device is read-only;
+/// <see cref="Write"/> throws <see cref="NotSupportedException"/>.
 /// </para>
 /// </remarks>
 public sealed class GodBlockDevice : IBlockDevice
 {
-    private const int SectorSize = Constants.SectorSize;
-    private const long SectorsPerDataFile = 0x14388;
-    private const long SectorsPerHashBlock = 0x198;
-    private const long HashBlockSize = 0x1000;
-    private const long DataAreaOffset = 0x2000;
-    private const long MaxFragmentSize = 0xA290000;
-    private const long SecuritySector = 0x20;
-    private const long SecuritySectorOffsetNormal = 0x12000;
-    private const long SecuritySectorOffsetEnhanced = 0x2000;
-
-#pragma warning disable MA0158 // object keeps net8 compat (System.Threading.Lock is net9+)
-    private readonly object _sync = new();
-#pragma warning restore MA0158
-    private readonly FileStream[] _fragments;
-    private bool _disposed;
+    private readonly SharpGodVolume _volume;
 
     /// <summary>Opens a GOD container (header file or its <c>.data</c> directory).</summary>
     /// <param name="path">GOD header path or the matching <c>.data</c> directory.</param>
@@ -68,44 +57,8 @@ public sealed class GodBlockDevice : IBlockDevice
     public GodBlockDevice(string path, FileShare share)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-
-        if (!GodHeader.TryReadVolume(path, share, out GodVolumeInfo? info))
-        {
-            if (!File.Exists(path) && !Directory.Exists(path))
-                throw new FileNotFoundException($"GOD container not found: {path}", path);
-
-            throw new InvalidDataException($"Not a valid GOD/SVOD container: {path}");
-        }
-
-        Info = info;
-        List<FileStream> fragments = new(info.Parts.Count - 1);
-        try
-        {
-            for (int index = 0; index < info.Parts.Count - 1; index++)
-            {
-                fragments.Add(new FileStream(
-                    info.Parts[index + 1],
-                    new FileStreamOptions
-                    {
-                        Mode = FileMode.Open,
-                        Access = FileAccess.Read,
-                        Share = share,
-                        BufferSize = 1 << 16,
-                        Options = FileOptions.RandomAccess,
-                    }));
-            }
-        }
-        catch
-        {
-            foreach (FileStream fragment in fragments)
-            {
-                fragment.Dispose();
-            }
-
-            throw;
-        }
-
-        _fragments = fragments.ToArray();
+        _volume = SharpGodVolume.Open(path, share);
+        Info = GodHeader.Map(_volume.Info);
     }
 
     /// <summary>Parsed header and fragment metadata.</summary>
@@ -118,119 +71,15 @@ public sealed class GodBlockDevice : IBlockDevice
     public string DataDirectory => Info.DataDirectory;
 
     /// <summary>Logical uncompressed image length in bytes.</summary>
-    public long Length => Info.Length;
+    public long Length => _volume.Length;
 
     /// <inheritdoc/>
-    public int Read(long offset, Span<byte> buffer)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(offset);
-
-        lock (_sync)
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            if (buffer.IsEmpty) return 0;
-
-            long length = Info.Length;
-            if (offset >= length) return 0;
-
-            int toRead = (int)Math.Min(buffer.Length, length - offset);
-            int total = 0;
-            long position = offset;
-            while (total < toRead)
-            {
-                long sector = position / SectorSize;
-                int offsetInSector = (int)(position % SectorSize);
-                int chunk = Math.Min(toRead - total, SectorSize - offsetInSector);
-
-                if (IsZeroFilled(sector))
-                {
-                    buffer.Slice(total, chunk).Clear();
-                }
-                else
-                {
-                    MapSector(sector, out int fragmentIndex, out long fragmentOffset);
-                    FileStream fragment = _fragments[fragmentIndex];
-                    fragment.Seek(fragmentOffset + offsetInSector, SeekOrigin.Begin);
-                    int read = fragment.Read(buffer.Slice(total, chunk));
-                    if (read != chunk)
-                    {
-                        throw new InvalidDataException(
-                            $"GOD data fragment is truncated at sector {sector} " +
-                            $"(fragment {fragmentIndex}, offset {fragmentOffset + offsetInSector}).");
-                    }
-                }
-
-                total += chunk;
-                position += chunk;
-            }
-
-            return total;
-        }
-    }
+    public int Read(long offset, Span<byte> buffer) => _volume.Read(offset, buffer);
 
     /// <inheritdoc/>
     public void Write(long offset, ReadOnlySpan<byte> buffer) =>
         throw new NotSupportedException("GOD containers are read-only through this block device.");
 
     /// <inheritdoc/>
-    public void Dispose()
-    {
-        lock (_sync)
-        {
-            if (_disposed) return;
-            _disposed = true;
-            foreach (FileStream fragment in _fragments)
-            {
-                fragment.Dispose();
-            }
-        }
-    }
-
-    private bool IsZeroFilled(long sector)
-    {
-        if (sector is SecuritySector or SecuritySector + 1)
-            return false;
-
-        return sector < (long)Info.StartingBlock * 2;
-    }
-
-    private void MapSector(long sector, out int fragmentIndex, out long fragmentOffset)
-    {
-        if (sector is SecuritySector or SecuritySector + 1)
-        {
-            fragmentIndex = 0;
-            fragmentOffset = (Info.EnhancedGdf
-                ? SecuritySectorOffsetEnhanced
-                : SecuritySectorOffsetNormal) + (sector - SecuritySector) * SectorSize;
-            return;
-        }
-
-        long trueBlock = sector - (long)Info.StartingBlock * 2;
-        if (Info.EnhancedGdf)
-            trueBlock += 2;
-
-        long fileIndex = trueBlock / SectorsPerDataFile;
-        long fileBlock = trueBlock % SectorsPerDataFile;
-        long level0Tables = (fileBlock / SectorsPerHashBlock) + 1;
-        long level1Tables = (level0Tables / 0xA1C4) + 1;
-        long offset = fileBlock * SectorSize + (level0Tables + level1Tables) * HashBlockSize;
-
-        // A fragment that would cross the 0xA290000-byte boundary rolls into
-        // the next fragment; the first two hash tables of the new fragment are
-        // skipped by the +0x2000 rule (xenia BlockToOffsetSVOD).
-        if (offset >= MaxFragmentSize)
-        {
-            fileIndex++;
-            offset = (offset % MaxFragmentSize) + DataAreaOffset;
-        }
-
-        if (fileIndex >= _fragments.Length)
-        {
-            throw new InvalidDataException(
-                $"GOD container references data fragment {fileIndex}, but only {_fragments.Length} exist.");
-        }
-
-        fragmentIndex = (int)fileIndex;
-        fragmentOffset = offset;
-    }
+    public void Dispose() => _volume.Dispose();
 }

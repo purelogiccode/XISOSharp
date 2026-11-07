@@ -79,6 +79,10 @@
              The library lives in the sibling CSharp_CCISharp repo; local changes there are
              consumed here by publishing a new package version. -->
     <PackageReference Include="CCISharp" Version="1.0.1" />
+    <!-- StfsSharp is consumed as a NuGet package (https://www.nuget.org/packages/StfsSharp).
+             The library lives in the sibling CSharp_STFSSharp repo; local changes there
+             are consumed here by publishing a new package version. -->
+    <PackageReference Include="StfsSharp" Version="1.0.0" />
   </ItemGroup>
 
   <ItemGroup>

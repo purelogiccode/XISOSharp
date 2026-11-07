@@ -43,7 +43,7 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` | Unified detection and open (`TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`) for ISO, split ISO, CISO, CCI, GOD/SVOD, split variants and ZAR |
 | `XisoCci` / `CciBlockDevice` | CCI/CCIM compression, extraction, default names and random access (CCISharp-backed) |
 | `XisoZarchive` (read APIs) | `ListZar`, `ExtractZar`, `ConvertZarToIso` alongside the existing `CreateZar` |
-| `StfsPackage` / `StfsEntry` / `StfsPackageInfo` | Read-only XBLA/XBLIG single-file STFS package: file table, hash-chain block lists, `Find`, `ReadAllBytes`, `CopyTo`, `ExtractTo`, `Validate` hash-tree verification and volume/title metadata |
+| `StfsPackage` / `StfsEntry` / `StfsPackageInfo` | Read-only XBLA/XBLIG single-file STFS package (StfsSharp-backed facade): file table, hash-chain block lists, `Find`, `ReadAllBytes`, `CopyTo`, `ExtractTo`, `Validate` hash-tree verification and volume/title metadata |
 | [`XisoExplorer`](api-utilities.md#xisoexplorer--xisoattributes) / [`XisoAttributes`](api-utilities.md#xisoexplorer--xisoattributes) | In-place exploration (list/get/copy/hash/XEX/XBE, bounded `OpenReadStream`, keep-open VFS mode) + Windows attribute mapping |
 | [`XisoWriter`](api-xisowriter.md) | Create and rewrite images + `build-image` remap (`CreateFromRemapTree`) |
 | [`XisoPatcher`](api-xisoreader.md#copyin) / [`DirectoryEntryTableWriter`](api-xisowriter.md#directoryentrytablewriter) | In-place file patching (`CopyIntoImage`) + single-table build/serialize primitive |
@@ -57,7 +57,7 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | [`XisoRanges`/`XisoSkeleton`/`XgdTables`/`XboxPrng`/`SecuritySectors`](api-utilities.md) | Redump archival: ranges, skeleton/SHA-1, wave tables, PRNG seed, `sectors.txt` |
 | [`XisoRedump`/`XisoOperations`/`XisoZarchive`](api-utilities.md) | Video/filler/wipe/trim/petrify/update/ZAR/rebuild |
 | [`XisoChecksum` / `CisoWriter`/`CisoReader`](api-utilities.md) | SHA3-256 image checksum + CISO compress/decompress |
-| [`BlockDevice/*`](api-utilities.md#blockdevice) | `IBlockDevice` + `File`/`Memory`/`Offset`/`Stream`/`Ciso`/`Cci`/`God` devices |
+| [`BlockDevice/*`](api-utilities.md#blockdevice) | `IBlockDevice` + `File`/`Memory`/`Offset`/`Stream`/`Ciso`/`Cci`/`God` devices (`GodBlockDevice` is StfsSharp-backed) |
 | [`RemapFilesystem`](api-utilities.md) | Ordered `host→image` remapping, `xdvdfs.toml`, `GenerateSpecText`, `DryRunRemap` |
 | Records/enums | `VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `XexTitleInfo`, `XbeInfo`, `XbeImage`, `TitleInfo`/`TitleKind`, `RemapRule`, `XisoLayoutSpec`, `XisoLayoutEntry`, `ProgressInfo`, `ExtractMode`, … |
 | Exceptions | `XisoFormatException`, `XisoEmptyException`, `XisoFileTooLargeException`, `ExtractErrorException` |
@@ -109,7 +109,8 @@ or `NotSupportedException` (ZAR) rather than returning a partially valid view.
 ## XBLA/XBLIG STFS packages
 
 A single-file XBLA or XBLIG package is an STFS file system, not an XISO sector
-image, so it has its own reader instead of `XisoImageSource`:
+image, so it has its own reader instead of `XisoImageSource` (the XISOSharp
+type is a facade over the standalone StfsSharp package):
 
 ```csharp
 using StfsPackage package = StfsPackage.Open(@"C:\games\4D5307E6");

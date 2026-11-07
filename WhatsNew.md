@@ -1,3 +1,29 @@
+# What's New in 1.7.0
+
+_Release date: 2026-11-07._
+
+XISOSharp 1.7.0 extracts the GOD/SVOD and single-file XBLA/XBLIG STFS readers
+into the standalone MIT package
+[`StfsSharp`](https://www.nuget.org/packages/StfsSharp) 1.0.0. The existing
+XISOSharp API is preserved through thin facades, so `title-info`, `list`,
+`extract`, `checksum` and `-V` output is unchanged.
+
+- **StfsSharp dependency**: `XISOSharp` now references `StfsSharp` 1.0.0 from
+  NuGet. `GodHeader`, `StfsHeader`, `StfsPackage` and `GodBlockDevice` map the
+  StfsSharp models/readers to the existing public records and interfaces.
+- **Standalone readers**: `StfsSharp.GodVolume`/`GodVolumeStream` expose a GOD
+  container as a seekable read-only stream; `StfsSharp.StfsPackage` adds
+  `ReadFileChunks`, extraction progress and warning channels.
+- **Facade removal plan**: the XISOSharp facades stay through 1.x and are
+  removed in 2.0.0, after which consumers use `StfsSharp` directly.
+- **Tests**: the moved unit tests now run in the StfsSharp repository; XISOSharp
+  keeps integration tests, including facade parity checks. The XISOSharp suite
+  is **2101 passed / 1 opt-in skip** on net8.0/net9.0 and **2165 passed / 1
+  opt-in skip** on net10.0.
+- **Verification**: InspectCode 0 warnings, `dotnet format` clean, package
+  validation green, and the real XBLA/XBLIG/GOD corpus opens and validates
+  through both the StfsSharp API and the XISOSharp CLI.
+
 # What's New in 1.6.0
 
 _Release date: 2026-11-06._

@@ -1,17 +1,17 @@
 # XISOSharp — Remaining Work Plan
 
-- **Updated:** 2026-11-06
+- **Updated:** 2026-11-07
 - **Latest release:** XISOSharp **1.6.0** (2026-11-06)
-- **Working tree:** 1.6.0 released, tagged `1.6.0` (`350f629`)
-- **Next releases:** 1.7.0 (`StfsSharp`) → CCISharp 1.1 (parallel track)
-- **Packages:** XISOSharp `1.6.0`, CCISharp `1.0.1`, ZArchiveSharp `1.4.0`
+- **Working tree:** StfsSharp extraction complete; XISOSharp 1.7.0 release gate pending
+- **Next releases:** 1.7.0 (`StfsSharp`, code-complete) → CCISharp 1.1 (parallel track)
+- **Packages:** XISOSharp `1.6.0`, StfsSharp `1.0.0`, CCISharp `1.0.1`, ZArchiveSharp `1.4.0`
 - **Scope of this file:** only work that is still open. Implemented features are listed once in [§9](#9-implemented-baseline-do-not-re-implement) so they are not re-implemented.
 
 > **How to use this file:** change `- [ ]` to `- [x]` when an item meets its **Done when** line. Add the version/date to the progress log in [§14](#14-progress-log).
 
 > **TL;DR**
-> 1. **Ship 1.6.0** — code is in the tree; docs, tag and release verification remain.
-> 2. **Ship 1.7.0** — extract the existing GOD/STFS readers into the `StfsSharp` package. No new format support is required.
+> 1. **Ship 1.6.0** — ✅ done (tag `350f629`, NuGet and GitHub release verified).
+> 2. **Ship 1.7.0** — `StfsSharp` is extracted and published; only the XISOSharp 1.7.0 tag/release remains.
 > 3. **Ship CCISharp 1.1** — LZ4-HC, parallel CCI compression and multi-digit parts; then remove the CCI `--jobs` restriction.
 > 4. **Harden** — source `IFilesystem`, per-call logging, sparse output, property tests and benchmarks.
 
@@ -22,11 +22,12 @@
 | Field | Value |
 |---|---|
 | Published library | **XISOSharp 1.6.0** (2026-11-06) |
-| Current tree | **1.6.0 released**, tag `1.6.0` at `350f629` |
-| Next release gate | 1.7.0 — `StfsSharp` extraction |
-| Next feature release | **1.7.0** — `StfsSharp` extraction |
+| Published readers | **StfsSharp 1.0.0** (2026-11-07, NuGet) |
+| Current tree | StfsSharp extraction complete; XISOSharp 1.7.0 release gate pending |
+| Next release gate | 1.7.0 — tag/publish XISOSharp with the StfsSharp dependency |
+| Next feature release | **1.7.0** — `StfsSharp` extraction (code/docs/tests done) |
 | Compression track | **CCISharp 1.1** — HC encoder, parallel writer, multi-digit parts |
-| Tests (last recorded) | 2098 passed / 1 skipped on `net8.0`/`net9.0`; 2162 passed / 1 skipped on `net10.0` |
+| Tests (last recorded) | 2101 passed / 1 skipped on `net8.0`/`net9.0`; 2165 passed / 1 skipped on `net10.0`; StfsSharp 37/37 on all TFMs |
 | CI gates | 3-OS build/test, `dotnet format`, InspectCode, AOT smoke, fuzz, battle-interop, coverage floors |
 | Reference set | 8 local copies under `References/` — see [§10](#10-reference-map) |
 
@@ -53,19 +54,19 @@
 | Priority | Workstream | Target | Open items |
 |---|---|---|---:|
 | **P0** | Ship 1.6.0 | ✅ released 2026-11-06 | 0 |
-| **P1** | Extract `StfsSharp` | 1.7.0 | 8 |
+| **P1** | Extract `StfsSharp` | 1.7.0 | 1 (XISOSharp tag/release) |
 | **P1** | CCISharp 1.1 | CCISharp 1.1 | 7 |
 | **P2** | Library hardening | 1.7.x / 2.0.0 | 8 |
 | **P2** | Docs, fixtures and GUI | 1.7.x | 8 |
 | **P3** | Distribution and supply chain | later | 5 |
 | **P3** | Cross-repo consumers | after 1.7.0 | 4 |
-| | **Total** | | **40 open** (3 optional) + 4 done |
+| | **Total** | | **33 open** (3 optional) + 11 done |
 
 **Recommended order**
 
 | Order | Work | Why |
 |---:|---|---|
-| 1 | `STF-01` … `STF-08` | Biggest structural change; makes GOD/STFS readers reusable. |
+| 1 | `STF-01` … `STF-08` | ✅ extraction complete; only the XISOSharp 1.7.0 tag/release remains. |
 | 2 | `CCI-01` … `CCI-06` | Independent track; unblocks CCI HC and `--jobs`. |
 | 3 | `LIB-01` … `LIB-08` | Harden the API after the release branches settle. |
 | 4 | `DOC-*`, `GUI-*` | User-facing polish; depends on the library work. |
@@ -103,38 +104,46 @@
 
 > Read-only GOD/SVOD and XBLA/XBLIG STFS support already works in-repo. This milestone moves those readers into a standalone MIT package so XISOSharp, companion apps and future consumers share one implementation. It is a packaging/API task, not new format support.
 
-- [ ] **STF-01 · Create the `StfsSharp` repository and package skeleton**
+- [x] **STF-01 · Create the `StfsSharp` repository and package skeleton**
   - Model on CCISharp/ZArchiveSharp: `StfsSharp/`, `StfsSharp.Tests/`, `StfsSharp.Benchmarks/`, optional `StfsSharp.Cli/`, `docs/`, `Directory.Build.props`, `global.json`, `LICENSE`, `THIRD-PARTY-NOTICES.md`, 3-OS CI. Target the supported XISOSharp matrix (currently `net8.0`/`net9.0`/`net10.0`; see `LIB-07`), MinVer, `IsTrimmable`/`IsAotCompatible`, zero runtime dependencies, nupkg + snupkg.
   - **Done when:** the package builds, packs and CI is green on Windows/Linux/macOS.
+  - **Done 2026-11-07:** repo created at `C:\...\CSharp_STFSSharp`, 4 projects (library/tests/benchmarks/fuzz), `net8.0`/`net9.0`/`net10.0`, MinVer `v1.0.0`, SourceLink, trimmable/AOT, pack + snupkg; GitHub CI green on Windows/Ubuntu/macOS (fuzz-smoke included) and `StfsSharp 1.0.0` published to NuGet.
 
-- [ ] **STF-02 · Move XContent/title metadata into `StfsSharp`**
+- [x] **STF-02 · Move XContent/title metadata into `StfsSharp`**
   - Move `XContentHeaderReader`, the `GodHeader` title fields, `StfsHeader`, `GodTitleInfo`, `StfsTitleInfo` and the package-kind enum into the `StfsSharp` public API.
   - **Done when:** XISOSharp `title-info` text/JSON output is unchanged and the metadata tests run against `StfsSharp`.
+  - **Done 2026-11-07:** `GodHeader`/`StfsHeader`/`GodTitleInfo`/`StfsTitleInfo`/`StfsPackageKind` and the internal `XContentHeaderReader` moved; `GodHeaderTests` and `StfsHeaderTests` now live in `StfsSharp.Tests`; XISOSharp keeps facade metadata tests and CLI output is unchanged.
 
-- [ ] **STF-03 · Move the read-only GOD/SVOD sector reader**
+- [x] **STF-03 · Move the read-only GOD/SVOD sector reader**
   - Move `GodHeader.TryReadVolume`, `GodVolumeInfo`, the SVOD fragment roll-over and hash-table interleave behind `StfsFile`/`StfsStream` in `StfsSharp`.
   - **Done when:** a synthetic multi-`DataNNNN` GOD set reads byte-identically through `StfsSharp` and matches the current `GodBlockDevice` output.
+  - **Done 2026-11-07:** `GodVolume` + seekable `GodVolumeStream` replace the in-repo mapping; `StfsFile` is the container factory. Synthetic two-fragment, enhanced-GDF, security-sector, zero-prefix and unaligned-read tests pass; real GOD mapping is covered by the optional corpus test.
 
-- [ ] **STF-04 · Move the STFS package reader**
+- [x] **STF-04 · Move the STFS package reader**
   - Move `StfsPackage`, `StfsEntry`, `StfsPackageInfo`, contiguous/hash-chain block lists, `ReadAllBytes`, `CopyTo` and `ExtractTo`.
   - Keep the current read-only scope: XBLA/XBLIG/Community Games packages; no saves, profiles or DLC packages.
   - **Done when:** listing/extraction matches the in-repo implementation on the synthetic fixture matrix.
+  - **Done 2026-11-07:** full `StfsPackage` port with `ReadFileChunks`, `StfsProgress`, warning/name-policy channels; read-only, writable-format, XBLIG/Community, non-contiguous and hash-boundary tests pass; real XBLA/XBLIG packages open, list and extract.
 
-- [ ] **STF-05 · Move STFS hash-tree validation**
+- [x] **STF-05 · Move STFS hash-tree validation**
   - Move `StfsPackage.Validate`, `StfsValidationReport` and `StfsValidationIssue`: per-block SHA-1, level-0/1/2 tables, top hash and header hash.
   - **Done when:** valid/corrupt fixture results are identical to today's `StfsPackage.Validate`.
+  - **Done 2026-11-07:** validation ported unchanged; corrupt data block, hash table, top hash, header hash, broken/cyclic chain and implausible block-count tests pass; real XBLA package reports PASS (394 files, 11,707 blocks).
 
-- [ ] **STF-06 · Integrate `StfsSharp` without breaking XISOSharp's public API**
+- [x] **STF-06 · Integrate `StfsSharp` without breaking XISOSharp's public API**
   - Replace the in-repo readers with `StfsSharp`; keep `XISOSharp.GodHeader`, `XISOSharp.BlockDevice.GodBlockDevice`, `XISOSharp.StfsPackage` and `XisoChecksum.ComputeStfsChecksum` as thin facades/adapters. Use type forwarding or wrappers for public types; remove them only in 2.0.0. Refresh `PublicApi.approved.txt`.
   - **Done when:** XISOSharp consumes the `StfsSharp` NuGet package, every read verb still passes, and `dotnet pack` package validation stays green.
+  - **Done 2026-11-07:** `XISOSharp.csproj` references `StfsSharp 1.0.0`; `GodHeader`/`StfsHeader`/`StfsPackage`/`GodBlockDevice` are mapping facades; `XContentHeaderReader` removed; `PublicApi.approved.txt` unchanged (no public-surface break); pack passes with the 1.4.4 baseline; full test suite and CLI/real-package smoke pass.
 
-- [ ] **STF-07 · Move tests, fixtures and fuzz coverage**
+- [x] **STF-07 · Move tests, fixtures and fuzz coverage**
   - Move `GodHeaderTests`, `GodBlockDeviceTests`, `StfsHeaderTests` and `StfsPackageTests` into `StfsSharp`; keep the XISOSharp integration tests. Move/extend `SyntheticStfsPackage` and add a `StfsSharp` fuzz target for `Open`, `Validate`, `ReadAllBytes` and `ExtractTo`.
   - **Done when:** both repositories have green suites and the fuzzer covers the moved readers.
+  - **Done 2026-11-07:** fixture and reader tests moved (37 tests on each TFM); a deterministic mutation fuzzer covers STFS and GOD `Open`/`Validate`/`ReadAllBytes`/`ExtractTo`; XISOSharp keeps integration/facade parity tests and its own fuzz target; 60-second CI fuzz-smoke green.
 
 - [ ] **STF-08 · Publish `StfsSharp` and cut 1.7.0**
   - Write `docs/format.md`, `docs/api.md`, `docs/interop.md` and README; add `THIRD-PARTY-NOTICES.md`; tag/publish `StfsSharp`; bump the XISOSharp reference; tag and publish **XISOSharp 1.7.0** with release notes and six bundles.
   - **Done when:** `StfsSharp` is on NuGet, XISOSharp 1.7.0 is published, and the docs state that GOD/STFS readers are `StfsSharp`-backed.
+  - **Status 2026-11-07:** `StfsSharp 1.0.0` is on NuGet and GitHub (`v1.0.0` tag + release), docs are written (README, `format.md`, `api.md`, `interop.md`), and XISOSharp docs/release notes are updated. Remaining: tag/publish XISOSharp 1.7.0 and build the six bundles.
 
 ---
 
@@ -298,6 +307,7 @@
 | **Metadata** | XBE/XEX headers, XDBF/XSRC 360 metadata, GOD/STFS XContent title metadata, XBE logo/title/save images |
 | **CLI** | extract/list/tree/checksum/hash/verify-hashes/validate/title-info/xbe-image, compress/decompress/convert/split, batch, JSON, `--layout`, `--jobs` (CISO/extraction; CCI pending), `--name-policy`, `--delete-source` |
 | **1.6.0 scope** | A1 XDBF, A2 XBE assets, A3 FATX cap, A4 `--delete-source`, A5 GOD/STFS title naming, read-only GOD input, STFS package listing/extraction/validation, parallel CISO compression, parallel extraction, safe-extract policy, CWD-free writer/reader |
+| **1.7.0 scope** | `StfsSharp` extraction: standalone GOD/SVOD + STFS readers, NuGet 1.0.0, XISOSharp facades with an unchanged public API, moved tests/fixtures/fuzzer/benchmarks |
 | **Quality** | 3-OS CI, format gate, InspectCode, AOT smoke, mutation fuzz, battle-interop, coverage floors, SBOM and build provenance |
 
 ---
@@ -312,7 +322,7 @@ All paths are under `References/`. These are **behaviour/format oracles** unless
 | `libCCI-0.1.0-1b0087e` | GPL-2.0-or-later | Normative CCI `FORMAT.md` and `cci_*` oracle | CCISharp 1.1 HC/multi-digit work (`CCI-*`) |
 | `Xbox360Convert-1.0.1` | GPL-3.0 (no own license file; links XboxToolkit) | GOD input, FATX split point, delete-source, GOD title naming | None — A3/A4/A5 implemented in 1.6.0; reference only |
 | `XboxKit-0.7` | Permissive (upstream) | Redump/ZAR parity baseline | None — XRD is deferred |
-| `XboxToolkit-main` | GPL-3.0-only | GOD/STFS read, XEX XDBF metadata, XBE image assets | `StfsSharp` extraction (`STF-*`) and GUI surfaces (`GUI-*`) |
+| `XboxToolkit-main` | GPL-3.0-only | GOD/STFS read, XEX XDBF metadata, XBE image assets | GUI surfaces (`GUI-*`); `StfsSharp` extraction done in 1.7.0 |
 | `xdvdfs-0.8.3` | MIT | CISO/split/checksum/CLI parity baseline | None |
 | `XDVDFS-TR-0.8.4-TR` | MIT | `xdvdfs-cci` (covered by CCISharp); `xdvdfs-fsd`/`xdvdfs-web` reviewed | None in XISOSharp — NFS/WASM are out of scope |
 | `XeCrypt-main` | MIT | XBE certificate/STFS hash-tree reference | None — signature verification is excluded; STFS hash tree is already implemented independently |
@@ -393,4 +403,10 @@ dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
 | 2026-11-06 | macOS CWD test fix | 1.6.0 | Compare actual CWD before/after; avoids `/var` vs `/private/var` symlink mismatch |
 | 2026-11-06 | `REL-03` tagged and published | 1.6.0 | Tag `1.6.0` at `350f629`; NuGet indexed; GitHub release 6 zips + SPDX |
 | 2026-11-06 | `REL-04` post-release smoke | 1.6.0 | win/linux/macOS bundles passed; downloaded win-x64 CLI/GUI smoke passed |
+| 2026-11-07 | `STF-01` repo/package skeleton | StfsSharp 1.0.0 | 4 projects, 3-OS CI, NuGet package published; GitHub repo `purelogiccode/STFSSharp` |
+| 2026-11-07 | `STF-08` StfsSharp release | StfsSharp 1.0.0 | `v1.0.0` tag pushed, CI green, GitHub release published |
+| 2026-11-07 | `STF-02`–`STF-05` readers moved | StfsSharp 1.0.0 | GOD/SVOD + STFS readers, metadata and validation ported; 37 tests per TFM |
+| 2026-11-07 | `STF-06` XISOSharp integration | 1.7.0-prep | NuGet dependency + facades; public API unchanged; pack validation green |
+| 2026-11-07 | `STF-07` tests/fixtures/fuzz | StfsSharp 1.0.0 | Tests and fixture moved, fuzzer added; XISOSharp suite 2101/2165 |
+| 2026-11-07 | Real-corpus verification | StfsSharp 1.0.0 | Aegis Wing XBLA (validate PASS), 1on1 Soccer XBLIG, GOD mapping; CLI smoke passed |
 | | | | |

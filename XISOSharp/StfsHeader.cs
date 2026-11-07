@@ -1,7 +1,8 @@
-using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using XISOSharp.Models;
+using SharpStfsHeader = StfsSharp.StfsHeader;
+using SharpStfsPackageKind = StfsSharp.Models.StfsPackageKind;
+using SharpStfsTitleInfo = StfsSharp.Models.StfsTitleInfo;
 
 namespace XISOSharp;
 
@@ -13,11 +14,10 @@ namespace XISOSharp;
 /// hash tree or block map is needed.
 /// </summary>
 /// <remarks>
-/// Supported content types: XBLA <c>0x000D0000</c> and XBLIG
-/// <c>0x00000002</c> (Community Game <c>0x02000000</c> is accepted as XBLIG).
-/// GOD/NXE containers are handled by <see cref="GodHeader"/>.
-/// The title name is at <c>0x411</c> (UTF-16BE, 0x80 bytes), title ID at
-/// <c>0x360</c>, and disc number/count at <c>0x366</c>/<c>0x367</c>.
+/// This is a compatibility facade over the standalone
+/// <see href="https://www.nuget.org/packages/StfsSharp">StfsSharp</see>
+/// package. The public XISOSharp model types are preserved and mapped from the
+/// StfsSharp models; they will be removed in XISOSharp 2.0.0.
 /// </remarks>
 public static class StfsHeader
 {
@@ -25,19 +25,7 @@ public static class StfsHeader
     /// Returns true when <paramref name="path"/> is a readable single-file STFS
     /// package with an XBLA or XBLIG content type.
     /// </summary>
-    public static bool IsStfsPackage(string path)
-    {
-        if (!XContentHeaderReader.TryReadHeader(path, out byte[] header))
-            return false;
-
-        if (!HasStfsVolumeType(header))
-            return false;
-
-        uint contentType = XContentHeaderReader.ReadContentType(header);
-        return contentType is XContentHeaderReader.ContentTypeXbla or
-            XContentHeaderReader.ContentTypeXblig or
-            XContentHeaderReader.ContentTypeCommunityGame;
-    }
+    public static bool IsStfsPackage(string path) => SharpStfsHeader.IsStfsPackage(path);
 
     /// <summary>
     /// Reads title metadata from an XBLA/XBLIG STFS package. Returns
@@ -48,49 +36,23 @@ public static class StfsHeader
     /// <param name="info">Parsed metadata when the method returns <c>true</c>.</param>
     public static bool TryReadTitle(string path, [NotNullWhen(true)] out StfsTitleInfo? info)
     {
-        info = null;
-        if (!XContentHeaderReader.TryReadHeader(path, out byte[] header))
-            return false;
-
-        if (!HasStfsVolumeType(header))
-            return false;
-
-        uint contentType = XContentHeaderReader.ReadContentType(header);
-        StfsPackageKind kind;
-        if (contentType == XContentHeaderReader.ContentTypeXbla)
+        if (!SharpStfsHeader.TryReadTitle(path, out SharpStfsTitleInfo? title))
         {
-            kind = StfsPackageKind.Xbla;
-        }
-        else if (contentType is XContentHeaderReader.ContentTypeXblig or
-                 XContentHeaderReader.ContentTypeCommunityGame)
-        {
-            kind = StfsPackageKind.Xblig;
-        }
-        else
-        {
+            info = null;
             return false;
         }
-
-        uint titleId = BinaryPrimitives.ReadUInt32BigEndian(
-            header.AsSpan(XContentHeaderReader.TitleIdOffset));
-        byte discNumber = header[XContentHeaderReader.DiscNumberOffset];
-        byte discCount = header[XContentHeaderReader.DiscCountOffset];
-
-        string titleName = XContentHeaderReader.SanitizeTitleName(
-            XContentHeaderReader.DecodeTitleName(
-                header.AsSpan(XContentHeaderReader.TitleNameOffset, XContentHeaderReader.TitleNameLength)));
-        if (titleName.Length == 0)
-            titleName = titleId.ToString("X8", CultureInfo.InvariantCulture);
 
         info = new StfsTitleInfo(
-            Path.GetFullPath(path),
-            kind,
-            titleName,
-            titleId,
-            $"0x{titleId:X8}",
-            discNumber,
-            discCount,
-            contentType);
+            title.PackagePath,
+            title.Kind == SharpStfsPackageKind.Xbla
+                ? StfsPackageKind.Xbla
+                : StfsPackageKind.Xblig,
+            title.TitleName,
+            title.TitleId,
+            title.TitleIdHex,
+            title.DiscNumber,
+            title.DiscCount,
+            title.ContentType);
         return true;
     }
 
@@ -100,8 +62,4 @@ public static class StfsHeader
     /// </summary>
     public static StfsTitleInfo? ReadTitle(string path) =>
         TryReadTitle(path, out StfsTitleInfo? info) ? info : null;
-
-    private static bool HasStfsVolumeType(ReadOnlySpan<byte> header) =>
-        BinaryPrimitives.ReadUInt32BigEndian(header[GodHeader.VolumeTypeOffset..]) ==
-        GodHeader.VolumeTypeStfs;
 }
