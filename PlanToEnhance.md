@@ -438,4 +438,5 @@ dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
 | 2026-11-07 | `DOC-03` docs refresh | 1.8.0 | READMEs, feature/limitations/compression/library/CLI/testing docs, release notes and support policy updated |
 | 2026-11-07 | `GUI-01`–`GUI-05` Xbox 360 GUI | 1.8.0 | GOD/STFS open/list/tree/extract/unpack/audit, title panel, XBE preview, drop routing, `--jobs` controls; self-test and GUI parity tests |
 | 2026-11-07 | 1.8.0 verification | 1.8.0 | Suite 2144/1 (net8/net9) + 2217/1 (net10); format clean; InspectCode 0; pack 1.7.0 baseline; AOT, fuzz 6,605 iterations, battle 40/40, GUI self-test and docs links green |
+| 2026-11-07 | 1.8.0 released | 1.8.0 | Tag `bce1393`; CI green; NuGet 1.8.0 indexed; GitHub release has six RID zips + SPDX; downloaded win-x64 bundle reports v1.8.0, `--probe-cli` 1.8.0 and `SELF-TEST: all passed` |
 | | | | |
