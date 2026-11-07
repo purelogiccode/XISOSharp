@@ -162,9 +162,198 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  sign-windows:
+    name: sign windows bundles
+    needs: [resolve, bundle]
+    # DST-02: enable with the ENABLE_WINDOWS_SIGNING repository variable plus
+    # WINDOWS_SIGNING_CERT (base64 PFX) and WINDOWS_SIGNING_PASSWORD secrets.
+    # When disabled, the unsigned bundle artifacts flow straight to `release`.
+    if: vars.ENABLE_WINDOWS_SIGNING == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
+    steps:
+      - name: Download Windows bundles
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: release-win-*
+          path: dist
+          merge-multiple: true
+
+      - name: Import signing certificate
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_CERT: ${{ secrets.WINDOWS_SIGNING_CERT }}
+        run: |
+          if (-not $env:WINDOWS_SIGNING_CERT) { throw 'WINDOWS_SIGNING_CERT is empty.' }
+          if (-not $env:WINDOWS_SIGNING_PASSWORD) { throw 'WINDOWS_SIGNING_PASSWORD is empty.' }
+          $pfx = Join-Path $env:RUNNER_TEMP 'xisosharp-signing.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERT))
+          "PFX_PATH=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signtool) { throw 'signtool.exe was not found in the Windows SDK.' }
+          "SIGNTOOL=$($signtool.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Sign and verify executables
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stageRoot = Join-Path $env:RUNNER_TEMP 'xiso-sign-stage'
+          $signedRoot = Join-Path $env:GITHUB_WORKSPACE 'signed'
+          New-Item -ItemType Directory -Force -Path $stageRoot, $signedRoot | Out-Null
+
+          foreach ($zip in Get-ChildItem dist -Filter 'release_*_win-*.zip') {
+            $rid = if ($zip.Name -match 'win-arm64') { 'win-arm64' } else { 'win-x64' }
+            $stage = Join-Path $stageRoot $rid
+            if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+            Expand-Archive -LiteralPath $zip.FullName -DestinationPath $stage
+
+            foreach ($exe in @('XISOSharp.exe', 'XISOSharp.Gui.exe')) {
+              $path = Join-Path $stage $exe
+              & $env:SIGNTOOL sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com `
+                /f $env:PFX_PATH /p $env:WINDOWS_SIGNING_PASSWORD $path
+              if ($LASTEXITCODE -ne 0) { throw "signtool sign failed for $exe ($LASTEXITCODE)." }
+              & $env:SIGNTOOL verify /pa /v $path
+              if ($LASTEXITCODE -ne 0) { throw "signtool verify failed for $exe ($LASTEXITCODE)." }
+            }
+
+            $files = @(Get-ChildItem $stage -File)
+            if ($files.Count -ne 5) {
+              throw "Signed bundle $($zip.Name) has $($files.Count) files; expected exactly 5."
+            }
+            Compress-Archive -Path (Join-Path $stage '*') -DestinationPath (Join-Path $signedRoot $zip.Name) -Force
+          }
+
+      - name: Upload signed x64 bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: signed-win-x64
+          path: signed/release_*_win-x64.zip
+          if-no-files-found: error
+
+      - name: Upload signed arm64 bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: signed-win-arm64
+          path: signed/release_*_win-arm64.zip
+          if-no-files-found: error
+
+  sign-macos:
+    name: sign macos bundles
+    needs: [resolve, bundle]
+    # DST-02: enable with the ENABLE_MACOS_SIGNING repository variable plus a
+    # Developer ID Application certificate. Notarization additionally needs the
+    # MACOS_NOTARY_* secrets; without them the bundles are signed but not
+    # notarized.
+    if: vars.ENABLE_MACOS_SIGNING == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      MACOS_SIGNING_CERT: ${{ secrets.MACOS_SIGNING_CERT }}
+      MACOS_SIGNING_PASSWORD: ${{ secrets.MACOS_SIGNING_PASSWORD }}
+      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+      MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+      MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
+    steps:
+      - name: Download macOS bundles
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: release-MacOsX-*
+          path: dist
+          merge-multiple: true
+
+      - name: Import signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${MACOS_SIGNING_CERT:-}" ]; then echo "::error::MACOS_SIGNING_CERT is empty."; exit 1; fi
+          if [ -z "${MACOS_SIGNING_IDENTITY:-}" ]; then echo "::error::MACOS_SIGNING_IDENTITY is empty."; exit 1; fi
+          cert="$RUNNER_TEMP/signing.p12"
+          printf '%s' "$MACOS_SIGNING_CERT" | base64 --decode > "$cert"
+          keychain="$RUNNER_TEMP/xisosharp-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$cert" -k "$keychain" -P "$MACOS_SIGNING_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
+
+      - name: Codesign, notarize and rezip
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage_root="$RUNNER_TEMP/xiso-sign-stage"
+          signed_root="$GITHUB_WORKSPACE/signed"
+          rm -rf "$stage_root" "$signed_root"
+          mkdir -p "$stage_root" "$signed_root"
+
+          for zip in dist/release_*_MacOsX-*.zip; do
+            name="$(basename "$zip")"
+            rid="${name#release_*_}"
+            rid="${rid%.zip}"
+            stage="$stage_root/$rid"
+            mkdir -p "$stage"
+            unzip -q "$zip" -d "$stage"
+
+            # Sign every Mach-O executable/dylib; managed DLLs are not Mach-O
+            # and are covered by the apphost signature.
+            while IFS= read -r -d '' file; do
+              codesign --force --options runtime --timestamp --sign "$MACOS_SIGNING_IDENTITY" "$file"
+            done < <(find "$stage" -type f \( -perm -111 -o -name '*.dylib' \) -print0)
+            codesign --force --options runtime --timestamp --sign "$MACOS_SIGNING_IDENTITY" \
+              "$stage/XISOSharp" "$stage/XISOSharp.Gui"
+            codesign --verify --strict --verbose=2 "$stage/XISOSharp" "$stage/XISOSharp.Gui"
+
+            if [ -n "${MACOS_NOTARY_APPLE_ID:-}" ] && [ -n "${MACOS_NOTARY_TEAM_ID:-}" ] && [ -n "${MACOS_NOTARY_PASSWORD:-}" ]; then
+              notarize_zip="$RUNNER_TEMP/$name.notarize.zip"
+              (cd "$stage" && ditto -c -k . "$notarize_zip")
+              xcrun notarytool submit "$notarize_zip" \
+                --apple-id "$MACOS_NOTARY_APPLE_ID" \
+                --team-id "$MACOS_NOTARY_TEAM_ID" \
+                --password "$MACOS_NOTARY_PASSWORD" \
+                --wait
+              # Bare executables in a zip cannot be stapled; Gatekeeper checks
+              # the notarization ticket online. Record the assessment result.
+              if ! spctl --assess --type execute --verbose=2 "$stage/XISOSharp"; then
+                echo "::warning::spctl assessment failed; confirm notarization in the notary log."
+              fi
+            else
+              echo "::warning::MACOS_NOTARY_* secrets are not set; the bundle is signed but not notarized."
+            fi
+
+            (cd "$stage" && zip -q -r "$signed_root/$name" \
+              XISOSharp XISOSharp.Gui README.md LICENSE WhatsNew.md)
+          done
+
+      - name: Upload signed x64 bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: signed-MacOsX-x64
+          path: signed/release_*_MacOsX-x64.zip
+          if-no-files-found: error
+
+      - name: Upload signed arm64 bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: signed-MacOsX-arm64
+          path: signed/release_*_MacOsX-arm64.zip
+          if-no-files-found: error
+
   smoke:
     name: smoke (${{ matrix.zip_rid }})
-    needs: [resolve, bundle]
+    needs: [resolve, bundle, sign-windows, sign-macos]
+    # Run after optional signing; a skipped sign job means signing is disabled.
+    if: >-
+      always() && needs.bundle.result == 'success' &&
+      (needs.sign-windows.result == 'success' || needs.sign-windows.result == 'skipped') &&
+      (needs.sign-macos.result == 'success' || needs.sign-macos.result == 'skipped')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -173,10 +362,13 @@ jobs:
         include:
           - zip_rid: win-x64
             os: windows-latest
+            artifact: ${{ vars.ENABLE_WINDOWS_SIGNING == 'true' && 'signed-win-x64' || 'release-win-x64' }}
           - zip_rid: linux-x64
             os: ubuntu-latest
+            artifact: release-linux-x64
           - zip_rid: MacOsX-arm64
             os: macos-latest
+            artifact: ${{ vars.ENABLE_MACOS_SIGNING == 'true' && 'signed-MacOsX-arm64' || 'release-MacOsX-arm64' }}
     steps:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
@@ -186,7 +378,7 @@ jobs:
       - name: Download bundle
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          name: release-${{ matrix.zip_rid }}
+          name: ${{ matrix.artifact }}
           path: dist
 
       - name: Smoke-test (unix)
@@ -262,12 +454,47 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Download bundles
+      - name: Download unsigned bundles
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: release-*
           path: dist
           merge-multiple: true
+
+      - name: Download signed Windows bundles
+        if: vars.ENABLE_WINDOWS_SIGNING == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: signed-win-*
+          path: signed-win
+          merge-multiple: true
+
+      - name: Download signed macOS bundles
+        if: vars.ENABLE_MACOS_SIGNING == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: signed-MacOsX-*
+          path: signed-macos
+          merge-multiple: true
+
+      - name: Prefer signed bundles
+        run: |
+          set -euo pipefail
+          if [ "${{ vars.ENABLE_WINDOWS_SIGNING }}" = "true" ]; then
+            rm -f dist/release_*_win-*.zip
+            cp signed-win/*.zip dist/
+          fi
+          if [ "${{ vars.ENABLE_MACOS_SIGNING }}" = "true" ]; then
+            rm -f dist/release_*_MacOsX-*.zip
+            cp signed-macos/*.zip dist/
+          fi
+          count=$(find dist -maxdepth 1 -name 'release_*.zip' | wc -l)
+          if [ "$count" -ne 6 ]; then
+            echo "::error::Expected six release bundles, found $count."
+            ls -la dist
+            exit 1
+          fi
+          ls -la dist
 
       - name: Generate SBOM
         # SPDX 2.2 SBOM over the release bundle contents, published alongside

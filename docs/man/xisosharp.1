@@ -1,0 +1,452 @@
+.\" Man page for the XISOSharp CLI.
+.\" Keep the flag set in sync with XISOSharp.Cli; scripts/check_cli_completions.py
+.\" checks that every flag is present in all completion files.
+.TH XISOSHARP 1 "2026-11-07" "XISOSharp 1.8.0" "User Commands"
+.SH NAME
+xisosharp \- create, extract, list, rewrite and archive Xbox XISO/XDVDFS disc images
+.SH SYNOPSIS
+.B XISOSharp
+[\fIoptions\fR] [\fB\-l\fR|\fB\-r\fR|\fB\-x\fR] \fIfile1.iso\fR [\fIfile2.iso\fR ...]
+.br
+.B XISOSharp
+[\fIoptions\fR] \fB\-c\fR \fIdirectory\fR [\fIname\fR] ...
+.br
+.B XISOSharp
+\fBvalidate\fR \fIsource\fR \fIoutput\fR [\fIoptions\fR]
+.br
+.B XISOSharp
+\fBrebuild\fR \fIsource\fR [\fIvideo.iso\fR] [\fIfiller\fR|\fIseed\fR] [\fIsu20076000_00000000\fR] \fB\-o\fR \fIredump.iso\fR
+.br
+.B XISOSharp
+\fBbuild-image\fR [\fIsourceDir\fR] [\fIoutput.iso\fR] \fB\-m\fR \fIhost:image\fR [\fB\-f\fR \fItoml\fR] [\fB\-O\fR \fIoutput\fR] [\fB\-D\fR]
+.br
+.B XISOSharp
+\fBimage-spec\fR \fBfrom\fR \fB\-O\fR \fIout\fR \fB\-m\fR \fIhost:image\fR ... [\fIspecPath\fR]
+.br
+.B XISOSharp
+\fBcompress\fR|\fBcso\fR|\fBcci\fR \fIsource\fR [\fIoutput\fR] [\fIoptions\fR]
+.br
+.B XISOSharp
+\fBdecompress\fR|\fBuncso\fR|\fBdecso\fR|\fBuncci\fR \fIcontainer\fR [\fIoutput.iso\fR]
+.br
+.B XISOSharp
+\fBchecksum\fR [\fB\-\-silent\fR] \fIimage\fR [\fIimages\fR ...]
+.br
+.B XISOSharp
+\fBhash\fR \fIimage\fR [\fIimages\fR ...] [\fB\-\-json\fR]
+.br
+.B XISOSharp
+\fBverify-hashes\fR \fIimage\fR \fIhash-file\fR [\fB\-\-ignore-extra\fR] [\fB\-\-json\fR]
+.br
+.B XISOSharp
+\fBtitle-info\fR \fIimage\fR [\fB\-\-json\fR]
+.br
+.B XISOSharp
+\fBxbe-image\fR \fIimage\fR \fIpath\fR \fB\-\-type\fR \fIlogo\fR|\fItitle\fR|\fIsave\fR \fB\-o\fR \fIout.png\fR
+.br
+.B XISOSharp
+\fBsplit\fR [\fB\-\-size\fR \fIbytes\fR|\fIhalf\fR] [\fB\-\-output\fR \fIbase\fR] \fIimage\fR ...
+.br
+.B XISOSharp
+\fBjoin\fR [\fB\-\-output\fR \fIfile\fR] \fIfirst.1.iso\fR [...]
+.br
+.B XISOSharp
+\fBconvert\fR \fIsource\fR \fIoutput\fR [\fB\-y\fR|\fB\-n\fR]
+.SH DESCRIPTION
+.B XISOSharp
+is a pure managed .NET tool for Xbox disc images. It is a port of
+.BR extract-xiso (1)
+with the archival modes of XboxKit and the packing/compression modes of
+xdvdfs. One detection layer reads plain ISO, split \fI.1.iso\fR sets, CISO
+(v1/v2), CCI/CCIM, ZAR, GOD/SVOD containers and read-only XBLA/XBLIG STFS
+packages; the writer creates XISO images, CISO, CCI, ZAR and split sets.
+.PP
+With no mode flag the default is extract. Flags must precede positional
+arguments; a flag after the first image name is refused. Read-only verbs
+accept \fB\-\-json\fR, which writes machine-readable output to stdout and
+human-readable logs to stderr.
+.SH MODES
+.TP
+.B \-c \fIdirectory\fR [\fIname\fR]
+Create an ISO from a directory. The optional \fIname\fR overrides the output
+file name (default: the directory leaf name plus \fI.iso\fR). Repeatable for
+batch creation.
+.TP
+.B \-\-pack \fIinput\fR [\fIname\fR]
+Pack a directory into an ISO, or repack an existing ISO in place.
+.TP
+.B \-x
+Extract (the default mode).
+.TP
+.B \-\-unpack \fIfile\fR [\fIdest\fR]
+Unpack the whole image to \fIdest\fR (default: a directory named after the
+image) and detect the optimized layout automatically.
+.TP
+.B \-l
+List the top-level entries.
+.TP
+.B \-t
+Recursively list the image tree.
+.TP
+.B \-i \fIfile\fR [\fIpath\fR]
+Show volume descriptor metadata and per-entry details.
+.TP
+.B \-\-ls \fIfile\fR [\fIpath\fR]
+List the names in one directory without recursion.
+.TP
+.B \-V \fIfile\fR ...
+Audit one or more images (header, tree, sector bounds, cycles) or STFS
+packages (SHA-1 hash tree).
+.TP
+.B \-r
+Rewrite each ISO as an optimized ISO. The output is byte-identical to
+.BR "extract-xiso \-r" .
+.TP
+.B \-\-repair \fIfile\fR
+Fix safely patchable audit issues in place (reserved attribute bits, a
+missing optimized tag, separators in names).
+.TP
+.B \-\-salvage \fIfile\fR
+Rebuild a readable image from a corrupt one, dropping unreadable entries.
+.TP
+.B validate \fIsource\fR \fIoutput\fR
+Compare the file trees of two images. Both sides accept ISO, CISO, CCI, split
+sets, GOD and ZAR.
+.TP
+.B rebuild \fIsource\fR [\fIvideo.iso\fR] [\fIfiller\fR|\fIseed\fR] [\fIsu...\fR] \fB\-o\fR \fIredump.iso\fR
+Rebuild a Redump-style ISO from an extracted XISO and its parts.
+.TP
+.B build-image [\fIsourceDir\fR] [\fIoutput.iso\fR] \fB\-m\fR \fIhost:image\fR
+Build an image from ordered \fBwax\fR remap rules; reads a
+\fIxdvdfs.toml\fR with \fB\-f\fR and previews with \fB\-D\fR.
+.TP
+.B image-spec from \fB\-O\fR \fIout\fR \fB\-m\fR \fIhost:image\fR ...
+Generate an xdvdfs TOML spec from map rules.
+.TP
+.B compress\fR|\fBcso\fR|\fBcci\fR \fIsource\fR [\fIoutput\fR]
+Compress to CISO or CCI. Use \fB\-\-format\fR to choose the container.
+.TP
+.B decompress\fR|\fBuncso\fR|\fBdecso\fR|\fBuncci\fR \fIcontainer\fR [\fIoutput.iso\fR]
+Decompress CISO, CCI or a GOD container to a plain ISO.
+.TP
+.B checksum [\fB\-\-silent\fR] \fIimage\fR ...
+Compute the SHA3-256 tree checksum (xdvdfs compatible). ISO, split ISO,
+CISO, CCI, GOD, ZAR and STFS inputs compare equally when their trees match.
+.TP
+.B hash \fIimage\fR ...
+Compute CRC32, MD5, SHA-1, SHA-256 and SHA3-256 in one pass.
+.TP
+.B verify-hashes \fIimage\fR \fIhash-file\fR
+Verify a \fI*.hash\fR sidecar produced by \fB\-\-petrify\fR.
+.TP
+.B title-info \fIimage\fR
+Show title metadata from XBE/XEX, XDBF/XSRC or GOD/STFS XContent headers.
+.TP
+.B xbe-image \fIimage\fR \fIpath\fR \fB\-\-type\fR \fIlogo|title|save\fR \fB\-o\fR \fIout\fR
+Extract the Microsoft logo, title image or save image as PNG or DDS.
+.TP
+.B split [\fB\-\-size\fR \fIbytes\fR|\fIhalf\fR] [\fB\-\-output\fR \fIbase\fR] \fIimage\fR ...
+Split a plain ISO into sector-aligned parts.
+.TP
+.B join [\fB\-\-output\fR \fIfile\fR] \fIfirst.1.iso\fR ...
+Reassemble split parts and validate the result.
+.TP
+.B convert \fIsource\fR \fIoutput\fR
+Convert between ISO and ZAR, or decompress a GOD container to ISO/CISO/CCI.
+.SH OPTIONS
+.SS General
+.TP
+.B \-d \fIdirectory\fR
+Extract destination directory, or the rewrite output directory.
+.TP
+.B \-D
+Delete the \fI.old\fR source after a successful rewrite. As
+\fBbuild-image \-D\fR, preview the host-to-image mapping without writing.
+.TP
+.B \-o \fIfilename\fR
+Output file name for rewrite, rebuild and compression modes.
+.TP
+.B \-O \fIfilename\fR
+Output file name for \fBbuild-image\fR and \fBimage-spec\fR.
+.TP
+.B \-m
+Create/rewrite: disable the automatic XBE media-enable patch. In
+\fBbuild-image\fR, supply a \fIhost:image\fR map rule.
+.TP
+.B \-f \fItoml\fR
+Read \fIxdvdfs.toml\fR map rules for \fBbuild-image\fR.
+.TP
+.B \-q
+Quiet: suppress non-error output.
+.TP
+.B \-Q
+Silent: suppress all output, including errors.
+.TP
+.B \-s
+Skip \fI$SystemUpdate\fR entries.
+.TP
+.B \-X \fIglob\fR
+Create mode: exclude files or directories matching the pattern. Repeatable.
+.TP
+.B \-y, \-\-yes
+Overwrite outputs without prompting.
+.TP
+.B \-n, \-\-no
+Never overwrite; refuse when an output exists.
+.TP
+.B \-v, \-\-version
+Print the version banner plus component, runtime and commit details.
+.TP
+.B \-h, \-\-help
+Print usage and exit 0.
+.SS Extraction and reading
+.TP
+.B \-\-skip-sectors \fIN\fR
+Treat the XISO filesystem as starting \fIN\fR sectors into the file (Redump
+images with a video partition).
+.TP
+.B \-\-skip-existing
+Skip files that already exist with matching sizes (resume an interrupted
+unpack).
+.TP
+.B \-\-continue-on-error
+Log per-file extraction failures and continue; the run still exits non-zero.
+.TP
+.B \-\-name-policy \fIreject\fR|\fIsanitize\fR|\fIskip\fR
+How to handle host-unsafe entry names during extraction.
+.TP
+.B \-\-copy-out \fIiso\fR \fIpath\fR \fIdest\fR
+Copy a file or directory out of an image.
+.TP
+.B \-\-copy-in \fIiso\fR \fIhost\fR \fIpath\fR
+Copy a host file into an image in place.
+.TP
+.B \-\-no-backup
+Skip the \fI.old\fR backup for \fB\-\-copy-in\fR and \fB\-\-repair\fR.
+.TP
+.B \-\-md5 \fIiso\fR [\fIpath\fR]
+Compute MD5 hashes of files inside the image.
+.TP
+.B \-\-sha256 \fIiso\fR [\fIpath\fR]
+Compute SHA-256 hashes of files inside the image.
+.TP
+.B \-\-xex-info \fIiso\fR \fIpath\fR
+Show the Xbox 360 XEX2 header and XDBF/XSRC metadata.
+.TP
+.B \-\-xbe-info \fIiso\fR \fIpath\fR
+Show the original-Xbox XBEH header and certificate.
+.TP
+.B \-\-filetime \fIiso\fR
+Show the volume descriptor FILETIME.
+.TP
+.B \-\-get-filetime \fIiso\fR
+Alias of \fB\-\-filetime\fR.
+.TP
+.B \-\-set-filetime \fIiso\fR \fIvalue\fR
+Set the volume descriptor FILETIME.
+.TP
+.B \-\-sector-layout \fIiso\fR
+Print the full on-disk sector map.
+.TP
+.B \-\-ranges \fIiso\fR
+Print the system and file sector ranges.
+.TP
+.B \-\-is-optimized \fIiso\fR
+Report whether the optimized tag is present.
+.SS Writing and containers
+.TP
+.B \-\-prepend-sectors \fIN\fR
+Write \fIN\fR empty sectors before the XISO filesystem (video-partition room).
+.TP
+.B \-\-layout \fIfile\fR
+Pack entries at the sectors named by a sector-layout JSON/text file.
+.TP
+.B \-\-preserve-attrs
+Rewrite mode: keep the source dirent attribute bits instead of the
+extract-xiso parity defaults.
+.TP
+.B \-\-file-time \fIvalue\fR
+Fixed FILETIME for create, pack and build-image (ISO-8601, raw, hex,
+\fInow\fR or \fI0\fR).
+.TP
+.B \-\-jobs \fIN\fR
+Parallel workers (1\-64) for extraction, CISO/CCI compression, batch
+conversion and ZAR creation. Output stays byte-identical to \fB\-\-jobs 1\fR.
+.TP
+.B \-\-batch \fIdirectory\fR
+Process every supported image in a directory.
+.TP
+.B \-\-batch-recursive
+Search subdirectories for \fB\-\-batch\fR.
+.TP
+.B \-\-output-name \fItemplate\fR
+Name batch outputs from \fI{name}\fR, \fI{ext}\fR and \fI{format}\fR.
+.TP
+.B \-\-delete-source
+Delete each source after a successful batch conversion (requires
+\fB\-\-yes\fR).
+.TP
+.B \-\-format \fIcso\fR|\fIcci\fR|\fIiso\fR|\fIzar\fR
+Container format for \fBcompress\fR and \fBconvert --batch\fR.
+.TP
+.B \-\-ciso-level \fI0..9\fR
+CISO compression level (default 9).
+.TP
+.B \-\-ciso-version \fI1\fR|\fI2\fR|\fIauto\fR
+CISO format version.
+.TP
+.B \-\-ciso-split \fIbytes\fR
+Split CISO output at the given size (0 writes a single file).
+.TP
+.B \-\-cci-level \fI0..12\fR
+CCI compression level; 10\-12 select the LZ4-HC encoder.
+.TP
+.B \-\-cci-split \fIbytes\fR
+Split CCI output at the given size.
+.TP
+.B \-\-size \fIbytes\fR|\fIhalf\fR
+Split size for \fBsplit\fR; \fIhalf\fR splits in two.
+.TP
+.B \-\-policy \fIskip\fR|\fIoverwrite\fR|\fIauto-rename\fR
+Overwrite policy for ZAR creation without prompting.
+.TP
+.B \-\-ignore-extra
+\fBverify-hashes\fR: ignore files present in the image but absent from the
+sidecar.
+.SS Redump archival
+.TP
+.B \-\-video
+Extract the video partition.
+.TP
+.B \-\-random
+Extract random filler/padding.
+.TP
+.B \-\-seed
+Extract the XGD1 RNG seed.
+.TP
+.B \-\-wipe
+Zero filler gaps.
+.TP
+.B \-\-trim
+Truncate after the last file extent.
+.TP
+.B \-\-petrify
+Write a skeleton image plus a SHA-1 \fI.hash\fR sidecar.
+.TP
+.B \-\-update
+Extract the system update \fIsu20076000_00000000\fR.
+.TP
+.B \-\-zar
+Write a ZArchive (\fI.zar\fR) alongside the image.
+.TP
+.B \-\-all
+Alias: \fB\-\-random \-\-seed \-\-trim \-\-update \-\-video \-\-wipe\fR.
+.TP
+.B \-\-best
+Alias: \fB\-\-trim \-\-wipe\fR.
+.TP
+.B \-\-compress
+Alias: \fB\-\-petrify \-\-update \-\-video \-\-zar\fR.
+.TP
+.B \-\-security-sectors \fIfile\fR
+Rebuild only: override the security-sector ranges from a \fIstart-end\fR file.
+.TP
+.B \-\-sectors \fIfile\fR
+Alias of \fB\-\-security-sectors\fR.
+.SS Output and validation
+.TP
+.B \-\-json
+Machine-readable output for read-only modes.
+.TP
+.B \-\-silent
+Checksum: print only the hash.
+.TP
+.B \-\-validate, \-\-validate-strict, \-\-validate-checksums, \-\-validate-report
+Validation flavors; \fB\-V\fR is the audit form.
+.TP
+.B \-\-dry-run
+With \fB\-\-repair\fR, preview fixes without changing the file.
+.TP
+.B \-\-repair-out \fIpath\fR
+With \fB\-\-salvage\fR, choose the rebuilt image path.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Usage error, unreadable/corrupt input, failed validation/audit, or a failed
+operation.
+.SH ENVIRONMENT
+.TP
+.B XISO_NO_UPDATE_CHECK
+Disable the daily GitHub release check performed by the CLI and GUI.
+.TP
+.B XISO_NO_PAUSE
+Never wait for a keypress after a double-click launch.
+.SH FILES
+.TP
+.I *.iso
+Plain or optimized XISO image.
+.TP
+.I *.1.iso, *.2.iso, ...
+Split plain ISO set.
+.TP
+.I *.cso, *.1.cso, ...
+CISO container (v1 or v2), optionally split.
+.TP
+.I *.cci, *.1.cci, ...
+CCI/CCIM container, optionally split.
+.TP
+.I *.zar
+ZArchive (zstd) archive.
+.TP
+.I *.hash
+SHA-1 sidecar written by \fB\-\-petrify\fR or verified by \fBverify-hashes\fR.
+.SH EXAMPLES
+Extract an image into a directory:
+.PP
+.nf
+.RS
+XISOSharp \-x game.iso \-d out
+.RE
+.fi
+.PP
+List an image as JSON:
+.PP
+.nf
+.RS
+XISOSharp \-l game.iso \-\-json
+.RE
+.fi
+.PP
+Create a deterministic ISO from a folder:
+.PP
+.nf
+.RS
+XISOSharp \-c src game.iso \-\-file-time 0
+.RE
+.fi
+.PP
+Compress to a split CCI with parallel workers:
+.PP
+.nf
+.RS
+XISOSharp compress game.iso game.cci \-\-format cci \-\-jobs 8
+.RE
+.fi
+.PP
+Verify two images have the same file tree:
+.PP
+.nf
+.RS
+XISOSharp validate game.iso game.1.cso
+.RE
+.fi
+.SH SEE ALSO
+.BR extract-xiso (1),
+.BR xdvdfs (1)
+.PP
+Full documentation: \fIhttps://purelogiccode.github.io/XISOSharp/\fR
+.PP
+Project home: \fIhttps://github.com/purelogiccode/XISOSharp\fR

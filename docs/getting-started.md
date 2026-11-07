@@ -9,7 +9,7 @@ command-line tool or the .NET library.
 |---|---|
 | OS | Windows, Linux, or macOS |
 | .NET SDK (build from source) | 10.0.301 or newer (see [`global.json`](../global.json)) |
-| .NET runtime (run prebuilt binaries) | .NET 8, .NET 9, or .NET 10 |
+| .NET runtime (run prebuilt binaries) | .NET 10 (Desktop Runtime for the GUI) |
 | Disk space | At least 2× the ISO size for extraction, plus workspace for creation |
 
 > [!NOTE]
@@ -45,6 +45,42 @@ renamed to **`XISOSharp`** (Windows: `XISOSharp.exe`).
 > window open until you press a key. The pause only happens on an interactive
 > no-argument launch — scripts and pipes are never blocked (`XISO_NO_PAUSE=1`
 > disables it explicitly).
+
+### Prebuilt bundles
+
+Every release publishes six framework-dependent zips
+(`release_<version>_<rid>.zip` for `win-x64`, `win-arm64`, `linux-x64`,
+`linux-arm64`, `MacOsX-x64`, `MacOsX-arm64`). Extract the zip and run
+`XISOSharp` (`XISOSharp.exe` on Windows) or `XISOSharp.Gui`. The bundles need
+the **.NET 10 runtime** (Desktop Runtime for the GUI); nothing else is bundled.
+
+### Package managers and container
+
+The repository ships generated winget, Scoop and Homebrew manifests under
+[`packaging/`](../packaging) plus a container image:
+
+```powershell
+# winget: install from the checked-in manifest (requires LocalManifestFiles)
+winget settings --enable LocalManifestFiles
+winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\1.8.0
+
+# Scoop: the repository root is a bucket
+scoop bucket add xisosharp https://github.com/purelogiccode/XISOSharp
+scoop install xisosharp/xisosharp
+```
+
+```bash
+# Homebrew cask (local file; a tap can host packaging/homebrew/xisosharp.rb)
+brew install --cask ./packaging/homebrew/xisosharp.rb
+
+# Container image
+docker run --rm -v "$PWD:/work" -w /work ghcr.io/purelogiccode/xisosharp:latest -v
+```
+
+`scripts/update-packaging.ps1 -Version <version>` refreshes the manifests and
+their SHA-256 values from a published GitHub release. See
+[Shell Completions & Man Page](shell-completions.md) for the tab-completion
+scripts and `xisosharp(1)`.
 
 ### First extraction
 

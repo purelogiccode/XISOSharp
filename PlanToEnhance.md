@@ -2,7 +2,7 @@
 
 - **Updated:** 2026-11-07
 - **Latest release:** XISOSharp **1.8.0** (2026-11-07)
-- **Working tree:** 1.8.0 hardened; P2 tracks complete
+- **Working tree:** 1.8.0 + DST-03/04/05 distribution track; DST-01/02 signing is implemented behind repository secrets
 - **Next release:** 2.0.0 (facade removal / TFM drop) or a future P3 track
 - **Packages:** XISOSharp `1.8.0`, StfsSharp `1.0.0`, CCISharp `1.1.0`, ZArchiveSharp `1.4.0`
 - **Scope of this file:** only work that is still open. Implemented features are listed once in [§9](#9-implemented-baseline-do-not-re-implement) so they are not re-implemented.
@@ -14,6 +14,7 @@
 > 2. **Ship 1.7.0** — ✅ done: `StfsSharp 1.0.0` extracted and published; XISOSharp 1.7.0 tagged/released with six bundles.
 > 3. **Ship CCISharp 1.1** — ✅ done: LZ4-HC, parallel CCI compression, multi-digit parts; `CCISharp 1.1.0` published and integrated.
 > 4. **Harden and ship 1.8.0** — ✅ done: LIB-01…08, DOC-01…03 and GUI-01…05 implemented. P3 distribution/cross-repo items remain deliberately deferred.
+> 5. **P3 distribution track** — DST-03/04/05 implemented (winget/Scoop/Homebrew manifests, shell completions + man page, container image). DST-01/02 are implemented behind repository signing secrets and stay open until a signed package/release is verified. XRP-01…04 stay cross-repo.
 
 ---
 
@@ -23,12 +24,12 @@
 |---|---|
 | Published library | **XISOSharp 1.8.0** (2026-11-07) |
 | Published readers | **StfsSharp 1.0.0** (2026-11-07), **CCISharp 1.1.0** (2026-11-07, NuGet) |
-| Current tree | **1.8.0**, P2 tracks complete |
+| Current tree | **1.8.0 + DST-03/04/05**; signing scaffolding for DST-01/02 |
 | Next release gate | **2.0.0** — facade removal and `net8.0`/`net9.0` drop |
 | Next feature release | **2.0.0** or a future P3 distribution/cross-repo track |
 | Compression track | **CCISharp 1.1** — ✅ HC encoder, parallel writer, multi-digit parts |
 | Tests (last recorded) | XISOSharp 2144 passed / 1 skipped on `net8.0`/`net9.0`; 2217 passed / 1 skipped on `net10.0`; CCISharp 78/78 on all TFMs; StfsSharp 37/37 on all TFMs |
-| CI gates | 3-OS build/test, `dotnet format`, InspectCode, AOT smoke, fuzz, battle-interop, coverage floors |
+| CI gates | 3-OS build/test, `dotnet format`, InspectCode, AOT smoke, fuzz, battle-interop, packaging (completions/man/winget/Scoop/Homebrew), Docker smoke, coverage floors |
 | Reference set | 8 local copies under `References/` — see [§10](#10-reference-map) |
 
 **Checkbox key**
@@ -58,9 +59,9 @@
 | **P1** | CCISharp 1.1 | ✅ released 2026-11-07 | 0 |
 | **P2** | Library hardening | 1.8.0 | 0 |
 | **P2** | Docs, fixtures and GUI | 1.8.0 | 0 |
-| **P3** | Distribution and supply chain | later | 5 |
+| **P3** | Distribution and supply chain | later | 2 (DST-01/02 await signing certs) |
 | **P3** | Cross-repo consumers | after 1.8.0 | 4 |
-| | **Total** | | **9 open** (2 optional) + 35 done |
+| | **Total** | | **6 open** (2 optional) + 38 done |
 
 **Recommended order**
 
@@ -70,7 +71,9 @@
 | 2 | `CCI-01` … `CCI-06` | ✅ done; `CCISharp 1.1.0` is published and integrated. |
 | 3 | `LIB-01` … `LIB-08` | ✅ done in 1.8.0. |
 | 4 | `DOC-*`, `GUI-*` | ✅ done in 1.8.0. |
-| 5 | `DST-*`, `XRP-*` | Deferred; separate distribution and companion-repository tracks. |
+| 5 | `DST-03` … `DST-05` | ✅ implemented: manifests, completions/man page and container image. |
+| 6 | `DST-01`, `DST-02` | Implemented behind repository signing secrets; close when a signed package/release is verified. |
+| 7 | `XRP-*` | Deferred; separate companion-repository tracks. |
 
 ---
 
@@ -270,26 +273,35 @@
 - [ ] **DST-01 · NuGet author signing**
   - Sign nupkg/snupkg when a repository certificate secret is configured.
   - **Done when:** a signed package verifies and the unsigned fallback still works.
+  - **Implemented 2026-11-07 (awaiting secrets):** `ci.yml` `pack` decodes `NUGET_SIGNING_CERT`/`NUGET_SIGNING_PASSWORD`, runs `dotnet nuget sign` + `dotnet nuget verify --all` with an optional `NUGET_SIGNING_TIMESTAMPER`, and skips the step when unset. Local self-signed sign/verify and the unsigned fallback were exercised; close when a release with the real certificate verifies.
 
 - [ ] **DST-02 · Windows Authenticode signing + macOS notarization**
   - Gate on repository secrets; sign the CLI/GUI bundles and notarize the macOS builds.
   - **Done when:** `signtool verify` and `spctl --assess` succeed on the release assets.
+  - **Implemented 2026-11-07 (awaiting secrets):** `release.yml` gains `sign-windows` (Authenticode sign + `signtool verify /pa` before zipping) and `sign-macos` (codesign every Mach-O, notarize with `notarytool` when the `MACOS_NOTARY_*` secrets exist), gated by `ENABLE_WINDOWS_SIGNING` / `ENABLE_MACOS_SIGNING`. Smoke and release prefer the signed artifacts; unsigned bundles remain the default. Local self-signed `signtool sign`/`verify` passed.
 
-- [ ] **DST-03 · Package-manager manifests**
+- [x] **DST-03 · Package-manager manifests**
   - Generate winget, scoop and Homebrew manifests from the release assets.
   - **Done when:** each manifest installs the latest release in CI or a manual smoke test.
+  - **Done 2026-11-07:** `scripts/update-packaging.ps1 -Version 1.8.0` generated the winget manifests, Scoop manifest (also at the repository-root `bucket/`), and Homebrew cask from the 1.8.0 release digests. `winget validate` passes; the win-x64 asset hash and nested `XISOSharp.exe`/`XISOSharp.Gui.exe` layout were verified against the published zip; CI adds winget, Scoop and Homebrew install smokes.
 
-- [ ] **DST-04 · Shell completions and man page**
+- [x] **DST-04 · Shell completions and man page**
   - Add PowerShell, bash, zsh and fish completions plus `xisosharp.1`; publish them as separate release assets or docs pages (the six bundle zips keep their exact five-file layout).
   - **Done when:** completions load and the man page renders.
+  - **Done 2026-11-07:** `docs/completions/{xisosharp.ps1,xisosharp.bash,_xisosharp,xisosharp.fish}` and `docs/man/xisosharp.1` are served by the docs site. PowerShell `TabExpansion2` and bash `_xisosharp` were exercised locally; CI parses all four scripts, checks every CLI flag is completable (`scripts/check_cli_completions.py`), and renders/lints the man page with `groff`/`mandoc`. The six RID zips are unchanged.
 
-- [ ] **DST-05 · Optional Docker image**
+- [x] **DST-05 · Optional Docker image**
   - Publish `ghcr.io/purelogiccode/xisosharp` with the CLI and document usage.
   - **Done when:** the image runs `XISOSharp -v` and a smoke conversion.
+  - **Done 2026-11-07:** root `Dockerfile` publishes the framework-dependent CLI on the .NET 10 runtime; `.github/workflows/docker.yml` builds, runs `-v`, create/list/extract byte-compares a synthetic folder, and pushes `:<version>` + `:latest` to GHCR on tag pushes. The exact publish arguments and smoke commands were exercised locally (version `0.0.0-dockertest`).
 
 ---
 
 ## 8. P3 — Cross-repo consumers
+
+> These items live in the companion repositories (`CSharp_SimpleXisoDrive`,
+> `CSharp_XISOStudio`, `CSharp_ZArchiveSharp`, `CSharp_VideoGameFileSystemParser`),
+> not in this tree. They stay open here as a cross-repo reminder.
 
 - [ ] **XRP-01 · Upgrade `SimpleXisoDrive`**
   - Move to XISOSharp 1.7/`StfsSharp`, adopt `XisoImage`, and verify GOD mount through `XisoImageSource.OpenRead`.
@@ -321,6 +333,7 @@
 | **1.7.0 scope** | `StfsSharp` extraction: standalone GOD/SVOD + STFS readers, NuGet 1.0.0, XISOSharp facades with an unchanged public API, moved tests/fixtures/fuzzer/benchmarks |
 | **CCISharp 1.1 scope** | LZ4-HC levels 10..12, parallel sector compression (`Jobs` 1..64, byte-identical), multi-digit split discovery, `CCISharp.Cli`, fuzz + benchmarks, `CCISharp 1.1.0` on NuGet |
 | **Quality** | 3-OS CI, format gate, InspectCode, AOT smoke, mutation fuzz, battle-interop, coverage floors, SBOM and build provenance |
+| **Distribution (1.8.x)** | winget/Scoop/Homebrew manifests + generator, PowerShell/bash/zsh/fish completions, `xisosharp(1)`, CLI container image (GHCR), optional NuGet/Authenticode/macOS signing pipelines |
 
 ---
 
@@ -400,6 +413,12 @@ dotnet pack XISOSharp/XISOSharp.csproj -c Release -o artifacts
 dotnet publish XISOSharp.AotSmoke/XISOSharp.AotSmoke.csproj -c Release -r linux-x64
 dotnet run --project XISOSharp.Fuzz -c Release -- --seconds 60
 dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
+
+# Distribution artifacts
+python scripts/check_cli_completions.py
+winget validate --manifest packaging/winget/manifests/p/purelogiccode/XISOSharp/1.8.0
+docker build -t xisosharp --build-arg VERSION=1.8.0 .
+docker run --rm xisosharp -v
 ```
 
 ---
@@ -439,4 +458,79 @@ dotnet run --project XISOSharp.Benchmarks -c Release -- --filter "*EndToEnd*"
 | 2026-11-07 | `GUI-01`–`GUI-05` Xbox 360 GUI | 1.8.0 | GOD/STFS open/list/tree/extract/unpack/audit, title panel, XBE preview, drop routing, `--jobs` controls; self-test and GUI parity tests |
 | 2026-11-07 | 1.8.0 verification | 1.8.0 | Suite 2144/1 (net8/net9) + 2217/1 (net10); format clean; InspectCode 0; pack 1.7.0 baseline; AOT, fuzz 6,605 iterations, battle 40/40, GUI self-test and docs links green |
 | 2026-11-07 | 1.8.0 released | 1.8.0 | Tag `bce1393`; CI green; NuGet 1.8.0 indexed; GitHub release has six RID zips + SPDX; downloaded win-x64 bundle reports v1.8.0, `--probe-cli` 1.8.0 and `SELF-TEST: all passed` |
-| | | | |
+| 2026-11-07 | `DST-04` completions + man page | 1.8.x | PowerShell/bash/zsh/fish completions and `xisosharp(1)` in docs; CLI-flag coverage checker; `packaging-smoke` CI |
+| 2026-11-07 | `DST-03` package manifests | 1.8.x | winget/Scoop/Homebrew manifests generated from 1.8.0 digests; `winget validate` green; asset hash + nested layout verified; install-smoke CI |
+| 2026-11-07 | `DST-05` container image | 1.8.x | `Dockerfile` + `docker.yml`; local publish/smoke arguments validated; GHCR publish on tags |
+| 2026-11-07 | `DST-01`/`DST-02` signing pipelines | 1.8.x | NuGet sign/verify and Windows/macOS sign jobs gated on repository secrets; local self-signed sign/verify passed; open until real certs verify |
+| 2026-11-07 | Distribution verification | 1.8.x | Full suite 2144/1 + 2217/1; build 0 warnings; format clean; pack green; docs links 263 OK; real `XBOXReady` ISOs audit/checksum/title-info PASS; winget asset hash + layout verified |
+| 2026-11-07 | Work paused | 1.8.x | Distribution track implemented and locally validated; CI/install-smoke and real signing certs remain. Resume notes in [§15](#15-resume-notes--handoff) |
+
+---
+
+## 15. Resume notes / handoff
+
+**State at pause (2026-11-07):** the distribution track is implemented in the
+working tree but **not committed or pushed**. No source files under
+`XISOSharp/` or `XISOSharp.Cli/` changed; this is docs + CI + packaging only.
+
+### Completed locally
+
+- `dotnet build CSharp_XISOSharp.sln -c Release -m:1` — 0 warnings / 0 errors.
+- `dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release --no-build` —
+  2144/1 (`net8.0`), 2144/1 (`net9.0`), 2217/1 (`net10.0`).
+- `dotnet format whitespace ... --verify-no-changes` — clean.
+- `dotnet pack XISOSharp/XISOSharp.csproj -c Release` — 1.8.1-alpha package +
+  snupkg, package validation green.
+- `python scripts/check_cli_completions.py` — 96 flags present in all four
+  completion files; `bash -n` and PowerShell AST/TabExpansion2 exercised.
+- `winget validate` — clean; the published win-x64 asset hash and nested
+  `XISOSharp.exe` / `XISOSharp.Gui.exe` layout match the manifest.
+- Docs link checker — 263 local links OK.
+- Real `D:\Samples\XBOXReady` ISOs: `-l`, `-V` (PASS), `checksum`,
+  `title-info --json` all pass.
+- Docker publish arguments exercised locally (no container runtime installed);
+  version `0.0.0-dockertest` banner verified.
+
+### First actions on resume
+
+1. `git status` — confirm the new files are visible. The local
+   `.git/info/exclude` had a stale `/Scripts/` rule (Windows treats it as
+   `scripts/`); it was removed so `scripts/check_cli_completions.py` and
+   `scripts/update-packaging.ps1` can be committed. Do not lose them.
+2. Commit and push the distribution track (user approval required per
+   `AGENTS.md`; do not delete anything under `bin/Release`, `publish*` or the
+   release zips).
+3. Wait for the new CI jobs and fix the expected CI-only issues:
+   - `packaging-smoke` — zsh/fish/groff/mandoc are first exercised there.
+   - `packaging-windows` — `winget validate` + Scoop/winget consistency.
+   - `package-install-smoke` — winget needs `LocalManifestFiles` (admin),
+     Scoop uses `-RunAsAdmin` on hosted runners, Homebrew uses
+     `--skip-cask-deps`; confirm the portable alias/shim paths.
+   - `docker` workflow — first real container build/smoke.
+4. After green CI, update the progress log/`§1` counts if any install-smoke
+   adjustment was needed. DST-03/04/05 are already marked done; DST-01/02 stay
+   open until real certificates verify.
+
+### DST-01/DST-02 signing checklist
+
+| Item | Required repository configuration |
+|---|---|
+| NuGet author signing | secrets `NUGET_SIGNING_CERT` (base64 PFX), `NUGET_SIGNING_PASSWORD`; optional variable `NUGET_SIGNING_TIMESTAMPER` |
+| Windows Authenticode | variable `ENABLE_WINDOWS_SIGNING=true`; secrets `WINDOWS_SIGNING_CERT`, `WINDOWS_SIGNING_PASSWORD` |
+| macOS codesign | variable `ENABLE_MACOS_SIGNING=true`; secrets `MACOS_SIGNING_CERT`, `MACOS_SIGNING_PASSWORD`, `MACOS_SIGNING_IDENTITY` |
+| macOS notarization | additionally secrets `MACOS_NOTARY_APPLE_ID`, `MACOS_NOTARY_TEAM_ID`, `MACOS_NOTARY_PASSWORD` |
+
+Verification to record before closing DST-01/02: `dotnet nuget verify --all` on
+the published nupkg/snupkg, `signtool verify /pa` on both Windows bundles, and
+`spctl --assess --type execute` on the macOS binaries (notarization ticket).
+
+### Pending after this track
+
+- `XRP-01` … `XRP-04` live in the companion repositories and were explicitly
+  out of scope for this working directory.
+- The next product release remains **2.0.0** (facade removal and
+  `net8.0`/`net9.0` drop); this distribution work can ship earlier as 1.9.0 if
+  desired.
+- After every release run
+  `./scripts/update-packaging.ps1 -Version <version>` and commit the refreshed
+  winget/Scoop/Homebrew files.

@@ -1,0 +1,106 @@
+#compdef XISOSharp xisosharp
+# zsh completion for the XISOSharp CLI.
+#
+# Install:
+#   fpath=(/path/to/completions $fpath)
+#   autoload -Uz compinit && compinit
+# or copy this file as `_xisosharp` into a directory on $fpath.
+
+_xisosharp() {
+    local -a verbs flags
+    verbs=(
+        validate rebuild build-image image-spec
+        compress cso cci decompress uncso decso uncci
+        checksum split join joinsplit convert hash
+        verify-hashes verify-hash title-info title xbe-image
+    )
+    flags=(
+        -h --help -v --version
+        -c -x --unpack --pack -l -t -i --ls
+        --xex-info --xbe-info --xbe-image --md5 --sha256
+        -V --validate --validate-strict --validate-checksums --validate-report
+        --repair --salvage --repair-out --dry-run --dryrun
+        --copy-out --copy-in --no-backup
+        -r -q -Q -s -D -m -y --yes -n --no
+        -d -o -O -X -f
+        --skip-sectors --prepend-sectors --preserve-attrs
+        --file-time --filetime --get-filetime --set-filetime
+        --layout --sector-layout --ranges --is-optimized
+        --checksum --silent --json
+        --batch --batch-recursive --skip-existing --continue-on-error
+        --name-policy --delete-source --jobs
+        --policy --all --best --compress --zar
+        --video --random --seed --wipe --trim --petrify --update
+        --security-sectors --sectors
+        --ciso-level --ciso-version --ciso-split
+        --cci-level --cci-split --level
+        --format --output-name --output --map --file --type --size --ignore-extra
+        --split --verify-hashes
+    )
+
+    local prev=${words[CURRENT-1]}
+    case $prev in
+        --format)
+            compadd -- cso cci iso zar
+            return
+            ;;
+        --ciso-version)
+            compadd -- 1 2 auto
+            return
+            ;;
+        --ciso-level|--level)
+            compadd -- 0 1 2 3 4 5 6 7 8 9
+            return
+            ;;
+        --cci-level)
+            compadd -- 0 1 2 3 4 5 6 7 8 9 10 11 12
+            return
+            ;;
+        --name-policy)
+            compadd -- reject sanitize skip
+            return
+            ;;
+        --policy)
+            compadd -- skip overwrite auto-rename
+            return
+            ;;
+        --type)
+            compadd -- logo title save
+            return
+            ;;
+        --size)
+            compadd -- half halves
+            return
+            ;;
+        --jobs)
+            compadd -- 1 2 4 8 16 32 64
+            return
+            ;;
+    esac
+
+    # Flags are only valid before the first positional token.
+    local positional=0
+    local i
+    for (( i = 2; i < CURRENT; i++ )); do
+        if [[ ${words[i]} != -* ]]; then
+            positional=1
+            break
+        fi
+    done
+
+    if [[ ${words[CURRENT]} == -* ]]; then
+        compadd -- $flags
+        return
+    fi
+
+    if (( positional == 0 )); then
+        if ! compadd -- $verbs; then
+            _files
+        fi
+        return
+    fi
+
+    _files
+}
+
+_xisosharp "$@"

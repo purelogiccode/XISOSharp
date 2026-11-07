@@ -196,6 +196,170 @@ jobs:
       - name: Check local documentation links
         run: python3 scripts/check_docs_links.py _site
 
+  packaging-smoke:
+    name: packaging-smoke (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install -y fish groff mandoc shellcheck zsh
+
+      - name: Validate shell completions
+        run: |
+          set -euo pipefail
+          bash -n docs/completions/xisosharp.bash
+          zsh -n docs/completions/_xisosharp
+          fish -n docs/completions/xisosharp.fish
+          shellcheck docs/completions/xisosharp.bash
+          python3 scripts/check_cli_completions.py
+
+      - name: Parse PowerShell completion
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "docs/completions/xisosharp.ps1", [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+          Write-Host "PowerShell completion parses cleanly."
+
+      - name: Render man page
+        run: |
+          set -euo pipefail
+          groff -man -Tutf8 -ww -z docs/man/xisosharp.1
+          mandoc -T lint -W error docs/man/xisosharp.1
+          groff -man -Tutf8 docs/man/xisosharp.1 | grep -q 'XISOSHARP'
+          echo "man page renders."
+
+  packaging-windows:
+    name: packaging-windows
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Validate winget manifest
+        shell: pwsh
+        run: |
+          $root = 'packaging/winget/manifests/p/purelogiccode/XISOSharp'
+          $version = Get-ChildItem $root -Directory |
+            Sort-Object { [version]$_.Name } -Descending |
+            Select-Object -First 1
+          if (-not $version) { throw 'No winget manifest version directory found.' }
+          winget validate --manifest $version.FullName
+          if ($LASTEXITCODE -ne 0) { throw "winget validate exited $LASTEXITCODE" }
+
+      - name: Validate Scoop manifest
+        shell: pwsh
+        run: |
+          $root = 'packaging/winget/manifests/p/purelogiccode/XISOSharp'
+          $version = Get-ChildItem $root -Directory |
+            Sort-Object { [version]$_.Name } -Descending |
+            Select-Object -First 1
+          $scoop = Get-Content 'packaging/scoop/xisosharp.json' -Raw | ConvertFrom-Json
+          if ($scoop.version -ne $version.Name) {
+            throw "Scoop is $($scoop.version) but winget is $($version.Name)"
+          }
+          foreach ($architecture in $scoop.architecture.PSObject.Properties) {
+            if ($architecture.Value.hash -notmatch '^[0-9a-f]{64}$') {
+              throw "Invalid SHA-256 for $($architecture.Name)"
+            }
+          }
+          Write-Host "Scoop manifest matches winget $($version.Name)."
+
+  package-install-smoke:
+    name: package-install (${{ matrix.kind }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: windows
+            os: windows-latest
+          - kind: macos
+            os: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install from winget and Scoop
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # --- winget: local manifest install -------------------------------
+          winget settings --enable LocalManifestFiles
+          $root = 'packaging/winget/manifests/p/purelogiccode/XISOSharp'
+          $version = Get-ChildItem $root -Directory |
+            Sort-Object { [version]$_.Name } -Descending |
+            Select-Object -First 1
+          winget install --manifest $version.FullName `
+            --accept-package-agreements --accept-source-agreements --disable-interactivity
+          if ($LASTEXITCODE -ne 0) { throw "winget install exited $LASTEXITCODE" }
+
+          $links = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
+          $banner = & (Join-Path $links 'xisosharp.exe') -v
+          if ($LASTEXITCODE -ne 0) { throw "winget-installed CLI exited $LASTEXITCODE" }
+          $text = $banner -join "`n"
+          if ($text -notmatch '^XISOSharp v\d+\.\d+\.\d+') { throw "Unexpected winget banner: $text" }
+          Write-Host $text
+          winget uninstall --id purelogiccode.XISOSharp --exact `
+            --disable-interactivity --accept-source-agreements
+          if ($LASTEXITCODE -ne 0) { throw "winget uninstall exited $LASTEXITCODE" }
+
+          # --- Scoop: repository-root bucket --------------------------------
+          $env:SCOOP = Join-Path $env:RUNNER_TEMP 'scoop'
+          $env:SCOOP_GLOBAL = Join-Path $env:RUNNER_TEMP 'scoop-global'
+          $installer = [scriptblock]::Create((Invoke-RestMethod -Uri 'https://get.scoop.sh'))
+          $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
+          if ($isAdmin) { & $installer -RunAsAdmin } else { & $installer }
+          if ($LASTEXITCODE -ne 0) { throw "Scoop install script exited $LASTEXITCODE" }
+          $env:PATH = "$(Join-Path $env:SCOOP 'shims');$env:PATH"
+          if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { throw 'scoop was not found after installation.' }
+          scoop bucket add xisosharp $env:GITHUB_WORKSPACE
+          scoop install xisosharp/xisosharp
+          if ($LASTEXITCODE -ne 0) { throw "scoop install exited $LASTEXITCODE" }
+          $shim = Join-Path $env:SCOOP 'shims\xisosharp.exe'
+          $scoopBanner = & $shim -v
+          if ($LASTEXITCODE -ne 0) { throw "Scoop-installed CLI exited $LASTEXITCODE" }
+          $scoopText = $scoopBanner -join "`n"
+          if ($scoopText -notmatch '^XISOSharp v\d+\.\d+\.\d+') { throw "Unexpected Scoop banner: $scoopText" }
+          Write-Host $scoopText
+          scoop uninstall xisosharp
+
+      - name: Validate cask syntax
+        if: matrix.kind == 'macos'
+        run: ruby -c packaging/homebrew/xisosharp.rb
+
+      - name: Install from Homebrew
+        if: matrix.kind == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install --cask --skip-cask-deps ./packaging/homebrew/xisosharp.rb
+          banner="$(xisosharp -v)"
+          echo "$banner"
+          grep -Eq '^XISOSharp v[0-9]+\.[0-9]+\.[0-9]+' <<< "$banner"
+          brew uninstall --cask xisosharp
+
   aot-smoke:
     name: aot-smoke (linux)
     runs-on: ubuntu-latest
@@ -464,7 +628,13 @@ jobs:
     timeout-minutes: 30
     # Package only when every gate is green: a tag push then publishes exactly
     # what CI validated.
-    needs: [build-and-test, gui-smoke, inspectcode, dependency-audit, aot-smoke, fuzz-smoke, battle-interop]
+    needs: [build-and-test, gui-smoke, inspectcode, dependency-audit, aot-smoke, fuzz-smoke, battle-interop, packaging-smoke, packaging-windows]
+    env:
+      # Optional NuGet author signing. Both secrets are required together; when
+      # they are absent the step is skipped and the packages stay unsigned.
+      NUGET_SIGNING_CERT: ${{ secrets.NUGET_SIGNING_CERT }}
+      NUGET_SIGNING_PASSWORD: ${{ secrets.NUGET_SIGNING_PASSWORD }}
+      NUGET_SIGNING_TIMESTAMPER: ${{ vars.NUGET_SIGNING_TIMESTAMPER }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -491,6 +661,28 @@ jobs:
         # package validation); .snupkg holds its symbols. The CLI ships as
         # GitHub release bundles only.
         run: dotnet pack XISOSharp/XISOSharp.csproj --no-build --configuration Release --output artifacts
+
+      - name: Sign packages (optional)
+        # DST-01: NuGet author signing. Enable by adding the `NUGET_SIGNING_CERT`
+        # (base64 PFX) and `NUGET_SIGNING_PASSWORD` repository secrets; the
+        # unsigned path remains the default.
+        if: env.NUGET_SIGNING_CERT != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cert="$(mktemp)"
+          trap 'rm -f "$cert"' EXIT
+          printf '%s' "$NUGET_SIGNING_CERT" | base64 --decode > "$cert"
+          timestamper="${NUGET_SIGNING_TIMESTAMPER:-https://timestamp.digicert.com}"
+          for package in artifacts/*.nupkg artifacts/*.snupkg; do
+            dotnet nuget sign "$package" \
+              --certificate-path "$cert" \
+              --certificate-password "$NUGET_SIGNING_PASSWORD" \
+              --timestamper "$timestamper" \
+              --overwrite
+            dotnet nuget verify "$package" --all
+          done
+          echo "Signed and verified $(find artifacts -maxdepth 1 \( -name '*.nupkg' -o -name '*.snupkg' \) | wc -l) package(s)."
 
       - name: Upload packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

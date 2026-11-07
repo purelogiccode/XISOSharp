@@ -65,10 +65,12 @@ reproducible or re-downloadable. Never delete them.
   `--self-test`), `inspectcode` (JetBrains InspectCode, pinned
   `2026.2.3.1`, fails on any warning/error and uploads SARIF),
   `dependency-audit` (`dotnet list package --vulnerable`), `aot-smoke`
-  (NativeAOT publish + run), `fuzz-smoke` (2-minute mutation fuzz) and
+  (NativeAOT publish + run), `fuzz-smoke` (2-minute mutation fuzz),
   `battle-interop` (synthetic copyright-free corpus vs the checked-in
-  extract-xiso/xdvdfs/xboxkit oracles). Keep InspectCode at 0 warnings; the
-  floor is enforced in CI.
+  extract-xiso/xdvdfs/xboxkit oracles), `packaging-smoke` (completion/man-page
+  syntax + CLI-flag coverage), `packaging-windows` (`winget validate` and
+  Scoop consistency) and `package-install-smoke` (winget/Scoop/Homebrew
+  installs). Keep InspectCode at 0 warnings; the floor is enforced in CI.
 - Coverage: the Windows test job writes merged line/branch coverage to the job
   summary and fails below `MIN_LINE_COVERAGE` (70%) or
   `MIN_BRANCH_COVERAGE` (60%).
@@ -80,7 +82,8 @@ reproducible or re-downloadable. Never delete them.
   projects.
 - Companion workflows: `codeql.yml` (CodeQL C#), `dependency-review.yml` (PRs),
   `scorecard.yml` (OpenSSF Scorecard), `release.yml` (tag: six RID bundles +
-  GitHub release), `pages.yml`/`wiki.yml` (docs).
+  GitHub release), `docker.yml` (CLI image build/smoke; GHCR publish on tags),
+  `pages.yml`/`wiki.yml` (docs).
 - Tag pushes trigger the tag-only `publish-nuget` job; PR/branch runs stop at
   pack. `release.yml` runs in parallel and creates the GitHub release.
 - The three TFM test hosts run in parallel and share one `TestData/` tree; the
@@ -138,6 +141,22 @@ reproducible or re-downloadable. Never delete them.
    ```
 
    Push the nupkg before the snupkg (symbols require the package to exist).
+
+### Distribution artifacts
+
+- `scripts/update-packaging.ps1 -Version <version>` regenerates the winget
+  manifests (`packaging/winget/...`), the Scoop manifest
+  (`packaging/scoop/xisosharp.json` + repository-root `bucket/`) and the
+  Homebrew cask from the published release digests. Run it after a release and
+  commit the refreshed files.
+- Optional signing is gated on repository variables/secrets:
+  `NUGET_SIGNING_CERT`/`NUGET_SIGNING_PASSWORD` (NuGet author signing),
+  `ENABLE_WINDOWS_SIGNING` + `WINDOWS_SIGNING_CERT`/`WINDOWS_SIGNING_PASSWORD`
+  (Authenticode), and `ENABLE_MACOS_SIGNING` + `MACOS_SIGNING_*` /
+  `MACOS_NOTARY_*` (codesign/notarization). Unsigned is the default; enabling a
+  flag without its secrets fails the job.
+- Completions and the man page live in `docs/completions` / `docs/man` and are
+  part of the docs site, not the five-file RID bundles.
 
 ## Routine: publish a GitHub release
 

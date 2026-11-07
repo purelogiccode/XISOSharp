@@ -4,6 +4,7 @@
 - **User Guide**
   - [Getting Started](getting-started.md)
   - [CLI Reference](cli.md)
+  - [Shell Completions & Man Page](shell-completions.md)
   - [Validation](validation.md)
   - [Redump & Disc Layouts](redump-workflows.md)
   - [Archival Workflows](archival.md)

@@ -40,6 +40,7 @@ Full docs live in [`docs/`](docs/README.md) — served as a **Docsify site with 
 
 - [Getting Started](docs/getting-started.md) — install, first extract/create/list
 - [CLI Reference](docs/cli.md) — every flag, verb, exit code
+- [Shell Completions & Man Page](docs/shell-completions.md) — PowerShell/bash/zsh/fish completion and `xisosharp(1)`
 - [Archival Workflows](docs/archival.md) — `--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`rebuild`
 - [Build-Image & Image-Spec](docs/xdvdfs-compat.md#build-image) — ordered `wax` remapping, `xdvdfs.toml`
 - [Compression (CISO, CCI)](docs/compression.md) - `compress`/`decompress`, `CisoBlockDevice`, `CciBlockDevice`, `XisoCci`
@@ -63,6 +64,31 @@ Install-Package XISOSharp
 ```
 
 Package targets `net8.0`, `net9.0`, `net10.0`, strong-named, `IsTrimmable`+`IsAotCompatible`, `snupkg` via SourceLink; runtime dependencies are `ZArchiveSharp` (ZAR), `CCISharp` (CCI) and `StfsSharp` (GOD/SVOD and XBLA/XBLIG STFS readers).
+
+### Prebuilt bundles, package managers and container
+
+Each release publishes six framework-dependent zips
+(`release_<version>_<rid>.zip`) that need the **.NET 10 runtime**. Extract the
+zip and run `XISOSharp(.exe)` / `XISOSharp.Gui`. Generated winget, Scoop and
+Homebrew manifests live under [`packaging/`](packaging), and the CLI is also
+published as a container image:
+
+```powershell
+winget settings --enable LocalManifestFiles
+winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\1.8.0
+
+scoop bucket add xisosharp https://github.com/purelogiccode/XISOSharp
+scoop install xisosharp/xisosharp
+```
+
+```bash
+brew install --cask ./packaging/homebrew/xisosharp.rb
+docker run --rm -v "$PWD:/work" -w /work ghcr.io/purelogiccode/xisosharp:latest -v
+```
+
+Shell completions (PowerShell, bash, zsh, fish) and the `xisosharp(1)` man page
+are in [`docs/completions`](docs/completions) and [`docs/man`](docs/man); see
+[Shell Completions & Man Page](docs/shell-completions.md).
 
 ### CLI (from source)
 

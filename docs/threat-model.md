@@ -44,8 +44,9 @@ boundaries, the main threats and the controls that mitigate them.
   directory you control, not over system paths.
 - In-place `--repair`/`--copy-in` modify the source; keep backups (the CLI writes
   one by default).
-- Code signing/notarization is not enabled by default; verify the published
-  hashes/SBOM/provenance before running release bundles.
+- Code signing/notarization is optional and disabled unless the repository
+  signing secrets are configured; verify the published hashes/SBOM/provenance
+  before running release bundles.
 
 Report suspected vulnerabilities through
 [private vulnerability reporting](https://github.com/purelogiccode/XISOSharp/security/advisories/new),

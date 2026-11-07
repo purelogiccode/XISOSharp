@@ -1,5 +1,35 @@
 # Release Notes
 
+## Unreleased
+
+**Distribution and shell integration.** No library API or read/write behavior
+changed.
+
+### Packaging
+
+- **winget, Scoop and Homebrew manifests (DST-03):** the release assets are
+  described by generated manifests under `packaging/`. The repository root is
+  also a Scoop bucket (`bucket/xisosharp.json`), and
+  `scripts/update-packaging.ps1 -Version <version>` refreshes every manifest and
+  SHA-256 value from a published GitHub release.
+- **Shell completions and man page (DST-04):** PowerShell, bash, zsh and fish
+  completions live in `docs/completions/`, and `xisosharp(1)` in `docs/man/`.
+  CI parses each script, checks that every CLI flag is completable, and
+  renders/lints the man page.
+- **Container image (DST-05):** `Dockerfile` builds a framework-dependent CLI
+  image. `docker.yml` smoke-tests `-v`, create/list/extract and publishes
+  `ghcr.io/purelogiccode/xisosharp:<version>` plus `:latest` on tag pushes.
+- **Optional signing (DST-01/DST-02):** NuGet author signing runs when the
+  signing secrets exist; Windows bundles can be Authenticode-signed and
+  verified, and macOS bundles codesigned/notarized, behind repository variables.
+  Unsigned builds remain the default.
+
+### Validation
+
+- CI adds `packaging-smoke` (completions/man page), `packaging-windows`
+  (winget/Scoop validation) and `package-install-smoke` (winget, Scoop and
+  Homebrew installs).
+
 ## 1.8.0
 
 **Release date:** 2026-11-07.

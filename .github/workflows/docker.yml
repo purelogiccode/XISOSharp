@@ -1,0 +1,112 @@
+name: Docker
+
+# Builds and smoke-tests the CLI container image. Tag pushes publish
+# ghcr.io/<owner>/xisosharp:<version> and :latest; pull requests and branch
+# pushes only build and smoke-test the image.
+
+on:
+  push:
+    branches: [master, main]
+    tags: ['v*', '[0-9]*']
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.editorconfig'
+      - 'Directory.Build.props'
+      - 'NuGet.config'
+      - 'XISOSharp/**'
+      - 'XISOSharp.Cli/**'
+      - '.github/workflows/docker.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.editorconfig'
+      - 'Directory.Build.props'
+      - 'NuGet.config'
+      - 'XISOSharp/**'
+      - 'XISOSharp.Cli/**'
+      - '.github/workflows/docker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/xisosharp
+
+jobs:
+  build:
+    name: build and smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="0.0.0-pr.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build image
+        run: |
+          docker build \
+            --build-arg VERSION="${{ steps.version.outputs.version }}" \
+            --tag "xisosharp:test" .
+
+      - name: Smoke-test the CLI
+        run: |
+          set -euo pipefail
+          banner="$(docker run --rm xisosharp:test -v)"
+          echo "$banner"
+          grep -Eq '^XISOSharp v[0-9]+\.[0-9]+\.[0-9]+' <<< "$banner"
+
+          work="$PWD/.docker-smoke"
+          rm -rf "$work"
+          mkdir -p "$work/src"
+          printf 'hello from the container\n' > "$work/src/hello.txt"
+
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$work:/work" -w /work xisosharp:test \
+            --file-time 0 -c src game.iso
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$work:/work" -w /work xisosharp:test -l game.iso
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$work:/work" -w /work xisosharp:test -x -d out game.iso
+          cmp "$work/src/hello.txt" "$work/out/hello.txt"
+          rm -rf "$work"
+
+      - name: Log in to GHCR
+        if: github.ref_type == 'tag'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish image
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          image="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          version="${{ steps.version.outputs.version }}"
+          docker tag xisosharp:test "$image:$version"
+          docker tag xisosharp:test "$image:latest"
+          docker push "$image:$version"
+          docker push "$image:latest"

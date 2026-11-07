@@ -45,6 +45,7 @@ The DocFX API link is absolute because the generated reference is published on P
 |---|---|
 | [Getting Started](getting-started.md) | Installation, first extract/create/list, requirements |
 | [CLI Reference](cli.md) | Every command, flag, mode, exit code, and batch behavior (incl. archival & xdvdfs verbs) |
+| [Shell Completions & Man Page](shell-completions.md) | PowerShell/bash/zsh/fish completion and `xisosharp(1)` |
 | [Validation](validation.md) | `validate` command and `--validate*` flags |
 | [Redump & Disc Layouts](redump-workflows.md) | XGD offsets (incl. hybrid `0x89D80000`), video partitions, `--skip-sectors` / `--prepend-sectors` |
 | [Archival Workflows](archival.md) | Redump lossless pipeline: `--video` / `--random` / `--seed` / `--wipe` / `--trim` / `--petrify` / `--update` / `--zar` / `--all` / `--best` / `--compress` / `rebuild` / `--security-sectors` |

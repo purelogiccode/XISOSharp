@@ -110,7 +110,16 @@ skipping for a recovery run. The OS must still have long paths enabled
 
 - Release bundles and the NuGet library are built by CI with an SBOM and build
   provenance. Authenticode signing, macOS notarization and NuGet author signing
-  require repository signing secrets and are not enabled by default.
+  are implemented but disabled by default: enable them with the repository
+  variables/secrets listed in [Building](building.md#distribution-artifacts).
+  Unsigned builds remain the default and are fully supported.
+- Shell completions and the `xisosharp(1)` man page ship in the docs tree
+  (`docs/completions`, `docs/man`); the six RID zips keep their five-file layout
+  and do not embed them.
+- winget/Scoop/Homebrew manifests are generated from release assets. winget and
+  Homebrew still require submission to their upstream repositories (or a local
+  manifest/cask install); the checked-in Scoop bucket works directly.
+- The container image contains the CLI only (no GUI, no .NET SDK).
 - The CLI ships only through GitHub releases (no NuGet package). The release
   zips are framework-dependent (need the .NET 10 runtime); the self-contained
   single-file builds come from `publish-cli.ps1` / `publish-gui.ps1`.
