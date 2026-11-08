@@ -251,6 +251,8 @@ items became `BRF-11`…`BRF-13` in the (now retired) missing-feature plan.
 | 2026-11-07 | `BRF-12` symlink policy + `BRF-13` host-I/O diagnostics | 1.9.0-dev | `--symlink-mode follow\|skip\|reject` for create/pack/build-image/Apply; `HostIoDiagnostics` actionable messages wired into extraction and CLI modes |
 | 2026-11-07 | `FAC-01` facade removal | 1.9.0-dev | Removed the StfsSharp compatibility facades and models; library/CLI/GUI/fuzz/tests use StfsSharp directly; internal GOD adapter; baseline 1.8.0 + reviewed CP0001 suppressions |
 | 2026-11-07 | `FAC-02` TFM matrix documented | 1.9.0-prep | Support policy, known limitations, README and release notes now describe `net8.0`/`net9.0` as supported compatibility targets; all three TFMs remain in the build/test matrix. |
+| 2026-11-08 | 1.9.0 review fixes | 1.9.0 | Deterministic rewrite FILETIME overloads, size-only DAT entry handling, Unix `EWOULDBLOCK` mapping and default petrify name warnings; regression tests added. |
+| 2026-11-08 | 1.9.0 released | 1.9.0 | Tag `bca71d0`; CI green with NuGet publish; six RID zips on GitHub; winget/Scoop/Homebrew manifests regenerated; DocFX/site/docs links green. |
 
 ## Historical handoff (2026-11-07)
 

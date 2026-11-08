@@ -29,7 +29,10 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $rids = @('win-x64', 'win-arm64', 'linux-x64', 'linux-arm64', 'MacOsX-x64', 'MacOsX-arm64')
 
 Write-Host "Reading release $version from $Repo..."
-$release = gh release view $version --repo $Repo --json 'tagName,assets' | ConvertFrom-Json
+# Use the REST API: older `gh release view` versions do not request the
+# `digest` field, so their JSON assets report `digest: null` even though the
+# release API returns the SHA-256 digest.
+$release = gh api "repos/$Repo/releases/tags/$version" | ConvertFrom-Json
 $hashes = @{}
 foreach ($asset in $release.assets) {
     if ($asset.digest -and $asset.digest.StartsWith('sha256:', [StringComparison]::Ordinal)) {
@@ -209,7 +212,7 @@ cask "xisosharp" do
   homepage "https://github.com/__REPO__"
 
   depends_on formula: "dotnet"
-  depends_on macos: ">= :monterey"
+  depends_on macos: :monterey
 
   binary "XISOSharp", target: "xisosharp"
   binary "XISOSharp.Gui", target: "xisosharp-gui"
