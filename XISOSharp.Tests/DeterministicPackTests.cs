@@ -184,6 +184,27 @@ public sealed class DeterministicPackTests : IDisposable
     }
 
     [Fact]
+    public void RepackingAnImage_WithDeterministic_WritesFileTimeZero()
+    {
+        string source = CreateSource();
+        string work = TempDir();
+        string image = Path.Combine(work, "source.iso");
+        Assert.Equal(0, XisoWriter.PackFromDirectory(source, image));
+        Assert.NotEqual(0UL, XisoReader.GetFileTimeRaw(image));
+
+        using (FileStream fs = new(image, FileMode.Open, FileAccess.Write, FileShare.None))
+        {
+            fs.Seek(Constants.OptimizedTagOffset, SeekOrigin.Begin);
+            fs.Write(new byte[Constants.OptimizedTagLength]);
+        }
+
+        string output = Path.Combine(work, "deterministic.iso");
+        (int exit, _, string error) = RunResult("-r", "-o", output, "--deterministic", image);
+        Assert.True(exit == 0, error);
+        Assert.Equal(0UL, XisoReader.GetFileTimeRaw(output));
+    }
+
+    [Fact]
     public void Deterministic_ConflictsWithExplicitFileTime()
     {
         string source = CreateSource();

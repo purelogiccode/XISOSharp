@@ -29,7 +29,7 @@ Deliberately out of scope:
   per-block SHA-1 hash tree (level-0/1/2 tables, top hash and header hash), but
   package signatures are not verified and the reader accepts
   XBLA/XBLIG/Community Game content types (not saves, profiles or DLC packages).
-  XISOSharp 2.0.0 removed the 1.x compatibility facades: reference the
+  XISOSharp 1.9.0 removed the 1.x compatibility facades: reference the
   `StfsSharp` package directly for these types.
 - CHD containers
 - XEX decryption or XBE editing

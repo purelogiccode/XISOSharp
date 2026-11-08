@@ -2,7 +2,7 @@
 #
 # Container image for the XISOSharp CLI.
 #
-#   docker build -t xisosharp --build-arg VERSION=1.8.0 .
+#   docker build -t xisosharp --build-arg VERSION=1.9.0 .
 #   docker run --rm -v "$PWD:/work" -w /work xisosharp -l game.iso
 #
 # The image is framework-dependent on the .NET 10 runtime and contains the

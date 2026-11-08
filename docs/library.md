@@ -26,7 +26,7 @@ The companion applications use the same library surface:
 
 The [StfsSharp](https://github.com/purelogiccode/STFSSharp), [CCISharp](https://github.com/purelogiccode/CCISharp) and [ZArchiveSharp](https://github.com/purelogiccode/ZArchiveSharp) packages remain usable on their own; XISOSharp
 consumes them directly for GOD/SVOD, CCI and ZAR support. The 1.x
-compatibility facades were removed in 2.0.0.
+compatibility facades were removed in 1.9.0.
 
 ### Consumer package usage
 
@@ -34,7 +34,7 @@ Consumers that need the standalone readers pin the packages directly instead
 of relying on XISOSharp's transitive dependencies:
 
 ```xml
-<PackageReference Include="XISOSharp" Version="1.8.0" />
+<PackageReference Include="XISOSharp" Version="1.9.0" />
 <PackageReference Include="CCISharp" Version="1.1.0" />
 <PackageReference Include="StfsSharp" Version="1.0.0" />
 ```

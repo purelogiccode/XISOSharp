@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- https://learn.microsoft.com/dotnet/fundamentals/package-validation/diagnostic-ids -->
-<!-- 2.0.0 validates against XISOSharp 1.8.0. The reviewed breaking change is
+<!-- 1.9.0 validates against XISOSharp 1.8.0. The reviewed breaking change is
      FAC-01: the StfsSharp compatibility facades are removed and consumers use
      StfsSharp types directly. Every suppression below is a CP0001 type removal
      from that one intentional change; no other API is removed. -->

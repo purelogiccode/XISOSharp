@@ -1,63 +1,103 @@
-# What's New in 2.0.0 (in progress)
+# What's New in 1.9.0
 
-XISOSharp 2.0.0 is the reviewed public-API cleanup: the 1.x compatibility
-facades over the standalone [StfsSharp](https://www.nuget.org/packages/StfsSharp)
-package are removed. `net8.0`, `net9.0` and `net10.0` remain supported.
+_Release date: 2026-11-08._
 
-- Use `StfsSharp.GodHeader`, `StfsSharp.StfsHeader`,
-  `StfsSharp.StfsPackage`, `StfsSharp.GodVolume` and the `StfsSharp.Models`
-  records directly. The `XISOSharp` facades (`GodHeader`, `StfsHeader`,
-  `StfsPackage`, `GodBlockDevice`, `GodTitleInfo`, `GodVolumeInfo`,
-  `StfsEntry`, `StfsPackageInfo`, `StfsPackageKind`, `StfsTitleInfo`,
-  `StfsValidationIssue`, `StfsValidationReport`) are gone in 2.0.0.
-- `XisoChecksum.ComputeStfsChecksum`/`ComputeStfsChecksumHex` remain as direct
-  StfsSharp-backed helpers, and `XisoImageSource` still opens GOD/SVOD inputs
-  through an internal adapter.
-- Package validation compares against 1.8.0; the reviewed suppressions cover
-  exactly the intentional facade removals.
-- Downstream consumers now follow the hybrid split: SimpleXisoDrive uses
-  `XISOSharp` for mounting/XDVDFS and `StfsSharp` directly for GOD/SVOD
-  resolution; XISO Studio uses `XISOSharp` for reads, `StfsSharp` directly for
-  GOD metadata and `CCISharp` directly for CCI validation.
+XISOSharp 1.9.0 is the most advanced release of the library for managing Xbox
+XISO/XDVDFS images. It combines the reviewed public-API cleanup with a
+beyond-reference tooling pass, complete distribution packaging and a refreshed
+documentation set. `net8.0`, `net9.0` and `net10.0` remain supported.
 
-# What's New in 2.1.0 (in progress)
+## Breaking change: StfsSharp compatibility facades removed
 
-The 2.1.0 feature pass is additive: existing read/write behavior and public
-APIs stay compatible.
+The 1.x facades over the standalone
+[StfsSharp](https://www.nuget.org/packages/StfsSharp) package are gone. Use
+`StfsSharp.GodHeader`, `StfsSharp.StfsHeader`, `StfsSharp.StfsPackage`,
+`StfsSharp.GodVolume` and the `StfsSharp.Models` records directly. The removed
+`XISOSharp` types are `GodHeader`, `StfsHeader`, `StfsPackage`, `GodBlockDevice`,
+`GodTitleInfo`, `GodVolumeInfo`, `StfsEntry`, `StfsPackageInfo`,
+`StfsPackageKind`, `StfsTitleInfo`, `StfsValidationIssue` and
+`StfsValidationReport`.
 
-- **Parallel collection verbs:** `--jobs 1..64` for multi-image `checksum`,
-  `hash`, `-V`/audit and `--batch` extract/list/tree/rewrite; output and JSON
-  order are identical to `--jobs 1`.
-- **Redump DAT verification:** `verify-dat` / `XisoDat.Verify` match whole
-  images against a Redump-style XML DAT and report verified, ambiguous,
-  not-in-DAT and missing entries, with `--json`.
-- **Create-time symlink policy:** `--symlink-mode follow|skip|reject` for
-  `-c`, `--pack`, `build-image` and `apply-skeleton`; cyclic links terminate.
-- **Actionable host-I/O diagnostics:** `HostIoDiagnostics` and the CLI name the
-  path, operation and likely fix for permission-denied, long-path,
+`XisoChecksum.ComputeStfsChecksum`/`ComputeStfsChecksumHex` remain as direct
+StfsSharp-backed helpers, and `XisoImageSource` still opens GOD/SVOD inputs
+through an internal adapter. Package validation compares against 1.8.0; the
+reviewed suppressions cover exactly these intentional facade removals.
+Downstream consumers follow the hybrid split: SimpleXisoDrive uses `XISOSharp`
+for mounting/XDVDFS and `StfsSharp` directly for GOD/SVOD resolution; XISO
+Studio uses `XISOSharp` for reads, `StfsSharp` directly for GOD metadata and
+`CCISharp` directly for CCI validation.
+
+## Inspection and archival tools
+
+- **Disc-layout inspector (`BRF-01`):** `disc-info` / `XisoDiscInfo.Read`
+  reports XGD type/subtype and wave, video L0/L1 and game-partition byte/sector
+  ranges, PFI presence and layer break, embedded or `sectors.txt`
+  security-sector ranges, Redump-size matching and consistency warnings, with
+  `--json`.
+- **Skeleton overlay (`BRF-02`):** `apply-skeleton` / `XisoSkeleton.Apply`
+  restores a `--petrify` skeleton from a source tree and verifies its `.hash`;
+  Petrify → Apply reproduces the original image byte-for-byte. Skeleton creation
+  preserves the system preamble and 0xFF file-tail padding.
+- **Per-file hash sidecars (`BRF-05`):** `file-hashes` /
+  `XisoReader.ComputeFileHashSidecar` generate SHA-1 (default), SHA-256 or MD5
+  sidecars for ISO/split/CISO/CCI/GOD/STFS/ZAR; `verify-hashes` detects all
+  three digest lengths and accepts the same containers.
+- **Redump DAT verification (`BRF-09`):** `verify-dat` / `XisoDat.Verify` match
+  whole images against a Redump-style XML DAT (`game/rom` size + MD5/SHA-1/CRC32)
+  and report verified, ambiguous, not-in-DAT and missing entries, with `--json`.
+- **Parallel collection verbs (`BRF-06`):** `--jobs 1..64` now also runs
+  multi-image `checksum`, `hash`, `-V`/audit and `--batch`
+  extract/list/tree/rewrite over images in parallel. Per-image output is
+  captured and replayed in input order, JSON arrays stay ordered, and scoped
+  logger counters keep each image's summary exact.
+
+## Xbox 360 metadata and executables
+
+- **Embedded `default.xex` metadata (`BRF-03`):** GOD headers and XBLA/XBLIG
+  STFS packages merge XDBF/XSRC publisher, developer, genre, description and
+  thumbnail presence into `title-info`/`TitleInfo`, in text and `--json`.
+- **Thumbnail export (`BRF-04`):** `xex-image --type thumbnail` writes the XDBF
+  `0x8000` PNG payload (image or loose `.xex` input).
+- **Loose executables (`BRF-08`):** `--xex-info`, `--xbe-info` and
+  `--xbe-image` accept a standalone `.xex`/`.xbe` with the same parser and JSON
+  shape as the image-plus-path form.
+- **ZAR level (`BRF-07`):** `--zar-level 1..22` for `--zar`, `--compress` and
+  `convert --format zar`; level 6 remains byte-identical.
+
+## Name, link and determinism policy
+
+- **Create-time link policy (`BRF-12`):** `--symlink-mode follow|skip|reject`
+  for `-c`, `--pack`, `build-image` and `apply-skeleton`. Cyclic directory links
+  always terminate.
+- **Actionable host-I/O diagnostics (`BRF-13`):** `HostIoDiagnostics` names the
+  path, operation and likely fix for permission-denied, long-path, sharing,
   existing-destination, illegal-name and full-disk failures.
-- **Disc-layout inspector:** `disc-info` / `XisoDiscInfo.Read` reports XGD
-  type/wave, video and game partition ranges, PFI layer break, security-sector
-  ranges and Redump-size warnings, with `--json`.
-- **Skeleton overlay:** `apply-skeleton` / `XisoSkeleton.Apply` restores a
-  `--petrify` skeleton from a source tree and verifies its `.hash`; the
-  Petrify → Apply round-trip is byte-identical.
-- **Per-file hash sidecars:** `file-hashes` /
-  `XisoReader.ComputeFileHashSidecar` work for ISO, split ISO, CISO, CCI, GOD,
-  STFS and ZAR; `verify-hashes` now detects MD5/SHA-1/SHA-256 sidecars.
-- **Xbox 360 metadata:** `title-info` merges embedded `default.xex`
-  XDBF/XSRC publisher/developer/genre/description/thumbnail fields for GOD and
-  XBLA/XBLIG packages, and `xex-image --type thumbnail` exports the PNG
-  thumbnail.
-- **Loose executables:** `--xex-info`, `--xbe-info` and `--xbe-image` accept a
-  standalone `.xex`/`.xbe`.
-- **ZAR level:** `--zar-level 1..22` controls zstd effort; the default level 6
-  is byte-identical.
-- **Name policy:** `--strict-names` and `XisoNameRules` enforce the Xbox
-  42-character component limit and Latin-1 storage contract; `+`, `!`, spaces
-  and Latin-1 names remain valid.
-- **Determinism:** `--deterministic` implies `--file-time 0` and is accepted
-  for create, pack, rewrite and `build-image`.
+- **Xbox filename rules (`BRF-10`):** `XisoNameRules` exposes the 42-character
+  component limit and Latin-1 contract. `--strict-names` fails before writing;
+  the default warns. `+`, `!`, spaces and Latin-1 names round-trip.
+- **Deterministic packing (`BRF-11`):** `--deterministic` is an alias for
+  `--file-time 0` and is accepted for create, `--pack`, rewrite and
+  `build-image`; repeated packs are byte-identical. A deterministic rewrite
+  overload writes FILETIME 0 instead of preserving the source timestamp.
+
+## Distribution and docs
+
+- **Package managers:** generated winget, Scoop and Homebrew manifests under
+  `packaging/`; the repository root is also a Scoop bucket
+  (`bucket/xisosharp.json`), refreshed by
+  `scripts/update-packaging.ps1 -Version <version>`.
+- **Shell completions and man page:** PowerShell, bash, zsh and fish
+  completions in `docs/completions/`, and `xisosharp(1)` in `docs/man/`; CI
+  checks that every CLI flag is completable.
+- **Container image:** `Dockerfile` builds a framework-dependent CLI image;
+  `ghcr.io/purelogiccode/xisosharp:<version>` is published on tag pushes.
+- **Optional signing:** NuGet author signing, Windows Authenticode and macOS
+  codesign/notarization run when the repository secrets exist; unsigned builds
+  remain the default.
+- **Docs:** the DocFX API reference is generated from the library XML docs, and
+  the Docsify site, GitHub Wiki, release notes and every README are refreshed.
+- **Tests:** 2312 passed / 1 opt-in skip on `net10.0` and 2239 passed / 1
+  opt-in skip on `net8.0`/`net9.0`.
 
 # What's New in 1.8.0
 
@@ -142,7 +182,7 @@ XISOSharp API is preserved through thin facades, so `title-info`, `list`,
   container as a seekable read-only stream; `StfsSharp.StfsPackage` adds
   `ReadFileChunks`, extraction progress and warning channels.
 - **Facade removal plan**: the XISOSharp facades stay through 1.x and are
-  removed in 2.0.0, after which consumers use `StfsSharp` directly.
+  removed in 1.9.0, after which consumers use `StfsSharp` directly.
 - **Tests**: the moved unit tests now run in the StfsSharp repository; XISOSharp
   keeps integration tests, including facade parity checks. The XISOSharp suite
   is **2101 passed / 1 opt-in skip** on net8.0/net9.0 and **2165 passed / 1

@@ -1,7 +1,7 @@
 .\" Man page for the XISOSharp CLI.
 .\" Keep the flag set in sync with XISOSharp.Cli; scripts/check_cli_completions.py
 .\" checks that every flag is present in all completion files.
-.TH XISOSHARP 1 "2026-11-07" "XISOSharp 1.8.0" "User Commands"
+.TH XISOSHARP 1 "2026-11-08" "XISOSharp 1.9.0" "User Commands"
 .SH NAME
 xisosharp \- create, extract, list, rewrite and archive Xbox XISO/XDVDFS disc images
 .SH SYNOPSIS
@@ -40,6 +40,18 @@ xisosharp \- create, extract, list, rewrite and archive Xbox XISO/XDVDFS disc im
 .br
 .B XISOSharp
 \fBverify-dat\fR \fIdat\fR \fIimage\fR [\fIimages\fR ...] [\fB\-\-json\fR]
+.br
+.B XISOSharp
+\fBfile-hashes\fR \fIimage\fR [\fB\-o\fR \fIfile\fR] [\fB\-\-algorithm\fR \fIsha1|sha256|md5\fR] [\fB\-\-json\fR]
+.br
+.B XISOSharp
+\fBdisc-info\fR \fIimage\fR [\fB\-\-json\fR] [\fB\-\-sectors\fR \fIsectors.txt\fR] [\fB\-\-skip-sectors\fR \fIN\fR]
+.br
+.B XISOSharp
+\fBapply-skeleton\fR \fIskeleton.xiso\fR \fIsource-dir\fR \fB\-o\fR \fIout.iso\fR [\fB\-\-hash\fR \fIfile\fR]
+.br
+.B XISOSharp
+\fBxex-image\fR \fIimage\fR \fIpath\fR \fB\-\-type\fR \fIthumbnail\fR \fB\-o\fR \fIout.png\fR
 .br
 .B XISOSharp
 \fBtitle-info\fR \fIimage\fR [\fB\-\-json\fR]
@@ -146,11 +158,24 @@ Verify a \fI*.hash\fR sidecar produced by \fB\-\-petrify\fR.
 Match whole images against a Redump-style XML DAT by size and MD5/SHA-1/CRC32;
 report verified, ambiguous, not-in-DAT and missing entries.
 .TP
+.B file-hashes \fIimage\fR [\fB\-o\fR \fIfile\fR] [\fB\-\-algorithm\fR \fIsha1|sha256|md5\fR]
+Generate a per-file sidecar for ISO, split ISO, CISO, CCI, GOD, STFS or ZAR.
+.TP
+.B disc-info \fIimage\fR
+Report XGD type/wave, video and game partition ranges, PFI layer break,
+security-sector ranges and Redump-size consistency warnings.
+.TP
+.B apply-skeleton \fIskeleton.xiso\fR \fIsource-dir\fR \fB\-o\fR \fIout.iso\fR [\fB\-\-hash\fR \fIfile\fR]
+Restore file data into a \fB\-\-petrify\fR skeleton and verify the optional hash.
+.TP
 .B title-info \fIimage\fR
 Show title metadata from XBE/XEX, XDBF/XSRC or GOD/STFS XContent headers.
 .TP
 .B xbe-image \fIimage\fR \fIpath\fR \fB\-\-type\fR \fIlogo|title|save\fR \fB\-o\fR \fIout\fR
 Extract the Microsoft logo, title image or save image as PNG or DDS.
+.TP
+.B xex-image \fIimage\fR \fIpath\fR \fB\-\-type\fR \fIthumbnail\fR \fB\-o\fR \fIout.png\fR
+Export the XDBF thumbnail from an Xbox 360 XEX2 executable.
 .TP
 .B split [\fB\-\-size\fR \fIbytes\fR|\fIhalf\fR] [\fB\-\-output\fR \fIbase\fR] \fIimage\fR ...
 Split a plain ISO into sector-aligned parts.
@@ -237,6 +262,12 @@ Compute MD5 hashes of files inside the image.
 .B \-\-sha256 \fIiso\fR [\fIpath\fR]
 Compute SHA-256 hashes of files inside the image.
 .TP
+.B \-\-algorithm \fIsha1|sha256|md5\fR
+Digest for \fBfile-hashes\fR output (default SHA-1).
+.TP
+.B \-\-hash \fIfile\fR
+Optional \fI.hash\fR sidecar verified while \fBapply-skeleton\fR writes.
+.TP
 .B \-\-xex-info \fIiso\fR \fIpath\fR
 Show the Xbox 360 XEX2 header and XDBF/XSRC metadata.
 .TP
@@ -275,6 +306,13 @@ extract-xiso parity defaults.
 .B \-\-file-time \fIvalue\fR
 Fixed FILETIME for create, pack and build-image (ISO-8601, raw, hex,
 \fInow\fR or \fI0\fR).
+.TP
+.B \-\-deterministic
+Alias for \fB\-\-file-time 0\fR; also accepted for rewrite.
+.TP
+.B \-\-strict-names
+Fail before writing when a path component exceeds the Xbox 42-character limit
+or is outside Latin-1; the default warns.
 .TP
 .B \-\-jobs \fIN\fR
 Parallel workers (1\-64) for extraction, CISO/CCI compression, batch
@@ -317,6 +355,10 @@ CCI compression level; 10\-12 select the LZ4-HC encoder.
 .TP
 .B \-\-cci-split \fIbytes\fR
 Split CCI output at the given size.
+.TP
+.B \-\-zar-level \fI1..22\fR
+zstd compression level for ZAR output; the default 6 is byte-identical to the
+historical output.
 .TP
 .B \-\-size \fIbytes\fR|\fIhalf\fR
 Split size for \fBsplit\fR; \fIhalf\fR splits in two.

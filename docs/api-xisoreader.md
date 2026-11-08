@@ -108,6 +108,9 @@ public static int Rewrite(
     CancellationToken cancellationToken = default,
     string? outputName = null, int? skipSectors = null, int? prependSectors = null,
     IProgress<ProgressInfo>? progress = null, bool preserveAttributes = false)
+
+// Deterministic rewrite overload (additive):
+public static int Rewrite(..., bool preserveAttributes, ulong fileTime)
 ```
 
 | Parameter | Meaning |
@@ -119,6 +122,7 @@ public static int Rewrite(
 | `skipSectors` | Read offset (Redump video partition), in 2048-byte sectors |
 | `prependSectors` | Rewrite only: reserve zero-filled sectors before the filesystem |
 | `preserveAttributes` | Rewrite only: re-encode the source dirent attribute bits (RO/HID/SYS/NOR). Default `false` — extract-xiso byte parity (entries re-encoded with DIR/ARC defaults, `dir=0x10`/`file=0x20`) |
+| `fileTime` | Rewrite overload only: fixed FILETIME for the output descriptor; omit it to preserve the source timestamp, pass `0` for deterministic output (`--deterministic -r`) |
 | `progress` | Rewrite: structured progress channel (`IProgress<ProgressInfo>`) — see [XisoWriter API](api-xisowriter.md#structured-progress-iprogresprogressinfo). Extract: a `FileAdded` event per file actually written (skipped/excluded files are silent), plus a per-chunk `FileProgress` event (`Size` = bytes copied so far, `Count` = total file bytes) while each file copies |
 | `options` | Extract/unpack only: resume and parallelism options — see [Resume interrupted unpacks](#resume-interrupted-unpacks) |
 
@@ -288,7 +292,11 @@ public static int DecodeXiso(
     int? skipSectors = null,
     int? prependSectors = null,
     IProgress<ProgressInfo>? progress = null,
-    UnpackOptions? unpackOptions = null)
+    UnpackOptions? unpackOptions = null,
+    bool preserveAttributes = false)
+
+// Deterministic rewrite overload (additive):
+public static int DecodeXiso(..., bool preserveAttributes, ulong fileTime)
 ```
 
 The generic entry point used by the wrappers above. `mode` is one of `ExtractMode`:

@@ -3178,10 +3178,17 @@ internal static class Program
                 try
                 {
                     File.Move(xisoPath, oldPath);
-                    int rewriteResult = XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite,
-                        out string? newIsoPath, true, cancellationToken: CollectionToken,
-                        outputName: outputName, skipSectors: skipSectors,
-                        prependSectors: prependSectors, preserveAttributes: preserveAttrs);
+                    string? newIsoPath;
+                    int rewriteResult = createFileTime is { } deterministicFileTime
+                        ? XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite,
+                            out newIsoPath, true, cancellationToken: CollectionToken,
+                            outputName: outputName, skipSectors: skipSectors,
+                            prependSectors: prependSectors, progress: null, unpackOptions: null,
+                            preserveAttributes: preserveAttrs, fileTime: deterministicFileTime)
+                        : XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite,
+                            out newIsoPath, true, cancellationToken: CollectionToken,
+                            outputName: outputName, skipSectors: skipSectors,
+                            prependSectors: prependSectors, preserveAttributes: preserveAttrs);
 
                     // The input now lives at <input>.old; a failed rewrite must
                     // not print success or exit 0. Track this file's own result
@@ -5365,7 +5372,8 @@ internal static class Program
 
         try
         {
-            IReadOnlyList<FileHashEntry> entries = XisoReader.ComputeFileHashSidecar(source, algorithm);
+            IReadOnlyList<FileHashEntry> entries =
+                XisoReader.ComputeFileHashSidecar(source, algorithm, CollectionToken);
             if (actualOutput is not null)
             {
                 string? directory = Path.GetDirectoryName(Path.GetFullPath(actualOutput));
@@ -5468,10 +5476,11 @@ internal static class Program
     }
 
     /// <summary>
-    /// Strict-name preflight for <c>--petrify</c>: validates the image's own
-    /// internal paths before any skeleton is written.
+    /// Name preflight for <c>--petrify</c>: validates the image's own internal
+    /// paths before any skeleton is written. With <paramref name="strictNames"/>
+    /// a violation fails; otherwise it warns and the skeleton is still written.
     /// </summary>
-    private static bool ValidateImageNames(string imagePath)
+    private static bool ValidateImageNames(string imagePath, bool strictNames)
     {
         try
         {
@@ -5484,11 +5493,19 @@ internal static class Program
                 }
 
                 string? error = XisoNameRules.GetPathError(node.FullPath);
-                if (error != null)
+                if (error == null)
+                {
+                    continue;
+                }
+
+                if (strictNames)
                 {
                     Logger.LogErr($"Error: {error} Image path: '{node.FullPath}'.\n");
                     return false;
                 }
+
+                Logger.LogErr($"warning: {error} Image path: '{node.FullPath}'.\n");
+                Logger.Warned = true;
             }
 
             return true;
@@ -5688,7 +5705,7 @@ internal static class Program
         List<string> images = positionals.Skip(1).ToList();
         try
         {
-            DatVerificationResult result = XisoDat.Verify(datPath, images);
+            DatVerificationResult result = XisoDat.Verify(datPath, images, CollectionToken);
             if (json)
             {
                 WriteJson(new JsonDatVerification(
@@ -6367,7 +6384,7 @@ internal static class Program
         try
         {
             int files = XisoSkeleton.Apply(skeleton, sourceDirectory, output, hash,
-                cancellationToken: default, strictNames: strictNames, symlinkMode: symlinkMode);
+                cancellationToken: CollectionToken, strictNames: strictNames, symlinkMode: symlinkMode);
             Logger.Log($"Applied skeleton: {files} file(s) restored to {output}\n");
             return 0;
         }
@@ -7831,7 +7848,7 @@ internal static class Program
 
             if (petrify)
             {
-                if (strictNames && !ValidateImageNames(iso))
+                if (!ValidateImageNames(iso, strictNames))
                 {
                     exit = 1;
                     continue;

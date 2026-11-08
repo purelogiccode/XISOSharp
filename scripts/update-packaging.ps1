@@ -2,7 +2,7 @@
 # Regenerate the winget, Scoop and Homebrew manifests from a GitHub release.
 #
 # Usage:
-#   ./scripts/update-packaging.ps1 -Version 1.8.0
+#   ./scripts/update-packaging.ps1 -Version 1.9.0
 #
 # The script reads the release assets and their SHA-256 digests from the
 # GitHub API (gh CLI), then rewrites:

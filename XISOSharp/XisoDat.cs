@@ -136,7 +136,7 @@ public static class XisoDat
         }
 
         List<DatRom> roms = [];
-        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<(string GameName, string Name, long Size, string? Md5, string? Sha1, string? Crc)> seen = [];
         foreach (XElement game in root.Elements().Where(static element =>
                      string.Equals(element.Name.LocalName, "game", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(element.Name.LocalName, "machine", StringComparison.OrdinalIgnoreCase)))
@@ -156,16 +156,16 @@ public static class XisoDat
                 string? md5 = NormalizeHash((string?)rom.Attribute("md5"), 32);
                 string? sha1 = NormalizeHash((string?)rom.Attribute("sha1"), 40);
                 string? crc = NormalizeHash((string?)rom.Attribute("crc"), 8);
-                if (md5 is null && sha1 is null && crc is null && size <= 0)
+                if (md5 is null && sha1 is null && crc is null)
                 {
-                    // A declaration without size or hash cannot verify anything.
+                    // A size-only declaration cannot verify content; keeping it
+                    // would report the entry as permanently "missing" because
+                    // Verify matches on at least one declared hash.
                     continue;
                 }
 
                 DatRom entry = new(gameName, name, size, md5, sha1, crc);
-                string key = string.Join('|', entry.GameName, entry.Name, entry.Size,
-                    entry.Md5 ?? string.Empty, entry.Sha1 ?? string.Empty, entry.Crc ?? string.Empty);
-                if (seen.Add(key))
+                if (seen.Add((entry.GameName, entry.Name, entry.Size, entry.Md5, entry.Sha1, entry.Crc)))
                 {
                     roms.Add(entry);
                 }

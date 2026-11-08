@@ -14,9 +14,10 @@ public static class HostIoDiagnostics
     private const int ErrorFilenameExcedRange = 206;
 
     // Unix errno values used when the runtime exposes the native code in HResult.
-    private const int UnixErrorBusy = 16;
-    private const int UnixErrorExists = 17;
-    private const int UnixErrorNameTooLong = 36;
+    private const int UnixErrorBusy = 16;         // EBUSY: lock violation
+    private const int UnixErrorExists = 17;       // EEXIST
+    private const int UnixErrorWouldBlock = 11;   // EAGAIN/EWOULDBLOCK: sharing violation
+    private const int UnixErrorNameTooLong = 36; // ENAMETOOLONG
 
     /// <summary>
     /// Describes <paramref name="exception"/> with the failed operation and
@@ -54,7 +55,7 @@ public static class HostIoDiagnostics
                    $"path or enable long-path support. ({detail})";
         }
 
-        if (exception is IOException && HasHResult(exception, ErrorSharingViolation, UnixErrorBusy) ||
+        if (exception is IOException && HasHResult(exception, ErrorSharingViolation, UnixErrorWouldBlock) ||
             exception is IOException && HasHResult(exception, ErrorLockViolation, UnixErrorBusy))
         {
             return $"{where}: another process is using the file. Close it and retry. ({detail})";

@@ -119,6 +119,24 @@ public sealed class XisoDatTests : IDisposable
     }
 
     [Fact]
+    public void Parse_SkipsSizeOnlyEntriesThatCannotVerifyContent()
+    {
+        string work = CreateTempDir("xiso_dat");
+        string dat = Path.Combine(work, "size-only.dat");
+        File.WriteAllText(dat,
+            "<datafile><game name=\"Unverifiable\"><rom name=\"size-only.iso\" size=\"2048\" /></game>" +
+            "<game name=\"Hashed\"><rom name=\"hashed.iso\" size=\"2048\" sha1=\"" +
+            new string('a', 40) + "\" /></game></datafile>", Encoding.UTF8);
+
+        IReadOnlyList<DatRom> roms = XisoDat.Parse(dat);
+
+        DatRom rom = Assert.Single(roms);
+        Assert.Equal("hashed.iso", rom.Name);
+        Assert.Null(rom.Md5);
+        Assert.NotNull(rom.Sha1);
+    }
+
+    [Fact]
     public void Parse_RejectsNonDatRoot()
     {
         string work = CreateTempDir("xiso_dat");

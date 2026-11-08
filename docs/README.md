@@ -12,10 +12,11 @@
 [![Last commit](https://img.shields.io/github/last-commit/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/commits/master)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/purelogiccode/XISOSharp/blob/master/LICENSE)
 
-**XISOSharp** is a pure C# implementation of [extract-xiso](https://github.com/XboxDev/extract-xiso)
-build [`202609111233`](https://github.com/XboxDev/extract-xiso/releases/tag/build-202609111233) — the tool and library for creating, extracting, listing, auditing, and rewriting
+**XISOSharp is the most advanced library for managing Xbox XISO/XDVDFS images.**
+It is a pure C# implementation of [extract-xiso](https://github.com/XboxDev/extract-xiso)
+build [`202609111233`](https://github.com/XboxDev/extract-xiso/releases/tag/build-202609111233) - the tool and library for creating, extracting, listing, inspecting, auditing, and rewriting
 Xbox ISO (XISO / XDVDFS) disc images. It is a direct, byte-identical port of the original
-C codebase into idiomatic managed C# — no native dependencies, no P/Invoke.
+C codebase into idiomatic managed C# - no native dependencies, no P/Invoke.
 
 This documentation set is published twice from the same sources and covers the CLI, the .NET
 library API, the XISO on-disk format, Xbox disc formats (XGD1/XGD2/XGD3/Hybrid, Redump images),
@@ -44,14 +45,14 @@ The DocFX API link is absolute because the generated reference is published on P
 | Page | What it covers |
 |---|---|
 | [Getting Started](getting-started.md) | Installation, first extract/create/list, requirements |
-| [CLI Reference](cli.md) | Every command, flag, mode, exit code, and batch behavior (incl. archival & xdvdfs verbs) |
+| [CLI Reference](cli.md) | Every command, flag, mode, exit code, and batch behavior (incl. archival, xdvdfs, `disc-info`, `verify-dat`, `file-hashes`, `apply-skeleton`, `xex-image` and parallel collection verbs) |
 | [Shell Completions & Man Page](shell-completions.md) | PowerShell/bash/zsh/fish completion and `xisosharp(1)` |
 | [Validation](validation.md) | `validate` command and `--validate*` flags |
 | [Redump & Disc Layouts](redump-workflows.md) | XGD offsets (incl. hybrid `0x89D80000`), video partitions, `--skip-sectors` / `--prepend-sectors` |
 | [Archival Workflows](archival.md) | Redump lossless pipeline: `--video` / `--random` / `--seed` / `--wipe` / `--trim` / `--petrify` / `--update` / `--zar` / `--all` / `--best` / `--compress` / `rebuild` / `--security-sectors` |
 | [Build-Image & Image-Spec](xdvdfs-compat.md#build-image) | Ordered `wax` remapping (`host/**:image/{1}`, `!negation`, `{n}` captures), `--dry-run`, `xdvdfs.toml` |
 | [Compression (CISO)](compression.md) | `compress`/`decompress` (CISO DEFLATE v1 + LZ4 v2, `align` 0/1/2), `BlockDevice` stack |
-| [Checksums](xdvdfs-compat.md#checksum) | SHA3-256 image checksum (`checksum`) vs per-file MD5/SHA-256 (`--md5`/`--sha256`) |
+| [Checksums](xdvdfs-compat.md#checksum) | SHA3-256 image checksum (`checksum`), per-file MD5/SHA-256 (`--md5`/`--sha256`), per-file sidecars (`file-hashes`/`verify-hashes`) and Redump DAT matching (`verify-dat`) |
 | [XISO Format](xiso-format.md) | On-disk format: header, directory entries, AVL tree, ECMA-119, empty-dir `0x0000` sentinel |
 | [FAQ](faq.md) | Frequently asked questions |
 

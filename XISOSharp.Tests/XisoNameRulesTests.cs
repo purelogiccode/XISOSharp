@@ -201,6 +201,22 @@ public sealed class XisoNameRulesTests : IDisposable
     }
 
     [Fact]
+    public void PetrifyLongImageComponent_WarnsByDefault()
+    {
+        string source = TempDir();
+        File.WriteAllText(Path.Combine(source, LongName(43)), "long");
+        string iso = Path.Combine(TempDir(), "game.iso");
+        Assert.Equal(0, XisoWriter.PackFromDirectory(source, iso, fileTime: 0));
+        string skeleton = Path.Combine(TempDir(), "game.skeleton.xiso");
+
+        (int exit, string error) = Run("--petrify", "-o", skeleton, iso);
+
+        Assert.Equal(0, exit);
+        Assert.Contains("42", error, StringComparison.Ordinal);
+        Assert.True(File.Exists(skeleton));
+    }
+
+    [Fact]
     public void BuildImageStrictNames_LongMappedComponent_Fails()
     {
         string source = TempDir();

@@ -205,7 +205,9 @@ public static class XisoDiscInfo
             }
             else
             {
-                warnings.Add($"PFI sector is outside the image (expected at 0x{pfiOffset:X}).");
+                warnings.Add(pfiOffset < 0
+                    ? "PFI sector is unavailable because no partition offset was detected."
+                    : $"PFI sector is outside the image (expected at 0x{pfiOffset:X}).");
             }
         }
 

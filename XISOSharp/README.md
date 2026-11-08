@@ -17,9 +17,34 @@
 [![Release date](https://img.shields.io/github/release-date/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/releases/latest)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://purelogiccode.github.io/XISOSharp/)
 
-A pure C# class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. A direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool from C to C# - byte-identical output, no native dependencies - extended with the archival power of [XboxKit](https://github.com/Deterous/XboxKit) (Redump video/filler/seed/wipe/trim/petrify/update/rebuild, ZAR) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) (build-image remapping, CISO compress/decompress, checksums). Container input is unified through `XisoImageSource`: plain ISO, split `.1.iso` sets, CISO/CSO (v1/v2, single or split), CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), read-only GOD/SVOD sectors, and ZAR for listing/extraction/conversion; single-file XBLA/XBLIG STFS packages are read directly through [StfsSharp](https://github.com/purelogiccode/STFSSharp). All logic - including the AVL tree, Boyer-Moore search, XISO header verification, directory traversal, format rewriting, and media-enable patching - is ported directly from the reference C implementation.
+**XISOSharp is the most advanced library for managing Xbox XISO/XDVDFS images.**
+It is a pure C# class library for creating, extracting, listing, inspecting and
+rewriting Xbox ISO (XISO) disc images. A direct conversion of the
+[extract-xiso](https://github.com/XboxDev/extract-xiso) tool from C to C# -
+byte-identical output, no native dependencies - extended with the archival
+power of [XboxKit](https://github.com/Deterous/XboxKit) (Redump
+video/filler/seed/wipe/trim/petrify/update/rebuild, ZAR) and the modern packing
+of [xdvdfs](https://github.com/antangelo/xdvdfs) (build-image remapping, CISO
+compress/decompress, checksums). Container input is unified through
+`XisoImageSource`: plain ISO, split `.1.iso` sets, CISO/CSO (v1/v2, single or
+split), CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp),
+read-only GOD/SVOD sectors, and ZAR for listing/extraction/conversion;
+single-file XBLA/XBLIG STFS packages are read directly through
+[StfsSharp](https://github.com/purelogiccode/STFSSharp). All logic - including
+the AVL tree, Boyer-Moore search, XISO header verification, directory
+traversal, format rewriting, and media-enable patching - is ported directly
+from the reference C implementation.
 
-The 2.1.0 additions cover the beyond-reference tooling: `XisoDiscInfo` (XGD/Redump layout inspection), `XisoSkeleton.Apply` (byte-identical skeleton overlay), `XisoReader.ComputeFileHashSidecar` (per-file hashes for every container), `XisoDat`/`verify-dat` (Redump DAT matching), parallel collection verbs (`--jobs` for checksum/hash/audit/batch extract/list/tree/rewrite), `--symlink-mode`, `HostIoDiagnostics`, embedded `default.xex` XDBF/XSRC metadata for GOD/STFS, XEX thumbnail export, loose `.xex`/`.xbe` parsing, `--zar-level`, `XisoNameRules`/`--strict-names`, and `--deterministic` packing.
+The 1.9.0 additions cover the beyond-reference tooling: `XisoDiscInfo`
+(XGD/Redump layout inspection), `XisoSkeleton.Apply` (byte-identical skeleton
+overlay), `XisoReader.ComputeFileHashSidecar` (per-file hashes for every
+container), `XisoDat`/`verify-dat` (Redump DAT matching), parallel collection
+verbs (`--jobs` for checksum/hash/audit/batch extract/list/tree/rewrite),
+`--symlink-mode`, `HostIoDiagnostics`, embedded `default.xex` XDBF/XSRC
+metadata for GOD/STFS, XEX thumbnail export, loose `.xex`/`.xbe` parsing,
+`--zar-level`, `XisoNameRules`/`--strict-names`, and `--deterministic` packing.
+The reviewed 1.9.0 API cleanup also removes the 1.x StfsSharp compatibility
+facades; reference the `StfsSharp` package directly.
 
 ## Companion projects
 
@@ -36,7 +61,7 @@ SimpleXisoDrive uses `XISOSharp` for mounting and XDVDFS reads and references
 XISO Studio uses `XISOSharp` for exploring/reading the filesystem, `StfsSharp`
 directly for GOD header/title metadata, and `CCISharp` directly for CCI
 container validation. The packages remain standalone NuGet dependencies, so
-neither app depends on the XISOSharp compatibility facades removed in 2.0.0.
+neither app depends on the XISOSharp compatibility facades removed in 1.9.0.
 
 Full documentation (getting started, CLI reference, archival workflows, library API) lives in the [docs folder on GitHub](https://github.com/purelogiccode/XISOSharp/tree/master/docs).
 
@@ -51,6 +76,10 @@ Full documentation (getting started, CLI reference, archival workflows, library 
 - [API Reference](#api-reference)
   - [XisoReader](#xisoreader)
   - [XisoWriter](#xisowriter)
+  - [Disc layout (XisoDiscInfo)](#disc-layout-xisodiscinfo)
+  - [Redump DAT verification (XisoDat)](#redump-dat-verification-xisodat)
+  - [Name rules and host-I/O diagnostics](#name-rules-and-host-io-diagnostics)
+  - [Skeleton overlay (XisoSkeleton.Apply)](#skeleton-overlay-xisoskeletonapply)
   - [Logger](#logger)
   - [AvlTree](#avltree)
   - [BoyerMoore](#boyermoore)
@@ -381,7 +410,7 @@ XisoReader.JoinSplitXiso(parts[0], "rejoined.iso");
 
 GOD/SVOD and single-file XBLA/XBLIG readers live in the standalone
 [StfsSharp](https://github.com/purelogiccode/STFSSharp) package. XISOSharp
-references it directly; there are no 1.x compatibility facades in 2.0.0.
+references it directly; there are no 1.x compatibility facades in 1.9.0.
 
 ```csharp
 using StfsSharp;
@@ -820,6 +849,57 @@ XisoWriter.PackFromDirectory("game_dir", "repacked.iso", fileTime: 0, layout: sp
   apply the same placement to remapped trees; the CLI also exposes `-c --layout`
   and `--pack <dir> --layout`.
 
+### Disc layout (`XisoDiscInfo`)
+
+```csharp
+XisoDiscLayout layout = XisoDiscInfo.Read("game.redump.iso");
+XisoDiscLayout fromContainer = XisoDiscInfo.Read("game.cso");
+bool known = XisoDiscInfo.IsKnownRedumpSize("game.redump.iso");
+```
+
+Reports the detected `XisoImageFormat`, XGD generation (`RAW`, `XGD1`, `XGD2`,
+`XGD2 Hybrid`, `XGD3`), Redump type index/name, video and game partition
+ranges, PFI fields and layer break, embedded (or `sectors.txt`) security-sector
+ranges and consistency warnings. Containers (CISO/CCI/split/GOD) report the
+logical game-partition view and mark video/PFI fields unavailable.
+
+### Redump DAT verification (`XisoDat`)
+
+```csharp
+IReadOnlyList<DatRom> roms = XisoDat.Parse("redump.dat");
+DatVerificationResult result = XisoDat.Verify("redump.dat", ["game.iso", "game2.iso"]);
+Console.WriteLine($"{result.Verified} verified, {result.Ambiguous} ambiguous, {result.NotInDat} not in DAT");
+```
+
+Parses Redump-style XML DATs (`datafile`/`datfile` → `game`/`machine` → `rom`)
+and matches whole images by declared size plus MD5/SHA-1/CRC32. Size-only
+entries are ignored because they cannot verify content.
+
+### Name rules and host-I/O diagnostics
+
+```csharp
+string? error = XisoNameRules.GetComponentError("naïve file.txt"); // 42-char Latin-1 contract
+string? pathError = XisoNameRules.GetPathError("/sub/日本語.txt");
+string message = HostIoDiagnostics.Describe(exception, "writing the extracted file", path);
+```
+
+`XisoNameRules` enforces the Xbox 42-character component limit and Latin-1
+storage. `HostIoDiagnostics` turns permission-denied, long-path, sharing,
+existing-destination, illegal-name and full-disk failures into actionable
+path/operation/fix messages.
+
+### Skeleton overlay (`XisoSkeleton.Apply`)
+
+```csharp
+int files = XisoSkeleton.Apply("game.skeleton.xiso", "./game_files", "restored.iso", "game.hash");
+```
+
+Restores file data into a `XisoSkeleton.Petrify` skeleton, verifies the optional
+SHA-1 `.hash` while writing, and reproduces the original image byte-for-byte.
+Missing/extra source files, size mismatches and hash mismatches are named
+exceptions before the destination is replaced. `symlinkMode` and
+`strictNames` apply the same create-time policies as `XisoWriter`.
+
 ### `GlobMatcher`
 
 Matches relative paths against shell-style glob patterns. Used by `CreateXiso`
@@ -1045,6 +1125,27 @@ Error codes for non-fatal extraction failures.
 | `ErrFileWrite` | `-5005` | Destination file or directory could not be created or written. |
 | `ErrExtractFailed` | `-5006` | End-of-run summary of a `ContinueOnError` run: one or more files failed (message lists each). |
 
+#### `SymlinkMode`
+
+Create-time host-link policy for `XisoWriter`, `RemapFilesystem` and
+`XisoSkeleton.Apply`.
+
+| Value | Description |
+|-------|-------------|
+| `Follow` | Default: file links pack their target's bytes; directory reparse points are skipped. |
+| `Skip` | Omit file and directory links, logging each skip. |
+| `Reject` | Fail with the offending link path before any output is written. |
+
+#### `DatMatchStatus`
+
+Result of matching one image against a Redump DAT.
+
+| Value | Description |
+|-------|-------------|
+| `Verified` | Exactly one DAT entry matched every declared hash. |
+| `Ambiguous` | More than one DAT entry matched. |
+| `NotInDat` | No DAT entry matched the image. |
+
 #### `AvlResult`
 
 Result codes returned by AVL tree insertion.
@@ -1095,6 +1196,27 @@ Metadata about an XISO volume descriptor.
 | `CreationTime` | `DateTimeOffset?` | Descriptor FILETIME as UTC time (`null` when invalid; raw 0 = 1601-01-01); agrees with `XisoReader.GetFileTime`. |
 | `FileTimeRaw` | `ulong` | Raw FILETIME field as stored in the descriptor. |
 | `DescriptorSector` | `int` | Partition-relative descriptor sector: `32` for standard layouts, `0` for rebuilt sector-0 images (the partition shift is `DiscLseek`); `-1` when invalid. |
+
+#### `XisoDiscLayout` / `DiscPartition` / `DiscPhysicalFormatInfo` / `DiscSecuritySectorRange`
+
+`XisoDiscInfo.Read` result. The layout carries the detected format, XGD/Redump
+type and wave, optional video L0/L1 and game-partition `DiscPartition` ranges,
+optional PFI fields (`BookType`, `LayerCount`, `Layer0EndSector`, data-area
+bounds), security-sector ranges and warning strings. `DiscPartition` exposes
+byte and sector offsets plus `Available`; `DiscSecuritySectorRange` exposes the
+start/end sector and 4096-sector count.
+
+#### `DatVerificationResult` / `DatImageMatch` / `DatRom`
+
+`XisoDat.Verify` result: `Images` keeps input order, each `DatImageMatch` carries
+`Status`, the image's full size/MD5/SHA-1/CRC32 and matched `Matches`, and
+`MissingRoms` lists DAT entries not matched by any supplied image. `Verified`,
+`Ambiguous`, `NotInDat`, `Missing` and `Passed` are aggregate helpers.
+
+#### `FileHashEntry`
+
+One file in a generated sidecar: `Path`, `Size`, `Algorithm` (`sha1`, `sha256`
+or `md5`) and `HashHex`.
 
 #### `EntryInfo`
 

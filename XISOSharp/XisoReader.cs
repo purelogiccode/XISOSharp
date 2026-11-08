@@ -1752,6 +1752,36 @@ public static class XisoReader
             outputName, skipSectors, prependSectors, progress, preserveAttributes: preserveAttributes);
 
     /// <summary>
+    /// <see cref="Rewrite(string,string?,out string?,CancellationToken,string?,int?,int?,IProgress{ProgressInfo}?,bool)"/>
+    /// with an explicit FILETIME for deterministic output.
+    /// </summary>
+    /// <param name="xisoPath">Path to the XISO file to rewrite.</param>
+    /// <param name="outputPath">Output directory for the rewritten ISO.</param>
+    /// <param name="outIsoPath">Receives the output ISO path.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="outputName">Custom output filename used verbatim.</param>
+    /// <param name="skipSectors">Optional source partition offset in sectors.</param>
+    /// <param name="prependSectors">Optional sectors reserved before the filesystem.</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <param name="preserveAttributes">Preserve source dirent attribute bits.</param>
+    /// <param name="fileTime">Fixed FILETIME to write; <c>0</c> is deterministic.</param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    public static int Rewrite(
+        string xisoPath,
+        string? outputPath,
+        out string? outIsoPath,
+        CancellationToken cancellationToken,
+        string? outputName,
+        int? skipSectors,
+        int? prependSectors,
+        IProgress<ProgressInfo>? progress,
+        bool preserveAttributes,
+        ulong fileTime) =>
+        DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken,
+            outputName, skipSectors, prependSectors, progress, unpackOptions: null,
+            preserveAttributes: preserveAttributes, fileTime: fileTime);
+
+    /// <summary>
     /// Extracts files from an XISO image to a directory.
     /// </summary>
     /// <param name="xisoPath">Path to the XISO file, or a <c>.cso</c> image (auto-detected).</param>
@@ -2138,7 +2168,7 @@ public static class XisoReader
     /// <summary>
     /// Main entry point for processing an XISO image. Verifies the image, then
     /// performs extraction, listing, or rewriting based on the specified mode.
-    /// Prefer using <see cref="Rewrite"/>, <c>Extract</c>, or <c>List</c>
+    /// Prefer using <c>Rewrite</c>, <c>Extract</c>, or <c>List</c>
     /// for mode-specific operations.
     /// </summary>
     /// <param name="xisoPath">Path to the XISO file (or <c>.old</c> file for rewrite mode),
@@ -2224,6 +2254,58 @@ public static class XisoReader
         return DecodeXisoCore(fs, xisoPath, outputPath, mode, out outIsoPath, llCompat,
             cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions,
             preserveAttributes: preserveAttributes);
+    }
+
+    /// <summary>
+    /// <see cref="DecodeXiso(string,string?,ExtractMode,out string?,bool,CancellationToken,string?,int?,int?,IProgress{ProgressInfo}?,UnpackOptions?,bool)"/>
+    /// with an explicit FILETIME for rewrite mode.
+    /// </summary>
+    /// <param name="xisoPath">Path to the image.</param>
+    /// <param name="outputPath">Output directory for extraction or rewrite output.</param>
+    /// <param name="mode">Operating mode.</param>
+    /// <param name="outIsoPath">Receives the rewritten ISO path.</param>
+    /// <param name="llCompat">Use the legacy linked-list right-offset calculation.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="outputName">Custom output filename for rewrite mode.</param>
+    /// <param name="skipSectors">Optional source partition offset in sectors.</param>
+    /// <param name="prependSectors">Optional sectors reserved before the filesystem.</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <param name="unpackOptions">Optional extract resume/parallelism options.</param>
+    /// <param name="preserveAttributes">Preserve source dirent attribute bits on rewrite.</param>
+    /// <param name="fileTime">Fixed FILETIME for the rewritten descriptor; <c>0</c> is deterministic.</param>
+    /// <returns>0 on success, non-zero on error.</returns>
+    public static int DecodeXiso(
+        string xisoPath,
+        string? outputPath,
+        ExtractMode mode,
+        out string? outIsoPath,
+        bool llCompat,
+        CancellationToken cancellationToken,
+        string? outputName,
+        int? skipSectors,
+        int? prependSectors,
+        IProgress<ProgressInfo>? progress,
+        UnpackOptions? unpackOptions,
+        bool preserveAttributes,
+        ulong fileTime)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (mode == ExtractMode.Rewrite && StfsSharp.GodHeader.IsGodContainer(xisoPath))
+        {
+            throw new NotSupportedException(
+                $"Cannot rewrite GOD container '{xisoPath}' in place; decompress it to ISO first.");
+        }
+
+        if (mode == ExtractMode.Rewrite && StfsSharp.StfsPackage.IsStfsPackage(xisoPath))
+        {
+            throw new NotSupportedException(
+                $"Cannot rewrite STFS package '{xisoPath}' in place; extract it first.");
+        }
+
+        using Stream fs = OpenImageStream(xisoPath);
+        return DecodeXisoCore(fs, xisoPath, outputPath, mode, out outIsoPath, llCompat,
+            cancellationToken, outputName, skipSectors, prependSectors, progress, unpackOptions,
+            preserveAttributes: preserveAttributes, fileTime: fileTime);
     }
 
     /// <summary>
@@ -2328,7 +2410,8 @@ public static class XisoReader
         IProgress<ProgressInfo>? progress = null,
         UnpackOptions? unpackOptions = null,
         IFilesystem? filesystem = null,
-        bool preserveAttributes = false)
+        bool preserveAttributes = false,
+        ulong? fileTime = null)
     {
         using IDisposable logScope = XisoLogScope.Begin(unpackOptions?.Log);
         outIsoPath = null;
@@ -2446,7 +2529,7 @@ public static class XisoReader
 
                 int rewriteResult = XisoWriter.CreateXiso(isoName, outputPath, avlRoot, fs, out outIsoPath,
                     outputName, null, cancellationToken, prependSectors: prependSectors, progress: progress,
-                    sourceDiscLseek: discLseek);
+                    fileTime: fileTime, sourceDiscLseek: discLseek);
 
                 // Surface write failures: callers (CLI, Rewrite) promise a
                 // non-zero result and must not report success for a rewrite
@@ -2562,6 +2645,43 @@ public static class XisoReader
         {
             int result = DecodeXiso(xisoPath, outputPath, mode, out string? outPath, llCompat, cancellationToken,
                 outputName, skipSectors, prependSectors, progress, unpackOptions, preserveAttributes);
+            return (result, outPath);
+        }, cancellationToken).ConfigureAwait(false);
+
+    /// <summary>
+    /// <see cref="DecodeXisoAsync(string,string?,ExtractMode,bool,CancellationToken,string?,int?,int?,IProgress{ProgressInfo}?,UnpackOptions?,bool)"/>
+    /// with an explicit FILETIME for deterministic rewrites.
+    /// </summary>
+    /// <param name="xisoPath">Path to the image.</param>
+    /// <param name="outputPath">Output directory for extraction or rewrite output.</param>
+    /// <param name="mode">Operating mode.</param>
+    /// <param name="llCompat">Use the legacy linked-list right-offset calculation.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="outputName">Custom output filename for rewrite mode.</param>
+    /// <param name="skipSectors">Optional source partition offset in sectors.</param>
+    /// <param name="prependSectors">Optional sectors reserved before the filesystem.</param>
+    /// <param name="progress">Optional structured progress channel.</param>
+    /// <param name="unpackOptions">Optional extract resume/parallelism options.</param>
+    /// <param name="preserveAttributes">Preserve source dirent attribute bits on rewrite.</param>
+    /// <param name="fileTime">Fixed FILETIME for the rewritten descriptor; <c>0</c> is deterministic.</param>
+    /// <returns>A task that completes with the result code and output ISO path.</returns>
+    public static async Task<(int Result, string? OutIsoPath)> DecodeXisoAsync(
+        string xisoPath,
+        string? outputPath,
+        ExtractMode mode,
+        bool llCompat,
+        CancellationToken cancellationToken,
+        string? outputName,
+        int? skipSectors,
+        int? prependSectors,
+        IProgress<ProgressInfo>? progress,
+        UnpackOptions? unpackOptions,
+        bool preserveAttributes,
+        ulong fileTime) =>
+        await Task.Run(() =>
+        {
+            int result = DecodeXiso(xisoPath, outputPath, mode, out string? outPath, llCompat, cancellationToken,
+                outputName, skipSectors, prependSectors, progress, unpackOptions, preserveAttributes, fileTime);
             return (result, outPath);
         }, cancellationToken).ConfigureAwait(false);
 

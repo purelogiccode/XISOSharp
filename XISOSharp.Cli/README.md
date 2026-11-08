@@ -19,7 +19,9 @@
 
 Command-line tool for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. Ships as `XISOSharp(.exe)` (see [Install](#install) below).
 
-This project is a direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) CLI tool (reference build [202609111233](https://github.com/XboxDev/extract-xiso/releases/tag/build-202609111233)) from C to C#. It provides the same interface and produces byte-identical output for all operations, plus 35+ extra modes (Redump archival, xdvdfs parity, audit/repair/salvage, CISO, checksums).
+This project is a direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) CLI tool (reference build [202609111233](https://github.com/XboxDev/extract-xiso/releases/tag/build-202609111233)) from C to C#. It provides the same interface and produces byte-identical output for all operations, plus 40+ extra modes (Redump archival, xdvdfs parity, audit/repair/salvage, CISO/CCI, disc/DAT inspection, skeleton overlay, per-file hashes, checksums).
+
+Version 1.9.0 adds `disc-info`, `apply-skeleton`, `file-hashes`, `verify-dat`, `xex-image`, parallel collection verbs, `--symlink-mode`, `--strict-names`, `--deterministic`, `--zar-level` and actionable host-I/O diagnostics. The reviewed API cleanup removes the 1.x StfsSharp facades; the CLI uses `StfsSharp` directly.
 
 Reader probing also accepts rebuilt "sector-0" XISOs (volume descriptor at absolute offset 0, `DescriptorSector = 0`): extract/list/tree/info, `--filetime`, `--sector-layout`, `--ranges`, `--copy-in`, and ZAR packing all work on them. `rebuild` rejects them with a clear error — repack to the standard sector-32 layout first.
 
@@ -88,6 +90,10 @@ XISOSharp checksum [--silent] <image> [images...]
 XISOSharp hash <image> [images...] [--json]
 XISOSharp verify-hashes <image> <hash-file> [--ignore-extra] [--json]
 XISOSharp verify-dat <dat> <image> [images...] [--json]
+XISOSharp file-hashes <image> [-o <file>] [--algorithm sha1|sha256|md5] [--json]
+XISOSharp disc-info <image> [--json] [--sectors <sectors.txt>] [--skip-sectors <n>]
+XISOSharp apply-skeleton <skeleton.xiso> <source-dir> -o <out.iso> [--hash <file>] [--strict-names]
+XISOSharp xex-image <image> <path>|game.xex --type thumbnail -o <out.png>
 XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...] [--batch <dir>]
 XISOSharp join [--output <file>] <first.1.iso> [...]
 XISOSharp convert <src.zar|src.iso|god> <out.iso|out.zar|out.cci|out.cso> [--batch <dir> --format iso|zar]
@@ -125,6 +131,10 @@ printed and the tool exits 1.
 | `validate <src> <out>` | Validate conversion between two images (+ `--validate*` flags; mismatch exits 2). Both sides accept ISO, CISO/CCI (single or split), split ISO sets and `.zar` |
 | `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum (`--silent` → hex only); ISO/ZAR/STFS tree hashes compare equal |
 | `verify-dat <dat> <image>...` | Redump-style XML DAT verification (size + MD5/SHA-1/CRC32); reports verified/ambiguous/not-in-DAT/missing entries, `--json` |
+| `file-hashes <image>` | Generate a per-file sidecar for ISO/split/CISO/CCI/GOD/STFS/ZAR (`--algorithm sha1\|sha256\|md5`, `-o <file>`, `--json`) |
+| `disc-info <image>` | XGD/Redump layout inspector: XGD type/wave, video/game partitions, PFI layer break, security sectors and Redump-size warnings (`--json`, `--sectors`, `--skip-sectors`) |
+| `apply-skeleton <skeleton> <dir> -o <out>` | Restore a `--petrify` skeleton from a source tree; verifies the optional `.hash` (`--strict-names`) |
+| `xex-image <image> <path> --type thumbnail -o <out.png>` | Export the XDBF `0x8000` thumbnail; a loose `.xex` is accepted |
 | `title-info <image> [--json]` | Root `default.xbe`, `default.xex` or `default_mp.xbe` title metadata (name, ID, region, disc, version); Xbox 360 XDBF adds publisher/developer/genre/description/thumbnail presence. A GOD header or its `.data` folder, or a single-file XBLA/XBLIG STFS package, reports `XContent` name/ID/disc metadata |
 | `split` / `join` (`joinsplit`) | Split into `<base>.1.iso`… parts / reassemble (`--size`, `--output`, `--batch`; default size `0xFF000000`, 4 GiB − 16 MiB) |
 | `--filetime <image>` / `--set-filetime <image> <value>` | Show / set the FILETIME volume field |
@@ -159,6 +169,8 @@ printed and the tool exits 1.
 | `--layout <file>` | Create/`--pack`/`build-image`: pack at fixed sectors from a `--sector-layout --json` file or a `path=sector` text spec; unlisted entries are first-fit |
 | `--preserve-attrs` | Rewrite: keep source RO/HID/SYS/NOR bits instead of DIR/ARC defaults |
 | `--file-time <value>` | Fixed volume FILETIME on create/pack/build-image (ISO-8601, decimal, `0x` hex, `now`, `0` = deterministic) |
+| `--deterministic` | Alias for `--file-time 0`; accepted for create, `--pack`, rewrite and `build-image` |
+| `--strict-names` | Fail before writing when a component exceeds the Xbox 42-character limit or is outside Latin-1 (default warns) |
 | `--skip-existing` | Extract/unpack/copy-out: skip files already on disk with matching sizes (resume). Batch verbs: skip sources whose output exists |
 | `--continue-on-error` | Extract/unpack/copy-out: log per-file failures and continue (still exits non-zero). Batch verbs: keep converting after a failure |
 | `--name-policy reject\|sanitize\|skip` | Extract/unpack: handle host-unsafe entry names (default `reject`; `sanitize` renames with collision-safe `~N`; `skip` omits the entry/subtree). Applies to ISO/CISO/CCI/GOD/ZAR/STFS extraction |
@@ -172,9 +184,10 @@ printed and the tool exits 1.
 | `--format cso\|cci` / `--cci-level 0..12` / `--cci-split <bytes>` | CCI output and codec options (compress only): `0` stores raw, `1..9` use fast LZ4, `10..12` use managed LZ4-HC. |
 | `--jobs <n>` / `--policy <skip\|overwrite\|auto-rename>` | Parallel + overwrite handling for `--zar`; batch verbs accept `--jobs 1..64`; single-file CISO/CCI `compress` accepts `--jobs 1..64` for sector compression (byte-identical output); extract (`-x`) and `--unpack` accept `--jobs 1..64` to copy independent files in parallel (byte-identical, ordered `FileAdded` progress); multi-image `checksum`, `hash`, `-V`, `-l`, `-t` and `-r` process images in parallel with identical output |
 | `--symlink-mode <follow\|skip\|reject>` | Create-time link policy for `-c`, `--pack`, `build-image` and `apply-skeleton` (`follow` is the historical behavior) |
+| `--zar-level <1..22>` | zstd level for `--zar`, `--compress` and `convert --format zar` (default 6 stays byte-identical) |
 | `--security-sectors <file>` (`--sectors`) | Rebuild-only security-sector range override |
 | `-f <toml>` / `-m "host:image"` (`--map`) / `-O <out>` (`--output`) | `build-image`/`image-spec` inputs |
-| `--json` | Machine-readable output for read-only verbs (`-i`, `-l`, `-t`, `checksum`, `--sector-layout`, `--ranges`, `--filetime`, `--xex-info`, `--xbe-info`, `validate`, `-v`). JSON on stdout, human logs on stderr |
+| `--json` | Machine-readable output for read-only verbs (`-i`, `-l`, `-t`, `checksum`, `hash`, `verify-hashes`, `verify-dat`, `file-hashes`, `disc-info`, `title-info`, `--sector-layout`, `--ranges`, `--filetime`, `--xex-info`, `--xbe-info`, `validate`, `-v`). JSON on stdout, human logs on stderr |
 
 ## Exit codes
 

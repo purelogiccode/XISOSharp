@@ -1,10 +1,16 @@
 # Release Notes
 
-## 2.0.0 (in progress)
+## 1.9.0
 
-**Reviewed breaking API cleanup (`FAC-01`).** The 1.x compatibility facades for
-the standalone `StfsSharp` package are removed; `net8.0`/`net9.0`/`net10.0`
-remain supported.
+**Release date:** 2026-11-08.
+
+**The most advanced XISO management release.** 1.9.0 combines the reviewed
+public-API cleanup (`FAC-01`), the beyond-reference feature pass
+(`BRF-01`…`BRF-13`), the distribution and shell-integration track
+(`DST-01`…`DST-05`) and a full documentation refresh. `net8.0`, `net9.0` and
+`net10.0` remain supported.
+
+### Breaking change: StfsSharp compatibility facades removed
 
 - Removed `XISOSharp.GodHeader`, `XISOSharp.StfsHeader`,
   `XISOSharp.StfsPackage`, `XISOSharp.BlockDevice.GodBlockDevice` and the
@@ -21,11 +27,6 @@ remain supported.
   `XISOSharp` for mounting/XDVDFS and `StfsSharp` directly for GOD/SVOD
   resolution; XISO Studio uses `XISOSharp` for reads, `StfsSharp` directly for
   GOD metadata and `CCISharp` directly for CCI validation (`XRP-04`).
-
-## 2.1.0 (in progress)
-
-**Beyond-reference feature pass.** Additive APIs only; existing read/write
-behavior is unchanged.
 
 ### New inspection and archival tools
 
@@ -86,7 +87,40 @@ behavior is unchanged.
   and `Apply`; `+`, `!`, spaces and Latin-1 names round-trip.
 - **Deterministic packing (`BRF-11`):** `--deterministic` is an alias for
   `--file-time 0` and is accepted for create, `--pack`, rewrite and
-  `build-image`; repeated packs are byte-identical.
+  `build-image`; repeated packs are byte-identical. Rewrites now accept an
+  explicit `fileTime` so `--deterministic -r` writes FILETIME 0 instead of
+  preserving the source timestamp.
+
+### Distribution and shell integration
+
+- **winget, Scoop and Homebrew manifests (`DST-03`):** the release assets are
+  described by generated manifests under `packaging/`. The repository root is
+  also a Scoop bucket (`bucket/xisosharp.json`), and
+  `scripts/update-packaging.ps1 -Version <version>` refreshes every manifest and
+  SHA-256 value from a published GitHub release.
+- **Shell completions and man page (`DST-04`):** PowerShell, bash, zsh and fish
+  completions live in `docs/completions/`, and `xisosharp(1)` in `docs/man/`.
+  CI parses each script, checks that every CLI flag is completable, and
+  renders/lints the man page.
+- **Container image (`DST-05`):** `Dockerfile` builds a framework-dependent CLI
+  image. `docker.yml` smoke-tests `-v`, create/list/extract and publishes
+  `ghcr.io/purelogiccode/xisosharp:<version>` plus `:latest` on tag pushes.
+- **Optional signing (`DST-01`/`DST-02`):** NuGet author signing runs when the
+  signing secrets exist; Windows bundles can be Authenticode-signed and
+  verified, and macOS bundles codesigned/notarized, behind repository
+  variables. Unsigned builds remain the default.
+- **CI validation:** `packaging-smoke` (completions/man page),
+  `packaging-windows` (winget/Scoop validation) and `package-install-smoke`
+  (winget, Scoop and Homebrew installs).
+
+### Review fixes
+
+- Deterministic rewrites now write the fixed FILETIME again
+  (`DecodeXiso`/`Rewrite` gained additive `fileTime` overloads).
+- Redump DAT parsing skips size-only entries that can never be content-verified,
+  and duplicate detection no longer depends on a `|`-joined key.
+- Host-I/O diagnostics map the Unix `EWOULDBLOCK` sharing error in addition to
+  `EBUSY` and `EEXIST`.
 
 ### Tests
 
@@ -94,38 +128,8 @@ New suites cover the disc inspector, skeleton overlay, embedded XEX metadata,
 thumbnail export, hash sidecars across containers, ZAR levels, loose
 executables, name rules, deterministic packing, parallel collection verbs,
 Redump DAT verification, symlink modes and host-I/O diagnostics. The full suite
-is **2309 passed / 1 skipped** on `net10.0` and **2236 passed / 1 skipped** on
-`net8.0`/`net9.0`.
-
-## Unreleased
-
-**Distribution and shell integration.** No library API or read/write behavior
-changed.
-
-### Packaging
-
-- **winget, Scoop and Homebrew manifests (DST-03):** the release assets are
-  described by generated manifests under `packaging/`. The repository root is
-  also a Scoop bucket (`bucket/xisosharp.json`), and
-  `scripts/update-packaging.ps1 -Version <version>` refreshes every manifest and
-  SHA-256 value from a published GitHub release.
-- **Shell completions and man page (DST-04):** PowerShell, bash, zsh and fish
-  completions live in `docs/completions/`, and `xisosharp(1)` in `docs/man/`.
-  CI parses each script, checks that every CLI flag is completable, and
-  renders/lints the man page.
-- **Container image (DST-05):** `Dockerfile` builds a framework-dependent CLI
-  image. `docker.yml` smoke-tests `-v`, create/list/extract and publishes
-  `ghcr.io/purelogiccode/xisosharp:<version>` plus `:latest` on tag pushes.
-- **Optional signing (DST-01/DST-02):** NuGet author signing runs when the
-  signing secrets exist; Windows bundles can be Authenticode-signed and
-  verified, and macOS bundles codesigned/notarized, behind repository variables.
-  Unsigned builds remain the default.
-
-### Validation
-
-- CI adds `packaging-smoke` (completions/man page), `packaging-windows`
-  (winget/Scoop validation) and `package-install-smoke` (winget, Scoop and
-  Homebrew installs).
+is **2312 passed / 1 opt-in skip** on `net10.0` and **2239 passed / 1 opt-in
+skip** on `net8.0`/`net9.0`.
 
 ## 1.8.0
 
@@ -224,8 +228,8 @@ thin facades, so no read verb changes behavior:
   existing XISOSharp records.
 - `GodBlockDevice` is an `IBlockDevice` adapter over `StfsSharp.GodVolume`.
 - `XisoChecksum.ComputeStfsChecksum` and the CLI/GUI paths are unchanged.
-- The facades are scheduled for removal in XISOSharp 2.0.0; consumers can move
-  to `StfsSharp` directly.
+- The facades were removed in XISOSharp 1.9.0; consumers use `StfsSharp`
+  directly.
 
 `StfsSharp` adds a standalone public surface for the moved readers:
 `GodVolume`/`GodVolumeStream`, `StfsPackage.Open`/`ReadFileChunks`, extraction

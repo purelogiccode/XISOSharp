@@ -11,6 +11,11 @@ helpers, format constants, records, enums, delegates, and exceptions.
 - [XisoExplorer & XisoAttributes](#xisoexplorer--xisoattributes)
 - [Constants](#constants)
 - [XisoValidator](#xisovalidator)
+- [XisoDiscInfo](#xisodiscinfo)
+- [XisoDat](#xisodat)
+- [XisoNameRules](#xisonamerules)
+- [HostIoDiagnostics](#hostiodiagnostics)
+- [XisoSkeleton.Apply](#xisoskeletonapply)
 - [Unpack & path safety](#unpack--path-safety)
 - [Records](#records)
 - [Enums](#enums)
@@ -277,6 +282,19 @@ modifying it and returns an `XisoDiscLayout`:
 Containers (CISO/CCI/GOD/split sets) report `IsContainer = true`, the
 game-partition view, and leave video/PFI fields null.
 
+## XisoDat
+
+`public static class XisoDat` parses Redump-style XML DATs and matches whole
+images by full-image size plus MD5/SHA-1/CRC32:
+
+| Member | Description |
+|---|---|
+| `Parse(datPath, ct = default)` | Reads `datafile`/`datfile` → `game`/`machine` → `rom` entries; requires at least one content hash per entry. |
+| `Verify(datPath, imagePaths, ct = default)` | Hashes each image once and returns `DatVerificationResult` (`Images`, `MissingRoms`, `Verified`, `Ambiguous`, `NotInDat`, `Missing`, `Passed`). |
+
+`DatImageMatch` carries the image path, `DatMatchStatus`, size, MD5, SHA-1,
+CRC32 and the matched `DatRom` entries. No DAT source is bundled.
+
 ## XisoNameRules
 
 `public static class XisoNameRules` owns the Xbox filename contract:
@@ -287,6 +305,22 @@ game-partition view, and leave video/PFI fields null.
 | `GetComponentError(component)` | Actionable error for empty/separator/non-Latin-1/over-long components; `null` when valid. |
 | `GetPathError(internalPath)` | Validates every `/`/`\` component. |
 | `IsValidComponent(component)` | Convenience boolean. |
+
+## HostIoDiagnostics
+
+`public static class HostIoDiagnostics` turns host filesystem exceptions into
+actionable messages: `Describe(exception, operation, path = null)` names the
+path and operation and suggests a fix for permission-denied, long-path,
+sharing/lock, existing-destination, illegal-name, missing-path and full-disk
+failures.
+
+## XisoSkeleton.Apply
+
+`public static int XisoSkeleton.Apply(skeletonPath, sourceDirectory, outputPath,
+hashPath = null, cancellationToken = default, strictNames = false)` restores
+file data into a `Petrify` skeleton, verifies the optional SHA-1 `.hash` while
+writing, and reproduces the original image byte-for-byte. The overload with
+`SymlinkMode` applies the create-time link policy to the source tree.
 
 ## Unpack & path safety
 
@@ -362,6 +396,10 @@ Paths are destination-root-relative, forward-slash separated, case-insensitive
 | `RemapRule` | `HostGlob`, `ImagePath`, `IsExclusion` — ordered remap rule (`!` prefix) |
 | `GlobMatchResult` | `IsMatch`, `Groups` (`Groups[0]` whole + per-`*/**` captures) |
 | `CisoHeader` | `BlockSize`, `TotalBlocks`, `Align`, `Version` (1 DEFLATE `0x80000000` vs 2 LZ4) |
+| `XisoDiscLayout` | `Format`, `IsContainer`, `FileLength`, `TotalSectors`, `Volume`, `XgdType`, Redump fields, video/game `DiscPartition` ranges, `Pfi`, `SecuritySectors`, `Warnings` |
+| `DiscPartition` / `DiscSecuritySectorRange` | Byte/sector ranges and 4096-sector security ranges |
+| `DatVerificationResult` / `DatImageMatch` / `DatRom` | Redump DAT parse/verify payloads |
+| `FileHashEntry` | `Path`, `Size`, `Algorithm`, `HashHex` |
 
 ## Enums
 
@@ -374,6 +412,8 @@ Paths are destination-root-relative, forward-slash separated, case-insensitive
 | `AvlTraversalMethod` | `Prefix`, `Infix`, `Postfix` |
 | `ValidationIssueType` | `MissingInOutput`, `ExtraInOutput`, `SizeMismatch`, `ChecksumMismatch` |
 | `ProgressInfoType` | `FileCount`, `DirCount`, `DirAdded`, `FileAdded`, `FileProgress`, `FinishedPacking` — progress event kinds (`FileAdded` also fires per written file in extract mode; `FileProgress` fires per chunk while extracting) |
+| `SymlinkMode` | `Follow` (default), `Skip`, `Reject` — create-time host-link policy |
+| `DatMatchStatus` | `Verified`, `Ambiguous`, `NotInDat` |
 
 ## Delegates
 

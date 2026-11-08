@@ -1,7 +1,7 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-2217-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2312-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![Test SDK](https://img.shields.io/badge/test--sdk-18.10.1-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
@@ -81,6 +81,13 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Sparse outputs** - NTFS allocation checks plus CISO/CCI/ZAR round-trips with all-zero content
 - **Property round-trips** - seeded pack/extract, split/join, CISO, CCI and ISO/ZAR at boundary sizes
 - **Public corpus** - every generated container opens/lists, title metadata and XBE images decode, and corrupt fixtures fail cleanly
+- **Disc/DAT inspection** - `XisoDiscInfo` XGD1/XGD2/XGD3/hybrid layouts, PFI/security ranges, truncation warnings and container views; `XisoDat` parsing/matching plus size-only entry rejection
+- **Skeleton overlay** - `XisoSkeleton.Apply` Petrify→Apply byte-identical round-trips, missing/extra/size/hash errors, name policy and symlink modes
+- **Hash sidecars** - `ComputeFileHashSidecar`/`file-hashes` parity across ISO/split/CISO/CCI/GOD/STFS/ZAR, MD5/SHA-1/SHA-256 verification and mixed-digest sidecars
+- **Xbox 360 metadata** - embedded `default.xex` XDBF/XSRC fields for GOD/STFS, thumbnail export and loose `.xex`/`.xbe` parsing
+- **Parallel collection verbs** - `--jobs 1..64` output/JSON parity for checksum/hash/audit/batch extract/list/tree/rewrite
+- **Name/link/determinism policy** - 42-character Latin-1 rules, `--strict-names`, symlink follow/skip/reject, host-I/O diagnostics and deterministic rewrite FILETIME
+- **Counts** - 2312 passed / 1 opt-in skip on `net10.0`; 2239 passed / 1 opt-in skip on `net8.0`/`net9.0`
 
 ## Running Tests
 
