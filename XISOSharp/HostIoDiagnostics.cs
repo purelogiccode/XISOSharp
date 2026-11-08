@@ -13,6 +13,11 @@ public static class HostIoDiagnostics
     private const int ErrorAlreadyExists = 183;
     private const int ErrorFilenameExcedRange = 206;
 
+    // Unix errno values used when the runtime exposes the native code in HResult.
+    private const int UnixErrorBusy = 16;
+    private const int UnixErrorExists = 17;
+    private const int UnixErrorNameTooLong = 36;
+
     /// <summary>
     /// Describes <paramref name="exception"/> with the failed operation and
     /// path, appending a likely fix for the common host errors.
@@ -42,21 +47,21 @@ public static class HostIoDiagnostics
         }
 
         if (exception is PathTooLongException ||
-            exception is IOException && HasHResult(exception, ErrorFilenameExcedRange) ||
+            exception is IOException && HasHResult(exception, ErrorFilenameExcedRange, UnixErrorNameTooLong) ||
             normalized.Contains("too long", StringComparison.Ordinal))
         {
             return $"{where}: the path is too long for this host filesystem. Shorten the destination " +
                    $"path or enable long-path support. ({detail})";
         }
 
-        if (exception is IOException && HasHResult(exception, ErrorSharingViolation) ||
-            exception is IOException && HasHResult(exception, ErrorLockViolation))
+        if (exception is IOException && HasHResult(exception, ErrorSharingViolation, UnixErrorBusy) ||
+            exception is IOException && HasHResult(exception, ErrorLockViolation, UnixErrorBusy))
         {
             return $"{where}: another process is using the file. Close it and retry. ({detail})";
         }
 
-        if (exception is IOException && HasHResult(exception, ErrorAlreadyExists) ||
-            exception is IOException && HasHResult(exception, ErrorFileExists))
+        if (exception is IOException && HasHResult(exception, ErrorAlreadyExists, UnixErrorExists) ||
+            exception is IOException && HasHResult(exception, ErrorFileExists, UnixErrorExists))
         {
             return $"{where}: the destination already exists. Remove it, choose another name, or pass " +
                    $"the overwrite option. ({detail})";
@@ -90,12 +95,13 @@ public static class HostIoDiagnostics
         return $"{where}: {detail}";
     }
 
-    private static bool HasHResult(Exception exception, int value)
+    private static bool HasHResult(Exception exception, int windowsValue, int unixValue)
     {
         int hresult = exception.HResult;
         // Windows HRESULTs carry the Win32 code in the low 16 bits; Unix
-        // implementations expose errno, so only compare on Windows.
-        return OperatingSystem.IsWindows() &&
-               (hresult & 0xFFFF) == value;
+        // implementations expose errno directly, so compare the matching code.
+        return OperatingSystem.IsWindows()
+            ? (hresult & 0xFFFF) == windowsValue
+            : hresult == unixValue;
     }
 }
