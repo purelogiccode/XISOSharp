@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
+using SharpGodHeader = StfsSharp.GodHeader;
 
 namespace XISOSharp.TestDataGenerator;
 
@@ -95,16 +96,16 @@ public static class SyntheticGodContainer
         byte discCount,
         uint dataBlocks)
     {
-        byte[] header = new byte[GodHeader.MinimumHeaderLength];
+        byte[] header = new byte[SharpGodHeader.MinimumHeaderLength];
         BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(0), SignatureLive);
         BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(0x344), ContentTypeGod);
-        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(GodHeader.TitleIdOffset), titleId);
-        header[GodHeader.DiscNumberOffset] = discNumber;
-        header[GodHeader.DiscCountOffset] = discCount;
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(SharpGodHeader.TitleIdOffset), titleId);
+        header[SharpGodHeader.DiscNumberOffset] = discNumber;
+        header[SharpGodHeader.DiscCountOffset] = discCount;
 
         byte[] name = Encoding.BigEndianUnicode.GetBytes(titleName);
-        name.AsSpan(0, Math.Min(name.Length, GodHeader.TitleNameLength))
-            .CopyTo(header.AsSpan(GodHeader.TitleNameOffset));
+        name.AsSpan(0, Math.Min(name.Length, SharpGodHeader.TitleNameLength))
+            .CopyTo(header.AsSpan(SharpGodHeader.TitleNameOffset));
 
         header[0x391] = 0; // not enhanced GDF
         header[0x392] = (byte)dataBlocks;

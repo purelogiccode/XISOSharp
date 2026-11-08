@@ -3,7 +3,6 @@ using System.Security.Cryptography;
 using System.Text;
 using XISOSharp.BlockDevice;
 using XISOSharp.Interfaces;
-using XISOSharp.Models;
 using ZArchiveSharp;
 
 namespace XISOSharp;
@@ -220,21 +219,21 @@ public static class XisoChecksum
         ArgumentException.ThrowIfNullOrEmpty(packagePath);
         ct.ThrowIfCancellationRequested();
 
-        using StfsPackage package = StfsPackage.Open(packagePath);
-        SortedDictionary<string, StfsEntry> map = new(StringComparer.Ordinal);
-        foreach (StfsEntry entry in package.Entries)
+        using StfsSharp.StfsPackage package = StfsSharp.StfsPackage.Open(packagePath);
+        SortedDictionary<string, StfsSharp.Models.StfsEntry> map = new(StringComparer.Ordinal);
+        foreach (StfsSharp.Models.StfsEntry entry in package.Entries)
         {
             map["/" + entry.Path] = entry;
         }
 
         using StfsHashAccumulator hasher = new();
 
-        foreach (KeyValuePair<string, StfsEntry> kv in map)
+        foreach (KeyValuePair<string, StfsSharp.Models.StfsEntry> kv in map)
         {
             ct.ThrowIfCancellationRequested();
             hasher.Append(Encoding.UTF8.GetBytes(kv.Key));
 
-            StfsEntry entry = kv.Value;
+            StfsSharp.Models.StfsEntry entry = kv.Value;
             if (entry.IsDirectory || entry.Size == 0)
             {
                 continue;

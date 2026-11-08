@@ -6,8 +6,22 @@ using System.Text;
 using System.Text.Json;
 using Serilog;
 using XISOSharp.Cli.Logging;
+using XISOSharp.Logging;
 using XISOSharp.Models;
+using ZArchiveSharp;
 using ZArchiveSharp.Pipeline;
+using ZArchiveSharp.Zstd;
+using GodHeader = StfsSharp.GodHeader;
+using GodTitleInfo = StfsSharp.Models.GodTitleInfo;
+using GodVolumeInfo = StfsSharp.Models.GodVolumeInfo;
+using StfsEntry = StfsSharp.Models.StfsEntry;
+using StfsPackage = StfsSharp.StfsPackage;
+using StfsPackageKind = StfsSharp.Models.StfsPackageKind;
+using StfsSharpExtractNamePolicy = StfsSharp.Models.ExtractNamePolicy;
+using StfsTitleInfo = StfsSharp.Models.StfsTitleInfo;
+using StfsValidationIssue = StfsSharp.Models.StfsValidationIssue;
+using StfsValidationReport = StfsSharp.Models.StfsValidationReport;
+using StfsHeader = StfsSharp.StfsHeader;
 
 namespace XISOSharp.Cli;
 
@@ -24,6 +38,14 @@ internal static class Program
 #else
     private static readonly object LogLock = new();
 #endif
+
+    /// <summary>
+    /// Cancellation source for the current invocation. Ctrl+C requests a
+    /// cooperative stop; collection loops no longer start new images.
+    /// </summary>
+    private static CancellationTokenSource? _collectionCancellationSource;
+
+    private static CancellationToken CollectionToken => _collectionCancellationSource?.Token ?? default;
 
     /// <summary>
     /// Parses a <c>--policy</c> value (<c>skip</c> / <c>overwrite</c> /
@@ -82,6 +104,42 @@ internal static class Program
         return false;
     }
 
+    /// <summary>Maps the CLI/library name policy onto the StfsSharp package policy.</summary>
+    private static StfsSharpExtractNamePolicy MapStfsNamePolicy(ExtractNamePolicy policy) => policy switch
+    {
+        ExtractNamePolicy.Sanitize => StfsSharpExtractNamePolicy.Sanitize,
+        ExtractNamePolicy.Skip => StfsSharpExtractNamePolicy.Skip,
+        _ => StfsSharpExtractNamePolicy.Reject,
+    };
+
+    /// <summary>
+    /// Parses a <c>--symlink-mode</c> value: <c>follow</c> (default),
+    /// <c>skip</c> or <c>reject</c>.
+    /// </summary>
+    private static bool TryParseSymlinkMode(string text, out SymlinkMode mode)
+    {
+        if (string.Equals(text, "follow", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = SymlinkMode.Follow;
+            return true;
+        }
+
+        if (string.Equals(text, "skip", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = SymlinkMode.Skip;
+            return true;
+        }
+
+        if (string.Equals(text, "reject", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = SymlinkMode.Reject;
+            return true;
+        }
+
+        mode = SymlinkMode.Follow;
+        return false;
+    }
+
     /// <summary>
     /// Emits UTF-8 on stdout/stderr regardless of the host console code page so
     /// Latin-1 filenames render and pipe identically on every platform (and match
@@ -127,9 +185,24 @@ internal static class Program
         // console): keep the window open at the end so the usage text stays
         // readable instead of flashing away.
         bool pauseBeforeExit = args.Length == 0 && IsInteractiveConsoleLaunch();
+        CancellationTokenSource cancellation = new();
+        _collectionCancellationSource = cancellation;
+        ConsoleCancelEventHandler cancelHandler = (_, eventArgs) =>
+        {
+            // Keep the process alive so in-flight writers can clean up; the
+            // collection loops observe the token and stop scheduling new work.
+            eventArgs.Cancel = true;
+            _collectionCancellationSource?.Cancel();
+        };
+        Console.CancelKeyPress += cancelHandler;
         try
         {
             return MainInner(args);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogErr("Canceled\n");
+            return 1;
         }
         catch (NotSupportedException ex)
         {
@@ -154,6 +227,9 @@ internal static class Program
         }
         finally
         {
+            Console.CancelKeyPress -= cancelHandler;
+            _collectionCancellationSource = null;
+            cancellation.Dispose();
             Logger.RouteInfoToError = priorRouteInfoToError;
             // X-003: deliver pending bug-report sends before the process exits;
             // a short-lived CLI would otherwise drop crash reports every time.
@@ -291,7 +367,11 @@ internal static class Program
         bool sectorLayoutMode = false;
         bool rangesMode = false;
         bool isOptimizedMode = false;
+        bool deterministic = false;
+        bool strictNames = false;
         bool jsonMode = false;
+        SymlinkMode symlinkMode = SymlinkMode.Follow;
+        bool symlinkModeSpecified = false;
 
         // XboxKit redump / archival modes
         bool videoMode = false;
@@ -306,6 +386,7 @@ internal static class Program
         bool bestMode = false;
         bool compressAlias = false;
         int jobs = 1;
+        int zarLevel = 6;
         ZarCollisionPolicy? zarPolicy = null;
         string? securitySectorsPath = null;
 
@@ -385,16 +466,44 @@ internal static class Program
         {
             return RunVerifyHashesMode(args, 1);
         }
+        else if (args.Length > 0 && (string.Equals(args[0], "verify-dat", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(args[0], "verify-dats", StringComparison.OrdinalIgnoreCase)))
+        {
+            return RunVerifyDatMode(args, 1);
+        }
+        else if (args.Length > 0 && (string.Equals(args[0], "file-hashes", StringComparison.OrdinalIgnoreCase) ||
+                                     Array.Exists(args, static a =>
+                                         string.Equals(a, "--file-hashes", StringComparison.OrdinalIgnoreCase))))
+        {
+            return RunFileHashesMode(args);
+        }
         else if (args.Length > 0 && (string.Equals(args[0], "title-info", StringComparison.OrdinalIgnoreCase) ||
                                      string.Equals(args[0], "title", StringComparison.OrdinalIgnoreCase)))
         {
             return RunTitleInfoMode(args, 1);
+        }
+        else if (args.Length > 0 && (string.Equals(args[0], "disc-info", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(args[0], "--disc-info", StringComparison.OrdinalIgnoreCase)))
+        {
+            return RunDiscInfoMode(args, 1);
+        }
+        else if (args.Length > 0 && (string.Equals(args[0], "apply-skeleton", StringComparison.OrdinalIgnoreCase) ||
+                                     Array.Exists(args, static a =>
+                                         string.Equals(a, "--apply-skeleton", StringComparison.OrdinalIgnoreCase))))
+        {
+            return RunApplySkeletonMode(args);
         }
         else if (args.Length > 0 && (string.Equals(args[0], "xbe-image", StringComparison.OrdinalIgnoreCase) ||
                                      Array.Exists(args, static a =>
                                          string.Equals(a, "--xbe-image", StringComparison.OrdinalIgnoreCase))))
         {
             return RunXbeImageMode(args);
+        }
+        else if (args.Length > 0 && (string.Equals(args[0], "xex-image", StringComparison.OrdinalIgnoreCase) ||
+                                     Array.Exists(args, static a =>
+                                         string.Equals(a, "--xex-image", StringComparison.OrdinalIgnoreCase))))
+        {
+            return RunXexImageMode(args);
         }
 
         for (int i = optind; i < args.Length; i++)
@@ -769,6 +878,22 @@ internal static class Program
                         }
 
                         break;
+                    case "--deterministic":
+                        deterministic = true;
+                        break;
+                    case "--strict-names":
+                        strictNames = true;
+                        break;
+                    case "--symlink-mode":
+                        if (i + 1 >= args.Length || !TryParseSymlinkMode(args[i + 1], out symlinkMode))
+                        {
+                            Logger.LogErr("Error: --symlink-mode must be follow, skip or reject\n");
+                            return 1;
+                        }
+
+                        symlinkModeSpecified = true;
+                        i++;
+                        break;
                     case "--batch":
                         if (i + 1 < args.Length)
                         {
@@ -924,6 +1049,18 @@ internal static class Program
                         if (i + 1 >= args.Length || !TryParseCollisionPolicy(args[i + 1], out zarPolicy))
                         {
                             PrintUsage();
+                            return 1;
+                        }
+
+                        i++;
+                        break;
+                    case "--zar-level":
+                        if (i + 1 >= args.Length ||
+                            !int.TryParse(args[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture,
+                                out zarLevel) ||
+                            zarLevel < 1 || zarLevel > 22)
+                        {
+                            Logger.LogErr("Error: --zar-level requires an integer from 1 to 22\n");
                             return 1;
                         }
 
@@ -1126,14 +1263,48 @@ internal static class Program
             checksumSilent = true;
         }
 
-        // Item #33: --file-time is only consumed by create mode (and --pack /
-        // build-image, which translate to it); it used to be silently accepted
-        // and ignored by extract/list/tree/rewrite.
-        if (createFileTime.HasValue && createList.Count == 0)
+        // --deterministic is a friendly alias for the reproducible-build
+        // timestamp (--file-time 0). Unlike an explicit --file-time, it is
+        // meaningful for rewrite/repack too.
+        if (deterministic && createFileTime.HasValue && createFileTime.Value != 0)
+        {
+            Logger.LogErr("Error: --deterministic conflicts with an explicit non-zero --file-time\n");
+            return 1;
+        }
+
+        if (strictNames && createList.Count == 0 && !copyIn && !petrifyMode)
+        {
+            Logger.LogErr(
+                "Error: --strict-names is only used with -c, --pack, --copy-in, --petrify or build-image\n");
+            return 1;
+        }
+
+        if (symlinkModeSpecified && createList.Count == 0)
+        {
+            Logger.LogErr(
+                "Error: --symlink-mode is only used with -c (create mode), --pack, build-image or apply-skeleton\n");
+            return 1;
+        }
+
+        // An explicit --file-time remains create/pack/build-image only (the old
+        // contract); --deterministic is the opt-in for deterministic rewrites.
+        if (!deterministic && createFileTime.HasValue && createList.Count == 0)
         {
             Logger.LogErr(
                 "Error: --file-time is only used with -c (create mode), --pack <directory>, or build-image\n");
             return 1;
+        }
+
+        if (deterministic && createList.Count == 0 && !rewrite)
+        {
+            Logger.LogErr(
+                "Error: --deterministic is only used with -c (create mode), --pack, -r (rewrite), or build-image\n");
+            return 1;
+        }
+
+        if (deterministic)
+        {
+            createFileTime = 0;
         }
 
         // Item #34: --preserve-attrs is only consumed by rewrite; extract/list/
@@ -1145,18 +1316,28 @@ internal static class Program
         }
 
         // Item #37: --jobs/--policy are only consumed by the parallel ZAR path
-        // (--compress expands to --zar later, so accept it here too) and, for
-        // --jobs, by the parallel extract/--unpack path.
+        // (--compress expands to --zar later, so accept it here too), the
+        // parallel extract/--unpack path, and the multi-image collection verbs
+        // (checksum, hash, audit, list, tree, rewrite).
         bool parallelExtract = (extract && !rewrite && createList.Count == 0) || unpackMode;
-        if (!zarMode && !compressAlias && !parallelExtract && jobs != 1)
+        bool collectionMode = checksumFlagMode || auditMode || listMode || tree || rewrite;
+        if (!zarMode && !compressAlias && !parallelExtract && !collectionMode && jobs != 1)
         {
-            Logger.LogErr("Error: --jobs is only used with --zar, extract (-x) or --unpack\n");
+            Logger.LogErr(
+                "Error: --jobs is only used with --zar, extract (-x), --unpack, checksum, hash, -V, " +
+                "-l, -t or -r\n");
             return 1;
         }
 
         if (!zarMode && !compressAlias && zarPolicy != null)
         {
             Logger.LogErr("Error: --policy is only used with --zar\n");
+            return 1;
+        }
+
+        if (zarLevel != 6 && !zarMode && !compressAlias)
+        {
+            Logger.LogErr("Error: --zar-level is only used with --zar or --compress\n");
             return 1;
         }
 
@@ -1362,9 +1543,14 @@ internal static class Program
         }.Count(b => b);
         bool parallelExtractMode = redumpModeCount == 0 &&
                                    ((extract && !rewrite && createList.Count == 0) || unpackMode);
-        if (jobs != 1 && !(zarMode && redumpModeCount == 1) && !parallelExtractMode)
+        bool parallelCollectionMode = redumpModeCount == 0 &&
+                                      (checksumFlagMode || auditMode || listMode || tree || rewrite);
+        if (jobs != 1 && !(zarMode && redumpModeCount == 1) &&
+            !parallelExtractMode && !parallelCollectionMode)
         {
-            Logger.LogErr("Error: --jobs is only used with a lone --zar over several inputs, extract (-x) or --unpack\n");
+            Logger.LogErr(
+                "Error: --jobs is only used with a lone --zar over several inputs, extract (-x), " +
+                "--unpack, checksum, hash, -V, -l, -t or -r\n");
             return 1;
         }
 
@@ -1671,24 +1857,39 @@ internal static class Program
 
             int cExit = 0;
             List<JsonChecksum>? jsonChecksums = jsonMode ? [] : null;
-            for (int k = optind; k < args.Length; k++)
+            List<string> checksumImages = args.Skip(optind).ToList();
+            IReadOnlyList<CollectionJobResult<(string? Hex, string? Error)>> checksumRuns =
+                RunOrderedParallel<(string? Hex, string? Error)>(checksumImages, jobs, static (iso, _) =>
+                {
+                    try
+                    {
+                        byte[] hash = XisoChecksum.ComputeImageChecksum(iso, ct: CollectionToken);
+                        return (Convert.ToHexString(hash).ToLowerInvariant(), null);
+                    }
+                    catch (Exception ex)
+                    {
+                        return (null, ex.Message);
+                    }
+                });
+
+            for (int k = 0; k < checksumImages.Count; k++)
             {
-                string iso = args[k];
-                try
+                CollectionJobResult<(string? Hex, string? Error)> run = checksumRuns[k];
+                run.Replay();
+                string iso = checksumImages[k];
+                if (run.Value.Error is not null)
                 {
-                    byte[] hash = XisoChecksum.ComputeImageChecksum(iso);
-                    string hex = Convert.ToHexString(hash).ToLowerInvariant();
-                    if (checksumSilent)
-                        Logger.Log($"{hex}\n");
-                    else
-                        Logger.Log($"{hex}\t{iso}\n");
-                    jsonChecksums?.Add(new JsonChecksum(iso, "sha3-256", hex));
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogErr($"Error checksumming {iso}: {ex.Message}\n");
+                    Logger.LogErr($"Error checksumming {iso}: {run.Value.Error}\n");
                     cExit = 1;
+                    continue;
                 }
+
+                string hex = run.Value.Hex!;
+                if (checksumSilent)
+                    Logger.Log($"{hex}\n");
+                else
+                    Logger.Log($"{hex}\t{iso}\n");
+                jsonChecksums?.Add(new JsonChecksum(iso, "sha3-256", hex));
             }
 
             if (jsonChecksums != null)
@@ -1749,7 +1950,7 @@ internal static class Program
             }
 
             return RunRedumpBatch(isoFiles, videoMode, randomMode, seedMode, wipeMode, trimMode, petrifyMode,
-                updateMode, zarMode, outputName, assumeYes, assumeNo, jobs, zarPolicy);
+                updateMode, zarMode, outputName, assumeYes, assumeNo, jobs, zarPolicy, zarLevel, strictNames);
         }
 
         if (createList.Count > 0)
@@ -1803,25 +2004,34 @@ internal static class Program
                         Directory.CreateDirectory(outputDir);
                     }
 
+                    if (!ValidateSourceNames(dir, strictNames))
+                    {
+                        return 1;
+                    }
+
                     XisoWriter.CreateXiso(dir, outputDir, null, null, out _, isoName, null,
+                        cancellationToken: default,
                         prependSectors: prependSectors,
                         excludePatterns: excludePatterns.Count > 0 ? excludePatterns : null,
+                        progress: null,
                         fileTime: createFileTime,
-                        layout: layout);
+                        sourceDiscLseek: 0,
+                        layout: layout,
+                        symlinkMode: symlinkMode);
                 }
                 catch (UnauthorizedAccessException ex)
                 {
-                    Logger.LogErr($"Error: permission denied: {ex.Message}\n");
+                    Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "creating the image", dir)}\n");
                     return 1;
                 }
                 catch (IOException ex)
                 {
-                    Logger.LogErr($"Error: {ex.Message}\n");
+                    Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "creating the image", dir)}\n");
                     return 1;
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogErr($"Error: {ex.Message}\n");
+                    Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "creating the image", dir)}\n");
                     return 1;
                 }
             }
@@ -1940,7 +2150,7 @@ internal static class Program
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
             {
-                Logger.LogErr($"Error: {ex.Message}\n");
+                Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "reading the image", xisoPath)}\n");
                 return 1;
             }
 
@@ -1985,7 +2195,7 @@ internal static class Program
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
             {
-                Logger.LogErr($"Error: {ex.Message}\n");
+                Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "listing the image", xisoPath)}\n");
                 return 1;
             }
 
@@ -1994,11 +2204,12 @@ internal static class Program
 
         if (xexInfoMode)
         {
-            // CLI-012: exactly <iso> <internal-path>. CLI-017: -d/-o/-D ignored.
+            // CLI-012: <iso> <internal-path>, or a single standalone .xex.
+            // CLI-017: -d/-o/-D ignored.
             if (RejectIgnoredOutputFlags("--xex-info"))
                 return 1;
 
-            if (optind + 1 >= args.Length)
+            if (optind >= args.Length)
             {
                 PrintUsage();
                 return 1;
@@ -2006,23 +2217,28 @@ internal static class Program
 
             if (optind + 2 < args.Length)
             {
-                Logger.LogErr("Error: --xex-info takes exactly <iso> <internal-path>\n");
+                Logger.LogErr("Error: --xex-info takes <iso> <internal-path> or one standalone .xex\n");
                 return 1;
             }
 
             string xisoPath = args[optind];
-            string internalPath = args[optind + 1];
+            bool loose = optind + 1 >= args.Length;
+            string internalPath = loose ? Path.GetFileName(xisoPath) : args[optind + 1];
 
             try
             {
-                XexInfo? xex = XisoReader.GetXexInfo(xisoPath, internalPath);
+                XexInfo? xex = loose
+                    ? XisoReader.GetLooseXexInfo(xisoPath)
+                    : XisoReader.GetXexInfo(xisoPath, internalPath);
                 if (xex == null)
                 {
                     Logger.LogErr($"Not an XEX2 executable: {internalPath}\n");
                     return 1;
                 }
 
-                XexTitleInfo? xexTitle = XisoReader.GetXexTitleInfo(xisoPath, internalPath);
+                XexTitleInfo? xexTitle = loose
+                    ? XisoReader.GetLooseXexTitleInfo(xisoPath)
+                    : XisoReader.GetXexTitleInfo(xisoPath, internalPath);
 
                 Logger.Log($"XEX info: {internalPath}\n");
                 Logger.Log($"  Module flags:      0x{xex.ModuleFlags:X8}{FormatXexModuleFlags(xex.ModuleFlags)}\n");
@@ -2089,7 +2305,7 @@ internal static class Program
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
             {
-                Logger.LogErr($"Error: {ex.Message}\n");
+                Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "reading the XEX", xisoPath)}\n");
                 return 1;
             }
 
@@ -2098,11 +2314,12 @@ internal static class Program
 
         if (xbeInfoMode)
         {
-            // CLI-012: exactly <iso> <internal-path>. CLI-017: -d/-o/-D ignored.
+            // CLI-012: <iso> <internal-path>, or a single standalone .xbe.
+            // CLI-017: -d/-o/-D ignored.
             if (RejectIgnoredOutputFlags("--xbe-info"))
                 return 1;
 
-            if (optind + 1 >= args.Length)
+            if (optind >= args.Length)
             {
                 PrintUsage();
                 return 1;
@@ -2110,16 +2327,19 @@ internal static class Program
 
             if (optind + 2 < args.Length)
             {
-                Logger.LogErr("Error: --xbe-info takes exactly <iso> <internal-path>\n");
+                Logger.LogErr("Error: --xbe-info takes <iso> <internal-path> or one standalone .xbe\n");
                 return 1;
             }
 
             string xisoPath = args[optind];
-            string internalPath = args[optind + 1];
+            bool loose = optind + 1 >= args.Length;
+            string internalPath = loose ? Path.GetFileName(xisoPath) : args[optind + 1];
 
             try
             {
-                XbeInfo? xbe = XisoReader.GetXbeInfo(xisoPath, internalPath);
+                XbeInfo? xbe = loose
+                    ? XisoReader.GetLooseXbeInfo(xisoPath)
+                    : XisoReader.GetXbeInfo(xisoPath, internalPath);
                 if (xbe == null)
                 {
                     Logger.LogErr($"Not an XBEH executable: {internalPath}\n");
@@ -2169,7 +2389,7 @@ internal static class Program
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
             {
-                Logger.LogErr($"Error: {ex.Message}\n");
+                Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "reading the XBE", xisoPath)}\n");
                 return 1;
             }
 
@@ -2230,7 +2450,7 @@ internal static class Program
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
             {
-                Logger.LogErr($"Error: {ex.Message}\n");
+                Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "repairing the image", xisoPath)}\n");
                 return 1;
             }
 
@@ -2296,7 +2516,7 @@ internal static class Program
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
             {
-                Logger.LogErr($"Error: {ex.Message}\n");
+                Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "salvaging the image", xisoPath)}\n");
                 return 1;
             }
 
@@ -2393,7 +2613,7 @@ internal static class Program
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
             {
-                Logger.LogErr($"Error: {ex.Message}\n");
+                Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "hashing image files", xisoPath)}\n");
                 return 1;
             }
 
@@ -2445,7 +2665,7 @@ internal static class Program
             catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException
                                            or ExtractErrorException)
             {
-                Logger.LogErr($"Error: {ex.Message}\n");
+                Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "copying out of the image", destPath)}\n");
                 return 1;
             }
 
@@ -2479,6 +2699,18 @@ internal static class Program
                 return 1;
             }
 
+            string? nameError = XisoNameRules.GetPathError(internalPath);
+            if (nameError != null)
+            {
+                if (strictNames)
+                {
+                    Logger.LogErr($"Error: {nameError}\n");
+                    return 1;
+                }
+
+                Logger.LogErr($"warning: {nameError}\n");
+            }
+
             if (XisoPaths.AreSamePath(xisoPath, hostPath))
             {
                 Logger.LogErr($"Error: host file {hostPath} is the image itself; choose another file\n");
@@ -2502,7 +2734,7 @@ internal static class Program
             catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException
                                            or ExtractErrorException)
             {
-                Logger.LogErr($"Error: {ex.Message}\n");
+                Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "copying into the image", xisoPath)}\n");
                 return 1;
             }
 
@@ -2522,9 +2754,21 @@ internal static class Program
             }
 
             bool allValid = true;
-            for (int i = 0; i < isoFiles.Count; i++)
+            IReadOnlyList<CollectionJobResult<bool>> runs =
+                RunOrderedParallel(isoFiles, jobs, static (xisoPath, _) => AuditOne(xisoPath));
+            foreach (CollectionJobResult<bool> run in runs)
             {
-                string xisoPath = isoFiles[i];
+                run.Replay();
+                if (!run.Value)
+                {
+                    allValid = false;
+                }
+            }
+
+            return allValid ? 0 : 1;
+
+            static bool AuditOne(string xisoPath)
+            {
                 try
                 {
                     if (StfsPackage.IsStfsPackage(xisoPath))
@@ -2542,7 +2786,6 @@ internal static class Program
                         }
                         else
                         {
-                            allValid = false;
                             Logger.Log($"  Result:         FAIL ({report.Issues.Count} issue(s))\n");
                             foreach (StfsValidationIssue issue in report.Issues)
                             {
@@ -2551,7 +2794,7 @@ internal static class Program
                         }
 
                         Logger.Log("\n");
-                        continue;
+                        return report.IsValid;
                     }
 
                     // Integrity audit: a missing optimized tag is reported through
@@ -2569,7 +2812,6 @@ internal static class Program
                     }
                     else
                     {
-                        allValid = false;
                         Logger.Log($"  Result:         FAIL ({result.Issues.Count} issue(s))\n");
                         foreach (string issue in result.Issues)
                         {
@@ -2578,15 +2820,14 @@ internal static class Program
                     }
 
                     Logger.Log("\n");
+                    return result.Issues.Count == 0;
                 }
                 catch (Exception ex) when (ex is InvalidDataException or IOException)
                 {
                     Logger.LogErr($"Error auditing {xisoPath}: {ex.Message}\n");
-                    allValid = false;
+                    return false;
                 }
             }
-
-            return allValid ? 0 : 1;
         }
 
         if (validateMode)
@@ -2681,13 +2922,79 @@ internal static class Program
 
         List<JsonImageListing>? jsonListings = jsonMode && !rewrite && !extract ? [] : null;
 
-        for (int i = 0; i < isoFiles.Count; i++)
+        // Extract with one explicit destination cannot safely run several
+        // images at once (they would share the same output tree). Everything
+        // else uses per-image destinations and can be ordered in parallel.
+        bool parallelImages = jobs > 1 && isoFiles.Count > 1 &&
+                              !(extract && !rewrite && path != null);
+
+        if (parallelImages)
         {
-            isos++;
+            IReadOnlyList<CollectionJobResult<(int ExitCode, List<JsonImageListing>? Listings, bool Warned)>> runs =
+                RunOrderedParallel(isoFiles, jobs, (iso, _) =>
+                {
+                    List<JsonImageListing>? localListings = jsonListings != null ? [] : null;
+                    Logger.TotalBytesAllIsos = 0;
+                    Logger.TotalFilesAllIsos = 0;
+                    int exitCode = ProcessImage(iso, localListings);
+                    return (exitCode, localListings, Logger.Warned);
+                });
+
+            for (int index = 0; index < runs.Count; index++)
+            {
+                isos++;
+                CollectionJobResult<(int ExitCode, List<JsonImageListing>? Listings, bool Warned)> run = runs[index];
+                run.Replay();
+                if (run.Value.ExitCode != 0)
+                {
+                    err = run.Value.ExitCode;
+                }
+
+                if (run.Value.Warned)
+                {
+                    Logger.Warned = true;
+                }
+
+                if (jsonListings != null && run.Value.Listings != null)
+                {
+                    jsonListings.AddRange(run.Value.Listings);
+                }
+
+                Logger.TotalFilesAllIsos = checked(Logger.TotalFilesAllIsos + run.FilesAllIsos);
+                Logger.TotalBytesAllIsos = checked(Logger.TotalBytesAllIsos + run.BytesAllIsos);
+            }
+        }
+        else
+        {
+            foreach (string xisoPath in isoFiles)
+            {
+                isos++;
+                int exitCode = ProcessImage(xisoPath, jsonListings);
+                if (exitCode != 0)
+                {
+                    err = exitCode;
+                }
+            }
+        }
+
+        if (jsonListings != null)
+        {
+            WriteJson(new JsonListing(1, tree ? "tree" : "list", jsonListings));
+            return err;
+        }
+
+        if (err == 0 && isos > 1)
+            Logger.Log($"\n{Logger.TotalFilesAllIsos} files in {isos} xiso's total {Logger.TotalBytesAllIsos} bytes\n");
+
+        if (Logger.Warned)
+            Logger.Log("\nWARNING:  Warning(s) were issued during execution--review stderr!\n");
+
+        return err;
+
+        int ProcessImage(string xisoPath, List<JsonImageListing>? localListings)
+        {
             Logger.Log("\n");
             Logger.TotalBytes = Logger.TotalFiles = 0;
-
-            string xisoPath = isoFiles[i];
 
             if (IsZarPath(xisoPath))
             {
@@ -2696,21 +3003,17 @@ internal static class Program
                     if (rewrite)
                     {
                         Logger.LogErr($"Error: cannot rewrite ZArchive '{xisoPath}'; convert it to ISO first\n");
-                        err = 1;
-                    }
-                    else if (extract && jobs > 1)
-                    {
-                        Logger.LogErr("Error: --jobs is not supported for ZArchive extraction\n");
-                        err = 1;
+                        return 1;
                     }
                     else if (extract)
                     {
                         string destination = path ?? DeriveZarExtractDirectory(xisoPath);
                         Logger.Log($"extracting {Path.GetFileName(xisoPath)}:\n\n");
                         XisoZarchive.ExtractZar(xisoPath, destination, namePolicy,
-                            skipExisting: unpackOptions?.SkipExisting ?? false);
+                            skipExisting: unpackOptions?.SkipExisting ?? false,
+                            ct: CollectionToken);
                     }
-                    else if (jsonListings != null)
+                    else if (localListings != null)
                     {
                         List<JsonEntry> entries = [];
                         int fileCount = 0;
@@ -2731,7 +3034,7 @@ internal static class Program
                             }
                         }
 
-                        jsonListings.Add(new JsonImageListing(xisoPath, fileCount, totalBytes, entries));
+                        localListings.Add(new JsonImageListing(xisoPath, fileCount, totalBytes, entries));
                     }
                     else
                     {
@@ -2741,10 +3044,10 @@ internal static class Program
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
                 {
                     Logger.LogErr($"Error processing ZArchive {xisoPath}: {ex.Message}\n");
-                    err = 1;
+                    return 1;
                 }
 
-                continue;
+                return 0;
             }
 
             if (StfsPackage.IsStfsPackage(xisoPath))
@@ -2755,35 +3058,32 @@ internal static class Program
                     if (rewrite)
                     {
                         Logger.LogErr($"Error: cannot rewrite STFS package '{xisoPath}'; extract it first\n");
-                        err = 1;
+                        return 1;
                     }
                     else if (skipSectors is not null)
                     {
                         Logger.LogErr("Error: --skip-sectors is not supported for STFS packages\n");
-                        err = 1;
+                        return 1;
                     }
                     else if (extract && unpackOptions?.ContinueOnError == true)
                     {
                         Logger.LogErr("Error: --continue-on-error is not supported for STFS packages\n");
-                        err = 1;
-                    }
-                    else if (extract && jobs > 1)
-                    {
-                        Logger.LogErr("Error: --jobs is not supported for STFS packages\n");
-                        err = 1;
+                        return 1;
                     }
                     else if (extract)
                     {
                         string destination = path ?? DeriveStfsExtractDirectory(xisoPath);
                         Logger.Log($"extracting {Path.GetFileName(xisoPath)}:\n\n");
-                        package.ExtractTo(destination, namePolicy,
-                            skipExisting: unpackOptions?.SkipExisting ?? false);
+                        package.ExtractTo(destination, MapStfsNamePolicy(namePolicy),
+                            skipExisting: unpackOptions?.SkipExisting ?? false,
+                            warning: message => Logger.LogErr(message),
+                            ct: CollectionToken);
                         Logger.TotalFiles = package.Info.FileCount;
                         Logger.TotalBytes = package.Info.TotalFileSize;
                         Logger.Log(
                             $"\n{package.Info.FileCount} files in {xisoPath} total {package.Info.TotalFileSize} bytes\n");
                     }
-                    else if (jsonListings != null)
+                    else if (localListings != null)
                     {
                         List<JsonEntry> entries = package.Entries
                             .Select(static entry => new JsonEntry(
@@ -2794,7 +3094,7 @@ internal static class Program
                                 entry.Size,
                                 0))
                             .ToList();
-                        jsonListings.Add(new JsonImageListing(
+                        localListings.Add(new JsonImageListing(
                             xisoPath, package.Info.FileCount, package.Info.TotalFileSize, entries));
                     }
                     else
@@ -2805,10 +3105,10 @@ internal static class Program
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException)
                 {
                     Logger.LogErr($"Error processing STFS package {xisoPath}: {ex.Message}\n");
-                    err = 1;
+                    return 1;
                 }
 
-                continue;
+                return 0;
             }
 
             bool optimized;
@@ -2825,26 +3125,22 @@ internal static class Program
                 // CLI-011: report the actual failure instead of always
                 // claiming a missing file.
                 Logger.LogErr($"open error: {xisoPath}: No such file or directory\n");
-                err = 1;
-                continue;
+                return 1;
             }
             catch (UnauthorizedAccessException ex)
             {
                 Logger.LogErr($"open error: {xisoPath}: permission denied ({ex.Message})\n");
-                err = 1;
-                continue;
+                return 1;
             }
             catch (Exception ex) when (ex is XisoFormatException or InvalidDataException)
             {
                 Logger.LogErr($"open error: {xisoPath} is not a valid xbox iso image ({ex.Message})\n");
-                err = 1;
-                continue;
+                return 1;
             }
             catch (Exception ex)
             {
                 Logger.LogErr($"open error: {xisoPath} ({ex.Message})\n");
-                err = 1;
-                continue;
+                return 1;
             }
 
             if (rewrite)
@@ -2855,21 +3151,20 @@ internal static class Program
                 if (rewriteRefusal != null)
                 {
                     Logger.LogErr(rewriteRefusal);
-                    err = 1;
-                    continue;
+                    return 1;
                 }
 
                 if (optimized)
                 {
                     Logger.Log($"{xisoPath} is already optimized, skipping...\n");
-                    continue;
+                    return 0;
                 }
 
                 string oldPath = xisoPath + ".old";
                 if (File.Exists(oldPath))
                 {
                     Logger.LogErr($"{oldPath} already exists, cannot rewrite {xisoPath}\n");
-                    continue;
+                    return 0;
                 }
 
                 // An explicit -o target may already exist (default output is the
@@ -2877,15 +3172,15 @@ internal static class Program
                 // after the move below there is no going back.
                 if (outputName != null && !OverwritePrompt.ConfirmOverwrite(outputName, assumeYes, assumeNo))
                 {
-                    err = 1;
-                    continue;
+                    return 1;
                 }
 
                 try
                 {
                     File.Move(xisoPath, oldPath);
                     int rewriteResult = XisoReader.DecodeXiso(oldPath, path, ExtractMode.Rewrite,
-                        out string? newIsoPath, true, outputName: outputName, skipSectors: skipSectors,
+                        out string? newIsoPath, true, cancellationToken: CollectionToken,
+                        outputName: outputName, skipSectors: skipSectors,
                         prependSectors: prependSectors, preserveAttributes: preserveAttrs);
 
                     // The input now lives at <input>.old; a failed rewrite must
@@ -2927,19 +3222,17 @@ internal static class Program
                     // (including validation): a failed rewrite must keep the
                     // only remaining copy.
                     if (deleteOld && fileErr == 0) File.Delete(oldPath);
-
-                    if (fileErr != 0)
-                        err = fileErr;
+                    return fileErr;
                 }
                 catch (Exception ex)
                 {
                     Logger.LogErr($"{ex.Message}\n");
-                    err = 1;
+                    return 1;
                 }
             }
             else
             {
-                if (jsonListings != null)
+                if (localListings != null)
                 {
                     List<JsonEntry> entries = [];
                     int fileCount = 0;
@@ -2950,24 +3243,41 @@ internal static class Program
                             new HashSet<(uint Sector, uint Size)>(), 0, ref fileCount, ref totalBytes);
                     }
 
-                    jsonListings.Add(new JsonImageListing(xisoPath, fileCount, totalBytes, entries));
-                    continue;
+                    localListings.Add(new JsonImageListing(xisoPath, fileCount, totalBytes, entries));
+                    return 0;
+                }
+
+                // The outer collection loop already runs images in parallel;
+                // keep each image's file copies sequential to avoid jobs^2 work.
+                UnpackOptions? imageOptions = unpackOptions;
+                if (parallelImages && unpackOptions is not null)
+                {
+                    imageOptions = new UnpackOptions
+                    {
+                        Log = unpackOptions.Log,
+                        SkipExisting = unpackOptions.SkipExisting,
+                        ContinueOnError = unpackOptions.ContinueOnError,
+                        NamePolicy = unpackOptions.NamePolicy,
+                        MaxDegreeOfParallelism = 1,
+                    };
                 }
 
                 try
                 {
                     if (extract)
                     {
-                        XisoReader.Extract(xisoPath, path, !optimized, skipSectors: skipSectors,
-                            options: unpackOptions);
+                        XisoReader.Extract(xisoPath, path, !optimized, cancellationToken: CollectionToken,
+                            skipSectors: skipSectors, options: imageOptions);
                     }
                     else if (tree)
                     {
-                        XisoReader.Tree(xisoPath, !optimized, skipSectors: skipSectors);
+                        XisoReader.Tree(xisoPath, !optimized, cancellationToken: CollectionToken,
+                            skipSectors: skipSectors);
                     }
                     else
                     {
-                        XisoReader.List(xisoPath, !optimized, skipSectors: skipSectors);
+                        XisoReader.List(xisoPath, !optimized, cancellationToken: CollectionToken,
+                            skipSectors: skipSectors);
                     }
                 }
                 catch (ExtractErrorException ex) when (ex.ErrorCode == ExtractError.ErrIsoNoFiles)
@@ -2977,44 +3287,30 @@ internal static class Program
                 }
                 catch (UnauthorizedAccessException ex)
                 {
-                    Logger.LogErr($"Error: permission denied: {ex.Message}\n");
-                    err = 1;
+                    Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "extracting the image", xisoPath)}\n");
+                    return 1;
                 }
                 catch (IOException ex)
                 {
-                    Logger.LogErr($"Error: {ex.Message}\n");
-                    err = 1;
+                    Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "extracting the image", xisoPath)}\n");
+                    return 1;
                 }
                 catch (Exception ex)
                 {
                     Logger.LogErr(
-                        $"failed to {(extract ? "extract" : tree ? "tree" : "list")} xbox iso image {xisoPath}: {ex.Message}\n");
-                    err = 1;
+                        $"failed to {(extract ? "extract" : tree ? "tree" : "list")} xbox iso image " +
+                        $"{xisoPath}: {HostIoDiagnostics.Describe(ex, "reading the image", xisoPath)}\n");
+                    return 1;
                 }
             }
 
-            if (err == 0)
-            {
-                if (tree)
-                    Logger.Log($"{Logger.TotalFiles} files, {Logger.TotalBytes} bytes\n");
-                else
-                    Logger.Log($"\n{Logger.TotalFiles} files in {xisoPath} total {Logger.TotalBytes} bytes\n");
-            }
+            if (tree)
+                Logger.Log($"{Logger.TotalFiles} files, {Logger.TotalBytes} bytes\n");
+            else
+                Logger.Log($"\n{Logger.TotalFiles} files in {xisoPath} total {Logger.TotalBytes} bytes\n");
+            return 0;
         }
 
-        if (jsonListings != null)
-        {
-            WriteJson(new JsonListing(1, tree ? "tree" : "list", jsonListings));
-            return err;
-        }
-
-        if (err == 0 && isos > 1)
-            Logger.Log($"\n{Logger.TotalFilesAllIsos} files in {isos} xiso's total {Logger.TotalBytesAllIsos} bytes\n");
-
-        if (Logger.Warned)
-            Logger.Log("\nWARNING:  Warning(s) were issued during execution--review stderr!\n");
-
-        return err;
 
         // CLI-001/CLI-002: the classic operational modes are mutually exclusive.
         // (-x/extract is the default, not a mode; -r/-c/rewrite/create, --unpack,
@@ -3107,7 +3403,7 @@ internal static class Program
         Console.Write(Constants.Banner);
         Console.Write($"  XISOSharp:      {GetVersion(typeof(Constants))}\n");
         Console.Write($"  CCISharp:       {GetVersion(typeof(CCISharp.CciFile))}\n");
-        Console.Write($"  ZArchiveSharp:  {GetVersion(typeof(ZArchiveSharp.ZArchiveReader))}\n");
+        Console.Write($"  ZArchiveSharp:  {GetVersion(typeof(ZArchiveReader))}\n");
         Console.Write($"  Runtime:        {RuntimeInformation.FrameworkDescription}\n");
         Console.Write($"  OS:             {RuntimeInformation.OSDescription}\n");
         Console.Write($"  Architecture:   {RuntimeInformation.ProcessArchitecture}\n");
@@ -3123,7 +3419,7 @@ internal static class Program
             "version",
             GetVersion(typeof(Constants)),
             GetVersion(typeof(CCISharp.CciFile)),
-            GetVersion(typeof(ZArchiveSharp.ZArchiveReader)),
+            GetVersion(typeof(ZArchiveReader)),
             RuntimeInformation.FrameworkDescription,
             RuntimeInformation.OSDescription,
             RuntimeInformation.ProcessArchitecture.ToString(),
@@ -3242,7 +3538,7 @@ internal static class Program
                 }
 
                 XisoZarchive.ExtractZar(xisoPath, destPath ?? DeriveZarExtractDirectory(xisoPath),
-                    namePolicy, skipExisting);
+                    namePolicy, skipExisting, ct: CollectionToken);
                 return 0;
             }
 
@@ -3267,8 +3563,9 @@ internal static class Program
                 }
 
                 using StfsPackage package = StfsPackage.Open(xisoPath);
-                package.ExtractTo(destPath ?? DeriveStfsExtractDirectory(xisoPath), namePolicy,
-                    skipExisting);
+                package.ExtractTo(destPath ?? DeriveStfsExtractDirectory(xisoPath),
+                    MapStfsNamePolicy(namePolicy), skipExisting,
+                    warning: message => Logger.LogErr(message), ct: CollectionToken);
                 return 0;
             }
 
@@ -3282,7 +3579,8 @@ internal static class Program
                     NamePolicy = namePolicy
                 }
                 : null;
-            int result = XisoReader.UnpackImage(xisoPath, destPath, skipSectors: skipSectors,
+            int result = XisoReader.UnpackImage(xisoPath, destPath, cancellationToken: CollectionToken,
+                skipSectors: skipSectors,
                 options: unpackOptions);
             return result == 0 ? 0 : 1;
         }
@@ -3292,12 +3590,12 @@ internal static class Program
         }
         catch (UnauthorizedAccessException ex)
         {
-            Logger.LogErr($"Error: permission denied: {ex.Message}\n");
+            Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "unpacking the image", xisoPath)}\n");
             return 1;
         }
         catch (IOException ex)
         {
-            Logger.LogErr($"Error: {ex.Message}\n");
+            Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "unpacking the image", xisoPath)}\n");
             return 1;
         }
         catch (Exception ex)
@@ -3469,8 +3767,10 @@ internal static class Program
         List<string> mapRaw = new();
         string? metaOutput = null;
         bool dryRun = false;
+        bool strictNames = false;
         ulong? fileTime = null;
         string? layoutFile = null;
+        SymlinkMode symlinkMode = SymlinkMode.Follow;
         List<string> positionals = new();
 
         for (int i = optind; i < args.Length; i++)
@@ -3526,6 +3826,24 @@ internal static class Program
                 }
 
                 fileTime = raw;
+                i++;
+            }
+            else if (string.Equals(a, "--deterministic", StringComparison.OrdinalIgnoreCase))
+            {
+                fileTime = 0;
+            }
+            else if (string.Equals(a, "--strict-names", StringComparison.OrdinalIgnoreCase))
+            {
+                strictNames = true;
+            }
+            else if (string.Equals(a, "--symlink-mode", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length || !TryParseSymlinkMode(args[i + 1], out symlinkMode))
+                {
+                    Logger.LogErr("Error: --symlink-mode must be follow, skip or reject\n");
+                    return 1;
+                }
+
                 i++;
             }
             else if (string.Equals(a, "--layout", StringComparison.OrdinalIgnoreCase))
@@ -3711,7 +4029,8 @@ internal static class Program
         {
             try
             {
-                IReadOnlyList<(string HostPath, string ImagePath)> list = RemapFilesystem.DryRunRemap(sourceDir, rules);
+                IReadOnlyList<(string HostPath, string ImagePath)> list =
+                    RemapFilesystem.DryRunRemap(sourceDir, rules, symlinkMode);
                 foreach ((string host, string guest) in list)
                     Console.WriteLine($"{host} -> {guest}");
                 return 0;
@@ -3750,7 +4069,23 @@ internal static class Program
             }
 
             Logger.Log($"{Constants.Banner}");
-            return RemapFilesystem.BuildImage(sourceDir, outputIso, rules, fileTime: fileTime, layout: layout);
+            if (strictNames)
+            {
+                IReadOnlyList<(string HostPath, string ImagePath)> remapped =
+                    RemapFilesystem.DryRunRemap(sourceDir, rules, symlinkMode);
+                foreach ((string hostPath, string imagePath) in remapped)
+                {
+                    string? nameError = XisoNameRules.GetPathError(imagePath);
+                    if (nameError != null)
+                    {
+                        Logger.LogErr($"Error: {nameError} Image path: '{imagePath}' (host: {hostPath}).\n");
+                        return 1;
+                    }
+                }
+            }
+
+            return RemapFilesystem.BuildImage(sourceDir, outputIso, rules, progress: null,
+                ct: default, fileTime: fileTime, layout: layout, symlinkMode: symlinkMode);
         }
     }
 
@@ -4227,7 +4562,7 @@ internal static class Program
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Logger.LogErr($"Error: {ex.Message}\n");
+            Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "scanning the batch directory", batch.Directory)}\n");
             return 1;
         }
 
@@ -4528,7 +4863,7 @@ internal static class Program
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Logger.LogErr($"Error: {ex.Message}\n");
+            Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "scanning the batch directory", batch.Directory)}\n");
             return 1;
         }
 
@@ -4694,6 +5029,7 @@ internal static class Program
     {
         bool silent = false;
         bool json = false;
+        int jobs = 1;
         List<string> positionals = new();
 
         for (int i = optind; i < args.Length; i++)
@@ -4707,6 +5043,18 @@ internal static class Program
             else if (string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase))
             {
                 json = true;
+            }
+            else if (string.Equals(a, "--jobs", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length ||
+                    !int.TryParse(args[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out jobs) ||
+                    jobs < 1 || jobs > UnpackOptions.MaxParallelism)
+                {
+                    Logger.LogErr($"Error: --jobs requires an integer 1..{UnpackOptions.MaxParallelism}\n");
+                    return 1;
+                }
+
+                i++;
             }
             else if (string.Equals(a, "-q", StringComparison.Ordinal))
             {
@@ -4750,27 +5098,42 @@ internal static class Program
 
         int exit = 0;
         List<JsonChecksum>? jsonChecksums = json ? [] : null;
-        foreach (string iso in positionals)
+        IReadOnlyList<CollectionJobResult<(string? Hex, string? Error)>> runs =
+            RunOrderedParallel<(string? Hex, string? Error)>(positionals, jobs, static (iso, _) =>
+            {
+                try
+                {
+                    byte[] hash = IsZarPath(iso)
+                        ? XisoChecksum.ComputeZarChecksum(iso, CollectionToken)
+                        : StfsPackage.IsStfsPackage(iso)
+                            ? XisoChecksum.ComputeStfsChecksum(iso, CollectionToken)
+                            : XisoChecksum.ComputeImageChecksum(iso, ct: CollectionToken);
+                    return (Convert.ToHexString(hash).ToLowerInvariant(), null);
+                }
+                catch (Exception ex)
+                {
+                    return (null, ex.Message);
+                }
+            });
+
+        for (int index = 0; index < positionals.Count; index++)
         {
-            try
+            CollectionJobResult<(string? Hex, string? Error)> run = runs[index];
+            run.Replay();
+            string iso = positionals[index];
+            if (run.Value.Error is not null)
             {
-                byte[] hash = IsZarPath(iso)
-                    ? XisoChecksum.ComputeZarChecksum(iso)
-                    : StfsPackage.IsStfsPackage(iso)
-                        ? XisoChecksum.ComputeStfsChecksum(iso)
-                        : XisoChecksum.ComputeImageChecksum(iso);
-                string hex = Convert.ToHexString(hash).ToLowerInvariant();
-                if (silent)
-                    Logger.Log($"{hex}\n");
-                else
-                    Logger.Log($"{hex}\t{iso}\n");
-                jsonChecksums?.Add(new JsonChecksum(iso, "sha3-256", hex));
-            }
-            catch (Exception ex)
-            {
-                Logger.LogErr($"Error checksumming {iso}: {ex.Message}\n");
+                Logger.LogErr($"Error checksumming {iso}: {run.Value.Error}\n");
                 exit = 1;
+                continue;
             }
+
+            string hex = run.Value.Hex!;
+            if (silent)
+                Logger.Log($"{hex}\n");
+            else
+                Logger.Log($"{hex}\t{iso}\n");
+            jsonChecksums?.Add(new JsonChecksum(iso, "sha3-256", hex));
         }
 
         if (jsonChecksums != null)
@@ -4789,6 +5152,7 @@ internal static class Program
     private static int RunImageHashMode(string[] args, int optind)
     {
         bool json = false;
+        int jobs = 1;
         List<string> positionals = new();
         for (int i = optind; i < args.Length; i++)
         {
@@ -4796,6 +5160,18 @@ internal static class Program
             if (string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase))
             {
                 json = true;
+            }
+            else if (string.Equals(a, "--jobs", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length ||
+                    !int.TryParse(args[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out jobs) ||
+                    jobs < 1 || jobs > UnpackOptions.MaxParallelism)
+                {
+                    Logger.LogErr($"Error: --jobs requires an integer 1..{UnpackOptions.MaxParallelism}\n");
+                    return 1;
+                }
+
+                i++;
             }
             else if (string.Equals(a, "-q", StringComparison.Ordinal))
             {
@@ -4839,30 +5215,45 @@ internal static class Program
 
         int exit = 0;
         List<JsonImageHash>? payloads = json ? [] : null;
-        foreach (string image in positionals)
-        {
-            try
+        IReadOnlyList<CollectionJobResult<(XisoImageHashResult? Result, string? Error)>> runs =
+            RunOrderedParallel<(XisoImageHashResult? Result, string? Error)>(positionals, jobs, static (image, _) =>
             {
-                XisoImageHashResult result = XisoImageHash.Compute(image);
-                if (!json)
+                try
                 {
-                    Logger.Log($"{image}\n");
-                    Logger.Log($"  CRC32     {result.Crc32}\n");
-                    Logger.Log($"  MD5       {result.Md5}\n");
-                    Logger.Log($"  SHA-1     {result.Sha1}\n");
-                    Logger.Log($"  SHA-256   {result.Sha256}\n");
-                    Logger.Log($"  SHA3-256  {result.Sha3256}\n");
-                    Logger.Log($"  Bytes     {result.TotalBytes}\n");
+                    return (XisoImageHash.Compute(image, CollectionToken), null);
                 }
+                catch (Exception ex)
+                {
+                    return (null, ex.Message);
+                }
+            });
 
-                payloads?.Add(new JsonImageHash(image, result.TotalBytes, result.Crc32, result.Md5,
-                    result.Sha1, result.Sha256, result.Sha3256));
-            }
-            catch (Exception ex)
+        for (int index = 0; index < positionals.Count; index++)
+        {
+            CollectionJobResult<(XisoImageHashResult? Result, string? Error)> run = runs[index];
+            run.Replay();
+            string image = positionals[index];
+            if (run.Value.Error is not null)
             {
-                Logger.LogErr($"Error hashing {image}: {ex.Message}\n");
+                Logger.LogErr($"Error hashing {image}: {run.Value.Error}\n");
                 exit = 1;
+                continue;
             }
+
+            XisoImageHashResult result = run.Value.Result!;
+            if (!json)
+            {
+                Logger.Log($"{image}\n");
+                Logger.Log($"  CRC32     {result.Crc32}\n");
+                Logger.Log($"  MD5       {result.Md5}\n");
+                Logger.Log($"  SHA-1     {result.Sha1}\n");
+                Logger.Log($"  SHA-256   {result.Sha256}\n");
+                Logger.Log($"  SHA3-256  {result.Sha3256}\n");
+                Logger.Log($"  Bytes     {result.TotalBytes}\n");
+            }
+
+            payloads?.Add(new JsonImageHash(image, result.TotalBytes, result.Crc32, result.Md5,
+                result.Sha1, result.Sha256, result.Sha3256));
         }
 
         if (payloads is not null)
@@ -4872,6 +5263,277 @@ internal static class Program
 
         return exit;
     }
+
+    /// <summary>
+    /// <c>file-hashes &lt;image&gt; [-o &lt;file&gt;] [--algorithm sha1|sha256|md5] [--json]</c>:
+    /// generates the per-file hash sidecar <c>verify-hashes</c> consumes for any
+    /// supported container.
+    /// </summary>
+    private static int RunFileHashesMode(string[] args)
+    {
+        bool json = false;
+        bool assumeYes = false;
+        bool assumeNo = false;
+        string? output = null;
+        HashAlgorithmName algorithm = HashAlgorithmName.SHA1;
+        List<string> positionals = new();
+        for (int i = 0; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (string.Equals(a, "file-hashes", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--file-hashes", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -o requires an output path (or '-' for stdout)\n");
+                    return 1;
+                }
+
+                output = args[++i];
+            }
+            else if (string.Equals(a, "--algorithm", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--algo", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length ||
+                    !TryParseHashAlgorithm(args[i + 1], out algorithm))
+                {
+                    Logger.LogErr("Error: --algorithm must be sha1, sha256 or md5\n");
+                    return 1;
+                }
+
+                i++;
+            }
+            else if (string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase))
+            {
+                json = true;
+            }
+            else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeYes = true;
+            }
+            else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeNo = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for file-hashes: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count != 1)
+        {
+            Logger.LogErr("Error: file-hashes requires exactly one image\n");
+            PrintUsage();
+            return 1;
+        }
+
+        string source = positionals[0];
+        string? actualOutput = string.Equals(output, "-", StringComparison.Ordinal)
+            ? null
+            : output ?? XisoImageSource.StripImageSuffix(source) + ".hash";
+        string algorithmName = algorithm == HashAlgorithmName.MD5
+            ? "md5"
+            : algorithm == HashAlgorithmName.SHA256
+                ? "sha256"
+                : "sha1";
+
+        if (actualOutput is not null && !OverwritePrompt.ConfirmOverwrite(actualOutput, assumeYes, assumeNo))
+        {
+            return 1;
+        }
+
+        try
+        {
+            IReadOnlyList<FileHashEntry> entries = XisoReader.ComputeFileHashSidecar(source, algorithm);
+            if (actualOutput is not null)
+            {
+                string? directory = Path.GetDirectoryName(Path.GetFullPath(actualOutput));
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                using StreamWriter writer = new(actualOutput, false, new UTF8Encoding(false));
+                foreach (FileHashEntry entry in entries)
+                {
+                    writer.Write(entry.HashHex);
+                    writer.Write(' ');
+                    writer.WriteLine(entry.Path);
+                }
+            }
+
+            if (json)
+            {
+                WriteJson(new JsonFileHashes(
+                    1,
+                    "file-hashes",
+                    source,
+                    actualOutput,
+                    algorithmName,
+                    entries.Count,
+                    entries.Sum(static entry => entry.Size),
+                    entries.Select(static entry => new JsonFileHashEntry(
+                        entry.Path, entry.Size, entry.Algorithm, entry.HashHex)).ToList()));
+            }
+            else if (actualOutput is null)
+            {
+                foreach (FileHashEntry entry in entries)
+                {
+                    Logger.Log($"{entry.HashHex} {entry.Path}\n");
+                }
+            }
+            else
+            {
+                Logger.Log(
+                    $"Wrote {entries.Count} file hash(es) ({algorithmName}) to {actualOutput}\n");
+            }
+
+            return 0;
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or
+                                       NotSupportedException or ArgumentException)
+        {
+            Logger.LogErr($"Error hashing files in {source}: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// Strict-name preflight for create/pack: walks the host tree (never
+    /// descending into directory reparse points) and fails on the first
+    /// component that cannot be represented on Xbox.
+    /// </summary>
+    private static bool ValidateSourceNames(string directory, bool strictNames)
+    {
+        if (!strictNames)
+        {
+            return true;
+        }
+
+        try
+        {
+            string root = Path.GetFullPath(directory);
+            Stack<string> pending = new();
+            pending.Push(root);
+            while (pending.Count > 0)
+            {
+                string current = pending.Pop();
+                foreach (string entry in Directory.GetFileSystemEntries(current))
+                {
+                    string relative = Path.GetRelativePath(root, entry).Replace('\\', '/');
+                    string? error = XisoNameRules.GetPathError(relative);
+                    if (error != null)
+                    {
+                        Logger.LogErr($"Error: {error} Source path: '{relative}'.\n");
+                        return false;
+                    }
+
+                    FileAttributes attributes = File.GetAttributes(entry);
+                    if ((attributes & FileAttributes.Directory) != FileAttributes.None &&
+                        (attributes & FileAttributes.ReparsePoint) == FileAttributes.None)
+                    {
+                        pending.Push(entry);
+                    }
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            Logger.LogErr($"Error scanning source names in {directory}: {ex.Message}\n");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Strict-name preflight for <c>--petrify</c>: validates the image's own
+    /// internal paths before any skeleton is written.
+    /// </summary>
+    private static bool ValidateImageNames(string imagePath)
+    {
+        try
+        {
+            using XisoImage image = XisoImage.Open(imagePath);
+            foreach (ExplorerNode node in image.ListFlat())
+            {
+                if (node.IsDirectory)
+                {
+                    continue;
+                }
+
+                string? error = XisoNameRules.GetPathError(node.FullPath);
+                if (error != null)
+                {
+                    Logger.LogErr($"Error: {error} Image path: '{node.FullPath}'.\n");
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or
+                                       NotSupportedException)
+        {
+            Logger.LogErr($"Error scanning image names in {imagePath}: {ex.Message}\n");
+            return false;
+        }
+    }
+
+    private static bool TryParseHashAlgorithm(string text, out HashAlgorithmName algorithm)
+    {
+        if (string.Equals(text, "sha1", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(text, "sha-1", StringComparison.OrdinalIgnoreCase))
+        {
+            algorithm = HashAlgorithmName.SHA1;
+            return true;
+        }
+
+        if (string.Equals(text, "sha256", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(text, "sha-256", StringComparison.OrdinalIgnoreCase))
+        {
+            algorithm = HashAlgorithmName.SHA256;
+            return true;
+        }
+
+        if (string.Equals(text, "md5", StringComparison.OrdinalIgnoreCase))
+        {
+            algorithm = HashAlgorithmName.MD5;
+            return true;
+        }
+
+        algorithm = HashAlgorithmName.SHA1;
+        return false;
+    }
+
+    /// <summary>
+    /// Builds the ZAR block compressor for a level. Level 6 is the format
+    /// default (and stays byte-identical to the historical output); null tells
+    /// the pipeline to use its shared default instance.
+    /// </summary>
+    private static IZarBlockCompressor? CreateZarCompressor(int level) =>
+        level == 6 ? null : new ZstdCompressor(ZstdCompressionOptions.FromLevel(level));
 
     /// <summary>
     /// <c>verify-hashes &lt;image&gt; &lt;hash-file&gt; [--json] [--ignore-extra]</c>:
@@ -4941,8 +5603,8 @@ internal static class Program
                         continue;
                     }
 
-                    Logger.Log($"  {entry.Status,-10} {entry.Path} expected={entry.ExpectedSha1 ?? "-"} " +
-                               $"actual={entry.ActualSha1 ?? "-"}\n");
+                    Logger.Log($"  {entry.Status,-10} {entry.Algorithm,-6} {entry.Path} " +
+                               $"expected={entry.ExpectedSha1 ?? "-"} actual={entry.ActualSha1 ?? "-"}\n");
                 }
 
                 Logger.Log(passed ? "Result: PASS\n" : "Result: FAIL\n");
@@ -4951,7 +5613,7 @@ internal static class Program
             {
                 List<JsonHashEntry> entries = result.Entries
                     .Select(static entry => new JsonHashEntry(entry.Path, entry.Status.ToString(),
-                        entry.ExpectedSha1, entry.ActualSha1))
+                        entry.ExpectedSha1, entry.ActualSha1, entry.Algorithm))
                     .ToList();
                 WriteJson(new JsonHashVerification(1, "verify-hashes", positionals[0], positionals[1], passed,
                     result.Checked, result.Matched, result.Mismatched, result.Missing, result.Extra, entries));
@@ -4962,6 +5624,133 @@ internal static class Program
         catch (Exception ex)
         {
             Logger.LogErr($"Error verifying hashes for {positionals[0]}: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// <c>verify-dat &lt;dat&gt; &lt;image&gt;... [--json]</c>: matches images
+    /// against a Redump-style XML DAT by full-image size/MD5/SHA-1/CRC32 and
+    /// reports verified, ambiguous and missing entries.
+    /// </summary>
+    private static int RunVerifyDatMode(string[] args, int optind)
+    {
+        bool json = false;
+        List<string> positionals = [];
+        for (int i = optind; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase))
+            {
+                json = true;
+            }
+            else if (string.Equals(a, "-q", StringComparison.Ordinal))
+            {
+                Logger.Quiet = true;
+            }
+            else if (string.Equals(a, "-Q", StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Quiet = Logger.RealQuiet = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (string.Equals(a, "-v", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--version", StringComparison.OrdinalIgnoreCase))
+            {
+                if (json) WriteJsonVersion();
+                else WriteVersionInfo();
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for verify-dat: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count < 2)
+        {
+            Logger.LogErr("Error: verify-dat requires <dat> <image>... (at least one image)\n");
+            PrintUsage();
+            return 1;
+        }
+
+        string datPath = positionals[0];
+        List<string> images = positionals.Skip(1).ToList();
+        try
+        {
+            DatVerificationResult result = XisoDat.Verify(datPath, images);
+            if (json)
+            {
+                WriteJson(new JsonDatVerification(
+                    1,
+                    "verify-dat",
+                    datPath,
+                    result.Passed,
+                    result.Verified,
+                    result.Missing,
+                    result.Ambiguous,
+                    result.NotInDat,
+                    result.Images.Count,
+                    result.Images.Select(static image => new JsonDatImage(
+                        image.ImagePath,
+                        image.Status.ToString(),
+                        image.Size,
+                        image.Md5,
+                        image.Sha1,
+                        image.Crc,
+                        image.Matches.Select(static rom => new JsonDatRom(
+                            rom.GameName, rom.Name, rom.Size, rom.Md5, rom.Sha1, rom.Crc)).ToList()))
+                        .ToList(),
+                    result.MissingRoms.Select(static rom => new JsonDatRom(
+                        rom.GameName, rom.Name, rom.Size, rom.Md5, rom.Sha1, rom.Crc)).ToList()));
+            }
+            else
+            {
+                Logger.Log($"verify-dat {datPath}:\n");
+                foreach (DatImageMatch image in result.Images)
+                {
+                    string status = image.Status switch
+                    {
+                        DatMatchStatus.Verified => "VERIFIED",
+                        DatMatchStatus.Ambiguous => "AMBIGUOUS",
+                        _ => "NOT IN DAT",
+                    };
+                    Logger.Log($"  {status,-10} {image.ImagePath}\n");
+                    foreach (DatRom rom in image.Matches)
+                    {
+                        string game = string.IsNullOrEmpty(rom.GameName) ? rom.Name : rom.GameName;
+                        Logger.Log($"             {game} ({rom.Name}, {rom.Size} bytes)\n");
+                    }
+                }
+
+                foreach (DatRom rom in result.MissingRoms)
+                {
+                    string game = string.IsNullOrEmpty(rom.GameName) ? rom.Name : rom.GameName;
+                    Logger.Log($"  MISSING    {game} ({rom.Name}, {rom.Size} bytes)\n");
+                }
+
+                Logger.Log(
+                    $"  Summary:   {result.Verified} verified, {result.Ambiguous} ambiguous, " +
+                    $"{result.NotInDat} not in DAT, {result.Missing} DAT entr(y/ies) missing\n");
+                Logger.Log(result.Passed ? "Result: PASS\n" : "Result: FAIL\n");
+            }
+
+            return result.Passed ? 0 : 1;
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or
+                                       ArgumentException or NotSupportedException or System.Xml.XmlException)
+        {
+            Logger.LogErr($"Error verifying DAT: {HostIoDiagnostics.Describe(ex, "reading the DAT", datPath)}\n");
             return 1;
         }
     }
@@ -5018,19 +5807,30 @@ internal static class Program
                     return 1;
                 }
 
+                XexTitleInfo? godXex = TryReadEmbeddedXex(positionals[0]);
+                string godTitle = string.IsNullOrEmpty(god.TitleName)
+                    ? godXex?.TitleName ?? string.Empty
+                    : god.TitleName;
                 if (json)
                 {
                     WriteJson(new JsonGodTitleInfo(1, "title-info", positionals[0], "god",
-                        god.HeaderPath, god.TitleName, god.TitleId, god.TitleIdHex,
-                        god.DiscNumber, god.DiscCount));
+                        god.HeaderPath, godTitle, god.TitleId, god.TitleIdHex,
+                        god.DiscNumber, god.DiscCount,
+                        XexPath: godXex?.XexPath,
+                        Publisher: godXex?.Publisher,
+                        Developer: godXex?.Developer,
+                        Genre: godXex?.Genre,
+                        Description: godXex?.Description,
+                        HasThumbnail: godXex?.HasThumbnail));
                 }
                 else
                 {
-                    Logger.Log($"Title:          {god.TitleName}\n");
+                    Logger.Log($"Title:          {godTitle}\n");
                     Logger.Log($"Title ID:       {god.TitleIdHex}\n");
                     Logger.Log($"Disc number:    {god.DiscNumber}\n");
                     Logger.Log($"Disc count:     {god.DiscCount}\n");
                     Logger.Log($"GOD header:     {god.HeaderPath}\n");
+                    PrintXexTitleFields(godXex);
                 }
 
                 return 0;
@@ -5039,21 +5839,32 @@ internal static class Program
             if (StfsHeader.TryReadTitle(positionals[0], out StfsTitleInfo? stfs))
             {
                 string kind = stfs.Kind == StfsPackageKind.Xbla ? "xbla" : "xblig";
+                XexTitleInfo? stfsXex = TryReadStfsXex(positionals[0]);
+                string stfsTitle = string.IsNullOrEmpty(stfs.TitleName)
+                    ? stfsXex?.TitleName ?? string.Empty
+                    : stfs.TitleName;
                 if (json)
                 {
                     WriteJson(new JsonStfsTitleInfo(1, "title-info", positionals[0], kind,
-                        stfs.PackagePath, stfs.TitleName, stfs.TitleId, stfs.TitleIdHex,
-                        stfs.DiscNumber, stfs.DiscCount, stfs.ContentType));
+                        stfs.PackagePath, stfsTitle, stfs.TitleId, stfs.TitleIdHex,
+                        stfs.DiscNumber, stfs.DiscCount, stfs.ContentType,
+                        XexPath: stfsXex?.XexPath,
+                        Publisher: stfsXex?.Publisher,
+                        Developer: stfsXex?.Developer,
+                        Genre: stfsXex?.Genre,
+                        Description: stfsXex?.Description,
+                        HasThumbnail: stfsXex?.HasThumbnail));
                 }
                 else
                 {
-                    Logger.Log($"Title:          {stfs.TitleName}\n");
+                    Logger.Log($"Title:          {stfsTitle}\n");
                     Logger.Log($"Title ID:       {stfs.TitleIdHex}\n");
                     Logger.Log($"Disc number:    {stfs.DiscNumber}\n");
                     Logger.Log($"Disc count:     {stfs.DiscCount}\n");
                     Logger.Log($"Package:        {kind.ToUpperInvariant()}\n");
                     Logger.Log($"Package path:   {stfs.PackagePath}\n");
                     Logger.Log($"Content type:   0x{stfs.ContentType:X8}\n");
+                    PrintXexTitleFields(stfsXex);
                 }
 
                 return 0;
@@ -5136,6 +5947,440 @@ internal static class Program
     }
 
     /// <summary>
+    /// Reads the root <c>default.xex</c> metadata from a GOD container through
+    /// its logical stream. Returns <c>null</c> when the container has no
+    /// readable XEX (for example an original-Xbox title).
+    /// </summary>
+    private static XexTitleInfo? TryReadEmbeddedXex(string path)
+    {
+        try
+        {
+            return XisoReader.GetTitleInfo(path)?.Xex;
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or NotSupportedException or
+                                       XisoFormatException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Reads the package's <c>default.xex</c> (when present) and parses its
+    /// XDBF/XSRC metadata.
+    /// </summary>
+    private static XexTitleInfo? TryReadStfsXex(string path)
+    {
+        try
+        {
+            using StfsPackage package = StfsPackage.Open(path);
+            StfsEntry? entry = package.Find("default.xex");
+            if (entry is null || entry.IsDirectory)
+            {
+                return null;
+            }
+
+            byte[] data = package.ReadAllBytes(entry);
+            return XisoReader.GetXexTitleInfo(data, "/" + entry.Path);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or
+                                       NotSupportedException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static void PrintXexTitleFields(XexTitleInfo? xex)
+    {
+        if (xex is null)
+        {
+            return;
+        }
+
+        Logger.Log($"XEX:            {xex.XexPath}\n");
+        if (!string.IsNullOrEmpty(xex.Publisher))
+        {
+            Logger.Log($"Publisher:      {xex.Publisher}\n");
+        }
+
+        if (!string.IsNullOrEmpty(xex.Developer))
+        {
+            Logger.Log($"Developer:      {xex.Developer}\n");
+        }
+
+        if (!string.IsNullOrEmpty(xex.Genre))
+        {
+            Logger.Log($"Genre:          {xex.Genre}\n");
+        }
+
+        if (!string.IsNullOrEmpty(xex.Description))
+        {
+            Logger.Log($"Description:    {xex.Description}\n");
+        }
+
+        if (xex.HasThumbnail)
+        {
+            Logger.Log("Thumbnail:      present\n");
+        }
+    }
+
+    /// <summary>
+    /// <c>disc-info &lt;image&gt; [--json] [--sectors &lt;sectors.txt&gt;] [--skip-sectors &lt;n&gt;]</c>:
+    /// reports the XGD/Redump disc layout, video and game partition ranges, PFI
+    /// layer break, embedded security-sector ranges and consistency warnings.
+    /// </summary>
+    private static int RunDiscInfoMode(string[] args, int optind)
+    {
+        bool json = false;
+        string? securitySectors = null;
+        int? skipSectors = null;
+        List<string> positionals = new();
+        for (int i = optind; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase))
+            {
+                json = true;
+            }
+            else if (string.Equals(a, "--sectors", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--security-sectors", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: --sectors requires a sectors.txt path\n");
+                    return 1;
+                }
+
+                securitySectors = args[++i];
+            }
+            else if (string.Equals(a, "--skip-sectors", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length ||
+                    !int.TryParse(args[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int skip) ||
+                    skip < 0)
+                {
+                    Logger.LogErr("Error: --skip-sectors requires a non-negative integer\n");
+                    return 1;
+                }
+
+                skipSectors = skip;
+                i++;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for disc-info: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count != 1)
+        {
+            Logger.LogErr("Error: disc-info requires exactly one image\n");
+            PrintUsage();
+            return 1;
+        }
+
+        string source = positionals[0];
+        try
+        {
+            XisoDiscLayout info = XisoDiscInfo.Read(source, securitySectors, skipSectors);
+            if (json)
+            {
+                WriteJson(new JsonDiscInfo(
+                    1,
+                    "disc-info",
+                    source,
+                    info.Format.ToString(),
+                    info.IsContainer,
+                    info.FileLength,
+                    info.TotalSectors,
+                    ToJsonVolume(info.Volume, null, info.Volume.FileTimeRaw),
+                    info.DiscFormat,
+                    info.XgdType,
+                    info.RedumpTypeIndex,
+                    info.RedumpSizeMatch,
+                    info.RedumpTypeName,
+                    info.VideoTypeIndex,
+                    info.VideoTypeName,
+                    info.Wave,
+                    ToJsonDiscRange(info.VideoL0),
+                    ToJsonDiscRange(info.VideoL1),
+                    ToJsonDiscRange(info.GamePartition),
+                    info.Pfi is null
+                        ? null
+                        : new JsonDiscPfi(
+                            info.Pfi.ByteOffset,
+                            info.Pfi.BookType,
+                            info.Pfi.PartVersion,
+                            info.Pfi.DiscSize,
+                            info.Pfi.MaximumRate,
+                            info.Pfi.LayerCount,
+                            info.Pfi.TrackPath,
+                            info.Pfi.LayerType,
+                            info.Pfi.DataStartSector,
+                            info.Pfi.DataEndSector,
+                            info.Pfi.Layer0EndSector),
+                    info.SecuritySectorsSource,
+                    info.SecuritySectors.Select(static range => new JsonDiscSecurityRange(
+                        range.StartSector,
+                        range.EndSector,
+                        range.SectorCount)).ToList(),
+                    info.Warnings.ToList()));
+                return 0;
+            }
+
+            Logger.Log($"Disc:            {info.Path}\n");
+            Logger.Log($"Format:          {info.Format}{(info.IsContainer ? " (container)" : "")}\n");
+            Logger.Log($"XGD type:        {info.XgdType}\n");
+            Logger.Log($"Disc format:     {info.DiscFormat}\n");
+            Logger.Log(info.RedumpTypeIndex is { } redumpType
+                ? $"Redump type:     {info.RedumpTypeName} (type {redumpType})\n"
+                : "Redump type:     not a known Redump image size\n");
+            Logger.Log(info.VideoTypeIndex is { } videoType
+                ? $"Video type:      {info.VideoTypeName} (type {videoType})\n"
+                : "Video type:      unavailable\n");
+            if (!string.IsNullOrEmpty(info.Wave))
+            {
+                Logger.Log($"Wave:            {info.Wave}\n");
+            }
+
+            Logger.Log(
+                $"File length:     {info.FileLength} bytes ({info.TotalSectors} sectors)\n");
+            Logger.Log(info.Volume.IsValid
+                ? $"Volume:          valid, offset 0x{info.Volume.DiscLseek:X8}, " +
+                  $"root sector {info.Volume.RootDirSector}\n"
+                : "Volume:          invalid (no XISO volume descriptor)\n");
+
+            PrintDiscRange("Video L0", info.VideoL0, info.IsContainer);
+            PrintDiscRange("Video L1", info.VideoL1, info.IsContainer);
+            PrintDiscRange("Game partition", info.GamePartition, false);
+
+            if (info.Pfi is { } pfi)
+            {
+                Logger.Log(
+                    $"PFI:             present at 0x{pfi.ByteOffset:X}, layer break 0x{pfi.Layer0EndSector:X} " +
+                    $"(sector {pfi.Layer0EndSector})\n");
+                Logger.Log(
+                    $"                 data area 0x{pfi.DataStartSector:X}-0x{pfi.DataEndSector:X}, " +
+                    $"layers {pfi.LayerCount}\n");
+            }
+            else
+            {
+                Logger.Log(info.IsContainer
+                    ? "PFI:             unavailable (container)\n"
+                    : "PFI:             not found\n");
+            }
+
+            if (info.SecuritySectors.Count == 0)
+            {
+                Logger.Log("Security:        none\n");
+            }
+            else
+            {
+                Logger.Log(
+                    $"Security:        {info.SecuritySectorsSource} ({info.SecuritySectors.Count} range(s))\n");
+                foreach (DiscSecuritySectorRange range in info.SecuritySectors)
+                {
+                    Logger.Log(
+                        $"                 0x{range.StartSector:X}-0x{range.EndSector:X} " +
+                        $"({range.SectorCount} sectors)\n");
+                }
+            }
+
+            if (info.Warnings.Count == 0)
+            {
+                Logger.Log("Warnings:        none\n");
+            }
+            else
+            {
+                Logger.Log($"Warnings:        {info.Warnings.Count}\n");
+                foreach (string warning in info.Warnings)
+                {
+                    Logger.LogErr($"  - {warning}\n");
+                }
+            }
+
+            return 0;
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or NotSupportedException)
+        {
+            Logger.LogErr($"Error reading disc layout from {source}: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    private static JsonDiscRange? ToJsonDiscRange(DiscPartition? range) => range is null
+        ? null
+        : new JsonDiscRange(
+            range.Name,
+            range.ByteOffset,
+            range.ByteLength,
+            range.StartSector,
+            range.SectorCount,
+            range.Available);
+
+    private static void PrintDiscRange(string label, DiscPartition? range, bool container)
+    {
+        string name = label + ":";
+        if (range is null)
+        {
+            Logger.Log($"{name,-16} unavailable{(container ? " (container)" : "")}\n");
+            return;
+        }
+
+        long endByte = range.ByteLength > 0 ? range.ByteOffset + range.ByteLength - 1 : range.ByteOffset;
+        long endSector = range.SectorCount > 0 ? range.StartSector + range.SectorCount - 1 : range.StartSector;
+        Logger.Log(
+            $"{name,-16} bytes 0x{range.ByteOffset:X}-0x{endByte:X}, " +
+            $"sectors 0x{range.StartSector:X}-0x{endSector:X} ({range.SectorCount})\n");
+    }
+
+    /// <summary>
+    /// <c>apply-skeleton &lt;skeleton.xiso&gt; &lt;source-dir&gt; -o &lt;out.iso&gt; [--hash &lt;file&gt;]</c>
+    /// or <c>--apply-skeleton &lt;skeleton.xiso&gt; &lt;source-dir&gt; -o ...</c>:
+    /// restores file data into a skeleton image (the inverse of <c>--petrify</c>).
+    /// </summary>
+    private static int RunApplySkeletonMode(string[] args)
+    {
+        string? skeleton = null;
+        string? output = null;
+        string? hash = null;
+        bool assumeYes = false;
+        bool assumeNo = false;
+        bool strictNames = false;
+        SymlinkMode symlinkMode = SymlinkMode.Follow;
+        List<string> positionals = new();
+        for (int i = 0; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (string.Equals(a, "--apply-skeleton", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "apply-skeleton", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.Equals(a, "--apply-skeleton", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                {
+                    skeleton = args[++i];
+                }
+
+                continue;
+            }
+
+            if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -o requires an output path\n");
+                    return 1;
+                }
+
+                output = args[++i];
+            }
+            else if (string.Equals(a, "--hash", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--hashes", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: --hash requires a .hash file path\n");
+                    return 1;
+                }
+
+                hash = args[++i];
+            }
+            else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeYes = true;
+            }
+            else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeNo = true;
+            }
+            else if (string.Equals(a, "--strict-names", StringComparison.OrdinalIgnoreCase))
+            {
+                strictNames = true;
+            }
+            else if (string.Equals(a, "--symlink-mode", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length || !TryParseSymlinkMode(args[i + 1], out symlinkMode))
+                {
+                    Logger.LogErr("Error: --symlink-mode must be follow, skip or reject\n");
+                    return 1;
+                }
+
+                i++;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for apply-skeleton: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (skeleton is null)
+        {
+            if (positionals.Count < 1)
+            {
+                Logger.LogErr("Error: apply-skeleton requires <skeleton.xiso> <source-dir> -o <out.iso>\n");
+                PrintUsage();
+                return 1;
+            }
+
+            skeleton = positionals[0];
+            positionals.RemoveAt(0);
+        }
+
+        if (positionals.Count != 1 || string.IsNullOrEmpty(output))
+        {
+            Logger.LogErr("Error: apply-skeleton requires exactly one source directory, -o <out.iso>\n");
+            PrintUsage();
+            return 1;
+        }
+
+        string sourceDirectory = positionals[0];
+        if (!OverwritePrompt.ConfirmOverwrite(output, assumeYes, assumeNo))
+        {
+            return 1;
+        }
+
+        try
+        {
+            int files = XisoSkeleton.Apply(skeleton, sourceDirectory, output, hash,
+                cancellationToken: default, strictNames: strictNames, symlinkMode: symlinkMode);
+            Logger.Log($"Applied skeleton: {files} file(s) restored to {output}\n");
+            return 0;
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or
+                                       ArgumentException or NotSupportedException)
+        {
+            Logger.LogErr($"Error applying skeleton: " +
+                          $"{HostIoDiagnostics.Describe(ex, "applying the skeleton", sourceDirectory)}\n");
+            return 1;
+        }
+    }
+
+    /// <summary>
     /// <c>xbe-image &lt;image&gt; &lt;internal-path&gt; --type logo|title|save -o &lt;out.png|out.dds&gt;</c>:
     /// extracts a logo, <c>$$XTIMAGE</c> title image or <c>$$XSIMAGE</c> save
     /// image from an XBE inside an image.
@@ -5175,6 +6420,14 @@ internal static class Program
 
                 output = args[++i];
             }
+            else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+            {
+                // xbe-image has always overwritten its output; keep that
+                // behavior while accepting the shared overwrite flags.
+            }
             else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
             {
@@ -5193,9 +6446,9 @@ internal static class Program
             }
         }
 
-        if (positionals.Count != 2)
+        if (positionals.Count is not (1 or 2))
         {
-            Logger.LogErr("Error: xbe-image requires exactly <image> <internal-path>\n");
+            Logger.LogErr("Error: xbe-image requires <image> <internal-path> or one standalone .xbe\n");
             PrintUsage();
             return 1;
         }
@@ -5231,17 +6484,22 @@ internal static class Program
 
         try
         {
-            XbeImage? image = XbeAssets.GetImage(positionals[0], positionals[1], kind);
+            bool loose = positionals.Count == 1;
+            XbeImage? image = loose
+                ? XbeAssets.GetLooseImage(positionals[0], kind)
+                : XbeAssets.GetImage(positionals[0], positionals[1], kind);
             if (image is null)
             {
-                Logger.LogErr($"Error: no {type} image in {positionals[0]} at {positionals[1]}\n");
+                string where = loose ? positionals[0] : $"{positionals[0]} at {positionals[1]}";
+                Logger.LogErr($"Error: no {type} image in {where}\n");
                 return 1;
             }
 
             byte[]? data = png ? image.Png : image.Dds;
             if (data is null)
             {
-                Logger.LogErr($"Error: {type} image in {positionals[1]} could not be decoded to " +
+                string assetPath = loose ? positionals[0] : positionals[1];
+                Logger.LogErr($"Error: {type} image in {assetPath} could not be decoded to " +
                               $"{(png ? "PNG" : "DDS")} (format: {image.PixelFormat})\n");
                 return 1;
             }
@@ -5257,6 +6515,148 @@ internal static class Program
         catch (Exception ex)
         {
             Logger.LogErr($"Error reading XBE image from {positionals[0]}: {ex.Message}\n");
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// <c>xex-image &lt;image&gt; &lt;internal-path&gt; --type thumbnail -o &lt;out.png&gt;</c>
+    /// (or the standalone <c>.xex</c> form): exports the XDBF <c>0x8000</c>
+    /// thumbnail payload.
+    /// </summary>
+    private static int RunXexImageMode(string[] args)
+    {
+        string? type = null;
+        string? output = null;
+        bool assumeYes = false;
+        bool assumeNo = false;
+        List<string> positionals = new();
+        for (int i = 0; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (string.Equals(a, "--xex-image", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(a, "xex-image", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (string.Equals(a, "--type", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: --type requires thumbnail\n");
+                    return 1;
+                }
+
+                type = args[++i];
+            }
+            else if (string.Equals(a, "-o", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--output", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Logger.LogErr("Error: -o requires an output path\n");
+                    return 1;
+                }
+
+                output = args[++i];
+            }
+            else if (string.Equals(a, "-y", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeYes = true;
+            }
+            else if (string.Equals(a, "-n", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
+            {
+                assumeNo = true;
+            }
+            else if (string.Equals(a, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a, "--help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintUsage();
+                return 0;
+            }
+            else if (a.StartsWith('-'))
+            {
+                Logger.LogErr($"Error: unknown option for xex-image: {a}\n");
+                PrintUsage();
+                return 1;
+            }
+            else
+            {
+                positionals.Add(a);
+            }
+        }
+
+        if (positionals.Count is not (1 or 2))
+        {
+            Logger.LogErr("Error: xex-image requires <image> <internal-path> or one standalone .xex\n");
+            PrintUsage();
+            return 1;
+        }
+
+        if (!string.Equals(type, "thumbnail", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrEmpty(output))
+        {
+            Logger.LogErr("Error: xex-image requires --type thumbnail and -o <out.png>\n");
+            PrintUsage();
+            return 1;
+        }
+
+        string extension = Path.GetExtension(output);
+        if (!string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.LogErr("Error: xex-image output must end in .png\n");
+            return 1;
+        }
+
+        if (!OverwritePrompt.ConfirmOverwrite(output, assumeYes, assumeNo))
+        {
+            return 1;
+        }
+
+        try
+        {
+            bool loose = positionals.Count == 1;
+            XexTitleInfo? title = loose
+                ? XisoReader.GetLooseXexTitleInfo(positionals[0])
+                : XisoReader.GetXexTitleInfo(positionals[0], positionals[1]);
+            if (title is null)
+            {
+                Logger.LogErr($"Error: not an XEX2 executable: {(loose ? positionals[0] : positionals[1])}\n");
+                return 1;
+            }
+
+            byte[]? thumbnail = title.Thumbnail;
+            if (thumbnail is not { Length: > 0 })
+            {
+                Logger.LogErr($"Error: no thumbnail resource in {title.XexPath}\n");
+                return 1;
+            }
+
+            ReadOnlySpan<byte> pngMagic = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+            if (thumbnail.Length < pngMagic.Length || !thumbnail.AsSpan(0, pngMagic.Length).SequenceEqual(pngMagic))
+            {
+                Logger.LogErr(
+                    $"Error: thumbnail in {title.XexPath} is not a PNG payload " +
+                    $"({thumbnail.Length} bytes, first byte 0x{thumbnail[0]:X2})\n");
+                return 1;
+            }
+
+            string? directory = Path.GetDirectoryName(Path.GetFullPath(output));
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllBytes(output, thumbnail);
+            Logger.Log($"Wrote thumbnail ({thumbnail.Length} bytes) to {output}\n");
+            return 0;
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            Logger.LogErr($"Error reading XEX thumbnail: {ex.Message}\n");
             return 1;
         }
     }
@@ -5313,6 +6713,7 @@ internal static class Program
         bool assumeYes = false;
         bool assumeNo = false;
         string? format = null;
+        int zarLevel = 6;
         BatchOptions batch = new();
         List<string> positionals = new();
 
@@ -5359,6 +6760,19 @@ internal static class Program
                      string.Equals(a, "--no", StringComparison.OrdinalIgnoreCase))
             {
                 assumeNo = true;
+            }
+            else if (string.Equals(a, "--zar-level", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length ||
+                    !int.TryParse(args[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture,
+                        out zarLevel) ||
+                    zarLevel < 1 || zarLevel > 22)
+                {
+                    Logger.LogErr("Error: --zar-level requires an integer from 1 to 22\n");
+                    return 1;
+                }
+
+                i++;
             }
             else if (string.Equals(a, "-q", StringComparison.Ordinal))
             {
@@ -5409,7 +6823,7 @@ internal static class Program
 
             batch.AssumeYes = assumeYes;
             batch.AssumeNo = assumeNo;
-            return RunConvertBatch(batch, format ?? "zar");
+            return RunConvertBatch(batch, format ?? "zar", zarLevel);
         }
 
         if (format != null)
@@ -5490,7 +6904,8 @@ internal static class Program
                     return 1;
                 }
 
-                return XisoZarchive.CreateZar(source, output) ? 0 : 1;
+                return XisoZarchive.CreateZar(source, output,
+                    compressor: CreateZarCompressor(zarLevel)) ? 0 : 1;
             }
 
             Logger.LogErr(
@@ -5509,7 +6924,7 @@ internal static class Program
     /// default) packs every plain ISO into a ZArchive; <c>iso</c> expands every
     /// ZArchive back to a plain ISO.
     /// </summary>
-    private static int RunConvertBatch(BatchOptions batch, string format)
+    private static int RunConvertBatch(BatchOptions batch, string format, int zarLevel = 6)
     {
         bool toZar = string.Equals(format, "zar", StringComparison.OrdinalIgnoreCase);
 
@@ -5522,7 +6937,7 @@ internal static class Program
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Logger.LogErr($"Error: {ex.Message}\n");
+            Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "scanning the batch directory", batch.Directory)}\n");
             return 1;
         }
 
@@ -5540,7 +6955,8 @@ internal static class Program
             source => BatchConversion.OutputPath(source, batch.OutputName, format, appendExtension: true),
             (_, output) => [output],
             (source, output) => toZar
-                ? (XisoZarchive.CreateZar(source, output) ? 0 : 1)
+                ? (XisoZarchive.CreateZar(source, output,
+                    compressor: CreateZarCompressor(zarLevel)) ? 0 : 1)
                 : XisoZarchive.ConvertZarToIso(source, output, overwrite: true),
             CliOutputGuard.CheckImageOutput);
     }
@@ -5776,7 +7192,7 @@ internal static class Program
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Logger.LogErr($"Error: {ex.Message}\n");
+            Logger.LogErr($"Error: {HostIoDiagnostics.Describe(ex, "scanning the batch directory", batch.Directory)}\n");
             return 1;
         }
 
@@ -6010,7 +7426,8 @@ internal static class Program
 
     private static int RunRedumpBatch(List<string> isoFiles, bool video, bool random, bool seed, bool wipe, bool trim,
         bool petrify, bool update, bool zar, string? outputName,
-        bool assumeYes, bool assumeNo, int jobs = 1, ZarCollisionPolicy? policy = null)
+        bool assumeYes, bool assumeNo, int jobs = 1, ZarCollisionPolicy? policy = null, int zarLevel = 6,
+        bool strictNames = false)
     {
         // Single-output guard
         bool singleModeCount = new[] { video, random, seed, wipe, trim, petrify, update, zar }.Count(b => b) == 1;
@@ -6414,6 +7831,12 @@ internal static class Program
 
             if (petrify)
             {
+                if (strictNames && !ValidateImageNames(iso))
+                {
+                    exit = 1;
+                    continue;
+                }
+
                 string outSkel = (outputName != null && singleModeCount)
                     ? outputName
                     : Path.Combine(dir, baseName + ".skeleton.xiso");
@@ -6447,7 +7870,8 @@ internal static class Program
                     {
                         // Skipped by user choice (-n refusal already failed this file above).
                     }
-                    else if (!XisoZarchive.CreateZar(iso, outZar, isRedump ? isoOffset : 0, Logger.Quiet))
+                    else if (!XisoZarchive.CreateZar(iso, outZar, isRedump ? isoOffset : 0, Logger.Quiet,
+                                 compressor: CreateZarCompressor(zarLevel)))
                     {
                         Logger.LogErr($"[ERROR] Failed creating ZAR for {iso}\n");
                         exit = 1;
@@ -6470,7 +7894,7 @@ internal static class Program
         // collision policy, then pack. Returns 0 on success or skip, 1 on
         // failure. Parallel workers stay quiet; one summary line is logged
         // under a lock so batch output does not interleave.
-        static int DeriveAndPackZar(string isoPath, ZarCollisionPolicy pol)
+        int DeriveAndPackZar(string isoPath, ZarCollisionPolicy pol)
         {
             long size;
             try
@@ -6508,7 +7932,7 @@ internal static class Program
             return PackZarResolved(isoPath, Path.Combine(isoDir, stem + ".zar"), offset, pol, parallel: true);
         }
 
-        static int PackZarResolved(string isoPath, string outZar, long isoOffset, ZarCollisionPolicy pol, bool parallel)
+        int PackZarResolved(string isoPath, string outZar, long isoOffset, ZarCollisionPolicy pol, bool parallel)
         {
             string? resolved;
             try
@@ -6541,7 +7965,8 @@ internal static class Program
             bool ok;
             try
             {
-                ok = XisoZarchive.CreateZar(isoPath, resolved, isoOffset, quiet: parallel || Logger.Quiet);
+                ok = XisoZarchive.CreateZar(isoPath, resolved, isoOffset, quiet: parallel || Logger.Quiet,
+                    compressor: CreateZarCompressor(zarLevel));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
             {
@@ -6765,6 +8190,127 @@ internal static class Program
     }
 
     /// <summary>
+    /// Runs independent collection jobs with at most <paramref name="jobs"/>
+    /// workers and returns their results in input order. Each job's log output
+    /// is captured so parallel runs replay byte-identically to a sequential run.
+    /// </summary>
+    private static IReadOnlyList<CollectionJobResult<T>> RunOrderedParallel<T>(
+        IReadOnlyList<string> items,
+        int jobs,
+        Func<string, int, T> worker)
+    {
+        if (items.Count == 0)
+        {
+            return [];
+        }
+
+        if (jobs <= 1 || items.Count == 1)
+        {
+            CollectionJobResult<T>[] sequential = new CollectionJobResult<T>[items.Count];
+            for (int i = 0; i < items.Count; i++)
+            {
+                sequential[i] = RunCaptured(items[i], i, worker);
+            }
+
+            return sequential;
+        }
+
+        CollectionJobResult<T>[] results = new CollectionJobResult<T>[items.Count];
+        Parallel.For(0, items.Count,
+            new ParallelOptions { MaxDegreeOfParallelism = jobs, CancellationToken = CollectionToken },
+            i => results[i] = RunCaptured(items[i], i, worker));
+        return results;
+    }
+
+    private static CollectionJobResult<T> RunCaptured<T>(string item, int index, Func<string, int, T> worker)
+    {
+        CapturingLogger sink = new();
+        using (XisoLogScope.Begin(new XisoLogOptions { Sink = sink }))
+        {
+            T value = worker(item, index);
+            return new CollectionJobResult<T>(
+                value,
+                sink.Messages,
+                Logger.TotalFilesAllIsos,
+                Logger.TotalBytesAllIsos);
+        }
+    }
+
+    /// <summary>
+    /// Buffers one collection job's log events (info and error in call order)
+    /// so the parent can replay them deterministically after the job finishes.
+    /// </summary>
+    private sealed class CapturingLogger : IXisoLogger
+    {
+        private readonly List<CapturedLogEvent> _messages = [];
+#if NET9_0_OR_GREATER
+        private readonly Lock _gate = new();
+#else
+        private readonly object _gate = new();
+#endif
+
+        internal IReadOnlyList<CapturedLogEvent> Messages
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _messages.ToArray();
+                }
+            }
+        }
+
+        public void Log(string message) => Add(error: false, message);
+
+        public void LogWarning(string message) => Add(error: false, message);
+
+        public void LogError(string message) => Add(error: true, message);
+
+        public void LogDebug(string message)
+        {
+            // Debug diagnostics are not part of the command output contract.
+        }
+
+        private void Add(bool error, string message)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                _messages.Add(new CapturedLogEvent(error, message));
+            }
+        }
+    }
+
+    private readonly record struct CapturedLogEvent(bool IsError, string Text);
+
+    private sealed record CollectionJobResult<T>(
+        T Value,
+        IReadOnlyList<CapturedLogEvent> Messages,
+        int FilesAllIsos,
+        long BytesAllIsos)
+    {
+        /// <summary>Replays the captured output through the static logger in order.</summary>
+        internal void Replay()
+        {
+            foreach (CapturedLogEvent message in Messages)
+            {
+                if (message.IsError)
+                {
+                    Logger.LogErr(message.Text);
+                }
+                else
+                {
+                    Logger.Log(message.Text);
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Formats the XEX module flags as a comma-separated list of names.
     /// </summary>
     private static string FormatXexModuleFlags(uint flags)
@@ -6911,12 +8457,28 @@ internal static class Program
                                                      --xex-info <file> <path>  Show the Xbox 360 XEX2 executable
                                                                            header of a .xex file inside the image
                                                                            (module flags, entry point, title ID, ...).
+                                                                           A single loose .xex is accepted too.
                                                      --xbe-info <file> <path>  Show the original-Xbox XBEH executable
                                                                            header + certificate of a .xbe file inside
                                                                            the image (title ID/name, media, region).
+                                                                           A single loose .xbe is accepted too.
                                                      --xbe-image <file> <path> --type logo|title|save -o <out>
                                                                            Extract the XBE logo, $$XTIMAGE title image
                                                                            or $$XSIMAGE save image as PNG or DDS.
+                                                     --xex-image <file> <path> --type thumbnail -o <out.png>
+                                                                           Export the XDBF 0x8000 thumbnail as PNG
+                                                                           (a single loose .xex is accepted too).
+                                                     disc-info <image> [--json] [--sectors <sectors.txt>]
+                                                                           Report XGD type/wave, video/game partition
+                                                                           ranges, PFI layer break, security-sector
+                                                                           ranges and Redump-size consistency warnings.
+                                                     apply-skeleton <skeleton.xiso> <source-dir> -o <out.iso> [--hash <file>]
+                                                                           Restore file data into a skeleton image
+                                                                           (the inverse of --petrify). Missing/extra
+                                                                           files and hash mismatches are named errors.
+                                                     file-hashes <image> [-o <file>] [--algorithm sha1|sha256|md5] [--json]
+                                                                           Generate a per-file hash sidecar for any
+                                                                           supported container; verified by verify-hashes.
                                                      -l                  List files in xiso(s).
                                                      --md5 <file> [path] Compute MD5 hash of file(s) in xiso.
                                                      -r                  Rewrite xiso(s) as optimized xiso(s).
@@ -6989,8 +8551,14 @@ internal static class Program
                                                                                 its own output name.
                                                      --jobs <n>               With a lone --zar over several inputs, pack
                                                                             up to <n> archives in parallel (default 1).
+                                                                            Multi-image checksum/hash/-V and batch
+                                                                            extract/list/tree/rewrite also use up to
+                                                                            <n> workers; output stays ordered.
                                                      --policy <p>            --zar overwrite handling without prompting:
                                                                             skip | overwrite | auto-rename.
+                                                     --zar-level <n>         zstd level 1..22 for --zar/--compress
+                                                                            and convert --format zar (default 6;
+                                                                            level 6 stays byte-identical).
                                                      --all <redump.iso>         Alias: --random --seed --trim --update --video --wipe
                                                      --best <iso>               Alias: --trim --wipe
                                                      --compress <iso>           Alias: --petrify --update --video --zar
@@ -7029,8 +8597,13 @@ internal static class Program
                                                                              SHA3-256 over sorted path bytes + file data). Output: hex tab path.
                                                        hash <image> [images...] [--json]  Full-image CRC32/MD5/SHA-1/SHA-256/SHA3-256 in one pass.
                                                        verify-hashes <image> <hash-file> [--ignore-extra] [--json]
-                                                                             Verify a --petrify/XboxKit .hash sidecar against the image.
-                                                       title-info <image> [--json]  Find the root default.xbe/default.xex (or a GOD/STFS package) and report title name, title ID, region, disc, version.
+                                                                             Verify a --petrify/XboxKit .hash sidecar against the image;
+                                                                             MD5 (32), SHA-1 (40) and SHA-256 (64) line lengths are detected.
+                                                       verify-dat <dat> <image> [images...] [--json]
+                                                                             Match whole images against a Redump-style XML DAT
+                                                                             (size + MD5/SHA-1/CRC32); report verified, ambiguous,
+                                                                             not-in-DAT and missing entries.
+                                                       title-info <image> [--json]  Find the root default.xbe/default.xex (or a GOD/STFS package) and report title name, title ID, region, disc, version. GOD/STFS packages also merge embedded default.xex XDBF/XSRC publisher, developer, genre, description and thumbnail fields.
                                                        split <image> [images...] [--size <bytes|half>] [--output <base>] [--batch <dir>]  Split ISO into sector-aligned
                                                                              .1.iso/.2.iso… parts (default 0xFF000000 = 4 GiB − 16 MiB FATX cap; 'half' splits in two).
                                                        join <first.1.iso> [...] [--output <file>]  Reassemble split parts (output validated as XISO).
@@ -7061,7 +8634,7 @@ internal static class Program
 
                                                        XDVDFS / Packing modes (ordered remapping):
 
-                                                      build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run] [--file-time <value>] [--layout <file>]
+                                                      build-image [sourceDir] [output.iso] -f <xdvdfs.toml> -m "hostGlob:imagePath" [-O output] [-D|--dry-run] [--file-time <value>] [--layout <file>] [--deterministic] [--strict-names]
                                                                             Pack an image with ordered wax-glob remapping ({0} whole match, {1..n} per '*'/'**' capture, '!' exclusion). Examples:
                                                                               build-image -m "bin:/" -m "assets/**:/assets/{1}" ./src dist/final.xiso.iso
                                                                               build-image --dry-run -f xdvdfs.toml ./src
@@ -7114,6 +8687,13 @@ internal static class Program
                                                                           deterministic timestamp so identical input
                                                                           produces byte-identical output. Valid in
                                                                           create (-c), --pack, and build-image modes.
+                                                     --deterministic      Alias for --file-time 0, also accepted with
+                                                                           -r/rewrite so repacking is reproducible.
+                                                     --strict-names       Fail before writing when a path component is
+                                                                           over the Xbox 42-character limit or outside
+                                                                           Latin-1; the default warns and packs.
+                                                     --zar-level <n>      zstd level 1..22 for --zar, --compress and
+                                                                           convert --format zar (default 6).
                                                      --skip-existing      In extract, --unpack, and --copy-out modes,
                                                                           skip files already on disk with matching
                                                                           sizes (logged as "skip: <path>") instead of
@@ -7139,6 +8719,11 @@ internal static class Program
                                                                           independent files with up to <n> workers
                                                                           (1..64, default 1; output is byte-identical
                                                                           and FileAdded progress stays in entry order).
+                                                                          Multi-image checksum/hash/-V and batch
+                                                                          extract/list/tree/rewrite also parallelize.
+                                                     --symlink-mode <m>   Create-time link policy for -c/--pack/
+                                                                          build-image/apply-skeleton: follow (default),
+                                                                          skip or reject.
                                                     -q                  Run quiet (suppress all non-error output).
                                                     -Q                  Run silent (suppress all output).
                                                     -s                  Skip $SystemUpdate folder.

@@ -2,7 +2,6 @@ using System.Buffers.Binary;
 using CCISharp;
 using XISOSharp.BlockDevice;
 using XISOSharp.Interfaces;
-using XISOSharp.Models;
 using ZArchiveSharp;
 
 namespace XISOSharp;
@@ -147,7 +146,7 @@ public static class XisoImageSource
     /// </summary>
     /// <param name="path">GOD header file or matching <c>.data</c> directory.</param>
     public static bool IsGodImage(string? path) =>
-        !string.IsNullOrWhiteSpace(path) && GodHeader.TryReadVolume(path, out _);
+        !string.IsNullOrWhiteSpace(path) && StfsSharp.GodHeader.TryReadVolume(path, out _);
 
     /// <summary>
     /// Returns true when <paramref name="path"/> has a CISO or CCI extension,
@@ -195,7 +194,7 @@ public static class XisoImageSource
                 new BlockDeviceStream(new CisoBlockDevice(path, share)),
             XisoImageFormat.Cci or XisoImageFormat.SplitCci =>
                 new BlockDeviceStream(new CciBlockDevice(path, share)),
-            XisoImageFormat.God => new BlockDeviceStream(new GodBlockDevice(path, share)),
+            XisoImageFormat.God => new BlockDeviceStream(new GodVolumeBlockDevice(path, share)),
             XisoImageFormat.Zar => throw new NotSupportedException(ZarNotSectorImageMessage),
             _ => throw new InvalidDataException($"Unsupported image format for '{path}'."),
         };
@@ -222,7 +221,7 @@ public static class XisoImageSource
             XisoImageFormat.SplitIso => new StreamBlockDevice(new SplitIsoStream(info.Parts, share)),
             XisoImageFormat.Ciso or XisoImageFormat.SplitCiso => new CisoBlockDevice(path, share),
             XisoImageFormat.Cci or XisoImageFormat.SplitCci => new CciBlockDevice(path, share),
-            XisoImageFormat.God => new GodBlockDevice(path, share),
+            XisoImageFormat.God => new GodVolumeBlockDevice(path, share),
             XisoImageFormat.Zar => throw new NotSupportedException(ZarNotSectorImageMessage),
             _ => throw new InvalidDataException($"Unsupported image format for '{path}'."),
         };
@@ -307,10 +306,10 @@ public static class XisoImageSource
     private static bool TryDetectGod(string path, FileShare share, out XisoImageSourceInfo? info)
     {
         info = null;
-        if (!GodHeader.TryReadVolume(path, share, out GodVolumeInfo? volume))
+        if (!StfsSharp.GodHeader.TryReadVolume(path, share, out StfsSharp.Models.GodVolumeInfo? volume))
             return false;
 
-        string displayName = GodHeader.ReadTitle(volume.HeaderPath)?.TitleName
+        string displayName = StfsSharp.GodHeader.ReadTitle(volume.HeaderPath)?.TitleName
                              ?? Path.GetFileName(volume.HeaderPath);
         info = new XisoImageSourceInfo(
             XisoImageFormat.God,

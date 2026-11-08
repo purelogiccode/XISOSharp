@@ -208,13 +208,12 @@ public class CliFlagContractExtraTests : IDisposable
     }
 
     [Fact]
-    public void Jobs_WithoutZar_IsRejected()
+    public void Jobs_WithList_IsAccepted()
     {
         int rc = Program.Main(["--jobs", "4", "-l", "no-such-flag-test.iso"]);
 
         Assert.Equal(1, rc);
-        Assert.Contains("--jobs is only used with --zar, extract (-x) or --unpack", AllError(),
-            StringComparison.Ordinal);
+        Assert.Contains("open error", AllError(), StringComparison.Ordinal);
     }
 
     [Fact]

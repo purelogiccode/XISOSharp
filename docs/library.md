@@ -18,15 +18,50 @@
 
 The companion applications use the same library surface:
 
-- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** mounts ISO/CISO and GOD/SVOD sources read-only through
-  `XisoImage`/`XisoImageSource`, and CHD/ZAR through their dedicated readers (Dokan on Windows,
-  FUSE 3 on Linux/macOS).
-- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** converts and explores Xbox images, including GOD/SVOD input, a title metadata
+- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** mounts ISO/CISO/CCI and GOD/SVOD sources read-only through
+  `XisoImage`/`XisoImageSource`, resolves CCI sets with `CCISharp.CciFile`, and opens CHD/ZAR through
+  their dedicated readers (Dokan on Windows, FUSE 3 on Linux/macOS).
+- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** converts and explores Xbox images, including CCI validation, GOD/SVOD input, a title metadata
   panel and XBE logo/title/save previews through `XbeAssets`.
 
 The [StfsSharp](https://github.com/purelogiccode/STFSSharp), [CCISharp](https://github.com/purelogiccode/CCISharp) and [ZArchiveSharp](https://github.com/purelogiccode/ZArchiveSharp) packages remain usable on their own; XISOSharp
-consumes them for GOD/SVOD, CCI and ZAR support and keeps compatibility facades for its existing
-public types.
+consumes them directly for GOD/SVOD, CCI and ZAR support. The 1.x
+compatibility facades were removed in 2.0.0.
+
+### Consumer package usage
+
+Consumers that need the standalone readers pin the packages directly instead
+of relying on XISOSharp's transitive dependencies:
+
+```xml
+<PackageReference Include="XISOSharp" Version="1.8.0" />
+<PackageReference Include="CCISharp" Version="1.1.0" />
+<PackageReference Include="StfsSharp" Version="1.0.0" />
+```
+
+```csharp
+using CCISharp;
+using StfsSharp;
+using StfsSharp.Models;
+
+// GOD/SVOD header, .data folder or parent folder:
+if (GodHeader.TryReadTitle(path, out GodTitleInfo? title))
+    Console.WriteLine($"{title.TitleName} - disc {title.DiscNumber}/{title.DiscCount}");
+
+// CCI split discovery and container validation:
+CciError error = CciFile.Open(path, out CciFile? cci);
+if (error == CciError.None && cci is not null)
+{
+    using (cci)
+        Console.WriteLine($"{cci.Parts.Count} part(s), {cci.TotalSectors} sectors");
+}
+```
+
+SimpleXisoDrive uses `XISOSharp` for mounting and XDVDFS reads and references
+`StfsSharp.GodHeader` directly for GOD/SVOD header, `.data` and parent-folder
+resolution. XISO Studio uses `XISOSharp` for exploring/reading the filesystem,
+`StfsSharp.GodHeader` directly for GOD title metadata, and `CCISharp.CciFile`
+directly for CCI container validation.
 
 ## Packaging & compatibility
 
@@ -53,12 +88,18 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | Type | Purpose |
 |---|---|
 | [`XisoImage`](api-utilities.md#xisoimage) / `XisoImageHash` | Open-once disposable facade (list/read/extract/validate/title/hash, async wrappers) + full-image CRC32/MD5/SHA-1/SHA-256/SHA3-256 |
-| [`XisoReader`](api-xisoreader.md) | Verify, extract, list, tree, rewrite, info, `ls`, audit, repair, salvage, hash, copy-out, copy-in, checksum, filetime, split/join, XEX/XBE info, XEX title metadata, BlockDevice overloads |
+| [`XisoReader`](api-xisoreader.md) | Verify, extract, list, tree, rewrite, info, `ls`, audit, repair, salvage, hash, per-file hash sidecars, copy-out, copy-in, checksum, filetime, split/join, loose XEX/XBE info, XEX title metadata, BlockDevice overloads |
+| `XisoDiscInfo` / `XisoDiscLayout` | Redump/XGD layout inspector: XGD type/wave, video/game partitions, PFI layer break, embedded/`sectors.txt` security ranges and consistency warnings |
+| `XisoNameRules` | Xbox 42-character component limit and the Latin-1/Windows-1252 storage contract (`GetComponentError`, `GetPathError`, `IsValidComponent`) |
+| `HostIoDiagnostics` | Actionable host-I/O messages (path, operation, likely fix) for permission, long-path, sharing, existing-destination, illegal-name and full-disk errors |
+| `XisoDat` | Redump-style XML DAT parser/verifier: `game/rom` size + MD5/SHA-1/CRC32 matching with verified/ambiguous/not-in-DAT/missing reports |
+| `SymlinkMode` | `Follow` (default), `Skip` or `Reject` policy for create/pack/remap/Apply source walks |
+| `XisoSkeleton.Apply` | Skeleton overlay: restore original file data into a petrified skeleton, optionally verifying the `.hash`; the exact inverse of `Petrify` |
 | `XbeAssets` | XBE logo / `$$XTIMAGE` / `$$XSIMAGE` extraction with BCL-only PNG and DDS output |
 | `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` | Unified detection and open (`TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`) for ISO, split ISO, CISO, CCI, GOD/SVOD, split variants and ZAR |
 | `XisoCci` / `CciBlockDevice` | CCI/CCIM compression, extraction, default names and random access (CCISharp-backed) |
 | `XisoZarchive` (read APIs) | `ListZar`, `ExtractZar`, `ConvertZarToIso` alongside the existing `CreateZar` |
-| `StfsPackage` / `StfsEntry` / `StfsPackageInfo` | Read-only XBLA/XBLIG single-file STFS package (StfsSharp-backed facade): file table, hash-chain block lists, `Find`, `ReadAllBytes`, `CopyTo`, `ExtractTo`, `Validate` hash-tree verification and volume/title metadata |
+| `StfsSharp.StfsPackage` / `StfsEntry` / `StfsPackageInfo` | Read-only XBLA/XBLIG single-file STFS package (from the `StfsSharp` package): file table, hash-chain block lists, `Find`, `ReadAllBytes`, `CopyTo`, `ExtractTo`, `Validate` hash-tree verification and volume/title metadata |
 | [`XisoExplorer`](api-utilities.md#xisoexplorer--xisoattributes) / [`XisoAttributes`](api-utilities.md#xisoexplorer--xisoattributes) | In-place exploration (list/get/copy/hash/XEX/XBE, bounded `OpenReadStream`, keep-open VFS mode) + Windows attribute mapping |
 | [`XisoWriter`](api-xisowriter.md) | Create and rewrite images + `build-image` remap (`CreateFromRemapTree`) |
 | [`XisoPatcher`](api-xisoreader.md#copyin) / [`DirectoryEntryTableWriter`](api-xisowriter.md#directoryentrytablewriter) | In-place file patching (`CopyIntoImage`) + single-table build/serialize primitive |
@@ -74,7 +115,7 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | [`XisoRanges`/`XisoSkeleton`/`XgdTables`/`XboxPrng`/`SecuritySectors`](api-utilities.md) | Redump archival: ranges, skeleton/SHA-1, wave tables, PRNG seed, `sectors.txt` |
 | [`XisoRedump`/`XisoOperations`/`XisoZarchive`](api-utilities.md) | Video/filler/wipe/trim/petrify/update/ZAR/rebuild |
 | [`XisoChecksum` / `CisoWriter`/`CisoReader`](api-utilities.md) | SHA3-256 image checksum + CISO compress/decompress |
-| [`BlockDevice/*`](api-utilities.md#blockdevice) | `IBlockDevice` + `File`/`Memory`/`Offset`/`Stream`/`Ciso`/`Cci`/`God` devices (`GodBlockDevice` is StfsSharp-backed) |
+| [`BlockDevice/*`](api-utilities.md#blockdevice) | `IBlockDevice` + `File`/`Memory`/`Offset`/`Stream`/`Ciso`/`Cci` devices (GOD/SVOD is mapped through `StfsSharp.GodVolume` by an internal adapter) |
 | [`RemapFilesystem`](api-utilities.md) | Ordered `host→image` remapping, `xdvdfs.toml`, `GenerateSpecText`, `DryRunRemap` |
 | Records/enums | `VolumeInfo`, `EntryInfo`, `AuditResult`, `ValidationResult`, `XexInfo`, `XexTitleInfo`, `XbeInfo`, `XbeImage`, `TitleInfo`/`TitleKind`, `RemapRule`, `XisoLayoutSpec`, `XisoLayoutEntry`, `ProgressInfo`, `ExtractMode`, … |
 | Exceptions | `XisoFormatException`, `XisoEmptyException`, `XisoFileTooLargeException`, `ExtractErrorException` |
@@ -126,10 +167,13 @@ or `NotSupportedException` (ZAR) rather than returning a partially valid view.
 ## XBLA/XBLIG STFS packages
 
 A single-file XBLA or XBLIG package is an STFS file system, not an XISO sector
-image, so it has its own reader instead of `XisoImageSource` (the XISOSharp
-type is a facade over the standalone StfsSharp package):
+image, so it has its own reader instead of `XisoImageSource`. Use the
+`StfsSharp` package directly (XISOSharp references it and re-exports no facade):
 
 ```csharp
+using StfsSharp;
+using StfsSharp.Models;
+
 using StfsPackage package = StfsPackage.Open(@"C:\games\4D5307E6");
 Console.WriteLine($"{package.Info.TitleName} ({package.Info.Kind})");
 
@@ -140,7 +184,7 @@ byte[] defaultXex = package.ReadAllBytes(package.Find("default.xex")!);
 package.ExtractTo(@"C:\games\4D5307E6-extracted", skipExisting: true);
 ```
 
-`StfsPackage` follows the STFS volume descriptor and the level-0/level-1/level-2
+`StfsSharp.StfsPackage` follows the STFS volume descriptor and the level-0/level-1/level-2
 hash-table interleave, including writable-format packages with primary and
 secondary tables. `XisoChecksum.ComputeStfsChecksum` uses the same sorted-path
 SHA3-256 tree hash as ISO and ZAR, so equivalent trees compare equal. The reader
@@ -387,6 +431,18 @@ XisoRedump.TryExtractVideo("game.redump.iso", "game.video.iso", out _);
 var filler = XisoOperations.ExtractFiller("game.iso");
 XisoOperations.WipeFiller("game.iso", "wiped.iso");
 XisoSkeleton.Petrify("game.iso", "skeleton.iso", "hash.txt");
+int restored = XisoSkeleton.Apply("skeleton.iso", "./files", "game-restored.iso", "hash.txt");
+
+// Redump/XGD layout inspection
+XisoDiscLayout layout = XisoDiscInfo.Read("game.redump.iso");
+Console.WriteLine($"{layout.XgdType} {layout.Wave}; game partition at 0x{layout.GamePartition?.ByteOffset:X}");
+
+// Per-file hashes for any container (ISO/split/CISO/CCI/GOD/STFS/ZAR)
+IReadOnlyList<FileHashEntry> hashes =
+    XisoReader.ComputeFileHashSidecar("game.iso", HashAlgorithmName.SHA256);
+
+// Name policy: check before writing
+string? nameError = XisoNameRules.GetPathError("/some/very-long-component.txt");
 
 // CISO
 CisoWriter.CompressToCso("game.iso", "game.cso", level: 9);

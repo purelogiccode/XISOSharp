@@ -17,6 +17,8 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 - [CopyOut](#copyout)
 - [CopyIn](#copyin)
 - [ComputeFileHash / ComputeDirectoryHashes](#computefilehash--computedirectoryhashes)
+- [ComputeFileHashSidecar](#computefilehashsidecar)
+- [Loose XEX/XBE executables](#loose-xexxbe-executables)
 - [AuditXiso](#auditxiso)
 - [Repair](#repair)
 - [Salvage](#salvage)
@@ -53,8 +55,6 @@ directory listing, auditing, hashing, copy-out, and copy-in.
 | `GetTitleInfo` | Resolve `default.xbe`/`default.xex`/`default_mp.xbe` title metadata |
 | `GetXbeInfo` | Parse the original-Xbox XBEH header + certificate of a `.xbe` file |
 | `XbeAssets.GetImage` | Extract an XBE logo, `$$XTIMAGE` title image or `$$XSIMAGE` save image as PNG/DDS (separate `XbeAssets` class) |
-| `GodHeader.TryReadTitle` | Read GOD/SVOD `XContent` title metadata (separate `GodHeader` class) |
-| `StfsHeader.TryReadTitle` | Read single-file XBLA/XBLIG STFS `XContent` title metadata (separate `StfsHeader` class) |
 | `AuditXiso` | Deep integrity audit |
 | `Repair` | Fix safely-patchable issues in place (`.old` backup, dry-run) |
 | `Salvage` | Rebuild a readable image from a corrupt one (repack + re-audit) |
@@ -583,14 +583,21 @@ bitmap (BGRA32, grayscale or RLE). Unsupported payloads are returned with
 `HasTitleImage` and `HasSaveImage` report presence without decoding. The CLI
 exposes this as `--xbe-image <image> <path> --type logo|title|save -o out.png|out.dds`.
 
-## GOD header title metadata (`GodHeader`)
+## GOD header title metadata (`StfsSharp.GodHeader`)
+
+GOD/SVOD and single-file XBLA/XBLIG readers live in the standalone
+[`StfsSharp`](https://www.nuget.org/packages/StfsSharp) package (referenced by
+XISOSharp). Use its types directly:
 
 ```csharp
-public static bool IsGodContainer(string path)
-public static bool TryReadTitle(string path, out GodTitleInfo? info)
-public static GodTitleInfo? ReadTitle(string path)
-public static bool TryReadVolume(string path, out GodVolumeInfo? info)
-public static bool TryReadVolume(string path, FileShare share, out GodVolumeInfo? info)
+// StfsSharp namespace
+public static bool GodHeader.IsGodContainer(string path)
+public static bool GodHeader.TryReadTitle(string path, out GodTitleInfo? info)
+public static GodTitleInfo? GodHeader.ReadTitle(string path)
+public static bool GodHeader.TryReadVolume(string path, out GodVolumeInfo? info)
+public static bool GodHeader.TryReadVolume(string path, FileShare share, out GodVolumeInfo? info)
+public static StfsHeader.TryReadTitle(string path, out StfsTitleInfo? info)
+public static StfsPackage StfsPackage.Open(string path, FileShare share = FileShare.Read)
 ```
 
 Reads the plaintext `XContent` header of a Games-on-Demand (GOD/SVOD)
@@ -600,52 +607,40 @@ and the GOD/NXE content type, then reads the title ID (`0x360`), disc
 number/count (`0x366`/`0x367`) and UTF-16BE title name (`0x411`, 0x80 bytes).
 Names are sanitised for FATX (non-ASCII/control characters removed,
 `\/:*?"<>|` replaced with `_`) and fall back to the 8-digit hex title ID when
-empty. `GodTitleInfo` carries `HeaderPath`, `TitleName`, `TitleId`,
-`TitleIdHex`, `DiscNumber` and `DiscCount`.
+empty.
 
-`TryReadVolume` additionally parses the SVOD device descriptor (start block,
-data-block count, enhanced-GDF flag) and the `DataNNNN` fragment list, returning
-a `GodVolumeInfo` with the logical image length and fragment paths. The
-`GodBlockDevice` (`XISOSharp.BlockDevice`) exposes that mapping as a read-only
-`IBlockDevice`, and `XisoImageSource` detects a GOD header or its `.data`
-folder and routes every read verb through the decompressed view. The CLI
-exposes this as `title-info <header-or-.data-folder> [--json]`,
+`GodVolume` additionally parses the SVOD device descriptor (start block,
+data-block count, enhanced-GDF flag) and the `DataNNNN` fragment list, exposing
+the logical image as a seekable reader. XISOSharp's `XisoImageSource` detects a
+GOD header or its `.data` folder and routes every read verb through that
+mapping. The CLI exposes this as
+`title-info <header-or-.data-folder> [--json]`,
 `decompress <header> [out.iso]`, and `convert <header> <out.iso|out.cci|out.cso>`.
 
-## Single-file STFS package metadata (`StfsHeader`)
+## Single-file STFS package contents (`StfsSharp.StfsPackage`)
+
+Single-file Xbox 360 STFS packages (XBLA content type `0x000D0000` or XBLIG
+`0x00000002`; Community Game `0x02000000` is accepted as XBLIG) are read through
+`StfsSharp.StfsPackage`. The package file itself starts with the XContent header
+and has no `.data` directory.
 
 ```csharp
-public static bool IsStfsPackage(string path)
-public static bool TryReadTitle(string path, out StfsTitleInfo? info)
-public static StfsTitleInfo? ReadTitle(string path)
-```
-
-Reads the same XContent header from a single-file Xbox 360 STFS package:
-XBLA (content type `0x000D0000`) or XBLIG (`0x00000002`; Community Game
-`0x02000000` is accepted as XBLIG). These packages have
-no `<header>.data` directory, so the package file itself is passed. The parser
-returns `StfsTitleInfo` with `PackagePath`, `Kind` (`Xbla`/`Xblig`),
-`TitleName`, `TitleId`, `TitleIdHex`, `DiscNumber`, `DiscCount` and the raw
-`ContentType`. GOD/NXE containers are handled by `GodHeader`.
-
-## Single-file STFS package contents (`StfsPackage`)
-
-```csharp
-public static bool IsStfsPackage(string? path)
-public static StfsPackage Open(string path, FileShare share = FileShare.Read)
-public static bool TryOpen(string path, out StfsPackage? package)
+public static bool StfsPackage.IsStfsPackage(string? path)
+public static StfsPackage StfsPackage.Open(string path, FileShare share = FileShare.Read)
+public static bool StfsPackage.TryOpen(string path, out StfsPackage? package)
 
 public StfsPackageInfo Info { get; }
 public IReadOnlyList<StfsEntry> Entries { get; }
 public StfsEntry? Find(string? path)
 public byte[] ReadAllBytes(StfsEntry entry)
 public void CopyTo(StfsEntry entry, Stream destination)
-public int ExtractTo(string outputDirectory, bool skipExisting = false,
-    IProgress<ProgressInfo>? progress = null, CancellationToken ct = default)
+public int ExtractTo(string outputDirectory, ExtractNamePolicy namePolicy,
+    bool skipExisting = false, IProgress<StfsProgress>? progress = null,
+    Action<string>? warning = null, CancellationToken ct = default)
 public StfsValidationReport Validate(CancellationToken ct = default)
 ```
 
-`StfsPackage` reads the STFS file table, follows contiguous and hash-chain
+`StfsSharp.StfsPackage` reads the STFS file table, follows contiguous and hash-chain
 block lists through the level-0/level-1/level-2 hash-table interleave (including
 writable-format primary/secondary tables) and exposes the package as a
 read-only tree. `StfsPackageInfo` reports the XContent title fields plus the
@@ -700,6 +695,28 @@ public static IReadOnlyList<EntryInfo> ListDirectory(IBlockDevice dev, string in
 ```
 
 `IBlockDevice` stack under `XISOSharp/BlockDevice/` (`FileBlockDevice`/`MemoryBlockDevice`/`OffsetBlockDevice`/`StreamBlockDevice`/`CisoBlockDevice`/`CciBlockDevice`). Mirror `xdvdfs-core/src/blockdev.rs` - enables in-memory golden fixtures + CISO/CCI random-access via single-sector caches without `no_std` target. All `FileStream` overloads delegate to these.
+
+## ComputeFileHashSidecar
+
+```csharp
+IReadOnlyList<FileHashEntry> entries =
+    XisoReader.ComputeFileHashSidecar("game.iso", HashAlgorithmName.SHA256);
+```
+
+Returns `<path, size, algorithm, hashHex>` for every regular file through the
+container-aware view (ISO, split ISO, CISO, CCI, GOD/SVOD, STFS and ZAR). The
+default is SHA-1 and the CLI `file-hashes` verb writes `<image stem>.hash` in
+the format `XisoSkeleton.VerifyHashes` consumes.
+
+## Loose XEX/XBE executables
+
+`GetLooseXexInfo`/`GetLooseXexTitleInfo` parse a standalone `.xex`, and
+`GetLooseXbeInfo` parses a standalone `.xbe` with the same parsers and result
+shapes as the image-plus-internal-path overloads. `GetXexInfo(byte[], string)`,
+`GetXexTitleInfo(byte[], string)` and `GetXbeInfo(byte[], string)` accept
+in-memory executables (for example the `default.xex` read from an STFS
+package). `XbeAssets.GetLooseImage`/`GetImage(byte[], ...)` do the same for XBE
+logo/title/save assets.
 
 ## AuditXiso
 

@@ -121,12 +121,12 @@ public sealed class ExtractFileException : ExtractErrorException
     internal static ExtractFileException ForCreate(string internalPath, string destPath, uint startSector,
         long fileSize, Exception inner) =>
         new(ExtractError.ErrFileWrite, internalPath, destPath, startSector, fileSize,
-            $"could not create output file: {inner.Message}", innerException: inner);
+            HostIoDiagnostics.Describe(inner, "could not create the output file"), innerException: inner);
 
     /// <summary>Destination directory could not be created; the subtree is skipped under continue-on-error.</summary>
     internal static ExtractFileException ForDirectory(string internalPath, string destPath, Exception inner) =>
         new(ExtractError.ErrFileWrite, internalPath, destPath, 0, 0,
-            $"could not create output directory: {inner.Message}", innerException: inner);
+            HostIoDiagnostics.Describe(inner, "could not create the output directory"), innerException: inner);
 
     /// <summary>
     /// Directory table is structurally corrupt (TODO #16): cycle, child offset
@@ -142,7 +142,7 @@ public sealed class ExtractFileException : ExtractErrorException
     internal static ExtractFileException ForWrite(string internalPath, string destPath, uint startSector,
         long fileSize, long bytesRead, Exception inner) =>
         new(ExtractError.ErrFileWrite, internalPath, destPath, startSector, fileSize,
-            $"write failed: {inner.Message}", bytesRead, inner);
+            HostIoDiagnostics.Describe(inner, "writing the output file"), bytesRead, inner);
 
     /// <summary>
     /// Image data ends before the reported size: truncated download, torn

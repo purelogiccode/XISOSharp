@@ -16,7 +16,8 @@ _xisosharp_verbs=(
     validate rebuild build-image image-spec
     compress cso cci decompress uncso decso uncci
     checksum split join joinsplit convert hash
-    verify-hashes verify-hash title-info title xbe-image
+    verify-hashes verify-hash verify-dat verify-dats title-info title xbe-image
+    xex-image disc-info apply-skeleton file-hashes
 )
 
 _xisosharp_flags=(
@@ -41,6 +42,8 @@ _xisosharp_flags=(
     --cci-level --cci-split --level
     --format --output-name --output --map --file --type --size --ignore-extra
     --split --verify-hashes
+    --xex-image --disc-info --apply-skeleton --file-hashes
+    --zar-level --deterministic --strict-names --symlink-mode --algorithm --algo --hash --hashes
 )
 
 _xisosharp_word() {
@@ -65,10 +68,14 @@ _xisosharp_value_completions() {
                         _xisosharp_complete_from "$2" 0 1 2 3 4 5 6 7 8 9 ;;
         --cci-level)    _xisosharp_complete_from "$2" 0 1 2 3 4 5 6 7 8 9 10 11 12 ;;
         --name-policy)  _xisosharp_complete_from "$2" reject sanitize skip ;;
+        --symlink-mode) _xisosharp_complete_from "$2" follow skip reject ;;
         --policy)       _xisosharp_complete_from "$2" skip overwrite auto-rename ;;
         --type)         _xisosharp_complete_from "$2" logo title save ;;
         --size)         _xisosharp_complete_from "$2" half halves ;;
         --jobs)         _xisosharp_complete_from "$2" 1 2 4 8 16 32 64 ;;
+        --algorithm|--algo)
+                        _xisosharp_complete_from "$2" sha1 sha256 md5 ;;
+        --zar-level)    _xisosharp_complete_from "$2" 1 6 9 12 16 19 22 ;;
     esac
 }
 
@@ -81,7 +88,7 @@ _xisosharp() {
     fi
 
     case "$prev" in
-        --format|--ciso-version|--ciso-level|--cci-level|--level|--name-policy|--policy|--type|--size|--jobs)
+        --format|--ciso-version|--ciso-level|--cci-level|--level|--name-policy|--symlink-mode|--policy|--type|--size|--jobs|--algorithm|--algo|--zar-level)
             local values
             values=$(_xisosharp_value_completions "$prev" "$cur")
             if [[ -n $values ]]; then

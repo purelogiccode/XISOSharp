@@ -122,7 +122,7 @@ public static class CisoWriter
         // A GOD `.data` folder is a container, not a directory to pack.
         XisoImageSource.TryDetect(sourcePath, out XisoImageSourceInfo? sourceInfo);
         bool isGod = sourceInfo is not null && sourceInfo.Format == XisoImageFormat.God;
-        if (!isGod && GodHeader.IsGodContainer(sourcePath))
+        if (!isGod && StfsSharp.GodHeader.IsGodContainer(sourcePath))
         {
             throw new InvalidDataException(
                 $"GOD container '{sourcePath}' is incomplete or has no readable data fragments.");

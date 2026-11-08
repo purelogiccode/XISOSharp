@@ -74,7 +74,23 @@ XISOSharp --trim -o <trimmed.xiso> <input.iso>
 XISOSharp --petrify -o <skeleton.xiso> <input.iso>   # hash derives as <base>.hash
 ```
 
-`XisoSkeleton.Petrify` — XISO with file extents zeroed + SHA-1 hex per file (`CollectFileEntries` sorted by `Offset`, `SHA1` streaming `sector*SectorSize+isoOffset`, line `hex + " " + path`). Skeleton = every filesystem (bone) sector verbatim, everything else zeroed, walked as keep-segments so bone islands inside mixed bone/file extents survive (zeroing to merged-extent ends would pave over them and leave an unlistable skeleton — see [Troubleshooting](troubleshooting.md#petrify-battle-skipped-oracle-emits-unreadable-skeleton)). On Redump inputs only the game partition is emitted (no Redump prefix), matching `xboxkit -p` sizing.
+`XisoSkeleton.Petrify` - XISO with file extents zeroed + SHA-1 hex per file (`CollectFileEntries` sorted by `Offset`, `SHA1` streaming `sector*SectorSize+isoOffset`, line `hex + " " + path`). Skeleton = every filesystem (bone) sector verbatim, the system preamble (ECMA-119 PVD + optimized tag) and all-0xFF file-tail padding preserved, everything else zeroed, walked as keep-segments so bone islands inside mixed bone/file extents survive (zeroing to merged-extent ends would pave over them and leave an unlistable skeleton - see [Troubleshooting](troubleshooting.md#petrify-battle-skipped-oracle-emits-unreadable-skeleton)). On Redump inputs only the game partition is emitted (no Redump prefix), matching `xboxkit -p` sizing.
+
+`XisoSkeleton.Apply` is the inverse: it copies the skeleton's filesystem/system sectors, places each source file at its recorded extent, and verifies the optional `.hash` while writing. Missing/extra files, size mismatches and hash mismatches are named errors; `Petrify` → `Apply` on the same tree reproduces the original image byte-for-byte.
+
+```bash
+XISOSharp --petrify -o game.skeleton.xiso game.iso
+XISOSharp apply-skeleton game.skeleton.xiso ./files -o game-restored.iso --hash game.hash
+```
+
+`disc-info` reports the XGD/Redump layout used by these workflows:
+
+```bash
+XISOSharp disc-info game.redump.iso
+XISOSharp disc-info game.redump.iso --json
+```
+
+It prints the XGD type/wave, video L0/L1 and game-partition ranges, PFI layer break, embedded `sectors.txt` security ranges, known-Redump-size match and consistency warnings. Containers report the game-partition view and mark video/PFI fields unavailable.
 
 ## Update
 
@@ -183,7 +199,7 @@ XISOSharp validate --validate-checksums game.redump.iso rebuilt.redump.iso
 | `XboxPrng` | `BruteForceSeed(ReadOnlySpan<byte>)`, `SimulateSectors(long count)`, `WriteSectors(Stream, long sectorCount)` |
 | `XisoRedump` | `TryExtractVideo`, `TryExtractUpdate`, `RebuildRedump` |
 | `XisoOperations` | `ExtractFiller`, `TryExtractSeed`/`ExtractSeed`, `WipeFiller`, `TrimXiso`, `WipeAndTrim` |
-| `XisoSkeleton` | `Petrify(skeletonPath, hashPath)`, `CollectFileEntries` |
+| `XisoSkeleton` | `Petrify(skeletonPath, hashPath)`, `Apply(skeletonPath, sourceDirectory, outputPath, hashPath)`, `CollectFileEntries` |
 | `XisoZarchive` | `CreateZar` |
 | `SecuritySectors` | `Parse(string path)` → `int[]`, validation `4095` length |
 | CLI | `rebuild` verb `RunRebuildMode` (`--security-sectors`/`--sectors` rebuild-only), `--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`--all`/`--best`/`--compress` → `RunRedumpBatch` (`--jobs` parallel ZAR pack, `--policy skip|overwrite|auto-rename`), `--security-sectors` threaded through rebuild only |

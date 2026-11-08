@@ -29,7 +29,31 @@ public sealed record HashVerificationEntry(
     string Path,
     string? ExpectedSha1,
     string? ActualSha1,
-    HashVerificationStatus Status);
+    HashVerificationStatus Status)
+{
+    /// <summary>
+    /// Algorithm selected by the expected digest length: <c>sha1</c>,
+    /// <c>sha256</c> or <c>md5</c>.
+    /// </summary>
+    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global",
+        Justification = "Public verification payload: consumers and CLI output read the algorithm.")]
+    public string Algorithm { get; init; } = "sha1";
+}
+
+/// <summary>
+/// One file digest in a generated <c>.hash</c> sidecar.
+/// </summary>
+/// <param name="Path">Image-internal path (leading <c>/</c> is optional).</param>
+/// <param name="Size">File size in bytes.</param>
+/// <param name="Algorithm">Lower-case algorithm name (<c>sha1</c>, <c>sha256</c> or <c>md5</c>).</param>
+/// <param name="HashHex">Lower-case hex digest.</param>
+[SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global",
+    Justification = "Public payload: consumers and JSON output render every field; the library only builds it.")]
+public sealed record FileHashEntry(
+    string Path,
+    long Size,
+    string Algorithm,
+    string HashHex);
 
 /// <summary>Result of verifying an image against a <c>.hash</c> sidecar.</summary>
 /// <param name="Checked">Number of hash-file entries checked.</param>

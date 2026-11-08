@@ -694,7 +694,8 @@ internal static partial class BattleRunner
 
     /// <summary>
     /// Structural skeleton check: same byte length as the game partition, every
-    /// filesystem (bone) byte identical to the source, every other byte zero.
+    /// filesystem (bone) byte identical to the source, file data zeroed, and any
+    /// preserved system preamble / pad tail either zero or equal to the source.
     /// Partition bounds mirror the CLI's Redump detection.
     /// </summary>
     private static bool VerifySkeletonStructure(string iso, string skeleton, out string detail)
@@ -742,6 +743,40 @@ internal static partial class BattleRunner
                 }
             }
 
+            // File-data extents must be zeroed; only the system preamble and the
+            // 0xFF pad tail after each file may legitimately match the source.
+            List<(long Start, long End)> fileRanges = [];
+            foreach ((_, long offset, uint fileSize) in XisoRanges.GetFileEntries(iso, isoOffset))
+            {
+                if (fileSize == 0)
+                {
+                    continue;
+                }
+
+                long start = offset - isoOffset;
+                long end = start + fileSize;
+                if (start < 0 || end <= start || start >= partLen)
+                {
+                    continue;
+                }
+
+                fileRanges.Add((start, Math.Min(end, partLen)));
+            }
+
+            fileRanges.Sort(static (a, b) => a.Start.CompareTo(b.Start));
+            List<(long Start, long End)> mergedFiles = [];
+            foreach ((long start, long end) in fileRanges)
+            {
+                if (mergedFiles.Count > 0 && start <= mergedFiles[^1].End)
+                {
+                    mergedFiles[^1] = (mergedFiles[^1].Start, Math.Max(mergedFiles[^1].End, end));
+                }
+                else
+                {
+                    mergedFiles.Add((start, end));
+                }
+            }
+
             using FileStream srcFs = new(iso, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
             using FileStream skFs = new(skeleton, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
             srcFs.Seek(isoOffset, SeekOrigin.Begin);
@@ -749,6 +784,7 @@ internal static partial class BattleRunner
             byte[] skBuf = new byte[1024 * 1024];
             long pos = 0;
             int ki = 0;
+            int fi = 0;
             long boneBytes = 0;
             while (pos < partLen)
             {
@@ -767,6 +803,12 @@ internal static partial class BattleRunner
                         ki++;
                     }
 
+                    while (fi < mergedFiles.Count && abs >= mergedFiles[fi].End)
+                    {
+                        fi++;
+                    }
+
+                    bool inFileData = fi < mergedFiles.Count && abs >= mergedFiles[fi].Start;
                     bool inBone = ki < keep.Count && abs >= keep[ki].Start;
                     if (inBone)
                     {
@@ -777,9 +819,17 @@ internal static partial class BattleRunner
                             return false;
                         }
                     }
-                    else if (skBuf[i] != 0)
+                    else if (inFileData)
                     {
-                        detail = $"non-zero non-bone byte at partition offset {abs}";
+                        if (skBuf[i] != 0)
+                        {
+                            detail = $"file-data byte is non-zero at partition offset {abs}";
+                            return false;
+                        }
+                    }
+                    else if (skBuf[i] != 0 && skBuf[i] != srcBuf[i])
+                    {
+                        detail = $"non-bone byte differs from both zero and the source at partition offset {abs}";
                         return false;
                     }
                 }

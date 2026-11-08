@@ -86,8 +86,12 @@ public static class Logger
     /// <summary>Cumulative bytes written across the current operation.</summary>
     public static long TotalBytes
     {
-        get => Interlocked.Read(ref _totalBytes);
-        set => Interlocked.Exchange(ref _totalBytes, value);
+        get => XisoLogScope.Current?.Counters.TotalBytes ?? Interlocked.Read(ref _totalBytes);
+        set
+        {
+            if (XisoLogScope.Current is { } scope) scope.Counters.TotalBytes = value;
+            else Interlocked.Exchange(ref _totalBytes, value);
+        }
     }
 
     /// <summary>Cumulative files processed in the current operation (thread-safe).</summary>
@@ -96,8 +100,12 @@ public static class Logger
     /// <summary>Cumulative files processed in the current operation.</summary>
     public static int TotalFiles
     {
-        get => Volatile.Read(ref _totalFiles);
-        set => Volatile.Write(ref _totalFiles, value);
+        get => XisoLogScope.Current?.Counters.TotalFiles ?? Volatile.Read(ref _totalFiles);
+        set
+        {
+            if (XisoLogScope.Current is { } scope) scope.Counters.TotalFiles = value;
+            else Volatile.Write(ref _totalFiles, value);
+        }
     }
 
     /// <summary>Cumulative bytes across all processed ISO images (thread-safe).</summary>
@@ -106,8 +114,12 @@ public static class Logger
     /// <summary>Cumulative bytes across all processed ISO images.</summary>
     public static long TotalBytesAllIsos
     {
-        get => Interlocked.Read(ref _totalBytesAllIsos);
-        set => Interlocked.Exchange(ref _totalBytesAllIsos, value);
+        get => XisoLogScope.Current?.Counters.TotalBytesAllIsos ?? Interlocked.Read(ref _totalBytesAllIsos);
+        set
+        {
+            if (XisoLogScope.Current is { } scope) scope.Counters.TotalBytesAllIsos = value;
+            else Interlocked.Exchange(ref _totalBytesAllIsos, value);
+        }
     }
 
     /// <summary>Cumulative file count across all processed ISO images (thread-safe).</summary>
@@ -116,8 +128,12 @@ public static class Logger
     /// <summary>Cumulative file count across all processed ISO images.</summary>
     public static int TotalFilesAllIsos
     {
-        get => Volatile.Read(ref _totalFilesAllIsos);
-        set => Volatile.Write(ref _totalFilesAllIsos, value);
+        get => XisoLogScope.Current?.Counters.TotalFilesAllIsos ?? Volatile.Read(ref _totalFilesAllIsos);
+        set
+        {
+            if (XisoLogScope.Current is { } scope) scope.Counters.TotalFilesAllIsos = value;
+            else Volatile.Write(ref _totalFilesAllIsos, value);
+        }
     }
 
     /// <summary>
@@ -126,6 +142,12 @@ public static class Logger
     /// </summary>
     public static void RecordFileWritten(long byteCount)
     {
+        if (XisoLogScope.Current is { } scope)
+        {
+            scope.Counters.RecordFileWritten(byteCount);
+            return;
+        }
+
         Interlocked.Increment(ref _totalFiles);
         Interlocked.Add(ref _totalBytes, byteCount);
     }
@@ -136,6 +158,12 @@ public static class Logger
     /// </summary>
     public static void RecordIsoFileWritten(long byteCount)
     {
+        if (XisoLogScope.Current is { } scope)
+        {
+            scope.Counters.RecordIsoFileWritten(byteCount);
+            return;
+        }
+
         RecordFileWritten(byteCount);
         Interlocked.Increment(ref _totalFilesAllIsos);
         Interlocked.Add(ref _totalBytesAllIsos, byteCount);

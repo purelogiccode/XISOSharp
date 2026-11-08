@@ -1,8 +1,9 @@
 using System.Buffers.Binary;
 using System.Text;
-using XISOSharp.BlockDevice;
 using XISOSharp.Cli;
 using XISOSharp.Models;
+using GodBlockDevice = XISOSharp.BlockDevice.GodVolumeBlockDevice;
+using GodHeader = StfsSharp.GodHeader;
 
 namespace XISOSharp.Tests;
 

@@ -112,6 +112,11 @@ public static int CreateXiso(
 | `fileTime` | Fixed FILETIME for the volume descriptor; `null` (default) = current time, or the preserved source timestamp in rewrite mode. See [Deterministic output](#deterministic-output) |
 | `layout` | Optional explicit sector layout. Matching files/tables are written at their requested sectors; the rest are allocated first-fit around them. See [Explicit sector-layout packing](#explicit-sector-layout-packing) |
 
+A companion overload with a final `SymlinkMode symlinkMode` parameter applies
+the create-time link policy (`Follow` default, `Skip`, `Reject`). The
+`PackFromDirectory` overloads have the same companion; `RemapFilesystem.BuildImage`
+and `XisoSkeleton.Apply` accept the same mode. CLI: `--symlink-mode`.
+
 Returns 0 on success, 1 on error (permission, I/O, or any exception while writing —
 errors are logged and converted to the return code).
 

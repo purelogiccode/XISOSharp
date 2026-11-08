@@ -90,6 +90,53 @@ public static class XbeAssets
             : ReadSection(imageStream, start, entry.FileSize, header, baseAddress, kind);
     }
 
+    /// <summary>
+    /// Reads one image asset from a standalone <c>.xbe</c> file.
+    /// </summary>
+    /// <param name="executablePath">Path to the <c>.xbe</c> file.</param>
+    /// <param name="kind">Image kind to read.</param>
+    /// <returns>The requested asset, or <c>null</c> when it is absent or the file is not an XBE.</returns>
+    /// <exception cref="ArgumentException"><paramref name="executablePath"/> is empty.</exception>
+    /// <exception cref="FileNotFoundException">The file does not exist.</exception>
+    /// <exception cref="IOException">The file cannot be read.</exception>
+    public static XbeImage? GetLooseImage(string executablePath, XbeImageKind kind)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(executablePath);
+        if (kind is not (XbeImageKind.Logo or XbeImageKind.Title or XbeImageKind.Save))
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown XBE image kind.");
+
+        byte[] data = File.ReadAllBytes(executablePath);
+        return GetImage(data, executablePath, kind);
+    }
+
+    /// <summary>
+    /// Reads one image asset from an in-memory XBE executable.
+    /// </summary>
+    /// <param name="executableData">Executable bytes.</param>
+    /// <param name="executableName">Display name used in diagnostics.</param>
+    /// <param name="kind">Image kind to read.</param>
+    /// <returns>The requested asset, or <c>null</c> when it is absent or the data is not an XBE.</returns>
+    public static XbeImage? GetImage(byte[] executableData, string executableName, XbeImageKind kind)
+    {
+        ArgumentNullException.ThrowIfNull(executableData);
+        _ = executableName;
+        if (kind is not (XbeImageKind.Logo or XbeImageKind.Title or XbeImageKind.Save))
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown XBE image kind.");
+        if (executableData.Length < 0x178)
+            return null;
+
+        int headerLength = Math.Min(executableData.Length, XbeHeaderReadLimit);
+        byte[] header = executableData.AsSpan(0, headerLength).ToArray();
+        if (!HasMagic(header, "XBEH"))
+            return null;
+
+        uint baseAddress = ReadU32(header, 0x104);
+        using MemoryStream stream = new(executableData, writable: false);
+        return kind == XbeImageKind.Logo
+            ? ReadLogo(stream, 0, executableData.Length, header, baseAddress)
+            : ReadSection(stream, 0, executableData.Length, header, baseAddress, kind);
+    }
+
     /// <summary>Attempts to read one XBE image asset.</summary>
     /// <param name="imagePath">Path to the image.</param>
     /// <param name="internalPath">Path of the <c>.xbe</c> file within the image.</param>

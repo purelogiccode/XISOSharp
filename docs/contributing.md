@@ -102,9 +102,9 @@ tool. Preserve that spirit:
 
 Good starting points:
 
-- The current missing-feature list lives in
-  [PlanToEnhance.md](https://github.com/purelogiccode/XISOSharp/blob/master/PlanToEnhance.md);
-  completed work and history are in [Project History](project-history.md).
+- Completed work and history are in [Project History](project-history.md);
+  the former missing-feature plan has been retired now that all tracked items
+  are implemented.
 - `docs/` improvements - accuracy passes, examples, screenshots.
 - Test coverage: sustain >85% line coverage on `XisoReader.cs`,
   `XisoWriter.cs`, `AvlTree.cs` (currently 94.2% / 89.6% / 100% - see

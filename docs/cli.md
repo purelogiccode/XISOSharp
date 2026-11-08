@@ -33,8 +33,13 @@ XISOSharp checksum [--silent] <image> [images...]
 XISOSharp --checksum <image> [--silent]            # flag form
 XISOSharp hash <image> [images...] [--json]
 XISOSharp verify-hashes <image> <hash-file> [--ignore-extra] [--json]
+XISOSharp verify-dat <dat> <image> [images...] [--json]
+XISOSharp file-hashes <image> [-o <file>] [--algorithm sha1|sha256|md5] [--json]
 XISOSharp title-info <image> [--json]
+XISOSharp disc-info <image> [--json] [--sectors <sectors.txt>] [--skip-sectors <n>]
+XISOSharp apply-skeleton <skeleton.xiso> <source-dir> -o <out.iso> [--hash <file>]
 XISOSharp xbe-image <image> <path> --type logo|title|save -o <out.png|out.dds>
+XISOSharp xex-image <image> <path> --type thumbnail -o <out.png>
 XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...] [--batch <dir>]
 XISOSharp join [--output <file>] <first.1.iso> [...]
 XISOSharp convert <src.zar|src.iso> <out.iso|out.zar> [--batch <dir> --format iso|zar]
@@ -94,8 +99,12 @@ Image inputs accept `.cso`/`.1.cso`, `.cci`/`.1.cci` and GOD header/`.data` sour
 | `--petrify` | **Redump:** skeleton — XISO with file extents zeroed + SHA-1 per file (`XisoSkeleton.Petrify`, `CollectFileEntries` sorted); writes skeleton + `*.hash`. See [Archival](archival.md#petrify). |
 | `--update` | **Redump:** extract system update `su20076000_00000000` from XGD3 video `L1` tail (`XisoRedump.TryExtractUpdate`, `FindUpdateOffset` `ABCDABCD`); warns on XGD1/2. See [Archival](archival.md#update). |
 | `--zar` | Create ZArchive/zstd (`XisoZarchive.CreateZar` → `ZArchiveSharp.ZArchiveWriter`, L6 blocks + raw fallback; standalone `--zar -o <out.zar> <iso>` or Redump-batch zar of the XISO component). Load the result directly in Xenia canary. See [Archival](archival.md#zar). |
-| `--jobs <n>` | With a lone `--zar` over several inputs, pack up to `<n>` archives in parallel (default `1`). On a batch container verb (`compress`, `decompress`, `convert`, `split`), run up to `<n>` conversions in parallel (`1..64`, default `1`). On a single-file CISO or CCI `compress`, compress sectors with `<n>` workers (`1..64`, default `1`; output is byte-identical to `--jobs 1`). In extract (`-x`) and `--unpack` modes, copy independent files with up to `<n>` workers (`1..64`, default `1`; output is byte-identical and per-file `FileAdded` progress stays in traversal order). |
+| `--jobs <n>` | Collection and extraction parallelism (`1..64`, default `1`). With a lone `--zar` over several inputs, pack up to `<n>` archives in parallel. On a batch container verb (`compress`, `decompress`, `convert`, `split`), run up to `<n>` conversions in parallel. On a single-file CISO or CCI `compress`, compress sectors with `<n>` workers. Multi-image `checksum`, `hash`, `-V`/audit and extract/list/tree/rewrite process up to `<n>` images at once; output (including JSON arrays) is byte-identical to `--jobs 1`. In extract (`-x`) and `--unpack` modes, copy independent files with up to `<n>` workers. |
+| `--symlink-mode follow\|skip\|reject` | Create-time link policy for `-c`, `--pack`, `build-image` and `apply-skeleton`. `follow` (default) packs file symlinks as their target content and skips directory reparse points; `skip` omits file and directory links and logs them; `reject` fails with the offending link path before writing. Cyclic directory links always terminate. |
 | `--policy <p>` | `--zar` overwrite handling without prompting: `skip` \| `overwrite` \| `auto-rename`. |
+| `--zar-level <1..22>` | zstd compression level for `--zar`, `--compress` and `convert --format zar`; the default **6** stays byte-identical to the historical output. The 64 KiB ZAR block size is format-defined and not configurable. |
+| `--deterministic` | Alias for `--file-time 0`; accepted for create (`-c`), `--pack`, rewrite (`-r`) and `build-image`, so repeated packs are byte-identical. |
+| `--strict-names` | Fail before writing when a path component exceeds the Xbox 42-character limit or is outside Latin-1. The default warns and packs; `+`, `!`, spaces and Latin-1 characters are valid. |
 | `--all` | Alias: `--random --seed --trim --update --video --wipe` (→ `--xiso` as batch). Mirrors XboxKit `-a`. |
 | `--best` | Alias: `--trim --wipe` (XISO). Mirrors XboxKit `-b`. |
 | `--compress` | Alias: `--petrify --update --video --zar`. Mirrors XboxKit `-c`. Also see xdvdfs `compress`. |
@@ -107,8 +116,13 @@ Image inputs accept `.cso`/`.1.cso`, `.cci`/`.1.cci` and GOD header/`.data` sour
 | `decompress\|uncso\|decso\|uncci <cso\|cci\|god> [out.iso] [--batch <dir>]` | **CISO/CCI/GOD** decompress: compressed containers are detected by extension/magic; `CisoReader.DecompressToIso` handles CISO v1/v2, `XisoCci.DecompressToIso` handles CCI, and a GOD header/`.data` folder is streamed to ISO (named after the header title when the output is omitted). Single files and split `.N.cso`/`.N.cci` parts are supported. With `--batch`, converts every `.cso`/`.cci` in `<dir>`. |
 | `checksum [--silent] <image> [images...]` / `--checksum <image> [--silent]` | **SHA3-256** image checksum (`XisoChecksum.ComputeImageChecksum`, `SortedDictionary Ordinal` `/path` UTF-8 + streamed data, `xdvdfs` compat). `.cso`/`.1.cso`, `.cci`/`.1.cci`, split `.1.iso` and GOD header/`.data` inputs are auto-detected and read through the decompressed/concatenated view - result identical to the source ISO. `.zar` inputs use `ComputeZarChecksum` (same tree hash) - also identical. XBLA/XBLIG STFS packages use `ComputeStfsChecksum`, the same sorted-path SHA3-256 tree hash, so equivalent ISO/ZAR/STFS trees compare equal. Prints `hex tab path` (`--silent` = hex only). Also `flag` form `--checksum` supports multiple ISOs (`--silent` requires `--checksum` in flag form). See [xdvdfs Compat](xdvdfs-compat.md#checksum). |
 | `hash <image> [images...] [--json]` | **Full-image hashes** (`XisoImageHash.Compute`): CRC32, MD5, SHA-1, SHA-256 and SHA3-256 in one streaming pass over the decompressed view, so ISO, split ISO, CISO, CCI and GOD agree. `--json` emits a `hashes` array. |
-| `verify-hashes <image> <hash-file> [--ignore-extra] [--json]` | **Verify a `.hash` sidecar** produced by `--petrify` (or XboxKit). Each line is `sha1hex path`; works for ISO, split ISO, CISO, CCI, GOD and ZAR. Missing/mismatched files fail; extra image files are reported and can be ignored with `--ignore-extra`. |
-| `title-info <image> [--json]` | **Title metadata**: finds the root `default.xbe`, `default.xex` or `default_mp.xbe` and reports title name, title ID, region, disc number and version. Xbox 360 titles additionally report publisher, developer, genre, description and thumbnail presence from the plaintext XDBF/XSRC resources. A GOD header or its `.data` folder is also accepted; it reports the `XContent` title name, title ID, disc number and disc count (no mount). Single-file XBLA/XBLIG STFS packages are accepted too (`StfsHeader`, content types `0x000D0000` / `0x00000002`; Community Game `0x02000000` is treated as XBLIG). |
+| `verify-hashes <image> <hash-file> [--ignore-extra] [--json]` | **Verify a `.hash` sidecar** produced by `--petrify` or `file-hashes`. Digests are detected by line length: MD5 (32), SHA-1 (40) or SHA-256 (64); works for ISO, split ISO, CISO, CCI, GOD, STFS and ZAR. Missing/mismatched files fail; extra image files are reported and can be ignored with `--ignore-extra`. |
+| `verify-dat <dat> <image> [images...] [--json]` | **Verify Redump DAT entries** (`XisoDat.Verify`): parses a Redump-style XML DAT (`game/rom` size + MD5/SHA-1/CRC32), hashes each image once, and reports `VERIFIED`, `AMBIGUOUS`, `NOT IN DAT` plus DAT entries not matched by any supplied image. Exit `0` when every supplied image matches exactly one entry. No DAT source is bundled. |
+| `file-hashes <image> [-o <file>] [--algorithm sha1\|sha256\|md5] [--json]` | **Generate a per-file sidecar** for any supported container through `XisoReader.ComputeFileHashSidecar`. The default output is `<image stem>.hash` in the SHA-1 format `verify-hashes` consumes; `-o -` writes the lines to stdout. |
+| `disc-info <image> [--json] [--sectors <file>] [--skip-sectors <n>]` | **Redump/XGD layout inspector** (`XisoDiscInfo.Read`): XGD generation/subtype and wave, video L0/L1 and game-partition byte/sector ranges, PFI presence and layer break, embedded security-sector ranges (falling back to `sectors.txt`), known-Redump-size match, and consistency warnings. Containers report the game-partition view and mark video/PFI fields unavailable. |
+| `apply-skeleton <skeleton.xiso> <source-dir> -o <out.iso> [--hash <file>] [--strict-names]` | **Skeleton overlay** (`XisoSkeleton.Apply`): the inverse of `--petrify`. Copies the skeleton's filesystem/system sectors, places each source file at its recorded extent, and verifies the optional `.hash` while writing. Missing/extra files, size mismatches and hash mismatches are named errors. |
+| `xex-image <image> <path> --type thumbnail -o <out.png>` | **Export the XDBF thumbnail** (`0x8000` entry) from a `default.xex`; the loose-file form (`xex-image game.xex ...`) is accepted. Absent or non-PNG payloads are clean errors. |
+| `title-info <image> [--json]` | **Title metadata**: finds the root `default.xbe`, `default.xex` or `default_mp.xbe` and reports title name, title ID, region, disc number and version. Xbox 360 titles additionally report publisher, developer, genre, description and thumbnail presence from the plaintext XDBF/XSRC resources. A GOD header or its `.data` folder is also accepted; it reports the `XContent` title name, title ID, disc number and disc count and merges the embedded `default.xex` publisher/developer/genre/description/thumbnail. Single-file XBLA/XBLIG STFS packages are accepted too (`StfsSharp.StfsHeader`, content types `0x000D0000` / `0x00000002`; Community Game `0x02000000` is treated as XBLIG) and merge `default.xex` metadata the same way. |
 | `split [--size <bytes\|half>] [--output <base>] <image> [images...] [--batch <dir>]` | **Split** a plain ISO into sector-aligned `<base>.1.iso`, `<base>.2.iso`, … parts (`XisoSplitter.Split`, TODO #17 / xdvdfs #97 — the plain-ISO counterpart to CSO `--ciso-split`). `--size` accepts bytes with `K`/`M`/`G` suffixes or `half`/`halves`; default `0xFF000000` (4 GiB − 16 MiB, conservative FATX cap); an explicit larger size warns. Base defaults to the input stem. Existing parts are refused; partial parts are removed on failure/cancel. With `--batch`, splits every unsplit `.iso`/`.xiso` in `<dir>`. |
 | `join\|joinsplit [--output <file>] <first.1.iso> [...]` | **Reassemble** split parts (`XisoSplitter.Join`). Output defaults to the part stem + `.iso` and must not exist; the result is validated as an XISO afterwards. |
 | `convert <src.zar\|src.iso\|god> <out.iso\|out.zar\|out.cci\|out.cso> [-y\|-n] [--batch <dir> --format iso\|zar]` | **Convert** ZArchive to ISO (`XisoZarchive.ConvertZarToIso`: extract to a temp directory then `XisoWriter.PackFromDirectory`), ISO to ZArchive (`CreateZar`), or a GOD container to ISO/CCI/CISO (streamed through the decompressed view). Existing outputs follow `-y`/`-n`. With `--batch`, converts every unsplit `.iso`/`.xiso` to `.zar` (`--format zar`, default) or every `.zar` to `.iso` (`--format iso`). |
@@ -381,7 +395,8 @@ Enforced at parse time; violations print an error and exit 1:
 | `--skip-existing` without extract/`--unpack`/`--copy-out` (e.g. with `-l`, `-t`, `-r`, `-c`, redump verbs) or a batch container verb (`compress`, `decompress`, `convert`, `split`) | Error |
 | `--continue-on-error` without extract/`--unpack`/`--copy-out` or a batch container verb | Error |
 | `--name-policy` without extract (`-x`) or `--unpack` | Error |
-| `--jobs` without a lone `--zar`, a batch container verb, or a single-file CISO `compress` | Error |
+| `--jobs` outside a lone `--zar`, a batch container verb, a single-file CISO/CCI `compress`, extract/`--unpack`, multi-image `checksum`/`hash`/`-V`/`-l`/`-t`/`-r` | Error |
+| `--symlink-mode` without `-c`, `--pack <dir>`, `build-image` or `apply-skeleton` | Error |
 | `--output-name` without a batch container verb | Error |
 | `--batch` without extract/list/tree/rewrite/audit or a container verb (`compress`, `decompress`, `convert`, `split`) (e.g. with `--copy-out`, `--copy-in`, `validate`, redump, `checksum`, `--filetime`, `--sector-layout`, `--ranges`, `--is-optimized`) | Error |
 | `--batch-recursive` without `--batch` | Error |
@@ -423,7 +438,11 @@ XISOSharp -v --json
 | `ranges` | `{ schemaVersion, command, source, system[{ startSector, sectorCount }], files[...] }` |
 | `filetime` | `{ schemaVersion, command, source, iso8601, raw, hex }` |
 | `xex-info` / `xbe-info` | `{ schemaVersion, command, source, path, ...parsed fields }`; `xex-info` adds optional `titleName` / `publisher` / `developer` / `genre` / `description` / `hasThumbnail` when XDBF is present, and `xbe-info` adds `hasLogoBitmap` / `hasTitleImage` / `hasSaveImage`. |
-| `title-info` | GOD: `{ schemaVersion, command, source, kind: "god", headerPath, titleName, titleId, titleIdHex, discNumber, discCount }`; XBLA/XBLIG: `{ schemaVersion, command, source, kind: "xbla"\|"xblig", packagePath, titleName, titleId, titleIdHex, discNumber, discCount, contentType }`; XBE: `{ schemaVersion, command, source, kind: "xbe", xbePath, titleName, titleId, titleIdHex, gameRegion, gameRegionName, diskNumber, version }`; XEX: `{ schemaVersion, command, source, kind: "xex", xbePath, xexPath, titleName, titleId, titleIdHex, gameRegion, gameRegionName, diskNumber, version, discCount, publisher?, developer?, genre?, description?, hasThumbnail? }` |
+| `title-info` | GOD: `{ schemaVersion, command, source, kind: "god", headerPath, titleName, titleId, titleIdHex, discNumber, discCount, xexPath?, publisher?, developer?, genre?, description?, hasThumbnail? }`; XBLA/XBLIG: `{ schemaVersion, command, source, kind: "xbla"\|"xblig", packagePath, titleName, titleId, titleIdHex, discNumber, discCount, contentType, xexPath?, publisher?, developer?, genre?, description?, hasThumbnail? }`; XBE: `{ schemaVersion, command, source, kind: "xbe", xbePath, titleName, titleId, titleIdHex, gameRegion, gameRegionName, diskNumber, version }`; XEX: `{ schemaVersion, command, source, kind: "xex", xbePath, xexPath, titleName, titleId, titleIdHex, gameRegion, gameRegionName, diskNumber, version, discCount, publisher?, developer?, genre?, description?, hasThumbnail? }` |
+| `disc-info` | `{ schemaVersion, command, source, format, isContainer, fileLength, totalSectors, volume, discFormat, xgdType, redumpTypeIndex?, redumpSizeMatch, redumpTypeName?, videoTypeIndex?, videoTypeName?, wave?, videoL0?, videoL1?, gamePartition?, pfi?, securitySectorsSource?, securitySectors[], warnings[] }` |
+| `file-hashes` | `{ schemaVersion, command, source, output?, algorithm, fileCount, totalBytes, entries[{ path, size, algorithm, hash }] }` |
+| `verify-hashes` | Adds `algorithm` to each entry (`md5`/`sha1`/`sha256`) alongside `expectedSha1`/`actualSha1` (historical field names; values are the detected algorithm's hex digest). |
+| `verify-dat` | `{ schemaVersion, command, dat, passed, verified, missing, ambiguous, notInDat, images, results[{ image, status, size, md5, sha1, crc, matches[] }], missingRoms[] }`; DAT entries are `{ game, name, size, md5, sha1, crc }`. |
 | `validate` | `{ schemaVersion, command, source, output, checksums, passed, sourceSummary, outputSummary, issues[] }` |
 | `-v` / `--version` | `{ schemaVersion, command, xisoSharp, cciSharp, zArchiveSharp, runtime, os, architecture, commit }` |
 
@@ -451,7 +470,11 @@ XISOSharp -v --json
 
 ## Batch / multi-ISO processing
 
-- `-l`, `-t`, `-x`, `-r`, `-V`, and `checksum` accept **multiple** ISO files.
+- `-l`, `-t`, `-x`, `-r`, `-V`, `checksum`, `hash` and `verify-dat` accept **multiple** ISO files.
+- `--jobs 1..64` runs collection verbs over images in parallel; output order is
+  the same as `--jobs 1` (including JSON arrays). Extract with one explicit `-d`
+  destination stays sequential to avoid two images sharing an output tree;
+  omit `-d` (per-image directories) to parallelize extraction.
 - `-i`, `--md5`, `--sha256`, `--copy-out`, `--copy-in`, and `validate` operate on a single ISO.
 - `--video`/`--random`/`--seed`/`--wipe`/`--trim`/`--petrify`/`--update`/`--zar`/`--all`/`--best`/`--compress` are batch modes (run via `RunRedumpBatch`) with `-o` single-file guard.
 - Per-ISO counters reset for each image; cumulative counters (`TotalFilesAllIsos`,
@@ -586,8 +609,21 @@ XISOSharp --best game.redump.iso          # trim + wipe
 
 # Petrify + update + zar
 XISOSharp --petrify game.iso              # skeleton + .hash (SHA-1)
+XISOSharp apply-skeleton game.skeleton.xiso ./files -o game-restored.iso --hash game.hash
 XISOSharp --update game.redump.iso        # XGD3 su20076000_00000000
 XISOSharp --zar -o game.zar game.iso
+XISOSharp --zar-level 22 -o game-small.zar game.iso
+
+# Inspect a Redump/XGD layout and generate a portable hash sidecar
+XISOSharp disc-info game.redump.iso
+XISOSharp disc-info game.redump.iso --json
+XISOSharp file-hashes game.iso --algorithm sha256 -o game.sha256
+
+# Xbox 360 metadata/thumbnail from a container or loose executable
+XISOSharp title-info game.god
+XISOSharp xex-image game.iso /default.xex --type thumbnail -o thumbnail.png
+XISOSharp --xex-info default.xex --json
+XISOSharp --xbe-info default.xbe --json
 
 # Rebuild Redump from components (lossless round-trip)
 XISOSharp rebuild x.iso video.iso filler.bin su20076000_00000000 -o rebuilt.redump.iso

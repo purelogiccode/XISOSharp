@@ -5,8 +5,8 @@
 | Target | Status | Notes |
 |---|---|---|
 | `net10.0` | **LTS** | Primary target; ships in the release bundles. |
-| `net9.0` | EOL (12 May 2026) | Compatibility-only: still built and tested through 1.x; no new feature depends on it. Dropped in 2.0.0. |
-| `net8.0` | EOL (10 Nov 2026) | Compatibility-only: still built and tested through 1.x; no security fixes after EOL. Dropped in 2.0.0. |
+| `net9.0` | EOL (12 May 2026) | Supported compatibility target: still built and tested in 2.x; no new feature depends on it. |
+| `net8.0` | EOL (10 Nov 2026) | Supported compatibility target: still built and tested in 2.x; no security fixes after EOL. |
 
 `netstandard2.0`/`net6.0` are **not** targets: the library uses
 `Span<T>`/`FileStreamOptions`/`SHA3_256` and modern BCL APIs. Consumers on older
@@ -21,9 +21,9 @@ frameworks can use the 1.4.x package line.
 - **Patch**: fixes only, no new public surface.
 
 The package validates against `PackageValidationBaselineVersion` (currently
-1.7.0). The 1.4.4-era suppressions were retired when the baseline moved; the
-1.5.0/1.6.0/1.7.0 APIs are part of the baseline now, and 1.8.0 adds only new
-members. Do not add suppressions without a written reason.
+1.8.0). The 2.0.0 suppressions cover exactly the reviewed `FAC-01` removal of
+the 1.x `StfsSharp` compatibility facades; every other API change since 1.8.0 is
+additive. Do not add suppressions without a written reason.
 
 ## Platform support
 

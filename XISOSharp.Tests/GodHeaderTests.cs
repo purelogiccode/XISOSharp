@@ -2,7 +2,8 @@ using System.Buffers.Binary;
 using System.Text;
 using System.Text.Json;
 using XISOSharp.Cli;
-using XISOSharp.Models;
+using GodHeader = StfsSharp.GodHeader;
+using GodTitleInfo = StfsSharp.Models.GodTitleInfo;
 
 namespace XISOSharp.Tests;
 

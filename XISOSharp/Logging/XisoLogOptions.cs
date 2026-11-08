@@ -67,6 +67,57 @@ public static class XisoLogScope
         internal IXisoLogger Sink { get; } = sink;
         internal bool SuppressStaticOutput { get; } = suppressStaticOutput;
         internal ScopeState? Parent { get; } = parent;
+        internal ScopedCounters Counters { get; } = new();
+    }
+
+    /// <summary>
+    /// Per-scope progress counters. A log scope isolates the process-wide
+    /// <see cref="XISOSharp.Logger"/> totals so concurrent operations can each
+    /// report their own file/byte counts without sharing state.
+    /// </summary>
+    internal sealed class ScopedCounters
+    {
+        private long _totalBytes;
+        private int _totalFiles;
+        private long _totalBytesAllIsos;
+        private int _totalFilesAllIsos;
+
+        internal long TotalBytes
+        {
+            get => Interlocked.Read(ref _totalBytes);
+            set => Interlocked.Exchange(ref _totalBytes, value);
+        }
+
+        internal int TotalFiles
+        {
+            get => Volatile.Read(ref _totalFiles);
+            set => Volatile.Write(ref _totalFiles, value);
+        }
+
+        internal long TotalBytesAllIsos
+        {
+            get => Interlocked.Read(ref _totalBytesAllIsos);
+            set => Interlocked.Exchange(ref _totalBytesAllIsos, value);
+        }
+
+        internal int TotalFilesAllIsos
+        {
+            get => Volatile.Read(ref _totalFilesAllIsos);
+            set => Volatile.Write(ref _totalFilesAllIsos, value);
+        }
+
+        internal void RecordFileWritten(long byteCount)
+        {
+            Interlocked.Increment(ref _totalFiles);
+            Interlocked.Add(ref _totalBytes, byteCount);
+        }
+
+        internal void RecordIsoFileWritten(long byteCount)
+        {
+            RecordFileWritten(byteCount);
+            Interlocked.Increment(ref _totalFilesAllIsos);
+            Interlocked.Add(ref _totalBytesAllIsos, byteCount);
+        }
     }
 
     private sealed class NoopScope : IDisposable

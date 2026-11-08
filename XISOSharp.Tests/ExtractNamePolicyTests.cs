@@ -2,6 +2,7 @@ using System.Text;
 using XISOSharp.Cli;
 using XISOSharp.Models;
 using XISOSharp.TestDataGenerator;
+using StfsPackage = StfsSharp.StfsPackage;
 using ZArchiveSharp;
 
 namespace XISOSharp.Tests;
@@ -271,11 +272,13 @@ public sealed class ExtractNamePolicyTests : IDisposable
         using StfsPackage package = StfsPackage.Open(packagePath);
 
         string sanitized = Path.Combine(work, "sanitized");
-        Assert.Equal(1, package.ExtractTo(sanitized, ExtractNamePolicy.Sanitize));
+        Assert.Equal(1, package.ExtractTo(sanitized, StfsSharp.Models.ExtractNamePolicy.Sanitize,
+            warning: static message => Logger.LogErr(message)));
         Assert.Equal([1, 2, 3], File.ReadAllBytes(Path.Combine(sanitized, "a_b.bin")));
 
         string skipped = Path.Combine(work, "skipped");
-        Assert.Equal(0, package.ExtractTo(skipped, ExtractNamePolicy.Skip));
+        Assert.Equal(0, package.ExtractTo(skipped, StfsSharp.Models.ExtractNamePolicy.Skip,
+            warning: static message => Logger.LogErr(message)));
         Assert.False(File.Exists(Path.Combine(skipped, "a_b.bin")));
 
         Assert.Throws<InvalidDataException>(() =>

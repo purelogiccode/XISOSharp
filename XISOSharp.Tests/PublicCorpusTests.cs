@@ -1,5 +1,9 @@
 using XISOSharp.Models;
 using XISOSharp.TestDataGenerator;
+using GodHeader = StfsSharp.GodHeader;
+using GodTitleInfo = StfsSharp.Models.GodTitleInfo;
+using StfsPackage = StfsSharp.StfsPackage;
+using StfsPackageKind = StfsSharp.Models.StfsPackageKind;
 
 namespace XISOSharp.Tests;
 

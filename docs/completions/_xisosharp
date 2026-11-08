@@ -12,7 +12,8 @@ _xisosharp() {
         validate rebuild build-image image-spec
         compress cso cci decompress uncso decso uncci
         checksum split join joinsplit convert hash
-        verify-hashes verify-hash title-info title xbe-image
+        verify-hashes verify-hash verify-dat verify-dats title-info title xbe-image
+        xex-image disc-info apply-skeleton file-hashes
     )
     flags=(
         -h --help -v --version
@@ -36,6 +37,8 @@ _xisosharp() {
         --cci-level --cci-split --level
         --format --output-name --output --map --file --type --size --ignore-extra
         --split --verify-hashes
+        --xex-image --disc-info --apply-skeleton --file-hashes
+        --zar-level --deterministic --strict-names --symlink-mode --algorithm --algo --hash --hashes
     )
 
     local prev=${words[CURRENT-1]}
@@ -60,6 +63,10 @@ _xisosharp() {
             compadd -- reject sanitize skip
             return
             ;;
+        --symlink-mode)
+            compadd -- follow skip reject
+            return
+            ;;
         --policy)
             compadd -- skip overwrite auto-rename
             return
@@ -74,6 +81,14 @@ _xisosharp() {
             ;;
         --jobs)
             compadd -- 1 2 4 8 16 32 64
+            return
+            ;;
+        --algorithm|--algo)
+            compadd -- sha1 sha256 md5
+            return
+            ;;
+        --zar-level)
+            compadd -- 1 6 9 12 16 19 22
             return
             ;;
     esac

@@ -85,6 +85,9 @@ XISOSharp compress|cso|cci <sourceDir|image> [output] [--format cso|cci]
     [--cci-level 0..12] [--cci-split bytes] [--batch <dir>] [--jobs <n>]
 XISOSharp decompress|uncso|decso|uncci <cso|cci|god> [output.iso] [--batch <dir>]
 XISOSharp checksum [--silent] <image> [images...]
+XISOSharp hash <image> [images...] [--json]
+XISOSharp verify-hashes <image> <hash-file> [--ignore-extra] [--json]
+XISOSharp verify-dat <dat> <image> [images...] [--json]
 XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...] [--batch <dir>]
 XISOSharp join [--output <file>] <first.1.iso> [...]
 XISOSharp convert <src.zar|src.iso|god> <out.iso|out.zar|out.cci|out.cso> [--batch <dir> --format iso|zar]
@@ -121,6 +124,7 @@ printed and the tool exits 1.
 | `-r` | Rewrite as optimized ISO (byte-identical to `extract-xiso -r`) |
 | `validate <src> <out>` | Validate conversion between two images (+ `--validate*` flags; mismatch exits 2). Both sides accept ISO, CISO/CCI (single or split), split ISO sets and `.zar` |
 | `checksum [images...]` / `--checksum` | SHA3-256 deterministic image checksum (`--silent` → hex only); ISO/ZAR/STFS tree hashes compare equal |
+| `verify-dat <dat> <image>...` | Redump-style XML DAT verification (size + MD5/SHA-1/CRC32); reports verified/ambiguous/not-in-DAT/missing entries, `--json` |
 | `title-info <image> [--json]` | Root `default.xbe`, `default.xex` or `default_mp.xbe` title metadata (name, ID, region, disc, version); Xbox 360 XDBF adds publisher/developer/genre/description/thumbnail presence. A GOD header or its `.data` folder, or a single-file XBLA/XBLIG STFS package, reports `XContent` name/ID/disc metadata |
 | `split` / `join` (`joinsplit`) | Split into `<base>.1.iso`… parts / reassemble (`--size`, `--output`, `--batch`; default size `0xFF000000`, 4 GiB − 16 MiB) |
 | `--filetime <image>` / `--set-filetime <image> <value>` | Show / set the FILETIME volume field |
@@ -166,7 +170,8 @@ printed and the tool exits 1.
 | `--validate` / `--validate-checksums` / `--validate-strict` / `--validate-report <file>` | Post-rewrite/conversion validation (require `-r` or `validate`) |
 | `--ciso-level 0..9` / `--ciso-version 1\|2\|auto` / `--ciso-split <bytes>` | CISO codec options (compress only) |
 | `--format cso\|cci` / `--cci-level 0..12` / `--cci-split <bytes>` | CCI output and codec options (compress only): `0` stores raw, `1..9` use fast LZ4, `10..12` use managed LZ4-HC. |
-| `--jobs <n>` / `--policy <skip\|overwrite\|auto-rename>` | Parallel + overwrite handling for `--zar`; batch verbs accept `--jobs 1..64`; single-file CISO `compress` accepts `--jobs 1..64` for sector compression (byte-identical output); extract (`-x`) and `--unpack` accept `--jobs 1..64` to copy independent files in parallel (byte-identical, ordered `FileAdded` progress) |
+| `--jobs <n>` / `--policy <skip\|overwrite\|auto-rename>` | Parallel + overwrite handling for `--zar`; batch verbs accept `--jobs 1..64`; single-file CISO/CCI `compress` accepts `--jobs 1..64` for sector compression (byte-identical output); extract (`-x`) and `--unpack` accept `--jobs 1..64` to copy independent files in parallel (byte-identical, ordered `FileAdded` progress); multi-image `checksum`, `hash`, `-V`, `-l`, `-t` and `-r` process images in parallel with identical output |
+| `--symlink-mode <follow\|skip\|reject>` | Create-time link policy for `-c`, `--pack`, `build-image` and `apply-skeleton` (`follow` is the historical behavior) |
 | `--security-sectors <file>` (`--sectors`) | Rebuild-only security-sector range override |
 | `-f <toml>` / `-m "host:image"` (`--map`) / `-O <out>` (`--output`) | `build-image`/`image-spec` inputs |
 | `--json` | Machine-readable output for read-only verbs (`-i`, `-l`, `-t`, `checksum`, `--sector-layout`, `--ranges`, `--filetime`, `--xex-info`, `--xbe-info`, `validate`, `-v`). JSON on stdout, human logs on stderr |

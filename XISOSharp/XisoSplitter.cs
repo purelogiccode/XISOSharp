@@ -259,13 +259,13 @@ public static class XisoSplitter
             throw new ArgumentException("Image path must not be empty.", nameof(isoPath));
         if (!File.Exists(isoPath))
             throw new FileNotFoundException($"Image not found: {isoPath}", isoPath);
-        if (GodHeader.IsGodContainer(isoPath))
+        if (StfsSharp.GodHeader.IsGodContainer(isoPath))
         {
             throw new NotSupportedException(
                 $"Cannot split GOD container '{isoPath}' directly; decompress it to ISO first.");
         }
 
-        if (StfsPackage.IsStfsPackage(isoPath))
+        if (StfsSharp.StfsPackage.IsStfsPackage(isoPath))
         {
             throw new NotSupportedException(
                 $"Cannot split STFS package '{isoPath}' directly; extract it first.");

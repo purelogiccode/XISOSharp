@@ -1,5 +1,102 @@
 # Release Notes
 
+## 2.0.0 (in progress)
+
+**Reviewed breaking API cleanup (`FAC-01`).** The 1.x compatibility facades for
+the standalone `StfsSharp` package are removed; `net8.0`/`net9.0`/`net10.0`
+remain supported.
+
+- Removed `XISOSharp.GodHeader`, `XISOSharp.StfsHeader`,
+  `XISOSharp.StfsPackage`, `XISOSharp.BlockDevice.GodBlockDevice` and the
+  matching `XISOSharp.Models` records/enums (`GodTitleInfo`, `GodVolumeInfo`,
+  `StfsEntry`, `StfsPackageInfo`, `StfsPackageKind`, `StfsTitleInfo`,
+  `StfsValidationIssue`, `StfsValidationReport`). Consumers use
+  [`StfsSharp`](https://www.nuget.org/packages/StfsSharp) types directly.
+- Kept `XisoChecksum.ComputeStfsChecksum`/`ComputeStfsChecksumHex` as
+  StfsSharp-backed helpers. The internal `GodVolumeBlockDevice` adapter keeps
+  `XisoImageSource`/`OpenRead`/`OpenBlockDevice` working for GOD/SVOD inputs.
+- Package validation now compares against 1.8.0; the reviewed CP0001
+  suppressions cover exactly the facade type removals.
+- Downstream consumers migrated to the hybrid split: SimpleXisoDrive uses
+  `XISOSharp` for mounting/XDVDFS and `StfsSharp` directly for GOD/SVOD
+  resolution; XISO Studio uses `XISOSharp` for reads, `StfsSharp` directly for
+  GOD metadata and `CCISharp` directly for CCI validation (`XRP-04`).
+
+## 2.1.0 (in progress)
+
+**Beyond-reference feature pass.** Additive APIs only; existing read/write
+behavior is unchanged.
+
+### New inspection and archival tools
+
+- **Parallel collection verbs (`BRF-06`):** `--jobs 1..64` now also runs
+  multi-image `checksum`, `hash`, `-V`/audit and `--batch`
+  extract/list/tree/rewrite over images in parallel. Per-image output is
+  captured and replayed in input order, JSON arrays stay ordered, and scoped
+  `Logger` counters keep each image's summary exact.
+- **Redump DAT verification (`BRF-09`):** `XisoDat.Parse`/`Verify` and
+  `verify-dat <dat> <image>... [--json]` match whole images against a
+  Redump-style XML DAT (`game/rom` size + MD5/SHA-1/CRC32) and report verified,
+  ambiguous, not-in-DAT and missing entries. No DAT source is bundled.
+- **Disc-layout inspector (`BRF-01`):** `XisoDiscInfo.Read` and
+  `disc-info`/`--disc-info` report XGD type/subtype and wave, video L0/L1 and
+  game-partition byte/sector ranges, PFI presence and layer break, embedded or
+  `sectors.txt` security-sector ranges, Redump-size matching and consistency
+  warnings. Containers report the game-partition view and mark video fields
+  unavailable.
+- **Skeleton overlay (`BRF-02`):** `XisoSkeleton.Apply` and
+  `apply-skeleton`/`--apply-skeleton` restore file data into a `--petrify`
+  skeleton, verifying the optional `.hash`; Petrify→Apply reproduces the
+  original image byte-for-byte. Skeleton creation now preserves the system
+  preamble and 0xFF file-tail padding.
+- **Per-file hash sidecars (`BRF-05`):** `XisoReader.ComputeFileHashSidecar`
+  and `file-hashes` generate SHA-1 (default), SHA-256 or MD5 sidecars for
+  ISO/split/CISO/CCI/GOD/STFS/ZAR; `verify-hashes` detects all three digest
+  lengths and accepts the same containers.
+- **Redump/XGD size helper:** `XisoDiscInfo.IsKnownRedumpSize`.
+
+### Xbox 360 metadata and executables
+
+- **Embedded `default.xex` metadata (`BRF-03`):** GOD headers and XBLA/XBLIG
+  STFS packages merge XDBF/XSRC publisher, developer, genre, description and
+  thumbnail presence into `title-info`/`TitleInfo`, in text and `--json`.
+- **Thumbnail export (`BRF-04`):** `xex-image --type thumbnail` writes the
+  XDBF `0x8000` PNG payload (image or loose `.xex` input).
+- **Loose executables (`BRF-08`):** `--xex-info`, `--xbe-info` and
+  `--xbe-image` accept a single `.xex`/`.xbe` file with the same parser and
+  JSON shape as the image-plus-path form.
+- **ZAR level (`BRF-07`):** `--zar-level 1..22` for `--zar`, `--compress` and
+  `convert --format zar`; level 6 remains byte-identical.
+
+### Name and determinism policy
+
+- **Create-time link policy (`BRF-12`):** `--symlink-mode follow|skip|reject`
+  for `-c`, `--pack`, `build-image` and `apply-skeleton`. `follow` is the
+  historical behavior (file links pack their target, directory reparse points
+  are skipped); `skip` omits both; `reject` fails with the link path. Cyclic
+  directory links always terminate.
+- **Actionable host-I/O diagnostics (`BRF-13`):** `HostIoDiagnostics` names the
+  path, operation and likely fix for permission-denied, long-path, sharing,
+  existing-destination, illegal-name and full-disk failures. Extraction
+  exceptions and CLI modes use the same detail, so raw `Permission denied` or
+  `Invalid argument` no longer reaches the user alone.
+- **Xbox filename rules (`BRF-10`):** `XisoNameRules` exposes the 42-character
+  component limit and Latin-1 contract. `--strict-names` fails before writing;
+  the default warns. Supported for create, `--pack`, `--copy-in`, `build-image`
+  and `Apply`; `+`, `!`, spaces and Latin-1 names round-trip.
+- **Deterministic packing (`BRF-11`):** `--deterministic` is an alias for
+  `--file-time 0` and is accepted for create, `--pack`, rewrite and
+  `build-image`; repeated packs are byte-identical.
+
+### Tests
+
+New suites cover the disc inspector, skeleton overlay, embedded XEX metadata,
+thumbnail export, hash sidecars across containers, ZAR levels, loose
+executables, name rules, deterministic packing, parallel collection verbs,
+Redump DAT verification, symlink modes and host-I/O diagnostics. The full suite
+is **2309 passed / 1 skipped** on `net10.0` and **2236 passed / 1 skipped** on
+`net8.0`/`net9.0`.
+
 ## Unreleased
 
 **Distribution and shell integration.** No library API or read/write behavior
@@ -61,8 +158,8 @@ all read/write behavior is unchanged; the package validates against `1.7.0`.
   compress/decompress and 64 MiB random-read cases; `docs/benchmarks.md`
   records the methodology and an extract-xiso/xdvdfs/XboxKit comparison with a
   reproducible script.
-- **Support policy (LIB-07):** `net8.0`/`net9.0` stay compatibility-only
-  through 1.x and are removed in 2.0.0; `net10.0` is the primary target.
+- **Support policy (LIB-07):** `net8.0`/`net9.0` stay supported compatibility
+  targets in 2.x (owner decision 2026-11-07); `net10.0` is the primary target.
 - **Package validation (LIB-08):** the baseline moved from `1.4.4` to `1.7.0`;
   the 1.4.4-era suppressions were retired.
 

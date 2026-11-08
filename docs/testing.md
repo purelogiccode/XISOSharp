@@ -67,10 +67,10 @@ Highlights:
 | Image splitting (`XisoSplitter` split/halves/join, alignment, guards, CLI verbs) | `XisoSplitTests.cs` |
 | FATX-safe split default and explicit over-cap warning | `XisoSplitTests.cs` |
 | Batch `--delete-source` (success/failure, `-y`/`-n`, split sets, summary) | `CliBatchConvertTests.cs` |
-| GOD read-only sector input (`GodBlockDevice`, detection, extraction, checksum, CLI decompress/convert, guards) | `GodBlockDeviceTests.cs` |
-| GOD header title metadata (`GodHeader`, `title-info` text/JSON) | `GodHeaderTests.cs` |
-| Single-file XBLA/XBLIG STFS header metadata (`StfsHeader`, text/JSON) | `StfsHeaderTests.cs` |
-| XBLA/XBLIG STFS package listing/extraction and SHA-1 hash-tree validation (file table, contiguous and hash-chain blocks, writable secondary tables, level-1 boundary, checksum vs ZAR, `Validate` corrupt data/table/top/header coverage, CLI verbs, corrupt/unsafe inputs) | `StfsPackageTests.cs` |
+| GOD read-only sector input (`StfsSharp.GodVolume` via the internal adapter, detection, extraction, checksum, CLI decompress/convert, guards) | `GodBlockDeviceTests.cs` |
+| GOD header title metadata (`StfsSharp.GodHeader`, `title-info` text/JSON) | `GodHeaderTests.cs` |
+| Single-file XBLA/XBLIG STFS header metadata (`StfsSharp.StfsHeader`, text/JSON) | `StfsHeaderTests.cs` |
+| XBLA/XBLIG STFS package listing/extraction and SHA-1 hash-tree validation (`StfsSharp.StfsPackage`: file table, contiguous and hash-chain blocks, writable secondary tables, level-1 boundary, checksum vs ZAR, `Validate` corrupt data/table/top/header coverage, CLI verbs, corrupt/unsafe inputs) | `StfsPackageTests.cs`, `StfsSharpIntegrationTests.cs` |
 | Explicit sector-layout packing (`XisoLayoutSpec` JSON/text, fixed extents, first-fit, CLI/build-image) | `LayoutPackingTests.cs` |
 | CISO compress/decompress, split parts, `.cso` auto-detect | `CisoTests.cs`, `CisoAutoDetectTests.cs` |
 | CISO parallel compression (`jobs` 1..64, byte-identical v1/v2/split, ordered progress) | `CisoTests.cs`, `CliBatchConvertTests.cs` |
@@ -81,6 +81,10 @@ Highlights:
 | Sparse pre-sized outputs (`FSCTL_SET_SPARSE`, zero-skipping CISO/CCI/ZAR) | `SparseOutputTests.cs` |
 | Seeded property round-trips (pack/extract, split/join, CISO, CCI, ZAR boundary sizes) | `PropertyRoundTripTests.cs` |
 | Public synthetic corpus (all containers, title metadata/images, corrupt fixtures, manifest) | `PublicCorpusTests.cs` |
+| Parallel collection verbs (`checksum`, `hash`, `-V`, batch extract/list/tree/rewrite; identical text/JSON order, mixed failures) | `ParallelCollectionTests.cs` |
+| Create-time symlink policy (`follow`/`skip`/`reject` for pack, build-image, Apply; cyclic links terminate) | `XisoSymlinkTests.cs` |
+| Host-I/O diagnostics (permission, long path, illegal name, existing destination, `ExtractFileException` detail, 42-character names) | `HostIoDiagnosticsTests.cs` |
+| Redump DAT verification (`XisoDat` parse/verify, verified/ambiguous/not-in-DAT/missing, CLI text/JSON) | `XisoDatTests.cs` |
 | GUI Xbox 360 tab (GOD/STFS argv parity, title panel formatting, asset builder) | `GuiXbox360Tests.cs`, `MainViewModelTests.cs`, `CliCommandsTests.cs` |
 
 Conventions:

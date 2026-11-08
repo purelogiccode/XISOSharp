@@ -2208,13 +2208,13 @@ public static class XisoReader
         bool preserveAttributes = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (mode == ExtractMode.Rewrite && GodHeader.IsGodContainer(xisoPath))
+        if (mode == ExtractMode.Rewrite && StfsSharp.GodHeader.IsGodContainer(xisoPath))
         {
             throw new NotSupportedException(
                 $"Cannot rewrite GOD container '{xisoPath}' in place; decompress it to ISO first.");
         }
 
-        if (mode == ExtractMode.Rewrite && StfsPackage.IsStfsPackage(xisoPath))
+        if (mode == ExtractMode.Rewrite && StfsSharp.StfsPackage.IsStfsPackage(xisoPath))
         {
             throw new NotSupportedException(
                 $"Cannot rewrite STFS package '{xisoPath}' in place; extract it first.");
@@ -2872,13 +2872,13 @@ public static class XisoReader
                 $"Cannot set the FILETIME of a compressed image: {isoPath}; decompress it first");
         }
 
-        if (GodHeader.IsGodContainer(isoPath))
+        if (StfsSharp.GodHeader.IsGodContainer(isoPath))
         {
             throw new IOException(
                 $"Cannot set the FILETIME of a GOD container in place: {isoPath}; decompress it to ISO first");
         }
 
-        if (StfsPackage.IsStfsPackage(isoPath))
+        if (StfsSharp.StfsPackage.IsStfsPackage(isoPath))
         {
             throw new IOException(
                 $"Cannot set the FILETIME of an STFS package in place: {isoPath}; extract it first");
@@ -4403,6 +4403,103 @@ public static class XisoReader
     }
 
     /// <summary>
+    /// Computes a per-file hash sidecar for any supported image or container:
+    /// plain/split ISO, CISO, CCI, GOD/SVOD, STFS and ZAR. The default SHA-1
+    /// format matches <see cref="XisoSkeleton.Petrify"/>'s <c>.hash</c> and is
+    /// consumed by <see cref="XisoSkeleton.VerifyHashes"/>.
+    /// </summary>
+    /// <param name="imagePath">Image or archive path.</param>
+    /// <param name="algorithm">
+    /// Hash algorithm (<see cref="HashAlgorithmName.SHA1"/> by default;
+    /// SHA-256 and MD5 are also supported).
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>One entry per regular file, in the container's natural order.</returns>
+    /// <exception cref="ArgumentException"><paramref name="imagePath"/> is empty.</exception>
+    /// <exception cref="FileNotFoundException">The image does not exist.</exception>
+    /// <exception cref="NotSupportedException">The algorithm or container is unsupported.</exception>
+    /// <exception cref="IOException">The image cannot be read.</exception>
+    /// <exception cref="OperationCanceledException">The operation was cancelled.</exception>
+    public static IReadOnlyList<FileHashEntry> ComputeFileHashSidecar(string imagePath,
+        HashAlgorithmName? algorithm = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(imagePath);
+        HashAlgorithmName hashAlgorithm = algorithm ?? HashAlgorithmName.SHA1;
+        string algorithmName = HashAlgorithmNameText(hashAlgorithm);
+        List<FileHashEntry> entries = [];
+
+        if (StfsSharp.StfsPackage.IsStfsPackage(imagePath))
+        {
+            using StfsSharp.StfsPackage package = StfsSharp.StfsPackage.Open(imagePath);
+            foreach (StfsSharp.Models.StfsEntry entry in package.Entries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (entry.IsDirectory)
+                {
+                    continue;
+                }
+
+                using HashAlgorithm hasher = CreateHashAlgorithm(hashAlgorithm);
+                package.ReadFileChunks(entry, hasher,
+                    static (state, buffer, offset, count) =>
+                        state.TransformBlock(buffer, offset, count, null, 0));
+                hasher.TransformFinalBlock([], 0, 0);
+                entries.Add(new FileHashEntry(entry.Path, entry.Size, algorithmName,
+                    Convert.ToHexString(hasher.Hash!).ToLowerInvariant()));
+            }
+
+            return entries;
+        }
+
+        if (imagePath.EndsWith(".zar", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (ZarEntry entry in XisoZarchive.ListZar(imagePath))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (entry.IsDirectory)
+                {
+                    continue;
+                }
+
+                byte[]? digest = XisoZarchive.ComputeFileHash(imagePath, entry.Path, hashAlgorithm);
+                if (digest is null)
+                {
+                    continue;
+                }
+
+                entries.Add(new FileHashEntry(entry.Path, checked((long)entry.Size), algorithmName,
+                    Convert.ToHexString(digest).ToLowerInvariant()));
+            }
+
+            return entries;
+        }
+
+        using XisoImage image = XisoImage.Open(imagePath);
+        foreach ((string path, _, uint size) in XisoRanges.GetFileEntries(imagePath, image.Volume.DiscLseek))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string? digest = image.ComputeHashHex(path, hashAlgorithm);
+            if (digest is null)
+            {
+                continue;
+            }
+
+            entries.Add(new FileHashEntry(path, size, algorithmName, digest.ToLowerInvariant()));
+        }
+
+        return entries;
+    }
+
+    /// <summary>Lower-case CLI name for a supported hash algorithm.</summary>
+    private static string HashAlgorithmNameText(HashAlgorithmName algorithm)
+    {
+        if (algorithm == HashAlgorithmName.MD5) return "md5";
+        if (algorithm == HashAlgorithmName.SHA256) return "sha256";
+        if (algorithm == HashAlgorithmName.SHA1) return "sha1";
+        throw new NotSupportedException($"Unsupported hash algorithm: {algorithm.Name}");
+    }
+
+    /// <summary>
     /// Computes the hash of a single file within an XISO image.
     /// </summary>
     /// <param name="isoPath">Path to the XISO file.</param>
@@ -4665,6 +4762,130 @@ public static class XisoReader
         fs.ReadExactly(header);
 
         return ParseXexHeader(header);
+    }
+
+    /// <summary>
+    /// Parses a standalone <c>.xex</c> file. The file is opened directly, so no
+    /// image or internal path is required.
+    /// </summary>
+    /// <param name="executablePath">Path to the <c>.xex</c> file.</param>
+    /// <returns>The parsed header, or <c>null</c> when the file is not an XEX2 executable.</returns>
+    /// <exception cref="ArgumentException"><paramref name="executablePath"/> is empty.</exception>
+    /// <exception cref="FileNotFoundException">The file does not exist.</exception>
+    /// <exception cref="IOException">The file cannot be read.</exception>
+    public static XexInfo? GetLooseXexInfo(string executablePath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(executablePath);
+        using FileStream fs = new(executablePath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        return GetXexInfo(fs, executablePath);
+    }
+
+    /// <summary>
+    /// Parses an in-memory XEX2 executable. Useful for STFS packages and other
+    /// containers that expose the executable as a byte array.
+    /// </summary>
+    /// <param name="executableData">Executable bytes.</param>
+    /// <param name="executableName">Display name used in diagnostics.</param>
+    /// <returns>The parsed header, or <c>null</c> when the data is not an XEX2 executable.</returns>
+    public static XexInfo? GetXexInfo(byte[] executableData, string executableName)
+    {
+        ArgumentNullException.ThrowIfNull(executableData);
+        if (executableData.Length < 0x18)
+            return null;
+
+        int length = Math.Min(executableData.Length, XexHeaderReadLimit);
+        return ParseXexHeader(executableData.AsSpan(0, length).ToArray());
+    }
+
+    private static XexInfo? GetXexInfo(Stream fs, string executableName)
+    {
+        _ = executableName;
+        int length = (int)Math.Min(fs.Length, XexHeaderReadLimit);
+        if (length < 0x18)
+            return null;
+
+        byte[] header = new byte[length];
+        fs.Seek(0, SeekOrigin.Begin);
+        fs.ReadExactly(header);
+        return ParseXexHeader(header);
+    }
+
+    /// <summary>
+    /// Reads the plaintext XDBF/XSRC title metadata from a standalone <c>.xex</c>
+    /// file.
+    /// </summary>
+    /// <param name="executablePath">Path to the <c>.xex</c> file.</param>
+    /// <returns>Title metadata, or <c>null</c> when the file is not an XEX2 executable.</returns>
+    public static XexTitleInfo? GetLooseXexTitleInfo(string executablePath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(executablePath);
+        using FileStream fs = new(executablePath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        return GetXexTitleInfo(fs, executablePath);
+    }
+
+    /// <summary>
+    /// Reads the plaintext XDBF/XSRC title metadata from an in-memory XEX2
+    /// executable (for example the <c>default.xex</c> inside an STFS package).
+    /// </summary>
+    /// <param name="executableData">Executable bytes.</param>
+    /// <param name="executableName">Display name used in diagnostics and the result path.</param>
+    /// <returns>Title metadata, or <c>null</c> when the data is not an XEX2 executable.</returns>
+    public static XexTitleInfo? GetXexTitleInfo(byte[] executableData, string executableName)
+    {
+        ArgumentNullException.ThrowIfNull(executableData);
+        using MemoryStream fs = new(executableData, writable: false);
+        return GetXexTitleInfo(fs, executableName);
+    }
+
+    private static XexTitleInfo? GetXexTitleInfo(Stream fs, string executableName)
+    {
+        XexInfo? xex = GetXexInfo(fs, executableName);
+        if (xex is null)
+            return null;
+
+        fs.Seek(0, SeekOrigin.Begin);
+        return XexDbdf.TryReadTitle(fs, 0, fs.Length, executableName, xex, out XexTitleInfo? title)
+            ? title
+            : new XexTitleInfo(executableName, string.Empty, null, null, null, null, null, xex);
+    }
+
+    /// <summary>
+    /// Parses a standalone <c>.xbe</c> file.
+    /// </summary>
+    /// <param name="executablePath">Path to the <c>.xbe</c> file.</param>
+    /// <returns>The parsed header, or <c>null</c> when the file is not an XBEH executable.</returns>
+    /// <exception cref="ArgumentException"><paramref name="executablePath"/> is empty.</exception>
+    /// <exception cref="FileNotFoundException">The file does not exist.</exception>
+    /// <exception cref="IOException">The file cannot be read.</exception>
+    public static XbeInfo? GetLooseXbeInfo(string executablePath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(executablePath);
+        using FileStream fs = new(executablePath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536);
+        int length = (int)Math.Min(fs.Length, XbeHeaderReadLimit);
+        if (length < 0x12C)
+            return null;
+
+        byte[] header = new byte[length];
+        fs.ReadExactly(header);
+        return ParseXbeHeader(header);
+    }
+
+    /// <summary>
+    /// Parses an in-memory XBE executable (for example the <c>default.xbe</c>
+    /// inside an STFS package).
+    /// </summary>
+    /// <param name="executableData">Executable bytes.</param>
+    /// <param name="executableName">Display name used in diagnostics.</param>
+    /// <returns>The parsed header, or <c>null</c> when the data is not an XBEH executable.</returns>
+    public static XbeInfo? GetXbeInfo(byte[] executableData, string executableName)
+    {
+        ArgumentNullException.ThrowIfNull(executableData);
+        _ = executableName;
+        if (executableData.Length < 0x12C)
+            return null;
+
+        int length = Math.Min(executableData.Length, XbeHeaderReadLimit);
+        return ParseXbeHeader(executableData.AsSpan(0, length).ToArray());
     }
 
     /// <summary>

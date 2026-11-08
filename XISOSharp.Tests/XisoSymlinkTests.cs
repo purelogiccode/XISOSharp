@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using XISOSharp.Cli;
 using XISOSharp.Models;
 
 namespace XISOSharp.Tests;
@@ -222,5 +223,132 @@ public class XisoSymlinkTests : IDisposable
         Directory.CreateDirectory(dest);
         Assert.Equal(0, XisoReader.Extract(isoPath, dest, false));
         Assert.Equal("data", File.ReadAllText(Path.Combine(dest, "alias.txt")));
+    }
+
+    [RequiresSymlinkFact(SymlinkKind.FileLink)]
+    public void Pack_SkipMode_OmitsFileAndDirectoryLinks()
+    {
+        string root = CreateTempDir("xiso_link");
+        File.WriteAllText(Path.Combine(root, "orig.txt"), "data");
+        Directory.CreateDirectory(Path.Combine(root, "sub"));
+        File.WriteAllText(Path.Combine(root, "sub", "real.txt"), "real");
+        Assert.True(TryCreateFileLink(Path.Combine(root, "alias.txt"), Path.Combine(root, "orig.txt")),
+            "Symlink privilege unavailable for 'FileLink'.");
+        Assert.True(TryCreateDirLink(Path.Combine(root, "linked"), Path.Combine(root, "sub")),
+            "Symlink privilege unavailable for 'DirLink'.");
+
+        string isoPath = Path.Combine(CreateTempDir("xiso_link_out"), "packed.iso");
+        Assert.Equal(0, XisoWriter.PackFromDirectory(root, isoPath,
+            excludePatterns: null, progressCallback: null, cancellationToken: default,
+            progress: null, fileTime: 0, layout: null, symlinkMode: SymlinkMode.Skip));
+
+        string dest = Path.Combine(CreateTempDir("xiso_link_ext"), "out");
+        Directory.CreateDirectory(dest);
+        Assert.Equal(0, XisoReader.Extract(isoPath, dest, false));
+        HashSet<string> files = ListExtractedFiles(dest);
+        Assert.Contains("orig.txt", files);
+        Assert.Contains("sub/real.txt", files);
+        Assert.DoesNotContain("alias.txt", files);
+        Assert.DoesNotContain(files, f => f.StartsWith("linked/", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [RequiresSymlinkFact(SymlinkKind.FileLink)]
+    public void Pack_RejectMode_NamesTheLinkAndFails()
+    {
+        string root = CreateTempDir("xiso_link");
+        File.WriteAllText(Path.Combine(root, "orig.txt"), "data");
+        Assert.True(TryCreateFileLink(Path.Combine(root, "alias.txt"), Path.Combine(root, "orig.txt")),
+            "Symlink privilege unavailable for 'FileLink'.");
+
+        string isoPath = Path.Combine(CreateTempDir("xiso_link_out"), "packed.iso");
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() =>
+            XisoWriter.PackFromDirectory(root, isoPath,
+                excludePatterns: null, progressCallback: null, cancellationToken: default,
+                progress: null, fileTime: 0, layout: null, symlinkMode: SymlinkMode.Reject));
+        Assert.Contains("alias.txt", ex.Message, StringComparison.Ordinal);
+    }
+
+    [RequiresSymlinkFact(SymlinkKind.FileLink)]
+    public void Cli_CreateRejectMode_NamesTheLink()
+    {
+        string root = CreateTempDir("xiso_link");
+        File.WriteAllText(Path.Combine(root, "orig.txt"), "data");
+        Assert.True(TryCreateFileLink(Path.Combine(root, "alias.txt"), Path.Combine(root, "orig.txt")),
+            "Symlink privilege unavailable for 'FileLink'.");
+
+        string isoPath = Path.Combine(CreateTempDir("xiso_link_out"), "packed.iso");
+        StringWriter capture = new();
+        TextWriter savedOut = Logger.Out;
+        TextWriter savedErr = Logger.Error;
+        bool savedQuiet = Logger.Quiet;
+        bool savedRealQuiet = Logger.RealQuiet;
+        Logger.Out = capture;
+        Logger.Error = capture;
+        Logger.Quiet = false;
+        Logger.RealQuiet = false;
+        int rc;
+        try
+        {
+            rc = Program.Main(["-c", root, isoPath, "--symlink-mode", "reject"]);
+        }
+        finally
+        {
+            Logger.Out = savedOut;
+            Logger.Error = savedErr;
+            Logger.Quiet = savedQuiet;
+            Logger.RealQuiet = savedRealQuiet;
+        }
+
+        Assert.Equal(1, rc);
+        Assert.Contains("alias.txt", capture.ToString(), StringComparison.Ordinal);
+        Assert.False(File.Exists(isoPath));
+    }
+
+    [RequiresSymlinkFact(SymlinkKind.FileLink)]
+    public void BuildImage_RejectMode_NamesTheLinkAndFails()
+    {
+        string root = CreateTempDir("xiso_link");
+        File.WriteAllText(Path.Combine(root, "orig.txt"), "data");
+        Assert.True(TryCreateFileLink(Path.Combine(root, "alias.txt"), Path.Combine(root, "orig.txt")),
+            "Symlink privilege unavailable for 'FileLink'.");
+
+        string isoPath = Path.Combine(CreateTempDir("xiso_link_out"), "remap.iso");
+        StringWriter capture = new();
+        TextWriter saved = Logger.Error;
+        Logger.Error = capture;
+        int rc;
+        try
+        {
+            rc = RemapFilesystem.BuildImage(root, isoPath, CatchAllRule(), progress: null, ct: default,
+                fileTime: 0, layout: null, symlinkMode: SymlinkMode.Reject);
+        }
+        finally
+        {
+            Logger.Error = saved;
+        }
+
+        Assert.Equal(1, rc);
+        Assert.Contains("alias.txt", capture.ToString(), StringComparison.Ordinal);
+    }
+
+    [RequiresSymlinkFact(SymlinkKind.FileLink)]
+    public void Apply_RejectMode_NamesTheLinkAndFails()
+    {
+        string source = CreateTempDir("xiso_link_apply_src");
+        File.WriteAllText(Path.Combine(source, "orig.txt"), "data");
+        string iso = Path.Combine(CreateTempDir("xiso_link_apply_iso"), "game.iso");
+        Assert.Equal(0, XisoWriter.PackFromDirectory(source, iso, fileTime: 0));
+
+        string skeleton = Path.Combine(CreateTempDir("xiso_link_apply_skel"), "game.skeleton.xiso");
+        Assert.True(XisoSkeleton.Petrify(iso, skeleton, quiet: true));
+
+        Assert.True(TryCreateFileLink(Path.Combine(source, "alias.txt"), Path.Combine(source, "orig.txt")),
+            "Symlink privilege unavailable for 'FileLink'.");
+
+        string output = Path.Combine(CreateTempDir("xiso_link_apply_out"), "applied.iso");
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() =>
+            XisoSkeleton.Apply(skeleton, source, output, hashPath: null, cancellationToken: default,
+                strictNames: false, symlinkMode: SymlinkMode.Reject));
+        Assert.Contains("alias.txt", ex.Message, StringComparison.Ordinal);
     }
 }

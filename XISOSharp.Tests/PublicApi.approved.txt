@@ -8,14 +8,15 @@ C:XISOSharp.BlockDevice.CisoBlockDevice(System.String)
 C:XISOSharp.BlockDevice.CisoBlockDevice(System.String,System.IO.FileShare)
 C:XISOSharp.BlockDevice.FileBlockDevice(System.IO.FileStream,System.Boolean)
 C:XISOSharp.BlockDevice.FileBlockDevice(System.String,System.IO.FileMode,System.IO.FileAccess,System.IO.FileShare,System.Int32)
-C:XISOSharp.BlockDevice.GodBlockDevice(System.String)
-C:XISOSharp.BlockDevice.GodBlockDevice(System.String,System.IO.FileShare)
 C:XISOSharp.BlockDevice.MemoryBlockDevice()
 C:XISOSharp.BlockDevice.MemoryBlockDevice(System.Int64)
 C:XISOSharp.BlockDevice.MemoryBlockDevice(System.ReadOnlySpan<System.Byte>)
 C:XISOSharp.BlockDevice.OffsetBlockDevice(XISOSharp.Interfaces.IBlockDevice,System.Int64,System.Boolean)
 C:XISOSharp.BlockDevice.StreamBlockDevice(System.IO.Stream,System.Boolean)
 C:XISOSharp.BoyerMoore(System.Byte[],System.Int32)
+C:XISOSharp.DatImageMatch(System.String,XISOSharp.DatMatchStatus,System.Int64,System.String,System.String,System.String,System.Collections.Generic.IReadOnlyList<XISOSharp.DatRom>)
+C:XISOSharp.DatRom(System.String,System.String,System.Int64,System.String,System.String,System.String)
+C:XISOSharp.DatVerificationResult(System.String,System.Collections.Generic.IReadOnlyList<XISOSharp.DatImageMatch>,System.Collections.Generic.IReadOnlyList<XISOSharp.DatRom>)
 C:XISOSharp.DataStructures.AvlNode()
 C:XISOSharp.DataStructures.DirEntry()
 C:XISOSharp.DirectoryEntryTableWriter+DirectoryTableEntry(System.String,System.Boolean,System.UInt32,System.UInt32,System.Byte)
@@ -40,11 +41,13 @@ C:XISOSharp.Logging.XisoLogOptions()
 C:XISOSharp.MemoryFilesystem()
 C:XISOSharp.Models.AuditResult(System.Boolean,System.Int32,System.Int32,System.Collections.Generic.IReadOnlyList<System.String>)
 C:XISOSharp.Models.CreateList()
+C:XISOSharp.Models.DiscPartition(System.String,System.Int64,System.Int64,System.Int64,System.Int64,System.Boolean)
+C:XISOSharp.Models.DiscPhysicalFormatInfo(System.Int64,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int64,System.Int64,System.Int64)
+C:XISOSharp.Models.DiscSecuritySectorRange(System.Int64,System.Int64)
 C:XISOSharp.Models.EntryInfo(System.String,System.Boolean,System.UInt32,System.UInt32,System.Byte,System.UInt16,System.UInt16)
 C:XISOSharp.Models.ExplorerNode(System.String,System.String,System.Boolean,System.Int64,System.UInt32,System.Byte)
+C:XISOSharp.Models.FileHashEntry(System.String,System.Int64,System.String,System.String)
 C:XISOSharp.Models.FileSectorExtent(System.String,System.Boolean,System.UInt32,System.UInt32,System.UInt32)
-C:XISOSharp.Models.GodTitleInfo(System.String,System.String,System.UInt32,System.String,System.Byte,System.Byte)
-C:XISOSharp.Models.GodVolumeInfo(System.String,System.String,System.UInt32,System.UInt32,System.UInt32,System.Boolean,System.Int64,System.Collections.Generic.IReadOnlyList<System.String>)
 C:XISOSharp.Models.HashVerificationEntry(System.String,System.String,System.String,XISOSharp.Models.HashVerificationStatus)
 C:XISOSharp.Models.HashVerificationResult(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.HashVerificationEntry>)
 C:XISOSharp.Models.ProcessRunResult()
@@ -54,11 +57,6 @@ C:XISOSharp.Models.RepairResult(System.Collections.Generic.IReadOnlyList<System.
 C:XISOSharp.Models.SalvageResult(System.Collections.Generic.IReadOnlyList<System.String>,System.Collections.Generic.IReadOnlyList<System.String>,System.String,System.Collections.Generic.IReadOnlyList<System.String>)
 C:XISOSharp.Models.SectorLayout(XISOSharp.Models.VolumeInfo,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.FileSectorExtent>,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.SectorRange>,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.SectorRange>,System.Int64)
 C:XISOSharp.Models.SectorRange(System.UInt32,System.UInt32)
-C:XISOSharp.Models.StfsEntry(System.String,System.String,System.Boolean,System.Int64,System.UInt32,System.UInt32,System.Boolean,System.Nullable<System.DateTimeOffset>,System.Nullable<System.DateTimeOffset>)
-C:XISOSharp.Models.StfsPackageInfo(System.String,XISOSharp.Models.StfsPackageKind,System.String,System.UInt32,System.String,System.Byte,System.Byte,System.UInt32,System.Int64,System.UInt32,System.Int64,System.UInt32,System.UInt32,System.UInt16,System.UInt32,System.Boolean,System.Int32,System.Int32,System.Int64)
-C:XISOSharp.Models.StfsTitleInfo(System.String,XISOSharp.Models.StfsPackageKind,System.String,System.UInt32,System.String,System.Byte,System.Byte,System.UInt32)
-C:XISOSharp.Models.StfsValidationIssue(System.String,System.String)
-C:XISOSharp.Models.StfsValidationReport(System.Boolean,System.Int32,System.Int32,System.Int32,System.Int64,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.StfsValidationIssue>)
 C:XISOSharp.Models.TitleInfo(System.String,System.String,System.UInt32,System.String,System.UInt32,System.String,System.UInt32,System.UInt32,XISOSharp.Models.XbeInfo)
 C:XISOSharp.Models.UnpackOptions()
 C:XISOSharp.Models.ValidationIssue(XISOSharp.Models.ValidationIssueType,System.String,System.Int64,System.Int64,System.Byte[],System.Byte[])
@@ -68,6 +66,7 @@ C:XISOSharp.Models.XbeImage(XISOSharp.Models.XbeImageKind,System.String,System.I
 C:XISOSharp.Models.XbeInfo(System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.String,System.UInt32[],System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32)
 C:XISOSharp.Models.XexInfo(System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.UInt32,System.Byte,System.Byte,System.Byte,System.UInt16,System.UInt16)
 C:XISOSharp.Models.XexTitleInfo(System.String,System.String,System.String,System.String,System.String,System.String,System.Byte[],XISOSharp.Models.XexInfo)
+C:XISOSharp.Models.XisoDiscLayout(System.String,XISOSharp.XisoImageFormat,System.Boolean,System.Int64,System.Int64,XISOSharp.Models.VolumeInfo,System.String,System.String,System.Nullable<System.Int32>,System.Boolean,System.String,System.Nullable<System.Int32>,System.String,System.String,XISOSharp.Models.DiscPartition,XISOSharp.Models.DiscPartition,XISOSharp.Models.DiscPartition,XISOSharp.Models.DiscPhysicalFormatInfo,System.String,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.DiscSecuritySectorRange>,System.Collections.Generic.IReadOnlyList<System.String>)
 C:XISOSharp.Models.XisoExplorerOptions()
 C:XISOSharp.Models.XisoLayoutEntry(System.String,System.UInt32,System.Nullable<System.UInt32>,System.Nullable<System.UInt32>,System.Nullable<System.Boolean>)
 C:XISOSharp.Models.ZarEntry(System.String,System.Boolean,System.UInt64)
@@ -165,6 +164,10 @@ F:XISOSharp.Constants.Xgd1LseekOffset:System.UInt32
 F:XISOSharp.Constants.Xgd2HybridLseekOffset:System.UInt32
 F:XISOSharp.Constants.Xgd2LseekOffset:System.UInt32
 F:XISOSharp.Constants.Xgd3LseekOffset:System.UInt32
+F:XISOSharp.DatMatchStatus.Ambiguous:XISOSharp.DatMatchStatus
+F:XISOSharp.DatMatchStatus.NotInDat:XISOSharp.DatMatchStatus
+F:XISOSharp.DatMatchStatus.Verified:XISOSharp.DatMatchStatus
+F:XISOSharp.DatMatchStatus.value__:System.Int32
 F:XISOSharp.DataStructures.AvlNode.Attributes:System.Byte
 F:XISOSharp.DataStructures.AvlNode.DirStart:System.Int64
 F:XISOSharp.DataStructures.AvlNode.EmptySubdirectory:XISOSharp.DataStructures.AvlNode
@@ -189,12 +192,6 @@ F:XISOSharp.DataStructures.DirEntry.ROffset:System.UInt16
 F:XISOSharp.DataStructures.DirEntry.StartSector:System.UInt32
 F:XISOSharp.FileTimeHelper.FileTimeEpoch:System.DateTimeOffset
 F:XISOSharp.FileTimeHelper.FileTimeZero:System.UInt64
-F:XISOSharp.GodHeader.DiscCountOffset:System.Int32
-F:XISOSharp.GodHeader.DiscNumberOffset:System.Int32
-F:XISOSharp.GodHeader.MinimumHeaderLength:System.Int32
-F:XISOSharp.GodHeader.TitleIdOffset:System.Int32
-F:XISOSharp.GodHeader.TitleNameLength:System.Int32
-F:XISOSharp.GodHeader.TitleNameOffset:System.Int32
 F:XISOSharp.Models.AvlResult.AvlBalanced:XISOSharp.Models.AvlResult
 F:XISOSharp.Models.AvlResult.AvlError:XISOSharp.Models.AvlResult
 F:XISOSharp.Models.AvlResult.NoErr:XISOSharp.Models.AvlResult
@@ -238,9 +235,10 @@ F:XISOSharp.Models.ProgressInfoType.FileCount:XISOSharp.Models.ProgressInfoType
 F:XISOSharp.Models.ProgressInfoType.FileProgress:XISOSharp.Models.ProgressInfoType
 F:XISOSharp.Models.ProgressInfoType.FinishedPacking:XISOSharp.Models.ProgressInfoType
 F:XISOSharp.Models.ProgressInfoType.value__:System.Int32
-F:XISOSharp.Models.StfsPackageKind.Xbla:XISOSharp.Models.StfsPackageKind
-F:XISOSharp.Models.StfsPackageKind.Xblig:XISOSharp.Models.StfsPackageKind
-F:XISOSharp.Models.StfsPackageKind.value__:System.Int32
+F:XISOSharp.Models.SymlinkMode.Follow:XISOSharp.Models.SymlinkMode
+F:XISOSharp.Models.SymlinkMode.Reject:XISOSharp.Models.SymlinkMode
+F:XISOSharp.Models.SymlinkMode.Skip:XISOSharp.Models.SymlinkMode
+F:XISOSharp.Models.SymlinkMode.value__:System.Int32
 F:XISOSharp.Models.TitleKind.Xbe:XISOSharp.Models.TitleKind
 F:XISOSharp.Models.TitleKind.Xex:XISOSharp.Models.TitleKind
 F:XISOSharp.Models.TitleKind.value__:System.Int32
@@ -272,6 +270,7 @@ F:XISOSharp.XisoImageFormat.SplitCiso:XISOSharp.XisoImageFormat
 F:XISOSharp.XisoImageFormat.SplitIso:XISOSharp.XisoImageFormat
 F:XISOSharp.XisoImageFormat.Zar:XISOSharp.XisoImageFormat
 F:XISOSharp.XisoImageFormat.value__:System.Int32
+F:XISOSharp.XisoNameRules.MaxComponentLength:System.Int32
 F:XISOSharp.XisoSplitter.DefaultPartSizeBytes:System.Int64
 M:XISOSharp.AvlTree.AvlCompareKey(System.String,System.String)->System.Int32
 M:XISOSharp.AvlTree.AvlFetch(XISOSharp.DataStructures.AvlNode,System.String)->XISOSharp.DataStructures.AvlNode
@@ -293,9 +292,6 @@ M:XISOSharp.BlockDevice.CisoBlockDevice.Write(System.Int64,System.ReadOnlySpan<S
 M:XISOSharp.BlockDevice.FileBlockDevice.Dispose()->System.Void
 M:XISOSharp.BlockDevice.FileBlockDevice.Read(System.Int64,System.Span<System.Byte>)->System.Int32
 M:XISOSharp.BlockDevice.FileBlockDevice.Write(System.Int64,System.ReadOnlySpan<System.Byte>)->System.Void
-M:XISOSharp.BlockDevice.GodBlockDevice.Dispose()->System.Void
-M:XISOSharp.BlockDevice.GodBlockDevice.Read(System.Int64,System.Span<System.Byte>)->System.Int32
-M:XISOSharp.BlockDevice.GodBlockDevice.Write(System.Int64,System.ReadOnlySpan<System.Byte>)->System.Void
 M:XISOSharp.BlockDevice.MemoryBlockDevice.AsSpan()->System.ReadOnlySpan<System.Byte>
 M:XISOSharp.BlockDevice.MemoryBlockDevice.Dispose()->System.Void
 M:XISOSharp.BlockDevice.MemoryBlockDevice.Read(System.Int64,System.Span<System.Byte>)->System.Int32
@@ -330,6 +326,24 @@ M:XISOSharp.Constants.IsEmptyDirectoryHeader(System.ReadOnlySpan<System.Byte>)->
 M:XISOSharp.Constants.IsEmptyDirectorySentinel(System.UInt16)->System.Boolean
 M:XISOSharp.Constants.MaskAttributes(System.Byte)->System.Byte
 M:XISOSharp.Constants.NumSectors(System.UInt32)->System.UInt32
+M:XISOSharp.DatImageMatch.<Clone>$()->XISOSharp.DatImageMatch
+M:XISOSharp.DatImageMatch.Deconstruct(out System.String,out XISOSharp.DatMatchStatus,out System.Int64,out System.String,out System.String,out System.String,out System.Collections.Generic.IReadOnlyList<XISOSharp.DatRom>)->System.Void
+M:XISOSharp.DatImageMatch.Equals(System.Object)->System.Boolean
+M:XISOSharp.DatImageMatch.Equals(XISOSharp.DatImageMatch)->System.Boolean
+M:XISOSharp.DatImageMatch.GetHashCode()->System.Int32
+M:XISOSharp.DatImageMatch.ToString()->System.String
+M:XISOSharp.DatRom.<Clone>$()->XISOSharp.DatRom
+M:XISOSharp.DatRom.Deconstruct(out System.String,out System.String,out System.Int64,out System.String,out System.String,out System.String)->System.Void
+M:XISOSharp.DatRom.Equals(System.Object)->System.Boolean
+M:XISOSharp.DatRom.Equals(XISOSharp.DatRom)->System.Boolean
+M:XISOSharp.DatRom.GetHashCode()->System.Int32
+M:XISOSharp.DatRom.ToString()->System.String
+M:XISOSharp.DatVerificationResult.<Clone>$()->XISOSharp.DatVerificationResult
+M:XISOSharp.DatVerificationResult.Deconstruct(out System.String,out System.Collections.Generic.IReadOnlyList<XISOSharp.DatImageMatch>,out System.Collections.Generic.IReadOnlyList<XISOSharp.DatRom>)->System.Void
+M:XISOSharp.DatVerificationResult.Equals(System.Object)->System.Boolean
+M:XISOSharp.DatVerificationResult.Equals(XISOSharp.DatVerificationResult)->System.Boolean
+M:XISOSharp.DatVerificationResult.GetHashCode()->System.Int32
+M:XISOSharp.DatVerificationResult.ToString()->System.String
 M:XISOSharp.DirectoryEntryTableWriter+DirectoryTableEntry.<Clone>$()->XISOSharp.DirectoryEntryTableWriter+DirectoryTableEntry
 M:XISOSharp.DirectoryEntryTableWriter+DirectoryTableEntry.Deconstruct(out System.String,out System.Boolean,out System.UInt32,out System.UInt32,out System.Byte)->System.Void
 M:XISOSharp.DirectoryEntryTableWriter+DirectoryTableEntry.Equals(System.Object)->System.Boolean
@@ -357,11 +371,7 @@ M:XISOSharp.GlobMatcher+GlobMatchResult.ToString()->System.String
 M:XISOSharp.GlobMatcher.IsMatch(System.String)->System.Boolean
 M:XISOSharp.GlobMatcher.MatchWithGroups(System.String)->XISOSharp.GlobMatcher+GlobMatchResult
 M:XISOSharp.GlobMatcher.TryMatch(System.String,out System.String[])->System.Boolean
-M:XISOSharp.GodHeader.IsGodContainer(System.String)->System.Boolean
-M:XISOSharp.GodHeader.ReadTitle(System.String)->XISOSharp.Models.GodTitleInfo
-M:XISOSharp.GodHeader.TryReadTitle(System.String,out XISOSharp.Models.GodTitleInfo)->System.Boolean
-M:XISOSharp.GodHeader.TryReadVolume(System.String,System.IO.FileShare,out XISOSharp.Models.GodVolumeInfo)->System.Boolean
-M:XISOSharp.GodHeader.TryReadVolume(System.String,out XISOSharp.Models.GodVolumeInfo)->System.Boolean
+M:XISOSharp.HostIoDiagnostics.Describe(System.Exception,System.String,System.String)->System.String
 M:XISOSharp.Interfaces.IBlockDevice.Read(System.Int64,System.Span<System.Byte>)->System.Int32
 M:XISOSharp.Interfaces.IBlockDevice.Write(System.Int64,System.ReadOnlySpan<System.Byte>)->System.Void
 M:XISOSharp.Interfaces.IFilesystem.CreateDirectory(System.String)->System.Void
@@ -423,6 +433,24 @@ M:XISOSharp.Models.AuditResult.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.AuditResult.Equals(XISOSharp.Models.AuditResult)->System.Boolean
 M:XISOSharp.Models.AuditResult.GetHashCode()->System.Int32
 M:XISOSharp.Models.AuditResult.ToString()->System.String
+M:XISOSharp.Models.DiscPartition.<Clone>$()->XISOSharp.Models.DiscPartition
+M:XISOSharp.Models.DiscPartition.Deconstruct(out System.String,out System.Int64,out System.Int64,out System.Int64,out System.Int64,out System.Boolean)->System.Void
+M:XISOSharp.Models.DiscPartition.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.DiscPartition.Equals(XISOSharp.Models.DiscPartition)->System.Boolean
+M:XISOSharp.Models.DiscPartition.GetHashCode()->System.Int32
+M:XISOSharp.Models.DiscPartition.ToString()->System.String
+M:XISOSharp.Models.DiscPhysicalFormatInfo.<Clone>$()->XISOSharp.Models.DiscPhysicalFormatInfo
+M:XISOSharp.Models.DiscPhysicalFormatInfo.Deconstruct(out System.Int64,out System.Int32,out System.Int32,out System.Int32,out System.Int32,out System.Int32,out System.Int32,out System.Int32,out System.Int64,out System.Int64,out System.Int64)->System.Void
+M:XISOSharp.Models.DiscPhysicalFormatInfo.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.DiscPhysicalFormatInfo.Equals(XISOSharp.Models.DiscPhysicalFormatInfo)->System.Boolean
+M:XISOSharp.Models.DiscPhysicalFormatInfo.GetHashCode()->System.Int32
+M:XISOSharp.Models.DiscPhysicalFormatInfo.ToString()->System.String
+M:XISOSharp.Models.DiscSecuritySectorRange.<Clone>$()->XISOSharp.Models.DiscSecuritySectorRange
+M:XISOSharp.Models.DiscSecuritySectorRange.Deconstruct(out System.Int64,out System.Int64)->System.Void
+M:XISOSharp.Models.DiscSecuritySectorRange.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.DiscSecuritySectorRange.Equals(XISOSharp.Models.DiscSecuritySectorRange)->System.Boolean
+M:XISOSharp.Models.DiscSecuritySectorRange.GetHashCode()->System.Int32
+M:XISOSharp.Models.DiscSecuritySectorRange.ToString()->System.String
 M:XISOSharp.Models.EntryInfo.<Clone>$()->XISOSharp.Models.EntryInfo
 M:XISOSharp.Models.EntryInfo.Deconstruct(out System.String,out System.Boolean,out System.UInt32,out System.UInt32,out System.Byte,out System.UInt16,out System.UInt16)->System.Void
 M:XISOSharp.Models.EntryInfo.Equals(System.Object)->System.Boolean
@@ -435,24 +463,18 @@ M:XISOSharp.Models.ExplorerNode.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.ExplorerNode.Equals(XISOSharp.Models.ExplorerNode)->System.Boolean
 M:XISOSharp.Models.ExplorerNode.GetHashCode()->System.Int32
 M:XISOSharp.Models.ExplorerNode.ToString()->System.String
+M:XISOSharp.Models.FileHashEntry.<Clone>$()->XISOSharp.Models.FileHashEntry
+M:XISOSharp.Models.FileHashEntry.Deconstruct(out System.String,out System.Int64,out System.String,out System.String)->System.Void
+M:XISOSharp.Models.FileHashEntry.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.FileHashEntry.Equals(XISOSharp.Models.FileHashEntry)->System.Boolean
+M:XISOSharp.Models.FileHashEntry.GetHashCode()->System.Int32
+M:XISOSharp.Models.FileHashEntry.ToString()->System.String
 M:XISOSharp.Models.FileSectorExtent.<Clone>$()->XISOSharp.Models.FileSectorExtent
 M:XISOSharp.Models.FileSectorExtent.Deconstruct(out System.String,out System.Boolean,out System.UInt32,out System.UInt32,out System.UInt32)->System.Void
 M:XISOSharp.Models.FileSectorExtent.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.FileSectorExtent.Equals(XISOSharp.Models.FileSectorExtent)->System.Boolean
 M:XISOSharp.Models.FileSectorExtent.GetHashCode()->System.Int32
 M:XISOSharp.Models.FileSectorExtent.ToString()->System.String
-M:XISOSharp.Models.GodTitleInfo.<Clone>$()->XISOSharp.Models.GodTitleInfo
-M:XISOSharp.Models.GodTitleInfo.Deconstruct(out System.String,out System.String,out System.UInt32,out System.String,out System.Byte,out System.Byte)->System.Void
-M:XISOSharp.Models.GodTitleInfo.Equals(System.Object)->System.Boolean
-M:XISOSharp.Models.GodTitleInfo.Equals(XISOSharp.Models.GodTitleInfo)->System.Boolean
-M:XISOSharp.Models.GodTitleInfo.GetHashCode()->System.Int32
-M:XISOSharp.Models.GodTitleInfo.ToString()->System.String
-M:XISOSharp.Models.GodVolumeInfo.<Clone>$()->XISOSharp.Models.GodVolumeInfo
-M:XISOSharp.Models.GodVolumeInfo.Deconstruct(out System.String,out System.String,out System.UInt32,out System.UInt32,out System.UInt32,out System.Boolean,out System.Int64,out System.Collections.Generic.IReadOnlyList<System.String>)->System.Void
-M:XISOSharp.Models.GodVolumeInfo.Equals(System.Object)->System.Boolean
-M:XISOSharp.Models.GodVolumeInfo.Equals(XISOSharp.Models.GodVolumeInfo)->System.Boolean
-M:XISOSharp.Models.GodVolumeInfo.GetHashCode()->System.Int32
-M:XISOSharp.Models.GodVolumeInfo.ToString()->System.String
 M:XISOSharp.Models.HashVerificationEntry.<Clone>$()->XISOSharp.Models.HashVerificationEntry
 M:XISOSharp.Models.HashVerificationEntry.Deconstruct(out System.String,out System.String,out System.String,out XISOSharp.Models.HashVerificationStatus)->System.Void
 M:XISOSharp.Models.HashVerificationEntry.Equals(System.Object)->System.Boolean
@@ -495,36 +517,6 @@ M:XISOSharp.Models.SectorRange.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.SectorRange.Equals(XISOSharp.Models.SectorRange)->System.Boolean
 M:XISOSharp.Models.SectorRange.GetHashCode()->System.Int32
 M:XISOSharp.Models.SectorRange.ToString()->System.String
-M:XISOSharp.Models.StfsEntry.<Clone>$()->XISOSharp.Models.StfsEntry
-M:XISOSharp.Models.StfsEntry.Deconstruct(out System.String,out System.String,out System.Boolean,out System.Int64,out System.UInt32,out System.UInt32,out System.Boolean,out System.Nullable<System.DateTimeOffset>,out System.Nullable<System.DateTimeOffset>)->System.Void
-M:XISOSharp.Models.StfsEntry.Equals(System.Object)->System.Boolean
-M:XISOSharp.Models.StfsEntry.Equals(XISOSharp.Models.StfsEntry)->System.Boolean
-M:XISOSharp.Models.StfsEntry.GetHashCode()->System.Int32
-M:XISOSharp.Models.StfsEntry.ToString()->System.String
-M:XISOSharp.Models.StfsPackageInfo.<Clone>$()->XISOSharp.Models.StfsPackageInfo
-M:XISOSharp.Models.StfsPackageInfo.Deconstruct(out System.String,out XISOSharp.Models.StfsPackageKind,out System.String,out System.UInt32,out System.String,out System.Byte,out System.Byte,out System.UInt32,out System.Int64,out System.UInt32,out System.Int64,out System.UInt32,out System.UInt32,out System.UInt16,out System.UInt32,out System.Boolean,out System.Int32,out System.Int32,out System.Int64)->System.Void
-M:XISOSharp.Models.StfsPackageInfo.Equals(System.Object)->System.Boolean
-M:XISOSharp.Models.StfsPackageInfo.Equals(XISOSharp.Models.StfsPackageInfo)->System.Boolean
-M:XISOSharp.Models.StfsPackageInfo.GetHashCode()->System.Int32
-M:XISOSharp.Models.StfsPackageInfo.ToString()->System.String
-M:XISOSharp.Models.StfsTitleInfo.<Clone>$()->XISOSharp.Models.StfsTitleInfo
-M:XISOSharp.Models.StfsTitleInfo.Deconstruct(out System.String,out XISOSharp.Models.StfsPackageKind,out System.String,out System.UInt32,out System.String,out System.Byte,out System.Byte,out System.UInt32)->System.Void
-M:XISOSharp.Models.StfsTitleInfo.Equals(System.Object)->System.Boolean
-M:XISOSharp.Models.StfsTitleInfo.Equals(XISOSharp.Models.StfsTitleInfo)->System.Boolean
-M:XISOSharp.Models.StfsTitleInfo.GetHashCode()->System.Int32
-M:XISOSharp.Models.StfsTitleInfo.ToString()->System.String
-M:XISOSharp.Models.StfsValidationIssue.<Clone>$()->XISOSharp.Models.StfsValidationIssue
-M:XISOSharp.Models.StfsValidationIssue.Deconstruct(out System.String,out System.String)->System.Void
-M:XISOSharp.Models.StfsValidationIssue.Equals(System.Object)->System.Boolean
-M:XISOSharp.Models.StfsValidationIssue.Equals(XISOSharp.Models.StfsValidationIssue)->System.Boolean
-M:XISOSharp.Models.StfsValidationIssue.GetHashCode()->System.Int32
-M:XISOSharp.Models.StfsValidationIssue.ToString()->System.String
-M:XISOSharp.Models.StfsValidationReport.<Clone>$()->XISOSharp.Models.StfsValidationReport
-M:XISOSharp.Models.StfsValidationReport.Deconstruct(out System.Boolean,out System.Int32,out System.Int32,out System.Int32,out System.Int64,out System.Collections.Generic.IReadOnlyList<XISOSharp.Models.StfsValidationIssue>)->System.Void
-M:XISOSharp.Models.StfsValidationReport.Equals(System.Object)->System.Boolean
-M:XISOSharp.Models.StfsValidationReport.Equals(XISOSharp.Models.StfsValidationReport)->System.Boolean
-M:XISOSharp.Models.StfsValidationReport.GetHashCode()->System.Int32
-M:XISOSharp.Models.StfsValidationReport.ToString()->System.String
 M:XISOSharp.Models.TitleInfo.<Clone>$()->XISOSharp.Models.TitleInfo
 M:XISOSharp.Models.TitleInfo.Deconstruct(out System.String,out System.String,out System.UInt32,out System.String,out System.UInt32,out System.String,out System.UInt32,out System.UInt32,out XISOSharp.Models.XbeInfo)->System.Void
 M:XISOSharp.Models.TitleInfo.Equals(System.Object)->System.Boolean
@@ -575,6 +567,12 @@ M:XISOSharp.Models.XexTitleInfo.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.XexTitleInfo.Equals(XISOSharp.Models.XexTitleInfo)->System.Boolean
 M:XISOSharp.Models.XexTitleInfo.GetHashCode()->System.Int32
 M:XISOSharp.Models.XexTitleInfo.ToString()->System.String
+M:XISOSharp.Models.XisoDiscLayout.<Clone>$()->XISOSharp.Models.XisoDiscLayout
+M:XISOSharp.Models.XisoDiscLayout.Deconstruct(out System.String,out XISOSharp.XisoImageFormat,out System.Boolean,out System.Int64,out System.Int64,out XISOSharp.Models.VolumeInfo,out System.String,out System.String,out System.Nullable<System.Int32>,out System.Boolean,out System.String,out System.Nullable<System.Int32>,out System.String,out System.String,out XISOSharp.Models.DiscPartition,out XISOSharp.Models.DiscPartition,out XISOSharp.Models.DiscPartition,out XISOSharp.Models.DiscPhysicalFormatInfo,out System.String,out System.Collections.Generic.IReadOnlyList<XISOSharp.Models.DiscSecuritySectorRange>,out System.Collections.Generic.IReadOnlyList<System.String>)->System.Void
+M:XISOSharp.Models.XisoDiscLayout.Equals(System.Object)->System.Boolean
+M:XISOSharp.Models.XisoDiscLayout.Equals(XISOSharp.Models.XisoDiscLayout)->System.Boolean
+M:XISOSharp.Models.XisoDiscLayout.GetHashCode()->System.Int32
+M:XISOSharp.Models.XisoDiscLayout.ToString()->System.String
 M:XISOSharp.Models.XisoExplorerOptions.<Clone>$()->XISOSharp.Models.XisoExplorerOptions
 M:XISOSharp.Models.XisoExplorerOptions.Equals(System.Object)->System.Boolean
 M:XISOSharp.Models.XisoExplorerOptions.Equals(XISOSharp.Models.XisoExplorerOptions)->System.Boolean
@@ -602,7 +600,9 @@ M:XISOSharp.ProgressCallback.BeginInvoke(System.Int64,System.Int64,System.AsyncC
 M:XISOSharp.ProgressCallback.EndInvoke(System.IAsyncResult)->System.Void
 M:XISOSharp.ProgressCallback.Invoke(System.Int64,System.Int64)->System.Void
 M:XISOSharp.RemapFilesystem.BuildImage(System.String,System.String,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.RemapRule>,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec)->System.Int32
+M:XISOSharp.RemapFilesystem.BuildImage(System.String,System.String,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.RemapRule>,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec,XISOSharp.Models.SymlinkMode)->System.Int32
 M:XISOSharp.RemapFilesystem.DryRunRemap(System.String,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.RemapRule>)->System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String,System.String>>
+M:XISOSharp.RemapFilesystem.DryRunRemap(System.String,System.Collections.Generic.IReadOnlyList<XISOSharp.Models.RemapRule>,XISOSharp.Models.SymlinkMode)->System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String,System.String>>
 M:XISOSharp.RemapFilesystem.GenerateSpecText(System.Collections.Generic.IEnumerable<XISOSharp.Models.RemapRule>,System.String)->System.String
 M:XISOSharp.RemapFilesystem.ParseSpecFile(System.String)->System.ValueTuple<System.String,System.Collections.Generic.List<XISOSharp.Models.RemapRule>>
 M:XISOSharp.RemapFilesystem.ParseSpecText(System.String)->System.ValueTuple<System.String,System.Collections.Generic.List<XISOSharp.Models.RemapRule>>
@@ -614,19 +614,6 @@ M:XISOSharp.SectorAllocator.MarkUsed(System.UInt32,System.UInt32)->System.Void
 M:XISOSharp.SectorAllocator.RequiredSectors(System.UInt64)->System.UInt32
 M:XISOSharp.SecuritySectors.ParseFile(System.String,System.Int64,System.Int32,System.Boolean)->System.Int32[]
 M:XISOSharp.SecuritySectors.ParseLines(System.Collections.Generic.IEnumerable<System.String>,System.Int64,System.Int32,System.Boolean)->System.Int32[]
-M:XISOSharp.StfsHeader.IsStfsPackage(System.String)->System.Boolean
-M:XISOSharp.StfsHeader.ReadTitle(System.String)->XISOSharp.Models.StfsTitleInfo
-M:XISOSharp.StfsHeader.TryReadTitle(System.String,out XISOSharp.Models.StfsTitleInfo)->System.Boolean
-M:XISOSharp.StfsPackage.CopyTo(XISOSharp.Models.StfsEntry,System.IO.Stream)->System.Void
-M:XISOSharp.StfsPackage.Dispose()->System.Void
-M:XISOSharp.StfsPackage.ExtractTo(System.String,System.Boolean,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Int32
-M:XISOSharp.StfsPackage.ExtractTo(System.String,XISOSharp.Models.ExtractNamePolicy,System.Boolean,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Threading.CancellationToken)->System.Int32
-M:XISOSharp.StfsPackage.Find(System.String)->XISOSharp.Models.StfsEntry
-M:XISOSharp.StfsPackage.IsStfsPackage(System.String)->System.Boolean
-M:XISOSharp.StfsPackage.Open(System.String,System.IO.FileShare)->XISOSharp.StfsPackage
-M:XISOSharp.StfsPackage.ReadAllBytes(XISOSharp.Models.StfsEntry)->System.Byte[]
-M:XISOSharp.StfsPackage.TryOpen(System.String,out XISOSharp.StfsPackage)->System.Boolean
-M:XISOSharp.StfsPackage.Validate(System.Threading.CancellationToken)->XISOSharp.Models.StfsValidationReport
 M:XISOSharp.ToolLocator.FindOnPath(System.String)->System.String
 M:XISOSharp.ToolLocator.GetFileName(System.String)->System.String
 M:XISOSharp.ToolLocator.ProbeVersionAsync(System.String,System.Nullable<System.TimeSpan>,System.Threading.CancellationToken)->System.Threading.Tasks.Task<System.String>
@@ -638,9 +625,11 @@ M:XISOSharp.TraversalCallback.Invoke(XISOSharp.DataStructures.AvlNode,System.Obj
 M:XISOSharp.WaxGlob.GetCapture(System.String,System.Int32)->System.String
 M:XISOSharp.WaxGlob.GetCaptures(System.String)->System.Collections.Generic.IReadOnlyList<System.String>
 M:XISOSharp.WaxGlob.IsMatch(System.String)->System.Boolean
+M:XISOSharp.XbeAssets.GetImage(System.Byte[],System.String,XISOSharp.Models.XbeImageKind)->XISOSharp.Models.XbeImage
 M:XISOSharp.XbeAssets.GetImage(System.IO.Stream,System.String,System.String,XISOSharp.Models.XbeImageKind)->XISOSharp.Models.XbeImage
 M:XISOSharp.XbeAssets.GetImage(System.String,System.String,XISOSharp.Models.XbeImageKind)->XISOSharp.Models.XbeImage
 M:XISOSharp.XbeAssets.GetLogo(System.String,System.String)->XISOSharp.Models.XbeImage
+M:XISOSharp.XbeAssets.GetLooseImage(System.String,XISOSharp.Models.XbeImageKind)->XISOSharp.Models.XbeImage
 M:XISOSharp.XbeAssets.GetSaveImage(System.String,System.String)->XISOSharp.Models.XbeImage
 M:XISOSharp.XbeAssets.GetTitleImage(System.String,System.String)->XISOSharp.Models.XbeImage
 M:XISOSharp.XbeAssets.TryGetImage(System.String,System.String,XISOSharp.Models.XbeImageKind,out XISOSharp.Models.XbeImage)->System.Boolean
@@ -654,8 +643,10 @@ M:XISOSharp.XboxPrng.WriteSectors(System.IO.Stream,System.Int64)->System.Void
 M:XISOSharp.XgdTables.GetRedumpIsoTypeBySize(System.Int64)->System.Int32
 M:XISOSharp.XgdTables.GetRedumpLength(System.Int32)->System.Int64
 M:XISOSharp.XgdTables.GetVideoType(System.IO.FileStream,System.Int32)->System.Int32
+M:XISOSharp.XgdTables.GetVideoType(System.IO.Stream,System.Int32)->System.Int32
 M:XISOSharp.XgdTables.GetVideoTypeBySize(System.Int64)->System.Int32
 M:XISOSharp.XgdTables.GetWave(System.IO.FileStream,System.Int32)->System.Int32
+M:XISOSharp.XgdTables.GetWave(System.IO.Stream,System.Int32)->System.Int32
 M:XISOSharp.XgdTables.GetXgdType(System.Int32)->System.Int32
 M:XISOSharp.XgdTables.GetXisoTypeBySize(System.Int64)->System.Int32
 M:XISOSharp.XgdTables.GetXisoTypeFromVideo(System.Int32)->System.Int32
@@ -673,6 +664,10 @@ M:XISOSharp.XisoChecksum.ComputeStfsChecksum(System.String,System.Threading.Canc
 M:XISOSharp.XisoChecksum.ComputeStfsChecksumHex(System.String,System.Threading.CancellationToken)->System.String
 M:XISOSharp.XisoChecksum.ComputeZarChecksum(System.String,System.Threading.CancellationToken)->System.Byte[]
 M:XISOSharp.XisoChecksum.ComputeZarChecksumHex(System.String,System.Threading.CancellationToken)->System.String
+M:XISOSharp.XisoDat.Parse(System.String,System.Threading.CancellationToken)->System.Collections.Generic.IReadOnlyList<XISOSharp.DatRom>
+M:XISOSharp.XisoDat.Verify(System.String,System.Collections.Generic.IReadOnlyList<System.String>,System.Threading.CancellationToken)->XISOSharp.DatVerificationResult
+M:XISOSharp.XisoDiscInfo.IsKnownRedumpSize(System.String)->System.Boolean
+M:XISOSharp.XisoDiscInfo.Read(System.String,System.String,System.Nullable<System.Int32>,System.Boolean)->XISOSharp.Models.XisoDiscLayout
 M:XISOSharp.XisoExplorer.Combine(System.String,System.String)->System.String
 M:XISOSharp.XisoExplorer.ComputeHashHex(System.String,System.Security.Cryptography.HashAlgorithmName)->System.String
 M:XISOSharp.XisoExplorer.CopyOut(System.String,System.String,XISOSharp.Models.UnpackOptions,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>)->System.Void
@@ -734,6 +729,9 @@ M:XISOSharp.XisoImageSourceInfo.Equals(System.Object)->System.Boolean
 M:XISOSharp.XisoImageSourceInfo.Equals(XISOSharp.XisoImageSourceInfo)->System.Boolean
 M:XISOSharp.XisoImageSourceInfo.GetHashCode()->System.Int32
 M:XISOSharp.XisoImageSourceInfo.ToString()->System.String
+M:XISOSharp.XisoNameRules.GetComponentError(System.String)->System.String
+M:XISOSharp.XisoNameRules.GetPathError(System.String)->System.String
+M:XISOSharp.XisoNameRules.IsValidComponent(System.String)->System.Boolean
 M:XISOSharp.XisoOperations.ExtractFiller(System.IO.FileStream,System.Int64,System.Int64,System.String,System.Boolean,System.Threading.CancellationToken)->System.Boolean
 M:XISOSharp.XisoOperations.ExtractFiller(System.String,System.String,System.Int64,System.Nullable<System.Int64>,System.Boolean,System.Threading.CancellationToken)->System.Boolean
 M:XISOSharp.XisoOperations.ExtractSeed(System.String,System.Int64,System.Boolean)->System.Nullable<System.UInt32>
@@ -761,6 +759,7 @@ M:XISOSharp.XisoReader.AuditXiso(XISOSharp.Interfaces.IBlockDevice,System.String
 M:XISOSharp.XisoReader.ComputeDirectoryHashes(System.String,System.String,System.Security.Cryptography.HashAlgorithmName)->System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String,System.Byte[]>>
 M:XISOSharp.XisoReader.ComputeFileHash(System.IO.Stream,System.String,System.String,System.Security.Cryptography.HashAlgorithmName)->System.Byte[]
 M:XISOSharp.XisoReader.ComputeFileHash(System.String,System.String,System.Security.Cryptography.HashAlgorithmName)->System.Byte[]
+M:XISOSharp.XisoReader.ComputeFileHashSidecar(System.String,System.Nullable<System.Security.Cryptography.HashAlgorithmName>,System.Threading.CancellationToken)->System.Collections.Generic.IReadOnlyList<XISOSharp.Models.FileHashEntry>
 M:XISOSharp.XisoReader.CopyIn(System.String,System.String,System.String,System.Boolean)->System.Void
 M:XISOSharp.XisoReader.CopyOut(System.IO.Stream,System.String,System.String,System.String,XISOSharp.Models.UnpackOptions,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>)->System.Void
 M:XISOSharp.XisoReader.CopyOut(System.String,System.String,System.String,XISOSharp.Models.UnpackOptions,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>)->System.Void
@@ -776,6 +775,9 @@ M:XISOSharp.XisoReader.GetFileTime(System.String,System.Nullable<System.Int32>)-
 M:XISOSharp.XisoReader.GetFileTime(XISOSharp.Interfaces.IBlockDevice,System.String,System.Nullable<System.Int32>)->System.DateTimeOffset
 M:XISOSharp.XisoReader.GetFileTimeRaw(System.String,System.Nullable<System.Int32>)->System.UInt64
 M:XISOSharp.XisoReader.GetFileTimeRaw(XISOSharp.Interfaces.IBlockDevice,System.String,System.Nullable<System.Int32>)->System.UInt64
+M:XISOSharp.XisoReader.GetLooseXbeInfo(System.String)->XISOSharp.Models.XbeInfo
+M:XISOSharp.XisoReader.GetLooseXexInfo(System.String)->XISOSharp.Models.XexInfo
+M:XISOSharp.XisoReader.GetLooseXexTitleInfo(System.String)->XISOSharp.Models.XexTitleInfo
 M:XISOSharp.XisoReader.GetSectorLayout(System.String)->XISOSharp.Models.SectorLayout
 M:XISOSharp.XisoReader.GetSectorLayout(System.String,System.Nullable<System.Int32>)->XISOSharp.Models.SectorLayout
 M:XISOSharp.XisoReader.GetTitleInfo(System.IO.Stream,System.String)->XISOSharp.Models.TitleInfo
@@ -784,10 +786,13 @@ M:XISOSharp.XisoReader.GetVolumeInfo(System.IO.Stream,System.String)->XISOSharp.
 M:XISOSharp.XisoReader.GetVolumeInfo(System.IO.Stream,System.String,System.Nullable<System.Int32>)->XISOSharp.Models.VolumeInfo
 M:XISOSharp.XisoReader.GetVolumeInfo(System.String)->XISOSharp.Models.VolumeInfo
 M:XISOSharp.XisoReader.GetVolumeInfo(System.String,System.Nullable<System.Int32>)->XISOSharp.Models.VolumeInfo
+M:XISOSharp.XisoReader.GetXbeInfo(System.Byte[],System.String)->XISOSharp.Models.XbeInfo
 M:XISOSharp.XisoReader.GetXbeInfo(System.IO.Stream,System.String,System.String)->XISOSharp.Models.XbeInfo
 M:XISOSharp.XisoReader.GetXbeInfo(System.String,System.String)->XISOSharp.Models.XbeInfo
+M:XISOSharp.XisoReader.GetXexInfo(System.Byte[],System.String)->XISOSharp.Models.XexInfo
 M:XISOSharp.XisoReader.GetXexInfo(System.IO.Stream,System.String,System.String)->XISOSharp.Models.XexInfo
 M:XISOSharp.XisoReader.GetXexInfo(System.String,System.String)->XISOSharp.Models.XexInfo
+M:XISOSharp.XisoReader.GetXexTitleInfo(System.Byte[],System.String)->XISOSharp.Models.XexTitleInfo
 M:XISOSharp.XisoReader.GetXexTitleInfo(System.IO.Stream,System.String,System.String)->XISOSharp.Models.XexTitleInfo
 M:XISOSharp.XisoReader.GetXexTitleInfo(System.String,System.String)->XISOSharp.Models.XexTitleInfo
 M:XISOSharp.XisoReader.IsOptimizedImage(System.IO.Stream,System.Nullable<System.Int32>)->System.Boolean
@@ -826,6 +831,8 @@ M:XISOSharp.XisoRedump.TryRebuildFromArgs(System.String[],System.String,System.S
 M:XISOSharp.XisoRepairer.RepairInPlace(System.String,System.Boolean,System.Boolean)->XISOSharp.Models.RepairResult
 M:XISOSharp.XisoSalvager.DefaultOutputPath(System.String)->System.String
 M:XISOSharp.XisoSalvager.Salvage(System.String,System.String)->XISOSharp.Models.SalvageResult
+M:XISOSharp.XisoSkeleton.Apply(System.String,System.String,System.String,System.String,System.Threading.CancellationToken,System.Boolean)->System.Int32
+M:XISOSharp.XisoSkeleton.Apply(System.String,System.String,System.String,System.String,System.Threading.CancellationToken,System.Boolean,XISOSharp.Models.SymlinkMode)->System.Int32
 M:XISOSharp.XisoSkeleton.Petrify(System.String,System.String,System.String,System.Int64,System.Nullable<System.Int64>,System.Boolean,System.Threading.CancellationToken)->System.Boolean
 M:XISOSharp.XisoSkeleton.VerifyHashes(System.String,System.String,System.Threading.CancellationToken)->XISOSharp.Models.HashVerificationResult
 M:XISOSharp.XisoSplitter.IsSplitPath(System.String)->System.Boolean
@@ -837,9 +844,11 @@ M:XISOSharp.XisoValidator.LogResult(XISOSharp.Models.ValidationResult,System.Str
 M:XISOSharp.XisoValidator.ValidateConversion(System.String,System.String,System.Boolean)->XISOSharp.Models.ValidationResult
 M:XISOSharp.XisoValidator.WriteReport(XISOSharp.Models.ValidationResult,System.String,System.String,System.String)->System.Void
 M:XISOSharp.XisoWriter.CreateXiso(System.String,System.String,XISOSharp.DataStructures.AvlNode,System.IO.Stream,out System.String,System.String,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.Nullable<System.Int32>,System.Collections.Generic.IReadOnlyList<System.String>,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,System.Int64,XISOSharp.Models.XisoLayoutSpec)->System.Int32
+M:XISOSharp.XisoWriter.CreateXiso(System.String,System.String,XISOSharp.DataStructures.AvlNode,System.IO.Stream,out System.String,System.String,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.Nullable<System.Int32>,System.Collections.Generic.IReadOnlyList<System.String>,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,System.Int64,XISOSharp.Models.XisoLayoutSpec,XISOSharp.Models.SymlinkMode)->System.Int32
 M:XISOSharp.XisoWriter.CreateXiso(XISOSharp.Interfaces.ISourceFilesystem,System.String,System.String,out System.String,System.String,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.Collections.Generic.IReadOnlyList<System.String>,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec,XISOSharp.Logging.XisoLogOptions)->System.Int32
 M:XISOSharp.XisoWriter.CreateXisoAsync(System.String,System.String,XISOSharp.DataStructures.AvlNode,System.IO.Stream,System.String,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.Nullable<System.Int32>,System.Collections.Generic.IReadOnlyList<System.String>,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec)->System.Threading.Tasks.Task<System.ValueTuple<System.Int32,System.String>>
 M:XISOSharp.XisoWriter.PackFromDirectory(System.String,System.String,System.Collections.Generic.IReadOnlyList<System.String>,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec)->System.Int32
+M:XISOSharp.XisoWriter.PackFromDirectory(System.String,System.String,System.Collections.Generic.IReadOnlyList<System.String>,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec,XISOSharp.Models.SymlinkMode)->System.Int32
 M:XISOSharp.XisoWriter.PackFromDirectory(XISOSharp.Interfaces.ISourceFilesystem,System.String,System.String,System.Collections.Generic.IReadOnlyList<System.String>,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec,XISOSharp.Logging.XisoLogOptions)->System.Int32
 M:XISOSharp.XisoWriter.PackFromDirectoryAsync(System.String,System.String,System.Collections.Generic.IReadOnlyList<System.String>,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec)->System.Threading.Tasks.Task<System.Int32>
 M:XISOSharp.XisoWriter.PackFromDirectoryAsync(XISOSharp.Interfaces.ISourceFilesystem,System.String,System.String,System.Collections.Generic.IReadOnlyList<System.String>,XISOSharp.ProgressCallback,System.Threading.CancellationToken,System.IProgress<XISOSharp.Models.ProgressInfo>,System.Nullable<System.UInt64>,XISOSharp.Models.XisoLayoutSpec,XISOSharp.Logging.XisoLogOptions)->System.Threading.Tasks.Task<System.Int32>
@@ -860,16 +869,33 @@ P:XISOSharp.BlockDevice.CciBlockDevice.Length:System.Int64:get;
 P:XISOSharp.BlockDevice.CisoBlockDevice.Length:System.Int64:get;
 P:XISOSharp.BlockDevice.FileBlockDevice.BaseStream:System.IO.FileStream:get;
 P:XISOSharp.BlockDevice.FileBlockDevice.Length:System.Int64:get;
-P:XISOSharp.BlockDevice.GodBlockDevice.DataDirectory:System.String:get;
-P:XISOSharp.BlockDevice.GodBlockDevice.HeaderPath:System.String:get;
-P:XISOSharp.BlockDevice.GodBlockDevice.Info:XISOSharp.Models.GodVolumeInfo:get;
-P:XISOSharp.BlockDevice.GodBlockDevice.Length:System.Int64:get;
 P:XISOSharp.BlockDevice.MemoryBlockDevice.Length:System.Int64:get;set;
 P:XISOSharp.BlockDevice.OffsetBlockDevice.Inner:XISOSharp.Interfaces.IBlockDevice:get;
 P:XISOSharp.BlockDevice.OffsetBlockDevice.Length:System.Int64:get;
 P:XISOSharp.BlockDevice.OffsetBlockDevice.Offset:System.Int64:get;
 P:XISOSharp.BlockDevice.StreamBlockDevice.Length:System.Int64:get;
 P:XISOSharp.Constants.Banner:System.String:get;
+P:XISOSharp.DatImageMatch.Crc:System.String:get;set;
+P:XISOSharp.DatImageMatch.ImagePath:System.String:get;set;
+P:XISOSharp.DatImageMatch.Matches:System.Collections.Generic.IReadOnlyList<XISOSharp.DatRom>:get;set;
+P:XISOSharp.DatImageMatch.Md5:System.String:get;set;
+P:XISOSharp.DatImageMatch.Sha1:System.String:get;set;
+P:XISOSharp.DatImageMatch.Size:System.Int64:get;set;
+P:XISOSharp.DatImageMatch.Status:XISOSharp.DatMatchStatus:get;set;
+P:XISOSharp.DatRom.Crc:System.String:get;set;
+P:XISOSharp.DatRom.GameName:System.String:get;set;
+P:XISOSharp.DatRom.Md5:System.String:get;set;
+P:XISOSharp.DatRom.Name:System.String:get;set;
+P:XISOSharp.DatRom.Sha1:System.String:get;set;
+P:XISOSharp.DatRom.Size:System.Int64:get;set;
+P:XISOSharp.DatVerificationResult.Ambiguous:System.Int32:get;
+P:XISOSharp.DatVerificationResult.DatPath:System.String:get;set;
+P:XISOSharp.DatVerificationResult.Images:System.Collections.Generic.IReadOnlyList<XISOSharp.DatImageMatch>:get;set;
+P:XISOSharp.DatVerificationResult.Missing:System.Int32:get;
+P:XISOSharp.DatVerificationResult.MissingRoms:System.Collections.Generic.IReadOnlyList<XISOSharp.DatRom>:get;set;
+P:XISOSharp.DatVerificationResult.NotInDat:System.Int32:get;
+P:XISOSharp.DatVerificationResult.Passed:System.Boolean:get;
+P:XISOSharp.DatVerificationResult.Verified:System.Int32:get;
 P:XISOSharp.DirectoryEntryTableWriter+DirectoryTableEntry.Attributes:System.Byte:get;set;
 P:XISOSharp.DirectoryEntryTableWriter+DirectoryTableEntry.FileSize:System.UInt32:get;set;
 P:XISOSharp.DirectoryEntryTableWriter+DirectoryTableEntry.IsDirectory:System.Boolean:get;set;
@@ -918,6 +944,26 @@ P:XISOSharp.Models.AuditResult.Issues:System.Collections.Generic.IReadOnlyList<S
 P:XISOSharp.Models.CreateList.Name:System.String:get;set;
 P:XISOSharp.Models.CreateList.Next:XISOSharp.Models.CreateList:get;set;
 P:XISOSharp.Models.CreateList.Path:System.String:get;set;
+P:XISOSharp.Models.DiscPartition.Available:System.Boolean:get;set;
+P:XISOSharp.Models.DiscPartition.ByteLength:System.Int64:get;set;
+P:XISOSharp.Models.DiscPartition.ByteOffset:System.Int64:get;set;
+P:XISOSharp.Models.DiscPartition.Name:System.String:get;set;
+P:XISOSharp.Models.DiscPartition.SectorCount:System.Int64:get;set;
+P:XISOSharp.Models.DiscPartition.StartSector:System.Int64:get;set;
+P:XISOSharp.Models.DiscPhysicalFormatInfo.BookType:System.Int32:get;set;
+P:XISOSharp.Models.DiscPhysicalFormatInfo.ByteOffset:System.Int64:get;set;
+P:XISOSharp.Models.DiscPhysicalFormatInfo.DataEndSector:System.Int64:get;set;
+P:XISOSharp.Models.DiscPhysicalFormatInfo.DataStartSector:System.Int64:get;set;
+P:XISOSharp.Models.DiscPhysicalFormatInfo.DiscSize:System.Int32:get;set;
+P:XISOSharp.Models.DiscPhysicalFormatInfo.Layer0EndSector:System.Int64:get;set;
+P:XISOSharp.Models.DiscPhysicalFormatInfo.LayerCount:System.Int32:get;set;
+P:XISOSharp.Models.DiscPhysicalFormatInfo.LayerType:System.Int32:get;set;
+P:XISOSharp.Models.DiscPhysicalFormatInfo.MaximumRate:System.Int32:get;set;
+P:XISOSharp.Models.DiscPhysicalFormatInfo.PartVersion:System.Int32:get;set;
+P:XISOSharp.Models.DiscPhysicalFormatInfo.TrackPath:System.Int32:get;set;
+P:XISOSharp.Models.DiscSecuritySectorRange.EndSector:System.Int64:get;set;
+P:XISOSharp.Models.DiscSecuritySectorRange.SectorCount:System.Int64:get;
+P:XISOSharp.Models.DiscSecuritySectorRange.StartSector:System.Int64:get;set;
 P:XISOSharp.Models.EntryInfo.Attributes:System.Byte:get;set;
 P:XISOSharp.Models.EntryInfo.FileSize:System.UInt32:get;set;
 P:XISOSharp.Models.EntryInfo.IsDirectory:System.Boolean:get;set;
@@ -931,26 +977,17 @@ P:XISOSharp.Models.ExplorerNode.IsDirectory:System.Boolean:get;set;
 P:XISOSharp.Models.ExplorerNode.Name:System.String:get;set;
 P:XISOSharp.Models.ExplorerNode.Size:System.Int64:get;set;
 P:XISOSharp.Models.ExplorerNode.StartSector:System.UInt32:get;set;
+P:XISOSharp.Models.FileHashEntry.Algorithm:System.String:get;set;
+P:XISOSharp.Models.FileHashEntry.HashHex:System.String:get;set;
+P:XISOSharp.Models.FileHashEntry.Path:System.String:get;set;
+P:XISOSharp.Models.FileHashEntry.Size:System.Int64:get;set;
 P:XISOSharp.Models.FileSectorExtent.FileSize:System.UInt32:get;set;
 P:XISOSharp.Models.FileSectorExtent.IsDirectory:System.Boolean:get;set;
 P:XISOSharp.Models.FileSectorExtent.Path:System.String:get;set;
 P:XISOSharp.Models.FileSectorExtent.SectorCount:System.UInt32:get;set;
 P:XISOSharp.Models.FileSectorExtent.StartSector:System.UInt32:get;set;
-P:XISOSharp.Models.GodTitleInfo.DiscCount:System.Byte:get;set;
-P:XISOSharp.Models.GodTitleInfo.DiscNumber:System.Byte:get;set;
-P:XISOSharp.Models.GodTitleInfo.HeaderPath:System.String:get;set;
-P:XISOSharp.Models.GodTitleInfo.TitleId:System.UInt32:get;set;
-P:XISOSharp.Models.GodTitleInfo.TitleIdHex:System.String:get;set;
-P:XISOSharp.Models.GodTitleInfo.TitleName:System.String:get;set;
-P:XISOSharp.Models.GodVolumeInfo.DataBlockCount:System.UInt32:get;set;
-P:XISOSharp.Models.GodVolumeInfo.DataDirectory:System.String:get;set;
-P:XISOSharp.Models.GodVolumeInfo.DataFileCount:System.UInt32:get;set;
-P:XISOSharp.Models.GodVolumeInfo.EnhancedGdf:System.Boolean:get;set;
-P:XISOSharp.Models.GodVolumeInfo.HeaderPath:System.String:get;set;
-P:XISOSharp.Models.GodVolumeInfo.Length:System.Int64:get;set;
-P:XISOSharp.Models.GodVolumeInfo.Parts:System.Collections.Generic.IReadOnlyList<System.String>:get;set;
-P:XISOSharp.Models.GodVolumeInfo.StartingBlock:System.UInt32:get;set;
 P:XISOSharp.Models.HashVerificationEntry.ActualSha1:System.String:get;set;
+P:XISOSharp.Models.HashVerificationEntry.Algorithm:System.String:get;set;
 P:XISOSharp.Models.HashVerificationEntry.ExpectedSha1:System.String:get;set;
 P:XISOSharp.Models.HashVerificationEntry.Path:System.String:get;set;
 P:XISOSharp.Models.HashVerificationEntry.Status:XISOSharp.Models.HashVerificationStatus:get;set;
@@ -989,50 +1026,6 @@ P:XISOSharp.Models.SectorLayout.UsedRanges:System.Collections.Generic.IReadOnlyL
 P:XISOSharp.Models.SectorLayout.Volume:XISOSharp.Models.VolumeInfo:get;set;
 P:XISOSharp.Models.SectorRange.SectorCount:System.UInt32:get;set;
 P:XISOSharp.Models.SectorRange.StartSector:System.UInt32:get;set;
-P:XISOSharp.Models.StfsEntry.BlockCount:System.UInt32:get;set;
-P:XISOSharp.Models.StfsEntry.Created:System.Nullable<System.DateTimeOffset>:get;set;
-P:XISOSharp.Models.StfsEntry.IsContiguous:System.Boolean:get;set;
-P:XISOSharp.Models.StfsEntry.IsDirectory:System.Boolean:get;set;
-P:XISOSharp.Models.StfsEntry.Modified:System.Nullable<System.DateTimeOffset>:get;set;
-P:XISOSharp.Models.StfsEntry.Name:System.String:get;set;
-P:XISOSharp.Models.StfsEntry.Path:System.String:get;set;
-P:XISOSharp.Models.StfsEntry.Size:System.Int64:get;set;
-P:XISOSharp.Models.StfsEntry.StartBlock:System.UInt32:get;set;
-P:XISOSharp.Models.StfsPackageInfo.ContentType:System.UInt32:get;set;
-P:XISOSharp.Models.StfsPackageInfo.DirectoryCount:System.Int32:get;set;
-P:XISOSharp.Models.StfsPackageInfo.DiscCount:System.Byte:get;set;
-P:XISOSharp.Models.StfsPackageInfo.DiscNumber:System.Byte:get;set;
-P:XISOSharp.Models.StfsPackageInfo.FileCount:System.Int32:get;set;
-P:XISOSharp.Models.StfsPackageInfo.FileTableBlockCount:System.UInt16:get;set;
-P:XISOSharp.Models.StfsPackageInfo.FileTableBlockNumber:System.UInt32:get;set;
-P:XISOSharp.Models.StfsPackageInfo.FirstBlockOffset:System.Int64:get;set;
-P:XISOSharp.Models.StfsPackageInfo.FreeBlockCount:System.UInt32:get;set;
-P:XISOSharp.Models.StfsPackageInfo.HeaderSize:System.UInt32:get;set;
-P:XISOSharp.Models.StfsPackageInfo.IsReadOnlyFormat:System.Boolean:get;set;
-P:XISOSharp.Models.StfsPackageInfo.Kind:XISOSharp.Models.StfsPackageKind:get;set;
-P:XISOSharp.Models.StfsPackageInfo.PackageLength:System.Int64:get;set;
-P:XISOSharp.Models.StfsPackageInfo.PackagePath:System.String:get;set;
-P:XISOSharp.Models.StfsPackageInfo.TitleId:System.UInt32:get;set;
-P:XISOSharp.Models.StfsPackageInfo.TitleIdHex:System.String:get;set;
-P:XISOSharp.Models.StfsPackageInfo.TitleName:System.String:get;set;
-P:XISOSharp.Models.StfsPackageInfo.TotalBlockCount:System.UInt32:get;set;
-P:XISOSharp.Models.StfsPackageInfo.TotalFileSize:System.Int64:get;set;
-P:XISOSharp.Models.StfsTitleInfo.ContentType:System.UInt32:get;set;
-P:XISOSharp.Models.StfsTitleInfo.DiscCount:System.Byte:get;set;
-P:XISOSharp.Models.StfsTitleInfo.DiscNumber:System.Byte:get;set;
-P:XISOSharp.Models.StfsTitleInfo.Kind:XISOSharp.Models.StfsPackageKind:get;set;
-P:XISOSharp.Models.StfsTitleInfo.PackagePath:System.String:get;set;
-P:XISOSharp.Models.StfsTitleInfo.TitleId:System.UInt32:get;set;
-P:XISOSharp.Models.StfsTitleInfo.TitleIdHex:System.String:get;set;
-P:XISOSharp.Models.StfsTitleInfo.TitleName:System.String:get;set;
-P:XISOSharp.Models.StfsValidationIssue.Area:System.String:get;set;
-P:XISOSharp.Models.StfsValidationIssue.Reason:System.String:get;set;
-P:XISOSharp.Models.StfsValidationReport.BlocksChecked:System.Int32:get;set;
-P:XISOSharp.Models.StfsValidationReport.BytesChecked:System.Int64:get;set;
-P:XISOSharp.Models.StfsValidationReport.FilesChecked:System.Int32:get;set;
-P:XISOSharp.Models.StfsValidationReport.HashTablesChecked:System.Int32:get;set;
-P:XISOSharp.Models.StfsValidationReport.IsValid:System.Boolean:get;set;
-P:XISOSharp.Models.StfsValidationReport.Issues:System.Collections.Generic.IReadOnlyList<XISOSharp.Models.StfsValidationIssue>:get;set;
 P:XISOSharp.Models.TitleInfo.DiskNumber:System.UInt32:get;set;
 P:XISOSharp.Models.TitleInfo.GameRegion:System.UInt32:get;set;
 P:XISOSharp.Models.TitleInfo.GameRegionName:System.String:get;set;
@@ -1125,6 +1118,27 @@ P:XISOSharp.Models.XexTitleInfo.TitleId:System.UInt32:get;
 P:XISOSharp.Models.XexTitleInfo.TitleIdHex:System.String:get;
 P:XISOSharp.Models.XexTitleInfo.TitleName:System.String:get;set;
 P:XISOSharp.Models.XexTitleInfo.XexPath:System.String:get;set;
+P:XISOSharp.Models.XisoDiscLayout.DiscFormat:System.String:get;set;
+P:XISOSharp.Models.XisoDiscLayout.FileLength:System.Int64:get;set;
+P:XISOSharp.Models.XisoDiscLayout.Format:XISOSharp.XisoImageFormat:get;set;
+P:XISOSharp.Models.XisoDiscLayout.GamePartition:XISOSharp.Models.DiscPartition:get;set;
+P:XISOSharp.Models.XisoDiscLayout.IsContainer:System.Boolean:get;set;
+P:XISOSharp.Models.XisoDiscLayout.Path:System.String:get;set;
+P:XISOSharp.Models.XisoDiscLayout.Pfi:XISOSharp.Models.DiscPhysicalFormatInfo:get;set;
+P:XISOSharp.Models.XisoDiscLayout.RedumpSizeMatch:System.Boolean:get;set;
+P:XISOSharp.Models.XisoDiscLayout.RedumpTypeIndex:System.Nullable<System.Int32>:get;set;
+P:XISOSharp.Models.XisoDiscLayout.RedumpTypeName:System.String:get;set;
+P:XISOSharp.Models.XisoDiscLayout.SecuritySectors:System.Collections.Generic.IReadOnlyList<XISOSharp.Models.DiscSecuritySectorRange>:get;set;
+P:XISOSharp.Models.XisoDiscLayout.SecuritySectorsSource:System.String:get;set;
+P:XISOSharp.Models.XisoDiscLayout.TotalSectors:System.Int64:get;set;
+P:XISOSharp.Models.XisoDiscLayout.VideoL0:XISOSharp.Models.DiscPartition:get;set;
+P:XISOSharp.Models.XisoDiscLayout.VideoL1:XISOSharp.Models.DiscPartition:get;set;
+P:XISOSharp.Models.XisoDiscLayout.VideoTypeIndex:System.Nullable<System.Int32>:get;set;
+P:XISOSharp.Models.XisoDiscLayout.VideoTypeName:System.String:get;set;
+P:XISOSharp.Models.XisoDiscLayout.Volume:XISOSharp.Models.VolumeInfo:get;set;
+P:XISOSharp.Models.XisoDiscLayout.Warnings:System.Collections.Generic.IReadOnlyList<System.String>:get;set;
+P:XISOSharp.Models.XisoDiscLayout.Wave:System.String:get;set;
+P:XISOSharp.Models.XisoDiscLayout.XgdType:System.String:get;set;
 P:XISOSharp.Models.XisoExplorerOptions.KeepOpen:System.Boolean:get;set;
 P:XISOSharp.Models.XisoExplorerOptions.Share:System.IO.FileShare:get;set;
 P:XISOSharp.Models.XisoLayoutEntry.FileSize:System.Nullable<System.UInt32>:get;set;
@@ -1144,8 +1158,6 @@ P:XISOSharp.SectorAllocator.FreeRanges:System.Collections.Generic.IReadOnlyList<
 P:XISOSharp.SectorAllocator.NextFree:System.UInt32:get;
 P:XISOSharp.SectorAllocator.TotalSectors:System.Nullable<System.Int64>:get;
 P:XISOSharp.SectorAllocator.UsedRanges:System.Collections.Generic.IReadOnlyList<XISOSharp.Models.SectorRange>:get;
-P:XISOSharp.StfsPackage.Entries:System.Collections.Generic.IReadOnlyList<XISOSharp.Models.StfsEntry>:get;
-P:XISOSharp.StfsPackage.Info:XISOSharp.Models.StfsPackageInfo:get;
 P:XISOSharp.TruncatedCopyException.CopiedBytes:System.Int64:get;
 P:XISOSharp.TruncatedCopyException.ExpectedBytes:System.Int64:get;
 P:XISOSharp.WaxGlob.Pattern:System.String:get;
@@ -1180,7 +1192,6 @@ T:XISOSharp.BlockDevice.BlockDeviceStream
 T:XISOSharp.BlockDevice.CciBlockDevice
 T:XISOSharp.BlockDevice.CisoBlockDevice
 T:XISOSharp.BlockDevice.FileBlockDevice
-T:XISOSharp.BlockDevice.GodBlockDevice
 T:XISOSharp.BlockDevice.MemoryBlockDevice
 T:XISOSharp.BlockDevice.OffsetBlockDevice
 T:XISOSharp.BlockDevice.StreamBlockDevice
@@ -1188,6 +1199,10 @@ T:XISOSharp.BoyerMoore
 T:XISOSharp.CisoReader
 T:XISOSharp.CisoWriter
 T:XISOSharp.Constants
+T:XISOSharp.DatImageMatch
+T:XISOSharp.DatMatchStatus
+T:XISOSharp.DatRom
+T:XISOSharp.DatVerificationResult
 T:XISOSharp.DataStructures.AvlNode
 T:XISOSharp.DataStructures.DirEntry
 T:XISOSharp.DirectoryEntryTableWriter
@@ -1197,7 +1212,7 @@ T:XISOSharp.ExtractFileException
 T:XISOSharp.FileTimeHelper
 T:XISOSharp.GlobMatcher
 T:XISOSharp.GlobMatcher+GlobMatchResult
-T:XISOSharp.GodHeader
+T:XISOSharp.HostIoDiagnostics
 T:XISOSharp.Interfaces.IBlockDevice
 T:XISOSharp.Interfaces.IFilesystem
 T:XISOSharp.Interfaces.ISourceFilesystem
@@ -1214,14 +1229,16 @@ T:XISOSharp.Models.AvlResult
 T:XISOSharp.Models.AvlSkew
 T:XISOSharp.Models.AvlTraversalMethod
 T:XISOSharp.Models.CreateList
+T:XISOSharp.Models.DiscPartition
+T:XISOSharp.Models.DiscPhysicalFormatInfo
+T:XISOSharp.Models.DiscSecuritySectorRange
 T:XISOSharp.Models.EntryInfo
 T:XISOSharp.Models.ExplorerNode
 T:XISOSharp.Models.ExtractError
 T:XISOSharp.Models.ExtractMode
 T:XISOSharp.Models.ExtractNamePolicy
+T:XISOSharp.Models.FileHashEntry
 T:XISOSharp.Models.FileSectorExtent
-T:XISOSharp.Models.GodTitleInfo
-T:XISOSharp.Models.GodVolumeInfo
 T:XISOSharp.Models.HashVerificationEntry
 T:XISOSharp.Models.HashVerificationResult
 T:XISOSharp.Models.HashVerificationStatus
@@ -1233,12 +1250,7 @@ T:XISOSharp.Models.RepairResult
 T:XISOSharp.Models.SalvageResult
 T:XISOSharp.Models.SectorLayout
 T:XISOSharp.Models.SectorRange
-T:XISOSharp.Models.StfsEntry
-T:XISOSharp.Models.StfsPackageInfo
-T:XISOSharp.Models.StfsPackageKind
-T:XISOSharp.Models.StfsTitleInfo
-T:XISOSharp.Models.StfsValidationIssue
-T:XISOSharp.Models.StfsValidationReport
+T:XISOSharp.Models.SymlinkMode
 T:XISOSharp.Models.TitleInfo
 T:XISOSharp.Models.TitleKind
 T:XISOSharp.Models.UnpackOptions
@@ -1251,6 +1263,7 @@ T:XISOSharp.Models.XbeImageKind
 T:XISOSharp.Models.XbeInfo
 T:XISOSharp.Models.XexInfo
 T:XISOSharp.Models.XexTitleInfo
+T:XISOSharp.Models.XisoDiscLayout
 T:XISOSharp.Models.XisoExplorerOptions
 T:XISOSharp.Models.XisoLayoutEntry
 T:XISOSharp.Models.XisoLayoutSpec
@@ -1260,8 +1273,6 @@ T:XISOSharp.ProgressCallback
 T:XISOSharp.RemapFilesystem
 T:XISOSharp.SectorAllocator
 T:XISOSharp.SecuritySectors
-T:XISOSharp.StfsHeader
-T:XISOSharp.StfsPackage
 T:XISOSharp.ToolLocator
 T:XISOSharp.TraversalCallback
 T:XISOSharp.TruncatedCopyException
@@ -1272,6 +1283,8 @@ T:XISOSharp.XgdTables
 T:XISOSharp.XisoAttributes
 T:XISOSharp.XisoCci
 T:XISOSharp.XisoChecksum
+T:XISOSharp.XisoDat
+T:XISOSharp.XisoDiscInfo
 T:XISOSharp.XisoEmptyException
 T:XISOSharp.XisoExplorer
 T:XISOSharp.XisoFileCopier
@@ -1284,6 +1297,7 @@ T:XISOSharp.XisoImageHashResult
 T:XISOSharp.XisoImageOptions
 T:XISOSharp.XisoImageSource
 T:XISOSharp.XisoImageSourceInfo
+T:XISOSharp.XisoNameRules
 T:XISOSharp.XisoOperations
 T:XISOSharp.XisoPatcher
 T:XISOSharp.XisoPaths

@@ -14,7 +14,8 @@ $global:XisoSharpVerbs = @(
     'validate', 'rebuild', 'build-image', 'image-spec',
     'compress', 'cso', 'cci', 'decompress', 'uncso', 'decso', 'uncci',
     'checksum', 'split', 'join', 'joinsplit', 'convert', 'hash',
-    'verify-hashes', 'verify-hash', 'title-info', 'title', 'xbe-image'
+    'verify-hashes', 'verify-hash', 'verify-dat', 'verify-dats', 'title-info', 'title', 'xbe-image',
+    'xex-image', 'disc-info', 'apply-skeleton', 'file-hashes'
 )
 
 $global:XisoSharpFlags = @(
@@ -39,7 +40,10 @@ $global:XisoSharpFlags = @(
     '--cci-level', '--cci-split', '--level',
     '--format', '--output-name', '--output', '--map', '--file',
     '--type', '--size', '--ignore-extra', '--split', '--verify-hashes',
-    '--skip-sectors', '--prepend-sectors'
+    '--skip-sectors', '--prepend-sectors',
+    '--xex-image', '--disc-info', '--apply-skeleton', '--file-hashes',
+    '--zar-level', '--deterministic', '--strict-names', '--symlink-mode', '--algorithm',
+    '--algo', '--hash', '--hashes'
 ) | Select-Object -Unique
 
 $global:XisoSharpValueCompletions = @{
@@ -49,10 +53,14 @@ $global:XisoSharpValueCompletions = @{
     '--cci-level'       = @('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12')
     '--level'           = @('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
     '--name-policy'     = @('reject', 'sanitize', 'skip')
+    '--symlink-mode'    = @('follow', 'skip', 'reject')
     '--policy'          = @('skip', 'overwrite', 'auto-rename')
     '--type'            = @('logo', 'title', 'save')
     '--size'            = @('half', 'halves')
     '--jobs'            = @('1', '2', '4', '8', '16', '32', '64')
+    '--algorithm'       = @('sha1', 'sha256', 'md5')
+    '--algo'            = @('sha1', 'sha256', 'md5')
+    '--zar-level'       = @('1', '6', '9', '12', '16', '19', '22')
 }
 
 function Register-XisoSharpCompletion {

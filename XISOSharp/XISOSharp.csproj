@@ -61,8 +61,9 @@
     <EnableStrictModeForPackageValidation>true</EnableStrictModeForPackageValidation>
     <!-- Compare against the last published package; additive APIs are allowed,
          accidental removals/renames fail the pack. Updated with each stable
-         release (1.8.0 validates against 1.7.0). -->
-    <PackageValidationBaselineVersion>1.7.0</PackageValidationBaselineVersion>
+         release (2.0.0 validates against 1.8.0; the facade removals are the
+         reviewed breaking change for this release). -->
+    <PackageValidationBaselineVersion>1.8.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>

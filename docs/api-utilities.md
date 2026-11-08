@@ -102,7 +102,7 @@ Manual `xdvdfs.toml` subset parser — see [xdvdfs Compat — Build-Image](xdvdf
 | `StreamBlockDevice` | Any readable, seekable `Stream` (split ISO, archives, test streams) with serialized reads/writes |
 | `CisoBlockDevice` | CISO random-access, `index[totalBlocks+1]` LE u32 + single-sector cache, DEFLATE v1 + LZ4 v2 on-demand |
 | `CciBlockDevice` | CCI/CCIM random-access over `CCISharp.CciFile`; single or split `.cci` sets |
-| `GodBlockDevice` | GOD/SVOD random-access over a header + `DataNNNN` fragments (SVOD hash-table interleave, fragment roll-over, security sectors) |
+| `GodVolumeBlockDevice` (internal) | GOD/SVOD random-access over a header + `DataNNNN` fragments. The public reader is `StfsSharp.GodVolume`; XISOSharp's internal adapter only lets `XisoImageSource` treat it as an `IBlockDevice`. |
 
 Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXiso(IBlockDevice, isoName, requireOptimizedTag)`), `ListDirectory(IBlockDevice, path)`. FileStream overloads delegate thinly.
 
@@ -119,10 +119,13 @@ Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXis
 | `SecuritySectors` | `Parse(path)` → `int[]` sorted, `4096`-sector `start-end` validation (`4095` length) |
 | `XisoZarchive` | `CreateZar` (XISO to `.zar` via `ZArchiveSharp.ZArchiveWriter`: zstd L6 blocks, raw fallback, optional `IZarBlockCompressor`, `removeUpdate`, partition offsets); `ListZar`, `ExtractZar` (depth-bounded, pre-sized exact-length copies, partial-file cleanup), `ConvertZarToIso`, `ComputeFileHash` (per-entry MD5/SHA-256 for validation) |
 | `XisoChecksum` | `ComputeImageChecksum` / `ComputeImageChecksumHex` — SHA3-256 `SortedDictionary Ordinal` (`/path` UTF-8 + streamed data, `xdvdfs` compat; BCL `SHA3_256` when supported, else pure-managed fallback); `ComputeZarChecksum`/`ComputeZarChecksumHex` for `.zar`; `ComputeStfsChecksum`/`ComputeStfsChecksumHex` for XBLA/XBLIG STFS packages |
-| `StfsPackage` / `StfsEntry` / `StfsPackageInfo` | Read-only single-file XBLA/XBLIG STFS package: `IsStfsPackage`, `Open`, `TryOpen`, `Entries`, `Find`, `ReadAllBytes`, `CopyTo`, `ExtractTo`, `Validate`; file table, hash-chain block lists, SHA-1 hash-tree verification and volume/title metadata |
-| `StfsValidationReport` / `StfsValidationIssue` | Result of `StfsPackage.Validate`: file/block/table counts, bytes checked, `IsValid` and the per-area mismatch list |
+| `StfsSharp.StfsPackage` / `StfsEntry` / `StfsPackageInfo` | Read-only single-file XBLA/XBLIG STFS package from the `StfsSharp` package: `IsStfsPackage`, `Open`, `TryOpen`, `Entries`, `Find`, `ReadAllBytes`, `CopyTo`, `ExtractTo`, `Validate`; file table, hash-chain block lists, SHA-1 hash-tree verification and volume/title metadata |
+| `StfsSharp.StfsValidationReport` / `StfsValidationIssue` | Result of `StfsPackage.Validate`: file/block/table counts, bytes checked, `IsValid` and the per-area mismatch list |
 | `CisoWriter` / `CisoReader` | `CompressToCso` (BCL DEFLATE v1 `0x80000000`, `align` 0/1/2, threshold `+12`, `--ciso-split` shim, optional `jobs` 1..64 for bounded-parallel sector compression with byte-identical output) / `DecompressToIso` (v1 DEFLATE + v2 LZ4) |
 | `XisoCci` | `CompressToCci` / `DecompressToIso` / `DeriveDefaultCciPath` / `DeriveDefaultIsoPath` (CCISharp-backed CCI/CCIM) |
+| `HostIoDiagnostics` | `Describe(exception, operation, path)` maps permission-denied, long-path, sharing, existing-destination, illegal-name and full-disk failures to a message naming the path, operation and likely fix |
+| `XisoDat` | `Parse` / `Verify`: Redump-style XML DAT (`game/rom` size + MD5/SHA-1/CRC32) matching with verified/ambiguous/not-in-DAT and missing-entry reports |
+| `SymlinkMode` | `Follow` (default), `Skip` or `Reject` for create/pack/remap/Apply source walks |
 | `XisoImageSource` | `TryDetect` / `IsSupportedImage` / `IsCompressedImage` / `IsGodImage` / `OpenRead` / `OpenBlockDevice` / `StripImageSuffix` across ISO, split ISO, CISO, CCI, GOD/SVOD and ZAR |
 
 See [Archival](archival.md) and [Compression](compression.md).
@@ -260,6 +263,30 @@ already-masked `ExplorerNode.Attributes` / `EntryInfo.Attributes`.
 | `ValidationResult ValidateConversion(string sourcePath, string outputPath, bool verifyChecksums = false)` | Compare two images' file trees (counts, paths, sizes, optional SHA-256). Either side may be ISO, CISO/CCI (single or split), a split plain-ISO set, or a `.zar` archive |
 | `void LogResult(ValidationResult result, string sourcePath, string outputPath)` | Print the `[VALIDATE]` summary |
 | `void WriteReport(ValidationResult result, string sourcePath, string outputPath, string reportPath)` | Write a JSON report |
+
+## XisoDiscInfo
+
+`public static class XisoDiscInfo` inspects a plain/Redump image without
+modifying it and returns an `XisoDiscLayout`:
+
+| Member | Description |
+|---|---|
+| `Read(path, securitySectorsPath = null, skipSectors = null, quiet = false)` | XGD type/wave, video L0/L1 and game-partition `DiscPartition` ranges, `DiscPhysicalFormatInfo` (PFI/layer break), `DiscSecuritySectorRange` list, Redump-size match and `Warnings`. |
+| `IsKnownRedumpSize(path)` | True when the file length matches one of `XgdTables.RedumpIsoLength`. |
+
+Containers (CISO/CCI/GOD/split sets) report `IsContainer = true`, the
+game-partition view, and leave video/PFI fields null.
+
+## XisoNameRules
+
+`public static class XisoNameRules` owns the Xbox filename contract:
+
+| Member | Description |
+|---|---|
+| `MaxComponentLength` | `42` (classic Xbox/Xbox 360 component limit). |
+| `GetComponentError(component)` | Actionable error for empty/separator/non-Latin-1/over-long components; `null` when valid. |
+| `GetPathError(internalPath)` | Validates every `/`/`\` component. |
+| `IsValidComponent(component)` | Convenience boolean. |
 
 ## Unpack & path safety
 

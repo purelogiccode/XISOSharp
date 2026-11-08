@@ -23,18 +23,32 @@
 
 A **pure C#** port of [extract-xiso](https://github.com/XboxDev/extract-xiso) for Xbox ISO (XISO / XDVDFS) images — **byte-identical** output, no native dependencies, no P/Invoke, just .NET. Beyond the C baseline it merges the archival power of [XboxKit](https://github.com/Deterous/XboxKit) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) into one trimmable, AOT-compatible library + CLI.
 
+The **2.0.0** API cleanup removes the 1.x StfsSharp compatibility facades
+(consumers use `StfsSharp` directly). The **2.1.0** feature pass adds
+`disc-info` (XGD/Redump layout inspector), `apply-skeleton` (the byte-identical
+inverse of `--petrify`), `file-hashes` per-file sidecars for every container,
+`verify-dat` Redump DAT matching, parallel collection verbs (`--jobs` for
+checksum/hash/audit/batch work), `--symlink-mode`, actionable host-I/O
+diagnostics, embedded `default.xex` metadata for GOD/STFS, XEX thumbnail export,
+loose `.xex`/`.xbe` inputs, `--zar-level`, Xbox 42-character name validation
+(`--strict-names`) and deterministic packing (`--deterministic`).
+
 ## Companion projects
 
 XISOSharp is one part of a small Xbox image toolchain:
 
-- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** — read-only Dokan/FUSE drive that mounts ISO/CISO and GOD/SVOD sources through `XisoImage`/`XisoImageSource`, plus CHD and ZAR through their dedicated readers.
-- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** — desktop converter/explorer with GOD/SVOD input, the title metadata panel and XBE logo/title/save previews.
+- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** - read-only Dokan/FUSE drive that mounts ISO/CISO/CCI and GOD/SVOD sources through `XisoImage`/`XisoImageSource`, plus CHD and ZAR through their dedicated readers.
+- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** - desktop converter/explorer with CCI validation, GOD/SVOD input, the title metadata panel and XBE logo/title/save previews.
 - **[StfsSharp](https://github.com/purelogiccode/STFSSharp)** — standalone read-only GOD/SVOD and XBLA/XBLIG STFS reader used by XISOSharp.
 - **[CCISharp](https://github.com/purelogiccode/CCISharp)** — CCI/CCIM reader/writer used by XISOSharp.
 - **[ZArchiveSharp](https://github.com/purelogiccode/ZArchiveSharp)** — ZArchive/zstd reader/writer used by XISOSharp.
 
-SimpleXisoDrive and XISO Studio consume the `XisoImage` facade and `XbeAssets` in-process;
-the three library packages remain standalone dependencies for their own readers.
+SimpleXisoDrive uses `XISOSharp` for mounting and XDVDFS reads and references
+`StfsSharp` directly for GOD/SVOD header, `.data` and parent-folder resolution.
+XISO Studio uses `XISOSharp` for exploring/reading the filesystem, `StfsSharp`
+directly for GOD header/title metadata, and `CCISharp` directly for CCI
+container validation. The packages remain standalone NuGet dependencies, so
+neither app depends on the XISOSharp compatibility facades removed in 2.0.0.
 
 ## Projects
 
@@ -42,7 +56,7 @@ the three library packages remain standalone dependencies for their own readers.
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) - full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) - extract-xiso-compatible flags + 35+ extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (2217 tests on net10.0; 2144 on net8.0/net9.0) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + XDBF/XSRC 360 title metadata + XBE logo/title/save images + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + CCI/libCCI interop + split-ISO input + ZAR input + GOD/SVOD read-only input + XBLA/XBLIG STFS package listing/extraction + SHA-1 hash-tree validation + StfsSharp facade parity + pathological TOC chains (list/tree/extract/rewrite/audit/ranges/repair/salvage/ZAR) + batch container conversion + JSON output/preallocation + explicit sector-layout packing + parallel extraction (ISO/CISO/split, resume, continue-on-error, CLI `--jobs`) + concurrent creation and extraction (independent overlapping creates, CWD-free writer and reader) + safe-extract name policy (reject/sanitize/skip) + GOD and XBLA/XBLIG header title metadata + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (2309 tests on net10.0; 2236 on net8.0/net9.0) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + XDBF/XSRC 360 title metadata + XBE logo/title/save images + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + CCI/libCCI interop + split-ISO input + ZAR input + GOD/SVOD read-only input + XBLA/XBLIG STFS package listing/extraction + SHA-1 hash-tree validation + StfsSharp integration + pathological TOC chains (list/tree/extract/rewrite/audit/ranges/repair/salvage/ZAR) + batch container conversion + JSON output/preallocation + explicit sector-layout packing + parallel extraction (ISO/CISO/split, resume, continue-on-error, CLI `--jobs`) + concurrent creation and extraction (independent overlapping creates, CWD-free writer and reader) + safe-extract name policy (reject/sanitize/skip) + GOD and XBLA/XBLIG header title metadata + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command coverage |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 1 of `H:\XBOXTest`, seeded): `extract-xiso.exe` (reference build `202609111233`; `list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
@@ -64,7 +78,6 @@ Full docs live in [`docs/`](docs/README.md) — served as a **Docsify site with 
 - [Benchmarks](docs/benchmarks.md) — in-process baseline and reproducible extract-xiso/xdvdfs comparison
 - [Release Notes](docs/release-notes.md) · [What's New](WhatsNew.md) — what changed in each release
 - [Project History](docs/project-history.md) — completed releases, implemented baseline, reference oracles and progress log
-- [Missing Features](PlanToEnhance.md) — current unimplemented feature list
 
 > **Left menu:** open `docs/index.html` locally or via Pages — [`docs/_sidebar.md`](docs/_sidebar.md) is the sidebar. The GitHub Wiki uses the generated `_Sidebar.md` from the same file.
 
@@ -583,7 +596,7 @@ if (XisoImageSource.TryDetect("game.1.cci", out XisoImageSourceInfo? source) && 
 
 using Stream imageView = XisoImageSource.OpenRead("game.1.cci"); // decompressed/concatenated view
 using IBlockDevice imageDev = XisoImageSource.OpenBlockDevice("game.1.iso");
-using var godDev = new GodBlockDevice("4D5307E6"); // GOD header or its .data folder
+using var godVolume = StfsSharp.GodVolume.Open("4D5307E6"); // GOD header or its .data folder
 
 // ZAR input: list, extract, convert, and the ISO-equivalent tree checksum
 IReadOnlyList<ZarEntry> zarEntries = XisoZarchive.ListZar("game.zar");
@@ -739,12 +752,12 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (same outputs; no implicit pack)
-dotnet test -c Release                       # 2217 tests on net10.0 (2144 on net8/9; `XISOSharp.Tests`; ZArchiveSharp/CCISharp/StfsSharp come from NuGet)
+dotnet test -c Release                       # 2309 tests on net10.0 (2236 on net8/9; `XISOSharp.Tests`; ZArchiveSharp/CCISharp/StfsSharp come from NuGet)
 ```
 
 Layout: every project lives in its own top-level folder beside the solution — `XISOSharp` (library), `XISOSharp.Cli`, `XISOSharp.Gui`, `XISOSharpTester`, the verification harnesses (`XISOSharp.Tests`, `XISOSharp.BattleTests`, `XISOSharp.Benchmarks`, `XISOSharp.Fuzz`, `XISOSharp.AotSmoke`, `XISOSharp.TestDataGenerator`) and the `XISOSharp.Sample` walkthrough. There are no `src`/`apps`/`tests`/`samples` grouping folders.
 
-Projects: `XISOSharp` (`net8.0`/`net9.0`/`net10.0`) packs explicitly (`dotnet pack`; `GeneratePackageOnBuild` is off); `XISOSharp.Cli` (`net8.0`/`net9.0`/`net10.0`, ships net10.0 as the release-bundle executable); `XISOSharp.Tests` (`net8.0`/`net9.0`/`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF); `XISOSharp.Fuzz` (mutation fuzzer); `XISOSharp.AotSmoke` (NativeAOT smoke); `XISOSharp.Sample` (library walkthrough). `ZArchiveSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZArchiveSharp.Tests` + `ZArchiveSharp.Benchmarks` moved to the sibling `../CSharp_ZArchiveSharp` repo (own solution); `XISOSharp` consumes the library as NuGet package `ZArchiveSharp` 1.4.0. The GOD/STFS readers live in the sibling `../CSharp_STFSSharp` repo and are consumed as NuGet package `StfsSharp` 1.0.0; XISOSharp keeps compatibility facades for its existing public types. CI builds on `ubuntu`/`windows`/`macos`.
+Projects: `XISOSharp` (`net8.0`/`net9.0`/`net10.0`) packs explicitly (`dotnet pack`; `GeneratePackageOnBuild` is off); `XISOSharp.Cli` (`net8.0`/`net9.0`/`net10.0`, ships net10.0 as the release-bundle executable); `XISOSharp.Tests` (`net8.0`/`net9.0`/`net10.0`); `XISOSharpTester` (`net10.0-windows` WPF); `XISOSharp.Fuzz` (mutation fuzzer); `XISOSharp.AotSmoke` (NativeAOT smoke); `XISOSharp.Sample` (library walkthrough). `ZArchiveSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZArchiveSharp.Tests` + `ZArchiveSharp.Benchmarks` moved to the sibling `../CSharp_ZArchiveSharp` repo (own solution); `XISOSharp` consumes the library as NuGet package `ZArchiveSharp` 1.4.0. The GOD/STFS readers live in the sibling `../CSharp_STFSSharp` repo and are consumed as NuGet package `StfsSharp` 1.0.0; XISOSharp 2.0.0 references those types directly (the 1.x compatibility facades are gone). CI builds on `ubuntu`/`windows`/`macos`.
 
 ## Requirements
 

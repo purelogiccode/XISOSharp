@@ -230,7 +230,26 @@ internal sealed record JsonHashEntry(
     string Path,
     string Status,
     string? ExpectedSha1,
-    string? ActualSha1);
+    string? ActualSha1,
+    string? Algorithm = null);
+
+/// <summary>One file in a generated <c>--file-hashes</c> sidecar.</summary>
+internal sealed record JsonFileHashEntry(
+    string Path,
+    long Size,
+    string Algorithm,
+    string Hash);
+
+/// <summary><c>file-hashes</c> command payload.</summary>
+internal sealed record JsonFileHashes(
+    int SchemaVersion,
+    string Command,
+    string Source,
+    string? Output,
+    string Algorithm,
+    int FileCount,
+    long TotalBytes,
+    List<JsonFileHashEntry> Entries);
 
 /// <summary><c>verify-hashes</c> command payload.</summary>
 internal sealed record JsonHashVerification(
@@ -245,6 +264,61 @@ internal sealed record JsonHashVerification(
     int Missing,
     int Extra,
     List<JsonHashEntry> Entries);
+
+/// <summary>One disc-layout partition range.</summary>
+internal sealed record JsonDiscRange(
+    string Name,
+    long ByteOffset,
+    long ByteLength,
+    long StartSector,
+    long SectorCount,
+    bool Available);
+
+/// <summary>One security-sector range.</summary>
+internal sealed record JsonDiscSecurityRange(
+    long StartSector,
+    long EndSector,
+    long SectorCount);
+
+/// <summary>Physical Format Information fields observed in a Redump image.</summary>
+internal sealed record JsonDiscPfi(
+    long ByteOffset,
+    int BookType,
+    int PartVersion,
+    int DiscSize,
+    int MaximumRate,
+    int LayerCount,
+    int TrackPath,
+    int LayerType,
+    long DataStartSector,
+    long DataEndSector,
+    long Layer0EndSector);
+
+/// <summary><c>disc-info</c> command payload.</summary>
+internal sealed record JsonDiscInfo(
+    int SchemaVersion,
+    string Command,
+    string Source,
+    string Format,
+    bool IsContainer,
+    long FileLength,
+    long TotalSectors,
+    JsonVolume Volume,
+    string DiscFormat,
+    string XgdType,
+    int? RedumpTypeIndex,
+    bool RedumpSizeMatch,
+    string? RedumpTypeName,
+    int? VideoTypeIndex,
+    string? VideoTypeName,
+    string? Wave,
+    JsonDiscRange? VideoL0,
+    JsonDiscRange? VideoL1,
+    JsonDiscRange? GamePartition,
+    JsonDiscPfi? Pfi,
+    string? SecuritySectorsSource,
+    List<JsonDiscSecurityRange> SecuritySectors,
+    List<string> Warnings);
 
 /// <summary><c>title-info</c> command payload.</summary>
 internal sealed record JsonTitleInfo(
@@ -279,7 +353,13 @@ internal sealed record JsonGodTitleInfo(
     uint TitleId,
     string TitleIdHex,
     byte DiscNumber,
-    byte DiscCount);
+    byte DiscCount,
+    string? XexPath = null,
+    string? Publisher = null,
+    string? Developer = null,
+    string? Genre = null,
+    string? Description = null,
+    bool? HasThumbnail = null);
 
 /// <summary><c>title-info</c> command payload for a single-file XBLA/XBLIG STFS package.</summary>
 internal sealed record JsonStfsTitleInfo(
@@ -293,7 +373,46 @@ internal sealed record JsonStfsTitleInfo(
     string TitleIdHex,
     byte DiscNumber,
     byte DiscCount,
-    uint ContentType);
+    uint ContentType,
+    string? XexPath = null,
+    string? Publisher = null,
+    string? Developer = null,
+    string? Genre = null,
+    string? Description = null,
+    bool? HasThumbnail = null);
+
+/// <summary><c>verify-dat</c> DAT entry payload.</summary>
+internal sealed record JsonDatRom(
+    string Game,
+    string Name,
+    long Size,
+    string? Md5,
+    string? Sha1,
+    string? Crc);
+
+/// <summary><c>verify-dat</c> image payload.</summary>
+internal sealed record JsonDatImage(
+    string Image,
+    string Status,
+    long Size,
+    string Md5,
+    string Sha1,
+    string Crc,
+    List<JsonDatRom> Matches);
+
+/// <summary><c>verify-dat</c> command payload.</summary>
+internal sealed record JsonDatVerification(
+    int SchemaVersion,
+    string Command,
+    string Dat,
+    bool Passed,
+    int Verified,
+    int Missing,
+    int Ambiguous,
+    int NotInDat,
+    int Images,
+    List<JsonDatImage> Results,
+    List<JsonDatRom> MissingRoms);
 
 /// <summary>
 /// Trim/AOT-safe source-generation context for every <c>--json</c> payload.
@@ -313,7 +432,10 @@ internal sealed record JsonStfsTitleInfo(
 [JsonSerializable(typeof(JsonValidation))]
 [JsonSerializable(typeof(JsonImageHashes))]
 [JsonSerializable(typeof(JsonHashVerification))]
+[JsonSerializable(typeof(JsonFileHashes))]
+[JsonSerializable(typeof(JsonDiscInfo))]
 [JsonSerializable(typeof(JsonTitleInfo))]
 [JsonSerializable(typeof(JsonGodTitleInfo))]
 [JsonSerializable(typeof(JsonStfsTitleInfo))]
+[JsonSerializable(typeof(JsonDatVerification))]
 internal sealed partial class JsonOutputContext : JsonSerializerContext;

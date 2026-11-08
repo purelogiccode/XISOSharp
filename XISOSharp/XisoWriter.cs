@@ -133,6 +133,36 @@ public static class XisoWriter
             out outIsoPath, inName, progressCallback, cancellationToken, prependSectors,
             excludePatterns, progress, fileTime, sourceDiscLseek, layout);
 
+#pragma warning disable CS1573 // Overload is documented by the main CreateXiso method.
+    /// <summary>
+    /// <inheritdoc cref="CreateXiso(string,string?,AvlNode?,Stream?,out string?,string?,ProgressCallback?,CancellationToken,int?,IReadOnlyList{string}?,IProgress{ProgressInfo}?,ulong?,long,XisoLayoutSpec?)"/>
+    /// </summary>
+    /// <param name="symlinkMode">
+    /// How file and directory links are treated while building the source tree.
+    /// The default keeps the historical behavior: file links follow their target
+    /// and directory reparse points are skipped.
+    /// </param>
+    public static int CreateXiso(
+        string rootDirectory,
+        string? outputDirectory,
+        AvlNode? inRoot,
+        Stream? sourceStream,
+        out string? outIsoPath,
+        string? inName,
+        ProgressCallback? progressCallback,
+        CancellationToken cancellationToken,
+        int? prependSectors,
+        IReadOnlyList<string>? excludePatterns,
+        IProgress<ProgressInfo>? progress,
+        ulong? fileTime,
+        long sourceDiscLseek,
+        XisoLayoutSpec? layout,
+        SymlinkMode symlinkMode) =>
+        CreateXisoCore(rootDirectory, outputDirectory, inRoot, sourceStream,
+            out outIsoPath, inName, progressCallback, cancellationToken, prependSectors,
+            excludePatterns, progress, fileTime, sourceDiscLseek, layout, symlinkMode: symlinkMode);
+#pragma warning restore CS1573
+
     /// <summary>
     /// Creates an XISO image from a caller-supplied source filesystem instead of
     /// a local directory. The tree is enumerated through
@@ -202,7 +232,9 @@ public static class XisoWriter
         ulong? fileTime = null,
         long sourceDiscLseek = 0,
         XisoLayoutSpec? layout = null,
-        ISourceFilesystem? sourceFilesystem = null)
+        ISourceFilesystem? sourceFilesystem = null,
+        bool strictNames = false,
+        SymlinkMode symlinkMode = SymlinkMode.Follow)
     {
         cancellationToken.ThrowIfCancellationRequested();
         outIsoPath = null;
@@ -417,7 +449,7 @@ public static class XisoWriter
                 ? GenerateAvlTreeSource(ref root.Subdirectory, ref n, ref filesSkipped,
                     sourceFilesystem, virtualSourceRoot, ref totalBytes, effectivePatterns)
                 : GenerateAvlTreeLocal(ref root.Subdirectory, ref n, ref filesSkipped,
-                    sourceRootPath ?? rootDirectory, ref totalBytes, effectivePatterns);
+                    sourceRootPath ?? rootDirectory, ref totalBytes, effectivePatterns, symlinkMode: symlinkMode);
 
             for (int i = 0; i < n; i++) Logger.Log("\b");
             for (int i = 0; i < n; i++) Logger.Log(" ");
@@ -433,6 +465,8 @@ public static class XisoWriter
         }
 
         if (err != 0) goto cleanup;
+
+        ValidateXboxNames(root.Subdirectory, string.Empty, strictNames);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -914,7 +948,7 @@ public static class XisoWriter
     /// to the source root with <c>/</c> separators; matching directories are not recursed into.
     /// </param>
     /// <param name="relativePath">Relative path of the current directory within the source root.</param>
-    /// <returns>0 on success.</returns>
+    /// <param name="symlinkMode">How file and directory links are treated.</param>
     private static int GenerateAvlTreeLocal(
         ref AvlNode? outRoot,
         ref int ioN,
@@ -922,11 +956,12 @@ public static class XisoWriter
         string directoryPath,
         ref long totalBytes,
         IReadOnlyList<string>? excludePatterns = null,
-        string relativePath = "")
+        string relativePath = "",
+        SymlinkMode symlinkMode = SymlinkMode.Follow)
     {
         GlobMatcher? matcher = excludePatterns is { Count: > 0 } ? new GlobMatcher(excludePatterns) : null;
         return GenerateAvlTreeLocalCore(ref outRoot, ref ioN, ref filesSkipped, directoryPath,
-            ref totalBytes, matcher, relativePath);
+            ref totalBytes, matcher, relativePath, symlinkMode);
     }
 
     private static int GenerateAvlTreeLocalCore(
@@ -936,7 +971,8 @@ public static class XisoWriter
         string directoryPath,
         ref long totalBytes,
         GlobMatcher? matcher,
-        string relativePath)
+        string relativePath,
+        SymlinkMode symlinkMode)
     {
         string[] entries = Directory.GetFileSystemEntries(directoryPath);
         // Deterministic (TODO #2): filesystem enumeration order is OS-dependent and
@@ -973,12 +1009,18 @@ public static class XisoWriter
                 if ((attr & FileAttributes.Directory) != FileAttributes.None &&
                     (attr & FileAttributes.ReparsePoint) != FileAttributes.None)
                 {
-                    // Never descend into directory reparse points (symlinks,
-                    // junctions, mount points): XISO has no link representation,
-                    // and a cyclic link would recurse forever (TODO #21).
-                    // Symlinks to files are still packed (target content).
-                    Logger.LogErr(
-                        $"warning: skipping reparse point (symlink/junction): {entryName}, not descending.\n");
+                    // Directory reparse points (symlinks, junctions, mount
+                    // points) have no XISO representation, and a cyclic link
+                    // would recurse forever (TODO #21).
+                    if (symlinkMode == SymlinkMode.Reject)
+                    {
+                        throw new InvalidDataException(
+                            $"Cannot pack directory link '{entryRelPath}': --symlink-mode reject.");
+                    }
+
+                    Logger.LogErr(symlinkMode == SymlinkMode.Skip
+                        ? $"symlink: skipping directory link {entryRelPath}.\n"
+                        : $"warning: skipping reparse point (symlink/junction): {entryName}, not descending.\n");
                     filesSkipped++;
                     continue;
                 }
@@ -989,10 +1031,24 @@ public static class XisoWriter
                 {
                     emptyDir = false;
                     GenerateAvlTreeLocalCore(ref avl.Subdirectory, ref ioN, ref filesSkipped, entryPath,
-                        ref totalBytes, matcher, entryRelPath);
+                        ref totalBytes, matcher, entryRelPath, symlinkMode);
                 }
                 else
                 {
+                    bool isLink = (attr & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint;
+                    if (isLink && symlinkMode != SymlinkMode.Follow)
+                    {
+                        if (symlinkMode == SymlinkMode.Reject)
+                        {
+                            throw new InvalidDataException(
+                                $"Cannot pack file link '{entryRelPath}': --symlink-mode reject.");
+                        }
+
+                        Logger.LogErr($"symlink: skipping file link {entryRelPath}.\n");
+                        filesSkipped++;
+                        continue;
+                    }
+
                     emptyDir = false;
                     FileInfo fi = new(entryPath);
                     long packedLength = PackedFileLength(fi);
@@ -1003,7 +1059,7 @@ public static class XisoWriter
 
                     // XISO has no link representation: a file symlink packs its
                     // target's bytes under the link name — say so (BUG-LIB-026).
-                    if ((fi.Attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
+                    if (isLink)
                     {
                         Logger.LogErr(
                             $"warning: packing symlink as target content (links are not preserved): {entryRelPath}.\n");
@@ -1251,6 +1307,40 @@ public static class XisoWriter
             fileTime: fileTime, layout: layout);
     }
 
+#pragma warning disable CS1573 // Overload is documented by the main PackFromDirectory method.
+    /// <summary>
+    /// <inheritdoc cref="PackFromDirectory(string,string,IReadOnlyList{string}?,ProgressCallback?,CancellationToken,IProgress{ProgressInfo}?,ulong?,XisoLayoutSpec?)"/>
+    /// </summary>
+    /// <param name="symlinkMode">How file and directory links are treated.</param>
+    public static int PackFromDirectory(
+        string sourceDirectory,
+        string outputIsoPath,
+        IReadOnlyList<string>? excludePatterns,
+        ProgressCallback? progressCallback,
+        CancellationToken cancellationToken,
+        IProgress<ProgressInfo>? progress,
+        ulong? fileTime,
+        XisoLayoutSpec? layout,
+        SymlinkMode symlinkMode)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
+
+        string fullOutput = Path.GetFullPath(outputIsoPath);
+        string fullSource = Path.GetFullPath(sourceDirectory).TrimEnd(Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar);
+        ValidateOutputNotColliding(fullSource, fullOutput);
+
+        string outputDirectory = Path.GetDirectoryName(fullOutput) ?? Directory.GetCurrentDirectory();
+        string inName = Path.GetFileName(fullOutput);
+
+        Directory.CreateDirectory(outputDirectory);
+
+        return CreateXiso(sourceDirectory, outputDirectory, null, null, out _, inName,
+            progressCallback, cancellationToken, null, excludePatterns, progress, fileTime, 0, layout,
+            symlinkMode);
+    }
+#pragma warning restore CS1573
+
     /// <summary>
     /// Packs a caller-supplied source filesystem into an XISO image with a 1:1
     /// mapping (LIB-01). The output remains a local host path; no host source
@@ -1368,16 +1458,18 @@ public static class XisoWriter
     /// When <c>null</c> (default), the current time is written.
     /// </param>
     /// <param name="layout">Optional explicit sector layout (PlanToEnhance Phase 8).</param>
+    /// <param name="strictNames">Fail before writing on a name-rule violation; warn by default.</param>
     internal static int CreateFromRemapTree(AvlNode? remapRoot, string outputIsoPath, string? volumeName = null,
         IProgress<ProgressInfo>? progress = null, ProgressCallback? progressCallback = null,
         CancellationToken cancellationToken = default, int? prependSectors = null, ulong? fileTime = null,
-        XisoLayoutSpec? layout = null) =>
+        XisoLayoutSpec? layout = null, bool strictNames = false) =>
         CreateFromRemapTreeCore(remapRoot, outputIsoPath, volumeName, progress, progressCallback,
-            cancellationToken, prependSectors, fileTime, layout);
+            cancellationToken, prependSectors, fileTime, layout, strictNames);
 
     private static int CreateFromRemapTreeCore(AvlNode? remapRoot, string outputIsoPath, string? volumeName,
         IProgress<ProgressInfo>? progress, ProgressCallback? progressCallback,
-        CancellationToken cancellationToken, int? prependSectors, ulong? fileTime, XisoLayoutSpec? layout)
+        CancellationToken cancellationToken, int? prependSectors, ulong? fileTime, XisoLayoutSpec? layout,
+        bool strictNames)
     {
         ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
         cancellationToken.ThrowIfCancellationRequested();
@@ -1400,6 +1492,8 @@ public static class XisoWriter
             StartSector = Constants.RootDirectorySector,
             Subdirectory = remapRoot ?? AvlNode.EmptySubdirectory
         };
+
+        ValidateXboxNames(root.Subdirectory, string.Empty, strictNames);
 
         // Compute totals from remap tree for progress
         long totalBytes = 0;
@@ -1633,6 +1727,47 @@ public static class XisoWriter
         }
 
         return p.Length == 0 ? "/" : p;
+    }
+
+    /// <summary>
+    /// Checks every packed component against the Xbox 42-character limit and
+    /// the Latin-1 storage contract. Warnings are non-fatal by default;
+    /// <paramref name="strict"/> turns the first problem into a named error
+    /// before any output file is created.
+    /// </summary>
+    private static void ValidateXboxNames(AvlNode? node, string parentPath, bool strict)
+    {
+        if (node is null || ReferenceEquals(node, AvlNode.EmptySubdirectory))
+        {
+            return;
+        }
+
+        ValidateXboxNames(node.Left, parentPath, strict);
+
+        string fullPath = parentPath.Length == 0 ? node.Filename : parentPath + "/" + node.Filename;
+        string? error = XisoNameRules.GetComponentError(node.Filename);
+        if (error != null)
+        {
+            // Only the classic 42-character overrun is a warning; names that
+            // cannot be encoded at all must fail before any output exists.
+            bool onlyTooLong = node.Filename.Length > XisoNameRules.MaxComponentLength &&
+                               node.Filename.All(static c => c <= 0xFF) &&
+                               !node.Filename.Contains('/') && !node.Filename.Contains('\\');
+            if (strict || !onlyTooLong)
+            {
+                throw new XisoFormatException($"{error} Image path: '{fullPath}'.");
+            }
+
+            Logger.LogErr($"warning: {error} Image path: '{fullPath}'.\n");
+            Logger.Warned = true;
+        }
+
+        if (node.Subdirectory is not null)
+        {
+            ValidateXboxNames(node.Subdirectory, fullPath, strict);
+        }
+
+        ValidateXboxNames(node.Right, parentPath, strict);
     }
 
     /// <summary>

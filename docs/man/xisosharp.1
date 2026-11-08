@@ -39,6 +39,9 @@ xisosharp \- create, extract, list, rewrite and archive Xbox XISO/XDVDFS disc im
 \fBverify-hashes\fR \fIimage\fR \fIhash-file\fR [\fB\-\-ignore-extra\fR] [\fB\-\-json\fR]
 .br
 .B XISOSharp
+\fBverify-dat\fR \fIdat\fR \fIimage\fR [\fIimages\fR ...] [\fB\-\-json\fR]
+.br
+.B XISOSharp
 \fBtitle-info\fR \fIimage\fR [\fB\-\-json\fR]
 .br
 .B XISOSharp
@@ -138,6 +141,10 @@ Compute CRC32, MD5, SHA-1, SHA-256 and SHA3-256 in one pass.
 .TP
 .B verify-hashes \fIimage\fR \fIhash-file\fR
 Verify a \fI*.hash\fR sidecar produced by \fB\-\-petrify\fR.
+.TP
+.B verify-dat \fIdat\fR \fIimage\fR ...
+Match whole images against a Redump-style XML DAT by size and MD5/SHA-1/CRC32;
+report verified, ambiguous, not-in-DAT and missing entries.
 .TP
 .B title-info \fIimage\fR
 Show title metadata from XBE/XEX, XDBF/XSRC or GOD/STFS XContent headers.
@@ -271,7 +278,14 @@ Fixed FILETIME for create, pack and build-image (ISO-8601, raw, hex,
 .TP
 .B \-\-jobs \fIN\fR
 Parallel workers (1\-64) for extraction, CISO/CCI compression, batch
-conversion and ZAR creation. Output stays byte-identical to \fB\-\-jobs 1\fR.
+conversion, ZAR creation and multi-image checksum/hash/audit/list/tree/rewrite.
+Output is byte-identical to \fB\-\-jobs 1\fR.
+.TP
+.B \-\-symlink-mode \fIfollow|skip|reject\fR
+Create-time link policy for \fB\-c\fR, \fB\-\-pack\fR, \fBbuild-image\fR and
+\fBapply-skeleton\fR. \fIfollow\fR packs file links as target content and skips
+directory reparse points; \fIskip\fR omits both; \fIreject\fR fails with the
+link path.
 .TP
 .B \-\-batch \fIdirectory\fR
 Process every supported image in a directory.

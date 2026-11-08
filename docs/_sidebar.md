@@ -29,7 +29,6 @@
   - [Testing](testing.md)
   - [Contributing](contributing.md)
   - [Project History](project-history.md)
-  - [Missing Features](https://github.com/purelogiccode/XISOSharp/blob/master/PlanToEnhance.md)
   - [Support Policy](support-policy.md)
   - [Threat Model](threat-model.md)
   - [Troubleshooting](troubleshooting.md)

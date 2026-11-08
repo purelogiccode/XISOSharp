@@ -557,7 +557,7 @@ public partial class MainWindow : Window
         {
             if (File.Exists(path))
             {
-                return GodHeader.IsGodContainer(path) || StfsPackage.IsStfsPackage(path);
+                return StfsSharp.GodHeader.IsGodContainer(path) || StfsSharp.StfsPackage.IsStfsPackage(path);
             }
 
             if (!Directory.Exists(path))
@@ -565,13 +565,13 @@ public partial class MainWindow : Window
                 return false;
             }
 
-            if (GodHeader.IsGodContainer(path))
+            if (StfsSharp.GodHeader.IsGodContainer(path))
             {
                 return true;
             }
 
             return Directory.EnumerateFiles(path).Any(static file =>
-                GodHeader.IsGodContainer(file) || StfsPackage.IsStfsPackage(file));
+                StfsSharp.GodHeader.IsGodContainer(file) || StfsSharp.StfsPackage.IsStfsPackage(file));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                                        or ArgumentException or NotSupportedException)

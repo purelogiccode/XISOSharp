@@ -67,7 +67,14 @@ public static class XgdTables
         };
 
     /// <summary>Gets video type index for a Redump ISO, or -1 if unknown. Mirrors XGD.GetVideoType.</summary>
-    public static int GetVideoType(FileStream? isoFs, int redumpIsoType)
+    public static int GetVideoType(FileStream? isoFs, int redumpIsoType) =>
+        GetVideoType((Stream?)isoFs, redumpIsoType);
+
+    /// <summary>
+    /// Stream overload of <see cref="GetVideoType(FileStream?,int)"/> for
+    /// container-backed images and memory streams.
+    /// </summary>
+    public static int GetVideoType(Stream? isoFs, int redumpIsoType)
     {
         int wave = -1;
         if (redumpIsoType == 5 || redumpIsoType == 7)
@@ -111,7 +118,14 @@ public static class XgdTables
     }
 
     /// <summary>Reads PVD at 0x832D and indexes into WAVE_PVD; -1 if not XGD2w3/XGD3v0 or read fails.</summary>
-    public static int GetWave(FileStream? isoFs, int redumpIsoType)
+    public static int GetWave(FileStream? isoFs, int redumpIsoType) =>
+        GetWave((Stream?)isoFs, redumpIsoType);
+
+    /// <summary>
+    /// Stream overload of <see cref="GetWave(FileStream?,int)"/> for
+    /// container-backed images and memory streams.
+    /// </summary>
+    public static int GetWave(Stream? isoFs, int redumpIsoType)
     {
         if (isoFs is null) return -1;
         if (redumpIsoType != 5 && redumpIsoType != 7) return -1;

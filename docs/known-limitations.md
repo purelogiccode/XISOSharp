@@ -23,15 +23,14 @@ metadata are in scope.
 Deliberately out of scope:
 
 - STFS/CON/LIVE/PIRS **writing**, package rebuild and re-signing. Read-only
-  GOD/SVOD input is supported through `GodBlockDevice`, and single-file
-  XBLA/XBLIG package listing/extraction is supported through `StfsPackage`;
-  STFS writes stay out of scope. `StfsPackage.Validate` verifies the per-block
-  SHA-1 hash tree (level-0/1/2 tables, top hash and header hash), but package
-  signatures are not verified and the reader accepts XBLA/XBLIG/Community Game
-  content types (not saves, profiles or DLC packages). The readers are
-  StfsSharp-backed compatibility facades; the facade types are scheduled for
-  removal in XISOSharp 2.0.0 so consumers can move to the `StfsSharp` package
-  directly.
+  GOD/SVOD input is supported through `StfsSharp.GodVolume`, and single-file
+  XBLA/XBLIG package listing/extraction through `StfsSharp.StfsPackage`;
+  STFS writes stay out of scope. `StfsSharp.StfsPackage.Validate` verifies the
+  per-block SHA-1 hash tree (level-0/1/2 tables, top hash and header hash), but
+  package signatures are not verified and the reader accepts
+  XBLA/XBLIG/Community Game content types (not saves, profiles or DLC packages).
+  XISOSharp 2.0.0 removed the 1.x compatibility facades: reference the
+  `StfsSharp` package directly for these types.
 - CHD containers
 - XEX decryption or XBE editing
 - FUSE/Dokan mounting (see SimpleXisoDrive)
@@ -81,8 +80,11 @@ skipping for a recovery run. The OS must still have long paths enabled
   oracle to port.
 - Redump **rebuild** needs the original video partition and filler/seed (or ZAR
   sidecar); it cannot invent missing disc bytes.
-- `verify-hashes` validates the per-file SHA-1 `.hash` sidecar; Redump DAT
-  matching is not built in (use the `hash` command for full-image digests).
+- `verify-hashes` validates the per-file `.hash` sidecar and detects MD5,
+  SHA-1 and SHA-256 digests; `file-hashes` generates the sidecar for any
+  supported container. `verify-dat` matches whole images against a Redump-style
+  XML DAT by size and MD5/SHA-1/CRC32; no DAT source is bundled, so callers
+  supply their own file.
 
 ## Compression
 
@@ -101,9 +103,9 @@ skipping for a recovery run. The OS must still have long paths enabled
 ## Platforms and support
 
 - The library targets `net8.0`, `net9.0` and `net10.0`. .NET 9 is EOL (May
-  2026) and .NET 8 is EOL (10 November 2026); both remain compatibility-only
-  through 1.x and are removed in 2.0.0. `net10.0` is the LTS target going
-  forward.
+  2026) and .NET 8 is EOL (10 November 2026); both remain supported
+  compatibility targets in 2.x (built and tested on every release).
+  `net10.0` is the LTS target going forward.
 - The test suite runs on Windows, Linux and macOS. The WPF `XISOSharpTester`
   harness only runs on Windows (it builds everywhere).
 - The per-file size field is 32-bit, so a single file cannot exceed ~4 GiB.

@@ -63,13 +63,13 @@ public static class XisoRepairer
                 $"Cannot repair compressed CISO/CCI container '{isoPath}' in place (compressed bytes are not patch-stable); decompress it first.");
         }
 
-        if (GodHeader.IsGodContainer(isoPath))
+        if (StfsSharp.GodHeader.IsGodContainer(isoPath))
         {
             throw new InvalidDataException(
                 $"Cannot repair GOD container '{isoPath}' in place; decompress it to ISO first.");
         }
 
-        if (StfsPackage.IsStfsPackage(isoPath))
+        if (StfsSharp.StfsPackage.IsStfsPackage(isoPath))
         {
             throw new InvalidDataException(
                 $"Cannot repair STFS package '{isoPath}' in place; extract it first.");

@@ -156,7 +156,15 @@ public static class RemapFilesystem
     /// Paths are returned with leading '/'.
     /// </summary>
     public static IReadOnlyList<(string HostPath, string ImagePath)> DryRunRemap(string sourceDir,
-        IReadOnlyList<RemapRule> rules)
+        IReadOnlyList<RemapRule> rules) =>
+        DryRunRemap(sourceDir, rules, SymlinkMode.Follow);
+
+    /// <summary>
+    /// <see cref="DryRunRemap(string,IReadOnlyList{RemapRule})"/> with an explicit
+    /// host-symlink policy.
+    /// </summary>
+    public static IReadOnlyList<(string HostPath, string ImagePath)> DryRunRemap(string sourceDir,
+        IReadOnlyList<RemapRule> rules, SymlinkMode symlinkMode)
     {
         ArgumentException.ThrowIfNullOrEmpty(sourceDir);
         ArgumentNullException.ThrowIfNull(rules);
@@ -164,7 +172,7 @@ public static class RemapFilesystem
             throw new DirectoryNotFoundException($"Source directory not found: {sourceDir}");
 
         List<(string, string)> result = new();
-        foreach ((string hostRel, string guestRel) in BuildMappings(sourceDir, rules))
+        foreach ((string hostRel, string guestRel) in BuildMappings(sourceDir, rules, symlinkMode))
         {
             string host = "/" + hostRel;
             string guest = "/" + guestRel;
@@ -196,7 +204,16 @@ public static class RemapFilesystem
     /// <param name="layout">Optional explicit sector layout (PlanToEnhance Phase 8).</param>
     public static int BuildImage(string sourceDir, string outputIsoPath, IReadOnlyList<RemapRule> rules,
         IProgress<ProgressInfo>? progress = null, CancellationToken ct = default, ulong? fileTime = null,
-        XisoLayoutSpec? layout = null)
+        XisoLayoutSpec? layout = null) =>
+        BuildImage(sourceDir, outputIsoPath, rules, progress, ct, fileTime, layout, SymlinkMode.Follow);
+
+    /// <summary>
+    /// <see cref="BuildImage(string,string,IReadOnlyList{RemapRule},IProgress{ProgressInfo}?,CancellationToken,ulong?,XisoLayoutSpec?)"/>
+    /// with an explicit host-symlink policy.
+    /// </summary>
+    public static int BuildImage(string sourceDir, string outputIsoPath, IReadOnlyList<RemapRule> rules,
+        IProgress<ProgressInfo>? progress, CancellationToken ct, ulong? fileTime,
+        XisoLayoutSpec? layout, SymlinkMode symlinkMode)
     {
         ArgumentException.ThrowIfNullOrEmpty(sourceDir);
         ArgumentException.ThrowIfNullOrEmpty(outputIsoPath);
@@ -219,7 +236,7 @@ public static class RemapFilesystem
         AvlNode? avlRoot;
         try
         {
-            avlRoot = BuildAvlTree(sourceDir, rules, ct);
+            avlRoot = BuildAvlTree(sourceDir, rules, ct, symlinkMode);
         }
         catch (OperationCanceledException)
         {
@@ -250,8 +267,48 @@ public static class RemapFilesystem
 
     // --- internal helpers ---
 
+    /// <summary>
+    /// Applies the create-time link policy to one host entry. Returns
+    /// <c>true</c> when the entry must be skipped; <c>false</c> when a file
+    /// link should be followed (the historical default).
+    /// </summary>
+    private static bool HandleLink(string entryRel, bool isDirectory, SymlinkMode symlinkMode)
+    {
+        if (isDirectory)
+        {
+            if (symlinkMode == SymlinkMode.Reject)
+            {
+                throw new InvalidDataException(
+                    $"Cannot pack directory link '{entryRel}': --symlink-mode reject.");
+            }
+
+            Logger.LogErr(symlinkMode == SymlinkMode.Skip
+                ? $"symlink: skipping directory link {entryRel}.\n"
+                : $"warning: skipping reparse point (symlink/junction): {entryRel}, not descending.\n");
+            return true;
+        }
+
+        if (symlinkMode == SymlinkMode.Follow)
+        {
+            // XISO has no link representation: a file symlink packs its target's
+            // bytes under the link name — say so (BUG-LIB-026).
+            Logger.LogErr(
+                $"warning: packing symlink as target content (links are not preserved): {entryRel}.\n");
+            return false;
+        }
+
+        if (symlinkMode == SymlinkMode.Reject)
+        {
+            throw new InvalidDataException(
+                $"Cannot pack file link '{entryRel}': --symlink-mode reject.");
+        }
+
+        Logger.LogErr($"symlink: skipping file link {entryRel}.\n");
+        return true;
+    }
+
     private static List<(string hostRel, string guestRel)> BuildMappings(string sourceDir,
-        IReadOnlyList<RemapRule> rules)
+        IReadOnlyList<RemapRule> rules, SymlinkMode symlinkMode = SymlinkMode.Follow)
     {
         // Prepare WaxGlobs for host patterns and all_globs check
         List<WaxGlob> waxGlobs = new(rules.Count);
@@ -297,14 +354,13 @@ public static class RemapFilesystem
                 {
                     FileAttributes attr = File.GetAttributes(fullEntry);
                     isDir = (attr & FileAttributes.Directory) != FileAttributes.None;
-                    if (isDir && (attr & FileAttributes.ReparsePoint) != FileAttributes.None)
+                    bool isLink = (attr & FileAttributes.ReparsePoint) != FileAttributes.None;
+                    if (isDir && isLink)
                     {
-                        // Never descend into directory reparse points (symlinks,
-                        // junctions, mount points): XISO has no link representation,
-                        // and a cyclic link would loop the walk forever (TODO #21).
-                        // Symlinks to files are still followed (target content).
-                        Logger.LogErr(
-                            $"warning: skipping reparse point (symlink/junction): {entryRel}, not descending.\n");
+                        // Directory reparse points (symlinks, junctions, mount
+                        // points) have no XISO representation, and a cyclic link
+                        // would loop the walk forever (TODO #21).
+                        HandleLink(entryRel, isDirectory: true, symlinkMode);
                         continue;
                     }
 
@@ -313,17 +369,13 @@ public static class RemapFilesystem
                         // Probe the length so unreadable files (locked, denied) take
                         // the skip path below; the walk itself only needs the kind.
                         _ = new FileInfo(fullEntry).Length;
-                    }
-
-                    // XISO has no link representation: a file symlink packs its
-                    // target's bytes under the link name — say so (BUG-LIB-026).
-                    if (!isDir && (attr & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
-                    {
-                        Logger.LogErr(
-                            $"warning: packing symlink as target content (links are not preserved): {entryRel}.\n");
+                        if (isLink && HandleLink(entryRel, isDirectory: false, symlinkMode))
+                        {
+                            continue;
+                        }
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not InvalidDataException)
                 {
                     Logger.LogDebug($"Skipping unreadable entry '{fullEntry}': {ex.Message}");
                     continue;
@@ -452,7 +504,8 @@ public static class RemapFilesystem
         return string.Join("/", parts);
     }
 
-    private static AvlNode BuildAvlTree(string sourceDir, IReadOnlyList<RemapRule> rules, CancellationToken ct)
+    private static AvlNode BuildAvlTree(string sourceDir, IReadOnlyList<RemapRule> rules, CancellationToken ct,
+        SymlinkMode symlinkMode = SymlinkMode.Follow)
     {
         // Build AVL tree incrementally
         Dictionary<string, AvlNode> dirCache = new(StringComparer.OrdinalIgnoreCase);
@@ -476,7 +529,8 @@ public static class RemapFilesystem
 
         // Rebuild mapping with types (avoid double walk by recomputing here)
         // For simplicity, call a variant that returns types.
-        List<(string hostRel, string guestRel, bool isDir)> typedMappings = BuildTypedMappings(sourceDir, rules);
+        List<(string hostRel, string guestRel, bool isDir)> typedMappings =
+            BuildTypedMappings(sourceDir, rules, symlinkMode);
 
         foreach ((string hostRel, string guestRel, bool isDir) in typedMappings)
         {
@@ -613,7 +667,7 @@ public static class RemapFilesystem
     }
 
     private static List<(string hostRel, string guestRel, bool isDir)> BuildTypedMappings(string sourceDir,
-        IReadOnlyList<RemapRule> rules)
+        IReadOnlyList<RemapRule> rules, SymlinkMode symlinkMode = SymlinkMode.Follow)
     {
         List<WaxGlob> waxGlobs = new(rules.Count);
         foreach (RemapRule r in rules) waxGlobs.Add(new WaxGlob(r.HostGlob));
@@ -653,14 +707,13 @@ public static class RemapFilesystem
                 {
                     FileAttributes attr = File.GetAttributes(fullEntry);
                     isDir = (attr & FileAttributes.Directory) != FileAttributes.None;
-                    if (isDir && (attr & FileAttributes.ReparsePoint) != FileAttributes.None)
+                    bool isLink = (attr & FileAttributes.ReparsePoint) != FileAttributes.None;
+                    if (isDir && isLink)
                     {
-                        // Never descend into directory reparse points (symlinks,
-                        // junctions, mount points): XISO has no link representation,
-                        // and a cyclic link would loop the walk forever (TODO #21).
-                        // Symlinks to files are still followed (target content).
-                        Logger.LogErr(
-                            $"warning: skipping reparse point (symlink/junction): {entryRel}, not descending.\n");
+                        // Directory reparse points (symlinks, junctions, mount
+                        // points) have no XISO representation, and a cyclic link
+                        // would loop the walk forever (TODO #21).
+                        HandleLink(entryRel, isDirectory: true, symlinkMode);
                         continue;
                     }
 
@@ -669,17 +722,13 @@ public static class RemapFilesystem
                         // Probe the length so unreadable files (locked, denied) take
                         // the skip path below; the walk itself only needs the kind.
                         _ = new FileInfo(fullEntry).Length;
-                    }
-
-                    // XISO has no link representation: a file symlink packs its
-                    // target's bytes under the link name — say so (BUG-LIB-026).
-                    if (!isDir && (attr & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
-                    {
-                        Logger.LogErr(
-                            $"warning: packing symlink as target content (links are not preserved): {entryRel}.\n");
+                        if (isLink && HandleLink(entryRel, isDirectory: false, symlinkMode))
+                        {
+                            continue;
+                        }
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not InvalidDataException)
                 {
                     Logger.LogDebug($"Skipping unreadable entry '{fullEntry}': {ex.Message}");
                     continue;

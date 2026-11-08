@@ -448,13 +448,14 @@ public sealed class ParallelExtractionTests : IDisposable
     }
 
     [Fact]
-    public void Cli_JobsOutsideExtract_IsRejected()
+    public void Cli_JobsWithList_IsAccepted()
     {
         int rc = Program.Main(["--jobs", "4", "-l", "no-such-image.iso"]);
 
+        // -l is a collection verb: --jobs is valid and the missing input is the
+        // reported failure.
         Assert.Equal(1, rc);
-        Assert.Contains("--jobs is only used with --zar, extract (-x) or --unpack",
-            _errCapture.ToString(), StringComparison.Ordinal);
+        Assert.Contains("open error", _errCapture.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -469,9 +470,10 @@ public sealed class ParallelExtractionTests : IDisposable
         _errCapture.GetStringBuilder().Clear();
         int rc2 = Program.Main(["-x", "--jobs", "2", "game.zar"]);
 
+        // A multi-image collection may parallelize ZAR extraction; a single
+        // missing archive still fails on the input, not on --jobs.
         Assert.Equal(1, rc2);
-        Assert.Contains("--jobs is not supported for ZArchive extraction",
-            _errCapture.ToString(), StringComparison.Ordinal);
+        Assert.Contains("Error processing ZArchive", _errCapture.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -480,7 +482,6 @@ public sealed class ParallelExtractionTests : IDisposable
         int rc = Program.Main(["--copy-out", "--jobs", "2", "game.iso", "/a.txt", "out.txt"]);
 
         Assert.Equal(1, rc);
-        Assert.Contains("--jobs is only used with --zar, extract (-x) or --unpack",
-            _errCapture.ToString(), StringComparison.Ordinal);
+        Assert.Contains("--jobs is only used with", _errCapture.ToString(), StringComparison.Ordinal);
     }
 }

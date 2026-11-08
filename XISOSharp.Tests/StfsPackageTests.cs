@@ -2,8 +2,14 @@ using System.Buffers.Binary;
 using System.Text;
 using System.Text.Json;
 using XISOSharp.Cli;
-using XISOSharp.Models;
 using XISOSharp.TestDataGenerator;
+using StfsEntry = StfsSharp.Models.StfsEntry;
+using StfsHeader = StfsSharp.StfsHeader;
+using StfsPackage = StfsSharp.StfsPackage;
+using StfsPackageInfo = StfsSharp.Models.StfsPackageInfo;
+using StfsPackageKind = StfsSharp.Models.StfsPackageKind;
+using StfsTitleInfo = StfsSharp.Models.StfsTitleInfo;
+using StfsValidationReport = StfsSharp.Models.StfsValidationReport;
 
 namespace XISOSharp.Tests;
 

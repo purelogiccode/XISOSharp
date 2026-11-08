@@ -17,20 +17,26 @@
 [![Release date](https://img.shields.io/github/release-date/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/releases/latest)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://purelogiccode.github.io/XISOSharp/)
 
-A pure C# class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. A direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool from C to C# - byte-identical output, no native dependencies - extended with the archival power of [XboxKit](https://github.com/Deterous/XboxKit) (Redump video/filler/seed/wipe/trim/petrify/update/rebuild, ZAR) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) (build-image remapping, CISO compress/decompress, checksums). Container input is unified through `XisoImageSource`: plain ISO, split `.1.iso` sets, CISO/CSO (v1/v2, single or split), CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), read-only GOD/SVOD sectors, and ZAR for listing/extraction/conversion; single-file XBLA/XBLIG STFS packages are read directly through the `StfsPackage` facade over [StfsSharp](https://github.com/purelogiccode/STFSSharp). All logic - including the AVL tree, Boyer-Moore search, XISO header verification, directory traversal, format rewriting, and media-enable patching - is ported directly from the reference C implementation.
+A pure C# class library for creating, extracting, listing, and rewriting Xbox ISO (XISO) disc images. A direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) tool from C to C# - byte-identical output, no native dependencies - extended with the archival power of [XboxKit](https://github.com/Deterous/XboxKit) (Redump video/filler/seed/wipe/trim/petrify/update/rebuild, ZAR) and the modern packing of [xdvdfs](https://github.com/antangelo/xdvdfs) (build-image remapping, CISO compress/decompress, checksums). Container input is unified through `XisoImageSource`: plain ISO, split `.1.iso` sets, CISO/CSO (v1/v2, single or split), CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), read-only GOD/SVOD sectors, and ZAR for listing/extraction/conversion; single-file XBLA/XBLIG STFS packages are read directly through [StfsSharp](https://github.com/purelogiccode/STFSSharp). All logic - including the AVL tree, Boyer-Moore search, XISO header verification, directory traversal, format rewriting, and media-enable patching - is ported directly from the reference C implementation.
+
+The 2.1.0 additions cover the beyond-reference tooling: `XisoDiscInfo` (XGD/Redump layout inspection), `XisoSkeleton.Apply` (byte-identical skeleton overlay), `XisoReader.ComputeFileHashSidecar` (per-file hashes for every container), `XisoDat`/`verify-dat` (Redump DAT matching), parallel collection verbs (`--jobs` for checksum/hash/audit/batch extract/list/tree/rewrite), `--symlink-mode`, `HostIoDiagnostics`, embedded `default.xex` XDBF/XSRC metadata for GOD/STFS, XEX thumbnail export, loose `.xex`/`.xbe` parsing, `--zar-level`, `XisoNameRules`/`--strict-names`, and `--deterministic` packing.
 
 ## Companion projects
 
 XISOSharp is part of a small Xbox image toolchain:
 
-- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** — read-only Dokan/FUSE drive that mounts ISO/CISO and GOD/SVOD sources through `XisoImage`/`XisoImageSource`, plus CHD and ZAR through their dedicated readers.
-- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** — desktop converter/explorer with GOD/SVOD input, the title metadata panel and XBE logo/title/save previews.
+- **[SimpleXisoDrive](https://github.com/purelogiccode/SimpleXisoDrive)** - read-only Dokan/FUSE drive that mounts ISO/CISO/CCI and GOD/SVOD sources through `XisoImage`/`XisoImageSource`, plus CHD and ZAR through their dedicated readers.
+- **[XISO Studio](https://github.com/purelogiccode/XISOStudio)** - desktop converter/explorer with CCI validation, GOD/SVOD input, the title metadata panel and XBE logo/title/save previews.
 - **[StfsSharp](https://github.com/purelogiccode/STFSSharp)** — standalone read-only GOD/SVOD and XBLA/XBLIG STFS reader consumed by this package.
 - **[CCISharp](https://github.com/purelogiccode/CCISharp)** — CCI/CCIM reader/writer consumed by this package.
 - **[ZArchiveSharp](https://github.com/purelogiccode/ZArchiveSharp)** — ZArchive/zstd reader/writer consumed by this package.
 
-SimpleXisoDrive and XISO Studio consume the `XisoImage` facade and `XbeAssets` in-process;
-the three library packages remain standalone NuGet dependencies for their own readers.
+SimpleXisoDrive uses `XISOSharp` for mounting and XDVDFS reads and references
+`StfsSharp` directly for GOD/SVOD header, `.data` and parent-folder resolution.
+XISO Studio uses `XISOSharp` for exploring/reading the filesystem, `StfsSharp`
+directly for GOD header/title metadata, and `CCISharp` directly for CCI
+container validation. The packages remain standalone NuGet dependencies, so
+neither app depends on the XISOSharp compatibility facades removed in 2.0.0.
 
 Full documentation (getting started, CLI reference, archival workflows, library API) lives in the [docs folder on GitHub](https://github.com/purelogiccode/XISOSharp/tree/master/docs).
 
@@ -114,7 +120,7 @@ accepts these sources through `XisoReader.OpenImageStream`:
 | `game.1.iso` … | Split plain ISO, concatenated and seekable; a missing middle part throws. |
 | `.cso`, `.1.cso` | CISO v1/v2, single or split, decompressed on demand (`CisoBlockDevice`). |
 | `.cci`, `.N.cci` | CCI/CCIM via [CCISharp](https://github.com/purelogiccode/CCISharp), single or split (`CciBlockDevice`); reader discovery accepts multi-digit parts such as `.10.cci`. |
-| GOD header or `<header>.data` | GOD/SVOD sector input: `DataNNNN` fragments are mapped to the logical image through `GodBlockDevice` (read-only, StfsSharp-backed). |
+| GOD header or `<header>.data` | GOD/SVOD sector input: `DataNNNN` fragments are mapped to the logical image through `StfsSharp.GodVolume` (read-only). |
 | `.zar` | ZArchive name tree: list/extract/checksum/validate/convert (`XisoZarchive`), not a sector image. |
 
 Detection is extension-led with a `CISO`/`CCIM` magic sniff fallback, so renamed
@@ -260,7 +266,7 @@ store such as `MemoryFilesystem` remains correct.
 `UnpackOptions.NamePolicy` controls hostile entry names: `Reject` (default,
 named error), `Sanitize` (replace unsafe characters with `_`, add `~N` on
 collisions) or `Skip` (omit the entry and a skipped directory's subtree).
-`StfsPackage.ExtractTo` and `XisoZarchive.ExtractZar` expose the same policy on
+`StfsSharp.StfsPackage.ExtractTo` and `XisoZarchive.ExtractZar` expose the same policy on
 their `ExtractNamePolicy` overloads.
 
 Built-in implementations:
@@ -371,101 +377,57 @@ var parts = XisoReader.SplitXiso("game.iso", "game", XisoSplitter.DefaultPartSiz
 XisoReader.JoinSplitXiso(parts[0], "rejoined.iso");
 ```
 
-#### GOD header title metadata (`GodHeader`)
+#### GOD header title metadata (`StfsSharp.GodHeader`)
 
-A GOD/SVOD container is a header file beside a `<header>.data` directory. The
-plaintext `XContent` header carries the title name, title ID and disc
-number/count, so `title-info` can report them without mounting the container.
-Names are sanitised for FATX (ASCII, path-safe characters) and fall back to the
-hex title ID when empty.
+GOD/SVOD and single-file XBLA/XBLIG readers live in the standalone
+[StfsSharp](https://github.com/purelogiccode/STFSSharp) package. XISOSharp
+references it directly; there are no 1.x compatibility facades in 2.0.0.
 
 ```csharp
-public static class GodHeader
-{
-    public static bool IsGodContainer(string path);
-    public static bool TryReadTitle(string path, out GodTitleInfo? info);
-    public static GodTitleInfo? ReadTitle(string path);
-    public static bool TryReadVolume(string path, out GodVolumeInfo? info);
-    public static bool TryReadVolume(string path, FileShare share, out GodVolumeInfo? info);
-}
+using StfsSharp;
+using StfsSharp.Models;
 
-public sealed record GodTitleInfo(
-    string HeaderPath, string TitleName, uint TitleId, string TitleIdHex,
-    byte DiscNumber, byte DiscCount);
-
-public sealed record GodVolumeInfo(
-    string HeaderPath, string DataDirectory, uint DataFileCount,
-    uint StartingBlock, uint DataBlockCount, bool EnhancedGdf,
-    long Length, IReadOnlyList<string> Parts);
+GodTitleInfo? title = GodHeader.ReadTitle(@"C:\games\4D5307E6");
+using GodVolume volume = GodVolume.Open(@"C:\games\4D5307E6"); // header or .data folder
+using StfsPackage package = StfsPackage.Open(@"C:\games\XBLA-title");
 ```
 
-`path` may be the header file or its `.data` directory. `TryReadVolume`
-parses the SVOD descriptor and fragment list; `GodBlockDevice` exposes the
-sector mapping as a read-only `IBlockDevice`, so every read verb accepts a GOD
-container. `GodBlockDevice` and `GodHeader` are compatibility facades over the
-standalone StfsSharp package (`GodVolume`/`GodHeader`). In-place `Repair`, `CopyIntoImage`, `SetFileTime`, rewrite and split
+`StfsSharp.GodHeader` reads the plaintext `XContent` title fields without mounting the
+container; names are sanitised for FATX and fall back to the hex title ID.
+`GodVolume` parses the SVOD descriptor and fragment list and exposes the sector
+mapping as a seekable reader. XISOSharp's `XisoImageSource` detects a GOD
+header or its `.data` folder internally, so every read verb accepts a GOD
+container. In-place `Repair`, `CopyIntoImage`, `SetFileTime`, rewrite and split
 refuse GOD and ask for `decompress` first.
 
-#### Single-file STFS package metadata (`StfsHeader`)
+#### Single-file STFS packages (`StfsSharp.StfsPackage`)
 
 XBLA and XBLIG downloads are single-file STFS packages, not GOD containers:
 they have no `.data` directory. The package file itself starts with the same
-XContent header, so `StfsHeader` reads the same title fields.
+XContent header. Use `StfsSharp.StfsHeader` for title metadata and
+`StfsSharp.StfsPackage` for file-table listing, reads, extraction and SHA-1
+hash-tree validation:
 
 ```csharp
-public static class StfsHeader
-{
-    public static bool IsStfsPackage(string path);
-    public static bool TryReadTitle(string path, out StfsTitleInfo? info);
-    public static StfsTitleInfo? ReadTitle(string path);
-}
+using StfsSharp;
+using StfsSharp.Models;
 
-public enum StfsPackageKind { Xbla, Xblig }
+using StfsPackage package = StfsPackage.Open(@"C:\games\XBLA-title");
+foreach (StfsEntry entry in package.Entries)
+    Console.WriteLine($"{entry.Path} {entry.Size}");
 
-public sealed record StfsTitleInfo(
-    string PackagePath, StfsPackageKind Kind, string TitleName, uint TitleId,
-    string TitleIdHex, byte DiscNumber, byte DiscCount, uint ContentType);
+package.ExtractTo(@"C:\games\XBLA-title-extracted", ExtractNamePolicy.Reject);
+StfsValidationReport report = package.Validate();
 ```
 
 Supported content types are XBLA `0x000D0000` and XBLIG `0x00000002`
-(Community Game `0x02000000` is treated as XBLIG).
-
-#### STFS package contents (`StfsPackage`)
-
-`StfsPackage` reads the file table and file data behind the STFS hash tables,
-so an XBLA/XBLIG package can be listed and extracted without converting it to
-an ISO. The type is a compatibility facade over the standalone
-[StfsSharp](https://github.com/purelogiccode/STFSSharp) package; the public
-XISOSharp model types are preserved until 2.0.0.
-
-```csharp
-public sealed class StfsPackage : IDisposable
-{
-    public StfsPackageInfo Info { get; }
-    public IReadOnlyList<StfsEntry> Entries { get; }
-
-    public static bool IsStfsPackage(string? path);
-    public static StfsPackage Open(string path, FileShare share = FileShare.Read);
-    public static bool TryOpen(string path, out StfsPackage? package);
-
-    public StfsEntry? Find(string? path);
-    public byte[] ReadAllBytes(StfsEntry entry);
-    public void CopyTo(StfsEntry entry, Stream destination);
-    public int ExtractTo(string outputDirectory, bool skipExisting = false,
-        IProgress<ProgressInfo>? progress = null, CancellationToken ct = default);
-    public int ExtractTo(string outputDirectory, ExtractNamePolicy namePolicy,
-        bool skipExisting = false, IProgress<ProgressInfo>? progress = null,
-        CancellationToken ct = default);
-    public StfsValidationReport Validate(CancellationToken ct = default);
-}
-```
-
-`StfsPackageInfo` reports the XContent title fields and the volume layout;
-`StfsEntry` carries the path, size, block range, contiguity flag and FAT
-timestamps. The reader handles contiguous files, hash-chain block lists and
-writable-format packages with primary/secondary hash tables. STFS writing and
-rebuilding remain out of scope. `XisoChecksum.ComputeStfsChecksum` hashes the
-same sorted-path tree as ISO and ZAR, so equivalent trees compare equal.
+(Community Game `0x02000000` is treated as XBLIG). `StfsPackageInfo` reports
+the XContent title fields and the volume layout; `StfsEntry` carries the path,
+size, block range, contiguity flag and FAT timestamps. The reader handles
+contiguous files, hash-chain block lists and writable-format packages with
+primary/secondary hash tables. STFS writing and rebuilding remain out of scope.
+`XisoChecksum.ComputeStfsChecksum` hashes the same sorted-path tree as ISO and
+ZAR, so equivalent trees compare equal.
 
 `StfsPackage.Validate` performs a deep read-only integrity check: it hashes
 every logical data block and compares it with its level-0 hash entry, walks each
@@ -1738,8 +1700,8 @@ The core processing engine is **not thread-safe** for concurrent operations on t
 | .NET 10 | `net10.0` |
 
 The library targets `net8.0`, `net9.0`, and `net10.0`. `net10.0` is the primary
-target; `net8.0`/`net9.0` are compatibility-only through 1.x and are removed in
-2.0.0 (see [Support Policy](https://github.com/purelogiccode/XISOSharp/blob/master/docs/support-policy.md)).
+target; `net8.0`/`net9.0` remain supported compatibility targets in 2.x (see
+[Support Policy](https://github.com/purelogiccode/XISOSharp/blob/master/docs/support-policy.md)).
 Its runtime dependencies beyond the .NET runtime are [ZArchiveSharp](https://www.nuget.org/packages/ZArchiveSharp)
 (ZAR archive support), [CCISharp](https://www.nuget.org/packages/CCISharp)
 (CCI/CCIM containers) and [StfsSharp](https://www.nuget.org/packages/StfsSharp)

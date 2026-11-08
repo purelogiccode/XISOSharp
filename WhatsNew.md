@@ -1,3 +1,64 @@
+# What's New in 2.0.0 (in progress)
+
+XISOSharp 2.0.0 is the reviewed public-API cleanup: the 1.x compatibility
+facades over the standalone [StfsSharp](https://www.nuget.org/packages/StfsSharp)
+package are removed. `net8.0`, `net9.0` and `net10.0` remain supported.
+
+- Use `StfsSharp.GodHeader`, `StfsSharp.StfsHeader`,
+  `StfsSharp.StfsPackage`, `StfsSharp.GodVolume` and the `StfsSharp.Models`
+  records directly. The `XISOSharp` facades (`GodHeader`, `StfsHeader`,
+  `StfsPackage`, `GodBlockDevice`, `GodTitleInfo`, `GodVolumeInfo`,
+  `StfsEntry`, `StfsPackageInfo`, `StfsPackageKind`, `StfsTitleInfo`,
+  `StfsValidationIssue`, `StfsValidationReport`) are gone in 2.0.0.
+- `XisoChecksum.ComputeStfsChecksum`/`ComputeStfsChecksumHex` remain as direct
+  StfsSharp-backed helpers, and `XisoImageSource` still opens GOD/SVOD inputs
+  through an internal adapter.
+- Package validation compares against 1.8.0; the reviewed suppressions cover
+  exactly the intentional facade removals.
+- Downstream consumers now follow the hybrid split: SimpleXisoDrive uses
+  `XISOSharp` for mounting/XDVDFS and `StfsSharp` directly for GOD/SVOD
+  resolution; XISO Studio uses `XISOSharp` for reads, `StfsSharp` directly for
+  GOD metadata and `CCISharp` directly for CCI validation.
+
+# What's New in 2.1.0 (in progress)
+
+The 2.1.0 feature pass is additive: existing read/write behavior and public
+APIs stay compatible.
+
+- **Parallel collection verbs:** `--jobs 1..64` for multi-image `checksum`,
+  `hash`, `-V`/audit and `--batch` extract/list/tree/rewrite; output and JSON
+  order are identical to `--jobs 1`.
+- **Redump DAT verification:** `verify-dat` / `XisoDat.Verify` match whole
+  images against a Redump-style XML DAT and report verified, ambiguous,
+  not-in-DAT and missing entries, with `--json`.
+- **Create-time symlink policy:** `--symlink-mode follow|skip|reject` for
+  `-c`, `--pack`, `build-image` and `apply-skeleton`; cyclic links terminate.
+- **Actionable host-I/O diagnostics:** `HostIoDiagnostics` and the CLI name the
+  path, operation and likely fix for permission-denied, long-path,
+  existing-destination, illegal-name and full-disk failures.
+- **Disc-layout inspector:** `disc-info` / `XisoDiscInfo.Read` reports XGD
+  type/wave, video and game partition ranges, PFI layer break, security-sector
+  ranges and Redump-size warnings, with `--json`.
+- **Skeleton overlay:** `apply-skeleton` / `XisoSkeleton.Apply` restores a
+  `--petrify` skeleton from a source tree and verifies its `.hash`; the
+  Petrify → Apply round-trip is byte-identical.
+- **Per-file hash sidecars:** `file-hashes` /
+  `XisoReader.ComputeFileHashSidecar` work for ISO, split ISO, CISO, CCI, GOD,
+  STFS and ZAR; `verify-hashes` now detects MD5/SHA-1/SHA-256 sidecars.
+- **Xbox 360 metadata:** `title-info` merges embedded `default.xex`
+  XDBF/XSRC publisher/developer/genre/description/thumbnail fields for GOD and
+  XBLA/XBLIG packages, and `xex-image --type thumbnail` exports the PNG
+  thumbnail.
+- **Loose executables:** `--xex-info`, `--xbe-info` and `--xbe-image` accept a
+  standalone `.xex`/`.xbe`.
+- **ZAR level:** `--zar-level 1..22` controls zstd effort; the default level 6
+  is byte-identical.
+- **Name policy:** `--strict-names` and `XisoNameRules` enforce the Xbox
+  42-character component limit and Latin-1 storage contract; `+`, `!`, spaces
+  and Latin-1 names remain valid.
+- **Determinism:** `--deterministic` implies `--file-time 0` and is accepted
+  for create, pack, rewrite and `build-image`.
+
 # What's New in 1.8.0
 
 _Release date: 2026-11-07._
@@ -39,8 +100,8 @@ XISOSharp now integrates **CCISharp 1.1**:
 - **Benchmarks.** Extract, CCI compress/decompress and a 64 MiB random-read case
   join the end-to-end suite; [Benchmarks](docs/benchmarks.md) records the
   in-process and CLI-comparison numbers with a reproducible script.
-- **Support policy.** `net10.0` is the primary target; `net8.0`/`net9.0` are
-  compatibility-only through 1.x and will be removed in 2.0.0.
+- **Support policy.** `net10.0` is the primary target; `net8.0`/`net9.0`
+  remain supported compatibility targets in 2.x.
 
 ## Xbox 360 GUI
 

@@ -4,6 +4,9 @@ using System.Security.Cryptography;
 using System.Text;
 using XISOSharp.Models;
 using XISOSharp.TestDataGenerator;
+using GodHeader = StfsSharp.GodHeader;
+using StfsEntry = StfsSharp.Models.StfsEntry;
+using StfsPackage = StfsSharp.StfsPackage;
 
 namespace XISOSharp.Fuzz;
 

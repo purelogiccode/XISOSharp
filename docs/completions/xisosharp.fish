@@ -7,7 +7,8 @@
 function __xisosharp_complete
     set -l verbs validate rebuild build-image image-spec compress cso cci \
         decompress uncso decso uncci checksum split join joinsplit convert \
-        hash verify-hashes verify-hash title-info title xbe-image
+        hash verify-hashes verify-hash verify-dat verify-dats title-info title xbe-image xex-image \
+        disc-info apply-skeleton file-hashes
 
     set -l short_flags -h -v -c -x -l -t -i -V -r -q -Q -s -D -m -y -n \
         -d -o -O -X -f
@@ -26,7 +27,8 @@ function __xisosharp_complete
         --update --security-sectors --sectors --ciso-level --ciso-version \
         --ciso-split --cci-level --cci-split --level --split --format \
         --output-name --output --map --file --type --size --ignore-extra \
-        --verify-hashes
+        --verify-hashes --xex-image --disc-info --apply-skeleton --file-hashes \
+        --zar-level --deterministic --strict-names --symlink-mode --algorithm --algo --hash --hashes
 
     for cmd in XISOSharp xisosharp
         # Verbs.
@@ -50,10 +52,14 @@ function __xisosharp_complete
         complete -c $cmd -l cci-level -x -a "0 1 2 3 4 5 6 7 8 9 10 11 12"
         complete -c $cmd -l level -x -a "0 1 2 3 4 5 6 7 8 9"
         complete -c $cmd -l name-policy -x -a "reject sanitize skip"
+        complete -c $cmd -l symlink-mode -x -a "follow skip reject"
         complete -c $cmd -l policy -x -a "skip overwrite auto-rename"
         complete -c $cmd -l type -x -a "logo title save"
         complete -c $cmd -l size -x -a "half halves"
         complete -c $cmd -l jobs -x -a "1 2 4 8 16 32 64"
+        complete -c $cmd -l algorithm -x -a "sha1 sha256 md5"
+        complete -c $cmd -l algo -x -a "sha1 sha256 md5"
+        complete -c $cmd -l zar-level -x -a "1 6 9 12 16 19 22"
 
         # File name completion after the first positional argument.
         complete -c $cmd -f -n "__fish_seen_subcommand_from $verbs" \
