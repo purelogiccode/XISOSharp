@@ -8,11 +8,11 @@
   "architecture": {
     "64bit": {
       "url": "https://github.com/purelogiccode/XISOSharp/releases/download/1.9.0/release_1.9.0_win-x64.zip",
-      "hash": "b8bcf0cc5672a4b6c5581c24f34f5d690fd3390bf0c33b35893d82ee60710ee1"
+      "hash": "d092bd6f2bd1051e5eec6eda287ed044b1baa025cbf6a004005e8b35596b9b3b"
     },
     "arm64": {
       "url": "https://github.com/purelogiccode/XISOSharp/releases/download/1.9.0/release_1.9.0_win-arm64.zip",
-      "hash": "0f714b7249192576e20eb1ff28aed79ba82429d37284fbabc24463121c67aba8"
+      "hash": "9587cdb09c8f49b6a94bfdec9027194c21ee52b57ab097c5239a6f458564846a"
     }
   },
   "bin": [

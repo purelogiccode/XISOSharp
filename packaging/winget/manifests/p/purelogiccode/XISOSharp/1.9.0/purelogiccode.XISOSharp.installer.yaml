@@ -12,10 +12,10 @@ NestedInstallerFiles:
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/purelogiccode/XISOSharp/releases/download/1.9.0/release_1.9.0_win-x64.zip
-    InstallerSha256: B8BCF0CC5672A4B6C5581C24F34F5D690FD3390BF0C33B35893D82EE60710EE1
+    InstallerSha256: D092BD6F2BD1051E5EEC6EDA287ED044B1BAA025CBF6A004005E8B35596B9B3B
   - Architecture: arm64
     InstallerUrl: https://github.com/purelogiccode/XISOSharp/releases/download/1.9.0/release_1.9.0_win-arm64.zip
-    InstallerSha256: 0F714B7249192576E20EB1FF28AED79BA82429D37284FBABC24463121C67ABA8
+    InstallerSha256: 9587CDB09C8F49B6A94BFDEC9027194C21EE52B57AB097C5239A6F458564846A
 Dependencies:
   PackageDependencies:
     - PackageIdentifier: Microsoft.DotNet.DesktopRuntime.10

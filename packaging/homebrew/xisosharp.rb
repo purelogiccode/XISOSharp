@@ -4,12 +4,12 @@ cask "xisosharp" do
 
   on_arm do
     url "https://github.com/purelogiccode/XISOSharp/releases/download/#{version}/release_#{version}_MacOsX-arm64.zip"
-    sha256 "5277ce2c6600026b77b1d3fd0f91f01afa328d60849209368b61e513f4a2de74"
+    sha256 "facdebfb6ddb71107d3a94e22a797136f3005564955ee0e2100d8f23fa4ccf93"
   end
 
   on_intel do
     url "https://github.com/purelogiccode/XISOSharp/releases/download/#{version}/release_#{version}_MacOsX-x64.zip"
-    sha256 "906e16fb08dd920488f838a8d96f4f161e66d7c3037ab5c86b36dbbe7ac6bc95"
+    sha256 "52afe1f81c56c4a5ed4cda926dc61cf7b9de4642d3ab11a5fc5ae09ddbe18ecc"
   end
 
   name "XISOSharp"
