@@ -444,7 +444,11 @@ jobs:
   release:
     name: create GitHub release
     needs: [resolve, smoke]
-    if: needs.resolve.outputs.dry_run != 'true'
+    # Keep the published release on tag pushes; workflow_dispatch may rehearse
+    # without one (dry_run=true). Avoid depending on a needs output here: a
+    # tag push previously evaluated this job as skipped even though the
+    # resolve step wrote dry_run=false.
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
