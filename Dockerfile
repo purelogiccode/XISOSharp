@@ -8,10 +8,9 @@
 # The image is framework-dependent on the .NET 10 runtime and contains the
 # CLI only; the Avalonia GUI is desktop-only and ships in the RID bundles.
 
-ARG DOTNET_SDK=10.0
-ARG DOTNET_RUNTIME=10.0
-
-FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_SDK} AS build
+# Base images are pinned by digest so the SDK/runtime cannot change under a
+# mutable tag (OpenSSF Scorecard PinnedDependencies). Refresh deliberately.
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:212fe4cb74627d5adf9817a4088906ae3edff1bd853bb27565d4b46731efe61e AS build
 ARG VERSION=0.0.0-local
 WORKDIR /src
 
@@ -30,7 +29,7 @@ RUN dotnet publish XISOSharp.Cli/XISOSharp.Cli.csproj \
         -p:MinVerVersionOverride="${VERSION}" \
         -o /out
 
-FROM mcr.microsoft.com/dotnet/runtime:${DOTNET_RUNTIME} AS runtime
+FROM mcr.microsoft.com/dotnet/runtime:10.0@sha256:4f1f30cf0bb4ab0c8b2daa84613051683456f8df4a9bf7c812e20d74962992ac AS runtime
 ARG VERSION=0.0.0-local
 
 LABEL org.opencontainers.image.title="XISOSharp"

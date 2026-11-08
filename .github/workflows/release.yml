@@ -501,7 +501,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${{ needs.resolve.outputs.version }}"
-          dotnet tool install --global Microsoft.Sbom.DotNetTool
+          dotnet tool install --global Microsoft.Sbom.DotNetTool --version 4.1.13
           export PATH="$PATH:$HOME/.dotnet/tools"
           sbom-tool generate -b dist -bc . -pn XISOSharp -pv "$version" \
             -ps purelogiccode -nsb "https://github.com/$GITHUB_REPOSITORY"
