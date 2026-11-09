@@ -94,7 +94,7 @@
 
   <!-- Source Link + versioning. -->
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.321">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.322">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
