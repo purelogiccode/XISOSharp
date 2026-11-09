@@ -256,6 +256,8 @@ items became `BRF-11`…`BRF-13` in the (now retired) missing-feature plan.
 | 2026-11-08 | 1.9.0 released | 1.9.0 | Tag `bca71d0`; CI green with NuGet publish; six RID zips on GitHub; winget/Scoop/Homebrew manifests regenerated; DocFX/site/docs links green. |
 | 2026-11-08 | 1.9.1 GUI picker fix | 1.9.1 | Avalonia's missing-directory picker exception is treated as a cancelled selection with a clear message; all picker failure logging is marshaled to the UI thread; regression tests added. |
 | 2026-11-08 | 1.9.1 verification | 1.9.1 | Full suite 2315/1 (net10) + 2239/1 (net8/net9); solution build 0 warnings; InspectCode 0; format clean; GUI self-test passed. |
+| 2026-11-08 | 1.9.1 release workflow fix | 1.9.1 | Release job now uses `always()` with explicit resolve/smoke success checks, so skipped optional signing jobs no longer skip release creation; MinVer override makes dispatch builds use the requested version. |
+| 2026-11-08 | 1.9.1 released | 1.9.1 | Tag `796ca4a`; tag CI `42548688104` green including NuGet 1.9.1; release dispatch `42549214611` produced six RID zips + SPDX; downloaded win-x64 bundle reports v1.9.1, `--probe-cli` 1.9.1 and `SELF-TEST: all passed`; packaging manifests refreshed in `7601370`. |
 
 ## Historical handoff (2026-11-07)
 
