@@ -126,15 +126,49 @@ public partial class MainWindow : Window
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
-    // Null-safe VM access for catch blocks: never throws, so exception handling
-    // cannot itself crash the async void method.
+    // Null-safe VM access. DataContext is thread-affine, so this property is
+    // only safe from the UI thread; asynchronous picker helpers resume on the
+    // thread pool after ConfigureAwait(false) and must use LogGuiMessage.
     private MainViewModel? VmOrNull => DataContext as MainViewModel;
+
+    /// <summary>
+    /// Logs a GUI message from any thread. DataContext access is marshaled to
+    /// the UI thread so exception handlers running on a pool thread cannot
+    /// turn a handled picker failure into a second, unhandled exception.
+    /// </summary>
+    private void LogGuiMessage(string line)
+    {
+        try
+        {
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                VmOrNull?.LogMessage(line);
+                return;
+            }
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                try
+                {
+                    VmOrNull?.LogMessage(line);
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "GUI message logging failed on the UI thread");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "GUI message logging failed");
+        }
+    }
 
     private void Donate_Click(object? sender, RoutedEventArgs e)
     {
         if (!UrlOpener.TryOpen("https://www.purelogiccode.com/donate"))
         {
-            VmOrNull?.LogMessage("[GUI] Could not open the donation page in the default browser.");
+            LogGuiMessage("[GUI] Could not open the donation page in the default browser.");
         }
     }
 
@@ -173,26 +207,19 @@ public partial class MainWindow : Window
             ScreenshotResult? result = ScreenshotService.CaptureActive(this, DateTime.Now);
             if (result is null)
             {
-                VmOrNull?.LogMessage("[GUI] Screenshot failed; see the log file for details.");
+                LogGuiMessage("[GUI] Screenshot failed; see the log file for details.");
                 return;
             }
 
             string note = result.UsedFallbackFolder
                 ? " (application folder not writable; saved to the fallback location)"
                 : string.Empty;
-            VmOrNull?.LogMessage($"[GUI] Screenshot saved{note}: {result.FilePath}");
+            LogGuiMessage($"[GUI] Screenshot saved{note}: {result.FilePath}");
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Screenshot shortcut failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Screenshot failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Screenshot failed: {ex.Message}");
         }
     }
 
@@ -238,7 +265,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "File picker failed: {Title}", title);
-            VmOrNull?.LogMessage($"[GUI] File picker failed: {ex.Message}");
+            LogGuiMessage($"[GUI] File picker failed: {ex.Message}");
             return null;
         }
     }
@@ -266,7 +293,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "File picker failed: {Title}", title);
-            VmOrNull?.LogMessage($"[GUI] File picker failed: {ex.Message}");
+            LogGuiMessage($"[GUI] File picker failed: {ex.Message}");
             return [];
         }
     }
@@ -289,10 +316,21 @@ public partial class MainWindow : Window
             }).ConfigureAwait(false);
             return picked.Count > 0 ? picked[0].Path.LocalPath : null;
         }
+        catch (ArgumentException ex) when (FolderPickerDiagnostics.IsMissingSelection(ex))
+        {
+            // Avalonia's BCL storage provider throws when the selected folder
+            // no longer exists (it can be deleted from inside the dialog):
+            // https://github.com/AvaloniaUI/Avalonia/issues/17908. That is a
+            // cancelled selection with a known cause, not an application bug.
+            Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                .Warning("Folder picker selected a path that is not an existing directory: {Title}", title);
+            LogGuiMessage(FolderPickerDiagnostics.MissingSelectionMessage);
+            return null;
+        }
         catch (Exception ex)
         {
             Log.Error(ex, "Folder picker failed: {Title}", title);
-            VmOrNull?.LogMessage($"[GUI] Folder picker failed: {ex.Message}");
+            LogGuiMessage($"[GUI] Folder picker failed: {ex.Message}");
             return null;
         }
     }
@@ -318,7 +356,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Save picker failed: {Title}", title);
-            VmOrNull?.LogMessage($"[GUI] Save picker failed: {ex.Message}");
+            LogGuiMessage($"[GUI] Save picker failed: {ex.Message}");
             return null;
         }
     }
@@ -620,14 +658,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse extract image failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -645,14 +676,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse extract destination failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -670,14 +694,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse create source failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -696,14 +713,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Add rewrite images failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Add images failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Add images failed: {ex.Message}");
         }
     }
 
@@ -721,14 +731,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse rewrite output failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -746,14 +749,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse rewrite work directory failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -771,14 +767,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse rewrite report failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -796,14 +785,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse wipe image failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -822,14 +804,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Add rebuild parts failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Add rebuild parts failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Add rebuild parts failed: {ex.Message}");
         }
     }
 
@@ -847,14 +822,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse rebuild output failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -873,14 +841,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse rebuild sectors failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -898,14 +859,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse compress source file failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -923,14 +877,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse compress source folder failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -950,14 +897,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse compress output failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -977,14 +917,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse ZAR source failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1004,14 +937,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse ZAR output failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1029,14 +955,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse decompress CISO/CCI failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1054,14 +973,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse decompress output failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1079,14 +991,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse validate source failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1104,14 +1009,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse validate output failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1129,14 +1027,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse validate report failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1155,14 +1046,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Add checksum images failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Add images failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Add images failed: {ex.Message}");
         }
     }
 
@@ -1180,14 +1064,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse batch directory failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1205,14 +1082,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse batch destination failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1231,14 +1101,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse Xbox 360 source file failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1257,14 +1120,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse Xbox 360 source folder failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1283,14 +1139,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse Xbox 360 destination failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 
@@ -1308,14 +1157,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Browse CLI path failed");
-            try
-            {
-                VmOrNull?.LogMessage($"[GUI] Browse failed: {ex.Message}");
-            }
-            catch
-            {
-                // ignored
-            }
+            LogGuiMessage($"[GUI] Browse failed: {ex.Message}");
         }
     }
 }

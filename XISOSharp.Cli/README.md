@@ -21,7 +21,14 @@ Command-line tool for creating, extracting, listing, and rewriting Xbox ISO (XIS
 
 This project is a direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) CLI tool (reference build [202609111233](https://github.com/XboxDev/extract-xiso/releases/tag/build-202609111233)) from C to C#. It provides the same interface and produces byte-identical output for all operations, plus 40+ extra modes (Redump archival, xdvdfs parity, audit/repair/salvage, CISO/CCI, disc/DAT inspection, skeleton overlay, per-file hashes, checksums).
 
-Version 1.9.0 adds `disc-info`, `apply-skeleton`, `file-hashes`, `verify-dat`, `xex-image`, parallel collection verbs, `--symlink-mode`, `--strict-names`, `--deterministic`, `--zar-level` and actionable host-I/O diagnostics. The reviewed API cleanup removes the 1.x StfsSharp facades; the CLI uses `StfsSharp` directly.
+Version 1.9.1 is a patch release with no CLI argument or output changes. It fixes
+GUI folder-picker handling for folders that disappear during selection, makes
+picker logging UI-thread safe, and hardens tag-driven releases. The 1.9.0
+feature set remains: `disc-info`, `apply-skeleton`, `file-hashes`, `verify-dat`,
+`xex-image`, parallel collection verbs, `--symlink-mode`, `--strict-names`,
+`--deterministic`, `--zar-level` and actionable host-I/O diagnostics. The
+reviewed API cleanup removes the 1.x StfsSharp facades; the CLI uses `StfsSharp`
+directly.
 
 Reader probing also accepts rebuilt "sector-0" XISOs (volume descriptor at absolute offset 0, `DescriptorSector = 0`): extract/list/tree/info, `--filetime`, `--sector-layout`, `--ranges`, `--copy-in`, and ZAR packing all work on them. `rebuild` rejects them with a clear error — repack to the standard sector-32 layout first.
 

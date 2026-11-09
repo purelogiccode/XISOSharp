@@ -25,6 +25,7 @@ The package validates against `PackageValidationBaselineVersion` (currently
 the 1.x `StfsSharp` compatibility facades; every other API change since 1.8.0 is
 additive. 1.9.0 is an owner-approved exception to the usual major-version rule
 for that one breaking change; do not add suppressions without a written reason.
+1.9.1 is a patch release with no public-API changes and keeps the same baseline.
 
 ## Platform support
 

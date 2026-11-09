@@ -18,7 +18,7 @@
 [![Downloads](https://img.shields.io/github/downloads/purelogiccode/XISOSharp/total)](https://github.com/purelogiccode/XISOSharp/releases)
 [![Code size](https://img.shields.io/github/languages/code-size/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)](https://github.com/purelogiccode/XISOSharp)
-[![Avalonia](https://img.shields.io/badge/Avalonia-12.1.3-blueviolet)](https://avaloniaui.net/)
+[![Avalonia](https://img.shields.io/badge/Avalonia-12.1.5-blueviolet)](https://avaloniaui.net/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/purelogiccode/XISOSharp/pulls)
 
 **XISOSharp is the most advanced library for managing Xbox XISO/XDVDFS images.**
@@ -29,17 +29,20 @@ Beyond the C baseline it merges the archival power of
 [xdvdfs](https://github.com/antangelo/xdvdfs) into one trimmable,
 AOT-compatible library + CLI.
 
-**1.9.0** is the most advanced release yet: the reviewed API cleanup removes
-the 1.x StfsSharp compatibility facades (consumers use `StfsSharp` directly),
-and the feature pass adds `disc-info` (XGD/Redump layout inspector),
-`apply-skeleton` (the byte-identical inverse of `--petrify`), `file-hashes`
-per-file sidecars for every container, `verify-dat` Redump DAT matching,
-parallel collection verbs (`--jobs` for checksum/hash/audit/batch work),
-`--symlink-mode`, actionable host-I/O diagnostics, embedded `default.xex`
-metadata for GOD/STFS, XEX thumbnail export, loose `.xex`/`.xbe` inputs,
-`--zar-level`, Xbox 42-character name validation (`--strict-names`),
-deterministic packing (`--deterministic`), package-manager manifests, shell
-completions, a man page, a container image and refreshed DocFX/README docs.
+**1.9.1** is the latest patch release and keeps the 1.9.0 feature set: the
+reviewed API cleanup removes the 1.x StfsSharp compatibility facades
+(consumers use `StfsSharp` directly), and the feature pass adds `disc-info`
+(XGD/Redump layout inspector), `apply-skeleton` (the byte-identical inverse of
+`--petrify`), `file-hashes` per-file sidecars for every container, `verify-dat`
+Redump DAT matching, parallel collection verbs (`--jobs` for
+checksum/hash/audit/batch work), `--symlink-mode`, actionable host-I/O
+diagnostics, embedded `default.xex` metadata for GOD/STFS, XEX thumbnail
+export, loose `.xex`/`.xbe` inputs, `--zar-level`, Xbox 42-character name
+validation (`--strict-names`), deterministic packing (`--deterministic`),
+package-manager manifests, shell completions, a man page, a container image and
+refreshed DocFX/README docs. The 1.9.1 patch fixes GUI folder-picker failures
+for folders that disappear or become inaccessible during selection, makes
+picker logging UI-thread safe, and hardens tag-driven release creation.
 
 ## Companion projects
 
@@ -64,7 +67,7 @@ neither app depends on the XISOSharp compatibility facades removed in 1.9.0.
 |---|---|
 | [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) - full read/write engine, `net8.0`/`net9.0`/`net10.0`, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) - extract-xiso-compatible flags + 35+ extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (2312 tests on net10.0; 2239 on net8.0/net9.0) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + XDBF/XSRC 360 title metadata + XBE logo/title/save images + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + CCI/libCCI interop + split-ISO input + ZAR input + GOD/SVOD read-only input + XBLA/XBLIG STFS package listing/extraction + SHA-1 hash-tree validation + StfsSharp integration + pathological TOC chains (list/tree/extract/rewrite/audit/ranges/repair/salvage/ZAR) + batch container conversion + JSON output/preallocation + explicit sector-layout packing + parallel extraction (ISO/CISO/split, resume, continue-on-error, CLI `--jobs`) + concurrent creation and extraction (independent overlapping creates, CWD-free writer and reader) + safe-extract name policy (reject/sanitize/skip) + GOD and XBLA/XBLIG header title metadata + disc/DAT/hash-sidecar/skeleton-overlay/name-rule/symlink/host-I/O suites + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (2315 tests on net10.0; 2239 on net8.0/net9.0) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + XDBF/XSRC 360 title metadata + XBE logo/title/save images + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + CCI/libCCI interop + split-ISO input + ZAR input + GOD/SVOD read-only input + XBLA/XBLIG STFS package listing/extraction + SHA-1 hash-tree validation + StfsSharp integration + pathological TOC chains (list/tree/extract/rewrite/audit/ranges/repair/salvage/ZAR) + batch container conversion + JSON output/preallocation + explicit sector-layout packing + parallel extraction (ISO/CISO/split, resume, continue-on-error, CLI `--jobs`) + concurrent creation and extraction (independent overlapping creates, CWD-free writer and reader) + safe-extract name policy (reject/sanitize/skip) + GOD and XBLA/XBLIG header title metadata + disc/DAT/hash-sidecar/skeleton-overlay/name-rule/symlink/host-I/O suites + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command/folder-picker coverage |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 1 of `H:\XBOXTest`, seeded): `extract-xiso.exe` (reference build `202609111233`; `list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
@@ -111,7 +114,7 @@ published as a container image:
 
 ```powershell
 winget settings --enable LocalManifestFiles
-winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\1.9.0
+winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\1.9.1
 
 scoop bucket add xisosharp https://github.com/purelogiccode/XISOSharp
 scoop install xisosharp/xisosharp
@@ -780,7 +783,7 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (same outputs; no implicit pack)
-dotnet test -c Release                       # 2312 tests on net10.0 (2239 on net8/9; `XISOSharp.Tests`; ZArchiveSharp/CCISharp/StfsSharp come from NuGet)
+dotnet test -c Release                       # 2315 tests on net10.0 (2239 on net8/9; `XISOSharp.Tests`; ZArchiveSharp/CCISharp/StfsSharp come from NuGet)
 ```
 
 Layout: every project lives in its own top-level folder beside the solution — `XISOSharp` (library), `XISOSharp.Cli`, `XISOSharp.Gui`, `XISOSharpTester`, the verification harnesses (`XISOSharp.Tests`, `XISOSharp.BattleTests`, `XISOSharp.Benchmarks`, `XISOSharp.Fuzz`, `XISOSharp.AotSmoke`, `XISOSharp.TestDataGenerator`) and the `XISOSharp.Sample` walkthrough. There are no `src`/`apps`/`tests`/`samples` grouping folders.

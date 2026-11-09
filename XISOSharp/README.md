@@ -46,6 +46,11 @@ metadata for GOD/STFS, XEX thumbnail export, loose `.xex`/`.xbe` parsing,
 The reviewed 1.9.0 API cleanup also removes the 1.x StfsSharp compatibility
 facades; reference the `StfsSharp` package directly.
 
+The 1.9.1 patch leaves this public API unchanged. It fixes GUI folder-picker
+failures when a selected directory disappears or becomes inaccessible while the
+native dialog is open, and marshals picker failure messages to the UI thread so
+a handled picker error cannot trigger a second exception.
+
 ## Companion projects
 
 XISOSharp is part of a small Xbox image toolchain:

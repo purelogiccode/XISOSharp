@@ -25,6 +25,7 @@ preserves the completed-work sections from the retired missing-feature plan
 | `1.8.0` | 2026-11-07 | LIB-01…08 (source filesystems, per-call logging, sparse outputs, property tests, benchmarks, support policy, validation baseline), DOC-01…03 (DocFX link gate, public corpus, docs refresh) and GUI-01…05 (Xbox 360 GUI). |
 | `1.8.x` distribution | 2026-11-07 | DST-03/04/05: winget/Scoop/Homebrew manifests, shell completions + `xisosharp(1)`, GHCR container image. DST-01/02 signing pipelines implemented behind repository secrets. |
 | `1.9.0` | 2026-11-08 | `FAC-01` facade removal plus the feature pass (`BRF-01`…`BRF-13`) and distribution track (`DST-01`…`DST-05`): disc/DAT/hash sidecars, skeleton overlay, parallel collection verbs, symlink/name/determinism policies, Xbox 360 metadata, package manifests, completions, man page, container image and docs refresh. Downstream consumers moved to direct `CCISharp`/`StfsSharp` references (`XRP-04`). |
+| `1.9.1` | 2026-11-08 | Patch release: GUI folder-picker failure handling and UI-thread-safe picker logging; tag-release, SBOM and Docker hardening; package manifests refreshed from the GitHub API digests. No public-API changes. |
 
 Release notes and per-release detail live in [Release Notes](release-notes.md) and
 [`WhatsNew.md`](https://github.com/purelogiccode/XISOSharp/blob/master/WhatsNew.md).
@@ -253,6 +254,8 @@ items became `BRF-11`…`BRF-13` in the (now retired) missing-feature plan.
 | 2026-11-07 | `FAC-02` TFM matrix documented | 1.9.0-prep | Support policy, known limitations, README and release notes now describe `net8.0`/`net9.0` as supported compatibility targets; all three TFMs remain in the build/test matrix. |
 | 2026-11-08 | 1.9.0 review fixes | 1.9.0 | Deterministic rewrite FILETIME overloads, size-only DAT entry handling, Unix `EWOULDBLOCK` mapping and default petrify name warnings; regression tests added. |
 | 2026-11-08 | 1.9.0 released | 1.9.0 | Tag `bca71d0`; CI green with NuGet publish; six RID zips on GitHub; winget/Scoop/Homebrew manifests regenerated; DocFX/site/docs links green. |
+| 2026-11-08 | 1.9.1 GUI picker fix | 1.9.1 | Avalonia's missing-directory picker exception is treated as a cancelled selection with a clear message; all picker failure logging is marshaled to the UI thread; regression tests added. |
+| 2026-11-08 | 1.9.1 verification | 1.9.1 | Full suite 2315/1 (net10) + 2239/1 (net8/net9); solution build 0 warnings; InspectCode 0; format clean; GUI self-test passed. |
 
 ## Historical handoff (2026-11-07)
 

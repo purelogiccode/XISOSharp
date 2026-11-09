@@ -1,3 +1,43 @@
+# What's New in 1.9.1
+
+_Release date: 2026-11-08._
+
+XISOSharp 1.9.1 is a patch release for the 1.9 line. The library API, CLI
+arguments, archive formats and `net8.0`/`net9.0`/`net10.0` targets are
+unchanged. The release focuses on two areas: the GUI no longer treats a folder
+that disappeared during picking as an internal error, and tag-driven releases
+now publish reliably with hardened SBOM and container inputs.
+
+## Folder picker failures are user input, not crashes
+
+Avalonia's folder picker throws when the selected directory no longer exists
+(for example, because it was deleted from inside the native dialog). XISOSharp
+1.9.1 recognizes that case, reports it as a cancelled selection, and tells you
+the path is not an existing folder so you can pick another folder or type the
+path directly. It is no longer logged as an application error or filed as a bug
+report.
+
+Picker failure messages are now written through the UI thread. Previously, a
+handled picker failure on a thread-pool continuation could itself throw
+`InvalidOperationException` from `DataContext` access and produce a second,
+misleading report.
+
+## Release and container hardening
+
+- Tag pushes create the GitHub release reliably, while `workflow_dispatch`
+  rehearsals still skip publication when `dry_run=true`.
+- The release SBOM tool is pinned to `Microsoft.Sbom.DotNetTool` 4.1.13.
+- Docker SDK/runtime images are pinned by digest, and GHCR write permission is
+  limited to the Docker build job.
+- Winget, Scoop and Homebrew manifests are generated from GitHub REST API asset
+  digests; the refreshed 1.9.0 manifests match the published release assets.
+
+## Verification
+
+The full suite is **2315 passed / 1 opt-in skip** on `net10.0` and **2239 passed
+/ 1 opt-in skip** on `net8.0`/`net9.0`. Build, formatting and InspectCode are
+clean.
+
 # What's New in 1.9.0
 
 _Release date: 2026-11-08._

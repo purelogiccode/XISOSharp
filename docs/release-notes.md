@@ -1,5 +1,42 @@
 # Release Notes
 
+## 1.9.1
+
+**Release date:** 2026-11-08.
+
+**Patch release: reliable releases and a clearer GUI.** There are no library API
+or archive-format changes; the package remains compatible with 1.9.0.
+
+### GUI
+
+- Folder pickers no longer surface Avalonia's `Directory must exist` exception
+  as an application error when the selected folder was deleted (or became
+  inaccessible) while the native dialog was open. The GUI now explains that the
+  path is not an existing folder and suggests choosing another folder or typing
+  the path directly.
+- Picker and browse failures now marshal their log messages to the UI thread, so
+  a handled picker error can no longer trigger a second
+  `InvalidOperationException` from `DataContext` access on a thread-pool thread.
+- Removed the now-redundant nested picker-failure guards and added regression
+  coverage for the Avalonia exception contract.
+
+### Release engineering and distribution
+
+- Tag pushes reliably create the GitHub release again; `workflow_dispatch` dry
+  runs still build and smoke-test the bundles without publishing.
+- The release SBOM tool is pinned to `Microsoft.Sbom.DotNetTool` 4.1.13.
+- Docker base images are pinned by digest, and GHCR write permission is scoped
+  to the Docker build job.
+- Packaging manifests are generated from GitHub REST API release digests
+  (including the refreshed 1.9.0 manifests), and the Homebrew cask uses the
+  current macOS dependency form.
+
+### Tests
+
+- Full suite: **2315 passed / 1 opt-in skip** on `net10.0` (three new GUI
+  folder-picker regression tests); **2239 passed / 1 opt-in skip** on
+  `net8.0`/`net9.0`.
+
 ## 1.9.0
 
 **Release date:** 2026-11-08.
