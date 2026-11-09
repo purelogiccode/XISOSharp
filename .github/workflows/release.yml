@@ -108,6 +108,7 @@ jobs:
         run: >-
           dotnet publish XISOSharp.Gui/XISOSharp.Gui.csproj
           -c Release -r ${{ matrix.rid }} --no-self-contained
+          -p:MinVerVersionOverride=${{ needs.resolve.outputs.version }}
           -o "$RUNNER_TEMP/stage"
 
       - name: Publish CLI
@@ -115,6 +116,7 @@ jobs:
           dotnet publish XISOSharp.Cli/XISOSharp.Cli.csproj
           -c Release -f net10.0 -r ${{ matrix.rid }} --no-self-contained
           -p:PublishTrimmed=false
+          -p:MinVerVersionOverride=${{ needs.resolve.outputs.version }}
           -o "$RUNNER_TEMP/stage"
 
       - name: Assemble bundle
@@ -444,6 +446,13 @@ jobs:
   release:
     name: create GitHub release
     needs: [resolve, smoke]
+    # `always()` is required: `smoke` is forced to run after the optional
+    # signing jobs are skipped, and without it this job inherits the skipped
+    # state of those transitive dependencies. Tag pushes always publish; a
+    # workflow_dispatch rehearsal only skips creation when dry_run is true.
+    if: >-
+      always() && needs.resolve.result == 'success' && needs.smoke.result == 'success' &&
+      (github.event_name == 'push' || needs.resolve.outputs.dry_run != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
