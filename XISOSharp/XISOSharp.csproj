@@ -100,8 +100,7 @@
     <!-- SourceLink 11's build-task closure uses System.IO.Hashing 11, which
          warns on the net8.0/net9.0 targets. Those TFMs keep SourceLink 10;
          net10.0/net11.0 use the current 11.x build tasks. -->
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.403" PrivateAssets="All"
-                      Condition="'$(TargetFramework)' == 'net8.0' Or '$(TargetFramework)' == 'net9.0'" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="11.0.100" PrivateAssets="All" Condition="'$(TargetFramework)' == 'net8.0' Or '$(TargetFramework)' == 'net9.0'" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="11.0.100" PrivateAssets="All"
                       Condition="'$(TargetFramework)' == 'net10.0' Or '$(TargetFramework)' == 'net11.0'" />
     <PackageReference Include="MinVer" Version="8.0.0" PrivateAssets="all">
