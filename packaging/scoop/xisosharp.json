@@ -1,18 +1,18 @@
 {
   "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
-  "version": "1.9.1",
+  "version": "2.0.0",
   "description": "Create, extract, list, rewrite and archive Xbox XISO/XDVDFS disc images.",
   "homepage": "https://github.com/purelogiccode/XISOSharp",
   "license": "MIT",
   "depends": "dotnet-sdk",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/purelogiccode/XISOSharp/releases/download/1.9.1/release_1.9.1_win-x64.zip",
-      "hash": "ce5cef67dc99a2387e8c9b78600c77ae54edbd74b5a998ce6d94668cd0e1279d"
+      "url": "https://github.com/purelogiccode/XISOSharp/releases/download/2.0.0/release_2.0.0_win-x64.zip",
+      "hash": "0780f41a7fcba40434502e9e173a5fe81784690e68c75494fcfee5619fa05c61"
     },
     "arm64": {
-      "url": "https://github.com/purelogiccode/XISOSharp/releases/download/1.9.1/release_1.9.1_win-arm64.zip",
-      "hash": "9f5a3d033b049d02b48e9ffde3008a860346afedab9356cbc8ebcd0bf0641efb"
+      "url": "https://github.com/purelogiccode/XISOSharp/releases/download/2.0.0/release_2.0.0_win-arm64.zip",
+      "hash": "0533bf99bee6f5fa51581fb21c651ba6d824c8e94d3cd5a40291adee065d8690"
     }
   },
   "bin": [

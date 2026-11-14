@@ -259,6 +259,9 @@ items became `BRF-11`…`BRF-13` in the (now retired) missing-feature plan.
 | 2026-11-08 | 1.9.1 verification | 1.9.1 | Full suite 2315/1 (net10) + 2239/1 (net8/net9); solution build 0 warnings; InspectCode 0; format clean; GUI self-test passed. |
 | 2026-11-08 | 1.9.1 release workflow fix | 1.9.1 | Release job now uses `always()` with explicit resolve/smoke success checks, so skipped optional signing jobs no longer skip release creation; MinVer override makes dispatch builds use the requested version. |
 | 2026-11-08 | 1.9.1 released | 1.9.1 | Tag `796ca4a`; tag CI `42548688104` green including NuGet 1.9.1; release dispatch `42549214611` produced six RID zips + SPDX; downloaded win-x64 bundle reports v1.9.1, `--probe-cli` 1.9.1 and `SELF-TEST: all passed`; packaging manifests refreshed in `7601370`. |
+| 2026-11-13 | 2.0.0 .NET 11 retarget | 2.0.0 | All projects target `net11.0`/C# 15; the net8.0/net9.0/net10.0 package assets are intentionally dropped with a reviewed `PKV006` suppression; release assets move to Windows `.zip`, Linux `.tar.gz`, macOS `.dmg`; GUI drive-root picker and updater/packaging extension handling fixed. |
+| 2026-11-13 | 2.0.0 verification | 2.0.0 | Suite 2317/1 on net11; build 0 warnings; InspectCode 0; format, docs links and pack clean; release dry run `43542358429` green across all six bundles and smoke tests. |
+| 2026-11-13 | 2.0.0 released | 2.0.0 | Tag `7552d51`; CI `43542653159` green after refreshing the stale NuGet environment key; NuGet 2.0.0 indexed; release `43542653106` green with six native bundles + SPDX; winget/Scoop/Homebrew manifests refreshed. |
 
 ## Historical handoff (2026-11-07)
 

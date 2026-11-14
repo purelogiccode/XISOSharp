@@ -116,7 +116,7 @@ as a container image:
 
 ```powershell
 winget settings --enable LocalManifestFiles
-winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\1.9.1
+winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\2.0.0
 
 scoop bucket add xisosharp https://github.com/purelogiccode/XISOSharp
 scoop install xisosharp/xisosharp

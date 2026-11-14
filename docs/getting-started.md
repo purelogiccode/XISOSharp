@@ -63,7 +63,7 @@ The repository ships generated winget, Scoop and Homebrew manifests under
 ```powershell
 # winget: install from the checked-in manifest (requires LocalManifestFiles)
 winget settings --enable LocalManifestFiles
-winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\1.9.1
+winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\2.0.0
 
 # Scoop: the repository root is a bucket
 scoop bucket add xisosharp https://github.com/purelogiccode/XISOSharp
