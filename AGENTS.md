@@ -43,6 +43,8 @@ reproducible or re-downloadable. Never delete them.
 - Never delete or remove files under a project's Release output paths:
   - any `*/bin/Release/**` (library, CLI, GUI, Tests, Tester, Benchmarks,
     BattleTests, TestDataGenerator)
+  - `XISOSharp.Cli/bin/Release/**` is explicitly append-only: never delete or
+    move any file there, including downloaded historical release bundles.
   - `publish/**`, `publish-gui/**` (publish-script outputs)
   - any `release_*.zip`, `release_*.tar.gz`, `release_*.dmg`, `*.nupkg`,
     `*.snupkg` file anywhere
