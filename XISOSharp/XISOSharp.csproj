@@ -60,13 +60,13 @@
     <EnableStrictModeForPackageValidation>true</EnableStrictModeForPackageValidation>
     <!-- Compare against the last published package; additive APIs are allowed,
          accidental removals/renames fail the pack. Updated with each stable
-         release (currently validates against 1.8.0; the net11-only retarget
+         release (currently validates against 1.9.1; the net11-only retarget
          records its intentional framework drop in CompatibilitySuppressions). -->
-    <PackageValidationBaselineVersion>1.8.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>1.9.1</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The 1.8.0 baseline still carries the EOL net8.0/net9.0 assets. Treat
+    <!-- The 1.9.1 baseline still carries the EOL net8.0/net9.0 assets. Treat
          their removal as intentional; net10.0 remains the nearest baseline
          used to validate the net11.0 API surface. -->
     <PackageValidationBaselineFrameworkToIgnore Include="net8.0" />

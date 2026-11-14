@@ -1,5 +1,51 @@
 # Release Notes
 
+## 2.0.0
+
+**Release date:** 2026-11-13.
+
+**Major release: .NET 11, C# 15 and platform-native bundles.** Every project
+now targets `net11.0` (`net11.0-windows` for the WPF Tester) with C# 15. The
+package no longer ships `net8.0`/`net9.0`/`net10.0` assets; consumers that must
+remain on .NET 10 should stay on the 1.9.x line.
+
+### Breaking changes
+
+- The `XISOSharp` NuGet package ships `lib/net11.0` only. Package validation
+  now uses 1.9.1 as its baseline and records the intentional `net10.0` framework
+  drop as a reviewed `PKV006` suppression.
+- Release bundles are platform-native: Windows `.zip`, Linux `.tar.gz`, macOS
+  `.dmg`. The CLI/GUI update check and packaging generators use the matching
+  extension for each RID.
+
+### Fixes
+
+- Selecting a drive root no longer fails the GUI folder picker: storage items
+  are resolved through `TryGetLocalPath` instead of `Uri.LocalPath`, which threw
+  for Avalonia's relative drive-root URIs. File, save and folder pickers plus
+  drag/drop share the same safe conversion, and non-local selections are
+  reported as cancelled input rather than an application error.
+- Update-cache timestamp parsing is culture-invariant.
+- CLI usage/validation refusals remain tagged `NoBugReport`; the reported
+  misplaced `-d` case is expected input, not a crash.
+
+### Tooling and distribution
+
+- SDK pinned to `11.0.100`; Docker SDK/runtime images moved to .NET 11.
+- The release workflow builds macOS `.dmg` files on macOS, signs/notarizes the
+  disk images, smoke-tests `.tar.gz`/`.dmg` bundles, and attests all six assets.
+- The winget desktop-runtime dependency moves to .NET 11; Homebrew and Scoop
+  generation follows the new asset extensions.
+- Dependencies updated: Avalonia 12.1.6, Meziantou.Analyzer 3.0.339,
+  Microsoft.SourceLink.GitHub 11.0.100, Microsoft.NET.Test.Sdk 18.12.0,
+  QuestPDF 2026.9.2, and .NET 11 ILCompiler/ILLink 11.0.0.
+
+### Tests
+
+- Full suite: **2317 passed / 1 opt-in skip** on `net11.0`; solution build 0
+  warnings; InspectCode 0 warnings/errors; format clean; pack with the 1.9.1
+  baseline succeeds.
+
 ## 1.9.1
 
 **Release date:** 2026-11-08.

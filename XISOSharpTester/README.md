@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
-[![.NET](https://img.shields.io/badge/.NET-10.0%20%2B%20WPF-512BD4)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-11.0%20%2B%20WPF-512BD4)](https://dotnet.microsoft.com/)
 [![WPF-UI](https://img.shields.io/badge/WPF--UI-4.3.0-blueviolet)](https://github.com/lepoco/wpfui)
-[![QuestPDF](https://img.shields.io/badge/QuestPDF-2026.9.1-blueviolet)](https://www.questpdf.com/)
+[![QuestPDF](https://img.shields.io/badge/QuestPDF-2026.9.2-blueviolet)](https://www.questpdf.com/)
 [![Serilog](https://img.shields.io/badge/Serilog-4.4.0-blueviolet)](https://serilog.net/)
 [![GitHub release](https://img.shields.io/github/v/release/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/releases/latest)
 [![GitHub stars](https://img.shields.io/github/stars/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/stargazers)

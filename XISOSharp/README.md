@@ -3,7 +3,7 @@
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 [![NuGet downloads](https://img.shields.io/nuget/dt/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
-[![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-11-512BD4)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/purelogiccode/XISOSharp/blob/master/LICENSE)
 ![Trim-ready](https://img.shields.io/badge/trimming-compatible-success)
 ![AOT-ready](https://img.shields.io/badge/AOT-compatible-success)
@@ -46,10 +46,11 @@ metadata for GOD/STFS, XEX thumbnail export, loose `.xex`/`.xbe` parsing,
 The reviewed 1.9.0 API cleanup also removes the 1.x StfsSharp compatibility
 facades; reference the `StfsSharp` package directly.
 
-The 1.9.1 patch leaves this public API unchanged. It fixes GUI folder-picker
-failures when a selected directory disappears or becomes inaccessible while the
-native dialog is open, and marshals picker failure messages to the UI thread so
-a handled picker error cannot trigger a second exception.
+XISOSharp 2.0.0 targets `net11.0` with C# 15 and no longer ships
+`net8.0`/`net9.0`/`net10.0` assets. Consumers that need .NET 10 should stay on
+the 1.9.x package line. The 1.9.1 GUI folder-picker fixes carry forward, and
+2.0.0 additionally resolves Avalonia's relative drive-root URIs through
+`TryGetLocalPath` so selecting a drive root no longer throws.
 
 ## Companion projects
 

@@ -34,7 +34,7 @@ Consumers that need the standalone readers pin the packages directly instead
 of relying on XISOSharp's transitive dependencies:
 
 ```xml
-<PackageReference Include="XISOSharp" Version="1.9.1" />
+<PackageReference Include="XISOSharp" Version="2.0.0" />
 <PackageReference Include="CCISharp" Version="1.1.0" />
 <PackageReference Include="StfsSharp" Version="1.0.0" />
 ```

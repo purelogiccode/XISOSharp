@@ -1,7 +1,7 @@
 # XISOSharp
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-[![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](global.json)
+[![.NET](https://img.shields.io/badge/.NET-11-512BD4)](global.json)
 [![NuGet](https://img.shields.io/nuget/v/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 [![NuGet downloads](https://img.shields.io/nuget/dt/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 [![GitHub release](https://img.shields.io/github/v/release/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/releases/latest)
@@ -18,7 +18,7 @@
 [![Downloads](https://img.shields.io/github/downloads/purelogiccode/XISOSharp/total)](https://github.com/purelogiccode/XISOSharp/releases)
 [![Code size](https://img.shields.io/github/languages/code-size/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)](https://github.com/purelogiccode/XISOSharp)
-[![Avalonia](https://img.shields.io/badge/Avalonia-12.1.5-blueviolet)](https://avaloniaui.net/)
+[![Avalonia](https://img.shields.io/badge/Avalonia-12.1.6-blueviolet)](https://avaloniaui.net/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/purelogiccode/XISOSharp/pulls)
 
 **XISOSharp is the most advanced library for managing Xbox XISO/XDVDFS images.**
@@ -29,20 +29,21 @@ Beyond the C baseline it merges the archival power of
 [xdvdfs](https://github.com/antangelo/xdvdfs) into one trimmable,
 AOT-compatible library + CLI.
 
-**1.9.1** is the latest patch release and keeps the 1.9.0 feature set: the
-reviewed API cleanup removes the 1.x StfsSharp compatibility facades
-(consumers use `StfsSharp` directly), and the feature pass adds `disc-info`
-(XGD/Redump layout inspector), `apply-skeleton` (the byte-identical inverse of
-`--petrify`), `file-hashes` per-file sidecars for every container, `verify-dat`
-Redump DAT matching, parallel collection verbs (`--jobs` for
-checksum/hash/audit/batch work), `--symlink-mode`, actionable host-I/O
-diagnostics, embedded `default.xex` metadata for GOD/STFS, XEX thumbnail
-export, loose `.xex`/`.xbe` inputs, `--zar-level`, Xbox 42-character name
-validation (`--strict-names`), deterministic packing (`--deterministic`),
-package-manager manifests, shell completions, a man page, a container image and
-refreshed DocFX/README docs. The 1.9.1 patch fixes GUI folder-picker failures
-for folders that disappear or become inaccessible during selection, makes
-picker logging UI-thread safe, and hardens tag-driven release creation.
+**2.0.0** is the latest release and moves the entire toolchain to .NET 11 and
+C# 15. It keeps the 1.9.0 feature set: the reviewed API cleanup removes the 1.x
+StfsSharp compatibility facades (consumers use `StfsSharp` directly), and the
+feature pass adds `disc-info` (XGD/Redump layout inspector), `apply-skeleton`
+(the byte-identical inverse of `--petrify`), `file-hashes` per-file sidecars for
+every container, `verify-dat` Redump DAT matching, parallel collection verbs
+(`--jobs` for checksum/hash/audit/batch work), `--symlink-mode`, actionable
+host-I/O diagnostics, embedded `default.xex` metadata for GOD/STFS, XEX
+thumbnail export, loose `.xex`/`.xbe` inputs, `--zar-level`, Xbox 42-character
+name validation (`--strict-names`), deterministic packing
+(`--deterministic`), package-manager manifests, shell completions, a man page
+and a container image. The 1.9.1 GUI picker fixes carry forward, and 2.0.0 adds
+the drive-root/non-local picker fix plus platform-native bundles (Windows
+`.zip`, Linux `.tar.gz`, macOS `.dmg`). The package now ships `net11.0` only;
+consumers on .NET 8/9/10 should stay on the 1.9.x line.
 
 ## Companion projects
 

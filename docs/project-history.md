@@ -26,6 +26,7 @@ preserves the completed-work sections from the retired missing-feature plan
 | `1.8.x` distribution | 2026-11-07 | DST-03/04/05: winget/Scoop/Homebrew manifests, shell completions + `xisosharp(1)`, GHCR container image. DST-01/02 signing pipelines implemented behind repository secrets. |
 | `1.9.0` | 2026-11-08 | `FAC-01` facade removal plus the feature pass (`BRF-01`…`BRF-13`) and distribution track (`DST-01`…`DST-05`): disc/DAT/hash sidecars, skeleton overlay, parallel collection verbs, symlink/name/determinism policies, Xbox 360 metadata, package manifests, completions, man page, container image and docs refresh. Downstream consumers moved to direct `CCISharp`/`StfsSharp` references (`XRP-04`). |
 | `1.9.1` | 2026-11-08 | Patch release: GUI folder-picker failure handling and UI-thread-safe picker logging; tag-release, SBOM and Docker hardening; package manifests refreshed from the GitHub API digests. No public-API changes. |
+| `2.0.0` | 2026-11-13 | Major release: .NET 11/C# 15 retarget with the net8.0/net9.0/net10.0 package assets dropped; platform-native bundles (Windows `.zip`, Linux `.tar.gz`, macOS `.dmg`); drive-root picker fix; Docker, updater and packaging updates. |
 
 Release notes and per-release detail live in [Release Notes](release-notes.md) and
 [`WhatsNew.md`](https://github.com/purelogiccode/XISOSharp/blob/master/WhatsNew.md).

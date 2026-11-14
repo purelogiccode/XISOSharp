@@ -3,7 +3,7 @@
 <!-- XISOSharp now ships net11.0 only. The net10.0 baseline asset is dropped
      intentionally; PKV006 records that reviewed break. The net8.0/net9.0
      framework drops are excluded in XISOSharp.csproj because those runtimes
-     are EOL. The 1.8.0 baseline API remains compatible with net11.0. -->
+     are EOL. The 1.9.1 baseline API remains compatible with net11.0. -->
 <Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <Suppression>
     <DiagnosticId>PKV006</DiagnosticId>

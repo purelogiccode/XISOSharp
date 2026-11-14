@@ -1,3 +1,50 @@
+# What's New in 2.0.0
+
+_Release date: 2026-11-13._
+
+XISOSharp 2.0 moves the entire toolchain to **.NET 11 and C# 15**. The library,
+CLI, GUI, sample and test harnesses all target `net11.0`; the WPF Tester targets
+`net11.0-windows`. Consumers that need .NET 8, .NET 9 or .NET 10 should stay on
+the 1.9.x package line.
+
+## Platform-native release bundles
+
+The six release assets now use the native archive format for each platform:
+
+- Windows: `release_<version>_win-x64.zip` / `win-arm64.zip`
+- Linux: `release_<version>_linux-x64.tar.gz` / `linux-arm64.tar.gz`
+- macOS: `release_<version>_MacOsX-x64.dmg` / `MacOsX-arm64.dmg`
+
+The CLI/GUI update check, Homebrew generation and publish scripts follow the new
+extensions. The release workflow builds macOS disk images on macOS, signs and
+notarizes them when configured, and smoke-tests the Linux tarballs and macOS
+images as well as the Windows zips.
+
+## GUI and CLI fixes
+
+- Drive-root selections work again: Avalonia returns a relative path URI for a
+  root directory, and the GUI now resolves it through `TryGetLocalPath` instead
+  of throwing from `Uri.LocalPath`.
+- File, save and folder pickers plus drag/drop now share that safe conversion;
+  non-local selections are treated as cancelled input.
+- Update-cache timestamps parse with the invariant culture.
+- The CLI keeps usage/validation refusals local-only, so a misplaced `-d` is a
+  clear usage error rather than a filed bug report.
+
+## Build and packaging
+
+- `global.json` pins SDK 11.0.100; `Directory.Build.props` pins C# 15.
+- Docker images use .NET 11, and the winget desktop-runtime dependency moves to
+  .NET 11.
+- Package validation now compares against 1.9.1 and records the intentional
+  `net10.0` framework drop.
+- Avalonia and the analyzer/test/packaging dependencies are refreshed.
+
+## Verification
+
+The full suite is **2317 passed / 1 opt-in skip** on `net11.0`. Build,
+formatting, InspectCode and `dotnet pack` are clean.
+
 # What's New in 1.9.1
 
 _Release date: 2026-11-08._

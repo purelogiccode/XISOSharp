@@ -21,7 +21,7 @@ line. `netstandard2.0`/`net6.0` were never targets: the library uses
 - **Patch**: fixes only, no new public surface.
 
 The package validates against `PackageValidationBaselineVersion` (currently
-1.8.0). The net11-only retarget intentionally drops the baseline `net10.0`
+1.9.1). The net11-only retarget intentionally drops the baseline `net10.0`
 asset, recorded as a reviewed `PKV006` suppression; the EOL `net8.0`/`net9.0`
 frameworks are excluded in `XISOSharp.csproj`. The 1.9.0 `FAC-01` facade
 removals remain part of the baseline history. Do not add suppressions without a
