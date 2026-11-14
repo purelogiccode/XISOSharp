@@ -13,9 +13,10 @@ command-line tool or the .NET library.
 | Disk space | At least 2× the ISO size for extraction, plus workspace for creation |
 
 > [!NOTE]
-> The library and all apps target `net11.0` with C# 15. The CLI can be published
-> as a **self-contained single-file** binary for any platform,
-> requiring no installed runtime - see [Building](building.md#publishing).
+> The library and CLI target `net8.0`, `net9.0`, `net10.0` and `net11.0` with
+> C# 15; the GUI and internal tools target `net11.0`. The CLI can be published
+> as a **self-contained single-file** binary for any platform, requiring no
+> installed runtime - see [Building](building.md#publishing).
 
 ## Option 1 — The command-line tool
 
@@ -63,7 +64,7 @@ The repository ships generated winget, Scoop and Homebrew manifests under
 ```powershell
 # winget: install from the checked-in manifest (requires LocalManifestFiles)
 winget settings --enable LocalManifestFiles
-winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\2.0.0
+winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\2.0.1
 
 # Scoop: the repository root is a bucket
 scoop bucket add xisosharp https://github.com/purelogiccode/XISOSharp

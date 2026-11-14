@@ -3,7 +3,7 @@
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 [![NuGet downloads](https://img.shields.io/nuget/dt/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
-[![.NET](https://img.shields.io/badge/.NET-11-512BD4)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010%20%7C%2011-512BD4)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/purelogiccode/XISOSharp/blob/master/LICENSE)
 ![Trim-ready](https://img.shields.io/badge/trimming-compatible-success)
 ![AOT-ready](https://img.shields.io/badge/AOT-compatible-success)
@@ -46,11 +46,11 @@ metadata for GOD/STFS, XEX thumbnail export, loose `.xex`/`.xbe` parsing,
 The reviewed 1.9.0 API cleanup also removes the 1.x StfsSharp compatibility
 facades; reference the `StfsSharp` package directly.
 
-XISOSharp 2.0.0 targets `net11.0` with C# 15 and no longer ships
-`net8.0`/`net9.0`/`net10.0` assets. Consumers that need .NET 10 should stay on
-the 1.9.x package line. The 1.9.1 GUI folder-picker fixes carry forward, and
-2.0.0 additionally resolves Avalonia's relative drive-root URIs through
-`TryGetLocalPath` so selecting a drive root no longer throws.
+XISOSharp 2.0.1 restores the `net8.0`/`net9.0`/`net10.0` assets alongside
+`net11.0` and is built with C# 15. The 2.0.0 package had accidentally shipped
+.NET 11 only; use 2.0.1 for the full compatibility matrix. The 1.9.1 GUI
+folder-picker fixes carry forward, and the drive-root/non-local selection fix
+resolves Avalonia's relative URIs through `TryGetLocalPath`.
 
 ## Companion projects
 
@@ -1823,9 +1823,14 @@ The core processing engine is **not thread-safe** for concurrent operations on t
 
 | Target | Version |
 |--------|---------|
+| .NET 8 | `net8.0` |
+| .NET 9 | `net9.0` |
+| .NET 10 | `net10.0` |
 | .NET 11 | `net11.0` |
 
-The library targets `net11.0` with C# 15 (see
+The library targets all four TFMs with C# 15. `net8.0`/`net9.0` remain
+compatibility targets even though those runtimes are out of support; `net10.0`
+is LTS and `net11.0` is STS (see
 [Support Policy](https://github.com/purelogiccode/XISOSharp/blob/master/docs/support-policy.md)).
 Its runtime dependencies beyond the .NET runtime are [ZArchiveSharp](https://www.nuget.org/packages/ZArchiveSharp)
 (ZAR archive support), [CCISharp](https://www.nuget.org/packages/CCISharp)

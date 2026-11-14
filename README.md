@@ -1,7 +1,7 @@
 # XISOSharp
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-[![.NET](https://img.shields.io/badge/.NET-11-512BD4)](global.json)
+[![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010%20%7C%2011-512BD4)](global.json)
 [![NuGet](https://img.shields.io/nuget/v/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 [![NuGet downloads](https://img.shields.io/nuget/dt/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 [![GitHub release](https://img.shields.io/github/v/release/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/releases/latest)
@@ -29,8 +29,9 @@ Beyond the C baseline it merges the archival power of
 [xdvdfs](https://github.com/antangelo/xdvdfs) into one trimmable,
 AOT-compatible library + CLI.
 
-**2.0.0** is the latest release and moves the entire toolchain to .NET 11 and
-C# 15. It keeps the 1.9.0 feature set: the reviewed API cleanup removes the 1.x
+**2.0.1** is the latest release. It restores the `net8.0`/`net9.0`/`net10.0`
+package assets alongside `net11.0`; 2.0.0 had accidentally shipped .NET 11
+only. The 1.9.0 feature set remains: the reviewed API cleanup removes the 1.x
 StfsSharp compatibility facades (consumers use `StfsSharp` directly), and the
 feature pass adds `disc-info` (XGD/Redump layout inspector), `apply-skeleton`
 (the byte-identical inverse of `--petrify`), `file-hashes` per-file sidecars for
@@ -40,10 +41,9 @@ host-I/O diagnostics, embedded `default.xex` metadata for GOD/STFS, XEX
 thumbnail export, loose `.xex`/`.xbe` inputs, `--zar-level`, Xbox 42-character
 name validation (`--strict-names`), deterministic packing
 (`--deterministic`), package-manager manifests, shell completions, a man page
-and a container image. The 1.9.1 GUI picker fixes carry forward, and 2.0.0 adds
-the drive-root/non-local picker fix plus platform-native bundles (Windows
-`.zip`, Linux `.tar.gz`, macOS `.dmg`). The package now ships `net11.0` only;
-consumers on .NET 8/9/10 should stay on the 1.9.x line.
+and a container image. The GUI picker fixes carry forward, including drive-root
+and non-local selection handling. Release bundles are platform-native: Windows
+`.zip`, Linux `.tar.gz`, macOS `.dmg`.
 
 ## Companion projects
 
@@ -66,9 +66,9 @@ neither app depends on the XISOSharp compatibility facades removed in 1.9.0.
 
 | Project | Description |
 |---|---|
-| [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) - full read/write engine, `net11.0`, C# 15, strong-named |
+| [XISOSharp.Core](XISOSharp/) | Core library (`NuGet: XISOSharp`) - full read/write engine, `net8.0`/`net9.0`/`net10.0`/`net11.0`, C# 15, strong-named |
 | [XISOSharp.Cli](XISOSharp.Cli/) | CLI project (ships binary `XISOSharp(.exe)`, `AssemblyName XISOSharp.Cli`) - extract-xiso-compatible flags + 35+ extra modes |
-| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (2317 passed / 1 opt-in skip on net11.0) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + XDBF/XSRC 360 title metadata + XBE logo/title/save images + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + CCI/libCCI interop + split-ISO input + ZAR input + GOD/SVOD read-only input + XBLA/XBLIG STFS package listing/extraction + SHA-1 hash-tree validation + StfsSharp integration + pathological TOC chains (list/tree/extract/rewrite/audit/ranges/repair/salvage/ZAR) + batch container conversion + JSON output/preallocation + explicit sector-layout packing + parallel extraction (ISO/CISO/split, resume, continue-on-error, CLI `--jobs`) + concurrent creation and extraction (independent overlapping creates, CWD-free writer and reader) + safe-extract name policy (reject/sanitize/skip) + GOD and XBLA/XBLIG header title metadata + disc/DAT/hash-sidecar/skeleton-overlay/name-rule/symlink/host-I/O suites + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command/folder-picker coverage |
+| [XISOSharp.Tests](XISOSharp.Tests/) | xUnit suite (2317 passed / 1 opt-in skip on net11.0; 2239 / 1 on net8/9/10) - snapshot `test_fixture.iso` + corruption resilience + in-place repair + salvage rebuild + XBE/XEX parsing + XDBF/XSRC 360 title metadata + XBE logo/title/save images + disc-format identity + `MemoryBlockDevice` + `xdvdfs-cli` split-CSO interop + CCI/libCCI interop + split-ISO input + ZAR input + GOD/SVOD read-only input + XBLA/XBLIG STFS package listing/extraction + SHA-1 hash-tree validation + StfsSharp integration + pathological TOC chains (list/tree/extract/rewrite/audit/ranges/repair/salvage/ZAR) + batch container conversion + JSON output/preallocation + explicit sector-layout packing + parallel extraction (ISO/CISO/split, resume, continue-on-error, CLI `--jobs`) + concurrent creation and extraction (independent overlapping creates, CWD-free writer and reader) + safe-extract name policy (reject/sanitize/skip) + GOD and XBLA/XBLIG header title metadata + disc/DAT/hash-sidecar/skeleton-overlay/name-rule/symlink/host-I/O suites + reference extract-xiso legacy-layout interop + unpack-resume/output-guard/`-d`-edge-case/stream-API/filesystem-destination/explorer/split-join/robustness/remap-escape/symlink coverage + process-runner/update-checker/overwrite-prompt/bug-report/internals/GUI-command/folder-picker coverage |
 | [XISOSharp.Benchmarks](XISOSharp.Benchmarks/) | BenchmarkDotNet (AVL, Boyer-Moore, sector math) |
 | [XISOSharpTester](XISOSharpTester/) | WPF GUI — batch regression vs `extract-xiso.exe` |
 | [XISOSharp.BattleTests](XISOSharp.BattleTests/) | CLI-vs-reference battle harness over a random sample of real ISOs (default 1 of `H:\XBOXTest`, seeded): `extract-xiso.exe` (reference build `202609111233`; `list`/`extract`/`rewrite`), `xdvdfs.exe` 0.8.3 (`checksum`/`md5`/`unpack`/`pack`/`cso` round-trip), `xboxkit.exe` 0.7 (`petrify`/`video`/`random`/`seed`/`trim`/`wipe`/`zar`/`rebuild`) — outputs compared byte-for-byte, per-exe timings reported |
@@ -103,7 +103,7 @@ dotnet add package XISOSharp
 Install-Package XISOSharp
 ```
 
-Package targets `net11.0` with C# 15, strong-named, `IsTrimmable`+`IsAotCompatible`, `snupkg` via SourceLink; runtime dependencies are `ZArchiveSharp` (ZAR), `CCISharp` (CCI) and `StfsSharp` (GOD/SVOD and XBLA/XBLIG STFS readers).
+Package targets `net8.0`, `net9.0`, `net10.0` and `net11.0` with C# 15, strong-named, `IsTrimmable`+`IsAotCompatible`, `snupkg` via SourceLink; runtime dependencies are `ZArchiveSharp` (ZAR), `CCISharp` (CCI) and `StfsSharp` (GOD/SVOD and XBLA/XBLIG STFS readers).
 
 ### Prebuilt bundles, package managers and container
 
@@ -116,7 +116,7 @@ as a container image:
 
 ```powershell
 winget settings --enable LocalManifestFiles
-winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\2.0.0
+winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\2.0.1
 
 scoop bucket add xisosharp https://github.com/purelogiccode/XISOSharp
 scoop install xisosharp/xisosharp
@@ -770,7 +770,7 @@ File-by-file against [`References/`](References/) — `extract-xiso` build `2026
 | Extraction to dir | ✅ | ✅ | ✅ | ✅ |
 | Platform detection (`OperatingSystem.Is*`) | ✅ | 🟡 `#if` | 🟡 | ✅ |
 | Per-hunk CRC / full-image verify | ✅ | — | — | 🟡 SHA3 |
-| Multi-target builds | ✅ `net11` (C# 15) | — | ✅ `net6`–`net10` (`LibXGD` `net20`–`net10`) | — (Rust) |
+| Multi-target builds | ✅ `net8`/`net9`/`net10`/`net11` (C# 15) | — | ✅ `net6`–`net10` (`LibXGD` `net20`–`net10`) | — (Rust) |
 | Strong-name signing (`snk`) | ✅ | — | ❌ | — |
 | Trimmable + AOT (`IsTrimmable`/`IsAotCompatible`) | ✅ | — | ❌ | ✅ native/`no_std` |
 | Native dependencies | **none** | none | none (managed NuGet `GrindCore`/`SabreTools`) | `bincode`/`serde`/`clap`/`wax`/`ciso`/`md-5`/`sha3` |
@@ -785,16 +785,16 @@ git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 dotnet build CSharp_XISOSharp.sln            # Debug
 dotnet build CSharp_XISOSharp.sln -c Release # Release (same outputs; no implicit pack)
-dotnet test -c Release                       # 2317 passed / 1 opt-in skip on net11.0 (`XISOSharp.Tests`; ZArchiveSharp/CCISharp/StfsSharp come from NuGet)
+dotnet test -c Release                       # 2317 passed / 1 opt-in skip on net11.0; 2239 / 1 on net8/9/10 (`XISOSharp.Tests`)
 ```
 
 Layout: every project lives in its own top-level folder beside the solution — `XISOSharp` (library), `XISOSharp.Cli`, `XISOSharp.Gui`, `XISOSharpTester`, the verification harnesses (`XISOSharp.Tests`, `XISOSharp.BattleTests`, `XISOSharp.Benchmarks`, `XISOSharp.Fuzz`, `XISOSharp.AotSmoke`, `XISOSharp.TestDataGenerator`) and the `XISOSharp.Sample` walkthrough. There are no `src`/`apps`/`tests`/`samples` grouping folders.
 
-Projects: `XISOSharp` (`net11.0`, C# 15) packs explicitly (`dotnet pack`; `GeneratePackageOnBuild` is off); `XISOSharp.Cli` (`net11.0`, ships as the release-bundle executable); `XISOSharp.Tests` (`net11.0`); `XISOSharpTester` (`net11.0-windows` WPF); `XISOSharp.Fuzz` (mutation fuzzer); `XISOSharp.AotSmoke` (NativeAOT smoke); `XISOSharp.Sample` (library walkthrough). `ZArchiveSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZArchiveSharp.Tests` + `ZArchiveSharp.Benchmarks` moved to the sibling `../CSharp_ZArchiveSharp` repo (own solution); `XISOSharp` consumes the library as NuGet package `ZArchiveSharp` 1.4.0. The GOD/STFS readers live in the sibling `../CSharp_STFSSharp` repo and are consumed as NuGet package `StfsSharp` 1.0.0; XISOSharp 1.9.0 references those types directly (the 1.x compatibility facades are gone). CI builds on `ubuntu`/`windows`/`macos`.
+Projects: `XISOSharp` (`net8.0`/`net9.0`/`net10.0`/`net11.0`, C# 15) packs explicitly (`dotnet pack`; `GeneratePackageOnBuild` is off); `XISOSharp.Cli` (same four TFMs, ships the net11.0 release-bundle executable); `XISOSharp.Tests` (same four TFMs); `XISOSharpTester` (`net11.0-windows` WPF); `XISOSharp.Fuzz` (mutation fuzzer); `XISOSharp.AotSmoke` (NativeAOT smoke); `XISOSharp.Sample` (library walkthrough). `ZArchiveSharp` (`net8.0`/`net9.0`/`net10.0` ZArchive library) + `ZArchiveSharp.Tests` + `ZArchiveSharp.Benchmarks` moved to the sibling `../CSharp_ZArchiveSharp` repo (own solution); `XISOSharp` consumes the library as NuGet package `ZArchiveSharp` 1.4.0. The GOD/STFS readers live in the sibling `../CSharp_STFSSharp` repo and are consumed as NuGet package `StfsSharp` 1.0.0; XISOSharp 1.9.0 references those types directly (the 1.x compatibility facades are gone). CI builds on `ubuntu`/`windows`/`macos`.
 
 ## Requirements
 
-- .NET SDK pinned to `11.0.100` (`rollForward: latestPatch`); every built binary targets .NET 11 with C# 15.
+- .NET SDK pinned to `11.0.100` (`rollForward: latestPatch`); the library and CLI target .NET 8/9/10/11, while the GUI and tools target .NET 11. All projects use C# 15.
 
 ## License
 

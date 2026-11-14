@@ -107,8 +107,10 @@ dotnet tool update --global JetBrains.ReSharper.GlobalTools --version 2026.2.3.1
   `pages.yml`/`wiki.yml` (docs).
 - Tag pushes trigger the tag-only `publish-nuget` job; PR/branch runs stop at
   pack. `release.yml` runs in parallel and creates the GitHub release.
-- All projects target `net11.0` (`net11.0-windows` for the WPF Tester) with C#
-  15. The test hosts share one `TestData/` tree; the fixture stamps
+- The library, CLI, tests and fixture generator multi-target
+  `net8.0`/`net9.0`/`net10.0`/`net11.0`; the GUI and internal tools target
+  `net11.0` (`net11.0-windows` for the WPF Tester). All use C# 15. The test
+  hosts share one `TestData/` tree; the fixture stamps
   `TestData/output/fixture.stamp` so only the first host rebuilds the ISO
   (`TestDataWriter`). Do not make the ISO rebuild unconditional again.
 - `XISOSharp.Tests` is strong-named with `XISOSharp/XISOSharp.snk` because the
@@ -121,8 +123,8 @@ dotnet tool update --global JetBrains.ReSharper.GlobalTools --version 2026.2.3.1
 ### Versioning facts
 
 - **2.0.0 is published (2026-11-13).** Do not reuse the version or move the
-  `2.0.0` tag again. It is the net11-only major release; the next release must
-  use a new tag (e.g. `2.0.1` or later).
+  `2.0.0` tag again. It accidentally shipped net11-only; the next release is
+  `2.0.1`, which restores the net8.0/net9.0/net10.0 assets alongside net11.0.
 - Version comes from git tags via **MinVer**. Never add or edit a `Version`
   property in a csproj.
 - Release tags are bare semver: `1.0.0`, `1.0.1`, `1.0.2` (`v1.0.2` also
@@ -145,7 +147,8 @@ dotnet tool update --global JetBrains.ReSharper.GlobalTools --version 2026.2.3.1
      `202609111233`), not `v2.7.1`. Never change the on-disk optimized tag
      `in!xiso!2.7.1 (01.11.14)` or `Constants.ExisoVersion`.
 2. Run the full suite: `dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release`
-   (currently 2317 passed / 1 skipped on net11.0).
+   (currently 2317 passed / 1 skipped on net11.0; 2239 / 1 on each of
+   net8.0/net9.0/net10.0).
 3. Commit + push `master` (only when the user asks), then tag and push:
    `git tag <version> && git push origin <version>`.
 4. The tag push triggers CI pack + publish. If the `nuget` environment has

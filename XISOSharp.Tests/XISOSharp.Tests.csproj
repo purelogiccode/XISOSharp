@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net11.0</TargetFramework>
+    <TargetFrameworks>net8.0;net9.0;net10.0;net11.0</TargetFrameworks>
     <AssemblyName>XISOSharp.Tests</AssemblyName>
     <RootNamespace>XISOSharp.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
@@ -48,7 +48,7 @@
   <ItemGroup>
     <ProjectReference Include="$(RepoRoot)XISOSharp\XISOSharp.csproj" />
     <ProjectReference Include="$(RepoRoot)XISOSharp.Cli\XISOSharp.Cli.csproj" />
-    <ProjectReference Include="$(RepoRoot)XISOSharp.Gui\XISOSharp.Gui.csproj" />
+    <ProjectReference Include="$(RepoRoot)XISOSharp.Gui\XISOSharp.Gui.csproj" Condition="'$(TargetFramework)' == 'net11.0'" />
     <!-- TestDataWriter lives in the Generator project (single owner); Tests
              references the project instead of linked-compiling the file, so new
              Generator sources always propagate. -->

@@ -28,8 +28,10 @@ Thanks for considering a contribution! This project is a byte-faithful port of
 - Follow the analyzers and formatting rules in [`.editorconfig`](../.editorconfig)
   (Meziantou.Analyzer + Roslynator are wired into every project; the build must stay
   at **0 warnings**).
-- Every project targets `net11.0` (`net11.0-windows` for the WPF Tester) with
-  C# 15; the language version is pinned in `Directory.Build.props`.
+- The library, CLI, tests and fixture generator target
+  `net8.0`/`net9.0`/`net10.0`/`net11.0`; the GUI and internal tools target
+  `net11.0` (`net11.0-windows` for the WPF Tester). C# 15 is pinned in
+  `Directory.Build.props`.
 - **XML documentation is mandatory on every new public API member of the
   `XISOSharp` library** — the package generates the doc file and package
   validation runs in strict mode. (App/harness projects need no doc file;
@@ -61,8 +63,8 @@ For every item that changes code:
 - Unit + integration + parity/interop + CLI contract tests added.
 - Synthetic fixtures only; no copyrighted game data and no GPL binaries.
 - Docs, READMEs and release notes updated in the same change.
-- Full suite green on `net11.0`; `dotnet format` clean; InspectCode 0
-  warnings/errors; trim/AOT analyzers clean.
+- Full suite green on `net8.0`/`net9.0`/`net10.0`/`net11.0`; `dotnet format`
+  clean; InspectCode 0 warnings/errors; trim/AOT analyzers clean.
 - `dotnet pack` succeeds with package validation.
 - No deletion of files under `bin/Release`, `publish*` or release archives (see
   [`AGENTS.md`](https://github.com/purelogiccode/XISOSharp/blob/master/AGENTS.md)).

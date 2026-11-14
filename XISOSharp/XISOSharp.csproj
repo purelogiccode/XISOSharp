@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net11.0</TargetFramework>
+    <TargetFrameworks>net8.0;net9.0;net10.0;net11.0</TargetFrameworks>
     <!-- LangVersion/ImplicitUsings/Nullable/Deterministic/ContinuousIntegrationBuild
              inherited from Directory.Build.props. -->
     <AssemblyName>XISOSharp</AssemblyName>
@@ -60,18 +60,9 @@
     <EnableStrictModeForPackageValidation>true</EnableStrictModeForPackageValidation>
     <!-- Compare against the last published package; additive APIs are allowed,
          accidental removals/renames fail the pack. Updated with each stable
-         release (currently validates against 1.9.1; the net11-only retarget
-         records its intentional framework drop in CompatibilitySuppressions). -->
-    <PackageValidationBaselineVersion>1.9.1</PackageValidationBaselineVersion>
+         release (currently validates against 2.0.0). -->
+    <PackageValidationBaselineVersion>2.0.0</PackageValidationBaselineVersion>
   </PropertyGroup>
-
-  <ItemGroup>
-    <!-- The 1.9.1 baseline still carries the EOL net8.0/net9.0 assets. Treat
-         their removal as intentional; net10.0 remains the nearest baseline
-         used to validate the net11.0 API surface. -->
-    <PackageValidationBaselineFrameworkToIgnore Include="net8.0" />
-    <PackageValidationBaselineFrameworkToIgnore Include="net9.0" />
-  </ItemGroup>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
@@ -106,7 +97,13 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="11.0.100" PrivateAssets="All" />
+    <!-- SourceLink 11's build-task closure uses System.IO.Hashing 11, which
+         warns on the net8.0/net9.0 targets. Those TFMs keep SourceLink 10;
+         net10.0/net11.0 use the current 11.x build tasks. -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.403" PrivateAssets="All"
+                      Condition="'$(TargetFramework)' == 'net8.0' Or '$(TargetFramework)' == 'net9.0'" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="11.0.100" PrivateAssets="All"
+                      Condition="'$(TargetFramework)' == 'net10.0' Or '$(TargetFramework)' == 'net11.0'" />
     <PackageReference Include="MinVer" Version="8.0.0" PrivateAssets="all">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

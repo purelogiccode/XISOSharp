@@ -138,7 +138,8 @@ exceed 4,294,967,295 bytes (~4 GB). Larger files throw `XisoFileTooLargeExceptio
 
 **Which .NET versions does the library support?**
 
-`net11.0` with C# 15. The CLI targets the same framework and can be published
+`net8.0`, `net9.0`, `net10.0` and `net11.0` with C# 15. The CLI multi-targets
+the same frameworks (the release bundle ships net11.0) and can be published
 self-contained for any platform (see [Building](building.md#publish)).
 
 **Is the library thread-safe?**

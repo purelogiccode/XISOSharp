@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-2317-brightgreen)
-[![.NET](https://img.shields.io/badge/.NET-11-512BD4)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010%20%7C%2011-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
 [![Test SDK](https://img.shields.io/badge/test--sdk-18.12.0-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
 [![Coverlet](https://img.shields.io/badge/coverage-coverlet-blueviolet)](https://github.com/coverlet-coverage/coverlet)
@@ -88,7 +88,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Xbox 360 metadata** - embedded `default.xex` XDBF/XSRC fields for GOD/STFS, thumbnail export and loose `.xex`/`.xbe` parsing
 - **Parallel collection verbs** - `--jobs 1..64` output/JSON parity for checksum/hash/audit/batch extract/list/tree/rewrite
 - **Name/link/determinism policy** - 42-character Latin-1 rules, `--strict-names`, symlink follow/skip/reject, host-I/O diagnostics and deterministic rewrite FILETIME
-- **Counts** - 2317 passed / 1 opt-in skip on `net11.0`
+- **Counts** - 2317 passed / 1 opt-in skip on `net11.0`; 2239 / 1 on each of `net8.0`/`net9.0`/`net10.0`
 
 ## Running Tests
 

@@ -102,10 +102,10 @@ skipping for a recovery run. The OS must still have long paths enabled
 
 ## Platforms and support
 
-- The library targets `net11.0` only (C# 15). .NET 8 and .NET 9 reached end of
-  support on 10 November 2026 and are no longer built or tested. .NET 10 remains
-  an LTS runtime, but the package no longer ships a `net10.0` asset; use the
-  1.9.x package line if you must stay on .NET 10.
+- The library targets `net8.0`, `net9.0`, `net10.0` and `net11.0` with C# 15.
+  .NET 8 and .NET 9 are EOL (10 November 2026) but remain supported
+  compatibility targets; no security fixes come from those runtimes. The GUI
+  and internal tools target .NET 11.
 - The test suite runs on Windows, Linux and macOS. The WPF `XISOSharpTester`
   harness only runs on Windows (it builds everywhere).
 - The per-file size field is 32-bit, so a single file cannot exceed ~4 GiB.

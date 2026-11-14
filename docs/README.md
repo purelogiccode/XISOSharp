@@ -5,7 +5,7 @@
 [![Docsify](https://img.shields.io/badge/docsify-4.x-blueviolet)](https://docsify.js.org/)
 [![Pages](https://github.com/purelogiccode/XISOSharp/actions/workflows/pages.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/pages.yml)
 [![Wiki sync](https://github.com/purelogiccode/XISOSharp/actions/workflows/wiki.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/wiki.yml)
-[![.NET](https://img.shields.io/badge/.NET-11-512BD4)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010%20%7C%2011-512BD4)](https://dotnet.microsoft.com/)
 [![NuGet](https://img.shields.io/nuget/v/XISOSharp.svg)](https://www.nuget.org/packages/XISOSharp/)
 [![GitHub stars](https://img.shields.io/github/stars/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/stargazers)
 [![GitHub contributors](https://img.shields.io/github/contributors/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/graphs/contributors)

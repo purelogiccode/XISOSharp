@@ -38,10 +38,10 @@ The solution contains:
 
 | Project | Target(s) | Output |
 |---|---|---|
-| `XISOSharp` | net11.0 (C# 15) | `XISOSharp.dll` + NuGet package |
-| `XISOSharp.Cli` | net11.0 | `XISOSharp` executable |
+| `XISOSharp` | net8.0, net9.0, net10.0, net11.0 (C# 15) | `XISOSharp.dll` + NuGet package |
+| `XISOSharp.Cli` | net8.0, net9.0, net10.0, net11.0 (ships: net11.0) | `XISOSharp` executable |
 | `XISOSharp.Gui` | net11.0 | Avalonia GUI (shippable, shells out to the CLI) |
-| `XISOSharp.Tests` | net11.0 | xUnit test assembly (engine + CLI) |
+| `XISOSharp.Tests` | net8.0, net9.0, net10.0, net11.0 | xUnit test assembly (engine + CLI) |
 | `ZArchiveSharp` (`ZArchiveSharp.Tests` / `ZArchiveSharp.Benchmarks` / `ZArchiveSharp.Cli`) | — | Lives in the sibling `../CSharp_ZArchiveSharp` repo (own solution); consumed here as NuGet package `ZArchiveSharp` 1.4.0 (`ZArchiveSharp.Cli` is a `dotnet tool`, not a library reference) |
 | `XISOSharp.Benchmarks` | net11.0 | BenchmarkDotNet harness |
 | `XISOSharpTester` | net11.0-windows | WPF regression-test rig (Windows-only, runs from build output) |

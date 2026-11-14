@@ -7,7 +7,7 @@
          The library (XISOSharp/) is the only published package. -->
     <IsPackable>false</IsPackable>
     <Description>XISOSharp command-line tool: create, extract, list, rewrite, compress and archive Xbox XISO/XDVDFS images. Reads ISO, split ISO, CISO, CCI and ZAR; writes XISO, CISO, CCI and ZAR; includes Redump/XboxKit archival modes.</Description>
-    <TargetFramework>net11.0</TargetFramework>
+    <TargetFrameworks>net8.0;net9.0;net10.0;net11.0</TargetFrameworks>
     <AssemblyName>XISOSharp.Cli</AssemblyName>
     <RootNamespace>XISOSharp.Cli</RootNamespace>
     <ApplicationIcon>icon\icon.ico</ApplicationIcon>

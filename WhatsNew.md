@@ -1,6 +1,37 @@
+# What's New in 2.0.1
+
+_Release date: 2026-11-14._
+
+XISOSharp 2.0.1 restores **.NET 8, .NET 9 and .NET 10 support** that was
+accidentally dropped in 2.0.0. The package now ships four target frameworks:
+
+- `net8.0`
+- `net9.0`
+- `net10.0`
+- `net11.0`
+
+The library, CLI, tests and fixture generator all multi-target those four TFMs
+with C# 15. Consumers can stay on .NET 8/9/10 or move to .NET 11 without
+changing packages.
+
+## Bundles and CI
+
+Release bundles continue to use the platform-native formats (Windows `.zip`,
+Linux `.tar.gz`, macOS `.dmg`) and ship the net11.0 CLI executable. CI now
+installs the .NET 8/9/10 runtimes alongside the pinned .NET 11 SDK so every
+test host runs on Ubuntu, Windows and macOS.
+
+## Verification
+
+The full suite is **2317 passed / 1 opt-in skip** on `net11.0` and **2239 passed
+/ 1 opt-in skip** on each of `net8.0`, `net9.0` and `net10.0`. Build, formatting,
+InspectCode and package validation are clean.
+
 # What's New in 2.0.0
 
 _Release date: 2026-11-13._
+
+> **Superseded by 2.0.1:** 2.0.0 shipped net11 only; 2.0.1 restores .NET 8/9/10.
 
 XISOSharp 2.0 moves the entire toolchain to **.NET 11 and C# 15**. The library,
 CLI, GUI, sample and test harnesses all target `net11.0`; the WPF Tester targets

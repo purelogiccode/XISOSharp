@@ -1,13 +1,40 @@
 # Release Notes
 
+## 2.0.1
+
+**Release date:** 2026-11-14.
+
+**Patch release: restores .NET 8, .NET 9 and .NET 10 package support.** 2.0.0
+accidentally shipped `net11.0` only. 2.0.1 multi-targets
+`net8.0;net9.0;net10.0;net11.0` for the library, CLI, tests and fixture
+generator, so consumers can stay on any supported runtime.
+
+### Packaging
+
+- The NuGet package again contains `lib/net8.0`, `lib/net9.0`, `lib/net10.0`
+  and `lib/net11.0`, validated against the 2.0.0 baseline.
+- The CLI multi-targets the same four frameworks; release bundles continue to
+  ship the net11.0 executable in Windows `.zip`, Linux `.tar.gz` and macOS
+  `.dmg` assets.
+- CI installs the .NET 8/9/10 runtimes alongside the pinned .NET 11 SDK so all
+  four test hosts run on every OS.
+
+### Tests
+
+- `net11.0`: **2317 passed / 1 opt-in skip**
+- `net8.0`, `net9.0`, `net10.0`: **2239 passed / 1 opt-in skip** each
+- Build, formatting, InspectCode and package validation are clean.
+
 ## 2.0.0
 
 **Release date:** 2026-11-13.
 
+> **Superseded by 2.0.1:** this release shipped `net11.0` only. Use 2.0.1 for
+> the restored `net8.0`/`net9.0`/`net10.0` assets.
+
 **Major release: .NET 11, C# 15 and platform-native bundles.** Every project
-now targets `net11.0` (`net11.0-windows` for the WPF Tester) with C# 15. The
-package no longer ships `net8.0`/`net9.0`/`net10.0` assets; consumers that must
-remain on .NET 10 should stay on the 1.9.x line.
+targets `net11.0` (`net11.0-windows` for the WPF Tester) with C# 15. The
+package in this release does not ship `net8.0`/`net9.0`/`net10.0` assets.
 
 ### Breaking changes
 
