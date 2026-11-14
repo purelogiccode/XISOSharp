@@ -13,8 +13,9 @@ namespace XISOSharp.Cli;
 /// GitHub release is compared against the running version. When a newer
 /// release exists the user is notified on stderr with the release URL and,
 /// on an interactive console, offered to open it in a browser.
-/// Release assets follow the <c>release_&lt;version&gt;_&lt;rid&gt;.zip</c>
-/// convention (e.g. <c>release_1.0.0_win-x64.zip</c>).
+/// Release assets follow the <c>release_&lt;version&gt;_&lt;rid&gt;.&lt;ext&gt;</c>
+/// convention: zip on Windows, tar.gz on Linux, dmg on macOS (e.g.
+/// <c>release_1.0.0_win-x64.zip</c>, <c>release_1.0.0_linux-x64.tar.gz</c>).
 /// Best effort and silent on failure: an offline machine or API error only
 /// delays startup by the HTTP timeout, never fails the run, and never files
 /// a bug report. Set <c>XISO_NO_UPDATE_CHECK=1</c> to disable.

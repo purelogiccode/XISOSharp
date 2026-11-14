@@ -63,26 +63,38 @@ jobs:
           echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
 
   bundle:
-    name: bundle (${{ matrix.zip_rid }})
+    name: bundle (${{ matrix.asset_rid }})
     needs: resolve
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
           - rid: win-x64
-            zip_rid: win-x64
+            asset_rid: win-x64
+            os: ubuntu-latest
+            archive: zip
           - rid: win-arm64
-            zip_rid: win-arm64
+            asset_rid: win-arm64
+            os: ubuntu-latest
+            archive: zip
           - rid: linux-x64
-            zip_rid: linux-x64
+            asset_rid: linux-x64
+            os: ubuntu-latest
+            archive: tar.gz
           - rid: linux-arm64
-            zip_rid: linux-arm64
+            asset_rid: linux-arm64
+            os: ubuntu-latest
+            archive: tar.gz
           - rid: osx-x64
-            zip_rid: MacOsX-x64
+            asset_rid: MacOsX-x64
+            os: macos-latest
+            archive: dmg
           - rid: osx-arm64
-            zip_rid: MacOsX-arm64
+            asset_rid: MacOsX-arm64
+            os: macos-latest
+            archive: dmg
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -114,7 +126,7 @@ jobs:
       - name: Publish CLI
         run: >-
           dotnet publish XISOSharp.Cli/XISOSharp.Cli.csproj
-          -c Release -f net10.0 -r ${{ matrix.rid }} --no-self-contained
+          -c Release -f net11.0 -r ${{ matrix.rid }} --no-self-contained
           -p:PublishTrimmed=false
           -p:MinVerVersionOverride=${{ needs.resolve.outputs.version }}
           -o "$RUNNER_TEMP/stage"
@@ -150,17 +162,37 @@ jobs:
             exit 1
           fi
 
-          zip_path="$GITHUB_WORKSPACE/release_${{ needs.resolve.outputs.version }}_${{ matrix.zip_rid }}.zip"
-          cd "$stage"
-          zip -q -r "$zip_path" "$cli" "$gui" README.md LICENSE WhatsNew.md
-          echo "Created $zip_path"
-          unzip -l "$zip_path"
+          asset="$GITHUB_WORKSPACE/release_${{ needs.resolve.outputs.version }}_${{ matrix.asset_rid }}.${{ matrix.archive }}"
+          case "${{ matrix.archive }}" in
+            zip)
+              (cd "$stage" && zip -q -r "$asset" "$cli" "$gui" README.md LICENSE WhatsNew.md)
+              unzip -l "$asset"
+              ;;
+            tar.gz)
+              tar -czf "$asset" -C "$stage" "$cli" "$gui" README.md LICENSE WhatsNew.md
+              tar -tzf "$asset"
+              ;;
+            dmg)
+              rm -f "$asset"
+              hdiutil create -volname "XISOSharp ${{ needs.resolve.outputs.version }}" \
+                -srcfolder "$stage" -ov -format UDZO "$asset"
+              hdiutil imageinfo "$asset" | head -20
+              ;;
+            *)
+              echo "::error::Unsupported archive format: ${{ matrix.archive }}"
+              exit 1
+              ;;
+          esac
+          echo "Created $asset"
 
       - name: Upload bundle
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: release-${{ matrix.zip_rid }}
-          path: release_*.zip
+          name: release-${{ matrix.asset_rid }}
+          path: |
+            release_*.zip
+            release_*.tar.gz
+            release_*.dmg
           if-no-files-found: error
           retention-days: 7
 
@@ -287,7 +319,7 @@ jobs:
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
 
-      - name: Codesign, notarize and rezip
+      - name: Codesign, notarize and repackage
         shell: bash
         run: |
           set -euo pipefail
@@ -296,13 +328,17 @@ jobs:
           rm -rf "$stage_root" "$signed_root"
           mkdir -p "$stage_root" "$signed_root"
 
-          for zip in dist/release_*_MacOsX-*.zip; do
-            name="$(basename "$zip")"
+          for dmg in dist/release_*_MacOsX-*.dmg; do
+            name="$(basename "$dmg")"
             rid="${name#release_*_}"
-            rid="${rid%.zip}"
+            rid="${rid%.dmg}"
             stage="$stage_root/$rid"
-            mkdir -p "$stage"
-            unzip -q "$zip" -d "$stage"
+            mount="$stage_root/mount-$rid"
+            rm -rf "$stage" "$mount"
+            mkdir -p "$stage" "$mount"
+            hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mount"
+            cp -R "$mount"/. "$stage"/
+            hdiutil detach "$mount"
 
             # Sign every Mach-O executable/dylib; managed DLLs are not Mach-O
             # and are covered by the apphost signature.
@@ -313,43 +349,42 @@ jobs:
               "$stage/XISOSharp" "$stage/XISOSharp.Gui"
             codesign --verify --strict --verbose=2 "$stage/XISOSharp" "$stage/XISOSharp.Gui"
 
+            signed_dmg="$signed_root/$name"
+            rm -f "$signed_dmg"
+            hdiutil create -volname "XISOSharp" -srcfolder "$stage" -ov -format UDZO "$signed_dmg"
+
             if [ -n "${MACOS_NOTARY_APPLE_ID:-}" ] && [ -n "${MACOS_NOTARY_TEAM_ID:-}" ] && [ -n "${MACOS_NOTARY_PASSWORD:-}" ]; then
-              notarize_zip="$RUNNER_TEMP/$name.notarize.zip"
-              (cd "$stage" && ditto -c -k . "$notarize_zip")
-              xcrun notarytool submit "$notarize_zip" \
+              xcrun notarytool submit "$signed_dmg" \
                 --apple-id "$MACOS_NOTARY_APPLE_ID" \
                 --team-id "$MACOS_NOTARY_TEAM_ID" \
                 --password "$MACOS_NOTARY_PASSWORD" \
                 --wait
-              # Bare executables in a zip cannot be stapled; Gatekeeper checks
-              # the notarization ticket online. Record the assessment result.
-              if ! spctl --assess --type execute --verbose=2 "$stage/XISOSharp"; then
+              xcrun stapler staple "$signed_dmg"
+              xcrun stapler validate "$signed_dmg"
+              if ! spctl --assess --type open --context context:primary-signature -v "$signed_dmg"; then
                 echo "::warning::spctl assessment failed; confirm notarization in the notary log."
               fi
             else
               echo "::warning::MACOS_NOTARY_* secrets are not set; the bundle is signed but not notarized."
             fi
-
-            (cd "$stage" && zip -q -r "$signed_root/$name" \
-              XISOSharp XISOSharp.Gui README.md LICENSE WhatsNew.md)
           done
 
       - name: Upload signed x64 bundle
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: signed-MacOsX-x64
-          path: signed/release_*_MacOsX-x64.zip
+          path: signed/release_*_MacOsX-x64.dmg
           if-no-files-found: error
 
       - name: Upload signed arm64 bundle
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: signed-MacOsX-arm64
-          path: signed/release_*_MacOsX-arm64.zip
+          path: signed/release_*_MacOsX-arm64.dmg
           if-no-files-found: error
 
   smoke:
-    name: smoke (${{ matrix.zip_rid }})
+    name: smoke (${{ matrix.asset_rid }})
     needs: [resolve, bundle, sign-windows, sign-macos]
     # Run after optional signing; a skipped sign job means signing is disabled.
     if: >-
@@ -362,20 +397,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - zip_rid: win-x64
+          - asset_rid: win-x64
             os: windows-latest
+            archive: zip
             artifact: ${{ vars.ENABLE_WINDOWS_SIGNING == 'true' && 'signed-win-x64' || 'release-win-x64' }}
-          - zip_rid: linux-x64
+          - asset_rid: linux-x64
             os: ubuntu-latest
+            archive: tar.gz
             artifact: release-linux-x64
-          - zip_rid: MacOsX-arm64
+          - asset_rid: MacOsX-arm64
             os: macos-latest
+            archive: dmg
             artifact: ${{ vars.ENABLE_MACOS_SIGNING == 'true' && 'signed-MacOsX-arm64' || 'release-MacOsX-arm64' }}
     steps:
       - name: Setup .NET
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Download bundle
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
@@ -389,7 +427,24 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
-          unzip -q release_*.zip -d bundle
+          mkdir bundle
+          case "${{ matrix.archive }}" in
+            tar.gz)
+              tar -xzf release_*.tar.gz -C bundle
+              ;;
+            dmg)
+              mount="$RUNNER_TEMP/xiso-dmg-smoke"
+              rm -rf "$mount"
+              mkdir -p "$mount"
+              hdiutil attach release_*.dmg -nobrowse -readonly -mountpoint "$mount"
+              cp -R "$mount"/. bundle/
+              hdiutil detach "$mount"
+              ;;
+            *)
+              echo "::error::Unsupported archive format: ${{ matrix.archive }}"
+              exit 1
+              ;;
+          esac
           cd bundle
           chmod +x XISOSharp XISOSharp.Gui
 
@@ -493,10 +548,10 @@ jobs:
             cp signed-win/*.zip dist/
           fi
           if [ "${{ vars.ENABLE_MACOS_SIGNING }}" = "true" ]; then
-            rm -f dist/release_*_MacOsX-*.zip
-            cp signed-macos/*.zip dist/
+            rm -f dist/release_*_MacOsX-*.dmg
+            cp signed-macos/*.dmg dist/
           fi
-          count=$(find dist -maxdepth 1 -name 'release_*.zip' | wc -l)
+          count=$(find dist -maxdepth 1 -type f \( -name 'release_*.zip' -o -name 'release_*.tar.gz' -o -name 'release_*.dmg' \) | wc -l)
           if [ "$count" -ne 6 ]; then
             echo "::error::Expected six release bundles, found $count."
             ls -la dist
@@ -506,7 +561,7 @@ jobs:
 
       - name: Generate SBOM
         # SPDX 2.2 SBOM over the release bundle contents, published alongside
-        # the zips for supply-chain verification.
+        # the bundles for supply-chain verification.
         run: |
           set -euo pipefail
           version="${{ needs.resolve.outputs.version }}"
@@ -520,7 +575,10 @@ jobs:
       - name: Attest bundle provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: dist/*.zip
+          subject-path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.dmg
 
       - name: Extract release notes
         run: |
@@ -550,10 +608,12 @@ jobs:
           ls -la dist
           if gh release view "$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             # Re-run: refresh the same-named assets, never delete anything else.
-            gh release upload "$version" dist/*.zip dist/*.spdx.json --clobber --repo "$GITHUB_REPOSITORY"
+            gh release upload "$version" dist/*.zip dist/*.tar.gz dist/*.dmg dist/*.spdx.json \
+              --clobber --repo "$GITHUB_REPOSITORY"
           else
             gh release create "$version" --verify-tag --title "$version" --draft=false \
-              --notes-file release-notes.md --repo "$GITHUB_REPOSITORY" dist/*.zip dist/*.spdx.json
+              --notes-file release-notes.md --repo "$GITHUB_REPOSITORY" \
+              dist/*.zip dist/*.tar.gz dist/*.dmg dist/*.spdx.json
           fi
           # A release created while the tag was being moved can land as a draft;
           # make the published state explicit on every run.

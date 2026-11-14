@@ -8,6 +8,8 @@
     <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Pin the language version for every project; .NET 11 ships C# 15. -->
+    <LangVersion>15.0</LangVersion>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

@@ -67,9 +67,9 @@ public static class TestDataWriter
     public static IReadOnlyList<string> EnsureTestData(string testDataRoot, bool force = false)
     {
         // BUG-TEST-007: the static gate below only serializes threads inside one
-        // process. Concurrent test hosts — parallel TFM runs (`dotnet test` builds
-        // and runs net8/9/10), a Rider session overlapping a CLI run, and the
-        // Generator tool — share one TestData/ tree, and a delete/rewrite landing
+        // process. Concurrent test hosts - parallel OS/CI runs, a Rider session
+        // overlapping a CLI run, and the Generator tool - share one TestData/
+        // tree, and a delete/rewrite landing
         // mid-rebuild in another process left the fixture half-written or threw
         // IOException out of the tests' ModuleInitializer (TypeInitializationException
         // failed every test in the host: 1274/1279 observed). Serialize across
@@ -146,7 +146,7 @@ public static class TestDataWriter
 
         // The ISO is a derived artifact: always rebuild so it matches the current writer.
         // Sources above were canonicalized, so the rebuild is deterministic.
-        // Concurrent test hosts (net8/9/10 run in parallel) share this tree; rebuilding
+        // Concurrent test hosts (multiple OS/CI runs) share this tree; rebuilding
         // unconditionally deleted the image under a host that was already running tests
         // (FileNotFoundException in XisoReaderTests). The stamp records the build that
         // produced the image, so only the first host rebuilds and the others reuse it.

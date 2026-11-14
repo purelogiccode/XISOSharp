@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net11.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <!-- Allow building the WPF Tester on Linux/macOS CI agents (NETSDK1100
              otherwise). The app still only *runs* on Windows. -->
@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.322">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.339">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -44,7 +44,7 @@
     <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
-    <PackageReference Include="QuestPDF" Version="2026.9.1" />
+    <PackageReference Include="QuestPDF" Version="2026.9.2" />
   </ItemGroup>
 
   <ItemGroup>

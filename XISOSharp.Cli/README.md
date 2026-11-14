@@ -41,9 +41,9 @@ Reader probing also accepts rebuilt "sector-0" XISOs (volume descriptor at absol
 ## Install
 
 ```bash
-# Framework-dependent build (requires the .NET 10 SDK, pinned in global.json)
+# Framework-dependent build (requires the .NET 11 SDK, pinned in global.json)
 dotnet build XISOSharp.Cli -c Release
-# bin: XISOSharp.Cli/bin/Release/net10.0/XISOSharp.Cli(.exe)
+# bin: XISOSharp.Cli/bin/Release/net11.0/XISOSharp.Cli(.exe)
 
 # Self-contained trimmed single-file (no runtime needed), renamed to XISOSharp(.exe)
 ./publish-cli.ps1
@@ -51,7 +51,7 @@ dotnet build XISOSharp.Cli -c Release
 # RIDs: win-x86, win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64
 
 # ... or one RID manually (single-file + trimmed come from the csproj defaults)
-dotnet publish XISOSharp.Cli -c Release -f net10.0 -r win-x64 --self-contained
+dotnet publish XISOSharp.Cli -c Release -f net11.0 -r win-x64 --self-contained
 ```
 
 > [!TIP]
@@ -66,8 +66,9 @@ On every launch the CLI compares its version against the latest GitHub release
 (at most one network request per 24 hours — the result is cached under
 `%LocalAppData%/XISOSharp/update-check.json`). When a newer release exists you get
 a stderr notice with the release URL and the matching platform asset
-(`release_<version>_<rid>.zip`, e.g. `release_1.0.0_win-x64.zip`), and on an
-interactive console you are offered to open the release page in your browser.
+(`release_<version>_<rid>.<ext>`: Windows `.zip`, Linux `.tar.gz`, macOS `.dmg`;
+e.g. `release_1.0.0_win-x64.zip`), and on an interactive console you are offered
+to open the release page in your browser.
 
 ```text
 [UPDATE] XISOSharp 1.0.3 is available (you have 1.0.2).

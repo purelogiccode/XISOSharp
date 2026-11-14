@@ -4,13 +4,13 @@
 
 | Target | Status | Notes |
 |---|---|---|
-| `net10.0` | **LTS** | Primary target; ships in the release bundles. |
-| `net9.0` | EOL (12 May 2026) | Supported compatibility target: still built and tested in 1.9+; no new feature depends on it. |
-| `net8.0` | EOL (10 Nov 2026) | Supported compatibility target: still built and tested in 1.9+; no security fixes after EOL. |
+| `net11.0` | **STS** (supported to 14 Nov 2028) | Only target; C# 15; ships in the release bundles. |
 
-`netstandard2.0`/`net6.0` are **not** targets: the library uses
-`Span<T>`/`FileStreamOptions`/`SHA3_256` and modern BCL APIs. Consumers on older
-frameworks can use the 1.4.x package line.
+`net8.0`/`net9.0` reached end of support on 10 November 2026 and are no longer
+targets. `net10.0` remains a supported LTS runtime but this package no longer
+ships a `net10.0` asset; consumers pinned to .NET 10 can use the 1.9.x package
+line. `netstandard2.0`/`net6.0` were never targets: the library uses
+`Span<T>`/`FileStreamOptions`/`SHA3_256` and modern BCL APIs.
 
 ## Versioning
 
@@ -21,11 +21,11 @@ frameworks can use the 1.4.x package line.
 - **Patch**: fixes only, no new public surface.
 
 The package validates against `PackageValidationBaselineVersion` (currently
-1.8.0). The 1.9.0 suppressions cover exactly the reviewed `FAC-01` removal of
-the 1.x `StfsSharp` compatibility facades; every other API change since 1.8.0 is
-additive. 1.9.0 is an owner-approved exception to the usual major-version rule
-for that one breaking change; do not add suppressions without a written reason.
-1.9.1 is a patch release with no public-API changes and keeps the same baseline.
+1.8.0). The net11-only retarget intentionally drops the baseline `net10.0`
+asset, recorded as a reviewed `PKV006` suppression; the EOL `net8.0`/`net9.0`
+frameworks are excluded in `XISOSharp.csproj`. The 1.9.0 `FAC-01` facade
+removals remain part of the baseline history. Do not add suppressions without a
+written reason.
 
 ## Platform support
 

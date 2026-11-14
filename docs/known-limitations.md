@@ -102,10 +102,10 @@ skipping for a recovery run. The OS must still have long paths enabled
 
 ## Platforms and support
 
-- The library targets `net8.0`, `net9.0` and `net10.0`. .NET 9 is EOL (May
-  2026) and .NET 8 is EOL (10 November 2026); both remain supported
-  compatibility targets in 2.x (built and tested on every release).
-  `net10.0` is the LTS target going forward.
+- The library targets `net11.0` only (C# 15). .NET 8 and .NET 9 reached end of
+  support on 10 November 2026 and are no longer built or tested. .NET 10 remains
+  an LTS runtime, but the package no longer ships a `net10.0` asset; use the
+  1.9.x package line if you must stay on .NET 10.
 - The test suite runs on Windows, Linux and macOS. The WPF `XISOSharpTester`
   harness only runs on Windows (it builds everywhere).
 - The per-file size field is 32-bit, so a single file cannot exceed ~4 GiB.
@@ -123,12 +123,12 @@ skipping for a recovery run. The OS must still have long paths enabled
   variables/secrets listed in [Building](building.md#distribution-artifacts).
   Unsigned builds remain the default and are fully supported.
 - Shell completions and the `xisosharp(1)` man page ship in the docs tree
-  (`docs/completions`, `docs/man`); the six RID zips keep their five-file layout
-  and do not embed them.
+  (`docs/completions`, `docs/man`); the six RID archives keep their five-file
+  layout and do not embed them.
 - winget/Scoop/Homebrew manifests are generated from release assets. winget and
   Homebrew still require submission to their upstream repositories (or a local
   manifest/cask install); the checked-in Scoop bucket works directly.
 - The container image contains the CLI only (no GUI, no .NET SDK).
 - The CLI ships only through GitHub releases (no NuGet package). The release
-  zips are framework-dependent (need the .NET 10 runtime); the self-contained
+  bundles are framework-dependent (need the .NET 11 runtime); the self-contained
   single-file builds come from `publish-cli.ps1` / `publish-gui.ps1`.

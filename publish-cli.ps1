@@ -17,9 +17,9 @@
 
 .EXAMPLE
     ./publish-cli.ps1 -Rid win-x64,win-x86 -Zip
-    Publishes 32/64-bit Windows and zips each output dir as release-<version>-<rid>.zip
-    (e.g. release_1.0.0_win-x64.zip), matching the asset names the CLI update
-    checker looks for on the GitHub release.
+    Publishes 32/64-bit Windows and packages each output as
+    release_<version>_<rid>.zip (Linux: .tar.gz, macOS: .dmg), matching the
+    asset names the CLI update checker looks for on the GitHub release.
 #>
 [CmdletBinding()]
 param(
@@ -35,17 +35,17 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $PSScriptRoot 'publish'
 }
 
-# Version for the -Zip asset names (release_<version>_<rid>.zip), from the
-# exact git tag so it matches the GitHub release the zips attach to. An
+# Version for the -Zip asset names (release_<version>_<rid>.<ext>), from the
+# exact git tag so it matches the GitHub release the bundles attach to. An
 # untagged HEAD must not silently reuse the previous tag: that would overwrite
-# a shipped release_<old>_<rid>.zip (AGENTS.md). Pass -Version <x.y.z> to build
-# a planned release before tagging. Without -Zip the value is only cosmetic.
+# a shipped release bundle (AGENTS.md). Pass -Version <x.y.z> to build a
+# planned release before tagging. Without -Zip the value is only cosmetic.
 $cliVersion = $Version
 if ([string]::IsNullOrWhiteSpace($cliVersion)) {
     $cliVersion = (& git -C $PSScriptRoot describe --tags --exact-match 2>$null)
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($cliVersion)) {
         if ($Zip) {
-            throw "-Zip needs an exact release tag or -Version <x.y.z>: refusing to overwrite a release_*.zip from an untagged commit."
+            throw "-Zip needs an exact release tag or -Version <x.y.z>: refusing to overwrite a shipped release bundle from an untagged commit."
         }
         $cliVersion = (& git -C $PSScriptRoot describe --tags --abbrev=0 2>$null)
         if ([string]::IsNullOrWhiteSpace($cliVersion)) {
@@ -57,7 +57,7 @@ $cliVersion = $cliVersion -replace '^[vV]', ''
 
 # Release-asset RID fragments (UpdateChecker convention): macOS ships as
 # MacOsX-*, RIDs without a convention entry fall back to the raw RID.
-$zipRidMap = @{
+$assetRidMap = @{
     'win-x64'     = 'win-x64'
     'win-x86'     = 'win-x86'
     'win-arm64'   = 'win-arm64'
@@ -66,6 +66,15 @@ $zipRidMap = @{
     'osx-x64'     = 'MacOsX-x64'
     'osx-arm64'   = 'MacOsX-arm64'
 }
+
+function Get-ArchiveExtension([string]$Rid) {
+    if ($Rid.StartsWith('linux-', [StringComparison]::Ordinal)) { return 'tar.gz' }
+    if ($Rid.StartsWith('osx-', [StringComparison]::Ordinal)) { return 'dmg' }
+    return 'zip'
+}
+
+$isMacOsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+    [System.Runtime.InteropServices.OSPlatform]::OSX)
 
 foreach ($r in $Rid) {
     $outDir = Join-Path $OutputRoot $r
@@ -77,11 +86,10 @@ foreach ($r in $Rid) {
         Remove-Item -LiteralPath $stage -Recurse -Force
     }
     New-Item -ItemType Directory -Path $stage -Force | Out-Null
-    # NOTE: -f net10.0 is required — XISOSharp.Cli multi-targets (net8/9/10) so the
-    # shippable closure can be referenced by the test suite on every TFM, but only
-    # net10.0 ships as a self-contained binary.
+    # NOTE: -f net11.0 is explicit so the shippable target stays unambiguous;
+    # net11.0 ships as a self-contained binary.
     & dotnet publish (Join-Path $PSScriptRoot 'XISOSharp.Cli/XISOSharp.Cli.csproj') `
-        -c $Configuration -f net10.0 -r $r --self-contained -o $stage
+        -c $Configuration -f net11.0 -r $r --self-contained -o $stage
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet publish failed for RID $r (exit $LASTEXITCODE)."
     }
@@ -99,13 +107,33 @@ foreach ($r in $Rid) {
     Write-Host "  OK: $bin ($sizeMB MB)" -ForegroundColor Green
 
     if ($Zip) {
-        $zipRid = if ($zipRidMap.ContainsKey($r)) { $zipRidMap[$r] } else { $r }
-        $zipPath = Join-Path $OutputRoot "release_${cliVersion}_${zipRid}.zip"
-        if (Test-Path -LiteralPath $zipPath) {
-            Remove-Item -LiteralPath $zipPath -Force
+        if ($r.StartsWith('osx-', [StringComparison]::Ordinal) -and -not $isMacOsHost) {
+            Write-Warning "Skipping .dmg for ${r}: hdiutil is only available on macOS. Run this on macOS to build the release asset."
+            continue
         }
-        Compress-Archive -Path (Join-Path $outDir '*') -DestinationPath $zipPath
-        Write-Host "  zipped: $zipPath" -ForegroundColor Green
+
+        $assetRid = if ($assetRidMap.ContainsKey($r)) { $assetRidMap[$r] } else { $r }
+        $extension = Get-ArchiveExtension $r
+        $archivePath = Join-Path $OutputRoot "release_${cliVersion}_${assetRid}.${extension}"
+        if (Test-Path -LiteralPath $archivePath) {
+            Remove-Item -LiteralPath $archivePath -Force
+        }
+
+        switch ($extension) {
+            'zip' {
+                Compress-Archive -Path (Join-Path $outDir '*') -DestinationPath $archivePath
+            }
+            'tar.gz' {
+                & tar -czf $archivePath -C $outDir .
+                if ($LASTEXITCODE -ne 0) { throw "tar failed for $archivePath (exit $LASTEXITCODE)." }
+            }
+            'dmg' {
+                & hdiutil create -volname "XISOSharp $cliVersion" -srcfolder $outDir `
+                    -ov -format UDZO $archivePath
+                if ($LASTEXITCODE -ne 0) { throw "hdiutil failed for $archivePath (exit $LASTEXITCODE)." }
+            }
+        }
+        Write-Host "  packaged: $archivePath" -ForegroundColor Green
     }
 }
 

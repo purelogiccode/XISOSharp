@@ -5,12 +5,12 @@
 #   docker build -t xisosharp --build-arg VERSION=1.9.0 .
 #   docker run --rm -v "$PWD:/work" -w /work xisosharp -l game.iso
 #
-# The image is framework-dependent on the .NET 10 runtime and contains the
+# The image is framework-dependent on the .NET 11 runtime and contains the
 # CLI only; the Avalonia GUI is desktop-only and ships in the RID bundles.
 
 # Base images are pinned by digest so the SDK/runtime cannot change under a
 # mutable tag (OpenSSF Scorecard PinnedDependencies). Refresh deliberately.
-FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:212fe4cb74627d5adf9817a4088906ae3edff1bd853bb27565d4b46731efe61e AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0@sha256:65f3c7c6a25a239ab3e6719f2896147e7b68242ff2d8818dd70498bde6ef8bea AS build
 ARG VERSION=0.0.0-local
 WORKDIR /src
 
@@ -23,13 +23,13 @@ RUN dotnet restore XISOSharp.Cli/XISOSharp.Cli.csproj -r linux-x64
 COPY XISOSharp/ XISOSharp/
 COPY XISOSharp.Cli/ XISOSharp.Cli/
 RUN dotnet publish XISOSharp.Cli/XISOSharp.Cli.csproj \
-        -c Release -f net10.0 -r linux-x64 --no-restore \
+        -c Release -f net11.0 -r linux-x64 --no-restore \
         --self-contained false \
         -p:PublishSingleFile=false -p:PublishTrimmed=false \
         -p:MinVerVersionOverride="${VERSION}" \
         -o /out
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0@sha256:4f1f30cf0bb4ab0c8b2daa84613051683456f8df4a9bf7c812e20d74962992ac AS runtime
+FROM mcr.microsoft.com/dotnet/runtime:11.0@sha256:3fe5f5495141c97986a49d3a4e76061f6225c3f93f94e8a7e522781376193863 AS runtime
 ARG VERSION=0.0.0-local
 
 LABEL org.opencontainers.image.title="XISOSharp"

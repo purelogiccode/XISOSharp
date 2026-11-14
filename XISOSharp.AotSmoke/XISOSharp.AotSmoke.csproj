@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <!-- CI publishes this app with PublishAot=true and runs it, proving the
          library surface (and the transitive ZAR/CCI packages) stay trim/AOT
          compatible. It is not packed or shipped. -->
@@ -18,17 +18,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Pin the AOT compiler above the SDK's bundled 10.0.9 (GHSA-p3jp-9v83-76w9).
-         Updating the implicit pack avoids the "explicit PackageReference"
-         versioning warning from the ILCompiler targets. -->
-    <KnownILCompilerPack Update="Microsoft.DotNet.ILCompiler" ILCompilerPackVersion="10.0.14" />
+    <!-- Keep the AOT compiler pinned to the .NET 11 servicing release used by
+         the rest of the solution. Updating the implicit pack avoids the
+         "explicit PackageReference" versioning warning from the ILCompiler
+         targets. -->
+    <KnownILCompilerPack Update="Microsoft.DotNet.ILCompiler" ILCompilerPackVersion="11.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.322">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.339">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="11.0.0" />
+    <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="11.0.0" />
     <PackageReference Include="Roslynator.Analyzers" Version="5.0.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

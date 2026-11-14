@@ -1822,12 +1822,9 @@ The core processing engine is **not thread-safe** for concurrent operations on t
 
 | Target | Version |
 |--------|---------|
-| .NET 8 | `net8.0` |
-| .NET 9 | `net9.0` |
-| .NET 10 | `net10.0` |
+| .NET 11 | `net11.0` |
 
-The library targets `net8.0`, `net9.0`, and `net10.0`. `net10.0` is the primary
-target; `net8.0`/`net9.0` remain supported compatibility targets in 2.x (see
+The library targets `net11.0` with C# 15 (see
 [Support Policy](https://github.com/purelogiccode/XISOSharp/blob/master/docs/support-policy.md)).
 Its runtime dependencies beyond the .NET runtime are [ZArchiveSharp](https://www.nuget.org/packages/ZArchiveSharp)
 (ZAR archive support), [CCISharp](https://www.nuget.org/packages/CCISharp)

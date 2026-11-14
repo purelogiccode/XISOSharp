@@ -85,7 +85,7 @@ public class XisoUpdateTests : IDisposable
 
     [Fact]
     public void BuildAssetName_StripsLeadingV() =>
-        Assert.Equal("release_1.0.0_MacOsX-arm64.zip", UpdateChecker.BuildAssetName("v1.0.0", "MacOsX-arm64"));
+        Assert.Equal("release_1.0.0_MacOsX-arm64.dmg", UpdateChecker.BuildAssetName("v1.0.0", "MacOsX-arm64"));
 
     private static JsonElement ReleasePayload() =>
         JsonDocument.Parse("""
@@ -95,8 +95,8 @@ public class XisoUpdateTests : IDisposable
                              "assets": [
                                { "name": "release_1.0.2_win-x64.zip",
                                  "browser_download_url": "https://github.com/purelogiccode/XISOSharp/releases/download/1.0.2/release_1.0.2_win-x64.zip" },
-                               { "name": "release_1.0.2_linux-x64.zip",
-                                 "browser_download_url": "https://github.com/purelogiccode/XISOSharp/releases/download/1.0.2/release_1.0.2_linux-x64.zip" }
+                               { "name": "release_1.0.2_linux-x64.tar.gz",
+                                 "browser_download_url": "https://github.com/purelogiccode/XISOSharp/releases/download/1.0.2/release_1.0.2_linux-x64.tar.gz" }
                              ]
                            }
                            """).RootElement;

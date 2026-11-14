@@ -8,7 +8,7 @@
              EnablePackageValidation here — package compat gates apply to the
              library (the only packable project) only. -->
     <IsPackable>false</IsPackable>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <!-- ImplicitUsings/Nullable inherited from Directory.Build.props. -->
     <AssemblyName>XISOSharp.Gui</AssemblyName>
     <RootNamespace>XISOSharp.Gui</RootNamespace>
@@ -48,6 +48,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="11.0.0" />
     <PackageReference Include="Roslynator.Analyzers" Version="5.0.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -58,14 +59,14 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-    <PackageReference Include="Avalonia" Version="12.1.5" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.1.5" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.5" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.5" />
+    <PackageReference Include="Avalonia" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.6" />
     <!-- DevTools only: no 12.x build of Avalonia.Diagnostics is published yet
              (latest is 11.x), so keep it Debug-only and out of the Release closure
              entirely. Upgrade to 12.x when available. -->
-    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.22" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.23" Condition="'$(Configuration)' == 'Debug'" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 
@@ -77,7 +78,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.322">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.339">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -112,25 +113,25 @@
        (deliberately NOT a ProjectReference: referencing an executable would
        cascade publish context and trip NETSDK1151 on framework-dependent
        `dotnet publish -r`). Publish globals are stripped via
-       RemoveProperties so the CLI always gets a plain net10.0 Build. -->
+       RemoveProperties so the CLI always gets a plain net11.0 Build. -->
   <Target Name="BuildCliForStaging" BeforeTargets="StageCliBesideGui" Condition="'$(DesignTimeBuild)' != 'true'">
     <MSBuild Projects="$(RepoRoot)XISOSharp.Cli\XISOSharp.Cli.csproj"
              Targets="Build"
-             Properties="Configuration=$(Configuration);TargetFramework=net10.0"
+             Properties="Configuration=$(Configuration);TargetFramework=net11.0"
              RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSingleFile;PublishTrimmed;PublishReadyToRun" />
   </Target>
   <Target Name="StageCliBesideGui" AfterTargets="Build">
     <ItemGroup>
-      <CliStageFiles Include="$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.exe"
-                     Condition="Exists('$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.exe')" />
-      <CliStageFiles Include="$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp"
-                     Condition="Exists('$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp')" />
-      <CliStageFiles Include="$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli"
-                     Condition="Exists('$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli')" />
-      <CliStageFiles Include="$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.dll"
-                     Condition="Exists('$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.dll')" />
-      <CliStageFiles Include="$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.runtimeconfig.json"
-                     Condition="Exists('$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net10.0\XISOSharp.Cli.runtimeconfig.json')" />
+      <CliStageFiles Include="$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net11.0\XISOSharp.exe"
+                     Condition="Exists('$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net11.0\XISOSharp.exe')" />
+      <CliStageFiles Include="$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net11.0\XISOSharp"
+                     Condition="Exists('$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net11.0\XISOSharp')" />
+      <CliStageFiles Include="$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net11.0\XISOSharp.Cli"
+                     Condition="Exists('$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net11.0\XISOSharp.Cli')" />
+      <CliStageFiles Include="$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net11.0\XISOSharp.Cli.dll"
+                     Condition="Exists('$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net11.0\XISOSharp.Cli.dll')" />
+      <CliStageFiles Include="$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net11.0\XISOSharp.Cli.runtimeconfig.json"
+                     Condition="Exists('$(RepoRoot)XISOSharp.Cli\bin\$(Configuration)\net11.0\XISOSharp.Cli.runtimeconfig.json')" />
     </ItemGroup>
     <Copy SourceFiles="@(CliStageFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Exec Command="chmod +x &quot;$(OutDir)XISOSharp&quot;"

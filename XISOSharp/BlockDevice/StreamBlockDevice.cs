@@ -17,7 +17,7 @@ public sealed class StreamBlockDevice : IBlockDevice
 {
     private readonly Stream _stream;
     private readonly bool _leaveOpen;
-#pragma warning disable MA0158 // object keeps net8 compat (System.Threading.Lock is net9+)
+#pragma warning disable MA0158 // object lock is intentional for this small critical section
     private readonly object _sync = new();
 #pragma warning restore MA0158
     private bool _disposed;

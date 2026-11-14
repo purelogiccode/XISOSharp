@@ -26,7 +26,14 @@ $ErrorActionPreference = 'Stop'
 
 $version = $Version.TrimStart('v')
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$rids = @('win-x64', 'win-arm64', 'linux-x64', 'linux-arm64', 'MacOsX-x64', 'MacOsX-arm64')
+$assets = @{
+    'win-x64'      = 'zip'
+    'win-arm64'    = 'zip'
+    'linux-x64'    = 'tar.gz'
+    'linux-arm64'  = 'tar.gz'
+    'MacOsX-x64'   = 'dmg'
+    'MacOsX-arm64' = 'dmg'
+}
 
 Write-Host "Reading release $version from $Repo..."
 # Use the REST API: older `gh release view` versions do not request the
@@ -40,8 +47,8 @@ foreach ($asset in $release.assets) {
     }
 }
 
-foreach ($rid in $rids) {
-    $asset = "release_${version}_${rid}.zip"
+foreach ($rid in $assets.Keys) {
+    $asset = "release_${version}_${rid}.$($assets[$rid])"
     if (-not $hashes.ContainsKey($asset)) {
         throw "Release asset $asset has no SHA-256 digest. Publish the bundles before generating manifests."
     }
@@ -49,8 +56,8 @@ foreach ($rid in $rids) {
 
 $winX64 = $hashes["release_${version}_win-x64.zip"]
 $winArm64 = $hashes["release_${version}_win-arm64.zip"]
-$macX64 = $hashes["release_${version}_MacOsX-x64.zip"]
-$macArm64 = $hashes["release_${version}_MacOsX-arm64.zip"]
+$macX64 = $hashes["release_${version}_MacOsX-x64.dmg"]
+$macArm64 = $hashes["release_${version}_MacOsX-arm64.dmg"]
 
 # ---------------------------------------------------------------- winget ----
 $wingetDir = Join-Path $repoRoot "packaging/winget/manifests/p/purelogiccode/XISOSharp/$version"
@@ -87,8 +94,8 @@ Installers:
     InstallerSha256: $($winArm64.ToUpperInvariant())
 Dependencies:
   PackageDependencies:
-    - PackageIdentifier: Microsoft.DotNet.DesktopRuntime.10
-      MinimumVersion: 10.0.0
+    - PackageIdentifier: Microsoft.DotNet.DesktopRuntime.11
+      MinimumVersion: 11.0.0
 ManifestType: installer
 ManifestVersion: 1.10.0
 "@
@@ -198,12 +205,12 @@ cask "xisosharp" do
   version "__VERSION__"
 
   on_arm do
-    url "https://github.com/__REPO__/releases/download/#{version}/release_#{version}_MacOsX-arm64.zip"
+    url "https://github.com/__REPO__/releases/download/#{version}/release_#{version}_MacOsX-arm64.dmg"
     sha256 "__MACARM64__"
   end
 
   on_intel do
-    url "https://github.com/__REPO__/releases/download/#{version}/release_#{version}_MacOsX-x64.zip"
+    url "https://github.com/__REPO__/releases/download/#{version}/release_#{version}_MacOsX-x64.dmg"
     sha256 "__MACX64__"
   end
 

@@ -68,7 +68,7 @@ directly for CCI container validation.
 | Aspect | Value |
 |---|---|
 | Package ID | `XISOSharp` |
-| Target frameworks | `net8.0`, `net9.0`, `net10.0` |
+| Target frameworks | `net11.0` (C# 15) |
 | Dependencies | `ZArchiveSharp` (ZAR), `CCISharp` (CCI/CCIM), `StfsSharp` (GOD/SVOD and XBLA/XBLIG STFS) |
 | Signing | strong-named assembly |
 | Trimming / AOT | `IsTrimmable`, `IsAotCompatible` |

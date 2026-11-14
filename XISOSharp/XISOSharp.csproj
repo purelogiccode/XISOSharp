@@ -1,10 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFramework>net11.0</TargetFramework>
     <!-- LangVersion/ImplicitUsings/Nullable/Deterministic/ContinuousIntegrationBuild
-             inherited from Directory.Build.props (per-TFM language default keeps the
-             net8 API guard). -->
+             inherited from Directory.Build.props. -->
     <AssemblyName>XISOSharp</AssemblyName>
     <RootNamespace>XISOSharp</RootNamespace>
 
@@ -61,10 +60,18 @@
     <EnableStrictModeForPackageValidation>true</EnableStrictModeForPackageValidation>
     <!-- Compare against the last published package; additive APIs are allowed,
          accidental removals/renames fail the pack. Updated with each stable
-         release (1.9.0 validates against 1.8.0; the facade removals are the
-         reviewed breaking change for this release). -->
+         release (currently validates against 1.8.0; the net11-only retarget
+         records its intentional framework drop in CompatibilitySuppressions). -->
     <PackageValidationBaselineVersion>1.8.0</PackageValidationBaselineVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The 1.8.0 baseline still carries the EOL net8.0/net9.0 assets. Treat
+         their removal as intentional; net10.0 remains the nearest baseline
+         used to validate the net11.0 API surface. -->
+    <PackageValidationBaselineFrameworkToIgnore Include="net8.0" />
+    <PackageValidationBaselineFrameworkToIgnore Include="net9.0" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
@@ -76,6 +83,7 @@
     <!-- ZArchiveSharp is consumed as a NuGet package (https://www.nuget.org/packages/ZArchiveSharp).
               The library lives in the sibling CSharp_ZArchiveSharp repo (separate solution);
               local changes there are consumed here by publishing a new package version. -->
+    <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="11.0.0" />
     <PackageReference Include="ZArchiveSharp" Version="1.4.0" />
     <!-- CCISharp is consumed as a NuGet package (https://www.nuget.org/packages/CCISharp).
              The library lives in the sibling CSharp_CCISharp repo; local changes there are
@@ -94,11 +102,11 @@
 
   <!-- Source Link + versioning. -->
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.322">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.339">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.403" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="11.0.100" PrivateAssets="All" />
     <PackageReference Include="MinVer" Version="8.0.0" PrivateAssets="all">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

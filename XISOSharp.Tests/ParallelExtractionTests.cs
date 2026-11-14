@@ -141,7 +141,7 @@ public sealed class ParallelExtractionTests : IDisposable
     private sealed class CollectingProgress : IProgress<ProgressInfo>
     {
         private readonly List<ProgressInfo> _events = [];
-#pragma warning disable MA0158 // object keeps net8 compat (System.Threading.Lock is net9+)
+#pragma warning disable MA0158 // object lock is intentional for this small critical section
         private readonly object _gate = new();
 #pragma warning restore MA0158
 

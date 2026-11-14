@@ -18,7 +18,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$cli = Join-Path $repo 'XISOSharp.Cli/bin/Release/net10.0/XISOSharp.exe'
+$cli = Join-Path $repo 'XISOSharp.Cli/bin/Release/net11.0/XISOSharp.exe'
 $extractXiso = Join-Path $repo 'XISOSharp.BattleTests/extract-xiso.exe'
 $xdvdfs = Join-Path $repo 'References/xdvdfs-0.8.3/xdvdfs.exe'
 $xboxkit = Join-Path $repo 'XISOSharp.BattleTests/xboxkit.exe'
@@ -30,7 +30,7 @@ foreach ($tool in @($extractXiso, $xdvdfs)) {
 }
 
 if (-not (Test-Path $cli)) {
-    dotnet build (Join-Path $repo 'XISOSharp.Cli/XISOSharp.Cli.csproj') -c Release -f net10.0 -m:1 | Out-Host
+    dotnet build (Join-Path $repo 'XISOSharp.Cli/XISOSharp.Cli.csproj') -c Release -f net11.0 -m:1 | Out-Host
 }
 
 $source = Join-Path $CorpusRoot 'source'

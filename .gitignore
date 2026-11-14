@@ -18,3 +18,5 @@ riderModule.iml
 /XISOSharp.BattleTests/battle_*.pid
 
 /BattleReports/
+# JetBrains InspectCode report (AGENTS.md pre-commit check)
+/inspectcode.sarif

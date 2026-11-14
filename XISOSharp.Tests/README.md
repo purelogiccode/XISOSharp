@@ -1,10 +1,10 @@
 # XISOSharp.Tests
 
 [![CI](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/purelogiccode/XISOSharp/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-2315-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2317-brightgreen)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4)](https://dotnet.microsoft.com/)
 [![xUnit](https://img.shields.io/badge/xUnit-2.9.3-blueviolet)](https://xunit.net/)
-[![Test SDK](https://img.shields.io/badge/test--sdk-18.11.0-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
+[![Test SDK](https://img.shields.io/badge/test--sdk-18.12.0-blueviolet)](https://www.nuget.org/packages/Microsoft.NET.Test.Sdk)
 [![Coverlet](https://img.shields.io/badge/coverage-coverlet-blueviolet)](https://github.com/coverlet-coverage/coverlet)
 ![Test matrix](https://img.shields.io/badge/tests-windows--latest-lightgrey)
 [![GitHub stars](https://img.shields.io/github/stars/purelogiccode/XISOSharp)](https://github.com/purelogiccode/XISOSharp/stargazers)
@@ -73,10 +73,10 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **CLI flag contracts** — `--silent` order independence (incl. `-v`/`--help`), `--file-time`/`--preserve-attrs`/`--jobs`/`--policy` mode rejection (incl. `--jobs` with `--compress`/multi-mode), `--ciso-split` first-part guard, Wipe/Trim flags-before-positionals
 - **Follow-up regressions** — `-c .` default output next to the source, colon names through list/tree/rewrite (extract refuses on Windows), audit root-size/extraction parity, header-only sector-layout reservations, `build-image` cancellation cleanup, child-offset `0xFFFF` sentinel guard
 - **Sequential execution** — assembly-wide `[CollectionBehavior(DisableTestParallelization = true)]` because many tests set the process CWD themselves (creation and extraction no longer do)
-- **GUI command builders** (net10.0) — `CliCommands` argv for every verb, flags-before-positionals invariant, `CliLocator` version metadata fallbacks
-- **GUI services** (net10.0) - screenshot file naming/folder resolution/collision suffixes and update-check version comparison/release-URL fallback
-- **GUI Xbox 360 tab** (net10.0) - GOD/STFS extraction argv parity with the direct CLI, title-info JSON formatting, and asset-builder contracts
-- **GUI folder picker** (net10.0) - classification of Avalonia's missing-directory exception so a deleted or inaccessible selection is treated as a cancelled picker action, not an application error
+- **GUI command builders** (net11.0) — `CliCommands` argv for every verb, flags-before-positionals invariant, `CliLocator` version metadata fallbacks
+- **GUI services** (net11.0) - screenshot file naming/folder resolution/collision suffixes and update-check version comparison/release-URL fallback
+- **GUI Xbox 360 tab** (net11.0) - GOD/STFS extraction argv parity with the direct CLI, title-info JSON formatting, and asset-builder contracts
+- **GUI folder picker** (net11.0) - classification of Avalonia's missing-directory exception so a deleted or inaccessible selection is treated as a cancelled picker action, not an application error
 - **Source filesystem packing** - `ISourceFilesystem`/`MemoryFilesystem` source parity with host packs, empty roots, exclude patterns, oversized/duplicate rejection, and concurrent CWD-free creates
 - **Per-call logging** - isolated concurrent sinks, nested scopes, static fallback, `UnpackOptions.Log`, and throwing-sink resilience
 - **Sparse outputs** - NTFS allocation checks plus CISO/CCI/ZAR round-trips with all-zero content
@@ -88,7 +88,7 @@ Unit tests for the XISOSharp.Core library. Uses xUnit to verify the correctness 
 - **Xbox 360 metadata** - embedded `default.xex` XDBF/XSRC fields for GOD/STFS, thumbnail export and loose `.xex`/`.xbe` parsing
 - **Parallel collection verbs** - `--jobs 1..64` output/JSON parity for checksum/hash/audit/batch extract/list/tree/rewrite
 - **Name/link/determinism policy** - 42-character Latin-1 rules, `--strict-names`, symlink follow/skip/reject, host-I/O diagnostics and deterministic rewrite FILETIME
-- **Counts** - 2315 passed / 1 opt-in skip on `net10.0`; 2239 passed / 1 opt-in skip on `net8.0`/`net9.0`
+- **Counts** - 2317 passed / 1 opt-in skip on `net11.0`
 
 ## Running Tests
 

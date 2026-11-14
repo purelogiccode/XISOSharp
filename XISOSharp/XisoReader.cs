@@ -1194,7 +1194,7 @@ public static class XisoReader
     {
         private readonly Stream _stream;
         private readonly SafeFileHandle? _handle;
-#pragma warning disable MA0158 // object keeps net8 compat (System.Threading.Lock is net9+)
+#pragma warning disable MA0158 // object lock is intentional for this small critical section
         private readonly object _gate = new();
 #pragma warning restore MA0158
 
@@ -1317,7 +1317,7 @@ public static class XisoReader
         int count = jobs.Count;
         byte[] states = new byte[count]; // 0 pending, 1 written, 2 skipped, 3 failed
         ExtractFileException?[] failures = new ExtractFileException?[count];
-#pragma warning disable MA0158 // object keeps net8 compat (System.Threading.Lock is net9+)
+#pragma warning disable MA0158 // object lock is intentional for this small critical section
         object stateGate = new();
         object ioGate = new();
 #pragma warning restore MA0158

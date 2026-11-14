@@ -220,8 +220,8 @@ is valid only in create (`-c`) and rewrite (`-r`).
 
 **`dotnet build` fails with a missing SDK.**
 
-The SDK version is pinned in `global.json` (10.0.301, `rollForward: latestPatch`).
-Install .NET SDK 10.0.301+ or adjust `global.json` for your environment.
+The SDK version is pinned in `global.json` (11.0.100, `rollForward: latestPatch`).
+Install .NET SDK 11.0.100+ or adjust `global.json` for your environment.
 
 **Tests fail with `The process cannot access the file because it is being used by
 another process`.**
@@ -244,7 +244,7 @@ dotnet run --project XISOSharp.BattleTests -c Release
 
 **The WPF tester does not build on Linux/macOS.**
 
-`XISOSharpTester` targets `net10.0-windows` and sets `EnableWindowsTargeting`, so
+`XISOSharpTester` targets `net11.0-windows` and sets `EnableWindowsTargeting`, so
 `dotnet build CSharp_XISOSharp.sln -c Release` works on all three CI OSes; the
 test suite still runs on Windows only.
 

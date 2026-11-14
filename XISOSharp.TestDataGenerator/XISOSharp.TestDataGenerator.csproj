@@ -4,10 +4,10 @@
     <OutputType>Exe</OutputType>
     <!-- Dev tool, never packed. -->
     <IsPackable>false</IsPackable>
-    <!-- Multi-target to match the library so XISOSharp.Tests (net8/9/10) can
-             reference the Generator project on every TFM (single owner of the
-             TestDataWriter fixture logic). -->
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <!-- Match the library/test target so XISOSharp.Tests can reference the
+             Generator project (single owner of the TestDataWriter fixture
+             logic). -->
+    <TargetFramework>net11.0</TargetFramework>
     <AssemblyName>XISOSharp.TestDataGenerator</AssemblyName>
     <RootNamespace>XISOSharp.TestDataGenerator</RootNamespace>
     <AssemblyTitle>XISOSharp TestData Generator</AssemblyTitle>
@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.322">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.339">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

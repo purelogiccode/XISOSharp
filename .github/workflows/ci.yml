@@ -298,7 +298,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Install from winget and Scoop
         if: matrix.kind == 'windows'
@@ -492,7 +492,7 @@ jobs:
       - name: Build CLI and GUI
         # -m:1: the GUI build stages the CLI beside itself out-of-band.
         run: |
-          dotnet build XISOSharp.Cli/XISOSharp.Cli.csproj -c Release -f net10.0 -m:1
+          dotnet build XISOSharp.Cli/XISOSharp.Cli.csproj -c Release -f net11.0 -m:1
           dotnet build XISOSharp.Gui/XISOSharp.Gui.csproj -c Release -m:1
 
       - name: Headless GUI contract
@@ -503,8 +503,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $cli = (Resolve-Path 'XISOSharp.Cli/bin/Release/net10.0/XISOSharp.exe').Path
-          $gui = (Resolve-Path 'XISOSharp.Gui/bin/Release/net10.0/XISOSharp.Gui.exe').Path
+          $cli = (Resolve-Path 'XISOSharp.Cli/bin/Release/net11.0/XISOSharp.exe').Path
+          $gui = (Resolve-Path 'XISOSharp.Gui/bin/Release/net11.0/XISOSharp.Gui.exe').Path
 
           $bannerLines = & $cli -v
           if ($LASTEXITCODE -ne 0) { throw "CLI -v exited $LASTEXITCODE" }

@@ -14,7 +14,8 @@
 
 .EXAMPLE
     ./publish-gui.ps1 -Rid win-x64 -Zip
-    Publishes 64-bit Windows GUI and zips it as xisosharp-gui-win-x64.zip.
+    Publishes 64-bit Windows GUI and packages it as
+    xisosharp-gui-win-x64.zip (Linux: .tar.gz, macOS: .dmg).
 #>
 [CmdletBinding()]
 param(
@@ -28,6 +29,15 @@ $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $PSScriptRoot 'publish-gui'
 }
+
+function Get-ArchiveExtension([string]$Rid) {
+    if ($Rid.StartsWith('linux-', [StringComparison]::Ordinal)) { return 'tar.gz' }
+    if ($Rid.StartsWith('osx-', [StringComparison]::Ordinal)) { return 'dmg' }
+    return 'zip'
+}
+
+$isMacOsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+    [System.Runtime.InteropServices.OSPlatform]::OSX)
 
 foreach ($r in $Rid) {
     $outDir = Join-Path $OutputRoot $r
@@ -58,12 +68,32 @@ foreach ($r in $Rid) {
     Write-Host "  OK: $bin ($sizeMB MB)" -ForegroundColor Green
 
     if ($Zip) {
-        $zipPath = Join-Path $OutputRoot "xisosharp-gui-$r.zip"
-        if (Test-Path -LiteralPath $zipPath) {
-            Remove-Item -LiteralPath $zipPath -Force
+        if ($r.StartsWith('osx-', [StringComparison]::Ordinal) -and -not $isMacOsHost) {
+            Write-Warning "Skipping .dmg for ${r}: hdiutil is only available on macOS. Run this on macOS to build the release asset."
+            continue
         }
-        Compress-Archive -Path (Join-Path $outDir '*') -DestinationPath $zipPath
-        Write-Host "  zipped: $zipPath" -ForegroundColor Green
+
+        $extension = Get-ArchiveExtension $r
+        $archivePath = Join-Path $OutputRoot "xisosharp-gui-$r.$extension"
+        if (Test-Path -LiteralPath $archivePath) {
+            Remove-Item -LiteralPath $archivePath -Force
+        }
+
+        switch ($extension) {
+            'zip' {
+                Compress-Archive -Path (Join-Path $outDir '*') -DestinationPath $archivePath
+            }
+            'tar.gz' {
+                & tar -czf $archivePath -C $outDir .
+                if ($LASTEXITCODE -ne 0) { throw "tar failed for $archivePath (exit $LASTEXITCODE)." }
+            }
+            'dmg' {
+                & hdiutil create -volname "XISOSharp" -srcfolder $outDir `
+                    -ov -format UDZO $archivePath
+                if ($LASTEXITCODE -ne 0) { throw "hdiutil failed for $archivePath (exit $LASTEXITCODE)." }
+            }
+        }
+        Write-Host "  packaged: $archivePath" -ForegroundColor Green
     }
 }
 

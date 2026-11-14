@@ -288,7 +288,22 @@ public partial class MainWindow : Window
                 AllowMultiple = allowMultiple,
                 FileTypeFilter = [.. filters, FilePickerFileTypes.All],
             }).ConfigureAwait(false);
-            return picked.Select(f => f.Path.LocalPath).ToList();
+
+            List<string> paths = [];
+            foreach (IStorageFile file in picked)
+            {
+                string? localPath = StorageItemPath.TryGetLocalPath(file);
+                if (localPath is null)
+                {
+                    Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                        .Warning("File picker returned a non-local path: {Title}", title);
+                    continue;
+                }
+
+                paths.Add(localPath);
+            }
+
+            return paths;
         }
         catch (Exception ex)
         {
@@ -314,7 +329,21 @@ public partial class MainWindow : Window
                 Title = title,
                 AllowMultiple = false,
             }).ConfigureAwait(false);
-            return picked.Count > 0 ? picked[0].Path.LocalPath : null;
+
+            if (picked.Count == 0)
+            {
+                return null;
+            }
+
+            string? localPath = StorageItemPath.TryGetLocalPath(picked[0]);
+            if (localPath is null)
+            {
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning("Folder picker returned a non-local path: {Title}", title);
+                LogGuiMessage(FolderPickerDiagnostics.NonLocalSelectionMessage);
+            }
+
+            return localPath;
         }
         catch (ArgumentException ex) when (FolderPickerDiagnostics.IsMissingSelection(ex))
         {
@@ -351,7 +380,16 @@ public partial class MainWindow : Window
                 Title = title,
                 SuggestedFileName = suggestedName,
             }).ConfigureAwait(false);
-            return picked?.Path.LocalPath;
+
+            string? localPath = StorageItemPath.TryGetLocalPath(picked);
+            if (picked is not null && localPath is null)
+            {
+                Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                    .Warning("Save picker returned a non-local path: {Title}", title);
+                LogGuiMessage(FolderPickerDiagnostics.NonLocalSelectionMessage);
+            }
+
+            return localPath;
         }
         catch (Exception ex)
         {
@@ -389,20 +427,14 @@ public partial class MainWindow : Window
             List<string> paths = e.DataTransfer.TryGetFiles()
                 ?.Select(f =>
                 {
-                    try
+                    string? localPath = StorageItemPath.TryGetLocalPath(f);
+                    if (localPath is null)
                     {
-                        return f.Path.LocalPath;
+                        Log.ForContext(BugReportSink.NoBugReportProperty, true)
+                            .Warning("Skipping dropped item with unreadable path");
                     }
-                    catch (InvalidOperationException ex)
-                    {
-                        Log.Warning(ex, "Skipping dropped item with unreadable path");
-                        return null;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex, "Reading dropped item path failed");
-                        return null;
-                    }
+
+                    return localPath;
                 })
                 .Where(p => p is not null)
                 .Cast<string>()

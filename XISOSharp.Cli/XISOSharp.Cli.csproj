@@ -7,7 +7,7 @@
          The library (XISOSharp/) is the only published package. -->
     <IsPackable>false</IsPackable>
     <Description>XISOSharp command-line tool: create, extract, list, rewrite, compress and archive Xbox XISO/XDVDFS images. Reads ISO, split ISO, CISO, CCI and ZAR; writes XISO, CISO, CCI and ZAR; includes Redump/XboxKit archival modes.</Description>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFramework>net11.0</TargetFramework>
     <AssemblyName>XISOSharp.Cli</AssemblyName>
     <RootNamespace>XISOSharp.Cli</RootNamespace>
     <ApplicationIcon>icon\icon.ico</ApplicationIcon>
@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(RepoRoot)XISOSharp\XISOSharp.csproj" />
+    <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="11.0.0" />
     <PackageReference Include="Serilog" Version="4.4.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
@@ -83,7 +84,7 @@
   </Target>
 
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.322">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.339">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

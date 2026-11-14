@@ -8,15 +8,14 @@ command-line tool or the .NET library.
 | Component | Requirement |
 |---|---|
 | OS | Windows, Linux, or macOS |
-| .NET SDK (build from source) | 10.0.301 or newer (see [`global.json`](../global.json)) |
-| .NET runtime (run prebuilt binaries) | .NET 10 (Desktop Runtime for the GUI) |
+| .NET SDK (build from source) | 11.0.100 or newer (see [`global.json`](../global.json)) |
+| .NET runtime (run prebuilt binaries) | .NET 11 (Desktop Runtime for the GUI) |
 | Disk space | At least 2× the ISO size for extraction, plus workspace for creation |
 
 > [!NOTE]
-> The library targets `net8.0`, `net9.0`, and `net10.0`. The CLI multi-targets the
-> same three frameworks (net10.0 ships as the published binary) and can be published
+> The library and all apps target `net11.0` with C# 15. The CLI can be published
 > as a **self-contained single-file** binary for any platform,
-> requiring no installed runtime — see [Building](building.md#publishing).
+> requiring no installed runtime - see [Building](building.md#publishing).
 
 ## Option 1 — The command-line tool
 
@@ -26,7 +25,7 @@ command-line tool or the .NET library.
 git clone https://github.com/purelogiccode/XISOSharp.git
 cd XISOSharp
 
-# Framework-dependent build (requires the .NET 10 SDK)
+# Framework-dependent build (requires the .NET 11 SDK)
 dotnet build XISOSharp.Cli -c Release
 
 # Or a self-contained single-file binary for your platform (no runtime needed)
@@ -36,7 +35,7 @@ dotnet publish XISOSharp.Cli -c Release -r win-x64 --self-contained -p:PublishSi
 ```
 
 A framework-dependent `dotnet build` produces `XISOSharp.Cli(.exe)` in
-`XISOSharp.Cli/bin/Release/net10.0/`; a self-contained `dotnet publish` (or
+`XISOSharp.Cli/bin/Release/net11.0/`; a self-contained `dotnet publish` (or
 `./publish-cli.ps1`, whose output lands in `publish/<rid>/`) ships the same tool
 renamed to **`XISOSharp`** (Windows: `XISOSharp.exe`).
 
@@ -48,11 +47,13 @@ renamed to **`XISOSharp`** (Windows: `XISOSharp.exe`).
 
 ### Prebuilt bundles
 
-Every release publishes six framework-dependent zips
-(`release_<version>_<rid>.zip` for `win-x64`, `win-arm64`, `linux-x64`,
-`linux-arm64`, `MacOsX-x64`, `MacOsX-arm64`). Extract the zip and run
-`XISOSharp` (`XISOSharp.exe` on Windows) or `XISOSharp.Gui`. The bundles need
-the **.NET 10 runtime** (Desktop Runtime for the GUI); nothing else is bundled.
+Every release publishes six framework-dependent bundles: Windows
+`release_<version>_<rid>.zip` (`win-x64`, `win-arm64`), Linux
+`release_<version>_<rid>.tar.gz` (`linux-x64`, `linux-arm64`) and macOS
+`release_<version>_<rid>.dmg` (`MacOsX-x64`, `MacOsX-arm64`). Extract the
+archive or mount the disk image, then run `XISOSharp` (`XISOSharp.exe` on
+Windows) or `XISOSharp.Gui`. The bundles need the **.NET 11 runtime** (Desktop
+Runtime for the GUI); nothing else is bundled.
 
 ### Package managers and container
 

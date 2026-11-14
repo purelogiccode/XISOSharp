@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <!-- Dev/test harness, never packed. -->
     <IsPackable>false</IsPackable>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <!-- ImplicitUsings/Nullable inherited from Directory.Build.props. -->
     <RootNamespace>XISOSharp.BattleTests</RootNamespace>
     <AssemblyName>XISOSharp.BattleTests</AssemblyName>
@@ -52,7 +52,7 @@
   </Target>
 
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="3.0.322">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.339">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

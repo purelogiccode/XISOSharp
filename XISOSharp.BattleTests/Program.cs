@@ -286,7 +286,7 @@ internal static class Program
         string repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
         foreach (string cfg in new[] { "Release", "Debug" })
         {
-            string candidate = Path.Combine(repoRoot, "XISOSharp.Cli", "bin", cfg, "net10.0", "XISOSharp.Cli.exe");
+            string candidate = Path.Combine(repoRoot, "XISOSharp.Cli", "bin", cfg, "net11.0", "XISOSharp.Cli.exe");
             if (File.Exists(candidate))
             {
                 return candidate;

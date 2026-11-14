@@ -128,8 +128,8 @@ public class UpdateCheckerExtraTests : IDisposable
     /// <summary>Verifies asset-name construction strips the tag prefix.</summary>
     [Theory]
     [InlineData("1.2.3", "win-x64", "release_1.2.3_win-x64.zip")]
-    [InlineData("v1.2.3", "linux-arm64", "release_1.2.3_linux-arm64.zip")]
-    [InlineData("V1.2.3", "MacOsX-x64", "release_1.2.3_MacOsX-x64.zip")]
+    [InlineData("v1.2.3", "linux-arm64", "release_1.2.3_linux-arm64.tar.gz")]
+    [InlineData("V1.2.3", "MacOsX-x64", "release_1.2.3_MacOsX-x64.dmg")]
     public void BuildAssetName_Formats(string tag, string rid, string expected)
     {
         Assert.Equal(expected, UpdateChecker.BuildAssetName(tag, rid));
@@ -209,7 +209,7 @@ public class UpdateCheckerExtraTests : IDisposable
         using JsonDocument doc = JsonDocument.Parse("""
                                                     {
                                                       "assets": [
-                                                        { "name": "release_1.2.3_linux-x64.zip", "browser_download_url": "https://example.com/linux.zip" },
+                                                        { "name": "release_1.2.3_linux-x64.tar.gz", "browser_download_url": "https://example.com/linux.tar.gz" },
                                                         { "name": "release_1.2.3_win-x64.zip", "browser_download_url": "https://example.com/win.zip" }
                                                       ]
                                                     }

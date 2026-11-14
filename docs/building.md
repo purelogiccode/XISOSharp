@@ -11,10 +11,9 @@ This page covers SDK requirements, build and publish commands, and the CI pipeli
 
 ## Requirements
 
-- **.NET SDK 10.0.301 or newer 10.0.3xx patch** — pinned in [`global.json`](../global.json)
-  (`rollForward: latestPatch`): 10.0.3xx patches are accepted; newer 10.0.4xx
-  feature bands and 11+ are not, and anything older than 10.0.301 (e.g. a
-  VS-shipped 10.0.1xx) fails before build.
+- **.NET SDK 11.0.100 or newer 11.0.1xx patch** - pinned in [`global.json`](../global.json)
+  (`rollForward: latestPatch`): 11.0.1xx patches are accepted; anything older
+  than 11.0.100 fails before build.
 - Any OS supported by .NET (the CI builds on Windows, Linux, and macOS).
 - No native toolchain is required — this is a pure managed codebase.
 
@@ -39,13 +38,13 @@ The solution contains:
 
 | Project | Target(s) | Output |
 |---|---|---|
-| `XISOSharp` | net8.0, net9.0, net10.0 | `XISOSharp.dll` + NuGet package |
-| `XISOSharp.Cli` | net8.0, net9.0, net10.0 (ships: net10.0) | `XISOSharp` executable |
-| `XISOSharp.Gui` | net10.0 | Avalonia GUI (shippable, shells out to the CLI) |
-| `XISOSharp.Tests` | net8.0, net9.0, net10.0 | xUnit test assembly (engine + CLI) |
+| `XISOSharp` | net11.0 (C# 15) | `XISOSharp.dll` + NuGet package |
+| `XISOSharp.Cli` | net11.0 | `XISOSharp` executable |
+| `XISOSharp.Gui` | net11.0 | Avalonia GUI (shippable, shells out to the CLI) |
+| `XISOSharp.Tests` | net11.0 | xUnit test assembly (engine + CLI) |
 | `ZArchiveSharp` (`ZArchiveSharp.Tests` / `ZArchiveSharp.Benchmarks` / `ZArchiveSharp.Cli`) | — | Lives in the sibling `../CSharp_ZArchiveSharp` repo (own solution); consumed here as NuGet package `ZArchiveSharp` 1.4.0 (`ZArchiveSharp.Cli` is a `dotnet tool`, not a library reference) |
-| `XISOSharp.Benchmarks` | net10.0 | BenchmarkDotNet harness |
-| `XISOSharpTester` | net10.0-windows | WPF regression-test rig (Windows-only, runs from build output) |
+| `XISOSharp.Benchmarks` | net11.0 | BenchmarkDotNet harness |
+| `XISOSharpTester` | net11.0-windows | WPF regression-test rig (Windows-only, runs from build output) |
 
 > [!NOTE]
 > Two GUI stacks, different jobs: `XISOSharp.Gui` (Avalonia, cross-platform) is
@@ -88,19 +87,19 @@ runtime required on the target machine:
 
 ```bash
 # Windows x64
-dotnet publish XISOSharp.Cli -c Release -f net10.0 -r win-x64 --self-contained
+dotnet publish XISOSharp.Cli -c Release -f net11.0 -r win-x64 --self-contained
 
 # Linux x64
-dotnet publish XISOSharp.Cli -c Release -f net10.0 -r linux-x64 --self-contained
+dotnet publish XISOSharp.Cli -c Release -f net11.0 -r linux-x64 --self-contained
 
 # macOS (Intel / Apple Silicon)
-dotnet publish XISOSharp.Cli -c Release -f net10.0 -r osx-x64 --self-contained
-dotnet publish XISOSharp.Cli -c Release -f net10.0 -r osx-arm64 --self-contained
+dotnet publish XISOSharp.Cli -c Release -f net11.0 -r osx-x64 --self-contained
+dotnet publish XISOSharp.Cli -c Release -f net11.0 -r osx-arm64 --self-contained
 ```
 
-(`-f net10.0` is required: the CLI multi-targets net8/9/10, but only net10.0
-ships. `PublishSingleFile` needs no `-p:` override — it defaults on in the
-csproj. `publish-cli.ps1` / `publish-gui.ps1` wrap this loop for all RIDs.)
+(`-f net11.0` is explicit so the publish target stays unambiguous.
+`PublishSingleFile` needs no `-p:` override - it defaults on in the csproj.
+`publish-cli.ps1` / `publish-gui.ps1` wrap this loop for all RIDs.)
 
 Supported runtime identifiers (single source of truth: `XISOSharp.Cli.csproj` /
 `XISOSharp.Gui.csproj` `RuntimeIdentifiers`, matching the `publish-*.ps1` defaults):
@@ -108,7 +107,7 @@ Supported runtime identifiers (single source of truth: `XISOSharp.Cli.csproj` /
 CLI (XboxKit parity, incl. the 32-bit `win-x86`); the GUI ships the six 64-bit
 RIDs only.
 
-Output lands in `XISOSharp.Cli/bin/Release/net10.0/<rid>/publish/` as a single
+Output lands in `XISOSharp.Cli/bin/Release/net11.0/<rid>/publish/` as a single
 `XISOSharp` (or `XISOSharp.exe`) binary (renamed from the `XISOSharp.Cli`
 assembly name by the csproj `RenamePublishedExeToXisoSharp` target).
 
@@ -222,15 +221,17 @@ Pushing a version tag (`1.6.0` or `v1.6.0`) does two independent things:
 
 - `ci.yml` packs and publishes `XISOSharp.<version>.nupkg` + `.snupkg` (the
   library is the only NuGet package) to NuGet.
-- `release.yml` builds the six framework-dependent bundles
-  (`release_<version>_<rid>.zip` for `win-x64`, `win-arm64`, `linux-x64`,
-  `linux-arm64`, `MacOsX-x64`, `MacOsX-arm64`) from the same tag, smoke-tests
+- `release.yml` builds the six framework-dependent bundles from the same tag:
+  Windows `release_<version>_<rid>.zip` (`win-x64`, `win-arm64`), Linux
+  `release_<version>_<rid>.tar.gz` (`linux-x64`, `linux-arm64`) and macOS
+  `release_<version>_<rid>.dmg` (`MacOsX-x64`, `MacOsX-arm64`). It smoke-tests
   the native ones, generates an SPDX 2.2 SBOM and a build-provenance
   attestation, and attaches everything to the GitHub release. Its body is the
   version's section of [`release-notes.md`](release-notes.md). When
   `ENABLE_WINDOWS_SIGNING` / `ENABLE_MACOS_SIGNING` are set, Windows bundles are
-  Authenticode-signed and verified, macOS bundles are codesigned (and notarized
-  when the notary secrets exist) before the smoke job and release upload.
+  Authenticode-signed and verified, macOS disk images are codesigned and
+  notarized (when the notary secrets exist) before the smoke job and release
+  upload.
 
 `release.yml` also has a `workflow_dispatch` entry with a `dry_run` switch to
 rehearse the bundle build + smoke tests without creating a release. The manual

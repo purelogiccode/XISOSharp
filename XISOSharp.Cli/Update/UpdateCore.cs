@@ -85,7 +85,7 @@ internal static class UpdateCore
                 return null;
             if (!root.TryGetProperty("checkedUtc", out JsonElement checkedEl) ||
                 checkedEl.ValueKind != JsonValueKind.String ||
-                !DateTime.TryParse(checkedEl.GetString(), null,
+                !DateTime.TryParse(checkedEl.GetString(), CultureInfo.InvariantCulture,
                     DateTimeStyles.RoundtripKind, out DateTime checkedUtc))
             {
                 return null;
@@ -280,12 +280,20 @@ internal static class UpdateCore
     }
 
     /// <summary>
-    /// Builds the expected asset file name for a release tag
-    /// (<c>release_1.0.0_win-x64.zip</c>). A leading <c>v</c> on the tag is
-    /// stripped to match the convention.
+    /// Builds the expected asset file name for a release tag. Windows ships a
+    /// zip, Linux a tarball and macOS a disk image
+    /// (<c>release_1.0.0_win-x64.zip</c>,
+    /// <c>release_1.0.0_linux-x64.tar.gz</c>,
+    /// <c>release_1.0.0_MacOsX-arm64.dmg</c>). A leading <c>v</c> on the tag
+    /// is stripped to match the convention.
     /// </summary>
-    internal static string BuildAssetName(string tag, string rid) =>
-        $"release_{tag.TrimStart('v', 'V')}_{rid}.zip";
+    internal static string BuildAssetName(string tag, string rid)
+    {
+        string extension = rid.StartsWith("linux-", StringComparison.Ordinal) ? "tar.gz"
+            : rid.StartsWith("MacOsX-", StringComparison.Ordinal) ? "dmg"
+            : "zip";
+        return $"release_{tag.TrimStart('v', 'V')}_{rid}.{extension}";
+    }
 
     /// <summary>
     /// Reports whether <paramref name="remoteTag"/> is newer than the running

@@ -15,6 +15,14 @@ internal static class FolderPickerDiagnostics
         "Choose another folder or type its path directly.";
 
     /// <summary>
+    /// User-facing explanation for a selection that has no local filesystem
+    /// path (for example, a virtual shell location).
+    /// </summary>
+    internal const string NonLocalSelectionMessage =
+        "[GUI] The selected location has no local filesystem path. " +
+        "Choose another location or type its path directly.";
+
+    /// <summary>
     /// Detects Avalonia's <c>BclStorageItem</c> rejection of a selected folder
     /// that no longer exists (it can be deleted from inside the native dialog).
     /// </summary>

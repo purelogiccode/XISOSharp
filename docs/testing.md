@@ -13,7 +13,7 @@ reference-comparison scripts, and the benchmarks.
 
 ## Test suite
 
-The xUnit suite lives in `XISOSharp.Tests` (engine + CLI, targets: net8.0/net9.0/net10.0).
+The xUnit suite lives in `XISOSharp.Tests` (engine + CLI, target: net11.0).
 `ZArchiveSharp.Tests` (pure-C# ZArchive/zstd port) moved to the sibling
 `../CSharp_ZArchiveSharp` repo with its own solution and CI. Run the local suite with:
 
@@ -225,7 +225,7 @@ merged line/branch coverage is written to the job summary. The job fails when
 line coverage drops below `MIN_LINE_COVERAGE` (70%) or branch coverage below
 `MIN_BRANCH_COVERAGE` (60%), both set in `.github/workflows/ci.yml`.
 
-Measured line coverage (coverlet, full net10.0 suite, 1.4.2): `XisoReader.cs`
+Measured line coverage (coverlet, the 1.4.2 suite): `XisoReader.cs`
 94.2%, `XisoWriter.cs` 89.6%, `AvlTree.cs` 100% — all above the 85% target. The
 remaining reader gaps are unreachable-by-construction defenses: the
 per-table entry-count caps (offsets are 16-bit, so >65536 distinct positions
@@ -258,7 +258,7 @@ dotnet run --project ZArchiveSharp.Benchmarks -c Release -- --filter *
 
 ## The GUI regression tester
 
-`XISOSharpTester` is a WPF application (net10.0-windows) for **batch regression
+`XISOSharpTester` is a WPF application (net11.0-windows) for **batch regression
 testing**: it runs the same scenario across many ISOs with the reference C tool and
 this implementation, compares outputs (file sets and hashes via `HashUtil`), and
 exports PDF reports (`PdfExporter`). Services:

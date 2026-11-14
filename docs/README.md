@@ -95,7 +95,7 @@ The DocFX API link is absolute because the generated reference is published on P
 - **xdvdfs parity:** `build-image` ordered `host/**:image/{0|1}` (`!` + `{n}` captures, `xdvdfs.toml`, `--dry-run`, `\:` colon escaping), `image-spec from`, **CISO** `compress`/`cso`/`decompress`/`uncso`/`decso` (DEFLATE v1 `0x80000000` + LZ4 v2, `align` 0/1/2, `--ciso-level`/`--ciso-version`/`--ciso-split`) with `CisoBlockDevice` random-access, `split`/`join`/`joinsplit` FATX parts, `IBlockDevice` (`File`/`Memory`/`Offset`/`Ciso`)
 - Automatic `.xbe` **media-enable patching** (Boyer–Moore `E8 CA FD FF FF 85 C0 7D → EB`)
 - Async APIs, `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FileProgress`/`FinishedPacking`, with `FileAdded` also per written file and per-chunk `FileProgress` in extract mode), `CancellationToken` throughout
-- Multi-targets **.NET 8, .NET 9, and .NET 10**; strong-named; trim/AOT compatible; **left side menu** on Pages and the GitHub Wiki
+- Targets **.NET 11 / C# 15**; strong-named; trim/AOT compatible; **left side menu** on Pages and the GitHub Wiki
 
 ## Quick start
 

@@ -44,7 +44,8 @@ reproducible or re-downloadable. Never delete them.
   - any `*/bin/Release/**` (library, CLI, GUI, Tests, Tester, Benchmarks,
     BattleTests, TestDataGenerator)
   - `publish/**`, `publish-gui/**` (publish-script outputs)
-  - any `release_*.zip`, `*.nupkg`, `*.snupkg` file anywhere
+  - any `release_*.zip`, `release_*.tar.gz`, `release_*.dmg`, `*.nupkg`,
+    `*.snupkg` file anywhere
 - Never run destructive cleanups against them: `dotnet clean -c Release`,
   `Remove-Item -Recurse` on `bin`/`obj`/`publish*`, `git clean -xdf`, etc.
 - Fresh builds go through a temp staging directory
@@ -54,6 +55,24 @@ reproducible or re-downloadable. Never delete them.
   deleting older or unrelated artifacts is not.
 - If a clean of a Release path seems required (corrupt output, TFM/RID change),
   stop and ask the user first.
+
+## Hard rule: run InspectCode before every commit
+
+Run JetBrains InspectCode before every commit and fix every warning and error it
+reports. Do not commit while the report is non-empty.
+
+```powershell
+dotnet build CSharp_XISOSharp.sln -c Release -m:1
+jb inspectcode CSharp_XISOSharp.sln --output=inspectcode.sarif --format=Sarif `
+  --severity=WARNING --no-build --no-updates --verbosity=WARN
+```
+
+The CI `inspectcode` job runs the same command. Keep the local
+`JetBrains.ReSharper.GlobalTools` version aligned with CI when it is bumped:
+
+```powershell
+dotnet tool update --global JetBrains.ReSharper.GlobalTools --version 2026.2.3.1
+```
 
 ## CI
 
@@ -86,9 +105,10 @@ reproducible or re-downloadable. Never delete them.
   `pages.yml`/`wiki.yml` (docs).
 - Tag pushes trigger the tag-only `publish-nuget` job; PR/branch runs stop at
   pack. `release.yml` runs in parallel and creates the GitHub release.
-- The three TFM test hosts run in parallel and share one `TestData/` tree; the
-  fixture stamps `TestData/output/fixture.stamp` so only the first host rebuilds
-  the ISO (`TestDataWriter`). Do not make the ISO rebuild unconditional again.
+- All projects target `net11.0` (`net11.0-windows` for the WPF Tester) with C#
+  15. The test hosts share one `TestData/` tree; the fixture stamps
+  `TestData/output/fixture.stamp` so only the first host rebuilds the ISO
+  (`TestDataWriter`). Do not make the ISO rebuild unconditional again.
 - `XISOSharp.Tests` is strong-named with `XISOSharp/XISOSharp.snk` because the
   library grants it `InternalsVisibleTo` with the matching public key embedded
   in `XISOSharp.csproj`; keep the key file, the test `SignAssembly` settings,
@@ -123,8 +143,7 @@ reproducible or re-downloadable. Never delete them.
      `202609111233`), not `v2.7.1`. Never change the on-disk optimized tag
      `in!xiso!2.7.1 (01.11.14)` or `Constants.ExisoVersion`.
 2. Run the full suite: `dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release`
-   (currently 2239 passed / 1 skipped on net8.0/net9.0 and 2312 passed / 1 skipped on
-   net10.0 — net10.0 adds the GUI-helper tests).
+   (currently 2317 passed / 1 skipped on net11.0).
 3. Commit + push `master` (only when the user asks), then tag and push:
    `git tag <version> && git push origin <version>`.
 4. The tag push triggers CI pack + publish. If the `nuget` environment has
@@ -161,12 +180,14 @@ reproducible or re-downloadable. Never delete them.
 ## Routine: publish a GitHub release
 
 GitHub releases carry only the six RID app bundles; the library packages stay
-NuGet-only (user decision). The CLI's `[UPDATE]` check downloads
-`release_<version>_<rid>.zip` from the latest release, so asset names and the
-release tag must match the version exactly.
+NuGet-only (user decision). Windows ships `.zip`, Linux `.tar.gz` and macOS
+`.dmg`; the CLI's `[UPDATE]` check downloads the platform asset
+(`release_<version>_<rid>.<ext>`) from the latest release, so asset names and
+the release tag must match the version exactly.
 
 **Automated path (default):** `.github/workflows/release.yml` runs on the tag
-push, builds all six bundles on `ubuntu-latest` with the recipe below, smoke-tests
+push, builds the bundles on their native runners (Ubuntu for Windows/Linux
+cross-publishes, macOS for the disk images), smoke-tests
 `win-x64`/`linux-x64`/`MacOsX-arm64`, and creates the release from the tag with
 the version's `docs/release-notes.md` section as the body. Re-runs refresh the
 same-named assets (`gh release upload --clobber`) and never delete other assets.
@@ -188,14 +209,14 @@ To rehearse without tagging, dispatch the workflow with `dry_run: true`.
    ```bash
    gh release upload <version> XISOSharp.Gui/bin/Release/release_<version>_win-x64.zip \
      XISOSharp.Gui/bin/Release/release_<version>_win-arm64.zip \
-     XISOSharp.Gui/bin/Release/release_<version>_linux-x64.zip \
-     XISOSharp.Gui/bin/Release/release_<version>_linux-arm64.zip \
-     XISOSharp.Gui/bin/Release/release_<version>_MacOsX-x64.zip \
-     XISOSharp.Gui/bin/Release/release_<version>_MacOsX-arm64.zip
+     XISOSharp.Gui/bin/Release/release_<version>_linux-x64.tar.gz \
+     XISOSharp.Gui/bin/Release/release_<version>_linux-arm64.tar.gz \
+     XISOSharp.Gui/bin/Release/release_<version>_MacOsX-x64.dmg \
+     XISOSharp.Gui/bin/Release/release_<version>_MacOsX-arm64.dmg
    ```
 
 4. Verify:
-   - `gh release view <version> --json assets` lists exactly the six zips.
+   - `gh release view <version> --json assets` lists exactly the six bundles.
    - `https://github.com/purelogiccode/XISOSharp/releases/download/<version>/release_<version>_win-x64.zip`
      returns HTTP 200.
 5. Never attach `*.nupkg`/`*.snupkg` to the release, and never delete existing
@@ -203,26 +224,33 @@ To rehearse without tagging, dispatch the workflow with `dry_run: true`.
 
 ## Bundle build recipe (framework-dependent)
 
-Outputs need the .NET 10 runtime (Desktop Runtime for the GUI). For each RID,
-stage into `%TEMP%` (safe to wipe) and produce the zip under
+Outputs need the .NET 11 runtime (Desktop Runtime for the GUI). For each RID,
+stage into `%TEMP%` (safe to wipe) and produce the platform archive under
 `XISOSharp.Gui/bin/Release/`:
 
 ```powershell
 $stage = "$env:TEMP\xiso_bundle\<rid>"
 # create/clear ONLY the temp stage
 dotnet publish XISOSharp.Gui/XISOSharp.Gui.csproj -c Release -r <rid> --no-self-contained -o $stage
-dotnet publish XISOSharp.Cli/XISOSharp.Cli.csproj -c Release -f net10.0 -r <rid> --no-self-contained -p:PublishTrimmed=false -o $stage
+dotnet publish XISOSharp.Cli/XISOSharp.Cli.csproj -c Release -f net11.0 -r <rid> --no-self-contained -p:PublishTrimmed=false -o $stage
 Get-ChildItem $stage -Include *.pdb,*.xml -Recurse | Remove-Item -Force
 Copy-Item README.md $stage
 Copy-Item LICENSE $stage
 Copy-Item WhatsNew.md $stage
-Compress-Archive "$stage\*" "XISOSharp.Gui\bin\Release\release_<version>_<rid>.zip" -Force
+$asset = "XISOSharp.Gui\bin\Release\release_<version>_<asset-rid>"
+switch -Wildcard (<rid>) {
+    'win-*'   { Compress-Archive "$stage\*" "$asset.zip" -Force }
+    'linux-*' { tar -czf "$asset.tar.gz" -C $stage . }
+    'osx-*'   { hdiutil create -volname "XISOSharp <version>" -srcfolder $stage -ov -format UDZO "$asset.dmg" }
+}
 ```
 
-Each zip must contain exactly the GUI app, `XISOSharp(.exe)`, `README.md`,
-`LICENSE`, and `WhatsNew.md` — no `*.pdb` / `*.xml`.
+`<asset-rid>` is `win-*`/`linux-*` unchanged and `MacOsX-*` for `osx-*`; the
+macOS `.dmg` step requires `hdiutil` (run it on macOS). Each archive must contain
+exactly the GUI app, `XISOSharp(.exe)`, `README.md`, `LICENSE`, and
+`WhatsNew.md` - no `*.pdb` / `*.xml`.
 
-Smoke-test from an extracted zip:
+Smoke-test from an extracted/mounted archive:
 
 - `XISOSharp.exe -v` →
   `XISOSharp v<version> for <platform> - https://github.com/purelogiccode/XISOSharp`

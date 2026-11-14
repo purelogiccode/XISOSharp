@@ -15,8 +15,8 @@ files after publishing a release:
 | `../bucket/xisosharp.json` | The same Scoop manifest at the repository-root bucket path |
 
 The generator reads each asset's SHA-256 digest from the GitHub release and
-writes the exact `release_<version>_<rid>.zip` URLs. It never deletes older
-winget version directories.
+writes the exact platform URLs (Windows `.zip`, Linux `.tar.gz`, macOS `.dmg`).
+It never deletes older winget version directories.
 
 ## Install from the checked-in files
 
