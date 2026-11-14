@@ -263,6 +263,9 @@ items became `BRF-11`…`BRF-13` in the (now retired) missing-feature plan.
 | 2026-11-13 | 2.0.0 .NET 11 retarget | 2.0.0 | All projects target `net11.0`/C# 15; the net8.0/net9.0/net10.0 package assets are intentionally dropped with a reviewed `PKV006` suppression; release assets move to Windows `.zip`, Linux `.tar.gz`, macOS `.dmg`; GUI drive-root picker and updater/packaging extension handling fixed. |
 | 2026-11-13 | 2.0.0 verification | 2.0.0 | Suite 2317/1 on net11; build 0 warnings; InspectCode 0; format, docs links and pack clean; release dry run `43542358429` green across all six bundles and smoke tests. |
 | 2026-11-13 | 2.0.0 released | 2.0.0 | Tag `7552d51`; CI `43542653159` green after refreshing the stale NuGet environment key; NuGet 2.0.0 indexed; release `43542653106` green with six native bundles + SPDX; winget/Scoop/Homebrew manifests refreshed. |
+| 2026-11-14 | 2.0.1 multi-target restoration | 2.0.1 | Restored `net8.0`/`net9.0`/`net10.0` alongside `net11.0` for the library, CLI, tests and fixture generator; package validation moved to the 2.0.0 baseline with no suppressions; CI installs the runtime matrix. |
+| 2026-11-14 | 2.0.1 verification | 2.0.1 | Suite 2317/1 on net11 and 2239/1 on each of net8/net9/net10; build 0 warnings; InspectCode 0; format and docs links clean; master CI `43550930819` green. |
+| 2026-11-14 | 2.0.1 released | 2.0.1 | Tag `00c5af2`; tag CI `43552996152` green including NuGet publish; NuGet 2.0.1 indexed; release `43552996113` green with six native bundles + SPDX; Docker `43552996227` green; packaging manifests refreshed. |
 
 ## Historical handoff (2026-11-07)
 

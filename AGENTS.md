@@ -122,9 +122,10 @@ dotnet tool update --global JetBrains.ReSharper.GlobalTools --version 2026.2.3.1
 
 ### Versioning facts
 
-- **2.0.0 is published (2026-11-13).** Do not reuse the version or move the
-  `2.0.0` tag again. It accidentally shipped net11-only; the next release is
-  `2.0.1`, which restores the net8.0/net9.0/net10.0 assets alongside net11.0.
+- **2.0.1 is published (2026-11-14).** Do not reuse the version or move the
+  `2.0.1` tag again. It restores the net8.0/net9.0/net10.0 assets alongside
+  net11.0 after 2.0.0 accidentally shipped net11-only; the next release must
+  use a new tag (e.g. `2.0.2` or later).
 - Version comes from git tags via **MinVer**. Never add or edit a `Version`
   property in a csproj.
 - Release tags are bare semver: `1.0.0`, `1.0.1`, `1.0.2` (`v1.0.2` also
