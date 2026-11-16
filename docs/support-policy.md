@@ -9,8 +9,9 @@
 | `net9.0` | EOL (10 Nov 2026) | Supported compatibility target; no security fixes after EOL. |
 | `net8.0` | EOL (10 Nov 2026) | Supported compatibility target; no security fixes after EOL. |
 
-2.0.1 restores the `net8.0`/`net9.0`/`net10.0` assets that 2.0.0 accidentally
-dropped. `netstandard2.0`/`net6.0` are **not** targets: the library uses
+2.0.1 restored the `net8.0`/`net9.0`/`net10.0` assets that 2.0.0 accidentally
+dropped; 2.1.0 keeps that matrix and adds STFS-to-ISO conversion.
+`netstandard2.0`/`net6.0` are **not** targets: the library uses
 `Span<T>`/`FileStreamOptions`/`SHA3_256` and modern BCL APIs. Consumers on
 older frameworks can use the 1.4.x package line.
 
@@ -23,7 +24,7 @@ older frameworks can use the 1.4.x package line.
 - **Patch**: fixes only, no new public surface.
 
 The package validates against `PackageValidationBaselineVersion` (currently
-2.0.0). The `FAC-01` facade removals remain part of the baseline history. Do
+2.0.1). The `FAC-01` facade removals remain part of the baseline history. Do
 not add suppressions without a written reason.
 
 ## Platform support

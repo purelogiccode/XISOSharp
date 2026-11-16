@@ -131,7 +131,7 @@ Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXis
 | `HostIoDiagnostics` | `Describe(exception, operation, path)` maps permission-denied, long-path, sharing, existing-destination, illegal-name, full-disk and file-too-large (FAT32 4 GB) failures to a message naming the path, operation and likely fix |
 | `XisoDat` | `Parse` / `Verify`: Redump-style XML DAT (`game/rom` size + MD5/SHA-1/CRC32) matching with verified/ambiguous/not-in-DAT and missing-entry reports |
 | `SymlinkMode` | `Follow` (default), `Skip` or `Reject` for create/pack/remap/Apply source walks |
-| `XisoImageSource` | `TryDetect` / `IsSupportedImage` / `IsCompressedImage` / `IsGodImage` / `OpenRead` / `OpenBlockDevice` / `StripImageSuffix` across ISO, split ISO, CISO, CCI, GOD/SVOD and ZAR |
+| `XisoImageSource` | `TryDetect` / `IsSupportedImage` / `IsCompressedImage` / `IsGodImage` / `OpenRead` / `OpenBlockDevice` / `StripImageSuffix` across ISO, split ISO, CISO, CCI, GOD/SVOD, ZAR and STFS packages |
 
 See [Archival](archival.md) and [Compression](compression.md).
 

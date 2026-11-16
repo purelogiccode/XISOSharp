@@ -34,7 +34,7 @@ Consumers that need the standalone readers pin the packages directly instead
 of relying on XISOSharp's transitive dependencies:
 
 ```xml
-<PackageReference Include="XISOSharp" Version="2.0.1" />
+<PackageReference Include="XISOSharp" Version="2.1.0" />
 <PackageReference Include="CCISharp" Version="1.1.0" />
 <PackageReference Include="StfsSharp" Version="1.0.0" />
 ```
@@ -96,7 +96,7 @@ Internal data structures stay in `XISOSharp.DataStructures`.
 | `SymlinkMode` | `Follow` (default), `Skip` or `Reject` policy for create/pack/remap/Apply source walks |
 | `XisoSkeleton.Apply` | Skeleton overlay: restore original file data into a petrified skeleton, optionally verifying the `.hash`; the exact inverse of `Petrify` |
 | `XbeAssets` | XBE logo / `$$XTIMAGE` / `$$XSIMAGE` extraction with BCL-only PNG and DDS output |
-| `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` | Unified detection and open (`TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`) for ISO, split ISO, CISO, CCI, GOD/SVOD, split variants and ZAR |
+| `XisoImageSource` / `XisoImageFormat` / `XisoImageSourceInfo` | Unified detection and open (`TryDetect`, `OpenRead`, `OpenBlockDevice`, `StripImageSuffix`) for ISO, split ISO, CISO, CCI, GOD/SVOD, split variants, ZAR and STFS packages |
 | `XisoCci` / `CciBlockDevice` | CCI/CCIM compression, extraction, default names and random access (CCISharp-backed) |
 | `XisoZarchive` (read APIs) | `ListZar`, `ExtractZar`, `ConvertZarToIso` alongside the existing `CreateZar` |
 | `StfsSharp.StfsPackage` / `StfsEntry` / `StfsPackageInfo` | Read-only XBLA/XBLIG single-file STFS package (from the `StfsSharp` package): file table, hash-chain block lists, `Find`, `ReadAllBytes`, `CopyTo`, `ExtractTo`, `Validate` hash-tree verification and volume/title metadata |

@@ -43,8 +43,11 @@ reproducible or re-downloadable. Never delete them.
 - Never delete or remove files under a project's Release output paths:
   - any `*/bin/Release/**` (library, CLI, GUI, Tests, Tester, Benchmarks,
     BattleTests, TestDataGenerator)
-  - `XISOSharp.Cli/bin/Release/**` is explicitly append-only: never delete or
-    move any file there, including downloaded historical release bundles.
+  - `D:\repo\CSharp_XISOSharp\XISOSharp.Cli\bin\Release` (repo path
+    `XISOSharp.Cli/bin/Release/**`) is explicitly append-only: never delete,
+    rename, or move any file there. Besides build output, it holds a complete
+    mirror of every historical GitHub release bundle
+    (`release_<version>_<rid>.*`), which may not be re-downloadable.
   - `publish/**`, `publish-gui/**` (publish-script outputs)
   - any `release_*.zip`, `release_*.tar.gz`, `release_*.dmg`, `*.nupkg`,
     `*.snupkg` file anywhere
@@ -122,10 +125,10 @@ dotnet tool update --global JetBrains.ReSharper.GlobalTools --version 2026.2.3.1
 
 ### Versioning facts
 
-- **2.0.1 is published (2026-11-14).** Do not reuse the version or move the
-  `2.0.1` tag again. It restores the net8.0/net9.0/net10.0 assets alongside
-  net11.0 after 2.0.0 accidentally shipped net11-only; the next release must
-  use a new tag (e.g. `2.0.2` or later).
+- **2.1.0 is published (2026-11-16).** Do not reuse the version or move the
+  `2.1.0` tag again. It adds STFS-to-ISO conversion and content-based STFS
+  detection on top of the 2.0.1 multi-target matrix; the next release must use
+  a new tag (e.g. `2.1.1` or later).
 - Version comes from git tags via **MinVer**. Never add or edit a `Version`
   property in a csproj.
 - Release tags are bare semver: `1.0.0`, `1.0.1`, `1.0.2` (`v1.0.2` also
@@ -148,7 +151,7 @@ dotnet tool update --global JetBrains.ReSharper.GlobalTools --version 2026.2.3.1
      `202609111233`), not `v2.7.1`. Never change the on-disk optimized tag
      `in!xiso!2.7.1 (01.11.14)` or `Constants.ExisoVersion`.
 2. Run the full suite: `dotnet test XISOSharp.Tests/XISOSharp.Tests.csproj -c Release`
-   (currently 2317 passed / 1 skipped on net11.0; 2239 / 1 on each of
+   (currently 2323 passed / 1 skipped on net11.0; 2245 / 1 on each of
    net8.0/net9.0/net10.0).
 3. Commit + push `master` (only when the user asks), then tag and push:
    `git tag <version> && git push origin <version>`.

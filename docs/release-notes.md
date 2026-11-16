@@ -1,5 +1,72 @@
 # Release Notes
 
+## 2.1.0
+
+**Release date:** 2026-11-16.
+
+**Minor release: XBLA/XBLIG STFS packages can be converted to optimized ISOs.**
+
+### STFS-to-ISO conversion
+
+- `XISOSharp convert <package> <out.iso>` and
+  `XisoReader.Rewrite(package, outputDirectory, out isoPath)` convert a
+  single-file XBLA/XBLIG STFS package by extracting its file table to a
+  temporary directory and packing it with `XisoWriter.CreateXiso`. The source
+  package is only read; the output is a normal optimized XISO with the
+  extract-xiso tag and a valid AVL tree.
+- `skipSectors` is rejected for a package (it has no disc-sector layout), and
+  the default output name colliding with the package is refused instead of
+  overwriting it. In-place `-r` rewrite and `split` still refuse a package and
+  now point at `convert`/`-x`.
+- STFS detection is content-based (XContent header, STFS volume type,
+  XBLA/XBLIG/Community Game content type), so a package misnamed `.iso` is
+  recognized before the plain-ISO fallback. `XisoImageSource.TryDetect`
+  reports the new `XisoImageFormat.Stfs`; `XisoImageSource.OpenRead`,
+  `OpenBlockDevice`, `XisoImage.Open`, `XisoDiscInfo`, `XisoImageHash`,
+  `compress`, `decompress` and the redump verbs refuse it with an actionable
+  message.
+- The conversion tree matches the `Extract-STFS` 1.0.0 reference extractor
+  byte-for-byte on the synthetic corpus.
+
+### Diagnostics
+
+- `HostIoDiagnostics` maps the FAT32 4 GB per-file limit
+  (`ERROR_FILE_TOO_LARGE` / `EFBIG`) to a message naming the destination and
+  suggesting NTFS/exFAT or `split`. `CisoReader.DecompressToIso` wraps host I/O
+  failures with the output path and that fix.
+- Truncated reads keep the short read as the `ExtractFileException` inner
+  `IOException` (`TruncatedCopyException`) in both the reader and the
+  drag-and-drop copy path; the copy path pre-checks the entry range before
+  creating the destination, so a torn image never leaves a partial file.
+
+### Fixes
+
+- Create/rewrite summaries report the real file/byte totals: the per-directory
+  write contexts now propagate their counts to the root, so
+  `sucessfully created <iso> (N files totalling B bytes added)` and the CLI
+  rewrite summary no longer print zero.
+- `CisoReader.DecompressToIso` drops a dead `InvalidDataException` check from
+  its I/O wrapper (`InvalidDataException` is a `SystemException`, not an
+  `IOException`).
+- STFS refusal messages point at `convert`/`-x` instead of the old
+  "extract it first" wording.
+
+### Build and packaging
+
+- `Meziantou.Analyzer` 3.0.341 and `coverlet.collector` 10.1.1.
+- `net8.0`/`net9.0` keep `Microsoft.SourceLink.GitHub` 10.0.403; SourceLink 11
+  pulls `System.IO.Hashing` 11, whose build-transitive target warns on those
+  TFMs. `net10.0`/`net11.0` use 11.0.100.
+- Package validation baseline moves from 2.0.0 to 2.0.1.
+- CLI reference, library/API pages, known limitations, troubleshooting and the
+  man page document the conversion path.
+
+### Tests
+
+- `net11.0`: **2323 passed / 1 opt-in skip**
+- `net8.0`, `net9.0`, `net10.0`: **2245 passed / 1 opt-in skip** each
+- Build, formatting, InspectCode and package validation are clean.
+
 ## 2.0.1
 
 **Release date:** 2026-11-14.

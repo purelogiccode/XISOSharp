@@ -46,11 +46,14 @@ metadata for GOD/STFS, XEX thumbnail export, loose `.xex`/`.xbe` parsing,
 The reviewed 1.9.0 API cleanup also removes the 1.x StfsSharp compatibility
 facades; reference the `StfsSharp` package directly.
 
-XISOSharp 2.0.1 restores the `net8.0`/`net9.0`/`net10.0` assets alongside
-`net11.0` and is built with C# 15. The 2.0.0 package had accidentally shipped
-.NET 11 only; use 2.0.1 for the full compatibility matrix. The 1.9.1 GUI
-folder-picker fixes carry forward, and the drive-root/non-local selection fix
-resolves Avalonia's relative URIs through `TryGetLocalPath`.
+XISOSharp 2.1.0 adds **STFS-to-ISO conversion**: `XisoReader.Rewrite` (and the
+CLI's `convert`) extracts a single-file XBLA/XBLIG package's file table and
+repacks it as an optimized XISO, leaving the package untouched. Detection is
+content-based (the new `XisoImageFormat.Stfs`), so a package misnamed `.iso` is
+refused by the sector-image APIs with an actionable message. The 2.0.1
+compatibility matrix remains: `net8.0`/`net9.0`/`net10.0`/`net11.0`, C# 15.
+The 1.9.1 GUI folder-picker fixes carry forward, and the drive-root/non-local
+selection fix resolves Avalonia's relative URIs through `TryGetLocalPath`.
 
 ## Companion projects
 
@@ -463,7 +466,14 @@ contiguous files, hash-chain block lists and writable-format packages with
 primary/secondary hash tables. STFS writing and rebuilding remain out of scope,
 but `XisoReader.Rewrite` converts a package to a new optimized XISO (extract the
 file table to a temporary directory, then pack it) and leaves the package
-untouched. `XisoChecksum.ComputeStfsChecksum` hashes the same sorted-path tree
+untouched:
+
+```csharp
+int rc = XisoReader.Rewrite(@"C:\games\XBLA-title", @"C:\games\iso", out string? isoPath);
+// isoPath = C:\games\iso\XBLA-title.iso (a standard optimized XISO)
+```
+
+`XisoChecksum.ComputeStfsChecksum` hashes the same sorted-path tree
 as ISO and ZAR, so equivalent trees compare equal.
 
 `StfsPackage.Validate` performs a deep read-only integrity check: it hashes

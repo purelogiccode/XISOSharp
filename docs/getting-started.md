@@ -64,7 +64,7 @@ The repository ships generated winget, Scoop and Homebrew manifests under
 ```powershell
 # winget: install from the checked-in manifest (requires LocalManifestFiles)
 winget settings --enable LocalManifestFiles
-winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\2.0.1
+winget install --manifest .\packaging\winget\manifests\p\purelogiccode\XISOSharp\2.1.0
 
 # Scoop: the repository root is a bucket
 scoop bucket add xisosharp https://github.com/purelogiccode/XISOSharp
@@ -256,9 +256,10 @@ XISOSharp -l "4D5307E6"                   # list/extract/checksum/hash/validate
 XISOSharp decompress "4D5307E6" game.iso  # title-named ISO by default
 XISOSharp convert "4D5307E6" game.cci     # or .cso
 
-# XBLA/XBLIG STFS package (single-file; read-only)
+# XBLA/XBLIG STFS package (single-file; read-only input)
 XISOSharp -l game.stfs                    # list the STFS file table
 XISOSharp -x -d game game.stfs            # extract every package file
+XISOSharp convert game.stfs game.iso      # convert to an optimized XISO
 XISOSharp checksum game.stfs              # same tree hash as an equivalent ISO/ZAR
 
 # Deterministic SHA3-256 image checksum (BTreeMap sorted, xdvdfs compat)

@@ -21,14 +21,17 @@ Command-line tool for creating, extracting, listing, and rewriting Xbox ISO (XIS
 
 This project is a direct conversion of the [extract-xiso](https://github.com/XboxDev/extract-xiso) CLI tool (reference build [202609111233](https://github.com/XboxDev/extract-xiso/releases/tag/build-202609111233)) from C to C#. It provides the same interface and produces byte-identical output for all operations, plus 40+ extra modes (Redump archival, xdvdfs parity, audit/repair/salvage, CISO/CCI, disc/DAT inspection, skeleton overlay, per-file hashes, checksums).
 
-Version 2.0.1 multi-targets .NET 8, .NET 9, .NET 10 and .NET 11 with C# 15;
-2.0.0 had accidentally shipped .NET 11 only. Release bundles remain Windows
-`.zip`, Linux `.tar.gz` and macOS `.dmg`, with the net11.0 executable. The
-1.9.0 feature set remains: `disc-info`, `apply-skeleton`, `file-hashes`,
-`verify-dat`, `xex-image`, parallel collection verbs, `--symlink-mode`,
-`--strict-names`, `--deterministic`, `--zar-level` and actionable host-I/O
-diagnostics. The reviewed API cleanup removes the 1.x StfsSharp facades; the
-CLI uses `StfsSharp` directly.
+Version 2.1.0 adds **STFS-to-ISO conversion** (`XISOSharp convert <package>
+<out.iso>`: extract the package file table, then repack it as an optimized
+XISO) and content-based STFS detection, including packages misnamed `.iso`.
+Host-I/O diagnostics now recognize the FAT32 4 GB limit. The tool still
+multi-targets .NET 8, .NET 9, .NET 10 and .NET 11 with C# 15. Release bundles
+remain Windows `.zip`, Linux `.tar.gz` and macOS `.dmg`, with the net11.0
+executable. The 1.9.0 feature set carries forward: `disc-info`,
+`apply-skeleton`, `file-hashes`, `verify-dat`, `xex-image`, parallel collection
+verbs, `--symlink-mode`, `--strict-names`, `--deterministic`, `--zar-level` and
+actionable host-I/O diagnostics. The reviewed API cleanup removes the 1.x
+StfsSharp facades; the CLI uses `StfsSharp` directly.
 
 Reader probing also accepts rebuilt "sector-0" XISOs (volume descriptor at absolute offset 0, `DescriptorSector = 0`): extract/list/tree/info, `--filetime`, `--sector-layout`, `--ranges`, `--copy-in`, and ZAR packing all work on them. `rebuild` rejects them with a clear error — repack to the standard sector-32 layout first.
 

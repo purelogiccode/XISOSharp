@@ -93,9 +93,10 @@ The DocFX API link is absolute because the generated reference is published on P
 - **Disc coverage** — RAW `0x0`, **GLOBAL/XGD2** `0x0FD90000`, **XGD3** `0x02080000`, **Hybrid** `0x89D80000`, **XGD1** `0x18300000` (native) + arbitrary `--skip-sectors`/`--prepend-sectors`
 - **Redump archival (XboxKit parity):** `--video`, `--random` (filler), `--seed` (XGD1 PRNG brute-force), `--wipe`, `--trim`, `--petrify` (skeleton + SHA-1), `--update` (XGD3 `su…`), `--zar` (ZArchive/zstd, `--jobs`/`--policy`), `--security-sectors <sectors.txt>` (rebuild only), aliases `--all`/`--best`/`--compress`, verb `rebuild` for lossless Redump ↔ XISO
 - **xdvdfs parity:** `build-image` ordered `host/**:image/{0|1}` (`!` + `{n}` captures, `xdvdfs.toml`, `--dry-run`, `\:` colon escaping), `image-spec from`, **CISO** `compress`/`cso`/`decompress`/`uncso`/`decso` (DEFLATE v1 `0x80000000` + LZ4 v2, `align` 0/1/2, `--ciso-level`/`--ciso-version`/`--ciso-split`) with `CisoBlockDevice` random-access, `split`/`join`/`joinsplit` FATX parts, `IBlockDevice` (`File`/`Memory`/`Offset`/`Ciso`)
+- **Containers:** read ISO, split ISO, CISO, CCI, GOD/SVOD and ZAR through one content/extension detection layer; list, extract and SHA-1 validate XBLA/XBLIG STFS packages; **convert an STFS package to an optimized XISO** with `convert`/`XisoReader.Rewrite` (extract the package file table, then repack it — the package is left untouched)
 - Automatic `.xbe` **media-enable patching** (Boyer–Moore `E8 CA FD FF FF 85 C0 7D → EB`)
 - Async APIs, `IProgress<ProgressInfo>` (`FileCount`/`DirCount`/`DirAdded`/`FileAdded`/`FileProgress`/`FinishedPacking`, with `FileAdded` also per written file and per-chunk `FileProgress` in extract mode), `CancellationToken` throughout
-- Targets **.NET 11 / C# 15**; strong-named; trim/AOT compatible; **left side menu** on Pages and the GitHub Wiki
+- Targets **.NET 8 / 9 / 10 / 11** with **C# 15**; strong-named; trim/AOT compatible; **left side menu** on Pages and the GitHub Wiki
 
 ## Quick start
 

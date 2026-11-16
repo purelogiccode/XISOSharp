@@ -72,6 +72,7 @@ Highlights:
 | GOD header title metadata (`StfsSharp.GodHeader`, `title-info` text/JSON) | `GodHeaderTests.cs` |
 | Single-file XBLA/XBLIG STFS header metadata (`StfsSharp.StfsHeader`, text/JSON) | `StfsHeaderTests.cs` |
 | XBLA/XBLIG STFS package listing/extraction and SHA-1 hash-tree validation (`StfsSharp.StfsPackage`: file table, contiguous and hash-chain blocks, writable secondary tables, level-1 boundary, checksum vs ZAR, `Validate` corrupt data/table/top/header coverage, CLI verbs, corrupt/unsafe inputs) | `StfsPackageTests.cs`, `StfsSharpIntegrationTests.cs` |
+| STFS-to-ISO conversion (`convert`/`XisoReader.Rewrite` extract + repack, misnamed `.iso` detection, sector-image API refusals, same-path/`skipSectors` guards) | `StfsSharpIntegrationTests.cs`, `StfsPackageTests.cs` |
 | Explicit sector-layout packing (`XisoLayoutSpec` JSON/text, fixed extents, first-fit, CLI/build-image) | `LayoutPackingTests.cs` |
 | CISO compress/decompress, split parts, `.cso` auto-detect | `CisoTests.cs`, `CisoAutoDetectTests.cs` |
 | CISO parallel compression (`jobs` 1..64, byte-identical v1/v2/split, ordered progress) | `CisoTests.cs`, `CliBatchConvertTests.cs` |

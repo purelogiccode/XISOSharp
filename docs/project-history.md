@@ -28,6 +28,7 @@ preserves the completed-work sections from the retired missing-feature plan
 | `1.9.1` | 2026-11-08 | Patch release: GUI folder-picker failure handling and UI-thread-safe picker logging; tag-release, SBOM and Docker hardening; package manifests refreshed from the GitHub API digests. No public-API changes. |
 | `2.0.0` | 2026-11-13 | Major release: .NET 11/C# 15 retarget; platform-native bundles (Windows `.zip`, Linux `.tar.gz`, macOS `.dmg`); drive-root picker fix; Docker, updater and packaging updates. Accidentally shipped net11-only and was superseded by 2.0.1. |
 | `2.0.1` | 2026-11-14 | Patch release: restores `net8.0`/`net9.0`/`net10.0` package, CLI, test and fixture-generator targets alongside `net11.0`; CI installs the runtime matrix for all four test hosts. |
+| `2.1.0` | 2026-11-16 | Minor release: XBLA/XBLIG STFS packages convert to optimized ISOs through `convert`/`XisoReader.Rewrite` (extract + repack); content-based STFS detection (`XisoImageFormat.Stfs`, misnamed `.iso` included); FAT32 file-too-large and truncated-read diagnostics; package baseline moves to 2.0.1. |
 
 Release notes and per-release detail live in [Release Notes](release-notes.md) and
 [`WhatsNew.md`](https://github.com/purelogiccode/XISOSharp/blob/master/WhatsNew.md).
@@ -65,7 +66,7 @@ Do not re-implement these; they are covered by the shipped library and tests.
 | Area | Already implemented |
 |---|---|
 | **Core XISO** | `XisoImage` facade, create, list, tree, extract, rewrite, validate, repair, salvage, checksum/hash, sector layout, explicit layout packing, pathological-TOC traversal, pre-sized extraction/writer I/O |
-| **Containers** | one detection layer for ISO, split ISO, CISO v1/v2, split CISO, CCI/CCIM, split CCI, ZAR, read-only GOD/SVOD, read-only XBLA/XBLIG STFS |
+| **Containers** | one detection layer for ISO, split ISO, CISO v1/v2, split CISO, CCI/CCIM, split CCI, ZAR, read-only GOD/SVOD, read-only XBLA/XBLIG STFS, and STFS-to-ISO conversion |
 | **Metadata** | XBE/XEX headers, XDBF/XSRC 360 metadata, GOD/STFS XContent title metadata, XBE logo/title/save images |
 | **CLI** | extract/list/tree/checksum/hash/verify-hashes/validate/title-info/xbe-image, compress/decompress/convert/split, batch, JSON, `--layout`, `--jobs` (CISO/CCI/extraction), `--name-policy`, `--delete-source` |
 | **1.6.0 scope** | XDBF, XBE assets, FATX cap, `--delete-source`, GOD/STFS title naming, read-only GOD input, STFS package listing/extraction/validation, parallel CISO compression, parallel extraction, safe-extract policy, CWD-free writer/reader |
@@ -266,6 +267,8 @@ items became `BRF-11`…`BRF-13` in the (now retired) missing-feature plan.
 | 2026-11-14 | 2.0.1 multi-target restoration | 2.0.1 | Restored `net8.0`/`net9.0`/`net10.0` alongside `net11.0` for the library, CLI, tests and fixture generator; package validation moved to the 2.0.0 baseline with no suppressions; CI installs the runtime matrix. |
 | 2026-11-14 | 2.0.1 verification | 2.0.1 | Suite 2317/1 on net11 and 2239/1 on each of net8/net9/net10; build 0 warnings; InspectCode 0; format and docs links clean; master CI `43550930819` green. |
 | 2026-11-14 | 2.0.1 released | 2.0.1 | Tag `00c5af2`; tag CI `43552996152` green including NuGet publish; NuGet 2.0.1 indexed; release `43552996113` green with six native bundles + SPDX; Docker `43552996227` green; packaging manifests refreshed. |
+| 2026-11-16 | STFS-to-ISO conversion | 2.1.0 | `convert` and `XisoReader.Rewrite` extract an XBLA/XBLIG package's file table and repack it as an optimized XISO; content detection reports `XisoImageFormat.Stfs` (misnamed `.iso` included) and the sector-image APIs refuse it; `HostIoDiagnostics` maps FAT32 `ERROR_FILE_TOO_LARGE`/`EFBIG`; truncated reads preserve the inner `TruncatedCopyException`; create/rewrite summaries report real file/byte totals; conversion tree matches the `Extract-STFS` 1.0.0 reference byte-for-byte. |
+| 2026-11-16 | 2.1.0 verification | 2.1.0 | Suite 2323/1 on net11 and 2245/1 on each of net8/net9/net10; build 0 warnings (SourceLink 11 restricted to net10/net11); InspectCode 0; format and docs links clean; package baseline 2.0.1. |
 
 ## Historical handoff (2026-11-07)
 

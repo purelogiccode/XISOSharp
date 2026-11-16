@@ -1,3 +1,62 @@
+# What's New in 2.1.0
+
+_Release date: 2026-11-16._
+
+XISOSharp 2.1.0 adds **STFS-to-ISO conversion**. A single-file XBLA/XBLIG
+package (`.live`/`.xcp`, or even a package misnamed `.iso`) can now be turned
+into a normal optimized XISO without an external extractor:
+
+```bash
+XISOSharp convert package.iso game.iso
+```
+
+`XisoReader.Rewrite(package, outputDirectory, out isoPath)` performs the same
+conversion from code. The package file table is extracted to a temporary
+directory and packed with `XisoWriter.CreateXiso`; the source package is only
+read, and the result is a standard optimized XISO (extract-xiso tag, AVL tree,
+`XisoReader.AuditXiso` clean). `skipSectors` is rejected because a package has
+no disc-sector layout. The in-place `-r` rewrite and `split` still refuse a
+package and now point at `convert`.
+
+## Detection and diagnostics
+
+- STFS packages are recognized **by content** (XContent header, STFS volume
+  type and XBLA/XBLIG/Community Game content type), before the plain-ISO
+  fallback, so a misnamed `.iso` is no longer treated as sector data.
+  `XisoImageSource.TryDetect` reports the new `XisoImageFormat.Stfs`, and the
+  sector-image APIs (`XisoImageSource.OpenRead`/`OpenBlockDevice`,
+  `XisoImage.Open`, `XisoDiscInfo`, `XisoImageHash`, `compress`, `decompress`,
+  redump verbs) refuse it with an actionable message instead of a bogus
+  format error.
+- Host-I/O diagnostics recognize the FAT32 4 GB per-file limit
+  (`ERROR_FILE_TOO_LARGE` / `EFBIG`) and suggest an NTFS/exFAT destination or
+  `split`; `CisoReader.DecompressToIso` wraps destination failures with the
+  output path and that fix.
+- Truncated reads keep the short read as the `ExtractFileException` inner
+  `IOException` (`TruncatedCopyException`), so consumers can distinguish a torn
+  input from an application defect. The drag-and-drop copy path now performs
+  the same pre-check as unpack and never leaves a partial destination.
+- Create/rewrite summaries report real totals: the per-directory write contexts
+  now propagate their counts to the root, so the "N files totalling B bytes
+  added" line (including the new STFS conversion) no longer prints zero.
+
+## Build and packaging
+
+- `Meziantou.Analyzer` 3.0.341 and `coverlet.collector` 10.1.1.
+- `net8.0`/`net9.0` keep `Microsoft.SourceLink.GitHub` 10.0.403 (SourceLink 11
+  pulls `System.IO.Hashing` 11, which warns on those TFMs); `net10.0`/`net11.0`
+  use 11.0.100.
+- Package validation now compares against the published 2.0.1 baseline.
+- Documentation: CLI reference, library/API pages, known limitations,
+  troubleshooting and the man page cover the conversion path.
+
+## Verification
+
+The full suite is **2323 passed / 1 opt-in skip** on `net11.0` and **2245 passed
+/ 1 opt-in skip** on each of `net8.0`, `net9.0` and `net10.0`. Build, formatting,
+InspectCode and package validation are clean. The converted corpus tree matches
+the `Extract-STFS` 1.0.0 reference byte-for-byte.
+
 # What's New in 2.0.1
 
 _Release date: 2026-11-14._
