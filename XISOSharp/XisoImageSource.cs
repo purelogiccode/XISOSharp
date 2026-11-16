@@ -190,7 +190,7 @@ public static class XisoImageSource
     /// <param name="share">File sharing mode for the underlying file(s).</param>
     /// <exception cref="FileNotFoundException">The image or a split part does not exist.</exception>
     /// <exception cref="InvalidDataException">A container header or index is invalid.</exception>
-    /// <exception cref="NotSupportedException">The path is a ZArchive (not a sector image).</exception>
+    /// <exception cref="NotSupportedException">The path is a ZArchive or an STFS package (not a sector image).</exception>
     /// <exception cref="IOException">Another I/O error occurred.</exception>
     public static Stream OpenRead(string path, FileShare share = FileShare.Read)
     {
@@ -229,7 +229,7 @@ public static class XisoImageSource
     /// <param name="share">File sharing mode for the underlying file(s).</param>
     /// <exception cref="FileNotFoundException">The image or a split part does not exist.</exception>
     /// <exception cref="InvalidDataException">A container header or index is invalid.</exception>
-    /// <exception cref="NotSupportedException">The path is a ZArchive (not a sector image).</exception>
+    /// <exception cref="NotSupportedException">The path is a ZArchive or an STFS package (not a sector image).</exception>
     /// <exception cref="IOException">Another I/O error occurred.</exception>
     public static IBlockDevice OpenBlockDevice(string path, FileShare share = FileShare.Read)
     {

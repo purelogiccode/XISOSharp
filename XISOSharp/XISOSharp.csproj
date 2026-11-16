@@ -18,7 +18,7 @@
     <Authors>purelogiccode</Authors>
     <!-- Version is derived from git tags via MinVer. Tag format: v1.0.2 or 1.0.2 -->
     <Title>XISOSharp</Title>
-    <Description>The most advanced library for managing Xbox XISO/XDVDFS disc images. C# port of extract-xiso (reference build 202609111233), extended with XboxKit archival (Redump video/filler/seed/wipe/trim/petrify/rebuild, ZAR), xdvdfs packing (build-image, CISO), disc/DAT inspection (`XisoDiscInfo`, `XisoDat`), skeleton overlay (`XisoSkeleton.Apply`), per-file hash sidecars, and parallel collection verbs. Reads plain ISO, split .1.iso sets, CISO, CCI/CCIM, GOD/SVOD and ZAR inputs through one detection layer, plus XBLA/XBLIG STFS package listing/extraction/validation and XContent title metadata, Xbox 360 XDBF/XSRC title metadata, and XBE logo/title/save images; packs to an explicit sector layout (`XisoLayoutSpec`/`--layout`), enforces Xbox name rules, and supports deterministic output. Supports RAW, GLOBAL, XGD1, XGD2, XGD3, and Hybrid disc layouts. Provides both synchronous and asynchronous APIs with cancellation support. Strong-named and trimmable, with an AOT-compatible library surface.</Description>
+    <Description>The most advanced library for managing Xbox XISO/XDVDFS disc images. C# port of extract-xiso (reference build 202609111233), extended with XboxKit archival (Redump video/filler/seed/wipe/trim/petrify/rebuild, ZAR), xdvdfs packing (build-image, CISO), disc/DAT inspection (`XisoDiscInfo`, `XisoDat`), skeleton overlay (`XisoSkeleton.Apply`), per-file hash sidecars, and parallel collection verbs. Reads plain ISO, split .1.iso sets, CISO, CCI/CCIM, GOD/SVOD and ZAR inputs through one detection layer, plus XBLA/XBLIG STFS package listing/extraction/validation, STFS-to-ISO conversion and XContent title metadata, Xbox 360 XDBF/XSRC title metadata, and XBE logo/title/save images; packs to an explicit sector layout (`XisoLayoutSpec`/`--layout`), enforces Xbox name rules, and supports deterministic output. Supports RAW, GLOBAL, XGD1, XGD2, XGD3, and Hybrid disc layouts. Provides both synchronous and asynchronous APIs with cancellation support. Strong-named and trimmable, with an AOT-compatible library surface.</Description>
     <PackageTags>xiso;xbox;iso;extract-xiso;xdvdfs;xgd1;xgd2;xgd3;redump;ciso;cci;ccim;zar;god;stfs;svod;split-iso;sector-layout;xbe;xex;disc-image;original-xbox;xbox-360</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
@@ -60,8 +60,8 @@
     <EnableStrictModeForPackageValidation>true</EnableStrictModeForPackageValidation>
     <!-- Compare against the last published package; additive APIs are allowed,
          accidental removals/renames fail the pack. Updated with each stable
-         release (currently validates against 2.0.0). -->
-    <PackageValidationBaselineVersion>2.0.0</PackageValidationBaselineVersion>
+         release (currently validates against 2.0.1). -->
+    <PackageValidationBaselineVersion>2.0.1</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -99,8 +99,11 @@
     </PackageReference>
     <!-- SourceLink 11's build-task closure uses System.IO.Hashing 11, which
          warns on the net8.0/net9.0 targets. Those TFMs keep SourceLink 10;
-         net10.0/net11.0 use the current 11.x build tasks. -->
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="11.0.100" PrivateAssets="All" Condition="'$(TargetFramework)' == 'net8.0' Or '$(TargetFramework)' == 'net9.0'" />
+         net10.0/net11.0 use the current 11.x build tasks. Do not bump the
+         net8.0/net9.0 pin: it reintroduces the System.IO.Hashing TFM-support
+         warning on every Release build. -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.403" PrivateAssets="All"
+                      Condition="'$(TargetFramework)' == 'net8.0' Or '$(TargetFramework)' == 'net9.0'" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="11.0.100" PrivateAssets="All"
                       Condition="'$(TargetFramework)' == 'net10.0' Or '$(TargetFramework)' == 'net11.0'" />
     <PackageReference Include="MinVer" Version="8.0.0" PrivateAssets="all">

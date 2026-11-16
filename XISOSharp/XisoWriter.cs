@@ -757,6 +757,13 @@ public static class XisoWriter
                 emptySector.Fill(Constants.PadByte);
                 xisoFs.Write(emptySector);
             }
+
+            // Propagate this directory's counts to the caller's context. The
+            // traversal hands each directory a fresh sub-context, so without
+            // this the root context (the success summary and Logger.Total*)
+            // always reported 0 files / 0 bytes.
+            ctx.FilesWritten += subCtx.FilesWritten;
+            ctx.BytesWritten += subCtx.BytesWritten;
         }
 
         return 0;

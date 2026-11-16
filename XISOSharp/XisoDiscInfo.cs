@@ -60,7 +60,7 @@ public static class XisoDiscInfo
     /// <exception cref="ArgumentException"><paramref name="path"/> is empty.</exception>
     /// <exception cref="FileNotFoundException">The image does not exist.</exception>
     /// <exception cref="InvalidDataException">The path is not a supported Xbox image.</exception>
-    /// <exception cref="NotSupportedException">The path is a ZArchive (not a sector image).</exception>
+    /// <exception cref="NotSupportedException">The path is a ZArchive or an STFS package (not a sector image).</exception>
     public static XisoDiscLayout Read(string path, string? securitySectorsPath = null, int? skipSectors = null,
         bool quiet = false)
     {

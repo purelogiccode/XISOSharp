@@ -90,7 +90,7 @@ public sealed class XisoImage : IDisposable, IAsyncDisposable
     /// <returns>An open <see cref="XisoImage"/>.</returns>
     /// <exception cref="ArgumentException">The path is empty.</exception>
     /// <exception cref="FileNotFoundException">The image does not exist.</exception>
-    /// <exception cref="NotSupportedException">The path is a ZAR archive.</exception>
+    /// <exception cref="NotSupportedException">The path is a ZAR or an STFS package.</exception>
     /// <exception cref="XisoFormatException">The image is not a valid XISO.</exception>
     public static XisoImage Open(string path, XisoImageOptions? options = null)
     {

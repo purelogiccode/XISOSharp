@@ -3057,7 +3057,8 @@ internal static class Program
                     using StfsPackage package = StfsPackage.Open(xisoPath);
                     if (rewrite)
                     {
-                        Logger.LogErr($"Error: cannot rewrite STFS package '{xisoPath}'; extract it first\n");
+                        Logger.LogErr($"Error: cannot rewrite STFS package '{xisoPath}' in place; " +
+                                      "convert it to ISO (XISOSharp convert) or extract it (XISOSharp -x)\n");
                         return 1;
                     }
                     else if (skipSectors is not null)
@@ -4481,7 +4482,8 @@ internal static class Program
         if (StfsPackage.IsStfsPackage(source))
         {
             Logger.LogErr(
-                "Error: STFS packages are not sector images; extract them first (XISOSharp -x).\n");
+                "Error: STFS packages are not sector images; convert them to ISO first (XISOSharp convert) " +
+                "or extract them (XISOSharp -x).\n");
             return 1;
         }
 
@@ -4720,7 +4722,8 @@ internal static class Program
         if (StfsPackage.IsStfsPackage(source))
         {
             Logger.LogErr(
-                "Error: STFS packages are not sector images; extract them first (XISOSharp -x).\n");
+                "Error: STFS packages are not sector images; convert them to ISO first (XISOSharp convert) " +
+                "or extract them (XISOSharp -x).\n");
             return 1;
         }
 
@@ -4927,7 +4930,8 @@ internal static class Program
 
         if (StfsPackage.IsStfsPackage(path))
         {
-            return $"'{path}' is an STFS package; extract it first (XISOSharp -x).";
+            return $"'{path}' is an STFS package; convert it to ISO first (XISOSharp convert) " +
+                   "or extract it (XISOSharp -x).";
         }
 
         if (GodHeader.IsGodContainer(path))
@@ -7142,7 +7146,8 @@ internal static class Program
             {
                 if (StfsPackage.IsStfsPackage(iso))
                 {
-                    Logger.LogErr($"Error: cannot split STFS package '{iso}'; extract it first\n");
+                    Logger.LogErr($"Error: cannot split STFS package '{iso}'; " +
+                                  "convert it to ISO first (XISOSharp convert)\n");
                     exit = 1;
                     continue;
                 }

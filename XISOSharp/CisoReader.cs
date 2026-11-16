@@ -75,8 +75,11 @@ public static class CisoReader
         {
             // CISO/format failures keep their own type and message; host I/O
             // failures (including the FAT32 4 GB limit) gain the destination
-            // path and an actionable cause.
-            if (ex is InvalidDataException or EndOfStreamException)
+            // path and an actionable cause. InvalidDataException is a
+            // SystemException (not an IOException), so it already propagates
+            // untouched; EndOfStreamException is an IOException and must not
+            // be re-wrapped.
+            if (ex is EndOfStreamException)
             {
                 throw;
             }

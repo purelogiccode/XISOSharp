@@ -181,6 +181,35 @@ public sealed class StfsSharpIntegrationTests : IDisposable
         Assert.Contains("STFS", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void SectorImageApis_RefuseStfsPackage()
+    {
+        string packagePath = Path.Combine(_work, "game.iso");
+        SyntheticStfsPackage.Create(packagePath, [
+            new SyntheticStfsFile("default.xex", [1, 2, 3]),
+        ]);
+
+        Assert.Throws<NotSupportedException>(() => XisoImageSource.OpenRead(packagePath));
+        Assert.Throws<NotSupportedException>(() => XisoImageSource.OpenBlockDevice(packagePath));
+        Assert.Throws<NotSupportedException>(() => XisoImageHash.Compute(packagePath));
+        Assert.Throws<NotSupportedException>(() => XisoDiscInfo.Read(packagePath));
+    }
+
+    [Fact]
+    public void Rewrite_StfsPackage_RejectsSkipSectorsAndSamePath()
+    {
+        string packagePath = Path.Combine(_work, "game.iso");
+        SyntheticStfsPackage.Create(packagePath, [
+            new SyntheticStfsFile("default.xex", [1, 2, 3]),
+        ]);
+
+        // A package has no disc-sector layout, and the default output name
+        // (game.iso) would overwrite the package in place.
+        Assert.Throws<ArgumentException>(() =>
+            XisoReader.Rewrite(packagePath, _work, out _, skipSectors: 32));
+        Assert.Throws<IOException>(() => XisoReader.Rewrite(packagePath, _work, out _));
+    }
+
     private static byte[] CreatePayload(int length)
     {
         byte[] data = new byte[length];

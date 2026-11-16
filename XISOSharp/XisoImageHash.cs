@@ -38,7 +38,7 @@ public static class XisoImageHash
     /// <returns>The five digests and the number of bytes hashed.</returns>
     /// <exception cref="ArgumentException">The path is empty.</exception>
     /// <exception cref="FileNotFoundException">The image does not exist.</exception>
-    /// <exception cref="NotSupportedException">The path is a ZAR archive.</exception>
+    /// <exception cref="NotSupportedException">The path is a ZAR archive or an STFS package (not a sector image).</exception>
     /// <exception cref="IOException">The image cannot be read.</exception>
     public static XisoImageHashResult Compute(string imagePath, CancellationToken cancellationToken = default)
     {
