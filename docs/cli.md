@@ -42,7 +42,7 @@ XISOSharp xbe-image <image> <path> --type logo|title|save -o <out.png|out.dds>
 XISOSharp xex-image <image> <path> --type thumbnail -o <out.png>
 XISOSharp split [--size <bytes|half>] [--output <base>] <image> [images...] [--batch <dir>]
 XISOSharp join [--output <file>] <first.1.iso> [...]
-XISOSharp convert <src.zar|src.iso> <out.iso|out.zar> [--batch <dir> --format iso|zar]
+XISOSharp convert <src.zar|src.iso|god|stfs> <out.iso|out.zar|out.cci|out.cso> [--batch <dir> --format iso|zar]
 ```
 
 - Flags must precede positional arguments; the first non-flag token ends option parsing (except verbs above which are detected as first token).
@@ -61,7 +61,7 @@ XISOSharp convert <src.zar|src.iso> <out.iso|out.zar> [--batch <dir> --format is
 
 Modes are mutually exclusive unless noted as aliases. If no mode is given, **extract** is the default.
 
-Image inputs accept `.cso`/`.1.cso`, `.cci`/`.1.cci` and GOD header/`.data` sources directly (auto-detected by extension, header content or a magic-sniff fallback, `xdvdfs img.rs` parity): `extract`, `--unpack`, `-l`/`-t`, `--pack` (iso→rewrite), `-r`, and `checksum` all operate on the decompressed view, with outputs named after the game stem (`game.cso` → `game.iso`, extract dir `game/`; a GOD source uses its header title). Split plain-ISO sets (`game.1.iso`) are also read directly. `.zar` archives are accepted by `-l`, `-t`, `-x`, `--unpack`, `checksum` and `validate`, and converted with `convert`. Single-file XBLA/XBLIG **STFS packages** are accepted by `-l`, `-t`, `-x`, `--unpack`, `-V`, `checksum` and `--json`; the STFS file table is read directly (they are not sector images, so `compress`, `decompress`, `convert`, rewrite, `split` and the raw redump modes refuse them with an "extract first" message). Sector-only verbs (`-i`, `--ls`, `-V`, `--filetime`, `--sector-layout`, `--ranges`, `--repair`, …) reject a `.zar` with a clean error naming the archive verbs instead of probing compressed bytes. In-place write verbs (`-r`, `--repair`, `--copy-in`, `--set-filetime`) and `split` refuse a GOD source and ask for `decompress` first.
+Image inputs accept `.cso`/`.1.cso`, `.cci`/`.1.cci` and GOD header/`.data` sources directly (auto-detected by extension, header content or a magic-sniff fallback, `xdvdfs img.rs` parity): `extract`, `--unpack`, `-l`/`-t`, `--pack` (iso→rewrite), `-r`, and `checksum` all operate on the decompressed view, with outputs named after the game stem (`game.cso` → `game.iso`, extract dir `game/`; a GOD source uses its header title). Split plain-ISO sets (`game.1.iso`) are also read directly. `.zar` archives are accepted by `-l`, `-t`, `-x`, `--unpack`, `checksum` and `validate`, and converted with `convert`. Single-file XBLA/XBLIG **STFS packages** are accepted by `-l`, `-t`, `-x`, `--unpack`, `-V`, `checksum`, `--json` and `convert` (to ISO); the STFS file table is read directly (they are not sector images, so `compress`, `decompress`, in-place rewrite, `split` and the raw redump modes refuse them with an "extract first" message). Sector-only verbs (`-i`, `--ls`, `-V`, `--filetime`, `--sector-layout`, `--ranges`, `--repair`, …) reject a `.zar` with a clean error naming the archive verbs instead of probing compressed bytes. In-place write verbs (`-r`, `--repair`, `--copy-in`, `--set-filetime`) and `split` refuse a GOD source and ask for `decompress` first.
 
 | Flag | Description |
 |---|---|
@@ -125,13 +125,13 @@ Image inputs accept `.cso`/`.1.cso`, `.cci`/`.1.cci` and GOD header/`.data` sour
 | `title-info <image> [--json]` | **Title metadata**: finds the root `default.xbe`, `default.xex` or `default_mp.xbe` and reports title name, title ID, region, disc number and version. Xbox 360 titles additionally report publisher, developer, genre, description and thumbnail presence from the plaintext XDBF/XSRC resources. A GOD header or its `.data` folder is also accepted; it reports the `XContent` title name, title ID, disc number and disc count and merges the embedded `default.xex` publisher/developer/genre/description/thumbnail. Single-file XBLA/XBLIG STFS packages are accepted too (`StfsSharp.StfsHeader`, content types `0x000D0000` / `0x00000002`; Community Game `0x02000000` is treated as XBLIG) and merge `default.xex` metadata the same way. |
 | `split [--size <bytes\|half>] [--output <base>] <image> [images...] [--batch <dir>]` | **Split** a plain ISO into sector-aligned `<base>.1.iso`, `<base>.2.iso`, … parts (`XisoSplitter.Split`, TODO #17 / xdvdfs #97 — the plain-ISO counterpart to CSO `--ciso-split`). `--size` accepts bytes with `K`/`M`/`G` suffixes or `half`/`halves`; default `0xFF000000` (4 GiB − 16 MiB, conservative FATX cap); an explicit larger size warns. Base defaults to the input stem. Existing parts are refused; partial parts are removed on failure/cancel. With `--batch`, splits every unsplit `.iso`/`.xiso` in `<dir>`. |
 | `join\|joinsplit [--output <file>] <first.1.iso> [...]` | **Reassemble** split parts (`XisoSplitter.Join`). Output defaults to the part stem + `.iso` and must not exist; the result is validated as an XISO afterwards. |
-| `convert <src.zar\|src.iso\|god> <out.iso\|out.zar\|out.cci\|out.cso> [-y\|-n] [--batch <dir> --format iso\|zar]` | **Convert** ZArchive to ISO (`XisoZarchive.ConvertZarToIso`: extract to a temp directory then `XisoWriter.PackFromDirectory`), ISO to ZArchive (`CreateZar`), or a GOD container to ISO/CCI/CISO (streamed through the decompressed view). Existing outputs follow `-y`/`-n`. With `--batch`, converts every unsplit `.iso`/`.xiso` to `.zar` (`--format zar`, default) or every `.zar` to `.iso` (`--format iso`). |
+| `convert <src.zar\|src.iso\|god\|stfs> <out.iso\|out.zar\|out.cci\|out.cso> [-y\|-n] [--batch <dir> --format iso\|zar]` | **Convert** ZArchive to ISO (`XisoZarchive.ConvertZarToIso`: extract to a temp directory then `XisoWriter.PackFromDirectory`), ISO to ZArchive (`CreateZar`), a GOD container to ISO/CCI/CISO (streamed through the decompressed view), or an XBLA/XBLIG STFS package to ISO (`XisoReader.Rewrite`: extract the package file table to a temp directory then pack it). Existing outputs follow `-y`/`-n`. With `--batch`, converts every unsplit `.iso`/`.xiso` to `.zar` (`--format zar`, default) or every `.zar` to `.iso` (`--format iso`). |
 
 The redump modes read and write absolute sectors through a raw file stream, so
 they accept only plain `.iso`/`.xiso` images. A `.cso`/`.cci`, a split-ISO part,
 a `.zar`, a GOD container or an XBLA/XBLIG STFS package is refused up front with
-a "decompress/convert/join/extract first" error (use `decompress`, `convert`,
-`join` or `-x`).
+a "decompress/convert/join/extract first" error (use `decompress`, `convert`
+(for ZAR/STFS to ISO), `join` or `-x`).
 
 ## Options
 

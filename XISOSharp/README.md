@@ -460,9 +460,11 @@ Supported content types are XBLA `0x000D0000` and XBLIG `0x00000002`
 the XContent title fields and the volume layout; `StfsEntry` carries the path,
 size, block range, contiguity flag and FAT timestamps. The reader handles
 contiguous files, hash-chain block lists and writable-format packages with
-primary/secondary hash tables. STFS writing and rebuilding remain out of scope.
-`XisoChecksum.ComputeStfsChecksum` hashes the same sorted-path tree as ISO and
-ZAR, so equivalent trees compare equal.
+primary/secondary hash tables. STFS writing and rebuilding remain out of scope,
+but `XisoReader.Rewrite` converts a package to a new optimized XISO (extract the
+file table to a temporary directory, then pack it) and leaves the package
+untouched. `XisoChecksum.ComputeStfsChecksum` hashes the same sorted-path tree
+as ISO and ZAR, so equivalent trees compare equal.
 
 `StfsPackage.Validate` performs a deep read-only integrity check: it hashes
 every logical data block and compares it with its level-0 hash entry, walks each

@@ -144,9 +144,15 @@ The stream must be readable and seekable (`ArgumentException` otherwise) and is
 left open; `imageName` (typically the file name) drives output naming and
 messages. `IsOptimizedImage` has a matching `Stream` overload (position
 restored), and `OpenImageStream` - the `XisoImageSource` opener the path APIs use
-internally — is public too. Rewrite stays path-only (it is file-identity based,
+internally - is public too. Rewrite stays path-only (it is file-identity based,
 the `.old` dance), so the stream `DecodeXiso` refuses `ExtractMode.Rewrite`
 with `ArgumentException`.
+
+`Rewrite` also accepts a single-file XBLA/XBLIG STFS package (even when it is
+misnamed `.iso`): the package file table is extracted to a temporary directory
+and repacked as a new optimized ISO, leaving the source package untouched. This
+is a conversion, not an in-place rewrite; `skipSectors` is rejected because a
+package has no disc-sector layout.
 
 ```csharp
 using var image = new MemoryStream(File.ReadAllBytes("game.iso"));
@@ -657,7 +663,9 @@ and FAT timestamps. `XisoChecksum.ComputeStfsChecksum` hashes the same
 sorted-path tree as ISO/ZAR, so equivalent trees compare equal. `Validate`
 performs a deep SHA-1 hash-tree check (per-block hashes, level tables, top hash
 and header hash) and returns a `StfsValidationReport`; package signatures are
-not verified. STFS writing and rebuilding remain out of scope.
+not verified. STFS writing and rebuilding remain out of scope, but
+`XisoReader.Rewrite` converts a package to a new optimized XISO (extract +
+repack) without modifying it.
 
 ## Checksum (SHA3-256)
 

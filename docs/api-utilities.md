@@ -128,7 +128,7 @@ Overloads: `VerifyXiso(IBlockDevice)`, `AuditXiso(IBlockDevice)` (plus `AuditXis
 | `StfsSharp.StfsValidationReport` / `StfsValidationIssue` | Result of `StfsPackage.Validate`: file/block/table counts, bytes checked, `IsValid` and the per-area mismatch list |
 | `CisoWriter` / `CisoReader` | `CompressToCso` (BCL DEFLATE v1 `0x80000000`, `align` 0/1/2, threshold `+12`, `--ciso-split` shim, optional `jobs` 1..64 for bounded-parallel sector compression with byte-identical output) / `DecompressToIso` (v1 DEFLATE + v2 LZ4) |
 | `XisoCci` | `CompressToCci` / `DecompressToIso` / `DeriveDefaultCciPath` / `DeriveDefaultIsoPath` (CCISharp-backed CCI/CCIM) |
-| `HostIoDiagnostics` | `Describe(exception, operation, path)` maps permission-denied, long-path, sharing, existing-destination, illegal-name and full-disk failures to a message naming the path, operation and likely fix |
+| `HostIoDiagnostics` | `Describe(exception, operation, path)` maps permission-denied, long-path, sharing, existing-destination, illegal-name, full-disk and file-too-large (FAT32 4 GB) failures to a message naming the path, operation and likely fix |
 | `XisoDat` | `Parse` / `Verify`: Redump-style XML DAT (`game/rom` size + MD5/SHA-1/CRC32) matching with verified/ambiguous/not-in-DAT and missing-entry reports |
 | `SymlinkMode` | `Follow` (default), `Skip` or `Reject` for create/pack/remap/Apply source walks |
 | `XisoImageSource` | `TryDetect` / `IsSupportedImage` / `IsCompressedImage` / `IsGodImage` / `OpenRead` / `OpenBlockDevice` / `StripImageSuffix` across ISO, split ISO, CISO, CCI, GOD/SVOD and ZAR |

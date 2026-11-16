@@ -125,6 +125,62 @@ public sealed class StfsSharpIntegrationTests : IDisposable
         Assert.Equal(0x4D5307E6u, titleInfo.TitleId);
     }
 
+    [Fact]
+    public void Rewrite_MisnamedStfsPackage_CreatesXisoWithSameTree()
+    {
+        // The reported package was named `.iso`; content detection must win over
+        // the extension so Rewrite converts it instead of refusing.
+        string packagePath = Path.Combine(_work, "game.iso");
+        byte[] payload = CreatePayload(5000);
+        SyntheticStfsPackage.Create(packagePath, [
+            new SyntheticStfsFile("default.xex", [1, 2, 3]),
+            new SyntheticStfsFile("data/payload.bin", payload),
+            new SyntheticStfsFile("data/empty.bin", []),
+        ], extraDirectories: ["empty-dir"]);
+
+        string outputDirectory = Path.Combine(_work, "converted");
+        int result = XisoReader.Rewrite(packagePath, outputDirectory, out string? isoPath);
+
+        Assert.Equal(0, result);
+        Assert.NotNull(isoPath);
+        Assert.True(File.Exists(isoPath));
+        Assert.True(File.Exists(packagePath), "the source package must be left untouched");
+        Assert.True(XisoReader.IsOptimizedImage(isoPath));
+
+        string extractDirectory = Path.Combine(_work, "extracted");
+        XisoReader.Extract(isoPath, extractDirectory, llCompat: false);
+        Assert.Equal(payload, File.ReadAllBytes(Path.Combine(extractDirectory, "data", "payload.bin")));
+        Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(Path.Combine(extractDirectory, "default.xex")));
+        Assert.Equal(0, new FileInfo(Path.Combine(extractDirectory, "data", "empty.bin")).Length);
+        Assert.True(Directory.Exists(Path.Combine(extractDirectory, "empty-dir")));
+    }
+
+    [Fact]
+    public void TryDetect_MisnamedStfsPackage_ReportsStfsFormat()
+    {
+        string packagePath = Path.Combine(_work, "game.iso");
+        SyntheticStfsPackage.Create(packagePath, [
+            new SyntheticStfsFile("default.xex", [1, 2, 3]),
+        ]);
+
+        Assert.True(XisoImageSource.TryDetect(packagePath, out XisoImageSourceInfo? info));
+        Assert.NotNull(info);
+        Assert.Equal(XisoImageFormat.Stfs, info.Format);
+        Assert.Equal(packagePath, info.FirstPart);
+    }
+
+    [Fact]
+    public void Open_MisnamedStfsPackage_RefusesAsSectorImage()
+    {
+        string packagePath = Path.Combine(_work, "game.iso");
+        SyntheticStfsPackage.Create(packagePath, [
+            new SyntheticStfsFile("default.xex", [1, 2, 3]),
+        ]);
+
+        NotSupportedException ex = Assert.Throws<NotSupportedException>(() => XisoImage.Open(packagePath));
+        Assert.Contains("STFS", ex.Message, StringComparison.Ordinal);
+    }
+
     private static byte[] CreatePayload(int length)
     {
         byte[] data = new byte[length];

@@ -6852,17 +6852,18 @@ internal static class Program
         if (positionals.Count != 2)
         {
             Logger.LogErr(
-                "Error: convert requires <source.zar|source.iso|god> <output.iso|output.zar|output.cci|output.cso>\n");
+                "Error: convert requires <source.zar|source.iso|god|stfs> <output.iso|output.zar|output.cci|output.cso>\n");
             return 1;
         }
 
         string source = positionals[0];
         string output = positionals[1];
+        bool sourceStfs = StfsPackage.IsStfsPackage(source);
 
-        if (StfsPackage.IsStfsPackage(source))
+        if (sourceStfs && !Path.GetExtension(output).Equals(".iso", StringComparison.OrdinalIgnoreCase))
         {
             Logger.LogErr(
-                "Error: STFS packages are not sector images; extract them first (XISOSharp -x).\n");
+                "Error: an STFS package can be converted to .iso; extract it for other targets (XISOSharp -x)\n");
             return 1;
         }
 
@@ -6870,6 +6871,14 @@ internal static class Program
 
         try
         {
+            if (sourceStfs)
+            {
+                int rewrite = XisoReader.Rewrite(source,
+                    Path.GetDirectoryName(Path.GetFullPath(output)), out string? outIso,
+                    outputName: Path.GetFileName(output));
+                return rewrite == 0 && File.Exists(outIso ?? output) ? 0 : 1;
+            }
+
             bool sourceGod = XisoImageSource.TryDetect(source, out XisoImageSourceInfo? godInfo) &&
                              godInfo is not null &&
                              godInfo.Format == XisoImageFormat.God;
@@ -6926,7 +6935,7 @@ internal static class Program
             }
 
             Logger.LogErr(
-                "Error: convert supports .zar -> .iso, .iso -> .zar, and GOD -> .iso/.cci/.cso\n");
+                "Error: convert supports .zar -> .iso, .iso -> .zar, STFS -> .iso, and GOD -> .iso/.cci/.cso\n");
             return 1;
         }
         catch (Exception ex)
@@ -8624,8 +8633,9 @@ internal static class Program
                                                        split <image> [images...] [--size <bytes|half>] [--output <base>] [--batch <dir>]  Split ISO into sector-aligned
                                                                              .1.iso/.2.iso… parts (default 0xFF000000 = 4 GiB − 16 MiB FATX cap; 'half' splits in two).
                                                        join <first.1.iso> [...] [--output <file>]  Reassemble split parts (output validated as XISO).
-                                                       convert <src.zar|src.iso|god> <out.iso|out.zar|out.cci|out.cso>  Convert ZArchive to ISO (extract + repack),
-                                                                             ISO to ZArchive, or a GOD container to ISO/CCI/CISO. Existing outputs follow -y/-n.
+                                                       convert <src.zar|src.iso|god|stfs> <out.iso|out.zar|out.cci|out.cso>  Convert ZArchive to ISO (extract + repack),
+                                                                             ISO to ZArchive, a GOD container to ISO/CCI/CISO, or an
+                                                                             STFS package to ISO. Existing outputs follow -y/-n.
                                                                              --batch <dir> --format iso|zar converts a whole
                                                                              directory (default format: zar).
                                                        Batch container verbs (compress/decompress/convert/split):

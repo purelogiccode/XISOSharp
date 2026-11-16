@@ -149,8 +149,8 @@ public sealed class ExtractFileException : ExtractErrorException
     /// image, or an entry pointing past end of image.
     /// </summary>
     internal static ExtractFileException ForTruncated(string internalPath, string destPath, uint startSector,
-        long fileSize, long bytesRead) =>
+        long fileSize, long bytesRead, Exception? innerException = null) =>
         new(ExtractError.ErrFileTruncated, internalPath, destPath, startSector, fileSize,
-            "image data ends before the reported file size", bytesRead);
+            "image data ends before the reported file size", bytesRead, innerException);
 }
 #pragma warning restore RCS1194

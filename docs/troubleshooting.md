@@ -147,12 +147,30 @@ create the target directory (`-d` creates it for you in extract mode).
 The image's directory entry claims more bytes than the image actually contains —
 a truncated download or corrupt/torn image. The file fails with
 `ErrFileTruncated` (expected vs actual byte counts are in the message) instead
-of being left short on disk; add `--continue-on-error` to salvage the rest.
+of being left short on disk; the short read is preserved as the exception's
+inner `IOException`, so consumers can classify it as a truncated input rather
+than an application defect. Add `--continue-on-error` to salvage the rest.
 (Retired warning text from older builds:
 `WARNING: File <name> is truncated. Reported size: X bytes, read size: Y bytes!`.)
 See [CLI Reference](cli.md#extraction-robustness). For a systematically damaged
 image (not just one short file), audit and rebuild it instead — see
 [Recovering a corrupt image](#recovering-a-corrupt-image--v---repair---salvage).
+
+### `The file size exceeds the limit allowed and cannot be saved` (FAT32 output)
+
+A single output file larger than 4 GB cannot be stored on a FAT32 volume (the
+reported `X:\output\Halo 2.iso` case). Choose an NTFS/exFAT destination, or
+produce FATX-sized parts with `split`. XISOSharp wraps the host error with the
+destination path and this fix instead of surfacing the raw Windows message.
+
+### `Cannot rewrite STFS package ...` / converting an STFS package
+
+An XBLA/XBLIG STFS package is a file table, not a sector image, so it cannot be
+rewritten in place. Convert it to a new optimized ISO with
+`XISOSharp convert <package> <out.iso>` or
+`XisoReader.Rewrite(package, outputDirectory, out isoPath)`: the package file
+table is extracted to a temporary directory and packed with
+`XisoWriter.CreateXiso`. The source package is only read.
 
 ### `petrify` battle Skipped: oracle emits unreadable skeleton
 

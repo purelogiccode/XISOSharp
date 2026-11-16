@@ -66,8 +66,24 @@ public static class CisoReader
             throw new IOException("Source and destination paths are the same");
 
         using Stream src = OpenReadStream(csoPath);
-        using FileStream dst = new(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
-        DecompressStream(src, dst, progress, ct);
+        try
+        {
+            using FileStream dst = new(output, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
+            DecompressStream(src, dst, progress, ct);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // CISO/format failures keep their own type and message; host I/O
+            // failures (including the FAT32 4 GB limit) gain the destination
+            // path and an actionable cause.
+            if (ex is InvalidDataException or EndOfStreamException)
+            {
+                throw;
+            }
+
+            throw new IOException(HostIoDiagnostics.Describe(ex, "writing the decompressed ISO", output), ex);
+        }
+
         Logger.Log($"Decompressed {csoPath} -> {output} ({new FileInfo(output).Length} bytes)\n");
         return 0;
     }

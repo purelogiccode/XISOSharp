@@ -12,12 +12,14 @@ public static class HostIoDiagnostics
     private const int ErrorFileExists = 80;
     private const int ErrorAlreadyExists = 183;
     private const int ErrorFilenameExcedRange = 206;
+    private const int ErrorFileTooLarge = 223; // ERROR_FILE_TOO_LARGE (FAT32 4 GB limit)
 
     // Unix errno values used when the runtime exposes the native code in HResult.
     private const int UnixErrorBusy = 16;         // EBUSY: lock violation
     private const int UnixErrorExists = 17;       // EEXIST
     private const int UnixErrorWouldBlock = 11;   // EAGAIN/EWOULDBLOCK: sharing violation
     private const int UnixErrorNameTooLong = 36; // ENAMETOOLONG
+    private const int UnixErrorFileTooLarge = 27; // EFBIG
 
     /// <summary>
     /// Describes <paramref name="exception"/> with the failed operation and
@@ -88,12 +90,37 @@ public static class HostIoDiagnostics
             return $"{where}: not found. Check the path and spelling. ({detail})";
         }
 
+        if (IsFileTooLarge(exception))
+        {
+            return $"{where}: the destination filesystem cannot store a file this large. " +
+                   $"FAT32 is limited to 4 GB per file; use an NTFS/exFAT destination or split the output. ({detail})";
+        }
+
         if (exception is IOException && normalized.Contains("no space", StringComparison.Ordinal))
         {
             return $"{where}: the destination is full. Free space or choose another filesystem. ({detail})";
         }
 
         return $"{where}: {detail}";
+    }
+
+    private static bool IsFileTooLarge(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is not IOException) continue;
+
+            string message = current.Message.ToLowerInvariant();
+            if (HasHResult(current, ErrorFileTooLarge, UnixErrorFileTooLarge) ||
+                message.Contains("file size exceeds the limit", StringComparison.Ordinal) ||
+                message.Contains("file too large", StringComparison.Ordinal) ||
+                message.Contains("value too large for defined data type", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool HasHResult(Exception exception, int windowsValue, int unixValue)

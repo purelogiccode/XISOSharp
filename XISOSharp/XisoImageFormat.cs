@@ -31,4 +31,11 @@ public enum XisoImageFormat
     /// header beside a <c>&lt;header&gt;.data</c> directory.
     /// </summary>
     God,
+
+    /// <summary>
+    /// A single-file XBLA/XBLIG STFS package (read-only; not a sector image).
+    /// Use <c>StfsSharp.StfsPackage</c> to read it, or <c>XisoReader.Rewrite</c>
+    /// to convert it to an XISO.
+    /// </summary>
+    Stfs,
 }

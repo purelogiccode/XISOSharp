@@ -108,6 +108,13 @@ public sealed class XisoImage : IDisposable, IAsyncDisposable
                 "ZArchive (.zar) files are not sector images; use XisoZarchive.ListZar/ExtractZar/ConvertZarToIso.");
         }
 
+        if (source.Format == XisoImageFormat.Stfs)
+        {
+            throw new NotSupportedException(
+                "STFS packages are not sector images; read or extract them with StfsSharp.StfsPackage, " +
+                "or convert them to an XISO with XisoReader.Rewrite.");
+        }
+
         XisoExplorer explorer = new(path, new XisoExplorerOptions { KeepOpen = true, Share = opts.Share });
         return new XisoImage(path, source, explorer);
     }

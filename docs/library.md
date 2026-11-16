@@ -160,9 +160,10 @@ AuditResult audit = image.Validate();
 | `Ciso` / `SplitCiso` | `.cso`/`.1.cso`, magic sniff fallback | `CisoBlockDevice` |
 | `Cci` / `SplitCci` | `.cci`/`.1.cci`, magic sniff fallback | `CciBlockDevice` |
 | `Zar` | `.zar` | Not a sector image; use `XisoZarchive.ExtractZar`/`ConvertZarToIso` |
+| `Stfs` | XContent/STFS header content (even when misnamed `.iso`) | Not a sector image; use `StfsSharp.StfsPackage` or `XisoReader.Rewrite` to convert to ISO |
 
 `OpenRead`/`OpenBlockDevice` throw `FileNotFoundException`, `InvalidDataException`
-or `NotSupportedException` (ZAR) rather than returning a partially valid view.
+or `NotSupportedException` (ZAR/STFS) rather than returning a partially valid view.
 
 ## XBLA/XBLIG STFS packages
 
@@ -188,7 +189,9 @@ package.ExtractTo(@"C:\games\4D5307E6-extracted", skipExisting: true);
 hash-table interleave, including writable-format packages with primary and
 secondary tables. `XisoChecksum.ComputeStfsChecksum` uses the same sorted-path
 SHA3-256 tree hash as ISO and ZAR, so equivalent trees compare equal. The reader
-is read-only; STFS writing/rebuilding is out of scope. `ExtractTo` has an
+is read-only; STFS writing/rebuilding is out of scope, but
+`XisoReader.Rewrite` converts a package to a new optimized XISO (extract +
+repack) without modifying it. `ExtractTo` has an
 `ExtractNamePolicy` overload for hostile entry names (reject/sanitize/skip), and
 `Validate` verifies the SHA-1 hash tree (per-block hashes, level tables, top
 hash and header hash) and returns a `StfsValidationReport`; package signatures

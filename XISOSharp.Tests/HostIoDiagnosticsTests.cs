@@ -65,6 +65,31 @@ public sealed class HostIoDiagnosticsTests
     }
 
     [Fact]
+    public void FileTooLarge_NamesFat32LimitAndSuggestsExfat()
+    {
+        IOException exception = new("The file size exceeds the limit allowed and cannot be saved.")
+        {
+            HResult = OperatingSystem.IsWindows()
+                ? unchecked((int)0x800700DF)
+                : 27,
+        };
+
+        string message = HostIoDiagnostics.Describe(
+            exception, "writing the decompressed ISO", @"X:\output\Halo 2.iso");
+
+        Assert.Contains("Halo 2.iso", message, StringComparison.Ordinal);
+        Assert.Contains("4 GB", message, StringComparison.Ordinal);
+        Assert.Contains("FAT32", message, StringComparison.Ordinal);
+        Assert.Contains("exFAT", message, StringComparison.Ordinal);
+
+        // Wrapped host errors (the CISO writer adds destination context) still
+        // map through the inner exception.
+        string wrapped = HostIoDiagnostics.Describe(
+            new IOException("writing failed", exception), "writing the decompressed ISO", "Halo 2.iso");
+        Assert.Contains("FAT32", wrapped, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ExtractFileException_UsesActionableDetail()
     {
         string work = Path.Combine(Path.GetTempPath(), $"xiso_io_diag_{Guid.NewGuid():N}");

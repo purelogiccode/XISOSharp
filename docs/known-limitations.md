@@ -15,8 +15,8 @@ Xbox container. This page lists deliberate boundaries and current workarounds.
 
 XISO/XDVDFS, Redump full-disc images, split ISO, CISO/CSO, CCI/CCIM, ZAR,
 read-only GOD/SVOD sector input, GOD and single-file XBLA/XBLIG header title
-metadata, XBLA/XBLIG STFS package listing/extraction and SHA-1 hash-tree
-validation, Xbox 360 XDBF/XSRC title
+metadata, XBLA/XBLIG STFS package listing/extraction, STFS-to-ISO conversion and
+SHA-1 hash-tree validation, Xbox 360 XDBF/XSRC title
 metadata, XBE logo/title/save image extraction, and XBE/XEX **read-only**
 metadata are in scope.
 
@@ -98,7 +98,8 @@ skipping for a recovery run. The OS must still have long paths enabled
   supported for reading and writing but is legacy.
 - In-place `--repair`, `--copy-in`, `--set-filetime`, `-r` (rewrite) and `split`
   refuse compressed, GOD, STFS and split containers; decompress/join/extract
-  first.
+  first. An STFS package can be converted to a new ISO with `convert` or
+  `XisoReader.Rewrite` (extract + repack); only the in-place rewrite is refused.
 
 ## Platforms and support
 

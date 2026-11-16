@@ -193,6 +193,9 @@ public class ExtractRobustnessTests : IDisposable
         Assert.Contains("20000", ex.Message, StringComparison.Ordinal);
         Assert.Contains("sector", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("c.bin", ex.DestPath);
+        // The short read is preserved so consumers can classify the failure as
+        // an I/O/truncation condition rather than an application defect.
+        Assert.IsAssignableFrom<IOException>(ex.InnerException);
         // The partial destination must not survive the failure.
         Assert.False(File.Exists(Path.Combine(dest, "c.bin")));
     }
@@ -302,6 +305,7 @@ public class ExtractRobustnessTests : IDisposable
         Assert.Equal(ExtractError.ErrFileTruncated, ex.ErrorCode);
         Assert.Contains("/c.bin", ex.Message, StringComparison.Ordinal);
         Assert.Contains("20000", ex.Message, StringComparison.Ordinal);
+        Assert.IsAssignableFrom<IOException>(ex.InnerException);
         // CopyOut must remove the partial destination before rethrowing.
         Assert.False(File.Exists(dest));
     }

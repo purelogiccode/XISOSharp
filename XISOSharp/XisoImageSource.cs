@@ -17,9 +17,11 @@ namespace XISOSharp;
 /// CCI container (for example a <c>.old</c> rewrite backup) still opens through
 /// the decompressed view. GOD headers are content-hash file names (or a
 /// <c>.data</c> directory), so they are probed by header content rather than
-/// extension. A plain file with an unknown extension is treated as a raw ISO
-/// candidate; <see cref="XisoReader.VerifyXiso(IBlockDevice, string, int?)"/>
-/// performs the authoritative format check.
+/// extension. Single-file XBLA/XBLIG packages are recognized by their STFS
+/// header even when misnamed <c>.iso</c>. A plain file with an unknown extension
+/// is treated as a raw ISO candidate;
+/// <see cref="XisoReader.VerifyXiso(IBlockDevice, string, int?)"/> performs the
+/// authoritative format check.
 /// </remarks>
 public static class XisoImageSource
 {
@@ -36,11 +38,21 @@ public static class XisoImageSource
         "or the CLI's list/extract/checksum/validate/convert verbs.";
 
     /// <summary>
+    /// Shared message for an STFS package handed to a sector-based API: the
+    /// package is a file table, not a 2048-byte sector image.
+    /// </summary>
+    private const string StfsNotSectorImageMessage =
+        "STFS packages are not sector images; read or extract them with StfsSharp.StfsPackage, " +
+        "or convert them to an XISO with XisoReader.Rewrite or the CLI's convert verb.";
+
+    /// <summary>
     /// Attempts to classify <paramref name="path"/> and read its logical length.
     /// Returns <c>false</c> when the path is empty, a known container header is
     /// invalid, or a split part set has no existing parts. A GOD header (or its
-    /// <c>.data</c> folder) is classified as <see cref="XisoImageFormat.God"/>;
-    /// other plain files classify as <see cref="XisoImageFormat.Iso"/>.
+    /// <c>.data</c> folder) is classified as <see cref="XisoImageFormat.God"/>,
+    /// a single-file XBLA/XBLIG package as <see cref="XisoImageFormat.Stfs"/>
+    /// (even when it is misnamed <c>.iso</c>), and other plain files as
+    /// <see cref="XisoImageFormat.Iso"/>.
     /// </summary>
     /// <param name="path">Image path (single file, GOD header/`.data` folder or first split part).</param>
     /// <param name="info">Detected source metadata, or <c>null</c> on failure.</param>
@@ -52,8 +64,9 @@ public static class XisoImageSource
     /// mode for header probes. Returns <c>false</c> when the path is empty, a
     /// known container header is invalid, or a split part set has no existing
     /// parts. A GOD header (or its <c>.data</c> folder) is classified as
-    /// <see cref="XisoImageFormat.God"/>; other plain files classify as
-    /// <see cref="XisoImageFormat.Iso"/>.
+    /// <see cref="XisoImageFormat.God"/>, a single-file XBLA/XBLIG package as
+    /// <see cref="XisoImageFormat.Stfs"/> (even when it is misnamed <c>.iso</c>),
+    /// and other plain files as <see cref="XisoImageFormat.Iso"/>.
     /// </summary>
     /// <param name="path">Image path (single file, GOD header/`.data` folder or first split part).</param>
     /// <param name="share">File sharing mode used for header probes.</param>
@@ -68,6 +81,12 @@ public static class XisoImageSource
         // paths. The content-type/volume-type check keeps ordinary ISO files
         // with an unrelated .data sibling from being misclassified.
         if (TryDetectGod(path, share, out info)) return true;
+
+        // Single-file XBLA/XBLIG packages are commonly misnamed `.iso` (or have
+        // no extension at all). Detect them by content before the plain-ISO
+        // fallback so callers can route them to the package reader/converter
+        // instead of treating the container bytes as sectors.
+        if (TryDetectStfs(path, out info)) return true;
 
         string extension = Path.GetExtension(path);
 
@@ -195,6 +214,7 @@ public static class XisoImageSource
             XisoImageFormat.Cci or XisoImageFormat.SplitCci =>
                 new BlockDeviceStream(new CciBlockDevice(path, share)),
             XisoImageFormat.God => new BlockDeviceStream(new GodVolumeBlockDevice(path, share)),
+            XisoImageFormat.Stfs => throw new NotSupportedException(StfsNotSectorImageMessage),
             XisoImageFormat.Zar => throw new NotSupportedException(ZarNotSectorImageMessage),
             _ => throw new InvalidDataException($"Unsupported image format for '{path}'."),
         };
@@ -222,6 +242,7 @@ public static class XisoImageSource
             XisoImageFormat.Ciso or XisoImageFormat.SplitCiso => new CisoBlockDevice(path, share),
             XisoImageFormat.Cci or XisoImageFormat.SplitCci => new CciBlockDevice(path, share),
             XisoImageFormat.God => new GodVolumeBlockDevice(path, share),
+            XisoImageFormat.Stfs => throw new NotSupportedException(StfsNotSectorImageMessage),
             XisoImageFormat.Zar => throw new NotSupportedException(ZarNotSectorImageMessage),
             _ => throw new InvalidDataException($"Unsupported image format for '{path}'."),
         };
@@ -317,6 +338,26 @@ public static class XisoImageSource
             volume.Length,
             volume.Parts);
         return true;
+    }
+
+    private static bool TryDetectStfs(string path, out XisoImageSourceInfo? info)
+    {
+        info = null;
+        if (!StfsSharp.StfsPackage.IsStfsPackage(path)) return false;
+
+        try
+        {
+            info = new XisoImageSourceInfo(
+                XisoImageFormat.Stfs,
+                Path.GetFileName(path),
+                new FileInfo(path).Length,
+                [path]);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static bool TryDetectSplitIso(string path, out XisoImageSourceInfo? info)

@@ -1471,8 +1471,9 @@ public static class XisoReader
                 long dataEnd = dataOffset + fileSize;
                 if (dataEnd > imageLength)
                 {
+                    long available = Math.Max(0, imageLength - dataOffset);
                     throw ExtractFileException.ForTruncated(internalPath, filename, startSector, fileSize,
-                        Math.Max(0, imageLength - dataOffset));
+                        available, new TruncatedCopyException(fileSize, available));
                 }
             }
             catch (ExtractFileException)
@@ -1592,10 +1593,10 @@ public static class XisoReader
                             },
                             cancellationToken);
                     }
-                    catch (TruncatedCopyException)
+                    catch (TruncatedCopyException ex)
                     {
                         throw ExtractFileException.ForTruncated(internalPath, filename, startSector, fileSize,
-                            totalSize);
+                            totalSize, ex);
                     }
                     finally
                     {
@@ -1633,7 +1634,10 @@ public static class XisoReader
             }
 
             if (writtenLength != fileSize)
-                throw ExtractFileException.ForTruncated(internalPath, dest, startSector, fileSize, totalSize);
+            {
+                throw ExtractFileException.ForTruncated(internalPath, dest, startSector, fileSize, totalSize,
+                    new TruncatedCopyException(fileSize, writtenLength));
+            }
 
             succeeded = true;
         }
@@ -1709,6 +1713,8 @@ public static class XisoReader
     /// Rewrites (optimizes) an XISO image. The source ISO is renamed to <c>.old</c>
     /// and a new optimized ISO is created in its place.
     /// Always uses <c>llCompat=true</c> to handle linked-list-style directory entries.
+    /// A single-file XBLA/XBLIG STFS package is converted to a new optimized ISO
+    /// instead (extract + repack); the package itself is not renamed or modified.
     /// </summary>
     /// <param name="xisoPath">Path to the XISO file to rewrite, or a <c>.cso</c> image (auto-detected).</param>
     /// <param name="outputPath">Output directory for the rewritten ISO, or <c>null</c> for the current directory.</param>
@@ -1780,6 +1786,101 @@ public static class XisoReader
         DecodeXiso(xisoPath, outputPath, ExtractMode.Rewrite, out outIsoPath, true, cancellationToken,
             outputName, skipSectors, prependSectors, progress, unpackOptions: null,
             preserveAttributes: preserveAttributes, fileTime: fileTime);
+
+    /// <summary>
+    /// Converts a single-file XBLA/XBLIG STFS package to an optimized XISO by
+    /// extracting the package file table to a temporary directory and packing
+    /// that tree with <c>XisoWriter.CreateXiso</c>. The package itself is
+    /// only read; the output is a new ISO named after the package (or
+    /// <paramref name="outputName"/>). In-place rewrite is not supported because
+    /// an STFS package is not a sector image.
+    /// </summary>
+    private static int RewriteStfsPackage(
+        string packagePath,
+        string? outputPath,
+        out string? outIsoPath,
+        CancellationToken cancellationToken,
+        string? outputName,
+        int? skipSectors,
+        int? prependSectors,
+        IProgress<ProgressInfo>? progress,
+        ulong? fileTime)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        outIsoPath = null;
+
+        if (outputPath?.Length == 0)
+            throw new ArgumentException("Output path must not be empty.", nameof(outputPath));
+
+        if (skipSectors is < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(skipSectors), skipSectors.Value,
+                "Skip sectors must be non-negative.");
+        }
+
+        if (skipSectors is > 0)
+        {
+            throw new ArgumentException(
+                "Skip sectors are not supported for STFS packages; the package has no disc-sector layout.",
+                nameof(skipSectors));
+        }
+
+        string fullPackage = Path.GetFullPath(packagePath);
+        string outputDirectory = string.IsNullOrWhiteSpace(outputPath)
+            ? Directory.GetCurrentDirectory()
+            : Path.GetFullPath(outputPath);
+
+        string packageName = Path.GetFileName(packagePath);
+        string packageStem = Path.GetFileNameWithoutExtension(packageName);
+        if (string.IsNullOrEmpty(packageStem)) packageStem = packageName;
+        string defaultName = packageStem + ".iso";
+        string requestedName = string.IsNullOrWhiteSpace(outputName) ? defaultName : outputName;
+        string fullOutput = Path.IsPathRooted(requestedName)
+            ? Path.GetFullPath(requestedName)
+            : Path.GetFullPath(Path.Combine(outputDirectory, requestedName));
+
+        if (XisoPaths.AreSamePath(fullPackage, fullOutput))
+        {
+            throw new IOException(
+                $"Cannot rewrite STFS package '{packagePath}' onto itself; choose a different output folder or name.");
+        }
+
+        string tempDirectory = Path.Combine(Path.GetTempPath(), $"xiso_stfs_{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(tempDirectory);
+            using (StfsSharp.StfsPackage package = StfsSharp.StfsPackage.Open(packagePath, FileShare.ReadWrite))
+            {
+                // Sanitize keeps hostile package names from escaping the temp
+                // directory; the writer then validates the XISO name rules.
+                package.ExtractTo(tempDirectory, StfsSharp.Models.ExtractNamePolicy.Sanitize,
+                    skipExisting: false, progress: null, warning: null, ct: cancellationToken);
+            }
+
+            string finalDirectory = Path.GetDirectoryName(fullOutput) ?? outputDirectory;
+            Directory.CreateDirectory(finalDirectory);
+            return XisoWriter.CreateXiso(tempDirectory, finalDirectory, null, null, out outIsoPath,
+                Path.GetFileName(fullOutput), null, cancellationToken, prependSectors, null, progress,
+                fileTime);
+        }
+        finally
+        {
+            TryDeleteTempDirectory(tempDirectory);
+        }
+    }
+
+    private static void TryDeleteTempDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.LogDebug($"Could not remove temporary STFS conversion directory '{path}': {ex.Message}");
+        }
+    }
 
     /// <summary>
     /// Extracts files from an XISO image to a directory.
@@ -2246,8 +2347,8 @@ public static class XisoReader
 
         if (mode == ExtractMode.Rewrite && StfsSharp.StfsPackage.IsStfsPackage(xisoPath))
         {
-            throw new NotSupportedException(
-                $"Cannot rewrite STFS package '{xisoPath}' in place; extract it first.");
+            return RewriteStfsPackage(xisoPath, outputPath, out outIsoPath, cancellationToken,
+                outputName, skipSectors, prependSectors, progress, fileTime: null);
         }
 
         using Stream fs = OpenImageStream(xisoPath);
@@ -2298,8 +2399,8 @@ public static class XisoReader
 
         if (mode == ExtractMode.Rewrite && StfsSharp.StfsPackage.IsStfsPackage(xisoPath))
         {
-            throw new NotSupportedException(
-                $"Cannot rewrite STFS package '{xisoPath}' in place; extract it first.");
+            return RewriteStfsPackage(xisoPath, outputPath, out outIsoPath, cancellationToken,
+                outputName, skipSectors, prependSectors, progress, fileTime);
         }
 
         using Stream fs = OpenImageStream(xisoPath);
@@ -4355,6 +4456,34 @@ public static class XisoReader
             return;
         }
 
+        // Integrity pre-check, matching the unpack path: an entry whose data
+        // range lies past the end of the image is a truncated/torn image, not
+        // an empty output file. Failing before the destination is created also
+        // keeps drag-and-drop preparation from seeing a partial file.
+        if (entry.FileSize > 0)
+        {
+            try
+            {
+                long imageLength = fs.Length;
+                long dataOffset = ((long)entry.StartSector * Constants.SectorSize) + volInfo.DiscLseek;
+                long dataEnd = dataOffset + entry.FileSize;
+                if (dataEnd > imageLength)
+                {
+                    long available = Math.Max(0, imageLength - dataOffset);
+                    throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
+                        entry.FileSize, available, new TruncatedCopyException(entry.FileSize, available));
+                }
+            }
+            catch (ExtractFileException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is NotSupportedException or IOException or ObjectDisposedException)
+            {
+                // Length unresolvable: fall through to the copy-loop check below.
+            }
+        }
+
         string? destDir = Path.GetDirectoryName(destPath);
         if (!string.IsNullOrEmpty(destDir))
             Directory.CreateDirectory(destDir);
@@ -4423,10 +4552,10 @@ public static class XisoReader
                             Sector: entry.StartSector, Size: copied)),
                         cancellationToken);
                 }
-                catch (TruncatedCopyException)
+                catch (TruncatedCopyException ex)
                 {
                     throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
-                        entry.FileSize, totalRead);
+                        entry.FileSize, totalRead, ex);
                 }
                 finally
                 {
@@ -4434,10 +4563,11 @@ public static class XisoReader
                 }
             }
 
-            if (new FileInfo(destPath).Length != entry.FileSize)
+            long writtenLength = new FileInfo(destPath).Length;
+            if (writtenLength != entry.FileSize)
             {
                 throw ExtractFileException.ForTruncated(internalPath, destPath, entry.StartSector,
-                    entry.FileSize, new FileInfo(destPath).Length);
+                    entry.FileSize, writtenLength, new TruncatedCopyException(entry.FileSize, writtenLength));
             }
 
             succeeded = true;

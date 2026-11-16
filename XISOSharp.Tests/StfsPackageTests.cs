@@ -367,8 +367,12 @@ public sealed class StfsPackageTests : IDisposable
 
         using (LogCapture capture = new())
         {
-            Assert.Equal(1, Program.Main(["convert", packagePath, Path.Combine(work, "out.iso")]));
-            Assert.Contains("STFS", capture.Output, StringComparison.OrdinalIgnoreCase);
+            string converted = Path.Combine(work, "out.iso");
+            Assert.Equal(0, Program.Main(["convert", packagePath, converted]));
+            Assert.True(File.Exists(converted), capture.Output);
+            var audit = XisoReader.AuditXiso(converted);
+            Assert.True(audit.IsValid, string.Join("; ", audit.Issues));
+            Assert.Equal(1, audit.FilesChecked);
         }
 
         using (LogCapture capture = new())
@@ -403,8 +407,9 @@ public sealed class StfsPackageTests : IDisposable
         Assert.Throws<IOException>(() => XisoReader.SetFileTime(packagePath, 0));
         Assert.Throws<NotSupportedException>(() =>
             XisoSplitter.Split(packagePath, Path.Combine(work, "split"), 1024 * 1024));
-        Assert.Throws<NotSupportedException>(() =>
-            XisoReader.Rewrite(packagePath, Path.Combine(work, "rewrite"), out _));
+        string rewriteDirectory = Path.Combine(work, "rewrite");
+        Assert.Equal(0, XisoReader.Rewrite(packagePath, rewriteDirectory, out string? rewritten));
+        Assert.True(File.Exists(rewritten));
     }
 
     [Fact]
