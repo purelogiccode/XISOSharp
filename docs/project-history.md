@@ -268,7 +268,8 @@ items became `BRF-11`…`BRF-13` in the (now retired) missing-feature plan.
 | 2026-11-14 | 2.0.1 verification | 2.0.1 | Suite 2317/1 on net11 and 2239/1 on each of net8/net9/net10; build 0 warnings; InspectCode 0; format and docs links clean; master CI `43550930819` green. |
 | 2026-11-14 | 2.0.1 released | 2.0.1 | Tag `00c5af2`; tag CI `43552996152` green including NuGet publish; NuGet 2.0.1 indexed; release `43552996113` green with six native bundles + SPDX; Docker `43552996227` green; packaging manifests refreshed. |
 | 2026-11-16 | STFS-to-ISO conversion | 2.1.0 | `convert` and `XisoReader.Rewrite` extract an XBLA/XBLIG package's file table and repack it as an optimized XISO; content detection reports `XisoImageFormat.Stfs` (misnamed `.iso` included) and the sector-image APIs refuse it; `HostIoDiagnostics` maps FAT32 `ERROR_FILE_TOO_LARGE`/`EFBIG`; truncated reads preserve the inner `TruncatedCopyException`; create/rewrite summaries report real file/byte totals; conversion tree matches the `Extract-STFS` 1.0.0 reference byte-for-byte. |
-| 2026-11-16 | 2.1.0 verification | 2.1.0 | Suite 2323/1 on net11 and 2245/1 on each of net8/net9/net10; build 0 warnings (SourceLink 11 restricted to net10/net11); InspectCode 0; format and docs links clean; package baseline 2.0.1. |
+| 2026-11-16 | 2.1.0 verification | 2.1.0 | Suite 2323/1 on net11 and 2245/1 on each of net8/net9/net10; build 0 warnings (SourceLink 11 restricted to net10/net11); InspectCode 0; format and docs links clean; package baseline 2.0.1; master CI `43909738364` and release dry run `43909787120` green. |
+| 2026-11-16 | 2.1.0 released | 2.1.0 | Tag `3081e30`; tag CI `43916570501` green including NuGet publish; release `43916570706` green with six native bundles + SPDX; Docker `43916570538` green; packaging manifests refreshed. |
 
 ## Historical handoff (2026-11-07)
 
